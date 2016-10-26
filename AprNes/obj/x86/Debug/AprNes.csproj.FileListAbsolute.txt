@@ -1,0 +1,8 @@
+C:\Users\abraxas\Dropbox\nes_dev2\AprNes\AprNes\bin\Debug\AprNes.exe
+C:\Users\abraxas\Dropbox\nes_dev2\AprNes\AprNes\bin\Debug\AprNes.pdb
+C:\Users\abraxas\Dropbox\nes_dev2\AprNes\AprNes\obj\x86\Debug\AprNes.Properties.Resources.resources
+C:\Users\abraxas\Dropbox\nes_dev2\AprNes\AprNes\obj\x86\Debug\AprNes.csproj.GenerateResource.Cache
+C:\Users\abraxas\Dropbox\nes_dev2\AprNes\AprNes\obj\x86\Debug\AprNes.exe
+C:\Users\abraxas\Dropbox\nes_dev2\AprNes\AprNes\obj\x86\Debug\AprNes.pdb
+C:\Users\abraxas\Dropbox\nes_dev2\AprNes\AprNes\obj\x86\Debug\AprNes.AprNesUI.resources
+C:\Users\abraxas\Dropbox\nes_dev2\AprNes\AprNes\obj\x86\Debug\AprNes.csprojResolveAssemblyReference.cache

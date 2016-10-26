@@ -1,0 +1,54 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ClassDiagram MajorVersion="1" MinorVersion="1">
+  <Class Name="AprNes.AprNesUI" Collapsed="true">
+    <Position X="3.75" Y="1" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAACAAIAAAAACAAAQDAAAYAgAAAGAAIQAAAAA=</HashCode>
+      <FileName>AprNesUI.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="AprNes.NesCore">
+    <Position X="0.5" Y="0.75" Width="1.5" />
+    <Compartments>
+      <Compartment Name="Nested Types" Collapsed="false" />
+    </Compartments>
+    <NestedTypes>
+      <Enum Name="AprNes.NesCore.Flag_Status">
+        <TypeIdentifier>
+          <NewMemberFileName>NesCore\CPU.cs</NewMemberFileName>
+        </TypeIdentifier>
+      </Enum>
+    </NestedTypes>
+    <TypeIdentifier>
+      <HashCode>gBVJJsgXQaU8BkBAJASgXIIAyP8CQAIKAQIAMWMYI0A=</HashCode>
+      <FileName>NesCore\APU.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="AprNes.Program" Collapsed="true">
+    <Position X="3.75" Y="2" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAA=</HashCode>
+      <FileName>Program.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="NativeWIN32API.NativeGDI" Collapsed="true">
+    <Position X="5.5" Y="1" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>ABACAAAAAAAgAgIIAAIBQAIAAAAgQgMASAgACAAYAAA=</HashCode>
+      <FileName>NativeWIN32API.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="AprNes.Properties.Resources" Collapsed="true">
+    <Position X="5.5" Y="2" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAABEAAAAQAAAAAAAAAAAAAAAIA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="AprNes.Properties.Settings" Collapsed="true">
+    <Position X="7.25" Y="2" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAIAAAAAABAAAAAAAAAAAAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Font Name="Microsoft JhengHei" Size="9" />
+</ClassDiagram>
