@@ -23,10 +23,7 @@ namespace AprNes
             }
             else if (address < 0x6000) { } //expansion rom , no support now
             else if (address < 0x8000) { }//sram , no support now
-            else if (address < 0xc000)
-                return PRG_ROM[address - 0x8000]; //RPG-ROM Lower Bank ,only mapper 0 support now
-            else
-                return PRG_ROM[address - 0x8000]; //RPG-ROM Upper Bank ,only mapper 0 support now
+            else return MapperRouterR(address);
 
             return 0;//impossible there
         }
@@ -44,8 +41,7 @@ namespace AprNes
             }
             else if (address < 0x6000) { } //expansion rom , no support now
             else if (address < 0x8000) { } //sram , no support now
-            else if (address < 0xc000) { } //RPG-ROM Lower Bank ,only mapper 0 support now
-            else { }//RPG-ROM Upper Bank,only mapper 0 support now
+            else MapperRouterW(address, value);
         }
     }
 }

@@ -2,13 +2,13 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Windows.Forms;
 using XBRz_speed;
 using NativeWIN32API;
 using System.Diagnostics;
 using System.Threading;
-
-
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
 
 namespace AprNes
 {
@@ -18,10 +18,14 @@ namespace AprNes
         int scanline = 241;
         public int frame_count = 0;
 
+
+        public int ScreenSize = 1;
+
+
         //NES Palette 
         //ref http://www.thealmightyguru.com/Games/Hacking/Wiki/index.php?title=NES_Palette
         //ref  http://www.dev.bowdenweb.com/nes/nes-color-palette.html
-        public uint[] NesColors = new uint[] { 
+        static readonly uint[] NesColors =  { 
             0xFF7C7C7C,0xFF0000FC,0xFF0000BC,0xFF4428BC,0xFF940084,0xFFA80020,0xFFA81000,0xFF881400,
             0xFF503000,0xFF007800,0xFF006800,0xFF005800,0xFF004058,0xFF000000,0xFF000000,0xFF000000,
             0xFFBCBCBC,0xFF0078F8,0xFF0058F8,0xFF6844FC,0xFFD800CC,0xFFE40058,0xFFF83800,0xFFE45C10,
@@ -40,14 +44,8 @@ namespace AprNes
         bool NMIable = false;
 
         //ppu mask 0x2001
-        bool Greyscale = false;//bit 0
-        bool ShowBgLeftMost = false;//bit 1
-        bool ShowSpLeftMost = false;//bit 2
         bool ShowBackGround = false;//bit 3
         bool ShowSprites = false;//bit 4
-        bool EmphasizeRed = false;//bit 5
-        bool EmphasizeGreen = false; //bit 6
-        bool EmphasizeBlue = false; //bit 7
 
         //ppu status 0x2002
         bool isSpriteOverflow = false;//bit 5
@@ -80,29 +78,6 @@ namespace AprNes
         uint[] ScreenBuffer5x = new uint[1280 * 1200];
 
         int scrol_y = 0;
-
-        public byte[] pre_Dec_tiles = new byte[512 * 64]; //共512個tiles , 每個tile由64bytes記錄
-        public void DecodeTiles()
-        {
-            //處理tiles迴圈
-            for (int tile = 0; tile < 512; tile++)
-            {
-                //解碼處理每個tile的線
-                for (int line = 0; line < 8; line++)
-                {
-                    byte low = CHR_ROM[tile * 16 + line];
-                    byte high = CHR_ROM[tile * 16 + line + 8];
-
-                    //解碼每一條線的每個bits計算
-                    for (int k = 0; k < 8; k++)
-                    {
-                        byte mask = (byte)(1 << (7 - k));
-                        byte pixel = (byte)((((high & mask) << 1) + (low & mask)) >> ((7 - k)));
-                        pre_Dec_tiles[64 * tile + line * 8 + k] = pixel;
-                    }
-                }
-            }
-        }
 
         bool NMI_set = false;
         public bool LimitFPS = true;
@@ -201,43 +176,39 @@ namespace AprNes
             ppu_cycles++;
         }
 
-        int[] AttributeLocation = new int[0x400];
-        int[] AttributeShift = new int[0x400];
+
         ushort attrAddr, attrAddrBuf;
-
         ushort tileAddr, tileAddrBuf;
-
         int attr, attrbuf;
-
-        int shift;
         byte low, high;
         ushort lowshift, highshift;
         int current;
         int pixel;
+
+        int vram_addr_limite;
         public void RenderBackGroundLine()
         {
 
             //-----------------------------------------------------------
-            attrAddr = (ushort)(0x23C0 | (vram_addr & 0xC00) | AttributeLocation[vram_addr & 0x3FF]);
-            shift = AttributeShift[vram_addr & 0x3FF];
-            attr = ((ppu_ram[attrAddr] >> shift) & 0x03);
+            vram_addr_limite = vram_addr & 0x3FF;
+            attrAddr = (ushort)(0x23C0 | (vram_addr & 0xC00) | (((vram_addr_limite >> 2) & 0x07) | (((vram_addr_limite >> 4) & 0x38) | 0x3C0)));
+            attr = ((ppu_ram[attrAddr] >> (((vram_addr_limite >> 4) & 0x04) | (vram_addr_limite & 0x02))) & 0x03);
+            tileAddr = (ushort)((vram_addr & 0xc00) | 0x2000 | vram_addr_limite);
 
-            tileAddr = (ushort)((vram_addr & 0xc00) | 0x2000 | (vram_addr & 0x3FF));
-
-            low = CHR_ROM[ppu_ram[tileAddr] * 16 + BgPatternTableAddr + ((scanline + scrol_y) % 8)];
-            high = CHR_ROM[ppu_ram[tileAddr] * 16 + BgPatternTableAddr + 8 + ((scanline + scrol_y) % 8)];
+            low = CHR_ROM[(ppu_ram[tileAddr] << 4) + BgPatternTableAddr + ((scanline + scrol_y) & 7)];
+            high = CHR_ROM[(ppu_ram[tileAddr] << 4) + BgPatternTableAddr + 8 + ((scanline + scrol_y) & 7)];
             lowshift = low;
             highshift = high;
 
             if ((vram_addr & 0x1F) == 0x1F) vram_addr ^= 0x41F; else vram_addr++;
             //-----------------------------------------------------------
-            attrAddrBuf = (ushort)(0x23C0 | (vram_addr & 0xC00) | AttributeLocation[vram_addr & 0x3FF]);
-            shift = AttributeShift[vram_addr & 0x3FF];
-            attrbuf = ((ppu_ram[attrAddrBuf] >> shift) & 0x03);
+            vram_addr_limite = vram_addr & 0x3FF;
+            attrAddrBuf = (ushort)(0x23C0 | (vram_addr & 0xC00) | (((vram_addr_limite >> 2) & 0x07) | (((vram_addr_limite >> 4) & 0x38) | 0x3C0)));
+            attrbuf = ((ppu_ram[attrAddrBuf] >> (((vram_addr_limite >> 4) & 0x04) | (vram_addr_limite & 0x02))) & 0x03);
 
-            tileAddrBuf = (ushort)((vram_addr & 0xc00) | 0x2000 | (vram_addr & 0x3FF));
-            low = CHR_ROM[ppu_ram[tileAddrBuf] * 16 + BgPatternTableAddr + ((scanline + scrol_y) % 8)];
-            high = CHR_ROM[ppu_ram[tileAddrBuf] * 16 + BgPatternTableAddr + 8 + ((scanline + scrol_y) % 8)];
+            tileAddrBuf = (ushort)((vram_addr & 0xc00) | 0x2000 | vram_addr_limite);
+            low = CHR_ROM[(ppu_ram[tileAddrBuf] << 4) + BgPatternTableAddr + ((scanline + scrol_y) & 7)];
+            high = CHR_ROM[(ppu_ram[tileAddrBuf] << 4) + BgPatternTableAddr + 8 + ((scanline + scrol_y) & 7)];
 
             lowshift = (ushort)((lowshift << 8) | low);
             highshift = (ushort)((highshift << 8) | high);
@@ -250,34 +221,33 @@ namespace AprNes
                 {
                     current = 15 - loc - FineX;
 
-                    pixel = Buffer_BG_array[x * 8 + loc][scanline] = ((lowshift >> current) & 1) | (((highshift >> current) & 1) << 1);
+                    pixel = Buffer_BG_array[(x << 3) + loc][scanline] = ((lowshift >> current) & 1) | (((highshift >> current) & 1) << 1);
                     if (current >= 8)
                     {
-                        int pal_offset = (pixel == 0) ? 0x3f00 : 0x3f00 + attr * 4;
-                        Buffer_Screen_array[x * 8 + loc][scanline] = NesColors[ppu_ram[pal_offset + pixel]];
+                        int pal_offset = (pixel == 0) ? 0x3f00 : 0x3f00 + (attr << 2);
+                        Buffer_Screen_array[(x << 3) + loc][scanline] = NesColors[ppu_ram[pal_offset + pixel]];
                     }
                     else
                     {
-                        int pal_offset = (pixel == 0) ? 0x3f00 : 0x3f00 + attrbuf * 4;
-                        Buffer_Screen_array[x * 8 + loc][scanline] = NesColors[ppu_ram[pal_offset + pixel]];
+                        int pal_offset = (pixel == 0) ? 0x3f00 : 0x3f00 + (attrbuf << 2);
+                        Buffer_Screen_array[(x << 3) + loc][scanline] = NesColors[ppu_ram[pal_offset + pixel]];
                     }
                 }
 
                 attr = attrbuf;
 
                 //-----------------------------------------------------------
-                attrAddrBuf = (ushort)(0x23C0 | (vram_addr & 0xC00) | AttributeLocation[vram_addr & 0x3FF]);
-                shift = AttributeShift[vram_addr & 0x3FF];
-                attrbuf = ((ppu_ram[attrAddrBuf] >> shift) & 0x03);
+                vram_addr_limite = vram_addr & 0x3FF;
+                attrAddrBuf = (ushort)(0x23C0 | (vram_addr & 0xC00) | (((vram_addr_limite >> 2) & 0x07) | (((vram_addr_limite >> 4) & 0x38) | 0x3C0)));
+                attrbuf = ((ppu_ram[attrAddrBuf] >> (((vram_addr_limite >> 4) & 0x04) | (vram_addr_limite & 0x02))) & 0x03);
 
-                tileAddrBuf = (ushort)((vram_addr & 0xc00) | 0x2000 | (vram_addr & 0x3FF));
+                tileAddrBuf = (ushort)((vram_addr & 0xc00) | 0x2000 | vram_addr_limite);
 
-                low = CHR_ROM[ppu_ram[tileAddrBuf] * 16 + BgPatternTableAddr + ((scanline + scrol_y) % 8)];
-                high = CHR_ROM[ppu_ram[tileAddrBuf] * 16 + BgPatternTableAddr + 8 + ((scanline + scrol_y) % 8)];
+                low = CHR_ROM[(ppu_ram[tileAddrBuf] << 4) + BgPatternTableAddr + ((scanline + scrol_y) & 7)];
+                high = CHR_ROM[(ppu_ram[tileAddrBuf] << 4) + BgPatternTableAddr + 8 + ((scanline + scrol_y) & 7)];
 
                 lowshift = (ushort)((lowshift << 8) | low);
                 highshift = (ushort)((highshift << 8) | high);
-
                 if ((vram_addr & 0x1F) == 0x1F) vram_addr ^= 0x41F; else vram_addr++;
                 //-----------------------------------------------------------
             }
@@ -285,220 +255,78 @@ namespace AprNes
 
         public void RenderSpritesLine()
         {
-
-            int offset = 0;
-            if (SpPatternTableAddr == 0x1000)
-                offset = 256;
-
-            int spriteCount = 0;
+            int spriteCount = 0, line_t, loc_t, oam_addr = 0, line, tile_th_t, y_loc = 0, offset, mask;
+            byte tile_th;
             for (int oam_th = 63; oam_th >= 0; oam_th--)
             {
-                int y_loc = spr_ram[oam_th * 4] + 1;
-
-                if (!Spritesize8x16)
+                oam_addr = oam_th << 2;
+                y_loc = spr_ram[oam_addr] + 1;
+                if (Spritesize8x16)
                 {
-                    if (scanline >= y_loc && scanline <= (y_loc + 7))
-                    {
-
-                        byte tile_th = spr_ram[oam_th * 4 + 1];
-                        byte sprite_attr = spr_ram[oam_th * 4 + 2];
-                        byte x_loc = spr_ram[oam_th * 4 + 3];
-
-                        int spr_color = sprite_attr & 3;
-
-                        bool priority = ((sprite_attr & 0x20) > 0) ? true : false;
-                        bool flip_x = ((sprite_attr & 0x40) > 0) ? true : false;
-                        bool flip_y = ((sprite_attr & 0x80) > 0) ? true : false;
-
-                        int pal_offset = 0x3f10 + spr_color * 4;
-                        int line = scanline - y_loc;
-                        byte p;
-
-                        for (int loc = 0; loc < 8; loc++)
-                        {
-
-                            if ((x_loc + loc) > 255)
-                                continue;
-
-                            if (!flip_x && !flip_y)
-                            {
-                                p = pre_Dec_tiles[64 * (tile_th + offset) + loc + line * 8];
-
-                                if (oam_th == 0 && !isSprite0hit && p != 0 && Buffer_BG_array[x_loc + loc][scanline] != 0) isSprite0hit = true;
-
-                                if ((p != 0 && !priority) || (p != 0 && priority && Buffer_BG_array[x_loc + loc][scanline] == 0))
-                                    Buffer_Screen_array[x_loc + loc][scanline] = NesColors[ppu_ram[pal_offset + p]];
-                            }
-                            else if (flip_x && !flip_y)
-                            {
-                                p = pre_Dec_tiles[64 * (tile_th + offset) + (7 - loc) + line * 8];
-
-                                if (oam_th == 0 && !isSprite0hit && p != 0 && Buffer_BG_array[x_loc + loc][scanline] != 0) isSprite0hit = true;
-
-                                if ((p != 0 && !priority) || (p != 0 && priority && Buffer_BG_array[x_loc + loc][scanline] == 0))
-                                    Buffer_Screen_array[x_loc + loc][scanline] = NesColors[ppu_ram[pal_offset + p]];
-                            }
-                            else if (!flip_x && flip_y)
-                            {
-                                p = pre_Dec_tiles[64 * (tile_th + offset) + loc + (7 - line) * 8];
-
-                                if (oam_th == 0 && !isSprite0hit && p != 0 && Buffer_BG_array[x_loc + loc][scanline] != 0) isSprite0hit = true;
-
-                                if ((p != 0 && !priority) || (p != 0 && priority && Buffer_BG_array[x_loc + loc][scanline] == 0))
-                                    Buffer_Screen_array[x_loc + loc][scanline] = NesColors[ppu_ram[pal_offset + p]];
-                            }
-                            else
-                            {
-                                p = pre_Dec_tiles[64 * (tile_th + offset) + (7 - loc) + (7 - line) * 8];
-
-                                if (oam_th == 0 && !isSprite0hit && p != 0 && Buffer_BG_array[x_loc + loc][scanline] != 0) isSprite0hit = true;
-
-                                if ((p != 0 && !priority) || (p != 0 && priority && Buffer_BG_array[x_loc + loc][scanline] == 0))
-                                    Buffer_Screen_array[x_loc + loc][scanline] = NesColors[ppu_ram[pal_offset + p]];
-                            }
-                        }
-                        spriteCount++;
-                        if (spriteCount == 9)
-                            isSpriteOverflow = true;
-                    }
-
+                    if (scanline < y_loc || scanline > (y_loc + 15)) continue;
+                    byte byte0 = spr_ram[oam_addr | 1];
+                    tile_th = (byte)((byte0 & 0xfe) >> 0);
+                    if ((byte0 & 1) > 0) offset = 256; else offset = 0;
                 }
                 else
                 {
-                    if (scanline >= y_loc && scanline <= (y_loc + 15))
-                    {
-
-                        byte byte0 = spr_ram[oam_th * 4 + 1];
-
-                        byte tile_th = (byte)((byte0 & 0xfe) >> 0);
-
-                        if ((byte0 & 1) > 0)
-                            offset = 256;
-                        else
-                            offset = 0;
-
-                        byte sprite_attr = spr_ram[oam_th * 4 + 2];
-                        byte x_loc = spr_ram[oam_th * 4 + 3];
-
-                        int spr_color = sprite_attr & 3;
-
-                        bool priority = ((sprite_attr & 0x20) > 0) ? true : false;
-                        bool flip_x = ((sprite_attr & 0x40) > 0) ? true : false;
-                        bool flip_y = ((sprite_attr & 0x80) > 0) ? true : false;
-
-                        int pal_offset = 0x3f10 + spr_color * 4;
-
-                        byte p;
-
-                        if (scanline >= y_loc && scanline <= (y_loc + 7))
-                        {
-                            int line = scanline - y_loc;
-
-                            for (int loc = 0; loc < 8; loc++)
-                            {
-
-                                if ((x_loc + loc) > 255)
-                                    continue;
-
-
-                                if (!flip_x && !flip_y)
-                                {
-                                    p = pre_Dec_tiles[64 * (tile_th + offset) + loc + line * 8];
-
-                                    if (oam_th == 0 && !isSprite0hit && p != 0 && Buffer_BG_array[x_loc + loc][scanline] != 0) isSprite0hit = true;
-                                    if ((p != 0 && !priority) || (p != 0 && priority && Buffer_BG_array[x_loc + loc][scanline] == 0))
-                                        Buffer_Screen_array[x_loc + loc][scanline] = NesColors[ppu_ram[pal_offset + p]];
-                                }
-                                else if (flip_x && !flip_y)
-                                {
-                                    p = pre_Dec_tiles[64 * (tile_th + offset) + (7 - loc) + line * 8];
-                                    if (oam_th == 0 && !isSprite0hit && p != 0 && Buffer_BG_array[x_loc + loc][scanline] != 0) isSprite0hit = true;
-                                    if ((p != 0 && !priority) || (p != 0 && priority && Buffer_BG_array[x_loc + loc][scanline] == 0))
-                                        Buffer_Screen_array[x_loc + loc][scanline] = NesColors[ppu_ram[pal_offset + p]];
-                                }
-                                else if (!flip_x && flip_y)
-                                {
-                                    p = pre_Dec_tiles[64 * (tile_th + offset) + loc + (7 - line) * 8];
-                                    if (oam_th == 0 && !isSprite0hit && p != 0 && Buffer_BG_array[x_loc + loc][scanline] != 0) isSprite0hit = true;
-                                    if ((p != 0 && !priority) || (p != 0 && priority && Buffer_BG_array[x_loc + loc][scanline] == 0))
-                                        Buffer_Screen_array[x_loc + loc][scanline] = NesColors[ppu_ram[pal_offset + p]];
-                                }
-                                else
-                                {
-                                    p = pre_Dec_tiles[64 * (tile_th + offset) + (7 - loc) + (7 - line) * 8];
-                                    if (oam_th == 0 && !isSprite0hit && p != 0 && Buffer_BG_array[x_loc + loc][scanline] != 0) isSprite0hit = true;
-                                    if ((p != 0 && !priority) || (p != 0 && priority && Buffer_BG_array[x_loc + loc][scanline] == 0))
-                                        Buffer_Screen_array[x_loc + loc][scanline] = NesColors[ppu_ram[pal_offset + p]];
-                                }
-                            }
-                        }
-                        else
-                        {
-                            int line = (scanline - y_loc) - 8;
-
-                            for (int loc = 0; loc < 8; loc++)
-                            {
-                                if ((x_loc + loc) > 255)
-                                    continue;
-
-                                if (!flip_x && !flip_y)
-                                {
-                                    p = pre_Dec_tiles[64 * (tile_th + offset + 1) + loc + line * 8];
-                                    if (oam_th == 0 && !isSprite0hit && p != 0 && Buffer_BG_array[x_loc + loc][scanline] != 0) isSprite0hit = true;
-                                    if ((p != 0 && !priority) || (p != 0 && priority && Buffer_BG_array[x_loc + loc][scanline] == 0))
-                                        Buffer_Screen_array[x_loc + loc][scanline] = NesColors[ppu_ram[pal_offset + p]];
-                                }
-                                else if (flip_x && !flip_y)
-                                {
-                                    p = pre_Dec_tiles[64 * (tile_th + offset + 1) + (7 - loc) + line * 8];
-                                    if (oam_th == 0 && !isSprite0hit && p != 0 && Buffer_BG_array[x_loc + loc][scanline] != 0) isSprite0hit = true;
-                                    if ((p != 0 && !priority) || (p != 0 && priority && Buffer_BG_array[x_loc + loc][scanline] == 0))
-                                        Buffer_Screen_array[x_loc + loc][scanline] = NesColors[ppu_ram[pal_offset + p]];
-                                }
-                                else if (!flip_x && flip_y)
-                                {
-                                    p = pre_Dec_tiles[64 * (tile_th + offset + 1) + loc + (7 - line) * 8];
-                                    if (oam_th == 0 && !isSprite0hit && p != 0 && Buffer_BG_array[x_loc + loc][scanline] != 0) isSprite0hit = true;
-                                    if ((p != 0 && !priority) || (p != 0 && priority && Buffer_BG_array[x_loc + loc][scanline] == 0))
-                                        Buffer_Screen_array[x_loc + loc][scanline] = NesColors[ppu_ram[pal_offset + p]];
-                                }
-                                else
-                                {
-                                    p = pre_Dec_tiles[64 * (tile_th + offset + 1) + (7 - loc) + (7 - line) * 8];
-
-                                    if (oam_th == 0 && !isSprite0hit && p != 0 && Buffer_BG_array[x_loc + loc][scanline] != 0) isSprite0hit = true;
-                                    if ((p != 0 && !priority) || (p != 0 && priority && Buffer_BG_array[x_loc + loc][scanline] == 0))
-                                        Buffer_Screen_array[x_loc + loc][scanline] = NesColors[ppu_ram[pal_offset + p]];
-                                }
-                            }
-                        }
-                        spriteCount++;
-                        if (spriteCount == 9)
-                            isSpriteOverflow = true;
-                    }
+                    if (scanline < y_loc || scanline > (y_loc + 7)) continue;
+                    tile_th = spr_ram[oam_addr | 1];
+                    offset = SpPatternTableAddr >> 4;
                 }
+                byte sprite_attr = spr_ram[oam_addr | 2];
+                byte x_loc = spr_ram[oam_addr | 3];
+                bool priority = ((sprite_attr & 0x20) > 0) ? true : false;
+                if (scanline >= y_loc && scanline <= (y_loc + 7))
+                {
+                    tile_th_t = tile_th + offset;
+                    line = scanline - y_loc;
+                }
+                else
+                {
+                    tile_th_t = tile_th + offset + 1;
+                    line = (scanline - y_loc) - 8;
+                }
+                if ((sprite_attr & 0x80) > 0) line_t = (7 - line); else line_t = line;
+                for (int loc = 0; loc < 8; loc++)
+                {
+                    if ((x_loc + loc) > 255) continue;
+                    if ((sprite_attr & 0x40) > 0) loc_t = (7 - loc); else loc_t = loc;
+                    mask = 1 << (7 - loc_t);
+                    pixel = (((CHR_ROM[(tile_th_t << 4) + line_t + 8] & mask) << 1) + (CHR_ROM[(tile_th_t << 4) + line_t] & mask)) >> ((7 - loc_t));
+                    if (oam_th == 0 && !isSprite0hit && pixel != 0 && Buffer_BG_array[x_loc + loc][scanline] != 0) isSprite0hit = true;
+                    if ((pixel != 0 && !priority) || (pixel != 0 && priority && Buffer_BG_array[x_loc + loc][scanline] == 0))
+                        Buffer_Screen_array[x_loc + loc][scanline] = NesColors[ppu_ram[0x3f10 + ((sprite_attr & 3) << 2) + pixel]];
+                }
+                if ((++spriteCount) == 9) isSpriteOverflow = true;
             }
         }
 
+        public bool screen_lock = false;
         public void RenderScreen()
         {
-            //1x spped test
-            /*for (int x = 255; x >= 0; x--)
-                for (int y = 239; y >= 0; y--)
-                    ScreenBuffer1x[y * 256 + x] = Buffer_Screen_array[x][y];*/
 
-            HS_XBRz.ScaleImage2X(Buffer_Screen_array, ScreenBuffer2x, 256, 240);
+            screen_lock = true;
+            switch (ScreenSize)
+            {
+                case 1:
+                    for (int x = 255; x >= 0; x--)
+                        for (int y = 239; y >= 0; y--)
+                            ScreenBuffer1x[(y << 8) + x] = Buffer_Screen_array[x][y];
+                    break;
+                case 2: HS_XBRz.ScaleImage2X(Buffer_Screen_array, ScreenBuffer2x, 256, 240); break;
+                case 3: HS_XBRz.ScaleImage3X(Buffer_Screen_array, ScreenBuffer3x, 256, 240); break;
+                case 4: HS_XBRz.ScaleImage4X(Buffer_Screen_array, ScreenBuffer4x, 256, 240); break;
+                case 5: HS_XBRz.ScaleImage5X(Buffer_Screen_array, ScreenBuffer5x, 256, 240); break;
+            }
             NativeGDI.DrawImageHighSpeedtoDevice();
+            screen_lock = false;
         }
 
         public void UpdateVramRegister()
         {
 
             if ((vram_addr & 0x1F) == 0x1F) vram_addr ^= 0x41F; else vram_addr++;
-
-            //fixed
-            if ((vram_addr & 0x1F) == 0x1F) vram_addr ^= 0x41F; else vram_addr++;
-
             if (ShowBackGround || ShowSprites)
             {
                 if ((vram_addr & 0x7000) == 0x7000)
@@ -515,7 +343,6 @@ namespace AprNes
                 }
                 else
                     vram_addr += 0x1000;
-
                 vram_addr = (ushort)((vram_addr & 0x7BE0) | (vram_addr_temp & 0x41F));
             }
         }
@@ -549,7 +376,7 @@ namespace AprNes
             if ((vram_addr & 0x3F00) == 0x3F00)
             {
                 if ((vram_addr & 3) == 0)
-                    ppu_2007_temp = ppu_ram[vram_addr];
+                    ppu_2007_temp = ppu_ram[vram_addr & 0x3fff]; // !! need check 
                 else
                     ppu_2007_temp = ppu_ram[(vram_addr % 0x3f00) | 0x3f00];
 
@@ -608,14 +435,8 @@ namespace AprNes
 
         public void ppu_w_2001(byte value) //ok
         {
-            Greyscale = ((value & 0x1) > 0) ? true : false;
-            ShowBgLeftMost = ((value & 0x2) > 0) ? true : false;
-            ShowSpLeftMost = ((value & 0x4) > 0) ? true : false;
             ShowBackGround = ((value & 0x8) > 0) ? true : false;
             ShowSprites = ((value & 0x10) > 0) ? true : false;
-            EmphasizeRed = ((value & 0x20) > 0) ? true : false;
-            EmphasizeGreen = ((value & 0x40) > 0) ? true : false;
-            EmphasizeBlue = ((value & 0x80) > 0) ? true : false;
         }
 
         public void ppu_w_2003(byte value) //ok
@@ -632,16 +453,12 @@ namespace AprNes
         {
             if (!vram_latch) //first
             {
-                //t: ....... ...HGFED = d: HGFED...                
                 vram_addr_temp = (ushort)((vram_addr_temp & 0x7fe0) | (((int)value & 0xf8) >> 3));
-
-                //x:              CBA = d: .....CBA
                 FineX = (byte)((int)value & 0x07);
             }
             else
             {
                 scrol_y = value;
-                //t: CBA..HG FED..... = d: HGFEDCBA
                 vram_addr_temp = (ushort)((vram_addr_temp & 0x0C1F) | (((int)value & 0x7) << 12) | (((int)value & 0xF8) << 2));
             }
             vram_latch = !vram_latch;
@@ -651,17 +468,11 @@ namespace AprNes
         {
             if (!vram_latch) //first
             {
-                //t: .FEDCBA ........ = d: ..FEDCBA
                 vram_addr_temp = (ushort)((vram_addr_temp & 0x00FF) | (((int)value & 0x3F) << 8));
-
-                //t: X...... ........ = 0
             }
             else
             {
-                //t: ....... HGFEDCBA = d: HGFEDCBA
                 vram_addr_temp = (ushort)((vram_addr_temp & 0x7F00) | (int)value);
-
-                //v                   = t
                 vram_addr = vram_addr_temp;
             }
             vram_latch = !vram_latch;
@@ -673,8 +484,10 @@ namespace AprNes
 
             if (vram_adder_tmp_access < 0x2000)
             {
-                //Pattern Table 
-                //MessageBox.Show("no support write to Pattern Table !");
+                if (mapper == 2)
+                {
+                    CHR_ROM[vram_adder_tmp_access] = value; 
+                }
             }
             else if (vram_adder_tmp_access < 0x3f00)
             {
@@ -766,5 +579,22 @@ namespace AprNes
             for (int i = 0; i < 256; i++)
                 spr_ram[i] = NES_MEM[start_addr | i];
         }
+
+
+
+        public Bitmap GetScreenFrame()
+        {
+            switch (ScreenSize)
+            {
+                case 1: return new Bitmap(256, 240, 256 * 4, PixelFormat.Format32bppRgb , Marshal.UnsafeAddrOfPinnedArrayElement(ScreenBuffer1x, 0));
+                case 2: return new Bitmap(256 * 2, 240 * 2, 256 * 2 * 4, PixelFormat.Format32bppRgb , Marshal.UnsafeAddrOfPinnedArrayElement(ScreenBuffer2x, 0));
+                case 3: return new Bitmap(256 * 3, 240 * 3, 256 * 3 * 4, PixelFormat.Format32bppRgb, Marshal.UnsafeAddrOfPinnedArrayElement(ScreenBuffer3x, 0));
+                case 4: return new Bitmap(256 * 4, 240 * 4, 256 * 4 * 4, PixelFormat.Format32bppRgb, Marshal.UnsafeAddrOfPinnedArrayElement(ScreenBuffer4x, 0));
+                case 5: return new Bitmap(256 * 5, 240 * 5, 256 * 5 * 4, PixelFormat.Format32bppRgb, Marshal.UnsafeAddrOfPinnedArrayElement(ScreenBuffer5x, 0));
+            }
+            return null;
+        }
+
+
     }
 }

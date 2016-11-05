@@ -15,7 +15,7 @@ namespace AprNes
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new AprNesUI());
+            Application.Run( AprNesUI.GetInstance() );
         }
     }
 }
