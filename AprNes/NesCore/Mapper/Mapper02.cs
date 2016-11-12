@@ -7,19 +7,28 @@ namespace AprNes
 {
     public partial class NesCore
     {
-        public void mapper02write(ushort address, byte value)
+        //unrom ok!
+        void mapper02write_ROM(ushort address, byte value)
         {
-            RPG_Bankselect = value & 7;
-
+            PRG_Bankselect = value & 7;
         }
 
-        public byte mapper02read(ushort address)
+        byte mapper02read_RPG(ushort address)
         {
-
             if (address < 0xc000)
-                return PRG_ROM[(address - 0x8000) + 0x4000 * RPG_Bankselect];//siwtch
+                return PRG_ROM[(address - 0x8000) + (PRG_Bankselect << 14)];//siwtch
             else
-                return PRG_ROM[(address - 0xc000) + 0x4000 * 7]; // fixed 
+                return PRG_ROM[(address - 0xc000) + Rom_offset]; // fixed 
+        }
+
+        byte mapper02read_CHR(int address)
+        {
+            return ppu_ram[address];
+        }
+
+        void mapper02write_CHR(int address, byte value)
+        {
+            ppu_ram[address] = value;
         }
     }
 }

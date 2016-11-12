@@ -12,13 +12,20 @@ namespace AprNes
 {
     public partial class NesCore
     {
-        int mapper;
-        byte PRG_ROM_count, CHR_ROM_count, ROM_Control_1, ROM_Control_2, RAM_banks_count;
-        byte[] PRG_ROM, CHR_ROM;
-        bool Vertical = false, NesHeaderV2 = false, battery = false;
+        byte PRG_ROM_count;
+        byte CHR_ROM_count;
+        byte ROM_Control_1;
+        byte ROM_Control_2;
+        byte RAM_banks_count;
 
-        public string rom_file_name = "";
-        string rom_sav = "";
+        int mapper;
+
+        byte[] PRG_ROM;
+        byte[] CHR_ROM;
+
+        bool Vertical = false;
+        bool NesHeaderV2 = false;
+
         public bool init(Graphics _device, byte[] rom_bytes)
         {
             try
@@ -30,6 +37,7 @@ namespace AprNes
                     MessageBox.Show("Bad Magic Number !");
                     return false;
                 }
+
                 Console.WriteLine("iNes header");
 
                 PRG_ROM_count = rom_bytes[4];
@@ -37,9 +45,13 @@ namespace AprNes
 
                 int PRG_ROM_count_needs = PRG_ROM_count;
                 if (PRG_ROM_count == 1) PRG_ROM_count_needs = 2;//min PRG ROM is 2
+
                 PRG_ROM = new byte[PRG_ROM_count_needs * 16384];
+
                 for (int i = 0; i < PRG_ROM_count * 16384; i++) PRG_ROM[i] = rom_bytes[16 + i];
-                if (PRG_ROM_count == 1) for (int i = 0; i < PRG_ROM_count * 16384; i++) PRG_ROM[i + 16384] = rom_bytes[16 + i]; // if only 1 RPG_ROM ,copy to another space
+
+                if (PRG_ROM_count == 1) // if only 1 RPG_ROM ,copy to another space
+                    for (int i = 0; i < PRG_ROM_count * 16384; i++) PRG_ROM[i + 16384] = rom_bytes[16 + i];
 
                 CHR_ROM_count = rom_bytes[5];
                 Console.WriteLine("CHR-ROM count : " + CHR_ROM_count);
@@ -50,11 +62,8 @@ namespace AprNes
                     for (int i = 0; i < CHR_ROM_count * 8192; i++)
                         CHR_ROM[i] = rom_bytes[PRG_ROM_count * 16384 + 16 + i];
                 }
-                else
-                    CHR_ROM = new byte[8192];
 
                 ROM_Control_1 = rom_bytes[6];
-                ROM_Control_2 = rom_bytes[7];
 
                 if ((ROM_Control_1 & 1) != 0)
                 {
@@ -69,21 +78,42 @@ namespace AprNes
 
                 if ((ROM_Control_1 & 2) != 0)
                 {
-                    battery = true;
                     Console.WriteLine("battery-backed RAM : yes");
+
+                    MessageBox.Show("battery-backed RAM not support");
+                    return false;
                 }
-                else Console.WriteLine("battery-backed RAM : no");
+                else
+                {
+                    Console.WriteLine("battery-backed RAM : no");
+                }
 
-                if ((ROM_Control_1 & 4) != 0) Console.WriteLine("trainer : yes");
-                else Console.WriteLine("trainer : no");
+                if ((ROM_Control_1 & 4) != 0)
+                {
+                    Console.WriteLine("trainer : yes");
+                }
+                else
+                {
+                    Console.WriteLine("trainer : no");
+                }
 
-                if ((ROM_Control_1 & 8) != 0) Console.WriteLine("fourscreen mirroring : yes");
-                else Console.WriteLine("fourscreen mirroring : no");
+                if ((ROM_Control_1 & 8) != 0)
+                {
+                    Console.WriteLine("fourscreen mirroring : yes");
+                }
+                else
+                {
+                    Console.WriteLine("fourscreen mirroring : no");
+                }
 
                 // https://wiki.nesdev.com/w/index.php/NES_2.0
+
+                ROM_Control_2 = rom_bytes[7];
+
                 if ((ROM_Control_2 & 0xf) != 0)
                 {
                     mapper = (ROM_Control_1 & 0xf0) >> 4;
+
                     if ((ROM_Control_2 & 0xc) == 8)
                     {
                         NesHeaderV2 = true;
@@ -96,23 +126,32 @@ namespace AprNes
                         Console.WriteLine("Old style Mapper info !");
                     }
                 }
-                else mapper = (byte)(((ROM_Control_1 & 0xf0) >> 4) | (ROM_Control_2 & 0xf0));
+                else
+                    mapper = (byte)(((ROM_Control_1 & 0xf0) >> 4) | (ROM_Control_2 & 0xf0));
+
                 Console.WriteLine("Mapper number : " + mapper);
+
+
                 bool mapper_pass = false;
-                foreach (int i in Mapper_Allow) if (i == mapper) mapper_pass = true;
+
+                foreach (int i in Mapper_Allow)
+                    if (i == mapper) mapper_pass = true;
 
                 if (!mapper_pass)
                 {
                     MessageBox.Show("not support mapper !");
                     return false;
                 }
+
                 if (NesHeaderV2)
                 {
                     RAM_banks_count = rom_bytes[8];
                     Console.WriteLine("RAM banks count : " + RAM_banks_count);
                 }
+
                 for (int i = 0; i < 65535; i++) NES_MEM[i] = 0;
                 for (int i = 0; i < 16384; i++) ppu_ram[i] = 0;
+
                 for (int i = 0; i < 256; i++)
                 {
                     Buffer_Screen_array[i] = new uint[240];
@@ -120,25 +159,11 @@ namespace AprNes
                 }
 
                 //for mapper value init region 
-                if (mapper == 1) PRG_Bankselect = PRG_ROM_count - 2;
-                if (mapper == 2) Rom_offset = (PRG_ROM_count - 1) * 0x4000;
-
-                //init sram
-                if (battery == true)
-                {
-                    rom_sav = rom_file_name + ".sav";
-                    if (File.Exists(rom_sav))
-                    {
-                        byte[] sav_bytes = File.ReadAllBytes(rom_sav);
-                        for (int i = 0; i < 0x2000; i++) NES_MEM[i + 0x6000] = sav_bytes[i]; //copy to ram
-                    }
-                    else File.WriteAllBytes(rom_sav, new byte[0x2000]);
-                }
+                if (mapper == 1)
+                    PRG_Bankselect = PRG_ROM_count - 2;
 
                 //init cpu pc
                 r_PC = (ushort)(Mem_r(0xfffc) | Mem_r(0xfffd) << 8);
-
-                Console.WriteLine(r_PC.ToString("x4"));
 
                 //bind graphic device
                 switch (ScreenSize)
@@ -149,10 +174,14 @@ namespace AprNes
                     case 4: NativeGDI.initHighSpeed(_device, 1024, 960, ScreenBuffer4x, 0, 0); break;
                     case 5: NativeGDI.initHighSpeed(_device, 1280, 1200, ScreenBuffer5x, 0, 0); break;
                 }
-                
-               /* if (File.Exists(@"c:\log\log.txt")) File.Delete(@"c:\log\log.txt");
-                if (!Directory.Exists(@"c:\log")) Directory.CreateDirectory((@"c:\log"));
+
+                //for debug
+                /*if (File.Exists(@"c:\log\log.txt"))
+                    File.Delete(@"c:\log\log.txt");
+                if (!Directory.Exists(@"c:\log"))
+                    Directory.CreateDirectory((@"c:\log"));
                 StepsLog = File.AppendText(@"c:\log\log.txt");*/
+
                 HS_XBRz.initTable();
             }
             catch (Exception e)
@@ -162,13 +191,7 @@ namespace AprNes
             }
             return true;
         }
-        public void SaveRam()
-        {
-            if (!battery) return;
-            byte[] sav_bytes = new byte[0x2000];
-            for (int i = 0; i < 0x2000; i++) sav_bytes[i] = NES_MEM[i + 0x6000]; //copy from ram
-            File.WriteAllBytes(rom_sav, sav_bytes);
-        }
+
         public void run()
         {
             StopWatch.Restart();
@@ -176,17 +199,18 @@ namespace AprNes
             {
                 cpu_step();
                 for (int i = 0; i < cpu_cycles * 3; i++) ppu_step();
-               // debug();
+                //debug();
                 if (exit) break;
             }
         }
-        
-        /*StreamWriter StepsLog;
+
+        /*
+        StreamWriter StepsLog;
         int scount = 0;
         public void debug()
         {
             StepsLog.WriteLine(cpu_cycles.ToString("x2") + " " + opcode.ToString("x2") + " " + r_PC.ToString("x4") + " " + r_A.ToString("x2") + " " + r_X.ToString("x2") + " " + r_Y.ToString("x2") + " " + r_SP.ToString("x2") + " " + scanline + " " + ppu_cycles.ToString("x2"));
-            if (scount == 100000)
+            if (scount == 300000)
             {
                 StepsLog.Flush();
                 StepsLog.Close();
@@ -195,5 +219,6 @@ namespace AprNes
             }
             scount++;
         }*/
+
     }
 }

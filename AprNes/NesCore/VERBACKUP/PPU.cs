@@ -39,14 +39,18 @@ namespace AprNes
         //ppu status 0x2002
         bool isSpriteOverflow = false, isSprite0hit = false, isVblank = false;
 
-        int vram_addr_internal = 0, vram_addr_tmp = 0, addr_range, vram_addr = 0, scrol_y = 0, FineX = 0;
+        int vram_addr_temp = 0, vram_addr = 0, scrol_y = 0;
         bool vram_latch = false;
-        byte spr_ram_add = 0, ppu_2007_buffer = 0, ppu_2007_temp = 0;
+        byte FineX = 0, spr_ram_add = 0, ppu_2007_buffer = 0, ppu_2007_temp = 0;
+
+        int vram_adder_tmp_access = 0;
 
         byte[] spr_ram = new byte[256];
         byte[] ppu_ram = new byte[0x4000];
+
         uint[][] Buffer_Screen_array = new uint[256][];
         int[][] Buffer_BG_array = new int[256][];
+
         uint[] ScreenBuffer1x = new uint[256 * 240];
         uint[] ScreenBuffer2x = new uint[512 * 480];
         uint[] ScreenBuffer3x = new uint[768 * 720];
@@ -65,20 +69,19 @@ namespace AprNes
                     if (ShowSprites) RenderSpritesLine();
                 }
                 else if (ppu_cycles == 256 && ShowBackGround) UpdateVramRegister();
-
             }
             else if (scanline == 240 && ppu_cycles == 1)
             {
                 if (!SuppressVbl) isVblank = true;
                 if (NMIable && !SuppressNmi) NMI_set = true;
                 RenderScreen();
-                if (LimitFPS) while (StopWatch.Elapsed.TotalSeconds < 0.01666) Thread.Sleep(1);//0.0167
+                if (LimitFPS) while (StopWatch.Elapsed.TotalSeconds < 0.01665) Thread.Sleep(0);  //0.0167
                 StopWatch.Restart();
                 frame_count++;
             }
             else if (scanline == 260)
             {
-                if (ppu_cycles == 1) isVblank = false;// Clear VBlank flag
+                if (ppu_cycles == 1) isVblank = false; // Clear VBlank flag
                 else if (ppu_cycles == 341)
                 {
                     scanline = -1;
@@ -86,12 +89,8 @@ namespace AprNes
                     return;
                 }
             }
-            else if (scanline == -1)
-            {
-                if (ppu_cycles == 1) isSprite0hit = isSpriteOverflow = false;
-                else if (ppu_cycles == 304 && (ShowBackGround || ShowSprites)) vram_addr = vram_addr_internal;
-            }
-
+            else if (ppu_cycles == 1) isSprite0hit = isSpriteOverflow = false;
+            else if (ppu_cycles == 304 && (ShowBackGround || ShowSprites)) vram_addr = vram_addr_temp;
             if (ppu_cycles == 341)
             {
                 ppu_cycles = 0;
@@ -127,8 +126,10 @@ namespace AprNes
                 {
                     current = 15 - loc - FineX;
                     pixel = Buffer_BG_array[(x << 3) + loc][scanline] = ((lowshift >> current) & 1) | (((highshift >> current) & 1) << 1);
-                    if (current >= 8) Buffer_Screen_array[(x << 3) + loc][scanline] = NesColors[ppu_ram[((pixel == 0) ? 0x3f00 : 0x3f00 + (attr << 2)) | pixel]];
-                    else Buffer_Screen_array[(x << 3) + loc][scanline] = NesColors[ppu_ram[((pixel == 0) ? 0x3f00 : 0x3f00 + (attrbuf << 2)) | pixel]];
+                    if (current >= 8)
+                        Buffer_Screen_array[(x << 3) + loc][scanline] = NesColors[ppu_ram[((pixel == 0) ? 0x3f00 : 0x3f00 + (attr << 2)) | pixel]];
+                    else
+                        Buffer_Screen_array[(x << 3) + loc][scanline] = NesColors[ppu_ram[((pixel == 0) ? 0x3f00 : 0x3f00 + (attrbuf << 2)) | pixel]];
                 }
                 attr = attrbuf;
                 //-----------------------------------------------------------
@@ -149,6 +150,8 @@ namespace AprNes
             bool flip_x = false;
             for (int oam_th = 63; oam_th >= 0; oam_th--)
             {
+
+                //--
                 oam_addr = oam_th << 2;
                 y_loc = spr_ram[oam_addr] + 1;
                 if (Spritesize8x16)
@@ -189,9 +192,11 @@ namespace AprNes
                     pixel = (((tile_hbyte & mask) << 1) + (tile_lbyte & mask)) >> ((7 - loc_t));
                     if (oam_th == 0 && !isSprite0hit && pixel != 0 && Buffer_BG_array[x_loc + loc][scanline] != 0) isSprite0hit = true;
                     if ((pixel != 0 && !priority) || (pixel != 0 && priority && Buffer_BG_array[x_loc + loc][scanline] == 0))
-                        Buffer_Screen_array[x_loc + loc][scanline] = NesColors[ppu_ram[0x3f10 + ((sprite_attr & 3) << 2) | pixel] & 0x3f];// &0x3f to limite  <= 0~63 color
+                        Buffer_Screen_array[x_loc + loc][scanline] = NesColors[ppu_ram[0x3f10 + ((sprite_attr & 3) << 2) | pixel]];
                 }
                 if ((++spriteCount) == 9) isSpriteOverflow = true;
+                //--
+
             }
         }
 
@@ -224,6 +229,7 @@ namespace AprNes
                 {
                     int tmp = vram_addr & 0x3E0;
                     vram_addr &= 0xFFF;
+
                     switch (tmp)
                     {
                         case 0x3A0: vram_addr ^= 0xBA0; break;
@@ -233,7 +239,7 @@ namespace AprNes
                 }
                 else
                     vram_addr += 0x1000;
-                vram_addr = (vram_addr & 0x7BE0) | (vram_addr_internal & 0x41F);
+                vram_addr = (ushort)((vram_addr & 0x7BE0) | (vram_addr_temp & 0x41F));
             }
         }
 
@@ -263,21 +269,21 @@ namespace AprNes
             {
                 if ((vram_addr & 3) == 0) ppu_2007_temp = ppu_ram[vram_addr & 0x3fff]; // !! need check 
                 else ppu_2007_temp = ppu_ram[(vram_addr % 0x3f00) | 0x3f00];
-                vram_addr_tmp = vram_addr & 0x2FFF;
-                if (vram_addr_tmp < 0x2000) ppu_2007_buffer = MapperRouterR_CHR(vram_addr_tmp);
-                else ppu_2007_buffer = ppu_ram[vram_addr_tmp];
+                vram_adder_tmp_access = vram_addr & 0x2FFF;
+                if (vram_adder_tmp_access < 0x2000) ppu_2007_buffer = MapperRouterR_CHR(vram_adder_tmp_access);
+                else ppu_2007_buffer = ppu_ram[vram_adder_tmp_access];
             }
             else
             {
                 ppu_2007_temp = ppu_2007_buffer; //need read from buffer
-                vram_addr_tmp = vram_addr & 0x3FFF;
-                if (vram_addr_tmp < 0x2000) ppu_2007_buffer = MapperRouterR_CHR(vram_addr_tmp);//Pattern Table 
-                else if (vram_addr_tmp < 0x3F00) ppu_2007_buffer = ppu_ram[vram_addr_tmp]; //Name Table & Attribute Table
+                vram_adder_tmp_access = vram_addr & 0x3FFF;
+                if (vram_adder_tmp_access < 0x2000) ppu_2007_buffer = MapperRouterR_CHR(vram_adder_tmp_access);//Pattern Table 
+                else if (vram_adder_tmp_access < 0x3F00) ppu_2007_buffer = ppu_ram[vram_adder_tmp_access]; //Name Table & Attribute Table
                 else//Sprite Palette & Image Palette
                 {
-                    vram_addr = (vram_addr + VramaddrIncrement) & 0x7FFF;
-                    if ((vram_addr_tmp & 3) == 0) return ppu_ram[0x3F00];
-                    else return ppu_ram[(vram_addr_tmp % 0x3f00) | 0x3f00];
+                    vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x7FFF);
+                    if ((vram_adder_tmp_access & 3) == 0) return ppu_ram[0x3F00];
+                    else return ppu_ram[(vram_adder_tmp_access % 0x3f00) | 0x3f00];
                 }
             }
             vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x7FFF);
@@ -287,7 +293,7 @@ namespace AprNes
         void ppu_w_2000(byte value) //ok
         {
             // t: ...BA.. ........ = d: ......BA
-            vram_addr_internal = (ushort)((vram_addr_internal & 0x73ff) | ((value & 3) << 10)); // 0xx73ff
+            vram_addr_temp = (ushort)((vram_addr_temp & 0x73ff) | ((value & 3) << 10)); // 0xx73ff
             BaseNameTableAddr = 0x2000 | ((value & 3) << 10);
             VramaddrIncrement = ((value & 4) > 0) ? 32 : 1;
             SpPatternTableAddr = ((value & 8) > 0) ? 0x1000 : 0;
@@ -314,15 +320,15 @@ namespace AprNes
 
         void ppu_w_2005(byte value) //ok
         {
-            if (vram_latch)
+            if (!vram_latch) //first
             {
-                scrol_y = value;
-                vram_addr_internal = (vram_addr_internal & 0x0C1F) | ((value & 0x7) << 12) | ((value & 0xF8) << 2);
+                vram_addr_temp = (ushort)((vram_addr_temp & 0x7fe0) | (((int)value & 0xf8) >> 3));
+                FineX = (byte)((int)value & 0x07);
             }
             else
-            {//first
-                vram_addr_internal = (vram_addr_internal & 0x7fe0) | ((value & 0xf8) >> 3);
-                FineX = value & 0x07;
+            {
+                scrol_y = value;
+                vram_addr_temp = (ushort)((vram_addr_temp & 0x0C1F) | (((int)value & 0x7) << 12) | (((int)value & 0xF8) << 2));
             }
             vram_latch = !vram_latch;
         }
@@ -330,39 +336,52 @@ namespace AprNes
         void ppu_w_2006(byte value)//ok
         {
             if (!vram_latch) //first
-                vram_addr_internal = (vram_addr_internal & 0x00FF) | ((value & 0x3F) << 8);
+                vram_addr_temp = (ushort)((vram_addr_temp & 0x00FF) | (((int)value & 0x3F) << 8));
             else
             {
-                vram_addr_internal = (vram_addr_internal & 0x7F00) | value;
-                vram_addr = vram_addr_internal;
+                vram_addr_temp = (ushort)((vram_addr_temp & 0x7F00) | (int)value);
+                vram_addr = vram_addr_temp;
             }
             vram_latch = !vram_latch;
         }
 
         void ppu_w_2007(byte value)
         {
-            vram_addr_tmp = vram_addr & 0x3FFF;
-            if (vram_addr_tmp < 0x2000) MapperRouterW_CHR(vram_addr_tmp, value);
-            else if (vram_addr_tmp < 0x3f00) //Name Table & Attribute Table
+            vram_adder_tmp_access = vram_addr & 0x3FFF;
+            if (vram_adder_tmp_access < 0x2000)
             {
-                addr_range = vram_addr_tmp & 0xc00;
+                MapperRouterW_CHR(vram_adder_tmp_access, value);
+            }
+            else if (vram_adder_tmp_access < 0x3f00)
+            {
+                //Name Table & Attribute Table
+                int range = vram_adder_tmp_access & 0xc00;
                 if (Vertical)
                 {
-                    if (addr_range < 0x800) ppu_ram[vram_addr_tmp] = ppu_ram[vram_addr_tmp | 0x800] = value;
-                    else ppu_ram[vram_addr_tmp] = ppu_ram[vram_addr_tmp & 0x37ff] = value;
+                    if (range < 0x800)
+                        ppu_ram[vram_adder_tmp_access] = ppu_ram[vram_adder_tmp_access | 0x800] = value;
+                    else
+                        ppu_ram[vram_adder_tmp_access] = ppu_ram[vram_adder_tmp_access & 0x37ff] = value;
                 }
                 else
                 {
-                    if (addr_range < 0x400) ppu_ram[vram_addr_tmp] = ppu_ram[vram_addr_tmp | 0x400] = value;
-                    else if (addr_range < 0x800) ppu_ram[vram_addr_tmp] = ppu_ram[vram_addr_tmp & 0x3bff] = value;
-                    else if (addr_range < 0xc00) ppu_ram[vram_addr_tmp] = ppu_ram[vram_addr_tmp | 0x400] = value;
-                    else ppu_ram[vram_addr_tmp] = ppu_ram[vram_addr_tmp & 0x3bff] = value;
+                    if (range < 0x400)
+                        ppu_ram[vram_adder_tmp_access] = ppu_ram[vram_adder_tmp_access | 0x400] = value;
+                    else if (range < 0x800)
+                        ppu_ram[vram_adder_tmp_access] = ppu_ram[vram_adder_tmp_access & 0x3bff] = value;
+                    else if (range < 0xc00)
+                        ppu_ram[vram_adder_tmp_access] = ppu_ram[vram_adder_tmp_access | 0x400] = value;
+                    else
+                        ppu_ram[vram_adder_tmp_access] = ppu_ram[vram_adder_tmp_access & 0x3bff] = value;
                 }
             }
-            else //Sprite Palette & Image Palette
+            else
             {
-                if ((vram_addr_tmp & 3) == 0) ppu_ram[vram_addr_tmp | 0x10] = ppu_ram[vram_addr_tmp & 0x3FEF] = value; //mirror 3f00 = 3f10 , 3f04 = 3f14 , 3f08 = 3f18 , 3f0c = 3f1c
-                else ppu_ram[(vram_addr_tmp % 0x3f00) + 0x3f00] = value;
+                //Sprite Palette & Image Palette
+                if ((vram_adder_tmp_access & 3) == 0) //mirror 3f00 = 3f10 , 3f04 = 3f14 , 3f08 = 3f18 , 3f0c = 3f1c
+                    ppu_ram[vram_adder_tmp_access | 0x10] = ppu_ram[vram_adder_tmp_access & 0x3FEF] = value;
+                else
+                    ppu_ram[(vram_adder_tmp_access % 0x3f00) + 0x3f00] = value;
             }
             vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x7FFF);
         }

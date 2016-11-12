@@ -7,11 +7,15 @@ namespace AprNes
 {
     public partial class NesCore
     {
-        //do nothing about write
-
-        public byte mapper00read(ushort address)
+        //nrom ok!
+        byte mapper00read_RPG(ushort address)
         {
             return PRG_ROM[address - 0x8000];
+        }
+
+        byte mapper00read_CHR(int address)
+        {
+            return CHR_ROM[address];
         }
     }
 }

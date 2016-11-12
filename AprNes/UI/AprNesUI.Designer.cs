@@ -37,6 +37,7 @@
             this.UIReset = new System.Windows.Forms.Label();
             this.UIConfig = new System.Windows.Forms.Label();
             this.UIAbout = new System.Windows.Forms.LinkLabel();
+            this.RomInf = new System.Windows.Forms.LinkLabel();
             this.SuspendLayout();
             // 
             // panel1
@@ -114,23 +115,36 @@
             // 
             // UIAbout
             // 
-            this.UIAbout.AutoSize = true;
             this.UIAbout.Font = new System.Drawing.Font("Microsoft JhengHei", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
             this.UIAbout.LinkColor = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(64)))), ((int)(((byte)(64)))));
-            this.UIAbout.Location = new System.Drawing.Point(5, 277);
+            this.UIAbout.Location = new System.Drawing.Point(201, 277);
             this.UIAbout.Name = "UIAbout";
-            this.UIAbout.Size = new System.Drawing.Size(40, 15);
+            this.UIAbout.Size = new System.Drawing.Size(60, 15);
             this.UIAbout.TabIndex = 17;
             this.UIAbout.TabStop = true;
             this.UIAbout.Text = "About";
+            this.UIAbout.TextAlign = System.Drawing.ContentAlignment.TopRight;
             this.UIAbout.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.linkLabel1_LinkClicked);
+            // 
+            // RomInf
+            // 
+            this.RomInf.Font = new System.Drawing.Font("Microsoft JhengHei", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
+            this.RomInf.LinkColor = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(64)))), ((int)(((byte)(64)))));
+            this.RomInf.Location = new System.Drawing.Point(5, 277);
+            this.RomInf.Name = "RomInf";
+            this.RomInf.Size = new System.Drawing.Size(60, 15);
+            this.RomInf.TabIndex = 18;
+            this.RomInf.TabStop = true;
+            this.RomInf.Text = "Rom Info";
+            this.RomInf.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.RomInf_LinkClicked);
             // 
             // AprNesUI
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 12F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Zoom;
-            this.ClientSize = new System.Drawing.Size(266, 292);
+            this.ClientSize = new System.Drawing.Size(266, 294);
+            this.Controls.Add(this.RomInf);
             this.Controls.Add(this.UIAbout);
             this.Controls.Add(this.UIConfig);
             this.Controls.Add(this.UIReset);
@@ -148,7 +162,6 @@
             this.Shown += new System.EventHandler(this.AprNesUI_Shown);
             this.KeyUp += new System.Windows.Forms.KeyEventHandler(this.AprNesUI_KeyUp);
             this.ResumeLayout(false);
-            this.PerformLayout();
 
         }
 
@@ -161,6 +174,7 @@
         private System.Windows.Forms.Label UIReset;
         private System.Windows.Forms.Label UIConfig;
         private System.Windows.Forms.LinkLabel UIAbout;
+        private System.Windows.Forms.LinkLabel RomInf;
     }
 }
 

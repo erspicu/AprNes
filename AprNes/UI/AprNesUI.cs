@@ -10,6 +10,7 @@ using System.IO;
 using System.Diagnostics;
 using System.Threading;
 using SharpDX.DirectInput;
+using UnzipTool;
 using AprNes;
 using LangTool;
 
@@ -23,7 +24,6 @@ namespace AprNes
 
         Dictionary<int, KeyMap> NES_KeyMAP = new Dictionary<int, KeyMap>();
         public Dictionary<string, KeyMap> NES_KeyMAP_joypad = new Dictionary<string, KeyMap>();
-
 
         public AprNesUI()
         {
@@ -62,40 +62,45 @@ namespace AprNes
                     panel1.Width = 256;
                     panel1.Height = 240;
                     this.Width = 272;
-                    this.Height = 320;
-                    UIAbout.Location = new Point(5, 277);
+                    this.Height = 322;
+                    UIAbout.Location = new Point(201, 277);
+                    RomInf.Location = new Point(5, 277);
                     break;
 
                 case 2:
                     panel1.Width = 256 * 2;
                     panel1.Height = 240 * 2;
                     this.Width = 272 + 256;
-                    this.Height = 320 + 240;
-                    UIAbout.Location = new Point(5, 277 + 240);
+                    this.Height = 322 + 240;
+                    UIAbout.Location = new Point(201 + 256, 277 + 240);
+                    RomInf.Location = new Point(5, 277 + 240);
                     break;
 
                 case 3:
                     panel1.Width = 256 * 3;
                     panel1.Height = 240 * 3;
                     this.Width = 272 + 256 * 2;
-                    this.Height = 320 + 240 * 2;
-                    UIAbout.Location = new Point(5, 277 + 240 * 2);
+                    this.Height = 322 + 240 * 2;
+                    UIAbout.Location = new Point(201 + 256 * 2, 277 + 240 * 2);
+                    RomInf.Location = new Point(5, 277 + 240 * 2);
                     break;
 
                 case 4:
                     panel1.Width = 256 * 4;
                     panel1.Height = 240 * 4;
                     this.Width = 272 + 256 * 3;
-                    this.Height = 320 + 240 * 3;
-                    UIAbout.Location = new Point(5, 277 + 240 * 3);
+                    this.Height = 322 + 240 * 3;
+                    UIAbout.Location = new Point(201 + 256 * 3, 277 + 240 * 3);
+                    RomInf.Location = new Point(5, 277 + 240 * 3);
                     break;
 
                 case 5:
                     panel1.Width = 256 * 5;
                     panel1.Height = 240 * 5;
                     this.Width = 272 + 256 * 4;
-                    this.Height = 320 + 240 * 4;
-                    UIAbout.Location = new Point(5, 277 + 240 * 4);
+                    this.Height = 322 + 240 * 4;
+                    UIAbout.Location = new Point(201 + 256 * 4, 277 + 240 * 4);
+                    RomInf.Location = new Point(5, 277 + 240 * 4);
                     break;
             }
         }
@@ -205,8 +210,6 @@ namespace AprNes
             NES_KeyMAP_joypad[joypad_LEFT] = KeyMap.NES_btn_LEFT;
             NES_KeyMAP_joypad[joypad_RIGHT] = KeyMap.NES_btn_RIGHT;
 
-
-
             NES_KeyMAP.Clear();
             NES_KeyMAP[key_A] = KeyMap.NES_btn_A;
             NES_KeyMAP[key_B] = KeyMap.NES_btn_B;
@@ -306,7 +309,7 @@ namespace AprNes
             }
             public void start()
             {
-                int press_key = 0;
+
                 while (true)
                 {
                     Thread.Sleep(10);
@@ -427,21 +430,151 @@ namespace AprNes
 
         List<Guid> joypads = new List<Guid>();
 
-
-
         //-------------------------------------------------------
 
         Thread nes_t = null;
         public NesCore nes_obj = null;
         bool running = false;
         public string rom_file = "";
+        public byte[] rom_bytes;
+
+        public static byte[] ReadFully(Stream input) //copy from http://stackoverflow.com/questions/221925/creating-a-byte-array-from-a-stream
+        {
+            byte[] buffer = new byte[16 * 1024];
+            using (MemoryStream ms = new MemoryStream())
+            {
+                int read;
+                while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    ms.Write(buffer, 0, read);
+                }
+                return ms.ToArray();
+            }
+        }
+
+        public enum MapperName
+        {
+            NROM = 0,
+            MMC1 = 1,
+            UNROM = 2,
+            CNROM = 3,
+            MMC3 = 4
+        }
+
+
+        public string GetRomInfo()
+        {
+            try
+            {
+
+                string info = "";
+                if (rom_bytes == null || rom_bytes.Count() == 0)
+                    return "No load Rom !";
+
+                if (!(rom_bytes[0] == 'N' && rom_bytes[1] == 'E' && rom_bytes[2] == 'S' && rom_bytes[3] == 0x1a))
+                    return "Bad Magic Number ! (maybe no intro header ?)";
+
+                info = "iNes Header\r\n";
+
+                byte PRG_ROM_count = rom_bytes[4];
+                info += "PRG-ROM count : " + PRG_ROM_count + "\r\n";
+
+                byte CHR_ROM_count = rom_bytes[5];
+                info += "CHR-ROM count : " + CHR_ROM_count + "\r\n";
+
+                byte ROM_Control_1 = rom_bytes[6];
+
+                if ((ROM_Control_1 & 1) != 0)
+                    info += "vertical mirroring\r\n";
+                else
+                    info += "horizontal mirroring\r\n";
+
+                if ((ROM_Control_1 & 2) != 0)
+                    info += "battery-backed RAM : yes\r\n";
+                else
+                    info += "battery-backed RAM : no\r\n";
+
+                if ((ROM_Control_1 & 4) != 0)
+                    info += "trainer : yes\r\n";
+                else
+                    info += "trainer : no\r\n";
+
+                if ((ROM_Control_1 & 8) != 0)
+                    info += "fourscreen mirroring : yes\r\n";
+                else
+                    info += "fourscreen mirroring : no\r\n";
+
+                byte ROM_Control_2 = rom_bytes[7];
+                int mapper;
+                bool v2 = false;
+                if ((ROM_Control_2 & 0xf) != 0)
+                {
+                    mapper = (ROM_Control_1 & 0xf0) >> 4;
+
+                    if ((ROM_Control_2 & 0xc) == 8)
+                    {
+                        v2 = true;
+                        mapper = (byte)(((ROM_Control_1 & 0xf0) >> 4) | (ROM_Control_2 & 0xf0));
+                        info += "Nes header 2.0 version !\r\n";
+                    }
+                    else
+                    {
+                        mapper = (ROM_Control_1 & 0xf0) >> 4;
+                        info += "Old style Mapper info !\r\n";
+                    }
+                }
+                else
+                    mapper = (byte)(((ROM_Control_1 & 0xf0) >> 4) | (ROM_Control_2 & 0xf0));
+
+                string mapper_name = ((MapperName)mapper).ToString();
+
+                info += "Mapper number : " + mapper + " " + mapper_name + "\r\n";
+
+                if (v2)
+                {
+                    byte RAM_banks_count = rom_bytes[8];
+                    info += "RAM banks count : " + RAM_banks_count + "\r\n";
+                }
+
+                return info;
+            }
+            catch
+            {
+                return "parse error !";
+            }
+        }
+
+        public string rom_file_name = "";
         private void button1_Click(object sender, EventArgs e)
         {
 
             OpenFileDialog fd = new OpenFileDialog();
+            fd.Filter = "nes file (*.nes *.zip)|*.nes;*.zip";
             if (fd.ShowDialog() != DialogResult.OK) return;
 
-            rom_file = fd.FileName;
+            FileInfo fi = new FileInfo(fd.FileName);
+            if (fi.Extension.ToLower() == ".zip")
+            {
+                Unzip uz = new Unzip(fi.FullName); // tks!! https://github.com/yallie/unzip good!
+                foreach (string i in uz.FileNames)
+                {
+                    if (i.ToLower().EndsWith(".nes"))
+                    {
+                        MemoryStream ms = new MemoryStream();
+                        uz.Extract(i, ms);
+                        ms.Position = 0;
+                        rom_bytes = ReadFully(ms);
+                        ms.Close();
+                    }
+                }
+            }
+            else
+            {
+                
+                rom_bytes = File.ReadAllBytes(fd.FileName);
+            }
+
+            rom_file_name = fd.FileName.Remove(fd.FileName.Length - 4, 4);
 
             if (nes_t != null)
             {
@@ -457,11 +590,21 @@ namespace AprNes
                 }
             }
 
+            try
+            {
+                if (nes_obj != null)
+                    nes_obj.SaveRam();
+            }
+            catch
+            {
+            }
+
             nes_obj = null;
             nes_obj = new NesCore();
             nes_obj.LimitFPS = LimitFPS;
             nes_obj.ScreenSize = ScreenSize;
-            bool init_result = nes_obj.init(grfx, File.ReadAllBytes(rom_file));
+            nes_obj.rom_file_name = rom_file_name;
+            bool init_result = nes_obj.init(grfx, rom_bytes);
             Console.WriteLine("init finsih");
 
             if (!init_result)
@@ -491,6 +634,14 @@ namespace AprNes
 
         private void AprNesUI_FormClosing(object sender, FormClosingEventArgs e)
         {
+            try
+            {
+                if (nes_obj != null)
+                    nes_obj.SaveRam();
+            }
+            catch
+            {
+            }
             Environment.Exit(1);
         }
 
@@ -574,7 +725,8 @@ namespace AprNes
         private void linkLabel1_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
         {
             AprNes_Infocs AprNesInf = new AprNes_Infocs();
-            AprNesInf.ShowDialog();
+            AprNesInf.StartPosition = FormStartPosition.CenterParent;
+            AprNesInf.ShowDialog(this);
         }
 
         private void label4_Click(object sender, EventArgs e)
@@ -604,11 +756,20 @@ namespace AprNes
                 }
             }
 
+            try
+            {
+                if (nes_obj != null)
+                    nes_obj.SaveRam();
+            }
+            catch
+            {
+            }
             nes_obj = null;
             nes_obj = new NesCore();
             nes_obj.LimitFPS = LimitFPS;
             nes_obj.ScreenSize = ScreenSize;
-            bool init_result = nes_obj.init(grfx, File.ReadAllBytes(rom_file));
+            nes_obj.rom_file_name = rom_file_name;
+            bool init_result = nes_obj.init(grfx, rom_bytes);
             Console.WriteLine("init finsih");
             nes_t = new Thread(nes_obj.run);
             nes_t.Start();
@@ -646,6 +807,13 @@ namespace AprNes
                 }
             }
             #endregion
+        }
+
+        private void RomInf_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            AprNes_RomInfoUI RomInfo = new AprNes_RomInfoUI();
+            RomInfo.StartPosition = FormStartPosition.CenterParent;
+            RomInfo.ShowDialog(this);
         }
     }
 }

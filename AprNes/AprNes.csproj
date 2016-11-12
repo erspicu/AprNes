@@ -31,7 +31,7 @@
     <BootstrapperEnabled>true</BootstrapperEnabled>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
-    <PlatformTarget>x86</PlatformTarget>
+    <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>true</Optimize>
@@ -54,7 +54,7 @@
     <StartupObject />
   </PropertyGroup>
   <PropertyGroup>
-    <ApplicationIcon>video_game_controller_72px_1176600_easyicon.net.ico</ApplicationIcon>
+    <ApplicationIcon>gamepad.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="SharpDX">
@@ -75,12 +75,16 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="NesCore\Mapper\Mapper01.cs" />
+    <Compile Include="NesCore\Mapper\Mapper03.cs" />
+    <Compile Include="NesCore\Mapper\Mapper04.cs" />
     <Compile Include="tool\LangINI.cs" />
-    <Compile Include="UI\AprNes_Infocs.cs">
+    <Compile Include="tool\Unzip.cs" />
+    <Compile Include="UI\AprNes_Info.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="UI\AprNes_Infocs.Designer.cs">
-      <DependentUpon>AprNes_Infocs.cs</DependentUpon>
+    <Compile Include="UI\AprNes_Info.Designer.cs">
+      <DependentUpon>AprNes_Info.cs</DependentUpon>
     </Compile>
     <Compile Include="UI\AprNesUI.cs">
       <SubType>Form</SubType>
@@ -102,28 +106,26 @@
     <Compile Include="NesCore\Main.cs" />
     <Compile Include="NesCore\Mapper\Mapper00.cs" />
     <Compile Include="NesCore\Mapper\Mapper02.cs" />
-    <Compile Include="NesCore\Mapper\MapperRouter.cs" />
+    <Compile Include="NesCore\Mapper\Mapper.cs" />
     <Compile Include="NesCore\MEM.cs" />
     <Compile Include="NesCore\PPU.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="UI\AprNes_RomInfoUI.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\AprNes_RomInfoUI.Designer.cs">
+      <DependentUpon>AprNes_RomInfoUI.cs</DependentUpon>
+    </Compile>
     <EmbeddedResource Include="UI\AprNesUI.resx">
       <DependentUpon>AprNesUI.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="Properties\Resources.resx">
-      <Generator>ResXFileCodeGenerator</Generator>
-      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
-      <SubType>Designer</SubType>
-    </EmbeddedResource>
-    <Compile Include="Properties\Resources.Designer.cs">
-      <AutoGen>True</AutoGen>
-      <DependentUpon>Resources.resx</DependentUpon>
-      <DesignTime>True</DesignTime>
-    </Compile>
     <EmbeddedResource Include="UI\AprNes_ConfigureUI.resx">
       <DependentUpon>AprNes_ConfigureUI.cs</DependentUpon>
     </EmbeddedResource>
-    <None Include="ClassDiagram1.cd" />
+    <EmbeddedResource Include="UI\AprNes_RomInfoUI.resx">
+      <DependentUpon>AprNes_RomInfoUI.cs</DependentUpon>
+    </EmbeddedResource>
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
@@ -135,7 +137,7 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="video_game_controller_72px_1176600_easyicon.net.ico" />
+    <Content Include="gamepad.ico" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include=".NETFramework,Version=v4.0">

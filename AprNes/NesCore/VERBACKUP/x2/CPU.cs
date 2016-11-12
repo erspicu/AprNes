@@ -35,18 +35,18 @@ namespace AprNes
         int cpu_cycles = 0;
         public bool exit = false;
 
-        byte GetFlag()
+        public byte GetFlag()
         {
             return (byte)((flagN << 7) | (flagV << 6) | (0 << 5) | (flagB << 4) | (flagD << 3) | (flagI << 2) | (flagZ << 1) | flagC | 0x30);
         }
 
-        void PushStack(byte val)
+        public void PushStack(byte val)
         {
             Mem_w((ushort)(0x100 + r_SP), val);
             r_SP--;
         }
 
-        void NMIInterrupt()
+        public void NMIInterrupt()
         {
             PushStack((byte)(r_PC >> 8));
             PushStack((byte)r_PC);
@@ -63,7 +63,7 @@ namespace AprNes
         ushort addr;
         byte t1_l, t1_h;
 
-        void cpu_step()
+        private void cpu_step()
         {
 
             if (NMI_set)
@@ -2100,6 +2100,7 @@ namespace AprNes
                     r_A = (byte)i4;
                     break;
 
+
                 case 0xF3://ISC
                     b1 = Mem_r(r_PC++);
                     us3 = (ushort)(((Mem_r(b1++) | (Mem_r(b1) << 8))) + r_Y);
@@ -2149,6 +2150,8 @@ namespace AprNes
                     r_A = (byte)i4;
                     break;
                 #endregion
+
+
 
                 default:
                     MessageBox.Show("unkonw opcode ! - 0x" + opcode.ToString("X2"));
