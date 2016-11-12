@@ -72,9 +72,9 @@ namespace AprNes
                 if (!SuppressVbl) isVblank = true;
                 if (NMIable && !SuppressNmi) NMI_set = true;
                 RenderScreen();
-                if (LimitFPS) while (StopWatch.Elapsed.TotalSeconds < 0.01666) Thread.Sleep(1);//0.0167
-                StopWatch.Restart();
+                if (LimitFPS) while (StopWatch.Elapsed.TotalSeconds < 0.01666) ;//0.0167
                 frame_count++;
+                StopWatch.Restart();
             }
             else if (scanline == 260)
             {

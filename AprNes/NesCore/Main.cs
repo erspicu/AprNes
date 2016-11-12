@@ -138,7 +138,6 @@ namespace AprNes
                 //init cpu pc
                 r_PC = (ushort)(Mem_r(0xfffc) | Mem_r(0xfffd) << 8);
 
-                Console.WriteLine(r_PC.ToString("x4"));
 
                 //bind graphic device
                 switch (ScreenSize)
