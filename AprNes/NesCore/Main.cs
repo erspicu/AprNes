@@ -103,7 +103,7 @@ namespace AprNes
 
                 if (!mapper_pass)
                 {
-                    MessageBox.Show("not support mapper !");
+                    MessageBox.Show("not support mapper ! " +mapper);
                     return false;
                 }
                 if (NesHeaderV2)

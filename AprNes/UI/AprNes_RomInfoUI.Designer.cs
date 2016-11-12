@@ -73,6 +73,7 @@
             this.Controls.Add(this.button2);
             this.Controls.Add(this.button1);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedToolWindow;
+            this.MaximizeBox = false;
             this.Name = "AprNes_RomInfoUI";
             this.Text = "ROM File information";
             this.ResumeLayout(false);

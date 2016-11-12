@@ -95,6 +95,7 @@
             this.Controls.Add(this.label1);
             this.Controls.Add(this.button1);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedToolWindow;
+            this.MaximizeBox = false;
             this.Name = "AprNes_Infocs";
             this.Text = "AprNes";
             this.ResumeLayout(false);

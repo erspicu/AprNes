@@ -123,6 +123,9 @@
     <EmbeddedResource Include="UI\AprNes_ConfigureUI.resx">
       <DependentUpon>AprNes_ConfigureUI.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="UI\AprNes_Info.resx">
+      <DependentUpon>AprNes_Info.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="UI\AprNes_RomInfoUI.resx">
       <DependentUpon>AprNes_RomInfoUI.cs</DependentUpon>
     </EmbeddedResource>

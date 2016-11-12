@@ -18,3 +18,4 @@ C:\Users\abraxas\Dropbox\nes_dev\AprNes\AprNes\obj\x86\Debug\AprNes.AprNes_RomIn
 C:\Users\abraxas\Dropbox\nes_dev\AprNes\AprNes\obj\x86\Debug\AprNes.csproj.GenerateResource.Cache
 C:\Users\abraxas\Dropbox\nes_dev\AprNes\AprNes\obj\x86\Debug\AprNes.exe
 C:\Users\abraxas\Dropbox\nes_dev\AprNes\AprNes\obj\x86\Debug\AprNes.pdb
+C:\Users\abraxas\Dropbox\nes_dev\AprNes\AprNes\obj\x86\Debug\AprNes.AprNes_Infocs.resources
