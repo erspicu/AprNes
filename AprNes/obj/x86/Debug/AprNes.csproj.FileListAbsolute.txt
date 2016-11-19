@@ -6,16 +6,3 @@ C:\Users\abraxas\Dropbox\nes_dev2\AprNes\AprNes\obj\x86\Debug\AprNes.exe
 C:\Users\abraxas\Dropbox\nes_dev2\AprNes\AprNes\obj\x86\Debug\AprNes.pdb
 C:\Users\abraxas\Dropbox\nes_dev2\AprNes\AprNes\obj\x86\Debug\AprNes.AprNesUI.resources
 C:\Users\abraxas\Dropbox\nes_dev2\AprNes\AprNes\obj\x86\Debug\AprNes.csprojResolveAssemblyReference.cache
-C:\Users\abraxas\Dropbox\nes_dev\AprNes\AprNes\bin\Debug\AprNes.exe
-C:\Users\abraxas\Dropbox\nes_dev\AprNes\AprNes\bin\Debug\AprNes.pdb
-C:\Users\abraxas\Dropbox\nes_dev\AprNes\AprNes\bin\Debug\SharpDX.DirectInput.dll
-C:\Users\abraxas\Dropbox\nes_dev\AprNes\AprNes\bin\Debug\SharpDX.dll
-C:\Users\abraxas\Dropbox\nes_dev\AprNes\AprNes\bin\Debug\SharpDX.xml
-C:\Users\abraxas\Dropbox\nes_dev\AprNes\AprNes\bin\Debug\SharpDX.DirectInput.xml
-C:\Users\abraxas\Dropbox\nes_dev\AprNes\AprNes\obj\x86\Debug\AprNes.AprNesUI.resources
-C:\Users\abraxas\Dropbox\nes_dev\AprNes\AprNes\obj\x86\Debug\AprNes.AprNes_ConfigureUI.resources
-C:\Users\abraxas\Dropbox\nes_dev\AprNes\AprNes\obj\x86\Debug\AprNes.AprNes_RomInfoUI.resources
-C:\Users\abraxas\Dropbox\nes_dev\AprNes\AprNes\obj\x86\Debug\AprNes.csproj.GenerateResource.Cache
-C:\Users\abraxas\Dropbox\nes_dev\AprNes\AprNes\obj\x86\Debug\AprNes.exe
-C:\Users\abraxas\Dropbox\nes_dev\AprNes\AprNes\obj\x86\Debug\AprNes.pdb
-C:\Users\abraxas\Dropbox\nes_dev\AprNes\AprNes\obj\x86\Debug\AprNes.AprNes_Infocs.resources

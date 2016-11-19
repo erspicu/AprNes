@@ -1,6 +1,6 @@
 using System;
 using System.Threading.Tasks;
-
+using System.Runtime.InteropServices;
 
 //C# Code from https://code.google.com/p/2dimagefilter
 //fix it for realtime performance
@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace XBRz_speed
 {
-    public class HS_XBRz
+    unsafe public class HS_XBRz
     {
         const int dominantDirectionThreshold = 4;
         const int steepDirectionThreshold = 2;
@@ -28,7 +28,9 @@ namespace XBRz_speed
         const int Rot180 = 2;
         const int Rot270 = 3;
 
-        static int[] lTable;
+        //static int* lTable;
+
+        static int* lTable_dist;
 
         private const int _MAX_ROTS = 4; // Number of 90 degree rotations
         private const int _MAX_SCALE = 6; // Highest possible scale
@@ -37,7 +39,6 @@ namespace XBRz_speed
 
         static HS_XBRz()
         {
-
             _MATRIX_ROTATION = new Tuple[(_MAX_SCALE - 1) * _MAX_SCALE_SQUARED * _MAX_ROTS];
             for (var n = 2; n < _MAX_SCALE + 1; n++)
                 for (var r = 0; r < _MAX_ROTS; r++)
@@ -82,22 +83,32 @@ namespace XBRz_speed
             }
         }
 
-        public static unsafe void initTable()
+        public static unsafe void initTable(int sw)
         {
-            if (lTable != null)
-            {
+            if (lTable_dist != null)
                 return;
-            }
-            lTable = new int[0x1000000];
 
-            for (uint i = 0; i < lTable.Length; i++)
+            lTable_dist = (int*)Marshal.AllocHGlobal(sizeof(int) * 0x1000000);
+
+            for (int i = 0; i < 0x1000000; i++)
             {
 
-                float r = (i & 0xff0000) >> 16;
-                float g = (i & 0x00ff00) >> 8;
-                float b = (i & 0x0000ff);
+                int r_diff = ((i & 0xff0000) >> 16) * 2 - 255;
+                int g_diff = ((i & 0x00ff00) >> 8) * 2 - 255;
+                int b_diff = ((i & 0x0000ff) >> 0) * 2 - 255;
 
-                lTable[i] = (byte)(.299 * r + .587 * g + .114 * b) | ((byte)((int)(-.169 * r - .331 * g + .5 * b) + 128) << 8) | ((byte)((int)(.5 * r - .419 * g - .081 * b) + 128) << 16);
+                double k_b = 0.0593; //ITU-R BT.2020 conversion
+                double k_r = 0.2627; //
+                double k_g = 1 - k_b - k_r;
+
+                double scale_b = 0.5 / (1 - k_b);
+                double scale_r = 0.5 / (1 - k_r);
+
+                double y = k_r * r_diff + k_g * g_diff + k_b * b_diff; //[!], analog YCbCr!
+                double c_b = scale_b * (b_diff - y);
+                double c_r = scale_r * (r_diff - y);
+
+                lTable_dist[i] = (int)(y * y + c_b * c_b + c_r * c_r);
             }
         }
 
@@ -113,6 +124,7 @@ namespace XBRz_speed
 
         static int GetBottomR(byte b)
         {
+
             return ((b >> 4) & 0x3);
         }
 
@@ -148,7 +160,7 @@ namespace XBRz_speed
             return (byte)(b << l | b >> r);
         }
 
-        static byte getAlpha(uint pix) { return (byte)((pix & 0xff000000) >> 24); }
+        // static byte getAlpha(uint pix) { return (byte)((pix & 0xff000000) >> 24); }
         static byte getRed(uint pix) { return (byte)((pix & 0xff0000) >> 16); }
         static byte getGreen(uint pix) { return (byte)((pix & 0xff00) >> 8); }
         static byte getBlue(uint pix) { return (byte)(pix & 0xff); }
@@ -176,19 +188,67 @@ namespace XBRz_speed
                     trg[trgi + x] = col;
         }
 
+        static void _FillBlock2x(uint* trg, int trgi, int pitch, uint col)
+        {
+            trg[trgi] = trg[trgi + 1] = col;
+            trgi += pitch;
+            trg[trgi] = trg[trgi + 1] = col;
+
+        }
+
+        static void _FillBlock3x(uint* trg, int trgi, int pitch, uint col)
+        {
+            trg[trgi] = trg[trgi + 1] = trg[trgi + 2] = col;
+            trgi += pitch;
+            trg[trgi] = trg[trgi + 1] = trg[trgi + 2] = col;
+            trgi += pitch;
+            trg[trgi] = trg[trgi + 1] = trg[trgi + 2] = col;
+        }
+
+        static void _FillBlock4x(uint* trg, int trgi, int pitch, uint col)
+        {
+            trg[trgi] = trg[trgi + 1] = trg[trgi + 2] = trg[trgi + 3] = col;
+            trgi += pitch;
+            trg[trgi] = trg[trgi + 1] = trg[trgi + 2] = trg[trgi + 3] = col;
+            trgi += pitch;
+            trg[trgi] = trg[trgi + 1] = trg[trgi + 2] = trg[trgi + 3] = col;
+            trgi += pitch;
+            trg[trgi] = trg[trgi + 1] = trg[trgi + 2] = trg[trgi + 3] = col;
+        }
+
+        static void _FillBlock5x(uint* trg, int trgi, int pitch, uint col)
+        {
+            trg[trgi] = trg[trgi + 1] = trg[trgi + 2] = trg[trgi + 3] = trg[trgi + 4] = col;
+            trgi += pitch;
+            trg[trgi] = trg[trgi + 1] = trg[trgi + 2] = trg[trgi + 3] = trg[trgi + 4] = col;
+            trgi += pitch;
+            trg[trgi] = trg[trgi + 1] = trg[trgi + 2] = trg[trgi + 3] = trg[trgi + 4] = col;
+            trgi += pitch;
+            trg[trgi] = trg[trgi + 1] = trg[trgi + 2] = trg[trgi + 3] = trg[trgi + 4] = col;
+            trgi += pitch;
+            trg[trgi] = trg[trgi + 1] = trg[trgi + 2] = trg[trgi + 3] = trg[trgi + 4] = col;
+        }
+
+        static void _FillBlock6x(uint* trg, int trgi, int pitch, uint col)
+        {
+            trg[trgi] = trg[trgi + 1] = trg[trgi + 2] = trg[trgi + 3] = trg[trgi + 4] = trg[trgi + 5] = col;
+            trgi += pitch;
+            trg[trgi] = trg[trgi + 1] = trg[trgi + 2] = trg[trgi + 3] = trg[trgi + 4] = trg[trgi + 5] = col;
+            trgi += pitch;
+            trg[trgi] = trg[trgi + 1] = trg[trgi + 2] = trg[trgi + 3] = trg[trgi + 4] = trg[trgi + 5] = col;
+            trgi += pitch;
+            trg[trgi] = trg[trgi + 1] = trg[trgi + 2] = trg[trgi + 3] = trg[trgi + 4] = trg[trgi + 5] = col;
+            trgi += pitch;
+            trg[trgi] = trg[trgi + 1] = trg[trgi + 2] = trg[trgi + 3] = trg[trgi + 4] = trg[trgi + 5] = col;
+            trgi += pitch;
+            trg[trgi] = trg[trgi + 1] = trg[trgi + 2] = trg[trgi + 3] = trg[trgi + 4] = trg[trgi + 5] = col;
+        }
         static int DistYCbCr(uint pix1, uint pix2)
         {
-
-            if (pix1 == pix2) return 0;
-
-            int YUV1 = lTable[pix1 & 0x00ffffff];
-            int YUV2 = lTable[pix2 & 0x00ffffff];
-
-            int y = ((YUV1 & Ymask) >> 16) - ((YUV2 & Ymask) >> 16);
-            int u = ((YUV1 & Umask) >> 8) - ((YUV2 & Umask) >> 8);
-            int v = (YUV1 & Vmask) - (YUV2 & Vmask);
-
-            return y * y + u * u + v * v;
+            int r_diff = getRed(pix1) - getRed(pix2);
+            int g_diff = getGreen(pix1) - getGreen(pix2);
+            int b_diff = getBlue(pix1) - getBlue(pix2);
+            return lTable_dist[(((r_diff + 255) >> 1) << 16) | (((g_diff + 255) >> 1) << 8) | ((b_diff + 255) >> 1)];
         }
 
         private static bool ColorEQ(uint pix1, uint pix2)
@@ -205,7 +265,7 @@ namespace XBRz_speed
             private readonly int _n;
             private int _nr;
 
-            public OutputMatrix(int scale, uint[] output, int outWidth)
+            public OutputMatrix(int scale, uint* output, int outWidth)
             {
                 this._n = (scale - 2) * (_MAX_ROTS * _MAX_SCALE_SQUARED);
                 this._output = new ImagePointer(output);
@@ -229,10 +289,10 @@ namespace XBRz_speed
 
         class ImagePointer
         {
-            private uint[] _imageData;
+            private uint* _imageData;
             private int _offset;
 
-            public ImagePointer(uint[] imageData)
+            public ImagePointer(uint* imageData)
             {
                 this._imageData = imageData;
             }
@@ -253,1743 +313,1825 @@ namespace XBRz_speed
             }
         }
 
-        /* no use for nes 
-        public static void ScaleImage6X(uint[][] src, uint[] trg, int srcWidth, int srcHeight)
+        public static void ScaleImage6X(uint* src, uint* trg, int srcWidth, int srcHeight)
         {
             int trgWidth = srcWidth * 6;
 
-            byte[] preProcBuffer = new byte[srcWidth];
-
-            OutputMatrix outputMatrix = new OutputMatrix(6, trg, trgWidth); //scale
-
-            for (int y = 0; y < srcHeight; ++y)
+            Parallel.For(0, 4, core =>
             {
-                int trgi = 6 * y * trgWidth; // scale
-                int sM1 = Math.Max(y - 1, 0);
-                int s0 = y;
-                int sP1 = Math.Min(y + 1, srcHeight - 1);
-                int sP2 = Math.Min(y + 2, srcHeight - 1);
-                byte blendXy1 = 0;
-                byte blendXy = 0;
-                //-----
-                int fg;
-                int hc;
-                bool doLineBlend;
-                bool haveShallowLine;
-                bool haveSteepLine;
-                uint px;
-                uint b, c, d, e, f, g, h, i;
-                uint ker4b, ker4c, ker4e, ker4f, ker4g, ker4h, ker4i, ker4j, ker4k, ker4l, ker4n, ker4o;
-                uint ker3_0, ker3_1, ker3_2, ker3_3, ker3_4, ker3_5, ker3_6, ker3_7, ker3_8;
-                byte blend;
-
-                for (int x = 0; x < srcWidth; ++x, trgi += 6) //scale
+                int start = 0, end = 0;
+                if (core == 0)
                 {
-                    int blendResult_f = 0, blendResult_g = 0, blendResult_j = 0, blendResult_k = 0;
-
-                    int xM1 = Math.Max(x - 1, 0);
-                    int xP1 = Math.Min(x + 1, srcWidth - 1);
-                    int xP2 = Math.Min(x + 2, srcWidth - 1);
-
-                    ker4b = src[x][sM1];    //src[(sM1 + x) % srcWidth][(sM1 + x) / srcWidth];
-                    ker4c = src[xP1][sM1]; //src[(sM1 + xP1) % srcWidth][(sM1 + xP1) / srcWidth];
-
-                    ker4e = src[xM1][s0]; //src[(s0 + xM1) % srcWidth][(s0 + xM1) / srcWidth];
-                    ker4f = src[x][s0]; //src[(s0 + x) % srcWidth][(s0 + x) /srcWidth];
-                    ker4g = src[xP1][s0];//  //src[(s0 + xP1) % srcWidth][(s0 + xP1) / srcWidth];
-                    ker4h = src[xP2][s0]; //src[(s0 + xP2) % srcWidth][(s0 + xP2)/srcWidth];
-
-                    ker4i = src[xM1][sP1]; //src[(sP1 + xM1) % srcWidth][(sP1 + xM1)/srcWidth];
-                    ker4j = src[x][sP1]; //src[(sP1 + x) % srcWidth][(sP1 + x)/srcWidth];
-                    ker4k = src[xP1][sP1];// //src[(sP1 + xP1) % srcWidth][(sP1 + xP1)/srcWidth];
-                    ker4l = src[xP2][sP1];// //src[(sP1 + xP2) % srcWidth][(sP1 + xP2)/srcWidth];
-
-                    ker4n = src[x][sP2];//  //src[(sP2 + x) % srcWidth][(sP2+x)/srcWidth];
-                    ker4o = src[xP1][sP2]; //src[(sP2 + xP1) % srcWidth][(sP2 + xP1) /srcWidth];
-
-                    //--------------------------------------
-
-                    if ((ker4f != ker4g || ker4j != ker4k) && (ker4f != ker4j || ker4g != ker4k))
-                    {
-                        int jg = DistYCbCr(ker4i, ker4f) + DistYCbCr(ker4f, ker4c) + DistYCbCr(ker4n, ker4k) + DistYCbCr(ker4k, ker4h) + (DistYCbCr(ker4j, ker4g) << 2);
-                        int fk = DistYCbCr(ker4e, ker4j) + DistYCbCr(ker4j, ker4o) + DistYCbCr(ker4b, ker4g) + DistYCbCr(ker4g, ker4l) + (DistYCbCr(ker4f, ker4k) << 2);
-
-                        if (jg < fk)
-                        {
-                            bool dominantGradient = dominantDirectionThreshold * jg < fk;
-                            if (ker4f != ker4g && ker4f != ker4j)
-                                blendResult_f = dominantGradient ? BlendDominant : BlendNormal;
-                            if (ker4k != ker4j && ker4k != ker4g)
-                                blendResult_k = dominantGradient ? BlendDominant : BlendNormal;
-
-                        }
-                        else if (fk < jg)
-                        {
-                            bool dominantGradient = dominantDirectionThreshold * fk < jg;
-                            if (ker4j != ker4f && ker4j != ker4k)
-                                blendResult_j = dominantGradient ? BlendDominant : BlendNormal;
-                            if (ker4g != ker4f && ker4g != ker4k)
-                                blendResult_g = dominantGradient ? BlendDominant : BlendNormal;
-                        }
-
-                    }
-                    //--------------------------------------
-
-                    blendXy = SetBottomR(preProcBuffer[x], blendResult_f);
-                    blendXy1 = SetTopR(blendXy1, blendResult_j);
-                    preProcBuffer[x] = blendXy1;
-                    blendXy1 = SetTopL(0, blendResult_k);
-
-                    if (x + 1 < srcWidth)
-                        preProcBuffer[x + 1] = SetBottomL(preProcBuffer[x + 1], blendResult_g);
-
-                    _FillBlock(trg, trgi, trgWidth, src[x][s0], 6);//scale
-
-                    if (blendXy == 0)
-                        continue;
-
-                    ker3_0 = src[xM1][sM1]; //src[(sM1 + xM1) % srcWidth][(sM1 + xM1) / srcWidth];
-                    ker3_1 = src[x][sM1]; //src[(sM1 + x) % srcWidth][(sM1 + x) / srcWidth];
-                    ker3_2 = src[xP1][sM1]; //src[(sM1 + xP1) % srcWidth][(sM1 + xP1) / srcWidth];
-
-                    ker3_3 = src[xM1][s0]; //src[(s0 + xM1) % srcWidth][(s0 + xM1) / srcWidth];
-                    ker3_4 = src[x][s0]; //src[(s0 + x) % srcWidth][(s0 + x) / srcWidth];
-                    ker3_5 = src[xP1][s0]; //src[(s0 + xP1) % srcWidth][(s0 + xP1) / srcWidth];
-
-                    ker3_6 = src[xM1][sP1];//src[(sP1 + xM1) % srcWidth][(sP1 + xM1) / srcWidth];
-                    ker3_7 = src[x][sP1]; //src[(sP1 + x) % srcWidth][(sP1 + x) / srcWidth];
-                    ker3_8 = src[xP1][sP1];// //src[(sP1 + xP1) % srcWidth][(sP1 + xP1) / srcWidth];
-
-                    //--
-
-                    b = ker3_1;
-                    c = ker3_2;
-                    d = ker3_3;
-                    e = ker3_4;
-                    f = ker3_5;
-                    g = ker3_6;
-                    h = ker3_7;
-                    i = ker3_8;
-
-                    blend = Rotate(blendXy, 0);
-
-                    if (GetBottomR(blend) != BlendNone)
-                    {
-                        if (GetBottomR(blend) >= BlendDominant)
-                            doLineBlend = true;
-                        else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
-                            doLineBlend = false;
-                        else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
-                            doLineBlend = false;
-                        else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
-                            doLineBlend = false;
-                        else
-                            doLineBlend = true;
-                        px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
-
-                        outputMatrix.Move(0, trgi);
-
-                        if (!doLineBlend)
-                        {
-                            Scaler_6X.BlendCorner(px, outputMatrix);
-
-                        }
-                        else
-                        {
-
-                            fg = DistYCbCr(f, g);
-                            hc = DistYCbCr(h, c);
-
-                            haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
-                            haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
-
-                            if (haveShallowLine)
-                            {
-                                if (haveSteepLine)
-                                    Scaler_6X.BlendLineSteepAndShallow(px, outputMatrix);
-                                else
-                                    Scaler_6X.BlendLineShallow(px, outputMatrix);
-                            }
-                            else
-                            {
-                                if (haveSteepLine)
-                                    Scaler_6X.BlendLineSteep(px, outputMatrix);
-                                else
-                                    Scaler_6X.BlendLineDiagonal(px, outputMatrix);
-                            }
-                        }
-                    }
-                    //-----
-
-                    b = ker3_3;
-                    c = ker3_0;
-                    d = ker3_7;
-                    e = ker3_4;
-                    f = ker3_1;
-                    g = ker3_8;
-                    h = ker3_5;
-                    i = ker3_2;
-
-                    blend = Rotate(blendXy, 1);
-
-                    if (GetBottomR(blend) != BlendNone)
-                    {
-                        if (GetBottomR(blend) >= BlendDominant)
-                            doLineBlend = true;
-                        else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
-                            doLineBlend = false;
-                        else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
-                            doLineBlend = false;
-                        else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
-                            doLineBlend = false;
-                        else
-                            doLineBlend = true;
-                        px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
-
-                        outputMatrix.Move(1, trgi);
-
-                        if (!doLineBlend)
-                        {
-                            Scaler_6X.BlendCorner(px, outputMatrix);
-
-                        }
-                        else
-                        {
-                            fg = DistYCbCr(f, g);
-                            hc = DistYCbCr(h, c);
-
-                            haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
-                            haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
-
-                            if (haveShallowLine)
-                            {
-                                if (haveSteepLine)
-                                    Scaler_6X.BlendLineSteepAndShallow(px, outputMatrix);
-                                else
-                                    Scaler_6X.BlendLineShallow(px, outputMatrix);
-                            }
-                            else
-                            {
-                                if (haveSteepLine)
-                                    Scaler_6X.BlendLineSteep(px, outputMatrix);
-                                else
-                                    Scaler_6X.BlendLineDiagonal(px, outputMatrix);
-                            }
-                        }
-                    }
-
-                    //--------------------------------
-
-                    b = ker3_7;
-                    c = ker3_6;
-                    d = ker3_5;
-                    e = ker3_4;
-                    f = ker3_3;
-                    g = ker3_2;
-                    h = ker3_1;
-                    i = ker3_0;
-
-                    blend = Rotate(blendXy, 2);
-
-                    if (GetBottomR(blend) != BlendNone)
-                    {
-                        if (GetBottomR(blend) >= BlendDominant)
-                            doLineBlend = true;
-                        else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
-                            doLineBlend = false;
-                        else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
-                            doLineBlend = false;
-                        else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
-                            doLineBlend = false;
-                        else
-                            doLineBlend = true;
-                        px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
-
-                        outputMatrix.Move(2, trgi);
-
-                        if (!doLineBlend)
-                        {
-                            Scaler_6X.BlendCorner(px, outputMatrix);
-
-                        }
-                        else
-                        {
-                            fg = DistYCbCr(f, g);
-                            hc = DistYCbCr(h, c);
-
-                            haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
-                            haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
-
-                            if (haveShallowLine)
-                            {
-                                if (haveSteepLine)
-                                    Scaler_6X.BlendLineSteepAndShallow(px, outputMatrix);
-                                else
-                                    Scaler_6X.BlendLineShallow(px, outputMatrix);
-                            }
-                            else
-                            {
-                                if (haveSteepLine)
-                                    Scaler_6X.BlendLineSteep(px, outputMatrix);
-                                else
-                                    Scaler_6X.BlendLineDiagonal(px, outputMatrix);
-                            }
-                        }
-                    }
-                    //--------------------------------
-                    b = ker3_5;
-                    c = ker3_8;
-                    d = ker3_1;
-                    e = ker3_4;
-                    f = ker3_7;
-                    g = ker3_0;
-                    h = ker3_3;
-                    i = ker3_6;
-                    blend = Rotate(blendXy, 3);
-                    if (GetBottomR(blend) != BlendNone)
-                    {
-                        if (GetBottomR(blend) >= BlendDominant)
-                            doLineBlend = true;
-                        else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
-                            doLineBlend = false;
-                        else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
-                            doLineBlend = false;
-                        else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
-                            doLineBlend = false;
-                        else
-                            doLineBlend = true;
-                        px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
-
-                        outputMatrix.Move(3, trgi);
-
-                        if (!doLineBlend)
-                        {
-                            Scaler_6X.BlendCorner(px, outputMatrix);
-
-                        }
-                        else
-                        {
-                            fg = DistYCbCr(f, g);
-                            hc = DistYCbCr(h, c);
-
-                            haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
-                            haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
-
-                            if (haveShallowLine)
-                            {
-                                if (haveSteepLine)
-                                    Scaler_6X.BlendLineSteepAndShallow(px, outputMatrix);
-                                else
-                                    Scaler_6X.BlendLineShallow(px, outputMatrix);
-                            }
-                            else
-                            {
-                                if (haveSteepLine)
-                                    Scaler_6X.BlendLineSteep(px, outputMatrix);
-                                else
-                                    Scaler_6X.BlendLineDiagonal(px, outputMatrix);
-                            }
-                        }
-                    }
+                    start = 0;
+                    end = srcHeight / 4;
                 }
-                //---
-            }
+                else if (core == 1)
+                {
+                    start = srcHeight / 4;
+                    end = srcHeight / 2;
+                }
+                else if (core == 2)
+                {
+                    start = srcHeight / 2;
+                    end = (srcHeight / 4) * 3;
+                }
+                else if (core == 3)
+                {
+                    start = (srcHeight / 4) * 3;
+                    end = srcHeight;
+                }
+
+                OutputMatrix outputMatrix = new OutputMatrix(6, trg, trgWidth);
+                byte[] preProcBuffer = new byte[srcWidth];
+                for (int y = start; y < end; ++y)
+                {
+                    int trgi = 6 * y * trgWidth; // scale
+                    int sM1 = Math.Max(y - 1, 0);
+                    int s0 = y;
+                    int sP1 = Math.Min(y + 1, srcHeight - 1);
+                    int sP2 = Math.Min(y + 2, srcHeight - 1);
+                    byte blendXy1 = 0;
+                    byte blendXy = 0;
+                    //-----
+                    int fg;
+                    int hc;
+                    bool doLineBlend;
+                    bool haveShallowLine;
+                    bool haveSteepLine;
+                    uint px;
+                    uint b, c, d, e, f, g, h, i;
+                    uint ker4b, ker4c, ker4e, ker4f, ker4g, ker4h, ker4i, ker4j, ker4k, ker4l, ker4n, ker4o;
+                    uint ker3_0, ker3_1, ker3_2, ker3_3, ker3_4, ker3_5, ker3_6, ker3_7, ker3_8;
+                    byte blend;
+
+                    for (int x = 0; x < srcWidth; ++x, trgi += 6) //scale
+                    {
+                        int blendResult_f = 0, blendResult_g = 0, blendResult_j = 0, blendResult_k = 0;
+
+                        int xM1 = Math.Max(x - 1, 0);
+                        int xP1 = Math.Min(x + 1, srcWidth - 1);
+                        int xP2 = Math.Min(x + 2, srcWidth - 1);
+
+                        ker4b = src[sM1 * srcWidth + x];
+                        ker4c = src[sM1 * srcWidth + xP1];
+
+                        ker4e = src[s0 * srcWidth + xM1];
+                        ker4f = src[s0 * srcWidth + x];
+                        ker4g = src[s0 * srcWidth + xP1];
+                        ker4h = src[s0 * srcWidth + xP2];
+
+                        ker4i = src[sP1 * srcWidth + xM1];
+                        ker4j = src[sP1 * srcWidth + x];
+                        ker4k = src[sP1 * srcWidth + xP1];
+                        ker4l = src[sP1 * srcWidth + xP2];
+
+                        ker4n = src[sP2 * srcWidth + x];
+                        ker4o = src[sP2 * srcWidth + xP1];
+                        //--------------------------------------
+
+                        if ((ker4f != ker4g || ker4j != ker4k) && (ker4f != ker4j || ker4g != ker4k))
+                        {
+                            int jg = DistYCbCr(ker4i, ker4f) + DistYCbCr(ker4f, ker4c) + DistYCbCr(ker4n, ker4k) + DistYCbCr(ker4k, ker4h) + (DistYCbCr(ker4j, ker4g) << 2);
+                            int fk = DistYCbCr(ker4e, ker4j) + DistYCbCr(ker4j, ker4o) + DistYCbCr(ker4b, ker4g) + DistYCbCr(ker4g, ker4l) + (DistYCbCr(ker4f, ker4k) << 2);
+
+                            if (jg < fk)
+                            {
+                                bool dominantGradient = dominantDirectionThreshold * jg < fk;
+                                if (ker4f != ker4g && ker4f != ker4j)
+                                    blendResult_f = dominantGradient ? BlendDominant : BlendNormal;
+                                if (ker4k != ker4j && ker4k != ker4g)
+                                    blendResult_k = dominantGradient ? BlendDominant : BlendNormal;
+                            }
+                            else if (fk < jg)
+                            {
+                                bool dominantGradient = dominantDirectionThreshold * fk < jg;
+                                if (ker4j != ker4f && ker4j != ker4k)
+                                    blendResult_j = dominantGradient ? BlendDominant : BlendNormal;
+                                if (ker4g != ker4f && ker4g != ker4k)
+                                    blendResult_g = dominantGradient ? BlendDominant : BlendNormal;
+                            }
+
+                        }
+                        //--------------------------------------
+
+                        blendXy = SetBottomR(preProcBuffer[x], blendResult_f);
+                        blendXy1 = SetTopR(blendXy1, blendResult_j);
+                        preProcBuffer[x] = blendXy1;
+                        blendXy1 = SetTopL(0, blendResult_k);
+                        if (x + 1 < srcWidth) preProcBuffer[x + 1] = SetBottomL(preProcBuffer[x + 1], blendResult_g);
+                        _FillBlock6x(trg, trgi, trgWidth, src[s0 * srcWidth + x]);
+                        if (blendXy == 0) continue;
+
+                        ker3_0 = src[sM1 * srcWidth + xM1];
+                        ker3_1 = src[sM1 * srcWidth + x];
+                        ker3_2 = src[sM1 * srcWidth + xP1];
+
+                        ker3_3 = src[s0 * srcWidth + xM1];
+                        ker3_4 = src[s0 * srcWidth + x];
+                        ker3_5 = src[s0 * srcWidth + xP1];
+
+                        ker3_6 = src[sP1 * srcWidth + xM1];
+                        ker3_7 = src[sP1 * srcWidth + x];
+                        ker3_8 = src[sP1 * srcWidth + xP1];
+
+                        //--
+
+                        b = ker3_1;
+                        c = ker3_2;
+                        d = ker3_3;
+                        e = ker3_4;
+                        f = ker3_5;
+                        g = ker3_6;
+                        h = ker3_7;
+                        i = ker3_8;
+
+                        blend = Rotate(blendXy, 0);
+
+                        if (GetBottomR(blend) != BlendNone)
+                        {
+                            if (GetBottomR(blend) >= BlendDominant)
+                                doLineBlend = true;
+                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
+                                doLineBlend = false;
+                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
+                                doLineBlend = false;
+                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
+                                doLineBlend = false;
+                            else
+                                doLineBlend = true;
+                            px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
+
+                            outputMatrix.Move(0, trgi);
+
+                            if (!doLineBlend)
+                            {
+                                Scaler_6X.BlendCorner(px, outputMatrix);
+
+                            }
+                            else
+                            {
+
+                                fg = DistYCbCr(f, g);
+                                hc = DistYCbCr(h, c);
+
+                                haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
+                                haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
+
+                                if (haveShallowLine)
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_6X.BlendLineSteepAndShallow(px, outputMatrix);
+                                    else
+                                        Scaler_6X.BlendLineShallow(px, outputMatrix);
+                                }
+                                else
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_6X.BlendLineSteep(px, outputMatrix);
+                                    else
+                                        Scaler_6X.BlendLineDiagonal(px, outputMatrix);
+                                }
+                            }
+                        }
+                        //-----
+
+                        b = ker3_3;
+                        c = ker3_0;
+                        d = ker3_7;
+                        e = ker3_4;
+                        f = ker3_1;
+                        g = ker3_8;
+                        h = ker3_5;
+                        i = ker3_2;
+
+                        blend = Rotate(blendXy, 1);
+
+                        if (GetBottomR(blend) != BlendNone)
+                        {
+                            if (GetBottomR(blend) >= BlendDominant)
+                                doLineBlend = true;
+                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
+                                doLineBlend = false;
+                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
+                                doLineBlend = false;
+                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
+                                doLineBlend = false;
+                            else
+                                doLineBlend = true;
+                            px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
+
+                            outputMatrix.Move(1, trgi);
+
+                            if (!doLineBlend)
+                            {
+                                Scaler_6X.BlendCorner(px, outputMatrix);
+
+                            }
+                            else
+                            {
+                                fg = DistYCbCr(f, g);
+                                hc = DistYCbCr(h, c);
+
+                                haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
+                                haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
+
+                                if (haveShallowLine)
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_6X.BlendLineSteepAndShallow(px, outputMatrix);
+                                    else
+                                        Scaler_6X.BlendLineShallow(px, outputMatrix);
+                                }
+                                else
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_6X.BlendLineSteep(px, outputMatrix);
+                                    else
+                                        Scaler_6X.BlendLineDiagonal(px, outputMatrix);
+                                }
+                            }
+                        }
+
+                        //--------------------------------
+
+                        b = ker3_7;
+                        c = ker3_6;
+                        d = ker3_5;
+                        e = ker3_4;
+                        f = ker3_3;
+                        g = ker3_2;
+                        h = ker3_1;
+                        i = ker3_0;
+
+                        blend = Rotate(blendXy, 2);
+
+                        if (GetBottomR(blend) != BlendNone)
+                        {
+                            if (GetBottomR(blend) >= BlendDominant)
+                                doLineBlend = true;
+                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
+                                doLineBlend = false;
+                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
+                                doLineBlend = false;
+                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
+                                doLineBlend = false;
+                            else
+                                doLineBlend = true;
+                            px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
+
+                            outputMatrix.Move(2, trgi);
+
+                            if (!doLineBlend)
+                            {
+                                Scaler_6X.BlendCorner(px, outputMatrix);
+
+                            }
+                            else
+                            {
+                                fg = DistYCbCr(f, g);
+                                hc = DistYCbCr(h, c);
+
+                                haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
+                                haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
+
+                                if (haveShallowLine)
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_6X.BlendLineSteepAndShallow(px, outputMatrix);
+                                    else
+                                        Scaler_6X.BlendLineShallow(px, outputMatrix);
+                                }
+                                else
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_6X.BlendLineSteep(px, outputMatrix);
+                                    else
+                                        Scaler_6X.BlendLineDiagonal(px, outputMatrix);
+                                }
+                            }
+                        }
+                        //--------------------------------
+                        b = ker3_5;
+                        c = ker3_8;
+                        d = ker3_1;
+                        e = ker3_4;
+                        f = ker3_7;
+                        g = ker3_0;
+                        h = ker3_3;
+                        i = ker3_6;
+                        blend = Rotate(blendXy, 3);
+                        if (GetBottomR(blend) != BlendNone)
+                        {
+                            if (GetBottomR(blend) >= BlendDominant)
+                                doLineBlend = true;
+                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
+                                doLineBlend = false;
+                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
+                                doLineBlend = false;
+                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
+                                doLineBlend = false;
+                            else
+                                doLineBlend = true;
+                            px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
+
+                            outputMatrix.Move(3, trgi);
+
+                            if (!doLineBlend)
+                            {
+                                Scaler_6X.BlendCorner(px, outputMatrix);
+
+                            }
+                            else
+                            {
+                                fg = DistYCbCr(f, g);
+                                hc = DistYCbCr(h, c);
+
+                                haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
+                                haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
+
+                                if (haveShallowLine)
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_6X.BlendLineSteepAndShallow(px, outputMatrix);
+                                    else
+                                        Scaler_6X.BlendLineShallow(px, outputMatrix);
+                                }
+                                else
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_6X.BlendLineSteep(px, outputMatrix);
+                                    else
+                                        Scaler_6X.BlendLineDiagonal(px, outputMatrix);
+                                }
+                            }
+                        }
+                    }
+                    //---
+                }
+            });
         }
-        */
-        public static void ScaleImage5X(uint[][] src, uint[] trg, int srcWidth, int srcHeight)
+
+        public static void ScaleImage5X(uint* src, uint* trg, int srcWidth, int srcHeight)
         {
             int trgWidth = srcWidth * 5;
-
-            byte[] preProcBuffer = new byte[srcWidth];
-
-            OutputMatrix outputMatrix = new OutputMatrix(5, trg, trgWidth); //scale
-
-            for (int y = 0; y < srcHeight; ++y)
+            Parallel.For(0, 4, core =>
             {
-                int trgi = 5 * y * trgWidth; // scale
-                int sM1 = Math.Max(y - 1, 0);
-                int s0 = y;
-                int sP1 = Math.Min(y + 1, srcHeight - 1);
-                int sP2 = Math.Min(y + 2, srcHeight - 1);
-                byte blendXy1 = 0;
-                byte blendXy = 0;
-                //-----
-                int fg;
-                int hc;
-                bool doLineBlend;
-                bool haveShallowLine;
-                bool haveSteepLine;
-                uint px;
-                uint b, c, d, e, f, g, h, i;
-                uint ker4b, ker4c, ker4e, ker4f, ker4g, ker4h, ker4i, ker4j, ker4k, ker4l, ker4n, ker4o;
-                uint ker3_0, ker3_1, ker3_2, ker3_3, ker3_4, ker3_5, ker3_6, ker3_7, ker3_8;
-                byte blend;
-
-                for (int x = 0; x < srcWidth; ++x, trgi += 5) //scale
+                int start = 0, end = 0;
+                if (core == 0)
                 {
-                    int blendResult_f = 0, blendResult_g = 0, blendResult_j = 0, blendResult_k = 0;
-
-                    int xM1 = Math.Max(x - 1, 0);
-                    int xP1 = Math.Min(x + 1, srcWidth - 1);
-                    int xP2 = Math.Min(x + 2, srcWidth - 1);
-
-                    ker4b = src[x][sM1];    //src[(sM1 + x) % srcWidth][(sM1 + x) / srcWidth];
-                    ker4c = src[xP1][sM1]; //src[(sM1 + xP1) % srcWidth][(sM1 + xP1) / srcWidth];
-
-                    ker4e = src[xM1][s0]; //src[(s0 + xM1) % srcWidth][(s0 + xM1) / srcWidth];
-                    ker4f = src[x][s0]; //src[(s0 + x) % srcWidth][(s0 + x) /srcWidth];
-                    ker4g = src[xP1][s0];//  //src[(s0 + xP1) % srcWidth][(s0 + xP1) / srcWidth];
-                    ker4h = src[xP2][s0]; //src[(s0 + xP2) % srcWidth][(s0 + xP2)/srcWidth];
-
-                    ker4i = src[xM1][sP1]; //src[(sP1 + xM1) % srcWidth][(sP1 + xM1)/srcWidth];
-                    ker4j = src[x][sP1]; //src[(sP1 + x) % srcWidth][(sP1 + x)/srcWidth];
-                    ker4k = src[xP1][sP1];// //src[(sP1 + xP1) % srcWidth][(sP1 + xP1)/srcWidth];
-                    ker4l = src[xP2][sP1];// //src[(sP1 + xP2) % srcWidth][(sP1 + xP2)/srcWidth];
-
-                    ker4n = src[x][sP2];//  //src[(sP2 + x) % srcWidth][(sP2+x)/srcWidth];
-                    ker4o = src[xP1][sP2]; //src[(sP2 + xP1) % srcWidth][(sP2 + xP1) /srcWidth];
-
-
-                    //--------------------------------------
-
-                    if ((ker4f != ker4g || ker4j != ker4k) && (ker4f != ker4j || ker4g != ker4k))
-                    {
-                        int jg = DistYCbCr(ker4i, ker4f) + DistYCbCr(ker4f, ker4c) + DistYCbCr(ker4n, ker4k) + DistYCbCr(ker4k, ker4h) + (DistYCbCr(ker4j, ker4g) << 2);
-                        int fk = DistYCbCr(ker4e, ker4j) + DistYCbCr(ker4j, ker4o) + DistYCbCr(ker4b, ker4g) + DistYCbCr(ker4g, ker4l) + (DistYCbCr(ker4f, ker4k) << 2);
-
-                        if (jg < fk)
-                        {
-                            bool dominantGradient = dominantDirectionThreshold * jg < fk;
-                            if (ker4f != ker4g && ker4f != ker4j)
-                                blendResult_f = dominantGradient ? BlendDominant : BlendNormal;
-                            if (ker4k != ker4j && ker4k != ker4g)
-                                blendResult_k = dominantGradient ? BlendDominant : BlendNormal;
-
-                        }
-                        else if (fk < jg)
-                        {
-                            bool dominantGradient = dominantDirectionThreshold * fk < jg;
-                            if (ker4j != ker4f && ker4j != ker4k)
-                                blendResult_j = dominantGradient ? BlendDominant : BlendNormal;
-                            if (ker4g != ker4f && ker4g != ker4k)
-                                blendResult_g = dominantGradient ? BlendDominant : BlendNormal;
-                        }
-
-                    }
-                    //--------------------------------------
-
-                    blendXy = SetBottomR(preProcBuffer[x], blendResult_f);
-                    blendXy1 = SetTopR(blendXy1, blendResult_j);
-                    preProcBuffer[x] = blendXy1;
-                    blendXy1 = SetTopL(0, blendResult_k);
-
-                    if (x + 1 < srcWidth)
-                        preProcBuffer[x + 1] = SetBottomL(preProcBuffer[x + 1], blendResult_g);
-
-                    _FillBlock(trg, trgi, trgWidth, src[x][s0], 5);//scale
-
-                    if (blendXy == 0)
-                        continue;
-
-                    ker3_0 = src[xM1][sM1]; //src[(sM1 + xM1) % srcWidth][(sM1 + xM1) / srcWidth];
-                    ker3_1 = src[x][sM1]; //src[(sM1 + x) % srcWidth][(sM1 + x) / srcWidth];
-                    ker3_2 = src[xP1][sM1]; //src[(sM1 + xP1) % srcWidth][(sM1 + xP1) / srcWidth];
-
-                    ker3_3 = src[xM1][s0]; //src[(s0 + xM1) % srcWidth][(s0 + xM1) / srcWidth];
-                    ker3_4 = src[x][s0]; //src[(s0 + x) % srcWidth][(s0 + x) / srcWidth];
-                    ker3_5 = src[xP1][s0]; //src[(s0 + xP1) % srcWidth][(s0 + xP1) / srcWidth];
-
-                    ker3_6 = src[xM1][sP1];//src[(sP1 + xM1) % srcWidth][(sP1 + xM1) / srcWidth];
-                    ker3_7 = src[x][sP1]; //src[(sP1 + x) % srcWidth][(sP1 + x) / srcWidth];
-                    ker3_8 = src[xP1][sP1];// //src[(sP1 + xP1) % srcWidth][(sP1 + xP1) / srcWidth];
-
-                    //--
-
-                    b = ker3_1;
-                    c = ker3_2;
-                    d = ker3_3;
-                    e = ker3_4;
-                    f = ker3_5;
-                    g = ker3_6;
-                    h = ker3_7;
-                    i = ker3_8;
-
-                    blend = Rotate(blendXy, 0);
-
-                    if (GetBottomR(blend) != BlendNone)
-                    {
-                        if (GetBottomR(blend) >= BlendDominant)
-                            doLineBlend = true;
-                        else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
-                            doLineBlend = false;
-                        else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
-                            doLineBlend = false;
-                        else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
-                            doLineBlend = false;
-                        else
-                            doLineBlend = true;
-                        px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
-
-                        outputMatrix.Move(0, trgi);
-
-                        if (!doLineBlend)
-                        {
-                            Scaler_5X.BlendCorner(px, outputMatrix);
-
-                        }
-                        else
-                        {
-
-                            fg = DistYCbCr(f, g);
-                            hc = DistYCbCr(h, c);
-
-                            haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
-                            haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
-
-                            if (haveShallowLine)
-                            {
-                                if (haveSteepLine)
-                                    Scaler_5X.BlendLineSteepAndShallow(px, outputMatrix);
-                                else
-                                    Scaler_5X.BlendLineShallow(px, outputMatrix);
-                            }
-                            else
-                            {
-                                if (haveSteepLine)
-                                    Scaler_5X.BlendLineSteep(px, outputMatrix);
-                                else
-                                    Scaler_5X.BlendLineDiagonal(px, outputMatrix);
-                            }
-                        }
-                    }
-                    //-----
-
-                    b = ker3_3;
-                    c = ker3_0;
-                    d = ker3_7;
-                    e = ker3_4;
-                    f = ker3_1;
-                    g = ker3_8;
-                    h = ker3_5;
-                    i = ker3_2;
-
-                    blend = Rotate(blendXy, 1);
-
-                    if (GetBottomR(blend) != BlendNone)
-                    {
-                        if (GetBottomR(blend) >= BlendDominant)
-                            doLineBlend = true;
-                        else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
-                            doLineBlend = false;
-                        else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
-                            doLineBlend = false;
-                        else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
-                            doLineBlend = false;
-                        else
-                            doLineBlend = true;
-                        px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
-
-                        outputMatrix.Move(1, trgi);
-
-                        if (!doLineBlend)
-                        {
-                            Scaler_5X.BlendCorner(px, outputMatrix);
-
-                        }
-                        else
-                        {
-                            fg = DistYCbCr(f, g);
-                            hc = DistYCbCr(h, c);
-
-                            haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
-                            haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
-
-                            if (haveShallowLine)
-                            {
-                                if (haveSteepLine)
-                                    Scaler_5X.BlendLineSteepAndShallow(px, outputMatrix);
-                                else
-                                    Scaler_5X.BlendLineShallow(px, outputMatrix);
-                            }
-                            else
-                            {
-                                if (haveSteepLine)
-                                    Scaler_5X.BlendLineSteep(px, outputMatrix);
-                                else
-                                    Scaler_5X.BlendLineDiagonal(px, outputMatrix);
-                            }
-                        }
-                    }
-
-                    //--------------------------------
-
-                    b = ker3_7;
-                    c = ker3_6;
-                    d = ker3_5;
-                    e = ker3_4;
-                    f = ker3_3;
-                    g = ker3_2;
-                    h = ker3_1;
-                    i = ker3_0;
-
-                    blend = Rotate(blendXy, 2);
-
-                    if (GetBottomR(blend) != BlendNone)
-                    {
-                        if (GetBottomR(blend) >= BlendDominant)
-                            doLineBlend = true;
-                        else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
-                            doLineBlend = false;
-                        else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
-                            doLineBlend = false;
-                        else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
-                            doLineBlend = false;
-                        else
-                            doLineBlend = true;
-                        px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
-
-                        outputMatrix.Move(2, trgi);
-
-                        if (!doLineBlend)
-                        {
-                            Scaler_5X.BlendCorner(px, outputMatrix);
-
-                        }
-                        else
-                        {
-                            fg = DistYCbCr(f, g);
-                            hc = DistYCbCr(h, c);
-
-                            haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
-                            haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
-
-                            if (haveShallowLine)
-                            {
-                                if (haveSteepLine)
-                                    Scaler_5X.BlendLineSteepAndShallow(px, outputMatrix);
-                                else
-                                    Scaler_5X.BlendLineShallow(px, outputMatrix);
-                            }
-                            else
-                            {
-                                if (haveSteepLine)
-                                    Scaler_5X.BlendLineSteep(px, outputMatrix);
-                                else
-                                    Scaler_5X.BlendLineDiagonal(px, outputMatrix);
-                            }
-                        }
-                    }
-                    //--------------------------------
-                    b = ker3_5;
-                    c = ker3_8;
-                    d = ker3_1;
-                    e = ker3_4;
-                    f = ker3_7;
-                    g = ker3_0;
-                    h = ker3_3;
-                    i = ker3_6;
-                    blend = Rotate(blendXy, 3);
-                    if (GetBottomR(blend) != BlendNone)
-                    {
-                        if (GetBottomR(blend) >= BlendDominant)
-                            doLineBlend = true;
-                        else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
-                            doLineBlend = false;
-                        else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
-                            doLineBlend = false;
-                        else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
-                            doLineBlend = false;
-                        else
-                            doLineBlend = true;
-                        px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
-
-                        outputMatrix.Move(3, trgi);
-
-                        if (!doLineBlend)
-                        {
-                            Scaler_5X.BlendCorner(px, outputMatrix);
-
-                        }
-                        else
-                        {
-                            fg = DistYCbCr(f, g);
-                            hc = DistYCbCr(h, c);
-
-                            haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
-                            haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
-
-                            if (haveShallowLine)
-                            {
-                                if (haveSteepLine)
-                                    Scaler_5X.BlendLineSteepAndShallow(px, outputMatrix);
-                                else
-                                    Scaler_5X.BlendLineShallow(px, outputMatrix);
-                            }
-                            else
-                            {
-                                if (haveSteepLine)
-                                    Scaler_5X.BlendLineSteep(px, outputMatrix);
-                                else
-                                    Scaler_5X.BlendLineDiagonal(px, outputMatrix);
-                            }
-                        }
-                    }
+                    start = 0;
+                    end = srcHeight / 4;
                 }
-                //---
-            }
+                else if (core == 1)
+                {
+                    start = srcHeight / 4;
+                    end = srcHeight / 2;
+                }
+                else if (core == 2)
+                {
+                    start = srcHeight / 2;
+                    end = (srcHeight / 4) * 3;
+                }
+                else if (core == 3)
+                {
+                    start = (srcHeight / 4) * 3;
+                    end = srcHeight;
+                }
+
+                OutputMatrix outputMatrix = new OutputMatrix(5, trg, trgWidth);
+                byte[] preProcBuffer = new byte[srcWidth];
+                for (int y = start; y < end; ++y)
+                {
+                    int trgi = 5 * y * trgWidth; // scale
+                    int sM1 = Math.Max(y - 1, 0);
+                    int s0 = y;
+                    int sP1 = Math.Min(y + 1, srcHeight - 1);
+                    int sP2 = Math.Min(y + 2, srcHeight - 1);
+                    byte blendXy1 = 0;
+                    byte blendXy = 0;
+                    //-----
+                    int fg;
+                    int hc;
+                    bool doLineBlend;
+                    bool haveShallowLine;
+                    bool haveSteepLine;
+                    uint px;
+                    uint b, c, d, e, f, g, h, i;
+                    uint ker4b, ker4c, ker4e, ker4f, ker4g, ker4h, ker4i, ker4j, ker4k, ker4l, ker4n, ker4o;
+                    uint ker3_0, ker3_1, ker3_2, ker3_3, ker3_4, ker3_5, ker3_6, ker3_7, ker3_8;
+                    byte blend;
+
+                    for (int x = 0; x < srcWidth; ++x, trgi += 5) //scale
+                    {
+                        int blendResult_f = 0, blendResult_g = 0, blendResult_j = 0, blendResult_k = 0;
+
+                        int xM1 = Math.Max(x - 1, 0);
+                        int xP1 = Math.Min(x + 1, srcWidth - 1);
+                        int xP2 = Math.Min(x + 2, srcWidth - 1);
+
+                        ker4b = src[sM1 * srcWidth + x];
+                        ker4c = src[sM1 * srcWidth + xP1];
+
+                        ker4e = src[s0 * srcWidth + xM1];
+                        ker4f = src[s0 * srcWidth + x];
+                        ker4g = src[s0 * srcWidth + xP1];
+                        ker4h = src[s0 * srcWidth + xP2];
+
+                        ker4i = src[sP1 * srcWidth + xM1];
+                        ker4j = src[sP1 * srcWidth + x];
+                        ker4k = src[sP1 * srcWidth + xP1];
+                        ker4l = src[sP1 * srcWidth + xP2];
+
+                        ker4n = src[sP2 * srcWidth + x];
+                        ker4o = src[sP2 * srcWidth + xP1];
+
+                        //--------------------------------------
+
+                        if ((ker4f != ker4g || ker4j != ker4k) && (ker4f != ker4j || ker4g != ker4k))
+                        {
+                            int jg = DistYCbCr(ker4i, ker4f) + DistYCbCr(ker4f, ker4c) + DistYCbCr(ker4n, ker4k) + DistYCbCr(ker4k, ker4h) + (DistYCbCr(ker4j, ker4g) << 2);
+                            int fk = DistYCbCr(ker4e, ker4j) + DistYCbCr(ker4j, ker4o) + DistYCbCr(ker4b, ker4g) + DistYCbCr(ker4g, ker4l) + (DistYCbCr(ker4f, ker4k) << 2);
+
+                            if (jg < fk)
+                            {
+                                bool dominantGradient = dominantDirectionThreshold * jg < fk;
+                                if (ker4f != ker4g && ker4f != ker4j)
+                                    blendResult_f = dominantGradient ? BlendDominant : BlendNormal;
+                                if (ker4k != ker4j && ker4k != ker4g)
+                                    blendResult_k = dominantGradient ? BlendDominant : BlendNormal;
+
+                            }
+                            else if (fk < jg)
+                            {
+                                bool dominantGradient = dominantDirectionThreshold * fk < jg;
+                                if (ker4j != ker4f && ker4j != ker4k)
+                                    blendResult_j = dominantGradient ? BlendDominant : BlendNormal;
+                                if (ker4g != ker4f && ker4g != ker4k)
+                                    blendResult_g = dominantGradient ? BlendDominant : BlendNormal;
+                            }
+
+                        }
+                        //--------------------------------------
+
+                        blendXy = SetBottomR(preProcBuffer[x], blendResult_f);
+                        blendXy1 = SetTopR(blendXy1, blendResult_j);
+                        preProcBuffer[x] = blendXy1;
+                        blendXy1 = SetTopL(0, blendResult_k);
+
+                        if (x + 1 < srcWidth)
+                            preProcBuffer[x + 1] = SetBottomL(preProcBuffer[x + 1], blendResult_g);
+
+                        _FillBlock5x(trg, trgi, trgWidth, src[s0 * srcWidth + x]);//, 5);//scale
+
+                        if (blendXy == 0)
+                            continue;
+
+                        ker3_0 = src[sM1 * srcWidth + xM1]; // src[xM1][sM1]; //src[(sM1 + xM1) % srcWidth][(sM1 + xM1) / srcWidth];
+                        ker3_1 = src[sM1 * srcWidth + x]; //src[x][sM1]; //src[(sM1 + x) % srcWidth][(sM1 + x) / srcWidth];
+                        ker3_2 = src[sM1 * srcWidth + xP1]; //src[xP1][sM1]; //src[(sM1 + xP1) % srcWidth][(sM1 + xP1) / srcWidth];
+
+                        ker3_3 = src[s0 * srcWidth + xM1];  // src[xM1][s0]; //src[(s0 + xM1) % srcWidth][(s0 + xM1) / srcWidth];
+                        ker3_4 = src[s0 * srcWidth + x];  //src[x][s0]; //src[(s0 + x) % srcWidth][(s0 + x) / srcWidth];
+                        ker3_5 = src[s0 * srcWidth + xP1];  //src[xP1][s0]; //src[(s0 + xP1) % srcWidth][(s0 + xP1) / srcWidth];
+
+                        ker3_6 = src[sP1 * srcWidth + xM1]; //src[xM1][sP1];//src[(sP1 + xM1) % srcWidth][(sP1 + xM1) / srcWidth];
+                        ker3_7 = src[sP1 * srcWidth + x]; //src[x][sP1]; //src[(sP1 + x) % srcWidth][(sP1 + x) / srcWidth];
+                        ker3_8 = src[sP1 * srcWidth + xP1]; //src[xP1][sP1];// //src[(sP1 + xP1) % srcWidth][(sP1 + xP1) / srcWidth];
+
+                        //--
+
+                        b = ker3_1;
+                        c = ker3_2;
+                        d = ker3_3;
+                        e = ker3_4;
+                        f = ker3_5;
+                        g = ker3_6;
+                        h = ker3_7;
+                        i = ker3_8;
+
+                        blend = Rotate(blendXy, 0);
+
+                        if (GetBottomR(blend) != BlendNone)
+                        {
+                            if (GetBottomR(blend) >= BlendDominant)
+                                doLineBlend = true;
+                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
+                                doLineBlend = false;
+                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
+                                doLineBlend = false;
+                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
+                                doLineBlend = false;
+                            else
+                                doLineBlend = true;
+                            px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
+
+                            outputMatrix.Move(0, trgi);
+
+                            if (!doLineBlend)
+                            {
+                                Scaler_5X.BlendCorner(px, outputMatrix);
+
+                            }
+                            else
+                            {
+
+                                fg = DistYCbCr(f, g);
+                                hc = DistYCbCr(h, c);
+
+                                haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
+                                haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
+
+                                if (haveShallowLine)
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_5X.BlendLineSteepAndShallow(px, outputMatrix);
+                                    else
+                                        Scaler_5X.BlendLineShallow(px, outputMatrix);
+                                }
+                                else
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_5X.BlendLineSteep(px, outputMatrix);
+                                    else
+                                        Scaler_5X.BlendLineDiagonal(px, outputMatrix);
+                                }
+                            }
+                        }
+                        //-----
+
+                        b = ker3_3;
+                        c = ker3_0;
+                        d = ker3_7;
+                        e = ker3_4;
+                        f = ker3_1;
+                        g = ker3_8;
+                        h = ker3_5;
+                        i = ker3_2;
+
+                        blend = Rotate(blendXy, 1);
+
+                        if (GetBottomR(blend) != BlendNone)
+                        {
+                            if (GetBottomR(blend) >= BlendDominant)
+                                doLineBlend = true;
+                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
+                                doLineBlend = false;
+                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
+                                doLineBlend = false;
+                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
+                                doLineBlend = false;
+                            else
+                                doLineBlend = true;
+                            px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
+
+                            outputMatrix.Move(1, trgi);
+
+                            if (!doLineBlend)
+                            {
+                                Scaler_5X.BlendCorner(px, outputMatrix);
+
+                            }
+                            else
+                            {
+                                fg = DistYCbCr(f, g);
+                                hc = DistYCbCr(h, c);
+
+                                haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
+                                haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
+
+                                if (haveShallowLine)
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_5X.BlendLineSteepAndShallow(px, outputMatrix);
+                                    else
+                                        Scaler_5X.BlendLineShallow(px, outputMatrix);
+                                }
+                                else
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_5X.BlendLineSteep(px, outputMatrix);
+                                    else
+                                        Scaler_5X.BlendLineDiagonal(px, outputMatrix);
+                                }
+                            }
+                        }
+
+                        //--------------------------------
+
+                        b = ker3_7;
+                        c = ker3_6;
+                        d = ker3_5;
+                        e = ker3_4;
+                        f = ker3_3;
+                        g = ker3_2;
+                        h = ker3_1;
+                        i = ker3_0;
+
+                        blend = Rotate(blendXy, 2);
+
+                        if (GetBottomR(blend) != BlendNone)
+                        {
+                            if (GetBottomR(blend) >= BlendDominant)
+                                doLineBlend = true;
+                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
+                                doLineBlend = false;
+                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
+                                doLineBlend = false;
+                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
+                                doLineBlend = false;
+                            else
+                                doLineBlend = true;
+                            px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
+
+                            outputMatrix.Move(2, trgi);
+
+                            if (!doLineBlend)
+                            {
+                                Scaler_5X.BlendCorner(px, outputMatrix);
+
+                            }
+                            else
+                            {
+                                fg = DistYCbCr(f, g);
+                                hc = DistYCbCr(h, c);
+
+                                haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
+                                haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
+
+                                if (haveShallowLine)
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_5X.BlendLineSteepAndShallow(px, outputMatrix);
+                                    else
+                                        Scaler_5X.BlendLineShallow(px, outputMatrix);
+                                }
+                                else
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_5X.BlendLineSteep(px, outputMatrix);
+                                    else
+                                        Scaler_5X.BlendLineDiagonal(px, outputMatrix);
+                                }
+                            }
+                        }
+                        //--------------------------------
+                        b = ker3_5;
+                        c = ker3_8;
+                        d = ker3_1;
+                        e = ker3_4;
+                        f = ker3_7;
+                        g = ker3_0;
+                        h = ker3_3;
+                        i = ker3_6;
+                        blend = Rotate(blendXy, 3);
+                        if (GetBottomR(blend) != BlendNone)
+                        {
+                            if (GetBottomR(blend) >= BlendDominant)
+                                doLineBlend = true;
+                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
+                                doLineBlend = false;
+                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
+                                doLineBlend = false;
+                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
+                                doLineBlend = false;
+                            else
+                                doLineBlend = true;
+                            px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
+
+                            outputMatrix.Move(3, trgi);
+
+                            if (!doLineBlend)
+                            {
+                                Scaler_5X.BlendCorner(px, outputMatrix);
+
+                            }
+                            else
+                            {
+                                fg = DistYCbCr(f, g);
+                                hc = DistYCbCr(h, c);
+
+                                haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
+                                haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
+
+                                if (haveShallowLine)
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_5X.BlendLineSteepAndShallow(px, outputMatrix);
+                                    else
+                                        Scaler_5X.BlendLineShallow(px, outputMatrix);
+                                }
+                                else
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_5X.BlendLineSteep(px, outputMatrix);
+                                    else
+                                        Scaler_5X.BlendLineDiagonal(px, outputMatrix);
+                                }
+                            }
+                        }
+                    }
+                    //---
+                }
+            });
         }
-        public static void ScaleImage4X(uint[][] src, uint[] trg, int srcWidth, int srcHeight)
+
+        public static void ScaleImage4X(uint* src, uint* trg, int srcWidth, int srcHeight)
         {
             int trgWidth = srcWidth << 2;
 
-            byte[] preProcBuffer = new byte[srcWidth];
 
-            OutputMatrix outputMatrix = new OutputMatrix(4, trg, trgWidth); //scale
-
-            for (int y = 0; y < srcHeight; ++y)
+            Parallel.For(0, 4, core =>
             {
-                int trgi = 4 * y * trgWidth; // scale
-                int sM1 = Math.Max(y - 1, 0);
-                int s0 = y;
-                int sP1 = Math.Min(y + 1, srcHeight - 1);
-                int sP2 = Math.Min(y + 2, srcHeight - 1);
-                byte blendXy1 = 0;
-                byte blendXy = 0;
-                //-----
-                int fg;
-                int hc;
-                bool doLineBlend;
-                bool haveShallowLine;
-                bool haveSteepLine;
-                uint px;
-                uint b, c, d, e, f, g, h, i;
-                uint ker4b, ker4c, ker4e, ker4f, ker4g, ker4h, ker4i, ker4j, ker4k, ker4l, ker4n, ker4o;
-                uint ker3_0, ker3_1, ker3_2, ker3_3, ker3_4, ker3_5, ker3_6, ker3_7, ker3_8;
-                byte blend;
-
-                for (int x = 0; x < srcWidth; ++x, trgi += 4) //scale
+                int start = 0, end = 0;
+                if (core == 0)
                 {
-                    int blendResult_f = 0, blendResult_g = 0, blendResult_j = 0, blendResult_k = 0;
-
-                    int xM1 = Math.Max(x - 1, 0);
-                    int xP1 = Math.Min(x + 1, srcWidth - 1);
-                    int xP2 = Math.Min(x + 2, srcWidth - 1);
-
-                    ker4b = src[x][sM1];    //src[(sM1 + x) % srcWidth][(sM1 + x) / srcWidth];
-                    ker4c = src[xP1][sM1]; //src[(sM1 + xP1) % srcWidth][(sM1 + xP1) / srcWidth];
-
-                    ker4e = src[xM1][s0]; //src[(s0 + xM1) % srcWidth][(s0 + xM1) / srcWidth];
-                    ker4f = src[x][s0]; //src[(s0 + x) % srcWidth][(s0 + x) /srcWidth];
-                    ker4g = src[xP1][s0];//  //src[(s0 + xP1) % srcWidth][(s0 + xP1) / srcWidth];
-                    ker4h = src[xP2][s0]; //src[(s0 + xP2) % srcWidth][(s0 + xP2)/srcWidth];
-
-                    ker4i = src[xM1][sP1]; //src[(sP1 + xM1) % srcWidth][(sP1 + xM1)/srcWidth];
-                    ker4j = src[x][sP1]; //src[(sP1 + x) % srcWidth][(sP1 + x)/srcWidth];
-                    ker4k = src[xP1][sP1];// //src[(sP1 + xP1) % srcWidth][(sP1 + xP1)/srcWidth];
-                    ker4l = src[xP2][sP1];// //src[(sP1 + xP2) % srcWidth][(sP1 + xP2)/srcWidth];
-
-                    ker4n = src[x][sP2];//  //src[(sP2 + x) % srcWidth][(sP2+x)/srcWidth];
-                    ker4o = src[xP1][sP2]; //src[(sP2 + xP1) % srcWidth][(sP2 + xP1) /srcWidth];
-
-                    //--------------------------------------
-
-                    if ((ker4f != ker4g || ker4j != ker4k) && (ker4f != ker4j || ker4g != ker4k))
-                    {
-                        int jg = DistYCbCr(ker4i, ker4f) + DistYCbCr(ker4f, ker4c) + DistYCbCr(ker4n, ker4k) + DistYCbCr(ker4k, ker4h) + (DistYCbCr(ker4j, ker4g) << 2);
-                        int fk = DistYCbCr(ker4e, ker4j) + DistYCbCr(ker4j, ker4o) + DistYCbCr(ker4b, ker4g) + DistYCbCr(ker4g, ker4l) + (DistYCbCr(ker4f, ker4k) << 2);
-
-                        if (jg < fk)
-                        {
-                            bool dominantGradient = dominantDirectionThreshold * jg < fk;
-                            if (ker4f != ker4g && ker4f != ker4j)
-                                blendResult_f = dominantGradient ? BlendDominant : BlendNormal;
-                            if (ker4k != ker4j && ker4k != ker4g)
-                                blendResult_k = dominantGradient ? BlendDominant : BlendNormal;
-
-                        }
-                        else if (fk < jg)
-                        {
-                            bool dominantGradient = dominantDirectionThreshold * fk < jg;
-                            if (ker4j != ker4f && ker4j != ker4k)
-                                blendResult_j = dominantGradient ? BlendDominant : BlendNormal;
-                            if (ker4g != ker4f && ker4g != ker4k)
-                                blendResult_g = dominantGradient ? BlendDominant : BlendNormal;
-                        }
-
-                    }
-                    //--------------------------------------
-
-                    blendXy = SetBottomR(preProcBuffer[x], blendResult_f);
-                    blendXy1 = SetTopR(blendXy1, blendResult_j);
-                    preProcBuffer[x] = blendXy1;
-                    blendXy1 = SetTopL(0, blendResult_k);
-
-                    if (x + 1 < srcWidth)
-                        preProcBuffer[x + 1] = SetBottomL(preProcBuffer[x + 1], blendResult_g);
-
-                    _FillBlock(trg, trgi, trgWidth, src[x][s0], 4);//scale
-
-
-
-                    if (blendXy == 0)
-                        continue;
-
-                    ker3_0 = src[xM1][sM1]; //src[(sM1 + xM1) % srcWidth][(sM1 + xM1) / srcWidth];
-                    ker3_1 = src[x][sM1]; //src[(sM1 + x) % srcWidth][(sM1 + x) / srcWidth];
-                    ker3_2 = src[xP1][sM1]; //src[(sM1 + xP1) % srcWidth][(sM1 + xP1) / srcWidth];
-
-                    ker3_3 = src[xM1][s0]; //src[(s0 + xM1) % srcWidth][(s0 + xM1) / srcWidth];
-                    ker3_4 = src[x][s0]; //src[(s0 + x) % srcWidth][(s0 + x) / srcWidth];
-                    ker3_5 = src[xP1][s0]; //src[(s0 + xP1) % srcWidth][(s0 + xP1) / srcWidth];
-
-                    ker3_6 = src[xM1][sP1];//src[(sP1 + xM1) % srcWidth][(sP1 + xM1) / srcWidth];
-                    ker3_7 = src[x][sP1]; //src[(sP1 + x) % srcWidth][(sP1 + x) / srcWidth];
-                    ker3_8 = src[xP1][sP1];// //src[(sP1 + xP1) % srcWidth][(sP1 + xP1) / srcWidth];
-
-                    //--
-
-                    b = ker3_1;
-                    c = ker3_2;
-                    d = ker3_3;
-                    e = ker3_4;
-                    f = ker3_5;
-                    g = ker3_6;
-                    h = ker3_7;
-                    i = ker3_8;
-
-                    blend = Rotate(blendXy, 0);
-
-                    if (GetBottomR(blend) != BlendNone)
-                    {
-                        if (GetBottomR(blend) >= BlendDominant)
-                            doLineBlend = true;
-                        else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
-                            doLineBlend = false;
-                        else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
-                            doLineBlend = false;
-                        else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
-                            doLineBlend = false;
-                        else
-                            doLineBlend = true;
-                        px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
-
-                        outputMatrix.Move(0, trgi);
-
-                        if (!doLineBlend)
-                        {
-                            Scaler_4X.BlendCorner(px, outputMatrix);
-
-                        }
-                        else
-                        {
-
-                            fg = DistYCbCr(f, g);
-                            hc = DistYCbCr(h, c);
-
-                            haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
-                            haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
-
-                            if (haveShallowLine)
-                            {
-                                if (haveSteepLine)
-                                    Scaler_4X.BlendLineSteepAndShallow(px, outputMatrix);
-                                else
-                                    Scaler_4X.BlendLineShallow(px, outputMatrix);
-                            }
-                            else
-                            {
-                                if (haveSteepLine)
-                                    Scaler_4X.BlendLineSteep(px, outputMatrix);
-                                else
-                                    Scaler_4X.BlendLineDiagonal(px, outputMatrix);
-                            }
-                        }
-                    }
-                    //-----
-
-                    b = ker3_3;
-                    c = ker3_0;
-                    d = ker3_7;
-                    e = ker3_4;
-                    f = ker3_1;
-                    g = ker3_8;
-                    h = ker3_5;
-                    i = ker3_2;
-
-                    blend = Rotate(blendXy, 1);
-
-                    if (GetBottomR(blend) != BlendNone)
-                    {
-                        if (GetBottomR(blend) >= BlendDominant)
-                            doLineBlend = true;
-                        else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
-                            doLineBlend = false;
-                        else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
-                            doLineBlend = false;
-                        else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
-                            doLineBlend = false;
-                        else
-                            doLineBlend = true;
-                        px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
-
-                        outputMatrix.Move(1, trgi);
-
-                        if (!doLineBlend)
-                        {
-                            Scaler_4X.BlendCorner(px, outputMatrix);
-
-                        }
-                        else
-                        {
-                            fg = DistYCbCr(f, g);
-                            hc = DistYCbCr(h, c);
-
-                            haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
-                            haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
-
-                            if (haveShallowLine)
-                            {
-                                if (haveSteepLine)
-                                    Scaler_4X.BlendLineSteepAndShallow(px, outputMatrix);
-                                else
-                                    Scaler_4X.BlendLineShallow(px, outputMatrix);
-                            }
-                            else
-                            {
-                                if (haveSteepLine)
-                                    Scaler_4X.BlendLineSteep(px, outputMatrix);
-                                else
-                                    Scaler_4X.BlendLineDiagonal(px, outputMatrix);
-                            }
-                        }
-                    }
-
-                    //--------------------------------
-
-                    b = ker3_7;
-                    c = ker3_6;
-                    d = ker3_5;
-                    e = ker3_4;
-                    f = ker3_3;
-                    g = ker3_2;
-                    h = ker3_1;
-                    i = ker3_0;
-
-                    blend = Rotate(blendXy, 2);
-
-                    if (GetBottomR(blend) != BlendNone)
-                    {
-                        if (GetBottomR(blend) >= BlendDominant)
-                            doLineBlend = true;
-                        else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
-                            doLineBlend = false;
-                        else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
-                            doLineBlend = false;
-                        else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
-                            doLineBlend = false;
-                        else
-                            doLineBlend = true;
-                        px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
-
-                        outputMatrix.Move(2, trgi);
-
-                        if (!doLineBlend)
-                        {
-                            Scaler_4X.BlendCorner(px, outputMatrix);
-
-                        }
-                        else
-                        {
-                            fg = DistYCbCr(f, g);
-                            hc = DistYCbCr(h, c);
-
-                            haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
-                            haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
-
-                            if (haveShallowLine)
-                            {
-                                if (haveSteepLine)
-                                    Scaler_4X.BlendLineSteepAndShallow(px, outputMatrix);
-                                else
-                                    Scaler_4X.BlendLineShallow(px, outputMatrix);
-                            }
-                            else
-                            {
-                                if (haveSteepLine)
-                                    Scaler_4X.BlendLineSteep(px, outputMatrix);
-                                else
-                                    Scaler_4X.BlendLineDiagonal(px, outputMatrix);
-                            }
-                        }
-                    }
-                    //--------------------------------
-                    b = ker3_5;
-                    c = ker3_8;
-                    d = ker3_1;
-                    e = ker3_4;
-                    f = ker3_7;
-                    g = ker3_0;
-                    h = ker3_3;
-                    i = ker3_6;
-                    blend = Rotate(blendXy, 3);
-                    if (GetBottomR(blend) != BlendNone)
-                    {
-                        if (GetBottomR(blend) >= BlendDominant)
-                            doLineBlend = true;
-                        else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
-                            doLineBlend = false;
-                        else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
-                            doLineBlend = false;
-                        else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
-                            doLineBlend = false;
-                        else
-                            doLineBlend = true;
-                        px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
-
-                        outputMatrix.Move(3, trgi);
-
-                        if (!doLineBlend)
-                        {
-                            Scaler_4X.BlendCorner(px, outputMatrix);
-
-                        }
-                        else
-                        {
-                            fg = DistYCbCr(f, g);
-                            hc = DistYCbCr(h, c);
-
-                            haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
-                            haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
-
-                            if (haveShallowLine)
-                            {
-                                if (haveSteepLine)
-                                    Scaler_4X.BlendLineSteepAndShallow(px, outputMatrix);
-                                else
-                                    Scaler_4X.BlendLineShallow(px, outputMatrix);
-                            }
-                            else
-                            {
-                                if (haveSteepLine)
-                                    Scaler_4X.BlendLineSteep(px, outputMatrix);
-                                else
-                                    Scaler_4X.BlendLineDiagonal(px, outputMatrix);
-                            }
-                        }
-                    }
+                    start = 0;
+                    end = srcHeight / 4;
                 }
-                //---
-            }
+                else if (core == 1)
+                {
+                    start = srcHeight / 4;
+                    end = srcHeight / 2;
+                }
+                else if (core == 2)
+                {
+                    start = srcHeight / 2;
+                    end = (srcHeight / 4) * 3;
+                }
+                else if (core == 3)
+                {
+                    start = (srcHeight / 4) * 3;
+                    end = srcHeight;
+                }
+
+                OutputMatrix outputMatrix = new OutputMatrix(4, trg, trgWidth);
+                byte[] preProcBuffer = new byte[srcWidth];
+                for (int y = start; y < end; ++y)
+                {
+                    int trgi = 4 * y * trgWidth; // scale
+                    int sM1 = Math.Max(y - 1, 0);
+                    int s0 = y;
+                    int sP1 = Math.Min(y + 1, srcHeight - 1);
+                    int sP2 = Math.Min(y + 2, srcHeight - 1);
+                    byte blendXy1 = 0;
+                    byte blendXy = 0;
+                    //-----
+                    int fg;
+                    int hc;
+                    bool doLineBlend;
+                    bool haveShallowLine;
+                    bool haveSteepLine;
+                    uint px;
+                    uint b, c, d, e, f, g, h, i;
+                    uint ker4b, ker4c, ker4e, ker4f, ker4g, ker4h, ker4i, ker4j, ker4k, ker4l, ker4n, ker4o;
+                    uint ker3_0, ker3_1, ker3_2, ker3_3, ker3_4, ker3_5, ker3_6, ker3_7, ker3_8;
+                    byte blend;
+
+                    for (int x = 0; x < srcWidth; ++x, trgi += 4) //scale
+                    {
+                        int blendResult_f = 0, blendResult_g = 0, blendResult_j = 0, blendResult_k = 0;
+
+                        int xM1 = Math.Max(x - 1, 0);
+                        int xP1 = Math.Min(x + 1, srcWidth - 1);
+                        int xP2 = Math.Min(x + 2, srcWidth - 1);
+
+                        ker4b = src[sM1 * srcWidth + x];         //src[x][sM1];    //src[(sM1 + x) % srcWidth][(sM1 + x) / srcWidth];
+                        ker4c = src[sM1 * srcWidth + xP1];    //src[xP1][sM1]; //src[(sM1 + xP1) % srcWidth][(sM1 + xP1) / srcWidth];
+
+                        ker4e = src[s0 * srcWidth + xM1];    //src[xM1][s0]; //src[(s0 + xM1) % srcWidth][(s0 + xM1) / srcWidth];
+                        ker4f = src[s0 * srcWidth + x];  //src[x][s0]; //src[(s0 + x) % srcWidth][(s0 + x) /srcWidth];
+                        ker4g = src[s0 * srcWidth + xP1];   //src[xP1][s0];//  //src[(s0 + xP1) % srcWidth][(s0 + xP1) / srcWidth];
+                        ker4h = src[s0 * srcWidth + xP2]; //src[(s0 + xP2) % srcWidth][(s0 + xP2)/srcWidth];
+
+                        ker4i = src[sP1 * srcWidth + xM1];  //src[xM1][sP1]; //src[(sP1 + xM1) % srcWidth][(sP1 + xM1)/srcWidth];
+                        ker4j = src[sP1 * srcWidth + x];    //src[x][sP1]; //src[(sP1 + x) % srcWidth][(sP1 + x)/srcWidth];
+                        ker4k = src[sP1 * srcWidth + xP1]; //src[xP1][sP1];// //src[(sP1 + xP1) % srcWidth][(sP1 + xP1)/srcWidth];
+                        ker4l = src[sP1 * srcWidth + xP2]; //src[xP2][sP1];// //src[(sP1 + xP2) % srcWidth][(sP1 + xP2)/srcWidth];
+
+                        ker4n = src[sP2 * srcWidth + x];  //src[x][sP2];//  //src[(sP2 + x) % srcWidth][(sP2+x)/srcWidth];
+                        ker4o = src[sP2 * srcWidth + xP1];   //src[xP1][sP2]; //src[(sP2 + xP1) % srcWidth][(sP2 + xP1) /srcWidth];
+
+                        //--------------------------------------
+
+                        if ((ker4f != ker4g || ker4j != ker4k) && (ker4f != ker4j || ker4g != ker4k))
+                        {
+                            int jg = DistYCbCr(ker4i, ker4f) + DistYCbCr(ker4f, ker4c) + DistYCbCr(ker4n, ker4k) + DistYCbCr(ker4k, ker4h) + (DistYCbCr(ker4j, ker4g) << 2);
+                            int fk = DistYCbCr(ker4e, ker4j) + DistYCbCr(ker4j, ker4o) + DistYCbCr(ker4b, ker4g) + DistYCbCr(ker4g, ker4l) + (DistYCbCr(ker4f, ker4k) << 2);
+
+                            if (jg < fk)
+                            {
+                                bool dominantGradient = dominantDirectionThreshold * jg < fk;
+                                if (ker4f != ker4g && ker4f != ker4j)
+                                    blendResult_f = dominantGradient ? BlendDominant : BlendNormal;
+                                if (ker4k != ker4j && ker4k != ker4g)
+                                    blendResult_k = dominantGradient ? BlendDominant : BlendNormal;
+
+                            }
+                            else if (fk < jg)
+                            {
+                                bool dominantGradient = dominantDirectionThreshold * fk < jg;
+                                if (ker4j != ker4f && ker4j != ker4k)
+                                    blendResult_j = dominantGradient ? BlendDominant : BlendNormal;
+                                if (ker4g != ker4f && ker4g != ker4k)
+                                    blendResult_g = dominantGradient ? BlendDominant : BlendNormal;
+                            }
+
+                        }
+                        //--------------------------------------
+
+                        blendXy = SetBottomR(preProcBuffer[x], blendResult_f);
+                        blendXy1 = SetTopR(blendXy1, blendResult_j);
+                        preProcBuffer[x] = blendXy1;
+                        blendXy1 = SetTopL(0, blendResult_k);
+
+                        if (x + 1 < srcWidth)
+                            preProcBuffer[x + 1] = SetBottomL(preProcBuffer[x + 1], blendResult_g);
+
+                        _FillBlock4x(trg, trgi, trgWidth, src[s0 * srcWidth + x]); //, 4);//scale
+
+
+
+                        if (blendXy == 0)
+                            continue;
+
+                        ker3_0 = src[sM1 * srcWidth + xM1]; // src[xM1][sM1]; //src[(sM1 + xM1) % srcWidth][(sM1 + xM1) / srcWidth];
+                        ker3_1 = src[sM1 * srcWidth + x]; //src[x][sM1]; //src[(sM1 + x) % srcWidth][(sM1 + x) / srcWidth];
+                        ker3_2 = src[sM1 * srcWidth + xP1]; //src[xP1][sM1]; //src[(sM1 + xP1) % srcWidth][(sM1 + xP1) / srcWidth];
+
+                        ker3_3 = src[s0 * srcWidth + xM1];  // src[xM1][s0]; //src[(s0 + xM1) % srcWidth][(s0 + xM1) / srcWidth];
+                        ker3_4 = src[s0 * srcWidth + x];  //src[x][s0]; //src[(s0 + x) % srcWidth][(s0 + x) / srcWidth];
+                        ker3_5 = src[s0 * srcWidth + xP1];  //src[xP1][s0]; //src[(s0 + xP1) % srcWidth][(s0 + xP1) / srcWidth];
+
+                        ker3_6 = src[sP1 * srcWidth + xM1]; //src[xM1][sP1];//src[(sP1 + xM1) % srcWidth][(sP1 + xM1) / srcWidth];
+                        ker3_7 = src[sP1 * srcWidth + x]; //src[x][sP1]; //src[(sP1 + x) % srcWidth][(sP1 + x) / srcWidth];
+                        ker3_8 = src[sP1 * srcWidth + xP1]; //src[xP1][sP1];// //src[(sP1 + xP1) % srcWidth][(sP1 + xP1) / srcWidth];
+                        //--
+
+                        //--
+
+                        b = ker3_1;
+                        c = ker3_2;
+                        d = ker3_3;
+                        e = ker3_4;
+                        f = ker3_5;
+                        g = ker3_6;
+                        h = ker3_7;
+                        i = ker3_8;
+
+                        blend = Rotate(blendXy, 0);
+
+                        if (GetBottomR(blend) != BlendNone)
+                        {
+                            if (GetBottomR(blend) >= BlendDominant)
+                                doLineBlend = true;
+                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
+                                doLineBlend = false;
+                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
+                                doLineBlend = false;
+                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
+                                doLineBlend = false;
+                            else
+                                doLineBlend = true;
+                            px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
+
+                            outputMatrix.Move(0, trgi);
+
+                            if (!doLineBlend)
+                            {
+                                Scaler_4X.BlendCorner(px, outputMatrix);
+
+                            }
+                            else
+                            {
+
+                                fg = DistYCbCr(f, g);
+                                hc = DistYCbCr(h, c);
+
+                                haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
+                                haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
+
+                                if (haveShallowLine)
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_4X.BlendLineSteepAndShallow(px, outputMatrix);
+                                    else
+                                        Scaler_4X.BlendLineShallow(px, outputMatrix);
+                                }
+                                else
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_4X.BlendLineSteep(px, outputMatrix);
+                                    else
+                                        Scaler_4X.BlendLineDiagonal(px, outputMatrix);
+                                }
+                            }
+                        }
+                        //-----
+
+                        b = ker3_3;
+                        c = ker3_0;
+                        d = ker3_7;
+                        e = ker3_4;
+                        f = ker3_1;
+                        g = ker3_8;
+                        h = ker3_5;
+                        i = ker3_2;
+
+                        blend = Rotate(blendXy, 1);
+
+                        if (GetBottomR(blend) != BlendNone)
+                        {
+                            if (GetBottomR(blend) >= BlendDominant)
+                                doLineBlend = true;
+                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
+                                doLineBlend = false;
+                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
+                                doLineBlend = false;
+                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
+                                doLineBlend = false;
+                            else
+                                doLineBlend = true;
+                            px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
+
+                            outputMatrix.Move(1, trgi);
+
+                            if (!doLineBlend)
+                            {
+                                Scaler_4X.BlendCorner(px, outputMatrix);
+
+                            }
+                            else
+                            {
+                                fg = DistYCbCr(f, g);
+                                hc = DistYCbCr(h, c);
+
+                                haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
+                                haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
+
+                                if (haveShallowLine)
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_4X.BlendLineSteepAndShallow(px, outputMatrix);
+                                    else
+                                        Scaler_4X.BlendLineShallow(px, outputMatrix);
+                                }
+                                else
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_4X.BlendLineSteep(px, outputMatrix);
+                                    else
+                                        Scaler_4X.BlendLineDiagonal(px, outputMatrix);
+                                }
+                            }
+                        }
+
+                        //--------------------------------
+
+                        b = ker3_7;
+                        c = ker3_6;
+                        d = ker3_5;
+                        e = ker3_4;
+                        f = ker3_3;
+                        g = ker3_2;
+                        h = ker3_1;
+                        i = ker3_0;
+
+                        blend = Rotate(blendXy, 2);
+
+                        if (GetBottomR(blend) != BlendNone)
+                        {
+                            if (GetBottomR(blend) >= BlendDominant)
+                                doLineBlend = true;
+                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
+                                doLineBlend = false;
+                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
+                                doLineBlend = false;
+                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
+                                doLineBlend = false;
+                            else
+                                doLineBlend = true;
+                            px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
+
+                            outputMatrix.Move(2, trgi);
+
+                            if (!doLineBlend)
+                            {
+                                Scaler_4X.BlendCorner(px, outputMatrix);
+
+                            }
+                            else
+                            {
+                                fg = DistYCbCr(f, g);
+                                hc = DistYCbCr(h, c);
+
+                                haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
+                                haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
+
+                                if (haveShallowLine)
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_4X.BlendLineSteepAndShallow(px, outputMatrix);
+                                    else
+                                        Scaler_4X.BlendLineShallow(px, outputMatrix);
+                                }
+                                else
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_4X.BlendLineSteep(px, outputMatrix);
+                                    else
+                                        Scaler_4X.BlendLineDiagonal(px, outputMatrix);
+                                }
+                            }
+                        }
+                        //--------------------------------
+                        b = ker3_5;
+                        c = ker3_8;
+                        d = ker3_1;
+                        e = ker3_4;
+                        f = ker3_7;
+                        g = ker3_0;
+                        h = ker3_3;
+                        i = ker3_6;
+                        blend = Rotate(blendXy, 3);
+                        if (GetBottomR(blend) != BlendNone)
+                        {
+                            if (GetBottomR(blend) >= BlendDominant)
+                                doLineBlend = true;
+                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
+                                doLineBlend = false;
+                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
+                                doLineBlend = false;
+                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
+                                doLineBlend = false;
+                            else
+                                doLineBlend = true;
+                            px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
+
+                            outputMatrix.Move(3, trgi);
+
+                            if (!doLineBlend)
+                            {
+                                Scaler_4X.BlendCorner(px, outputMatrix);
+
+                            }
+                            else
+                            {
+                                fg = DistYCbCr(f, g);
+                                hc = DistYCbCr(h, c);
+
+                                haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
+                                haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
+
+                                if (haveShallowLine)
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_4X.BlendLineSteepAndShallow(px, outputMatrix);
+                                    else
+                                        Scaler_4X.BlendLineShallow(px, outputMatrix);
+                                }
+                                else
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_4X.BlendLineSteep(px, outputMatrix);
+                                    else
+                                        Scaler_4X.BlendLineDiagonal(px, outputMatrix);
+                                }
+                            }
+                        }
+                    }
+                    //---
+                }
+            });
         }
-        public static void ScaleImage3X(uint[][] src, uint[] trg, int srcWidth, int srcHeight)
+        public static void ScaleImage3X(uint* src, uint* trg, int srcWidth, int srcHeight)
         {
             int trgWidth = srcWidth * 3;
-
-            byte[] preProcBuffer = new byte[srcWidth];
-
-            OutputMatrix outputMatrix = new OutputMatrix(3, trg, trgWidth);
-
-            for (int y = 0; y < srcHeight; ++y)
+            Parallel.For(0, 4, core =>
             {
-                int trgi = 3 * y * trgWidth; // scale
-                int sM1 = Math.Max(y - 1, 0);
-                int s0 = y;
-                int sP1 = Math.Min(y + 1, srcHeight - 1);
-                int sP2 = Math.Min(y + 2, srcHeight - 1);
-                byte blendXy1 = 0;
-                byte blendXy = 0;
-                //-----
-                int fg;
-                int hc;
-                bool doLineBlend;
-                bool haveShallowLine;
-                bool haveSteepLine;
-                uint px;
-                uint b, c, d, e, f, g, h, i;
-                uint ker4b, ker4c, ker4e, ker4f, ker4g, ker4h, ker4i, ker4j, ker4k, ker4l, ker4n, ker4o;
-                uint ker3_0, ker3_1, ker3_2, ker3_3, ker3_4, ker3_5, ker3_6, ker3_7, ker3_8;
-                byte blend;
-
-                for (int x = 0; x < srcWidth; ++x, trgi += 3)
+                int start = 0, end = 0;
+                if (core == 0)
                 {
-                    int blendResult_f = 0, blendResult_g = 0, blendResult_j = 0, blendResult_k = 0;
-
-                    int xM1 = Math.Max(x - 1, 0);
-                    int xP1 = Math.Min(x + 1, srcWidth - 1);
-                    int xP2 = Math.Min(x + 2, srcWidth - 1);
-
-                    ker4b = src[x][sM1];    //src[(sM1 + x) % srcWidth][(sM1 + x) / srcWidth];
-                    ker4c = src[xP1][sM1]; //src[(sM1 + xP1) % srcWidth][(sM1 + xP1) / srcWidth];
-
-                    ker4e = src[xM1][s0]; //src[(s0 + xM1) % srcWidth][(s0 + xM1) / srcWidth];
-                    ker4f = src[x][s0]; //src[(s0 + x) % srcWidth][(s0 + x) /srcWidth];
-                    ker4g = src[xP1][s0];//  //src[(s0 + xP1) % srcWidth][(s0 + xP1) / srcWidth];
-                    ker4h = src[xP2][s0]; //src[(s0 + xP2) % srcWidth][(s0 + xP2)/srcWidth];
-
-                    ker4i = src[xM1][sP1]; //src[(sP1 + xM1) % srcWidth][(sP1 + xM1)/srcWidth];
-                    ker4j = src[x][sP1]; //src[(sP1 + x) % srcWidth][(sP1 + x)/srcWidth];
-                    ker4k = src[xP1][sP1];// //src[(sP1 + xP1) % srcWidth][(sP1 + xP1)/srcWidth];
-                    ker4l = src[xP2][sP1];// //src[(sP1 + xP2) % srcWidth][(sP1 + xP2)/srcWidth];
-
-                    ker4n = src[x][sP2];//  //src[(sP2 + x) % srcWidth][(sP2+x)/srcWidth];
-                    ker4o = src[xP1][sP2]; //src[(sP2 + xP1) % srcWidth][(sP2 + xP1) /srcWidth];
-
-                    //--------------------------------------
-
-                    if ((ker4f != ker4g || ker4j != ker4k) && (ker4f != ker4j || ker4g != ker4k))
-                    {
-                        int jg = DistYCbCr(ker4i, ker4f) + DistYCbCr(ker4f, ker4c) + DistYCbCr(ker4n, ker4k) + DistYCbCr(ker4k, ker4h) + (DistYCbCr(ker4j, ker4g) << 2);
-                        int fk = DistYCbCr(ker4e, ker4j) + DistYCbCr(ker4j, ker4o) + DistYCbCr(ker4b, ker4g) + DistYCbCr(ker4g, ker4l) + (DistYCbCr(ker4f, ker4k) << 2);
-
-                        if (jg < fk)
-                        {
-                            bool dominantGradient = dominantDirectionThreshold * jg < fk;
-                            if (ker4f != ker4g && ker4f != ker4j)
-                                blendResult_f = dominantGradient ? BlendDominant : BlendNormal;
-                            if (ker4k != ker4j && ker4k != ker4g)
-                                blendResult_k = dominantGradient ? BlendDominant : BlendNormal;
-
-                        }
-                        else if (fk < jg)
-                        {
-                            bool dominantGradient = dominantDirectionThreshold * fk < jg;
-                            if (ker4j != ker4f && ker4j != ker4k)
-                                blendResult_j = dominantGradient ? BlendDominant : BlendNormal;
-                            if (ker4g != ker4f && ker4g != ker4k)
-                                blendResult_g = dominantGradient ? BlendDominant : BlendNormal;
-                        }
-
-                    }
-                    //--------------------------------------
-
-                    blendXy = SetBottomR(preProcBuffer[x], blendResult_f);
-                    blendXy1 = SetTopR(blendXy1, blendResult_j);
-                    preProcBuffer[x] = blendXy1;
-                    blendXy1 = SetTopL(0, blendResult_k);
-
-                    if (x + 1 < srcWidth)
-                        preProcBuffer[x + 1] = SetBottomL(preProcBuffer[x + 1], blendResult_g);
-
-                    _FillBlock(trg, trgi, trgWidth, src[x][s0], 3);
-
-                    if (blendXy == 0)
-                        continue;
-
-                    ker3_0 = src[xM1][sM1]; //src[(sM1 + xM1) % srcWidth][(sM1 + xM1) / srcWidth];
-                    ker3_1 = src[x][sM1]; //src[(sM1 + x) % srcWidth][(sM1 + x) / srcWidth];
-                    ker3_2 = src[xP1][sM1]; //src[(sM1 + xP1) % srcWidth][(sM1 + xP1) / srcWidth];
-
-                    ker3_3 = src[xM1][s0]; //src[(s0 + xM1) % srcWidth][(s0 + xM1) / srcWidth];
-                    ker3_4 = src[x][s0]; //src[(s0 + x) % srcWidth][(s0 + x) / srcWidth];
-                    ker3_5 = src[xP1][s0]; //src[(s0 + xP1) % srcWidth][(s0 + xP1) / srcWidth];
-
-                    ker3_6 = src[xM1][sP1];//src[(sP1 + xM1) % srcWidth][(sP1 + xM1) / srcWidth];
-                    ker3_7 = src[x][sP1]; //src[(sP1 + x) % srcWidth][(sP1 + x) / srcWidth];
-                    ker3_8 = src[xP1][sP1];// //src[(sP1 + xP1) % srcWidth][(sP1 + xP1) / srcWidth];
-
-                    //--
-
-                    b = ker3_1;
-                    c = ker3_2;
-                    d = ker3_3;
-                    e = ker3_4;
-                    f = ker3_5;
-                    g = ker3_6;
-                    h = ker3_7;
-                    i = ker3_8;
-
-                    blend = Rotate(blendXy, 0);
-
-                    if (GetBottomR(blend) != BlendNone)
-                    {
-                        if (GetBottomR(blend) >= BlendDominant)
-                            doLineBlend = true;
-                        else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
-                            doLineBlend = false;
-                        else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
-                            doLineBlend = false;
-                        else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
-                            doLineBlend = false;
-                        else
-                            doLineBlend = true;
-                        px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
-
-                        outputMatrix.Move(0, trgi);
-
-                        if (!doLineBlend)
-                        {
-                            Scaler_3X.BlendCorner(px, outputMatrix);
-
-                        }
-                        else
-                        {
-
-                            fg = DistYCbCr(f, g);
-                            hc = DistYCbCr(h, c);
-
-                            haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
-                            haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
-
-                            if (haveShallowLine)
-                            {
-                                if (haveSteepLine)
-                                    Scaler_3X.BlendLineSteepAndShallow(px, outputMatrix);
-                                else
-                                    Scaler_3X.BlendLineShallow(px, outputMatrix);
-                            }
-                            else
-                            {
-                                if (haveSteepLine)
-                                    Scaler_3X.BlendLineSteep(px, outputMatrix);
-                                else
-                                    Scaler_3X.BlendLineDiagonal(px, outputMatrix);
-                            }
-                        }
-                    }
-                    //-----
-
-                    b = ker3_3;
-                    c = ker3_0;
-                    d = ker3_7;
-                    e = ker3_4;
-                    f = ker3_1;
-                    g = ker3_8;
-                    h = ker3_5;
-                    i = ker3_2;
-
-                    blend = Rotate(blendXy, 1);
-
-                    if (GetBottomR(blend) != BlendNone)
-                    {
-                        if (GetBottomR(blend) >= BlendDominant)
-                            doLineBlend = true;
-                        else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
-                            doLineBlend = false;
-                        else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
-                            doLineBlend = false;
-                        else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
-                            doLineBlend = false;
-                        else
-                            doLineBlend = true;
-                        px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
-
-                        outputMatrix.Move(1, trgi);
-
-                        if (!doLineBlend)
-                        {
-                            Scaler_3X.BlendCorner(px, outputMatrix);
-
-                        }
-                        else
-                        {
-                            fg = DistYCbCr(f, g);
-                            hc = DistYCbCr(h, c);
-
-                            haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
-                            haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
-
-                            if (haveShallowLine)
-                            {
-                                if (haveSteepLine)
-                                    Scaler_3X.BlendLineSteepAndShallow(px, outputMatrix);
-                                else
-                                    Scaler_3X.BlendLineShallow(px, outputMatrix);
-                            }
-                            else
-                            {
-                                if (haveSteepLine)
-                                    Scaler_3X.BlendLineSteep(px, outputMatrix);
-                                else
-                                    Scaler_3X.BlendLineDiagonal(px, outputMatrix);
-                            }
-                        }
-                    }
-
-                    //--------------------------------
-
-                    b = ker3_7;
-                    c = ker3_6;
-                    d = ker3_5;
-                    e = ker3_4;
-                    f = ker3_3;
-                    g = ker3_2;
-                    h = ker3_1;
-                    i = ker3_0;
-
-                    blend = Rotate(blendXy, 2);
-
-                    if (GetBottomR(blend) != BlendNone)
-                    {
-                        if (GetBottomR(blend) >= BlendDominant)
-                            doLineBlend = true;
-                        else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
-                            doLineBlend = false;
-                        else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
-                            doLineBlend = false;
-                        else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
-                            doLineBlend = false;
-                        else
-                            doLineBlend = true;
-                        px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
-
-                        outputMatrix.Move(2, trgi);
-
-                        if (!doLineBlend)
-                        {
-                            Scaler_3X.BlendCorner(px, outputMatrix);
-
-                        }
-                        else
-                        {
-                            fg = DistYCbCr(f, g);
-                            hc = DistYCbCr(h, c);
-
-                            haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
-                            haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
-
-                            if (haveShallowLine)
-                            {
-                                if (haveSteepLine)
-                                    Scaler_3X.BlendLineSteepAndShallow(px, outputMatrix);
-                                else
-                                    Scaler_3X.BlendLineShallow(px, outputMatrix);
-                            }
-                            else
-                            {
-                                if (haveSteepLine)
-                                    Scaler_3X.BlendLineSteep(px, outputMatrix);
-                                else
-                                    Scaler_3X.BlendLineDiagonal(px, outputMatrix);
-                            }
-                        }
-                    }
-                    //--------------------------------
-                    b = ker3_5;
-                    c = ker3_8;
-                    d = ker3_1;
-                    e = ker3_4;
-                    f = ker3_7;
-                    g = ker3_0;
-                    h = ker3_3;
-                    i = ker3_6;
-                    blend = Rotate(blendXy, 3);
-                    if (GetBottomR(blend) != BlendNone)
-                    {
-                        if (GetBottomR(blend) >= BlendDominant)
-                            doLineBlend = true;
-                        else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
-                            doLineBlend = false;
-                        else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
-                            doLineBlend = false;
-                        else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
-                            doLineBlend = false;
-                        else
-                            doLineBlend = true;
-                        px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
-
-                        outputMatrix.Move(3, trgi);
-
-                        if (!doLineBlend)
-                        {
-                            Scaler_3X.BlendCorner(px, outputMatrix);
-
-                        }
-                        else
-                        {
-                            fg = DistYCbCr(f, g);
-                            hc = DistYCbCr(h, c);
-
-                            haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
-                            haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
-
-                            if (haveShallowLine)
-                            {
-                                if (haveSteepLine)
-                                    Scaler_3X.BlendLineSteepAndShallow(px, outputMatrix);
-                                else
-                                    Scaler_3X.BlendLineShallow(px, outputMatrix);
-                            }
-                            else
-                            {
-                                if (haveSteepLine)
-                                    Scaler_3X.BlendLineSteep(px, outputMatrix);
-                                else
-                                    Scaler_3X.BlendLineDiagonal(px, outputMatrix);
-                            }
-                        }
-                    }
+                    start = 0;
+                    end = srcHeight / 4;
                 }
-                //---
-            }
+                else if (core == 1)
+                {
+                    start = srcHeight / 4;
+                    end = srcHeight / 2;
+                }
+                else if (core == 2)
+                {
+                    start = srcHeight / 2;
+                    end = (srcHeight / 4) * 3;
+                }
+                else if (core == 3)
+                {
+                    start = (srcHeight / 4) * 3;
+                    end = srcHeight;
+                }
+
+                OutputMatrix outputMatrix = new OutputMatrix(3, trg, trgWidth);
+                byte[] preProcBuffer = new byte[srcWidth];
+                for (int y = start; y < end; ++y)
+                {
+                    int trgi = 3 * y * trgWidth; // scale
+                    int sM1 = Math.Max(y - 1, 0);
+                    int s0 = y;
+                    int sP1 = Math.Min(y + 1, srcHeight - 1);
+                    int sP2 = Math.Min(y + 2, srcHeight - 1);
+                    byte blendXy1 = 0;
+                    byte blendXy = 0;
+                    //-----
+                    int fg;
+                    int hc;
+                    bool doLineBlend;
+                    bool haveShallowLine;
+                    bool haveSteepLine;
+                    uint px;
+                    uint b, c, d, e, f, g, h, i;
+                    uint ker4b, ker4c, ker4e, ker4f, ker4g, ker4h, ker4i, ker4j, ker4k, ker4l, ker4n, ker4o;
+                    uint ker3_0, ker3_1, ker3_2, ker3_3, ker3_4, ker3_5, ker3_6, ker3_7, ker3_8;
+                    byte blend;
+
+                    for (int x = 0; x < srcWidth; ++x, trgi += 3)
+                    {
+                        int blendResult_f = 0, blendResult_g = 0, blendResult_j = 0, blendResult_k = 0;
+
+                        int xM1 = Math.Max(x - 1, 0);
+                        int xP1 = Math.Min(x + 1, srcWidth - 1);
+                        int xP2 = Math.Min(x + 2, srcWidth - 1);
+
+                        ker4b = src[sM1 * srcWidth + x];         //src[x][sM1];    //src[(sM1 + x) % srcWidth][(sM1 + x) / srcWidth];
+                        ker4c = src[sM1 * srcWidth + xP1];    //src[xP1][sM1]; //src[(sM1 + xP1) % srcWidth][(sM1 + xP1) / srcWidth];
+
+                        ker4e = src[s0 * srcWidth + xM1];    //src[xM1][s0]; //src[(s0 + xM1) % srcWidth][(s0 + xM1) / srcWidth];
+                        ker4f = src[s0 * srcWidth + x];  //src[x][s0]; //src[(s0 + x) % srcWidth][(s0 + x) /srcWidth];
+                        ker4g = src[s0 * srcWidth + xP1];   //src[xP1][s0];//  //src[(s0 + xP1) % srcWidth][(s0 + xP1) / srcWidth];
+                        ker4h = src[s0 * srcWidth + xP2]; //src[(s0 + xP2) % srcWidth][(s0 + xP2)/srcWidth];
+
+                        ker4i = src[sP1 * srcWidth + xM1];  //src[xM1][sP1]; //src[(sP1 + xM1) % srcWidth][(sP1 + xM1)/srcWidth];
+                        ker4j = src[sP1 * srcWidth + x];    //src[x][sP1]; //src[(sP1 + x) % srcWidth][(sP1 + x)/srcWidth];
+                        ker4k = src[sP1 * srcWidth + xP1]; //src[xP1][sP1];// //src[(sP1 + xP1) % srcWidth][(sP1 + xP1)/srcWidth];
+                        ker4l = src[sP1 * srcWidth + xP2]; //src[xP2][sP1];// //src[(sP1 + xP2) % srcWidth][(sP1 + xP2)/srcWidth];
+
+                        ker4n = src[sP2 * srcWidth + x];  //src[x][sP2];//  //src[(sP2 + x) % srcWidth][(sP2+x)/srcWidth];
+                        ker4o = src[sP2 * srcWidth + xP1];   //src[xP1][sP2]; //src[(sP2 + xP1) % srcWidth][(sP2 + xP1) /srcWidth];
+
+
+                        //--------------------------------------
+
+                        if ((ker4f != ker4g || ker4j != ker4k) && (ker4f != ker4j || ker4g != ker4k))
+                        {
+                            int jg = DistYCbCr(ker4i, ker4f) + DistYCbCr(ker4f, ker4c) + DistYCbCr(ker4n, ker4k) + DistYCbCr(ker4k, ker4h) + (DistYCbCr(ker4j, ker4g) << 2);
+                            int fk = DistYCbCr(ker4e, ker4j) + DistYCbCr(ker4j, ker4o) + DistYCbCr(ker4b, ker4g) + DistYCbCr(ker4g, ker4l) + (DistYCbCr(ker4f, ker4k) << 2);
+
+                            if (jg < fk)
+                            {
+                                bool dominantGradient = dominantDirectionThreshold * jg < fk;
+                                if (ker4f != ker4g && ker4f != ker4j)
+                                    blendResult_f = dominantGradient ? BlendDominant : BlendNormal;
+                                if (ker4k != ker4j && ker4k != ker4g)
+                                    blendResult_k = dominantGradient ? BlendDominant : BlendNormal;
+
+                            }
+                            else if (fk < jg)
+                            {
+                                bool dominantGradient = dominantDirectionThreshold * fk < jg;
+                                if (ker4j != ker4f && ker4j != ker4k)
+                                    blendResult_j = dominantGradient ? BlendDominant : BlendNormal;
+                                if (ker4g != ker4f && ker4g != ker4k)
+                                    blendResult_g = dominantGradient ? BlendDominant : BlendNormal;
+                            }
+
+                        }
+                        //--------------------------------------
+
+                        blendXy = SetBottomR(preProcBuffer[x], blendResult_f);
+                        blendXy1 = SetTopR(blendXy1, blendResult_j);
+                        preProcBuffer[x] = blendXy1;
+                        blendXy1 = SetTopL(0, blendResult_k);
+
+                        if (x + 1 < srcWidth)
+                            preProcBuffer[x + 1] = SetBottomL(preProcBuffer[x + 1], blendResult_g);
+
+                        _FillBlock3x(trg, trgi, trgWidth, src[s0 * srcWidth + x]);
+
+                        if (blendXy == 0)
+                            continue;
+
+                        ker3_0 = src[sM1 * srcWidth + xM1]; // src[xM1][sM1]; //src[(sM1 + xM1) % srcWidth][(sM1 + xM1) / srcWidth];
+                        ker3_1 = src[sM1 * srcWidth + x]; //src[x][sM1]; //src[(sM1 + x) % srcWidth][(sM1 + x) / srcWidth];
+                        ker3_2 = src[sM1 * srcWidth + xP1]; //src[xP1][sM1]; //src[(sM1 + xP1) % srcWidth][(sM1 + xP1) / srcWidth];
+
+                        ker3_3 = src[s0 * srcWidth + xM1];  // src[xM1][s0]; //src[(s0 + xM1) % srcWidth][(s0 + xM1) / srcWidth];
+                        ker3_4 = src[s0 * srcWidth + x];  //src[x][s0]; //src[(s0 + x) % srcWidth][(s0 + x) / srcWidth];
+                        ker3_5 = src[s0 * srcWidth + xP1];  //src[xP1][s0]; //src[(s0 + xP1) % srcWidth][(s0 + xP1) / srcWidth];
+
+                        ker3_6 = src[sP1 * srcWidth + xM1]; //src[xM1][sP1];//src[(sP1 + xM1) % srcWidth][(sP1 + xM1) / srcWidth];
+                        ker3_7 = src[sP1 * srcWidth + x]; //src[x][sP1]; //src[(sP1 + x) % srcWidth][(sP1 + x) / srcWidth];
+                        ker3_8 = src[sP1 * srcWidth + xP1]; //src[xP1][sP1];// //src[(sP1 + xP1) % srcWidth][(sP1 + xP1) / srcWidth];
+                        //--
+                        //--
+
+                        b = ker3_1;
+                        c = ker3_2;
+                        d = ker3_3;
+                        e = ker3_4;
+                        f = ker3_5;
+                        g = ker3_6;
+                        h = ker3_7;
+                        i = ker3_8;
+
+                        blend = Rotate(blendXy, 0);
+
+                        if (GetBottomR(blend) != BlendNone)
+                        {
+                            if (GetBottomR(blend) >= BlendDominant)
+                                doLineBlend = true;
+                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
+                                doLineBlend = false;
+                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
+                                doLineBlend = false;
+                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
+                                doLineBlend = false;
+                            else
+                                doLineBlend = true;
+                            px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
+
+                            outputMatrix.Move(0, trgi);
+
+                            if (!doLineBlend)
+                            {
+                                Scaler_3X.BlendCorner(px, outputMatrix);
+
+                            }
+                            else
+                            {
+
+                                fg = DistYCbCr(f, g);
+                                hc = DistYCbCr(h, c);
+
+                                haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
+                                haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
+
+                                if (haveShallowLine)
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_3X.BlendLineSteepAndShallow(px, outputMatrix);
+                                    else
+                                        Scaler_3X.BlendLineShallow(px, outputMatrix);
+                                }
+                                else
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_3X.BlendLineSteep(px, outputMatrix);
+                                    else
+                                        Scaler_3X.BlendLineDiagonal(px, outputMatrix);
+                                }
+                            }
+                        }
+                        //-----
+
+                        b = ker3_3;
+                        c = ker3_0;
+                        d = ker3_7;
+                        e = ker3_4;
+                        f = ker3_1;
+                        g = ker3_8;
+                        h = ker3_5;
+                        i = ker3_2;
+
+                        blend = Rotate(blendXy, 1);
+
+                        if (GetBottomR(blend) != BlendNone)
+                        {
+                            if (GetBottomR(blend) >= BlendDominant)
+                                doLineBlend = true;
+                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
+                                doLineBlend = false;
+                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
+                                doLineBlend = false;
+                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
+                                doLineBlend = false;
+                            else
+                                doLineBlend = true;
+                            px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
+
+                            outputMatrix.Move(1, trgi);
+
+                            if (!doLineBlend)
+                            {
+                                Scaler_3X.BlendCorner(px, outputMatrix);
+
+                            }
+                            else
+                            {
+                                fg = DistYCbCr(f, g);
+                                hc = DistYCbCr(h, c);
+
+                                haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
+                                haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
+
+                                if (haveShallowLine)
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_3X.BlendLineSteepAndShallow(px, outputMatrix);
+                                    else
+                                        Scaler_3X.BlendLineShallow(px, outputMatrix);
+                                }
+                                else
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_3X.BlendLineSteep(px, outputMatrix);
+                                    else
+                                        Scaler_3X.BlendLineDiagonal(px, outputMatrix);
+                                }
+                            }
+                        }
+
+                        //--------------------------------
+
+                        b = ker3_7;
+                        c = ker3_6;
+                        d = ker3_5;
+                        e = ker3_4;
+                        f = ker3_3;
+                        g = ker3_2;
+                        h = ker3_1;
+                        i = ker3_0;
+
+                        blend = Rotate(blendXy, 2);
+
+                        if (GetBottomR(blend) != BlendNone)
+                        {
+                            if (GetBottomR(blend) >= BlendDominant)
+                                doLineBlend = true;
+                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
+                                doLineBlend = false;
+                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
+                                doLineBlend = false;
+                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
+                                doLineBlend = false;
+                            else
+                                doLineBlend = true;
+                            px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
+
+                            outputMatrix.Move(2, trgi);
+
+                            if (!doLineBlend)
+                            {
+                                Scaler_3X.BlendCorner(px, outputMatrix);
+
+                            }
+                            else
+                            {
+                                fg = DistYCbCr(f, g);
+                                hc = DistYCbCr(h, c);
+
+                                haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
+                                haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
+
+                                if (haveShallowLine)
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_3X.BlendLineSteepAndShallow(px, outputMatrix);
+                                    else
+                                        Scaler_3X.BlendLineShallow(px, outputMatrix);
+                                }
+                                else
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_3X.BlendLineSteep(px, outputMatrix);
+                                    else
+                                        Scaler_3X.BlendLineDiagonal(px, outputMatrix);
+                                }
+                            }
+                        }
+                        //--------------------------------
+                        b = ker3_5;
+                        c = ker3_8;
+                        d = ker3_1;
+                        e = ker3_4;
+                        f = ker3_7;
+                        g = ker3_0;
+                        h = ker3_3;
+                        i = ker3_6;
+                        blend = Rotate(blendXy, 3);
+                        if (GetBottomR(blend) != BlendNone)
+                        {
+                            if (GetBottomR(blend) >= BlendDominant)
+                                doLineBlend = true;
+                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
+                                doLineBlend = false;
+                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
+                                doLineBlend = false;
+                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
+                                doLineBlend = false;
+                            else
+                                doLineBlend = true;
+                            px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
+
+                            outputMatrix.Move(3, trgi);
+
+                            if (!doLineBlend)
+                            {
+                                Scaler_3X.BlendCorner(px, outputMatrix);
+
+                            }
+                            else
+                            {
+                                fg = DistYCbCr(f, g);
+                                hc = DistYCbCr(h, c);
+
+                                haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
+                                haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
+
+                                if (haveShallowLine)
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_3X.BlendLineSteepAndShallow(px, outputMatrix);
+                                    else
+                                        Scaler_3X.BlendLineShallow(px, outputMatrix);
+                                }
+                                else
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_3X.BlendLineSteep(px, outputMatrix);
+                                    else
+                                        Scaler_3X.BlendLineDiagonal(px, outputMatrix);
+                                }
+                            }
+                        }
+                    }
+                    //---
+                }
+            });
         }
-        public static void ScaleImage2X(uint[][] src, uint[] trg, int srcWidth, int srcHeight)
+        public static void ScaleImage2X(uint* src, uint* trg, int srcWidth, int srcHeight)
         {
             int trgWidth = srcWidth << 1;
 
-            byte[] preProcBuffer = new byte[srcWidth];
-
-            OutputMatrix outputMatrix = new OutputMatrix(2, trg, trgWidth);
-
-            for (int y = 0; y < srcHeight; ++y)
+            Parallel.For(0, 4, core =>
             {
-                int trgi = 2 * y * trgWidth;
-                int sM1 = Math.Max(y - 1, 0);
-                int s0 = y;
-                int sP1 = Math.Min(y + 1, srcHeight - 1);
-                int sP2 = Math.Min(y + 2, srcHeight - 1);
-                byte blendXy1 = 0;
-                byte blendXy = 0;
-                //-----
-                int fg;
-                int hc;
-                bool doLineBlend;
-                bool haveShallowLine;
-                bool haveSteepLine;
-                uint px;
-                uint b, c, d, e, f, g, h, i;
-                uint ker4b, ker4c, ker4e, ker4f, ker4g, ker4h, ker4i, ker4j, ker4k, ker4l, ker4n, ker4o;
-                uint ker3_0, ker3_1, ker3_2, ker3_3, ker3_4, ker3_5, ker3_6, ker3_7, ker3_8;
-                byte blend;
-
-                for (int x = 0; x < srcWidth; ++x, trgi += 2)
+                int start = 0, end = 0;
+                if (core == 0)
                 {
-                    int blendResult_f = 0, blendResult_g = 0, blendResult_j = 0, blendResult_k = 0;
-
-                    int xM1 = Math.Max(x - 1, 0);
-                    int xP1 = Math.Min(x + 1, srcWidth - 1);
-                    int xP2 = Math.Min(x + 2, srcWidth - 1);
-
-                    ker4b = src[x][sM1];    //src[(sM1 + x) % srcWidth][(sM1 + x) / srcWidth];
-                    ker4c = src[xP1][sM1]; //src[(sM1 + xP1) % srcWidth][(sM1 + xP1) / srcWidth];
-
-                    ker4e = src[xM1][s0]; //src[(s0 + xM1) % srcWidth][(s0 + xM1) / srcWidth];
-                    ker4f = src[x][s0]; //src[(s0 + x) % srcWidth][(s0 + x) /srcWidth];
-                    ker4g = src[xP1][s0];//  //src[(s0 + xP1) % srcWidth][(s0 + xP1) / srcWidth];
-                    ker4h = src[xP2][s0]; //src[(s0 + xP2) % srcWidth][(s0 + xP2)/srcWidth];
-
-                    ker4i = src[xM1][sP1]; //src[(sP1 + xM1) % srcWidth][(sP1 + xM1)/srcWidth];
-                    ker4j = src[x][sP1]; //src[(sP1 + x) % srcWidth][(sP1 + x)/srcWidth];
-                    ker4k = src[xP1][sP1];// //src[(sP1 + xP1) % srcWidth][(sP1 + xP1)/srcWidth];
-                    ker4l = src[xP2][sP1];// //src[(sP1 + xP2) % srcWidth][(sP1 + xP2)/srcWidth];
-
-                    ker4n = src[x][sP2];//  //src[(sP2 + x) % srcWidth][(sP2+x)/srcWidth];
-                    ker4o = src[xP1][sP2]; //src[(sP2 + xP1) % srcWidth][(sP2 + xP1) /srcWidth];
-
-                    /*ker4b = src[sM1 + x];
-                    ker4c = src[sM1 + xP1];
-
-                    ker4e = src[s0 + xM1];
-                    ker4f = src[s0 + x];
-                    ker4g = src[s0 + xP1];
-                    ker4h = src[s0 + xP2];
-
-                    ker4i = src[sP1 + xM1];
-                    ker4j = src[sP1 + x];
-                    ker4k = src[sP1 + xP1];
-                    ker4l = src[sP1 + xP2];
-
-                    ker4n = src[sP2 + x];
-                    ker4o = src[sP2 + xP1];*/
-
-                    //--------------------------------------
-
-                    if ((ker4f != ker4g || ker4j != ker4k) && (ker4f != ker4j || ker4g != ker4k))
-                    {
-                        int jg = DistYCbCr(ker4i, ker4f) + DistYCbCr(ker4f, ker4c) + DistYCbCr(ker4n, ker4k) + DistYCbCr(ker4k, ker4h) + (DistYCbCr(ker4j, ker4g) << 2);
-                        int fk = DistYCbCr(ker4e, ker4j) + DistYCbCr(ker4j, ker4o) + DistYCbCr(ker4b, ker4g) + DistYCbCr(ker4g, ker4l) + (DistYCbCr(ker4f, ker4k) << 2);
-
-                        if (jg < fk)
-                        {
-                            bool dominantGradient = dominantDirectionThreshold * jg < fk;
-                            if (ker4f != ker4g && ker4f != ker4j)
-                                blendResult_f = dominantGradient ? BlendDominant : BlendNormal;
-                            if (ker4k != ker4j && ker4k != ker4g)
-                                blendResult_k = dominantGradient ? BlendDominant : BlendNormal;
-
-                        }
-                        else if (fk < jg)
-                        {
-                            bool dominantGradient = dominantDirectionThreshold * fk < jg;
-                            if (ker4j != ker4f && ker4j != ker4k)
-                                blendResult_j = dominantGradient ? BlendDominant : BlendNormal;
-                            if (ker4g != ker4f && ker4g != ker4k)
-                                blendResult_g = dominantGradient ? BlendDominant : BlendNormal;
-                        }
-
-                    }
-                    //--------------------------------------
-
-                    blendXy = SetBottomR(preProcBuffer[x], blendResult_f);
-                    blendXy1 = SetTopR(blendXy1, blendResult_j);
-                    preProcBuffer[x] = blendXy1;
-                    blendXy1 = SetTopL(0, blendResult_k);
-
-                    if (x + 1 < srcWidth)
-                        preProcBuffer[x + 1] = SetBottomL(preProcBuffer[x + 1], blendResult_g);
-
-
-                    _FillBlock(trg, trgi, trgWidth, src[x][s0], 2);
-
-                    //--
-
-                    // static void _FillBlock(uint[] trg, int trgi, int pitch, uint col, int blockSize)
-                    //{
-                   // for (int _y = 0; _y <= 1; ++y, trgi += trgWidth)
-                   //     for (int _x = 0; _x <= 1; ++_x)
-                    //        trg[trgi + _x] = src[x][s0];
-                    //}
-
-                    //--
-
-                    if (blendXy == 0)
-                        continue;
-
-                    ker3_0 = src[xM1][sM1]; //src[(sM1 + xM1) % srcWidth][(sM1 + xM1) / srcWidth];
-                    ker3_1 = src[x][sM1]; //src[(sM1 + x) % srcWidth][(sM1 + x) / srcWidth];
-                    ker3_2 = src[xP1][sM1]; //src[(sM1 + xP1) % srcWidth][(sM1 + xP1) / srcWidth];
-
-                    ker3_3 = src[xM1][s0]; //src[(s0 + xM1) % srcWidth][(s0 + xM1) / srcWidth];
-                    ker3_4 = src[x][s0]; //src[(s0 + x) % srcWidth][(s0 + x) / srcWidth];
-                    ker3_5 = src[xP1][s0]; //src[(s0 + xP1) % srcWidth][(s0 + xP1) / srcWidth];
-
-                    ker3_6 = src[xM1][sP1];//src[(sP1 + xM1) % srcWidth][(sP1 + xM1) / srcWidth];
-                    ker3_7 = src[x][sP1]; //src[(sP1 + x) % srcWidth][(sP1 + x) / srcWidth];
-                    ker3_8 = src[xP1][sP1];// //src[(sP1 + xP1) % srcWidth][(sP1 + xP1) / srcWidth];
-
-                    //--
-
-                    b = ker3_1;
-                    c = ker3_2;
-                    d = ker3_3;
-                    e = ker3_4;
-                    f = ker3_5;
-                    g = ker3_6;
-                    h = ker3_7;
-                    i = ker3_8;
-
-                    blend = Rotate(blendXy, 0);
-
-                    if (GetBottomR(blend) != BlendNone)
-                    {
-                        if (GetBottomR(blend) >= BlendDominant)
-                            doLineBlend = true;
-                        else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
-                            doLineBlend = false;
-                        else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
-                            doLineBlend = false;
-                        else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
-                            doLineBlend = false;
-                        else
-                            doLineBlend = true;
-                        px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
-
-                        outputMatrix.Move(0, trgi);
-
-                        if (!doLineBlend)
-                        {
-                            Scaler_2X.BlendCorner(px, outputMatrix);
-
-                        }
-                        else
-                        {
-
-                            fg = DistYCbCr(f, g);
-                            hc = DistYCbCr(h, c);
-
-                            haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
-                            haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
-
-                            if (haveShallowLine)
-                            {
-                                if (haveSteepLine)
-                                    Scaler_2X.BlendLineSteepAndShallow(px, outputMatrix);
-                                else
-                                    Scaler_2X.BlendLineShallow(px, outputMatrix);
-                            }
-                            else
-                            {
-                                if (haveSteepLine)
-                                    Scaler_2X.BlendLineSteep(px, outputMatrix);
-                                else
-                                    Scaler_2X.BlendLineDiagonal(px, outputMatrix);
-                            }
-                        }
-                    }
-                    //-----
-
-                    b = ker3_3;
-                    c = ker3_0;
-                    d = ker3_7;
-                    e = ker3_4;
-                    f = ker3_1;
-                    g = ker3_8;
-                    h = ker3_5;
-                    i = ker3_2;
-
-                    blend = Rotate(blendXy, 1);
-
-                    if (GetBottomR(blend) != BlendNone)
-                    {
-                        if (GetBottomR(blend) >= BlendDominant)
-                            doLineBlend = true;
-                        else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
-                            doLineBlend = false;
-                        else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
-                            doLineBlend = false;
-                        else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
-                            doLineBlend = false;
-                        else
-                            doLineBlend = true;
-                        px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
-
-                        outputMatrix.Move(1, trgi);
-
-                        if (!doLineBlend)
-                        {
-                            Scaler_2X.BlendCorner(px, outputMatrix);
-
-                        }
-                        else
-                        {
-                            fg = DistYCbCr(f, g);
-                            hc = DistYCbCr(h, c);
-
-                            haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
-                            haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
-
-                            if (haveShallowLine)
-                            {
-                                if (haveSteepLine)
-                                    Scaler_2X.BlendLineSteepAndShallow(px, outputMatrix);
-                                else
-                                    Scaler_2X.BlendLineShallow(px, outputMatrix);
-                            }
-                            else
-                            {
-                                if (haveSteepLine)
-                                    Scaler_2X.BlendLineSteep(px, outputMatrix);
-                                else
-                                    Scaler_2X.BlendLineDiagonal(px, outputMatrix);
-                            }
-                        }
-                    }
-
-                    //--------------------------------
-
-                    b = ker3_7;
-                    c = ker3_6;
-                    d = ker3_5;
-                    e = ker3_4;
-                    f = ker3_3;
-                    g = ker3_2;
-                    h = ker3_1;
-                    i = ker3_0;
-
-                    blend = Rotate(blendXy, 2);
-
-                    if (GetBottomR(blend) != BlendNone)
-                    {
-                        if (GetBottomR(blend) >= BlendDominant)
-                            doLineBlend = true;
-                        else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
-                            doLineBlend = false;
-                        else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
-                            doLineBlend = false;
-                        else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
-                            doLineBlend = false;
-                        else
-                            doLineBlend = true;
-                        px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
-
-                        outputMatrix.Move(2, trgi);
-
-                        if (!doLineBlend)
-                        {
-                            Scaler_2X.BlendCorner(px, outputMatrix);
-
-                        }
-                        else
-                        {
-                            fg = DistYCbCr(f, g);
-                            hc = DistYCbCr(h, c);
-
-                            haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
-                            haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
-
-                            if (haveShallowLine)
-                            {
-                                if (haveSteepLine)
-                                    Scaler_2X.BlendLineSteepAndShallow(px, outputMatrix);
-                                else
-                                    Scaler_2X.BlendLineShallow(px, outputMatrix);
-                            }
-                            else
-                            {
-                                if (haveSteepLine)
-                                    Scaler_2X.BlendLineSteep(px, outputMatrix);
-                                else
-                                    Scaler_2X.BlendLineDiagonal(px, outputMatrix);
-                            }
-                        }
-                    }
-                    //--------------------------------
-                    b = ker3_5;
-                    c = ker3_8;
-                    d = ker3_1;
-                    e = ker3_4;
-                    f = ker3_7;
-                    g = ker3_0;
-                    h = ker3_3;
-                    i = ker3_6;
-                    blend = Rotate(blendXy, 3);
-                    if (GetBottomR(blend) != BlendNone)
-                    {
-                        if (GetBottomR(blend) >= BlendDominant)
-                            doLineBlend = true;
-                        else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
-                            doLineBlend = false;
-                        else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
-                            doLineBlend = false;
-                        else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
-                            doLineBlend = false;
-                        else
-                            doLineBlend = true;
-                        px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
-
-                        outputMatrix.Move(3, trgi);
-
-                        if (!doLineBlend)
-                        {
-                            Scaler_2X.BlendCorner(px, outputMatrix);
-
-                        }
-                        else
-                        {
-                            fg = DistYCbCr(f, g);
-                            hc = DistYCbCr(h, c);
-
-                            haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
-                            haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
-
-                            if (haveShallowLine)
-                            {
-                                if (haveSteepLine)
-                                    Scaler_2X.BlendLineSteepAndShallow(px, outputMatrix);
-                                else
-                                    Scaler_2X.BlendLineShallow(px, outputMatrix);
-                            }
-                            else
-                            {
-                                if (haveSteepLine)
-                                    Scaler_2X.BlendLineSteep(px, outputMatrix);
-                                else
-                                    Scaler_2X.BlendLineDiagonal(px, outputMatrix);
-                            }
-                        }
-                    }
+                    start = 0;
+                    end = srcHeight / 4;
                 }
-                //---
-            }
+                else if (core == 1)
+                {
+                    start = srcHeight / 4;
+                    end = srcHeight / 2;
+                }
+                else if (core == 2)
+                {
+                    start = srcHeight / 2;
+                    end = (srcHeight / 4) * 3;
+                }
+                else if (core == 3)
+                {
+                    start = (srcHeight / 4) * 3;
+                    end = srcHeight;
+                }
+
+                OutputMatrix outputMatrix = new OutputMatrix(2, trg, trgWidth);
+                byte[] preProcBuffer = new byte[srcWidth];
+                for (int y = start; y < end; ++y)
+                {
+                    int trgi = 2 * y * trgWidth;
+                    int sM1 = Math.Max(y - 1, 0);
+                    int s0 = y;
+                    int sP1 = Math.Min(y + 1, srcHeight - 1);
+                    int sP2 = Math.Min(y + 2, srcHeight - 1);
+                    byte blendXy1 = 0;
+                    byte blendXy = 0;
+                    //-----
+                    int fg;
+                    int hc;
+                    bool doLineBlend;
+                    bool haveShallowLine;
+                    bool haveSteepLine;
+                    uint px;
+                    uint b, c, d, e, f, g, h, i;
+                    uint ker4b, ker4c, ker4e, ker4f, ker4g, ker4h, ker4i, ker4j, ker4k, ker4l, ker4n, ker4o;
+                    uint ker3_0, ker3_1, ker3_2, ker3_3, ker3_4, ker3_5, ker3_6, ker3_7, ker3_8;
+                    byte blend;
+
+                    for (int x = 0; x < srcWidth; ++x, trgi += 2)
+                    {
+                        int blendResult_f = 0, blendResult_g = 0, blendResult_j = 0, blendResult_k = 0;
+
+                        int xM1 = Math.Max(x - 1, 0);
+                        int xP1 = Math.Min(x + 1, srcWidth - 1);
+                        int xP2 = Math.Min(x + 2, srcWidth - 1);
+
+
+                        ker4b = src[sM1 * srcWidth + x];         //src[x][sM1];    //src[(sM1 + x) % srcWidth][(sM1 + x) / srcWidth];
+                        ker4c = src[sM1 * srcWidth + xP1];    //src[xP1][sM1]; //src[(sM1 + xP1) % srcWidth][(sM1 + xP1) / srcWidth];
+
+                        ker4e = src[s0 * srcWidth + xM1];    //src[xM1][s0]; //src[(s0 + xM1) % srcWidth][(s0 + xM1) / srcWidth];
+                        ker4f = src[s0 * srcWidth + x];  //src[x][s0]; //src[(s0 + x) % srcWidth][(s0 + x) /srcWidth];
+                        ker4g = src[s0 * srcWidth + xP1];   //src[xP1][s0];//  //src[(s0 + xP1) % srcWidth][(s0 + xP1) / srcWidth];
+                        ker4h = src[s0 * srcWidth + xP2]; //src[(s0 + xP2) % srcWidth][(s0 + xP2)/srcWidth];
+
+                        ker4i = src[sP1 * srcWidth + xM1];  //src[xM1][sP1]; //src[(sP1 + xM1) % srcWidth][(sP1 + xM1)/srcWidth];
+                        ker4j = src[sP1 * srcWidth + x];    //src[x][sP1]; //src[(sP1 + x) % srcWidth][(sP1 + x)/srcWidth];
+                        ker4k = src[sP1 * srcWidth + xP1]; //src[xP1][sP1];// //src[(sP1 + xP1) % srcWidth][(sP1 + xP1)/srcWidth];
+                        ker4l = src[sP1 * srcWidth + xP2]; //src[xP2][sP1];// //src[(sP1 + xP2) % srcWidth][(sP1 + xP2)/srcWidth];
+
+                        ker4n = src[sP2 * srcWidth + x];  //src[x][sP2];//  //src[(sP2 + x) % srcWidth][(sP2+x)/srcWidth];
+                        ker4o = src[sP2 * srcWidth + xP1];   //src[xP1][sP2]; //src[(sP2 + xP1) % srcWidth][(sP2 + xP1) /srcWidth];
+                        //--------------------------------------
+
+                        if ((ker4f != ker4g || ker4j != ker4k) && (ker4f != ker4j || ker4g != ker4k))
+                        {
+                            int jg = DistYCbCr(ker4i, ker4f) + DistYCbCr(ker4f, ker4c) + DistYCbCr(ker4n, ker4k) + DistYCbCr(ker4k, ker4h) + (DistYCbCr(ker4j, ker4g) << 2);
+                            int fk = DistYCbCr(ker4e, ker4j) + DistYCbCr(ker4j, ker4o) + DistYCbCr(ker4b, ker4g) + DistYCbCr(ker4g, ker4l) + (DistYCbCr(ker4f, ker4k) << 2);
+
+                            if (jg < fk)
+                            {
+                                bool dominantGradient = dominantDirectionThreshold * jg < fk;
+                                if (ker4f != ker4g && ker4f != ker4j)
+                                    blendResult_f = dominantGradient ? BlendDominant : BlendNormal;
+                                if (ker4k != ker4j && ker4k != ker4g)
+                                    blendResult_k = dominantGradient ? BlendDominant : BlendNormal;
+
+                            }
+                            else if (fk < jg)
+                            {
+                                bool dominantGradient = dominantDirectionThreshold * fk < jg;
+                                if (ker4j != ker4f && ker4j != ker4k)
+                                    blendResult_j = dominantGradient ? BlendDominant : BlendNormal;
+                                if (ker4g != ker4f && ker4g != ker4k)
+                                    blendResult_g = dominantGradient ? BlendDominant : BlendNormal;
+                            }
+
+                        }
+                        //--------------------------------------
+
+                        blendXy = SetBottomR(preProcBuffer[x], blendResult_f);
+                        blendXy1 = SetTopR(blendXy1, blendResult_j);
+                        preProcBuffer[x] = blendXy1;
+                        blendXy1 = SetTopL(0, blendResult_k);
+
+                        if (x + 1 < srcWidth)
+                            preProcBuffer[x + 1] = SetBottomL(preProcBuffer[x + 1], blendResult_g);
+
+
+                        _FillBlock2x(trg, trgi, trgWidth, src[s0 * srcWidth + x]);
+
+
+                        if (blendXy == 0)
+                            continue;
+
+                        ker3_0 = src[sM1 * srcWidth + xM1]; // src[xM1][sM1]; //src[(sM1 + xM1) % srcWidth][(sM1 + xM1) / srcWidth];
+                        ker3_1 = src[sM1 * srcWidth + x]; //src[x][sM1]; //src[(sM1 + x) % srcWidth][(sM1 + x) / srcWidth];
+                        ker3_2 = src[sM1 * srcWidth + xP1]; //src[xP1][sM1]; //src[(sM1 + xP1) % srcWidth][(sM1 + xP1) / srcWidth];
+
+                        ker3_3 = src[s0 * srcWidth + xM1];  // src[xM1][s0]; //src[(s0 + xM1) % srcWidth][(s0 + xM1) / srcWidth];
+                        ker3_4 = src[s0 * srcWidth + x];  //src[x][s0]; //src[(s0 + x) % srcWidth][(s0 + x) / srcWidth];
+                        ker3_5 = src[s0 * srcWidth + xP1];  //src[xP1][s0]; //src[(s0 + xP1) % srcWidth][(s0 + xP1) / srcWidth];
+
+                        ker3_6 = src[sP1 * srcWidth + xM1]; //src[xM1][sP1];//src[(sP1 + xM1) % srcWidth][(sP1 + xM1) / srcWidth];
+                        ker3_7 = src[sP1 * srcWidth + x]; //src[x][sP1]; //src[(sP1 + x) % srcWidth][(sP1 + x) / srcWidth];
+                        ker3_8 = src[sP1 * srcWidth + xP1]; //src[xP1][sP1];// //src[(sP1 + xP1) % srcWidth][(sP1 + xP1) / srcWidth];
+
+                        //--
+
+                        b = ker3_1;
+                        c = ker3_2;
+                        d = ker3_3;
+                        e = ker3_4;
+                        f = ker3_5;
+                        g = ker3_6;
+                        h = ker3_7;
+                        i = ker3_8;
+
+                        blend = Rotate(blendXy, 0);
+
+                        if (GetBottomR(blend) != BlendNone)
+                        {
+                            if (GetBottomR(blend) >= BlendDominant)
+                                doLineBlend = true;
+                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
+                                doLineBlend = false;
+                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
+                                doLineBlend = false;
+                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
+                                doLineBlend = false;
+                            else
+                                doLineBlend = true;
+                            px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
+
+                            outputMatrix.Move(0, trgi);
+
+                            if (!doLineBlend)
+                            {
+                                Scaler_2X.BlendCorner(px, outputMatrix);
+
+                            }
+                            else
+                            {
+
+                                fg = DistYCbCr(f, g);
+                                hc = DistYCbCr(h, c);
+
+                                haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
+                                haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
+
+                                if (haveShallowLine)
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_2X.BlendLineSteepAndShallow(px, outputMatrix);
+                                    else
+                                        Scaler_2X.BlendLineShallow(px, outputMatrix);
+                                }
+                                else
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_2X.BlendLineSteep(px, outputMatrix);
+                                    else
+                                        Scaler_2X.BlendLineDiagonal(px, outputMatrix);
+                                }
+                            }
+                        }
+                        //-----
+
+                        b = ker3_3;
+                        c = ker3_0;
+                        d = ker3_7;
+                        e = ker3_4;
+                        f = ker3_1;
+                        g = ker3_8;
+                        h = ker3_5;
+                        i = ker3_2;
+
+                        blend = Rotate(blendXy, 1);
+
+                        if (GetBottomR(blend) != BlendNone)
+                        {
+                            if (GetBottomR(blend) >= BlendDominant)
+                                doLineBlend = true;
+                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
+                                doLineBlend = false;
+                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
+                                doLineBlend = false;
+                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
+                                doLineBlend = false;
+                            else
+                                doLineBlend = true;
+                            px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
+
+                            outputMatrix.Move(1, trgi);
+
+                            if (!doLineBlend)
+                            {
+                                Scaler_2X.BlendCorner(px, outputMatrix);
+
+                            }
+                            else
+                            {
+                                fg = DistYCbCr(f, g);
+                                hc = DistYCbCr(h, c);
+
+                                haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
+                                haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
+
+                                if (haveShallowLine)
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_2X.BlendLineSteepAndShallow(px, outputMatrix);
+                                    else
+                                        Scaler_2X.BlendLineShallow(px, outputMatrix);
+                                }
+                                else
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_2X.BlendLineSteep(px, outputMatrix);
+                                    else
+                                        Scaler_2X.BlendLineDiagonal(px, outputMatrix);
+                                }
+                            }
+                        }
+
+                        //--------------------------------
+
+                        b = ker3_7;
+                        c = ker3_6;
+                        d = ker3_5;
+                        e = ker3_4;
+                        f = ker3_3;
+                        g = ker3_2;
+                        h = ker3_1;
+                        i = ker3_0;
+
+                        blend = Rotate(blendXy, 2);
+
+                        if (GetBottomR(blend) != BlendNone)
+                        {
+                            if (GetBottomR(blend) >= BlendDominant)
+                                doLineBlend = true;
+                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
+                                doLineBlend = false;
+                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
+                                doLineBlend = false;
+                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
+                                doLineBlend = false;
+                            else
+                                doLineBlend = true;
+                            px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
+
+                            outputMatrix.Move(2, trgi);
+
+                            if (!doLineBlend)
+                            {
+                                Scaler_2X.BlendCorner(px, outputMatrix);
+
+                            }
+                            else
+                            {
+                                fg = DistYCbCr(f, g);
+                                hc = DistYCbCr(h, c);
+
+                                haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
+                                haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
+
+                                if (haveShallowLine)
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_2X.BlendLineSteepAndShallow(px, outputMatrix);
+                                    else
+                                        Scaler_2X.BlendLineShallow(px, outputMatrix);
+                                }
+                                else
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_2X.BlendLineSteep(px, outputMatrix);
+                                    else
+                                        Scaler_2X.BlendLineDiagonal(px, outputMatrix);
+                                }
+                            }
+                        }
+                        //--------------------------------
+                        b = ker3_5;
+                        c = ker3_8;
+                        d = ker3_1;
+                        e = ker3_4;
+                        f = ker3_7;
+                        g = ker3_0;
+                        h = ker3_3;
+                        i = ker3_6;
+                        blend = Rotate(blendXy, 3);
+                        if (GetBottomR(blend) != BlendNone)
+                        {
+                            if (GetBottomR(blend) >= BlendDominant)
+                                doLineBlend = true;
+                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
+                                doLineBlend = false;
+                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
+                                doLineBlend = false;
+                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
+                                doLineBlend = false;
+                            else
+                                doLineBlend = true;
+                            px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
+
+                            outputMatrix.Move(3, trgi);
+
+                            if (!doLineBlend)
+                            {
+                                Scaler_2X.BlendCorner(px, outputMatrix);
+
+                            }
+                            else
+                            {
+                                fg = DistYCbCr(f, g);
+                                hc = DistYCbCr(h, c);
+
+                                haveShallowLine = steepDirectionThreshold * fg <= hc && e != g && d != g;
+                                haveSteepLine = steepDirectionThreshold * hc <= fg && e != c && b != c;
+
+                                if (haveShallowLine)
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_2X.BlendLineSteepAndShallow(px, outputMatrix);
+                                    else
+                                        Scaler_2X.BlendLineShallow(px, outputMatrix);
+                                }
+                                else
+                                {
+                                    if (haveSteepLine)
+                                        Scaler_2X.BlendLineSteep(px, outputMatrix);
+                                    else
+                                        Scaler_2X.BlendLineDiagonal(px, outputMatrix);
+                                }
+                            }
+                        }
+                    }
+                    //---
+                }
+            });
         }
 
         #region Scaler

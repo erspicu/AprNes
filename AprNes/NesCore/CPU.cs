@@ -6,10 +6,10 @@ using System.Windows.Forms;
 
 namespace AprNes
 {
-    public partial class NesCore
+    unsafe public partial class NesCore
     {
         //table port from  https://github.com/bfirsh/jsnes/blob/master/source/cpu.js
-        byte[] cycle_table = new byte[]{
+        byte[] cycle_tableData = new byte[]{
     /*0x00*/ 7,6,2,8,3,3,5,5,3,2,2,2,4,4,6,6,
     /*0x10*/ 2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
     /*0x20*/ 6,6,2,8,3,3,5,5,4,2,2,2,4,4,6,6,
@@ -28,8 +28,8 @@ namespace AprNes
     /*0xF0*/ 2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7
     };
 
-        byte flagN = 0, flagV = 0, flagB = 0, flagD = 0, flagI = 0, flagZ = 0, flagC = 0;
-        byte r_A = 0, r_X = 0, r_Y = 0, r_SP = 0xFD;
+        byte* cycle_table;
+        byte r_A = 0, r_X = 0, r_Y = 0, r_SP = 0xFD , flagN = 0, flagV = 0, flagB = 0, flagD = 0, flagI = 0, flagZ = 0, flagC = 0;
         ushort r_PC = 0;
         byte opcode;
         int cpu_cycles = 0;
@@ -54,6 +54,14 @@ namespace AprNes
             r_PC = (ushort)(Mem_r(0xfffa) | (Mem_r(0xfffb) << 8));
         }
 
+        void IRQInterrupt()
+        {
+            PushStack((byte)(r_PC >> 8));
+            PushStack((byte)r_PC);
+            PushStack(GetFlag());
+            r_PC = (ushort)(Mem_r(0xfffe) | (Mem_r(0xffff) << 8));
+        }
+
         //for temp value use
         ushort us1, us2, us3, us4;
         sbyte sb1;
@@ -65,13 +73,6 @@ namespace AprNes
 
         void cpu_step()
         {
-
-            if (NMI_set)
-            {
-                NMIInterrupt();
-                NMI_set = false;
-            }
-
             if (dma_cost > 0)
             {
                 dma_cost--;
@@ -79,9 +80,19 @@ namespace AprNes
                 return;
             }
 
-            opcode = Mem_r(r_PC);
+            if (NMI_set)
+            {
+                NMIInterrupt();
+                NMI_set = false;
+            }
+            else if (IRQ_set && flagB == 1)
+            {
+                IRQInterrupt();
+                IRQ_set = false;
+            }
+
+            opcode = Mem_r(r_PC++);
             cpu_cycles = cycle_table[opcode];
-            r_PC++;
 
             //參考了 mynes 去修正與debug許多錯誤 http://sourceforge.net/projects/mynes 
             switch (opcode)

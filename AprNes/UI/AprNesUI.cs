@@ -56,53 +56,12 @@ namespace AprNes
         int ScreenSize = 1;
         public void initUIsize()
         {
-            switch (ScreenSize)
-            {
-                case 1:
-                    panel1.Width = 256;
-                    panel1.Height = 240;
-                    this.Width = 272;
-                    this.Height = 322;
-                    UIAbout.Location = new Point(201, 277);
-                    RomInf.Location = new Point(5, 277);
-                    break;
-
-                case 2:
-                    panel1.Width = 256 * 2;
-                    panel1.Height = 240 * 2;
-                    this.Width = 272 + 256;
-                    this.Height = 322 + 240;
-                    UIAbout.Location = new Point(201 + 256, 277 + 240);
-                    RomInf.Location = new Point(5, 277 + 240);
-                    break;
-
-                case 3:
-                    panel1.Width = 256 * 3;
-                    panel1.Height = 240 * 3;
-                    this.Width = 272 + 256 * 2;
-                    this.Height = 322 + 240 * 2;
-                    UIAbout.Location = new Point(201 + 256 * 2, 277 + 240 * 2);
-                    RomInf.Location = new Point(5, 277 + 240 * 2);
-                    break;
-
-                case 4:
-                    panel1.Width = 256 * 4;
-                    panel1.Height = 240 * 4;
-                    this.Width = 272 + 256 * 3;
-                    this.Height = 322 + 240 * 3;
-                    UIAbout.Location = new Point(201 + 256 * 3, 277 + 240 * 3);
-                    RomInf.Location = new Point(5, 277 + 240 * 3);
-                    break;
-
-                case 5:
-                    panel1.Width = 256 * 5;
-                    panel1.Height = 240 * 5;
-                    this.Width = 272 + 256 * 4;
-                    this.Height = 322 + 240 * 4;
-                    UIAbout.Location = new Point(201 + 256 * 4, 277 + 240 * 4);
-                    RomInf.Location = new Point(5, 277 + 240 * 4);
-                    break;
-            }
+            panel1.Width = 256 * ScreenSize;
+            panel1.Height = 240 * ScreenSize;
+            this.Width = 272 + 256 * (ScreenSize - 1);
+            this.Height = 322 + 240 * (ScreenSize - 1);
+            UIAbout.Location = new Point(201 + 256 * (ScreenSize -1), 277 + 240 * (ScreenSize - 1));
+            RomInf.Location = new Point(5, 277 + 240 * (ScreenSize - 1));
         }
 
         public enum KeyMap
@@ -466,54 +425,34 @@ namespace AprNes
         {
             try
             {
-
                 string info = "";
-                if (rom_bytes == null || rom_bytes.Count() == 0)
-                    return "No load Rom !";
-
-                if (!(rom_bytes[0] == 'N' && rom_bytes[1] == 'E' && rom_bytes[2] == 'S' && rom_bytes[3] == 0x1a))
-                    return "Bad Magic Number ! (maybe no intro header ?)";
-
-                info = "iNes Header\r\n";
-
+                if (rom_bytes == null || rom_bytes.Count() == 0) return "No load Rom !";
+                if (!(rom_bytes[0] == 'N' && rom_bytes[1] == 'E' && rom_bytes[2] == 'S' && rom_bytes[3] == 0x1a)) return "Bad Magic Number ! (maybe no intro header ?)";
+                info = "FileName : " + nes_name + "\r\n";
+                info += "iNes Header\r\n";
                 byte PRG_ROM_count = rom_bytes[4];
                 info += "PRG-ROM count : " + PRG_ROM_count + "\r\n";
-
                 byte CHR_ROM_count = rom_bytes[5];
                 info += "CHR-ROM count : " + CHR_ROM_count + "\r\n";
-
                 byte ROM_Control_1 = rom_bytes[6];
-
-                if ((ROM_Control_1 & 1) != 0)
-                    info += "vertical mirroring\r\n";
-                else
-                    info += "horizontal mirroring\r\n";
-
-                if ((ROM_Control_1 & 2) != 0)
-                    info += "battery-backed RAM : yes\r\n";
-                else
-                    info += "battery-backed RAM : no\r\n";
-
-                if ((ROM_Control_1 & 4) != 0)
-                    info += "trainer : yes\r\n";
-                else
-                    info += "trainer : no\r\n";
-
-                if ((ROM_Control_1 & 8) != 0)
-                    info += "fourscreen mirroring : yes\r\n";
-                else
-                    info += "fourscreen mirroring : no\r\n";
-
+                if ((ROM_Control_1 & 1) != 0) info += "vertical mirroring\r\n";
+                else info += "horizontal mirroring\r\n";
+                if ((ROM_Control_1 & 2) != 0) info += "battery-backed RAM : yes\r\n";
+                else info += "battery-backed RAM : no\r\n";
+                if ((ROM_Control_1 & 4) != 0) info += "trainer : yes\r\n";
+                else info += "trainer : no\r\n";
+                if ((ROM_Control_1 & 8) != 0) info += "fourscreen mirroring : yes\r\n";
+                else info += "fourscreen mirroring : no\r\n";
                 byte ROM_Control_2 = rom_bytes[7];
                 int mapper;
-                bool v2 = false;
+                bool iNesV2 = false;
                 if ((ROM_Control_2 & 0xf) != 0)
                 {
                     mapper = (ROM_Control_1 & 0xf0) >> 4;
 
                     if ((ROM_Control_2 & 0xc) == 8)
                     {
-                        v2 = true;
+                        iNesV2 = true;
                         mapper = (byte)(((ROM_Control_1 & 0xf0) >> 4) | (ROM_Control_2 & 0xf0));
                         info += "Nes header 2.0 version !\r\n";
                     }
@@ -530,12 +469,11 @@ namespace AprNes
 
                 info += "Mapper number : " + mapper + " " + mapper_name + "\r\n";
 
-                if (v2)
+                if (iNesV2)
                 {
                     byte RAM_banks_count = rom_bytes[8];
                     info += "RAM banks count : " + RAM_banks_count + "\r\n";
                 }
-
                 return info;
             }
             catch
@@ -545,6 +483,7 @@ namespace AprNes
         }
 
         public string rom_file_name = "";
+        public string nes_name = "";
         private void button1_Click(object sender, EventArgs e)
         {
 
@@ -560,6 +499,7 @@ namespace AprNes
                 {
                     if (i.ToLower().EndsWith(".nes"))
                     {
+                        nes_name = i;
                         MemoryStream ms = new MemoryStream();
                         uz.Extract(i, ms);
                         ms.Position = 0;
@@ -570,7 +510,7 @@ namespace AprNes
             }
             else
             {
-                
+                nes_name = new FileInfo(fd.FileName).Name;
                 rom_bytes = File.ReadAllBytes(fd.FileName);
             }
 
@@ -590,14 +530,7 @@ namespace AprNes
                 }
             }
 
-            try
-            {
-                if (nes_obj != null)
-                    nes_obj.SaveRam();
-            }
-            catch
-            {
-            }
+            if (nes_obj != null) nes_obj.SaveRam();
 
             nes_obj = null;
             nes_obj = new NesCore();
@@ -615,7 +548,8 @@ namespace AprNes
                 MessageBox.Show("fail !");
                 return;
             }
-            nes_t = new Thread(nes_obj.run);
+            nes_t = new Thread(nes_obj.run );
+            nes_t.IsBackground = true;
             nes_t.Start();
             fps_count_timer.Enabled = true;
             running = true;
@@ -634,15 +568,7 @@ namespace AprNes
 
         private void AprNesUI_FormClosing(object sender, FormClosingEventArgs e)
         {
-            try
-            {
-                if (nes_obj != null)
-                    nes_obj.SaveRam();
-            }
-            catch
-            {
-            }
-            Environment.Exit(1);
+            if (nes_obj != null) nes_obj.SaveRam();
         }
 
         //http://stackoverflow.com/questions/11754874/keydown-not-firing-for-up-down-left-and-right
@@ -772,6 +698,7 @@ namespace AprNes
             bool init_result = nes_obj.init(grfx, rom_bytes);
             Console.WriteLine("init finsih");
             nes_t = new Thread(nes_obj.run);
+            nes_t.IsBackground = true;
             nes_t.Start();
             fps_count_timer.Enabled = true;
             running = true;

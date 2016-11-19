@@ -24,7 +24,7 @@ namespace NativeWIN32API
         static int loc_x=0;
         static int loc_y=0;
 
-        public unsafe static void initHighSpeed(Graphics _grDest, int width, int height, uint[] data , int dx , int dy )
+        public unsafe static void initHighSpeed(Graphics _grDest, int width, int height, uint* data , int dx , int dy )
         {
 
             loc_x = dx;
@@ -54,12 +54,7 @@ namespace NativeWIN32API
             info.bmiHeader.biBitCount = 32;
             info.bmiHeader.biCompression = BitmapCompressionMode.BI_RGB;
             info.bmiHeader.biSizeImage = (uint)(w * h * 4);
-
-            fixed (uint* dptr = data)
-            {
-                data_ptr = (IntPtr)dptr;
-
-            }
+            data_ptr = (IntPtr)data;
         }
 
         public unsafe static void freeHighSpeed()

@@ -68,6 +68,7 @@
             this.label17 = new System.Windows.Forms.Label();
             this.joypad_A = new System.Windows.Forms.TextBox();
             this.groupBox4 = new System.Windows.Forms.GroupBox();
+            this.radioButtonX6 = new System.Windows.Forms.RadioButton();
             this.radioButtonX5 = new System.Windows.Forms.RadioButton();
             this.radioButtonX4 = new System.Windows.Forms.RadioButton();
             this.radioButtonX3 = new System.Windows.Forms.RadioButton();
@@ -532,6 +533,7 @@
             // 
             // groupBox4
             // 
+            this.groupBox4.Controls.Add(this.radioButtonX6);
             this.groupBox4.Controls.Add(this.radioButtonX5);
             this.groupBox4.Controls.Add(this.radioButtonX4);
             this.groupBox4.Controls.Add(this.radioButtonX3);
@@ -543,6 +545,17 @@
             this.groupBox4.TabIndex = 14;
             this.groupBox4.TabStop = false;
             this.groupBox4.Text = "Screen";
+            // 
+            // radioButtonX6
+            // 
+            this.radioButtonX6.AutoSize = true;
+            this.radioButtonX6.Location = new System.Drawing.Point(46, 61);
+            this.radioButtonX6.Name = "radioButtonX6";
+            this.radioButtonX6.Size = new System.Drawing.Size(38, 16);
+            this.radioButtonX6.TabIndex = 17;
+            this.radioButtonX6.TabStop = true;
+            this.radioButtonX6.Text = "x 6";
+            this.radioButtonX6.UseVisualStyleBackColor = true;
             // 
             // radioButtonX5
             // 
@@ -698,5 +711,6 @@
         private System.Windows.Forms.RadioButton radioButtonX5;
         private System.Windows.Forms.ComboBox comboBox1;
         private System.Windows.Forms.Label label18;
+        private System.Windows.Forms.RadioButton radioButtonX6;
     }
 }

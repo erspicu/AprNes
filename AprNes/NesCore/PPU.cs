@@ -12,14 +12,14 @@ using System.Runtime.InteropServices;
 
 namespace AprNes
 {
-    public partial class NesCore
+    unsafe public partial class NesCore
     {
         public int frame_count = 0, ScreenSize = 1;
         public bool LimitFPS = true;
         int ppu_cycles = 0, scanline = 241;
 
         //Palette ref http://www.thealmightyguru.com/Games/Hacking/Wiki/index.php?title=NES_Palette & http://www.dev.bowdenweb.com/nes/nes-color-palette.html
-        static readonly uint[] NesColors =  { 
+        static readonly uint[] NesColorsData =  { 
             0xFF7C7C7C,0xFF0000FC,0xFF0000BC,0xFF4428BC,0xFF940084,0xFFA80020,0xFFA81000,0xFF881400,
             0xFF503000,0xFF007800,0xFF006800,0xFF005800,0xFF004058,0xFF000000,0xFF000000,0xFF000000,
             0xFFBCBCBC,0xFF0078F8,0xFF0058F8,0xFF6844FC,0xFFD800CC,0xFFE40058,0xFFF83800,0xFFE45C10,
@@ -42,18 +42,12 @@ namespace AprNes
         int vram_addr_internal = 0, vram_addr_tmp = 0, addr_range, vram_addr = 0, scrol_y = 0, FineX = 0;
         bool vram_latch = false;
         byte spr_ram_add = 0, ppu_2007_buffer = 0, ppu_2007_temp = 0;
+        byte* spr_ram, ppu_ram;
+        uint* ScreenBuf1x, ScreenBuf2x, ScreenBuf3x, ScreenBuf4x, ScreenBuf5x, ScreenBuf6x, NesColors;
+        int* Buffer_BG_array;
 
-        byte[] spr_ram = new byte[256];
-        byte[] ppu_ram = new byte[0x4000];
-        uint[][] Buffer_Screen_array = new uint[256][];
-        int[][] Buffer_BG_array = new int[256][];
-        uint[] ScreenBuffer1x = new uint[256 * 240];
-        uint[] ScreenBuffer2x = new uint[512 * 480];
-        uint[] ScreenBuffer3x = new uint[768 * 720];
-        uint[] ScreenBuffer4x = new uint[1024 * 960];
-        uint[] ScreenBuffer5x = new uint[1280 * 1200];
+        bool NMI_set = false, IRQ_set = false;
 
-        bool NMI_set = false;
         Stopwatch StopWatch = new Stopwatch();
         void ppu_step()
         {
@@ -65,14 +59,17 @@ namespace AprNes
                     if (ShowSprites) RenderSpritesLine();
                 }
                 else if (ppu_cycles == 256 && ShowBackGround) UpdateVramRegister();
-
+                else if (ppu_cycles == 260)
+                {
+                    if (SpPatternTableAddr == 0x1000 && BgPatternTableAddr == 0) mapper04step_IRQ();
+                }
             }
             else if (scanline == 240 && ppu_cycles == 1)
             {
                 if (!SuppressVbl) isVblank = true;
                 if (NMIable && !SuppressNmi) NMI_set = true;
                 RenderScreen();
-                if (LimitFPS) while (StopWatch.Elapsed.TotalSeconds < 0.01666) ;//0.0167
+                if (LimitFPS) while (StopWatch.Elapsed.TotalSeconds < 0.01666) Thread.Sleep(1);//0.0167
                 frame_count++;
                 StopWatch.Restart();
             }
@@ -100,46 +97,36 @@ namespace AprNes
             ppu_cycles++;
         }
 
-        ushort attrAddr, attrAddrBuf, tileAddr, tileAddrBuf, lowshift, highshift;
-        int current, pixel, vram_addr_limite, attr, attrbuf;
-        void RenderBackGroundLine()
+        ushort attrAddr, tileAddr, lowshift, highshift;
+        int current, pixel, vram_addr_limite, attr, attrbuf, array_loc;
+        int GetAttr()
         {
-            //-----------------------------------------------------------
             vram_addr_limite = vram_addr & 0x3FF;
             attrAddr = (ushort)(0x23C0 | (vram_addr & 0xC00) | (((vram_addr_limite >> 2) & 0x07) | (((vram_addr_limite >> 4) & 0x38) | 0x3C0)));
-            attr = ((ppu_ram[attrAddr] >> (((vram_addr_limite >> 4) & 0x04) | (vram_addr_limite & 0x02))) & 0x03);
             tileAddr = (ushort)((vram_addr & 0xc00) | 0x2000 | vram_addr_limite);
-            lowshift = MapperRouterR_CHR((ppu_ram[tileAddr] << 4) + BgPatternTableAddr + ((scanline + scrol_y) & 7));
-            highshift = MapperRouterR_CHR((ppu_ram[tileAddr] << 4) + BgPatternTableAddr + 8 + ((scanline + scrol_y) & 7));
+            array_loc = (ppu_ram[tileAddr] << 4) + BgPatternTableAddr + +((scanline + scrol_y) & 7);
+            lowshift = (ushort)((lowshift << 8) | MapperRouterR_CHR(array_loc));
+            highshift = (ushort)((highshift << 8) | MapperRouterR_CHR(array_loc + 8));
             if ((vram_addr & 0x1F) == 0x1F) vram_addr ^= 0x41F; else vram_addr++;
-            //-----------------------------------------------------------
-            vram_addr_limite = vram_addr & 0x3FF;
-            attrAddrBuf = (ushort)(0x23C0 | (vram_addr & 0xC00) | (((vram_addr_limite >> 2) & 0x07) | (((vram_addr_limite >> 4) & 0x38) | 0x3C0)));
-            attrbuf = ((ppu_ram[attrAddrBuf] >> (((vram_addr_limite >> 4) & 0x04) | (vram_addr_limite & 0x02))) & 0x03);
-            tileAddrBuf = (ushort)((vram_addr & 0xc00) | 0x2000 | vram_addr_limite);
-            lowshift = (ushort)((lowshift << 8) | MapperRouterR_CHR((ppu_ram[tileAddrBuf] << 4) + BgPatternTableAddr + ((scanline + scrol_y) & 7)));
-            highshift = (ushort)((highshift << 8) | MapperRouterR_CHR((ppu_ram[tileAddrBuf] << 4) + BgPatternTableAddr + 8 + ((scanline + scrol_y) & 7)));
-            if ((vram_addr & 0x1F) == 0x1F) vram_addr ^= 0x41F; else vram_addr++;
-            //-----------------------------------------------------------
+            return ((ppu_ram[attrAddr] >> (((vram_addr_limite >> 4) & 0x04) | (vram_addr_limite & 0x02))) & 0x03);
+        }
+
+        void RenderBackGroundLine()
+        {
+            attr = GetAttr();
+            attrbuf = GetAttr();
             for (int x = 0; x < 32; x++)
             {
                 for (int loc = 0; loc < 8; loc++)
                 {
                     current = 15 - loc - FineX;
-                    pixel = Buffer_BG_array[(x << 3) + loc][scanline] = ((lowshift >> current) & 1) | (((highshift >> current) & 1) << 1);
-                    if (current >= 8) Buffer_Screen_array[(x << 3) + loc][scanline] = NesColors[ppu_ram[((pixel == 0) ? 0x3f00 : 0x3f00 + (attr << 2)) | pixel]];
-                    else Buffer_Screen_array[(x << 3) + loc][scanline] = NesColors[ppu_ram[((pixel == 0) ? 0x3f00 : 0x3f00 + (attrbuf << 2)) | pixel]];
+                    array_loc = (scanline << 8) + ((x << 3) | loc);
+                    pixel = Buffer_BG_array[array_loc] = ((lowshift >> current) & 1) | (((highshift >> current) & 1) << 1);
+                    if (current >= 8) ScreenBuf1x[array_loc] = NesColors[ppu_ram[((pixel == 0) ? 0x3f00 : 0x3f00 | (attr << 2)) | pixel] & 0x3f];
+                    else ScreenBuf1x[array_loc] = NesColors[ppu_ram[((pixel == 0) ? 0x3f00 : 0x3f00 | (attrbuf << 2)) | pixel] & 0x3f];
                 }
                 attr = attrbuf;
-                //-----------------------------------------------------------
-                vram_addr_limite = vram_addr & 0x3FF;
-                attrAddrBuf = (ushort)(0x23C0 | (vram_addr & 0xC00) | (((vram_addr_limite >> 2) & 0x07) | (((vram_addr_limite >> 4) & 0x38) | 0x3C0)));
-                attrbuf = ((ppu_ram[attrAddrBuf] >> (((vram_addr_limite >> 4) & 0x04) | (vram_addr_limite & 0x02))) & 0x03);
-                tileAddrBuf = (ushort)((vram_addr & 0xc00) | 0x2000 | vram_addr_limite);
-                lowshift = (ushort)((lowshift << 8) | MapperRouterR_CHR((ppu_ram[tileAddrBuf] << 4) + BgPatternTableAddr + ((scanline + scrol_y) & 7)));
-                highshift = (ushort)((highshift << 8) | MapperRouterR_CHR((ppu_ram[tileAddrBuf] << 4) + BgPatternTableAddr + 8 + ((scanline + scrol_y) & 7)));
-                if ((vram_addr & 0x1F) == 0x1F) vram_addr ^= 0x41F; else vram_addr++;
-                //-----------------------------------------------------------
+                attrbuf = GetAttr();
             }
         }
         void RenderSpritesLine()
@@ -187,9 +174,10 @@ namespace AprNes
                     if (flip_x) loc_t = (7 - loc); else loc_t = loc;
                     mask = 1 << (7 - loc_t);
                     pixel = (((tile_hbyte & mask) << 1) + (tile_lbyte & mask)) >> ((7 - loc_t));
-                    if (oam_th == 0 && !isSprite0hit && pixel != 0 && Buffer_BG_array[x_loc + loc][scanline] != 0) isSprite0hit = true;
-                    if ((pixel != 0 && !priority) || (pixel != 0 && priority && Buffer_BG_array[x_loc + loc][scanline] == 0))
-                        Buffer_Screen_array[x_loc + loc][scanline] = NesColors[ppu_ram[0x3f10 + ((sprite_attr & 3) << 2) | pixel] & 0x3f];// &0x3f to limite  <= 0~63 color
+                    array_loc = ((scanline) << 8) + (x_loc + loc);
+                    if (oam_th == 0 && !isSprite0hit && pixel != 0 && Buffer_BG_array[array_loc] != 0) isSprite0hit = true;
+                    if ((pixel != 0 && !priority) || (pixel != 0 && priority && Buffer_BG_array[array_loc] == 0))
+                        ScreenBuf1x[array_loc] = NesColors[ppu_ram[0x3f10 + ((sprite_attr & 3) << 2) | pixel] & 0x3f];
                 }
                 if ((++spriteCount) == 9) isSpriteOverflow = true;
             }
@@ -199,18 +187,16 @@ namespace AprNes
         void RenderScreen()
         {
             screen_lock = true;
-            switch (ScreenSize)
-            {
-                case 1:
-                    for (int x = 255; x >= 0; x--)
-                        for (int y = 239; y >= 0; y--)
-                            ScreenBuffer1x[(y << 8) + x] = Buffer_Screen_array[x][y];
-                    break;
-                case 2: HS_XBRz.ScaleImage2X(Buffer_Screen_array, ScreenBuffer2x, 256, 240); break;
-                case 3: HS_XBRz.ScaleImage3X(Buffer_Screen_array, ScreenBuffer3x, 256, 240); break;
-                case 4: HS_XBRz.ScaleImage4X(Buffer_Screen_array, ScreenBuffer4x, 256, 240); break;
-                case 5: HS_XBRz.ScaleImage5X(Buffer_Screen_array, ScreenBuffer5x, 256, 240); break;
-            }
+
+            if (ScreenSize != 1)
+                switch (ScreenSize)
+                {
+                    case 2: HS_XBRz.ScaleImage2X(ScreenBuf1x, ScreenBuf2x, 256, 240); break;
+                    case 3: HS_XBRz.ScaleImage3X(ScreenBuf1x, ScreenBuf3x, 256, 240); break;
+                    case 4: HS_XBRz.ScaleImage4X(ScreenBuf1x, ScreenBuf4x, 256, 240); break;
+                    case 5: HS_XBRz.ScaleImage5X(ScreenBuf1x, ScreenBuf5x, 256, 240); break;
+                    case 6: HS_XBRz.ScaleImage6X(ScreenBuf1x, ScreenBuf6x, 256, 240); break;
+                }
             NativeGDI.DrawImageHighSpeedtoDevice();
             screen_lock = false;
         }
@@ -342,7 +328,11 @@ namespace AprNes
         void ppu_w_2007(byte value)
         {
             vram_addr_tmp = vram_addr & 0x3FFF;
-            if (vram_addr_tmp < 0x2000) MapperRouterW_CHR(vram_addr_tmp, value);
+            if (vram_addr_tmp < 0x2000)
+            {
+                if (CHR_ROM_count == 0) ppu_ram[vram_addr_tmp] = value;
+                //MapperRouterW_CHR(vram_addr_tmp, value);
+            }
             else if (vram_addr_tmp < 0x3f00) //Name Table & Attribute Table
             {
                 addr_range = vram_addr_tmp & 0xc00;
@@ -377,11 +367,12 @@ namespace AprNes
         {
             switch (ScreenSize)
             {
-                case 1: return new Bitmap(256, 240, 256 * 4, PixelFormat.Format32bppRgb, Marshal.UnsafeAddrOfPinnedArrayElement(ScreenBuffer1x, 0));
-                case 2: return new Bitmap(256 * 2, 240 * 2, 256 * 2 * 4, PixelFormat.Format32bppRgb, Marshal.UnsafeAddrOfPinnedArrayElement(ScreenBuffer2x, 0));
-                case 3: return new Bitmap(256 * 3, 240 * 3, 256 * 3 * 4, PixelFormat.Format32bppRgb, Marshal.UnsafeAddrOfPinnedArrayElement(ScreenBuffer3x, 0));
-                case 4: return new Bitmap(256 * 4, 240 * 4, 256 * 4 * 4, PixelFormat.Format32bppRgb, Marshal.UnsafeAddrOfPinnedArrayElement(ScreenBuffer4x, 0));
-                case 5: return new Bitmap(256 * 5, 240 * 5, 256 * 5 * 4, PixelFormat.Format32bppRgb, Marshal.UnsafeAddrOfPinnedArrayElement(ScreenBuffer5x, 0));
+                case 1: return new Bitmap(256, 240, 256 * 4, PixelFormat.Format32bppRgb, (IntPtr)ScreenBuf1x);
+                case 2: return new Bitmap(256 * 2, 240 * 2, 256 * 2 * 4, PixelFormat.Format32bppRgb, (IntPtr)ScreenBuf2x);
+                case 3: return new Bitmap(256 * 3, 240 * 3, 256 * 3 * 4, PixelFormat.Format32bppRgb, (IntPtr)ScreenBuf3x);
+                case 4: return new Bitmap(256 * 4, 240 * 4, 256 * 4 * 4, PixelFormat.Format32bppRgb, (IntPtr)ScreenBuf4x);
+                case 5: return new Bitmap(256 * 5, 240 * 5, 256 * 5 * 4, PixelFormat.Format32bppRgb, (IntPtr)ScreenBuf5x);
+                case 6: return new Bitmap(256 * 6, 240 * 6, 256 * 6 * 4, PixelFormat.Format32bppRgb, (IntPtr)ScreenBuf6x);
             }
             return null;
         }

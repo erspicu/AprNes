@@ -57,17 +57,12 @@ namespace AprNes
 
         public void BeforClose()
         {
-            if (radioButtonX1.Checked)
-                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "1";
-            else if (radioButtonX2.Checked)
-                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "2";
-            else if (radioButtonX3.Checked)
-                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "3";
-            else if (radioButtonX4.Checked)
-                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "4";
-            else if (radioButtonX5.Checked)
-                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "5";
-
+            if (radioButtonX1.Checked) AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "1";
+            else if (radioButtonX2.Checked) AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "2";
+            else if (radioButtonX3.Checked) AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "3";
+            else if (radioButtonX4.Checked) AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "4";
+            else if (radioButtonX5.Checked) AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "5";
+            else if (radioButtonX6.Checked) AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "6";
 
             AprNesUI.GetInstance().NES_KeyMAP_joypad.Clear();
 
@@ -75,8 +70,7 @@ namespace AprNes
                 AprNesUI.GetInstance().NES_KeyMAP_joypad[key] = NES_KeyMAP_joypad_config[key];
 
             AprNesUI.GetInstance().AppConfigure["LimitFPS"] = "0";
-            if (LimitFPS_checkBox.Checked)
-                AprNesUI.GetInstance().AppConfigure["LimitFPS"] = "1";
+            if (LimitFPS_checkBox.Checked) AprNesUI.GetInstance().AppConfigure["LimitFPS"] = "1";
 
             AprNesUI.GetInstance().AppConfigure["CaptureScreenPath"] = screen_path.Text;
             AprNesUI.GetInstance().key_A = key_A;
@@ -268,34 +262,23 @@ namespace AprNes
 
             if (xy_name == "X")
             {
-                if (value == 0)
-                    return "LEFT";
-
-                if (value == 65535)
-                    return "RIGHT";
+                if (value == 0) return "LEFT";
+                if (value == 65535) return "RIGHT";
             }
 
             if (xy_name == "Y")
             {
-                if (value == 0)
-                    return "UP";
-
-                if (value == 65535)
-                    return "DOWN";
+                if (value == 0) return "UP";
+                if (value == 65535) return "DOWN";
             }
 
             return tmp;
         }
-
-
         private void GBEMU_ConfigureUI_FormClosing(object sender, FormClosingEventArgs e)
         {
             e.Cancel = true;
             this.Visible = false;
         }
-
-
-
         Dictionary<string, AprNesUI.KeyMap> NES_KeyMAP_joypad_config = new Dictionary<string, AprNesUI.KeyMap>();
         private void GBEMU_ConfigureUI_Shown(object sender, EventArgs e)
         {
@@ -305,11 +288,10 @@ namespace AprNes
                 NES_KeyMAP_joypad_config[key] = AprNesUI.GetInstance().NES_KeyMAP_joypad[key];
 
             joypad_A.Text = joypad_B.Text = joypad_SELECT.Text = joypad_START.Text = joypad_UP.Text = joypad_DOWN.Text = joypad_LEFT.Text = joypad_RIGHT.Text = "";
-            
+
             foreach (string key in NES_KeyMAP_joypad_config.Keys)
             {
-                if (key == "")
-                    continue;
+                if (key == "") continue;
 
                 if (NES_KeyMAP_joypad_config[key] == AprNesUI.KeyMap.NES_btn_A)
                 {
@@ -352,31 +334,10 @@ namespace AprNes
                     joypad_RIGHT.Text = tmp[1];
                 }
             }
+            (groupBox4.Controls.Find("radioButtonX" + AprNesUI.GetInstance().AppConfigure["ScreenSize"], true)[0] as RadioButton).Checked = true;
 
-            switch (AprNesUI.GetInstance().AppConfigure["ScreenSize"])
-            {
-                case "1":
-                    radioButtonX1.Checked = true;
-                    break;
-                case "2":
-                    radioButtonX2.Checked = true;
-                    break;
-                case "3":
-                    radioButtonX3.Checked = true;
-                    break;
-                case "4":
-                    radioButtonX4.Checked = true;
-                    break;
-                case "5":
-                    radioButtonX5.Checked = true;
-                    break;
-            }
-
-            if (AprNesUI.GetInstance().AppConfigure["LimitFPS"] == "1")
-                LimitFPS_checkBox.Checked = true;
-            else
-                LimitFPS_checkBox.Checked = false;
-
+            if (AprNesUI.GetInstance().AppConfigure["LimitFPS"] == "1") LimitFPS_checkBox.Checked = true;
+            else LimitFPS_checkBox.Checked = false;
 
             screen_path.Text = AprNesUI.GetInstance().AppConfigure["CaptureScreenPath"];
 
@@ -404,20 +365,11 @@ namespace AprNes
         private void choose_dir_Click(object sender, EventArgs e)
         {
             FolderBrowserDialog fd = new FolderBrowserDialog();
-            if (fd.ShowDialog() != DialogResult.OK)
-                return;
+            if (fd.ShowDialog() != DialogResult.OK) return;
             screen_path.Text = fd.SelectedPath;
         }
 
-        int key_A = 0;
-        int key_B = 0;
-        int key_SELECT = 0;
-        int key_START = 0;
-        int key_RIGHT = 0;
-        int key_LEFT = 0;
-        int key_UP = 0;
-        int key_DOWN = 0;
-
+        int key_A = 0, key_B = 0, key_SELECT = 0, key_START = 0, key_RIGHT = 0, key_LEFT = 0, key_UP = 0, key_DOWN = 0;
         private void textBox_KeyConfig_KeyUp(object sender, KeyEventArgs e)
         {
 
@@ -427,37 +379,14 @@ namespace AprNes
             string name = (sender as TextBox).Name.Remove(0, 8);
             switch (name)
             {
-                case "A":
-                    key_A = e.KeyValue;
-                    break;
-
-                case "B":
-                    key_B = e.KeyValue;
-                    break;
-
-                case "START":
-                    key_START = e.KeyValue;
-                    break;
-
-                case "SELECT":
-                    key_SELECT = e.KeyValue;
-                    break;
-
-                case "UP":
-                    key_UP = e.KeyValue;
-                    break;
-
-                case "DOWN":
-                    key_DOWN = e.KeyValue;
-                    break;
-
-                case "LEFT":
-                    key_LEFT = e.KeyValue;
-                    break;
-
-                case "RIGHT":
-                    key_RIGHT = e.KeyValue;
-                    break;
+                case "A": key_A = e.KeyValue; break;
+                case "B": key_B = e.KeyValue; break;
+                case "START": key_START = e.KeyValue; break;
+                case "SELECT": key_SELECT = e.KeyValue; break;
+                case "UP": key_UP = e.KeyValue; break;
+                case "DOWN": key_DOWN = e.KeyValue; break;
+                case "LEFT": key_LEFT = e.KeyValue; break;
+                case "RIGHT": key_RIGHT = e.KeyValue; break;
             }
         }
 

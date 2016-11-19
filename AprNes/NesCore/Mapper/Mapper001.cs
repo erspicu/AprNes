@@ -5,12 +5,11 @@ using System.Text;
 
 namespace AprNes
 {
-    public partial class NesCore
+    unsafe public partial class NesCore
     {
-        //http://wiki.nesdev.com/w/index.php/MMC1
-
+        //MMC1 http://wiki.nesdev.com/w/index.php/MMC1
         int PRG_Bankmode, CHR_Bankmode, Mirroring_type;
-        void mapper01write_ROM(ushort address, byte value)
+        void mapper001write_ROM(ushort address, byte value)
         {
             if ((value & 0x80) != 0)
             {
@@ -44,7 +43,7 @@ namespace AprNes
             MapperShiftCount = MapperRegBuffer = 0;
         }
 
-        byte mapper01read_RPG(ushort address) // need fix
+        byte mapper001read_RPG(ushort address) // need fix
         {
             if (PRG_Bankmode == 0 || PRG_Bankmode == 1) return PRG_ROM[(address - 0x8000) + (PRG_Bankselect << 14)];//32k
             else if (PRG_Bankmode == 2)
@@ -59,9 +58,8 @@ namespace AprNes
             }
         }
 
-        byte mapper01read_CHR(int address) //checking
+        byte mapper001read_CHR(int address) //checking
         {
-            if (CHR_ROM_count == 0) return ppu_ram[address];
             if (CHR_Bankmode > 0) //4K
             {
                 if (address < 0x1000) return CHR_ROM[address + (CHR0_Bankselect << 12)];
@@ -70,9 +68,5 @@ namespace AprNes
             else return CHR_ROM[address + 0x2000 * (CHR0_Bankselect >> 1)];
         }
 
-        void mapper01write_CHR(int address, byte value) //ok
-        {
-            if (CHR_ROM_count == 0) ppu_ram[address] = value;
-        }
     }
 }

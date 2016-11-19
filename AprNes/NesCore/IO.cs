@@ -2,24 +2,22 @@
 {
     public partial class NesCore
     {
-
-        //IO read & write routor
         byte IO_read(ushort addr)
         {
+            if (addr < 0x4000) addr = (ushort)(0x2000 | (addr & 7));
             switch (addr)
             {
-                case 0x2002: return ppu_r_2002() ;
-                case 0x2007: return ppu_r_2007() ;
+                case 0x2002: return ppu_r_2002();
+                case 0x2007: return ppu_r_2007();
                 case 0x4015: return 0;
                 case 0x4016: return gamepad_r_4016();
                 case 0x4017: return 0x40;
-                default:
-                    //MessageBox.Show("unkonw IO Port read " + addr.ToString("x4"));
-                    return 0;
+                default: return 0;
             }
         }
         void IO_write(ushort addr, byte val)
         {
+            if (addr < 0x4000) addr = (ushort)(0x2000 | (addr & 7));
             switch (addr)
             {
                 case 0x2000: ppu_w_2000(val); break;
@@ -52,9 +50,7 @@
                 case 0x4015: break;
                 case 0x4016: gamepad_w_4016(val); break;
                 case 0x4017: break;
-                default: 
-                    //MessageBox.Show("unkonw IO Port write " + addr.ToString("x4")); 
-                    break;
+                default: break;
             }
         }
     }
