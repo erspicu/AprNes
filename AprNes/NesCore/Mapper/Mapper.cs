@@ -8,7 +8,7 @@ namespace AprNes
 {
     unsafe public partial class NesCore
     {
-        public int[] Mapper_Allow = new int[] { 0, 1, 2, 3, 4 }; //5,7,11,66,71
+        public int[] Mapper_Allow = new int[] { 0, 1, 2, 3, 4, 7, 11, 66 }; //5,7,11,66,71
 
         int PRG_Bankselect = 0;
         int CHR_Bankselect = 0;
@@ -26,7 +26,7 @@ namespace AprNes
             switch (mapper)
             {
                 case 5: return mapper005read_ExpansionROM(address);
-                default: return 0 ;
+                default: return 0;
             }
         }
 

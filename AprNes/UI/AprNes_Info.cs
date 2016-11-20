@@ -53,7 +53,7 @@ namespace AprNes
 
         private void linkLabel1_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
         {
-            Process.Start("http://baxermux.byethost18.com/myemu/AprNes/index.htm");
+            Process.Start("http://www.baxermux.byethost18.com/myemu/AprNes/index.htm");
         }
     }
 }

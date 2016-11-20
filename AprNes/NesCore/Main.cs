@@ -17,7 +17,7 @@ namespace AprNes
         int mapper;
         byte PRG_ROM_count, CHR_ROM_count, ROM_Control_1, ROM_Control_2, RAM_banks_count;
         byte* PRG_ROM, CHR_ROM;
-        bool Vertical = false, NesHeaderV2 = false, battery = false;
+        bool Vertical = false, NesHeaderV2 = false, battery = false , ScreenFour = false , ScreenSingle = false ,ScreenSpecial = false;
 
         public string rom_file_name = "";
         string rom_sav = "";
@@ -52,8 +52,8 @@ namespace AprNes
                     for (int i = 0; i < CHR_ROM_count * 8192; i++)
                         CHR_ROM[i] = rom_bytes[PRG_ROM_count * 16384 + 16 + i];
                 }
-                else
-                    CHR_ROM = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8192); //new byte[8192];
+                //else
+                    //CHR_ROM = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8192); //new byte[8192];
 
                 ROM_Control_1 = rom_bytes[6];
                 ROM_Control_2 = rom_bytes[7];
@@ -79,7 +79,11 @@ namespace AprNes
                 if ((ROM_Control_1 & 4) != 0) Console.WriteLine("trainer : yes");
                 else Console.WriteLine("trainer : no");
 
-                if ((ROM_Control_1 & 8) != 0) Console.WriteLine("fourscreen mirroring : yes");
+                if ((ROM_Control_1 & 8) != 0)
+                {
+                    ScreenFour =  ScreenSpecial = true;
+                    Console.WriteLine("fourscreen mirroring : yes");
+                }
                 else Console.WriteLine("fourscreen mirroring : no");
 
                 // https://wiki.nesdev.com/w/index.php/NES_2.0

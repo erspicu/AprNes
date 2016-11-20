@@ -7,7 +7,7 @@ namespace AprNes
 {
     unsafe public partial class NesCore
     {
-        //GxROM http://wiki.nesdev.com/w/index.php/GxROM need check!
+        //GxROM http://wiki.nesdev.com/w/index.php/GxROM ok
         void mapper066write_ROM(ushort address, byte value)
         {
             CHR_Bankselect = value & 3; // Select 8 KB CHR ROM bank for PPU $0000-$1FFF
@@ -21,7 +21,7 @@ namespace AprNes
 
         byte mapper066read_CHR(int address)
         {
-            return CHR_ROM[CHR_ROM_count << 13];
+            return CHR_ROM[ address + (CHR_Bankselect <<13)  ];
         }
     }
 }

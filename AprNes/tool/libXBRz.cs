@@ -83,12 +83,35 @@ namespace XBRz_speed
             }
         }
 
+
+        static byte* _preProcBuffer;
+
+
+        static int* results_j;
+
+        static int* results_k;
+
+        static int* results_g;
+
+        static int* results_f;
+
+        static byte* preProcBuffer_local; // = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
+
         public static unsafe void initTable(int sw)
         {
             if (lTable_dist != null)
                 return;
 
             lTable_dist = (int*)Marshal.AllocHGlobal(sizeof(int) * 0x1000000);
+
+            _preProcBuffer = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256 * 240);
+
+            results_f = (int*)Marshal.AllocHGlobal(sizeof(int) * 256 * 240);
+            results_j = (int*)Marshal.AllocHGlobal(sizeof(int) * 256 * 240);
+            results_k = (int*)Marshal.AllocHGlobal(sizeof(int) * 256 * 240);
+            results_g = (int*)Marshal.AllocHGlobal(sizeof(int) * 256 * 240);
+
+            preProcBuffer_local = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
 
             for (int i = 0; i < 0x1000000; i++)
             {
@@ -245,16 +268,19 @@ namespace XBRz_speed
         }
         static int DistYCbCr(uint pix1, uint pix2)
         {
-            int r_diff = getRed(pix1) - getRed(pix2);
-            int g_diff = getGreen(pix1) - getGreen(pix2);
-            int b_diff = getBlue(pix1) - getBlue(pix2);
+            uint r_diff = ((pix1 & 0xff0000) >> 16) - ((pix2 & 0xff0000) >> 16);
+            uint g_diff = ((pix1 & 0xff00) >> 8) - ((pix2 & 0xff00) >> 8);
+            uint b_diff = (pix1 & 0xff) - (pix2 & 0xff);
             return lTable_dist[(((r_diff + 255) >> 1) << 16) | (((g_diff + 255) >> 1) << 8) | ((b_diff + 255) >> 1)];
         }
 
         private static bool ColorEQ(uint pix1, uint pix2)
         {
             if (pix1 == pix2) return true;
-            return DistYCbCr(pix1, pix2) < eqColorThres;
+            uint r_diff = ((pix1 & 0xff0000) >> 16) - ((pix2 & 0xff0000) >> 16);
+            uint g_diff = ((pix1 & 0xff00) >> 8) - ((pix2 & 0xff00) >> 8);
+            uint b_diff = (pix1 & 0xff) - (pix2 & 0xff);
+            return lTable_dist[(((r_diff + 255) >> 1) << 16) | (((g_diff + 255) >> 1) << 8) | ((b_diff + 255) >> 1)] < eqColorThres;
         }
 
         class OutputMatrix
@@ -313,114 +339,133 @@ namespace XBRz_speed
             }
         }
 
+
         public static void ScaleImage6X(uint* src, uint* trg, int srcWidth, int srcHeight)
         {
             int trgWidth = srcWidth * 6;
 
-            Parallel.For(0, 4, core =>
+            Parallel.For(0, (srcHeight), y =>
             {
-                int start = 0, end = 0;
-                if (core == 0)
+                int sM1 = Math.Max(y - 1, 0);
+                int s0 = y;
+                int sP1 = Math.Min(y + 1, srcHeight - 1);
+                int sP2 = Math.Min(y + 2, srcHeight - 1);
+                uint ker4b, ker4c, ker4e, ker4f, ker4g, ker4h, ker4i, ker4j, ker4k, ker4l, ker4n, ker4o;
+                for (int x = 0; x < srcWidth; ++x)
                 {
-                    start = 0;
-                    end = srcHeight / 4;
-                }
-                else if (core == 1)
-                {
-                    start = srcHeight / 4;
-                    end = srcHeight / 2;
-                }
-                else if (core == 2)
-                {
-                    start = srcHeight / 2;
-                    end = (srcHeight / 4) * 3;
-                }
-                else if (core == 3)
-                {
-                    start = (srcHeight / 4) * 3;
-                    end = srcHeight;
-                }
+                    int blendResult_f = 0, blendResult_g = 0, blendResult_j = 0, blendResult_k = 0;
 
-                OutputMatrix outputMatrix = new OutputMatrix(6, trg, trgWidth);
-                byte[] preProcBuffer = new byte[srcWidth];
-                for (int y = start; y < end; ++y)
-                {
-                    int trgi = 6 * y * trgWidth; // scale
-                    int sM1 = Math.Max(y - 1, 0);
-                    int s0 = y;
-                    int sP1 = Math.Min(y + 1, srcHeight - 1);
-                    int sP2 = Math.Min(y + 2, srcHeight - 1);
-                    byte blendXy1 = 0;
-                    byte blendXy = 0;
-                    //-----
-                    int fg;
-                    int hc;
-                    bool doLineBlend;
-                    bool haveShallowLine;
-                    bool haveSteepLine;
-                    uint px;
-                    uint b, c, d, e, f, g, h, i;
-                    uint ker4b, ker4c, ker4e, ker4f, ker4g, ker4h, ker4i, ker4j, ker4k, ker4l, ker4n, ker4o;
-                    uint ker3_0, ker3_1, ker3_2, ker3_3, ker3_4, ker3_5, ker3_6, ker3_7, ker3_8;
-                    byte blend;
+                    int xM1 = Math.Max(x - 1, 0);
+                    int xP1 = Math.Min(x + 1, srcWidth - 1);
+                    int xP2 = Math.Min(x + 2, srcWidth - 1);
 
-                    for (int x = 0; x < srcWidth; ++x, trgi += 6) //scale
+                    int array_loc = x + y * srcWidth;
+
+                    ker4b = src[sM1 * srcWidth + x];
+                    ker4c = src[sM1 * srcWidth + xP1];
+
+                    ker4e = src[s0 * srcWidth + xM1];
+                    ker4f = src[s0 * srcWidth + x];
+                    ker4g = src[s0 * srcWidth + xP1];
+                    ker4h = src[s0 * srcWidth + xP2];
+
+                    ker4i = src[sP1 * srcWidth + xM1];
+                    ker4j = src[sP1 * srcWidth + x];
+                    ker4k = src[sP1 * srcWidth + xP1];
+                    ker4l = src[sP1 * srcWidth + xP2];
+
+                    ker4n = src[sP2 * srcWidth + x];
+                    ker4o = src[sP2 * srcWidth + xP1];
+
+
+                    //--------------------------------------
+
+                    if ((ker4f != ker4g || ker4j != ker4k) && (ker4f != ker4j || ker4g != ker4k))
                     {
-                        int blendResult_f = 0, blendResult_g = 0, blendResult_j = 0, blendResult_k = 0;
+                        int jg = DistYCbCr(ker4i, ker4f) + DistYCbCr(ker4f, ker4c) + DistYCbCr(ker4n, ker4k) + DistYCbCr(ker4k, ker4h) + (DistYCbCr(ker4j, ker4g) << 2);
+                        int fk = DistYCbCr(ker4e, ker4j) + DistYCbCr(ker4j, ker4o) + DistYCbCr(ker4b, ker4g) + DistYCbCr(ker4g, ker4l) + (DistYCbCr(ker4f, ker4k) << 2);
 
-                        int xM1 = Math.Max(x - 1, 0);
-                        int xP1 = Math.Min(x + 1, srcWidth - 1);
-                        int xP2 = Math.Min(x + 2, srcWidth - 1);
-
-                        ker4b = src[sM1 * srcWidth + x];
-                        ker4c = src[sM1 * srcWidth + xP1];
-
-                        ker4e = src[s0 * srcWidth + xM1];
-                        ker4f = src[s0 * srcWidth + x];
-                        ker4g = src[s0 * srcWidth + xP1];
-                        ker4h = src[s0 * srcWidth + xP2];
-
-                        ker4i = src[sP1 * srcWidth + xM1];
-                        ker4j = src[sP1 * srcWidth + x];
-                        ker4k = src[sP1 * srcWidth + xP1];
-                        ker4l = src[sP1 * srcWidth + xP2];
-
-                        ker4n = src[sP2 * srcWidth + x];
-                        ker4o = src[sP2 * srcWidth + xP1];
-                        //--------------------------------------
-
-                        if ((ker4f != ker4g || ker4j != ker4k) && (ker4f != ker4j || ker4g != ker4k))
+                        if (jg < fk)
                         {
-                            int jg = DistYCbCr(ker4i, ker4f) + DistYCbCr(ker4f, ker4c) + DistYCbCr(ker4n, ker4k) + DistYCbCr(ker4k, ker4h) + (DistYCbCr(ker4j, ker4g) << 2);
-                            int fk = DistYCbCr(ker4e, ker4j) + DistYCbCr(ker4j, ker4o) + DistYCbCr(ker4b, ker4g) + DistYCbCr(ker4g, ker4l) + (DistYCbCr(ker4f, ker4k) << 2);
-
-                            if (jg < fk)
-                            {
-                                bool dominantGradient = dominantDirectionThreshold * jg < fk;
-                                if (ker4f != ker4g && ker4f != ker4j)
-                                    blendResult_f = dominantGradient ? BlendDominant : BlendNormal;
-                                if (ker4k != ker4j && ker4k != ker4g)
-                                    blendResult_k = dominantGradient ? BlendDominant : BlendNormal;
-                            }
-                            else if (fk < jg)
-                            {
-                                bool dominantGradient = dominantDirectionThreshold * fk < jg;
-                                if (ker4j != ker4f && ker4j != ker4k)
-                                    blendResult_j = dominantGradient ? BlendDominant : BlendNormal;
-                                if (ker4g != ker4f && ker4g != ker4k)
-                                    blendResult_g = dominantGradient ? BlendDominant : BlendNormal;
-                            }
+                            bool dominantGradient = dominantDirectionThreshold * jg < fk;
+                            if (ker4f != ker4g && ker4f != ker4j)
+                                blendResult_f = dominantGradient ? BlendDominant : BlendNormal;
+                            if (ker4k != ker4j && ker4k != ker4g)
+                                blendResult_k = dominantGradient ? BlendDominant : BlendNormal;
 
                         }
-                        //--------------------------------------
+                        else if (fk < jg)
+                        {
+                            bool dominantGradient = dominantDirectionThreshold * fk < jg;
+                            if (ker4j != ker4f && ker4j != ker4k)
+                                blendResult_j = dominantGradient ? BlendDominant : BlendNormal;
+                            if (ker4g != ker4f && ker4g != ker4k)
+                                blendResult_g = dominantGradient ? BlendDominant : BlendNormal;
+                        }
 
-                        blendXy = SetBottomR(preProcBuffer[x], blendResult_f);
-                        blendXy1 = SetTopR(blendXy1, blendResult_j);
-                        preProcBuffer[x] = blendXy1;
-                        blendXy1 = SetTopL(0, blendResult_k);
-                        if (x + 1 < srcWidth) preProcBuffer[x + 1] = SetBottomL(preProcBuffer[x + 1], blendResult_g);
-                        _FillBlock6x(trg, trgi, trgWidth, src[s0 * srcWidth + x]);
-                        if (blendXy == 0) continue;
+                    }
+                    //--------------------------------------
+
+                    results_f[array_loc] = blendResult_f;
+                    results_j[array_loc] = blendResult_j;
+                    results_g[array_loc] = blendResult_g;
+                    results_k[array_loc] = blendResult_k;
+                }
+            });
+
+            for (int y = 0; y < srcHeight; ++y)
+            {
+                byte blendXy1 = 0;
+                int array_loc = 0;
+                for (int x = 0; x < srcWidth - 1; ++x, array_loc = x + y * srcWidth)
+                {
+                    _preProcBuffer[array_loc] = (byte)(preProcBuffer_local[x] | ((byte)results_f[array_loc] << 4));
+                    preProcBuffer_local[x] = blendXy1 = (byte)(blendXy1 | ((byte)results_j[array_loc] << 2));
+                    blendXy1 = (byte)results_k[array_loc];
+                    //if (x + 1 < srcWidth) 
+                    preProcBuffer_local[(x + 1)] = (byte)(preProcBuffer_local[(x + 1)] | ((byte)results_g[array_loc] << 6));
+                }
+            }
+
+            Parallel.For(0, srcHeight, y =>
+            {
+                int trgi = 6 * y * trgWidth; // scale
+                int sM1 = Math.Max(y - 1, 0);
+                int s0 = y;
+                int sP1 = Math.Min(y + 1, srcHeight - 1);
+                int sP2 = Math.Min(y + 2, srcHeight - 1);
+                byte blendXy = 0;
+                //-----
+                int fg;
+                int hc;
+                bool doLineBlend;
+                bool haveShallowLine;
+                bool haveSteepLine;
+                uint px;
+                uint b, c, d, e, f, g, h, i;
+                uint ker3_0, ker3_1, ker3_2, ker3_3, ker3_4, ker3_5, ker3_6, ker3_7, ker3_8;
+                byte blend;
+
+                OutputMatrix outputMatrix = new OutputMatrix(6, trg, trgWidth);
+
+                for (int x = 0; x < srcWidth; ++x, trgi += 6)
+                {
+
+
+
+                    int xM1 = Math.Max(x - 1, 0);
+                    int xP1 = Math.Min(x + 1, srcWidth - 1);
+                    int xP2 = Math.Min(x + 2, srcWidth - 1);
+
+
+
+                    blendXy = _preProcBuffer[x + y * srcWidth];
+
+                    _FillBlock6x(trg, trgi, trgWidth, src[s0 * srcWidth + x]);
+
+
+                    if (blendXy != 0)
+                    {
 
                         ker3_0 = src[sM1 * srcWidth + xM1];
                         ker3_1 = src[sM1 * srcWidth + x];
@@ -433,7 +478,7 @@ namespace XBRz_speed
                         ker3_6 = src[sP1 * srcWidth + xM1];
                         ker3_7 = src[sP1 * srcWidth + x];
                         ker3_8 = src[sP1 * srcWidth + xP1];
-
+                        //--
                         //--
 
                         b = ker3_1;
@@ -666,138 +711,150 @@ namespace XBRz_speed
                             }
                         }
                     }
-                    //---
                 }
+                //---
             });
+            // });
         }
 
         public static void ScaleImage5X(uint* src, uint* trg, int srcWidth, int srcHeight)
         {
             int trgWidth = srcWidth * 5;
-            Parallel.For(0, 4, core =>
+
+            Parallel.For(0, (srcHeight), y =>
             {
-                int start = 0, end = 0;
-                if (core == 0)
+                int sM1 = Math.Max(y - 1, 0);
+                int s0 = y;
+                int sP1 = Math.Min(y + 1, srcHeight - 1);
+                int sP2 = Math.Min(y + 2, srcHeight - 1);
+                uint ker4b, ker4c, ker4e, ker4f, ker4g, ker4h, ker4i, ker4j, ker4k, ker4l, ker4n, ker4o;
+                for (int x = 0; x < srcWidth; ++x)
                 {
-                    start = 0;
-                    end = srcHeight / 4;
-                }
-                else if (core == 1)
-                {
-                    start = srcHeight / 4;
-                    end = srcHeight / 2;
-                }
-                else if (core == 2)
-                {
-                    start = srcHeight / 2;
-                    end = (srcHeight / 4) * 3;
-                }
-                else if (core == 3)
-                {
-                    start = (srcHeight / 4) * 3;
-                    end = srcHeight;
-                }
+                    int blendResult_f = 0, blendResult_g = 0, blendResult_j = 0, blendResult_k = 0;
 
-                OutputMatrix outputMatrix = new OutputMatrix(5, trg, trgWidth);
-                byte[] preProcBuffer = new byte[srcWidth];
-                for (int y = start; y < end; ++y)
-                {
-                    int trgi = 5 * y * trgWidth; // scale
-                    int sM1 = Math.Max(y - 1, 0);
-                    int s0 = y;
-                    int sP1 = Math.Min(y + 1, srcHeight - 1);
-                    int sP2 = Math.Min(y + 2, srcHeight - 1);
-                    byte blendXy1 = 0;
-                    byte blendXy = 0;
-                    //-----
-                    int fg;
-                    int hc;
-                    bool doLineBlend;
-                    bool haveShallowLine;
-                    bool haveSteepLine;
-                    uint px;
-                    uint b, c, d, e, f, g, h, i;
-                    uint ker4b, ker4c, ker4e, ker4f, ker4g, ker4h, ker4i, ker4j, ker4k, ker4l, ker4n, ker4o;
-                    uint ker3_0, ker3_1, ker3_2, ker3_3, ker3_4, ker3_5, ker3_6, ker3_7, ker3_8;
-                    byte blend;
+                    int xM1 = Math.Max(x - 1, 0);
+                    int xP1 = Math.Min(x + 1, srcWidth - 1);
+                    int xP2 = Math.Min(x + 2, srcWidth - 1);
 
-                    for (int x = 0; x < srcWidth; ++x, trgi += 5) //scale
+                    int array_loc = x + y * srcWidth;
+
+                    ker4b = src[sM1 * srcWidth + x];
+                    ker4c = src[sM1 * srcWidth + xP1];
+
+                    ker4e = src[s0 * srcWidth + xM1];
+                    ker4f = src[s0 * srcWidth + x];
+                    ker4g = src[s0 * srcWidth + xP1];
+                    ker4h = src[s0 * srcWidth + xP2];
+
+                    ker4i = src[sP1 * srcWidth + xM1];
+                    ker4j = src[sP1 * srcWidth + x];
+                    ker4k = src[sP1 * srcWidth + xP1];
+                    ker4l = src[sP1 * srcWidth + xP2];
+
+                    ker4n = src[sP2 * srcWidth + x];
+                    ker4o = src[sP2 * srcWidth + xP1];
+
+
+                    //--------------------------------------
+
+                    if ((ker4f != ker4g || ker4j != ker4k) && (ker4f != ker4j || ker4g != ker4k))
                     {
-                        int blendResult_f = 0, blendResult_g = 0, blendResult_j = 0, blendResult_k = 0;
+                        int jg = DistYCbCr(ker4i, ker4f) + DistYCbCr(ker4f, ker4c) + DistYCbCr(ker4n, ker4k) + DistYCbCr(ker4k, ker4h) + (DistYCbCr(ker4j, ker4g) << 2);
+                        int fk = DistYCbCr(ker4e, ker4j) + DistYCbCr(ker4j, ker4o) + DistYCbCr(ker4b, ker4g) + DistYCbCr(ker4g, ker4l) + (DistYCbCr(ker4f, ker4k) << 2);
 
-                        int xM1 = Math.Max(x - 1, 0);
-                        int xP1 = Math.Min(x + 1, srcWidth - 1);
-                        int xP2 = Math.Min(x + 2, srcWidth - 1);
-
-                        ker4b = src[sM1 * srcWidth + x];
-                        ker4c = src[sM1 * srcWidth + xP1];
-
-                        ker4e = src[s0 * srcWidth + xM1];
-                        ker4f = src[s0 * srcWidth + x];
-                        ker4g = src[s0 * srcWidth + xP1];
-                        ker4h = src[s0 * srcWidth + xP2];
-
-                        ker4i = src[sP1 * srcWidth + xM1];
-                        ker4j = src[sP1 * srcWidth + x];
-                        ker4k = src[sP1 * srcWidth + xP1];
-                        ker4l = src[sP1 * srcWidth + xP2];
-
-                        ker4n = src[sP2 * srcWidth + x];
-                        ker4o = src[sP2 * srcWidth + xP1];
-
-                        //--------------------------------------
-
-                        if ((ker4f != ker4g || ker4j != ker4k) && (ker4f != ker4j || ker4g != ker4k))
+                        if (jg < fk)
                         {
-                            int jg = DistYCbCr(ker4i, ker4f) + DistYCbCr(ker4f, ker4c) + DistYCbCr(ker4n, ker4k) + DistYCbCr(ker4k, ker4h) + (DistYCbCr(ker4j, ker4g) << 2);
-                            int fk = DistYCbCr(ker4e, ker4j) + DistYCbCr(ker4j, ker4o) + DistYCbCr(ker4b, ker4g) + DistYCbCr(ker4g, ker4l) + (DistYCbCr(ker4f, ker4k) << 2);
-
-                            if (jg < fk)
-                            {
-                                bool dominantGradient = dominantDirectionThreshold * jg < fk;
-                                if (ker4f != ker4g && ker4f != ker4j)
-                                    blendResult_f = dominantGradient ? BlendDominant : BlendNormal;
-                                if (ker4k != ker4j && ker4k != ker4g)
-                                    blendResult_k = dominantGradient ? BlendDominant : BlendNormal;
-
-                            }
-                            else if (fk < jg)
-                            {
-                                bool dominantGradient = dominantDirectionThreshold * fk < jg;
-                                if (ker4j != ker4f && ker4j != ker4k)
-                                    blendResult_j = dominantGradient ? BlendDominant : BlendNormal;
-                                if (ker4g != ker4f && ker4g != ker4k)
-                                    blendResult_g = dominantGradient ? BlendDominant : BlendNormal;
-                            }
+                            bool dominantGradient = dominantDirectionThreshold * jg < fk;
+                            if (ker4f != ker4g && ker4f != ker4j)
+                                blendResult_f = dominantGradient ? BlendDominant : BlendNormal;
+                            if (ker4k != ker4j && ker4k != ker4g)
+                                blendResult_k = dominantGradient ? BlendDominant : BlendNormal;
 
                         }
-                        //--------------------------------------
+                        else if (fk < jg)
+                        {
+                            bool dominantGradient = dominantDirectionThreshold * fk < jg;
+                            if (ker4j != ker4f && ker4j != ker4k)
+                                blendResult_j = dominantGradient ? BlendDominant : BlendNormal;
+                            if (ker4g != ker4f && ker4g != ker4k)
+                                blendResult_g = dominantGradient ? BlendDominant : BlendNormal;
+                        }
 
-                        blendXy = SetBottomR(preProcBuffer[x], blendResult_f);
-                        blendXy1 = SetTopR(blendXy1, blendResult_j);
-                        preProcBuffer[x] = blendXy1;
-                        blendXy1 = SetTopL(0, blendResult_k);
+                    }
+                    //--------------------------------------
 
-                        if (x + 1 < srcWidth)
-                            preProcBuffer[x + 1] = SetBottomL(preProcBuffer[x + 1], blendResult_g);
+                    results_f[array_loc] = blendResult_f;
+                    results_j[array_loc] = blendResult_j;
+                    results_g[array_loc] = blendResult_g;
+                    results_k[array_loc] = blendResult_k;
+                }
+            });
 
-                        _FillBlock5x(trg, trgi, trgWidth, src[s0 * srcWidth + x]);//, 5);//scale
+            for (int y = 0; y < srcHeight; ++y)
+            {
+                byte blendXy1 = 0;
+                int array_loc = 0;
+                for (int x = 0; x < srcWidth - 1; ++x, array_loc = x + y * srcWidth)
+                {
+                    _preProcBuffer[array_loc] = (byte)(preProcBuffer_local[x] | ((byte)results_f[array_loc] << 4));
+                    preProcBuffer_local[x] = blendXy1 = (byte)(blendXy1 | ((byte)results_j[array_loc] << 2));
+                    blendXy1 = (byte)results_k[array_loc];
+                    preProcBuffer_local[(x + 1)] = (byte)(preProcBuffer_local[(x + 1)] | ((byte)results_g[array_loc] << 6));
+                }
+            }
 
-                        if (blendXy == 0)
-                            continue;
+            Parallel.For(0, srcHeight, y =>
+            {
+                int trgi = 5 * y * trgWidth; // scale
+                int sM1 = Math.Max(y - 1, 0);
+                int s0 = y;
+                int sP1 = Math.Min(y + 1, srcHeight - 1);
+                int sP2 = Math.Min(y + 2, srcHeight - 1);
+                byte blendXy = 0;
+                //-----
+                int fg;
+                int hc;
+                bool doLineBlend;
+                bool haveShallowLine;
+                bool haveSteepLine;
+                uint px;
+                uint b, c, d, e, f, g, h, i;
+                uint ker3_0, ker3_1, ker3_2, ker3_3, ker3_4, ker3_5, ker3_6, ker3_7, ker3_8;
+                byte blend;
 
-                        ker3_0 = src[sM1 * srcWidth + xM1]; // src[xM1][sM1]; //src[(sM1 + xM1) % srcWidth][(sM1 + xM1) / srcWidth];
-                        ker3_1 = src[sM1 * srcWidth + x]; //src[x][sM1]; //src[(sM1 + x) % srcWidth][(sM1 + x) / srcWidth];
-                        ker3_2 = src[sM1 * srcWidth + xP1]; //src[xP1][sM1]; //src[(sM1 + xP1) % srcWidth][(sM1 + xP1) / srcWidth];
+                OutputMatrix outputMatrix = new OutputMatrix(5, trg, trgWidth);
 
-                        ker3_3 = src[s0 * srcWidth + xM1];  // src[xM1][s0]; //src[(s0 + xM1) % srcWidth][(s0 + xM1) / srcWidth];
-                        ker3_4 = src[s0 * srcWidth + x];  //src[x][s0]; //src[(s0 + x) % srcWidth][(s0 + x) / srcWidth];
-                        ker3_5 = src[s0 * srcWidth + xP1];  //src[xP1][s0]; //src[(s0 + xP1) % srcWidth][(s0 + xP1) / srcWidth];
+                for (int x = 0; x < srcWidth; ++x, trgi += 5)
+                {
 
-                        ker3_6 = src[sP1 * srcWidth + xM1]; //src[xM1][sP1];//src[(sP1 + xM1) % srcWidth][(sP1 + xM1) / srcWidth];
-                        ker3_7 = src[sP1 * srcWidth + x]; //src[x][sP1]; //src[(sP1 + x) % srcWidth][(sP1 + x) / srcWidth];
-                        ker3_8 = src[sP1 * srcWidth + xP1]; //src[xP1][sP1];// //src[(sP1 + xP1) % srcWidth][(sP1 + xP1) / srcWidth];
 
+
+                    int xM1 = Math.Max(x - 1, 0);
+                    int xP1 = Math.Min(x + 1, srcWidth - 1);
+                    int xP2 = Math.Min(x + 2, srcWidth - 1);
+
+
+
+                    blendXy = _preProcBuffer[x + y * srcWidth];
+
+                    _FillBlock5x(trg, trgi, trgWidth, src[s0 * srcWidth + x]);
+
+
+                    if (blendXy != 0)
+                    {
+
+                        ker3_0 = src[sM1 * srcWidth + xM1];
+                        ker3_1 = src[sM1 * srcWidth + x];
+                        ker3_2 = src[sM1 * srcWidth + xP1];
+
+                        ker3_3 = src[s0 * srcWidth + xM1];
+                        ker3_4 = src[s0 * srcWidth + x];
+                        ker3_5 = src[s0 * srcWidth + xP1];
+
+                        ker3_6 = src[sP1 * srcWidth + xM1];
+                        ker3_7 = src[sP1 * srcWidth + x];
+                        ker3_8 = src[sP1 * srcWidth + xP1];
+                        //--
                         //--
 
                         b = ker3_1;
@@ -829,7 +886,7 @@ namespace XBRz_speed
 
                             if (!doLineBlend)
                             {
-                                Scaler_5X.BlendCorner(px, outputMatrix);
+                                Scaler_6X.BlendCorner(px, outputMatrix);
 
                             }
                             else
@@ -1030,143 +1087,151 @@ namespace XBRz_speed
                             }
                         }
                     }
-                    //---
                 }
+                //---
             });
+            // });
         }
 
         public static void ScaleImage4X(uint* src, uint* trg, int srcWidth, int srcHeight)
         {
-            int trgWidth = srcWidth << 2;
+            int trgWidth = srcWidth * 4;
 
-
-            Parallel.For(0, 4, core =>
+            Parallel.For(0, (srcHeight), y =>
             {
-                int start = 0, end = 0;
-                if (core == 0)
+                int sM1 = Math.Max(y - 1, 0);
+                int s0 = y;
+                int sP1 = Math.Min(y + 1, srcHeight - 1);
+                int sP2 = Math.Min(y + 2, srcHeight - 1);
+                uint ker4b, ker4c, ker4e, ker4f, ker4g, ker4h, ker4i, ker4j, ker4k, ker4l, ker4n, ker4o;
+                for (int x = 0; x < srcWidth; ++x)
                 {
-                    start = 0;
-                    end = srcHeight / 4;
-                }
-                else if (core == 1)
-                {
-                    start = srcHeight / 4;
-                    end = srcHeight / 2;
-                }
-                else if (core == 2)
-                {
-                    start = srcHeight / 2;
-                    end = (srcHeight / 4) * 3;
-                }
-                else if (core == 3)
-                {
-                    start = (srcHeight / 4) * 3;
-                    end = srcHeight;
-                }
+                    int blendResult_f = 0, blendResult_g = 0, blendResult_j = 0, blendResult_k = 0;
 
-                OutputMatrix outputMatrix = new OutputMatrix(4, trg, trgWidth);
-                byte[] preProcBuffer = new byte[srcWidth];
-                for (int y = start; y < end; ++y)
-                {
-                    int trgi = 4 * y * trgWidth; // scale
-                    int sM1 = Math.Max(y - 1, 0);
-                    int s0 = y;
-                    int sP1 = Math.Min(y + 1, srcHeight - 1);
-                    int sP2 = Math.Min(y + 2, srcHeight - 1);
-                    byte blendXy1 = 0;
-                    byte blendXy = 0;
-                    //-----
-                    int fg;
-                    int hc;
-                    bool doLineBlend;
-                    bool haveShallowLine;
-                    bool haveSteepLine;
-                    uint px;
-                    uint b, c, d, e, f, g, h, i;
-                    uint ker4b, ker4c, ker4e, ker4f, ker4g, ker4h, ker4i, ker4j, ker4k, ker4l, ker4n, ker4o;
-                    uint ker3_0, ker3_1, ker3_2, ker3_3, ker3_4, ker3_5, ker3_6, ker3_7, ker3_8;
-                    byte blend;
+                    int xM1 = Math.Max(x - 1, 0);
+                    int xP1 = Math.Min(x + 1, srcWidth - 1);
+                    int xP2 = Math.Min(x + 2, srcWidth - 1);
 
-                    for (int x = 0; x < srcWidth; ++x, trgi += 4) //scale
+                    int array_loc = x + y * srcWidth;
+
+                    ker4b = src[sM1 * srcWidth + x];
+                    ker4c = src[sM1 * srcWidth + xP1];
+
+                    ker4e = src[s0 * srcWidth + xM1];
+                    ker4f = src[s0 * srcWidth + x];
+                    ker4g = src[s0 * srcWidth + xP1];
+                    ker4h = src[s0 * srcWidth + xP2];
+
+                    ker4i = src[sP1 * srcWidth + xM1];
+                    ker4j = src[sP1 * srcWidth + x];
+                    ker4k = src[sP1 * srcWidth + xP1];
+                    ker4l = src[sP1 * srcWidth + xP2];
+
+                    ker4n = src[sP2 * srcWidth + x];
+                    ker4o = src[sP2 * srcWidth + xP1];
+
+
+                    //--------------------------------------
+
+                    if ((ker4f != ker4g || ker4j != ker4k) && (ker4f != ker4j || ker4g != ker4k))
                     {
-                        int blendResult_f = 0, blendResult_g = 0, blendResult_j = 0, blendResult_k = 0;
+                        int jg = DistYCbCr(ker4i, ker4f) + DistYCbCr(ker4f, ker4c) + DistYCbCr(ker4n, ker4k) + DistYCbCr(ker4k, ker4h) + (DistYCbCr(ker4j, ker4g) << 2);
+                        int fk = DistYCbCr(ker4e, ker4j) + DistYCbCr(ker4j, ker4o) + DistYCbCr(ker4b, ker4g) + DistYCbCr(ker4g, ker4l) + (DistYCbCr(ker4f, ker4k) << 2);
 
-                        int xM1 = Math.Max(x - 1, 0);
-                        int xP1 = Math.Min(x + 1, srcWidth - 1);
-                        int xP2 = Math.Min(x + 2, srcWidth - 1);
-
-                        ker4b = src[sM1 * srcWidth + x];         //src[x][sM1];    //src[(sM1 + x) % srcWidth][(sM1 + x) / srcWidth];
-                        ker4c = src[sM1 * srcWidth + xP1];    //src[xP1][sM1]; //src[(sM1 + xP1) % srcWidth][(sM1 + xP1) / srcWidth];
-
-                        ker4e = src[s0 * srcWidth + xM1];    //src[xM1][s0]; //src[(s0 + xM1) % srcWidth][(s0 + xM1) / srcWidth];
-                        ker4f = src[s0 * srcWidth + x];  //src[x][s0]; //src[(s0 + x) % srcWidth][(s0 + x) /srcWidth];
-                        ker4g = src[s0 * srcWidth + xP1];   //src[xP1][s0];//  //src[(s0 + xP1) % srcWidth][(s0 + xP1) / srcWidth];
-                        ker4h = src[s0 * srcWidth + xP2]; //src[(s0 + xP2) % srcWidth][(s0 + xP2)/srcWidth];
-
-                        ker4i = src[sP1 * srcWidth + xM1];  //src[xM1][sP1]; //src[(sP1 + xM1) % srcWidth][(sP1 + xM1)/srcWidth];
-                        ker4j = src[sP1 * srcWidth + x];    //src[x][sP1]; //src[(sP1 + x) % srcWidth][(sP1 + x)/srcWidth];
-                        ker4k = src[sP1 * srcWidth + xP1]; //src[xP1][sP1];// //src[(sP1 + xP1) % srcWidth][(sP1 + xP1)/srcWidth];
-                        ker4l = src[sP1 * srcWidth + xP2]; //src[xP2][sP1];// //src[(sP1 + xP2) % srcWidth][(sP1 + xP2)/srcWidth];
-
-                        ker4n = src[sP2 * srcWidth + x];  //src[x][sP2];//  //src[(sP2 + x) % srcWidth][(sP2+x)/srcWidth];
-                        ker4o = src[sP2 * srcWidth + xP1];   //src[xP1][sP2]; //src[(sP2 + xP1) % srcWidth][(sP2 + xP1) /srcWidth];
-
-                        //--------------------------------------
-
-                        if ((ker4f != ker4g || ker4j != ker4k) && (ker4f != ker4j || ker4g != ker4k))
+                        if (jg < fk)
                         {
-                            int jg = DistYCbCr(ker4i, ker4f) + DistYCbCr(ker4f, ker4c) + DistYCbCr(ker4n, ker4k) + DistYCbCr(ker4k, ker4h) + (DistYCbCr(ker4j, ker4g) << 2);
-                            int fk = DistYCbCr(ker4e, ker4j) + DistYCbCr(ker4j, ker4o) + DistYCbCr(ker4b, ker4g) + DistYCbCr(ker4g, ker4l) + (DistYCbCr(ker4f, ker4k) << 2);
-
-                            if (jg < fk)
-                            {
-                                bool dominantGradient = dominantDirectionThreshold * jg < fk;
-                                if (ker4f != ker4g && ker4f != ker4j)
-                                    blendResult_f = dominantGradient ? BlendDominant : BlendNormal;
-                                if (ker4k != ker4j && ker4k != ker4g)
-                                    blendResult_k = dominantGradient ? BlendDominant : BlendNormal;
-
-                            }
-                            else if (fk < jg)
-                            {
-                                bool dominantGradient = dominantDirectionThreshold * fk < jg;
-                                if (ker4j != ker4f && ker4j != ker4k)
-                                    blendResult_j = dominantGradient ? BlendDominant : BlendNormal;
-                                if (ker4g != ker4f && ker4g != ker4k)
-                                    blendResult_g = dominantGradient ? BlendDominant : BlendNormal;
-                            }
+                            bool dominantGradient = dominantDirectionThreshold * jg < fk;
+                            if (ker4f != ker4g && ker4f != ker4j)
+                                blendResult_f = dominantGradient ? BlendDominant : BlendNormal;
+                            if (ker4k != ker4j && ker4k != ker4g)
+                                blendResult_k = dominantGradient ? BlendDominant : BlendNormal;
 
                         }
-                        //--------------------------------------
+                        else if (fk < jg)
+                        {
+                            bool dominantGradient = dominantDirectionThreshold * fk < jg;
+                            if (ker4j != ker4f && ker4j != ker4k)
+                                blendResult_j = dominantGradient ? BlendDominant : BlendNormal;
+                            if (ker4g != ker4f && ker4g != ker4k)
+                                blendResult_g = dominantGradient ? BlendDominant : BlendNormal;
+                        }
 
-                        blendXy = SetBottomR(preProcBuffer[x], blendResult_f);
-                        blendXy1 = SetTopR(blendXy1, blendResult_j);
-                        preProcBuffer[x] = blendXy1;
-                        blendXy1 = SetTopL(0, blendResult_k);
+                    }
+                    //--------------------------------------
 
-                        if (x + 1 < srcWidth)
-                            preProcBuffer[x + 1] = SetBottomL(preProcBuffer[x + 1], blendResult_g);
+                    results_f[array_loc] = blendResult_f;
+                    results_j[array_loc] = blendResult_j;
+                    results_g[array_loc] = blendResult_g;
+                    results_k[array_loc] = blendResult_k;
+                }
+            });
 
-                        _FillBlock4x(trg, trgi, trgWidth, src[s0 * srcWidth + x]); //, 4);//scale
+            for (int y = 0; y < srcHeight; ++y)
+            {
+                byte blendXy1 = 0;
+                int array_loc = 0;
+                for (int x = 0; x < srcWidth - 1; ++x, array_loc = x + y * srcWidth)
+                {
+                    _preProcBuffer[array_loc] = (byte)(preProcBuffer_local[x] | ((byte)results_f[array_loc] << 4));
+                    preProcBuffer_local[x] = blendXy1 = (byte)(blendXy1 | ((byte)results_j[array_loc] << 2));
+                    blendXy1 = (byte)results_k[array_loc];
+                    //if (x + 1 < srcWidth) 
+                    preProcBuffer_local[(x + 1)] = (byte)(preProcBuffer_local[(x + 1)] | ((byte)results_g[array_loc] << 6));
+                }
+            }
+
+            Parallel.For(0, srcHeight, y =>
+            {
+                int trgi = 4 * y * trgWidth; // scale
+                int sM1 = Math.Max(y - 1, 0);
+                int s0 = y;
+                int sP1 = Math.Min(y + 1, srcHeight - 1);
+                int sP2 = Math.Min(y + 2, srcHeight - 1);
+                byte blendXy = 0;
+                //-----
+                int fg;
+                int hc;
+                bool doLineBlend;
+                bool haveShallowLine;
+                bool haveSteepLine;
+                uint px;
+                uint b, c, d, e, f, g, h, i;
+                uint ker3_0, ker3_1, ker3_2, ker3_3, ker3_4, ker3_5, ker3_6, ker3_7, ker3_8;
+                byte blend;
+
+                OutputMatrix outputMatrix = new OutputMatrix(4, trg, trgWidth);
+
+                for (int x = 0; x < srcWidth; ++x, trgi += 4)
+                {
 
 
 
-                        if (blendXy == 0)
-                            continue;
+                    int xM1 = Math.Max(x - 1, 0);
+                    int xP1 = Math.Min(x + 1, srcWidth - 1);
+                    int xP2 = Math.Min(x + 2, srcWidth - 1);
 
-                        ker3_0 = src[sM1 * srcWidth + xM1]; // src[xM1][sM1]; //src[(sM1 + xM1) % srcWidth][(sM1 + xM1) / srcWidth];
-                        ker3_1 = src[sM1 * srcWidth + x]; //src[x][sM1]; //src[(sM1 + x) % srcWidth][(sM1 + x) / srcWidth];
-                        ker3_2 = src[sM1 * srcWidth + xP1]; //src[xP1][sM1]; //src[(sM1 + xP1) % srcWidth][(sM1 + xP1) / srcWidth];
 
-                        ker3_3 = src[s0 * srcWidth + xM1];  // src[xM1][s0]; //src[(s0 + xM1) % srcWidth][(s0 + xM1) / srcWidth];
-                        ker3_4 = src[s0 * srcWidth + x];  //src[x][s0]; //src[(s0 + x) % srcWidth][(s0 + x) / srcWidth];
-                        ker3_5 = src[s0 * srcWidth + xP1];  //src[xP1][s0]; //src[(s0 + xP1) % srcWidth][(s0 + xP1) / srcWidth];
 
-                        ker3_6 = src[sP1 * srcWidth + xM1]; //src[xM1][sP1];//src[(sP1 + xM1) % srcWidth][(sP1 + xM1) / srcWidth];
-                        ker3_7 = src[sP1 * srcWidth + x]; //src[x][sP1]; //src[(sP1 + x) % srcWidth][(sP1 + x) / srcWidth];
-                        ker3_8 = src[sP1 * srcWidth + xP1]; //src[xP1][sP1];// //src[(sP1 + xP1) % srcWidth][(sP1 + xP1) / srcWidth];
+                    blendXy = _preProcBuffer[x + y * srcWidth];
+
+                    _FillBlock4x(trg, trgi, trgWidth, src[s0 * srcWidth + x]);
+
+
+                    if (blendXy != 0)
+                    {
+
+                        ker3_0 = src[sM1 * srcWidth + xM1];
+                        ker3_1 = src[sM1 * srcWidth + x];
+                        ker3_2 = src[sM1 * srcWidth + xP1];
+
+                        ker3_3 = src[s0 * srcWidth + xM1];
+                        ker3_4 = src[s0 * srcWidth + x];
+                        ker3_5 = src[s0 * srcWidth + xP1];
+
+                        ker3_6 = src[sP1 * srcWidth + xM1];
+                        ker3_7 = src[sP1 * srcWidth + x];
+                        ker3_8 = src[sP1 * srcWidth + xP1];
                         //--
-
                         //--
 
                         b = ker3_1;
@@ -1399,137 +1464,151 @@ namespace XBRz_speed
                             }
                         }
                     }
-                    //---
                 }
+                //---
             });
+            // });
         }
+
+
         public static void ScaleImage3X(uint* src, uint* trg, int srcWidth, int srcHeight)
         {
             int trgWidth = srcWidth * 3;
-            Parallel.For(0, 4, core =>
+
+            Parallel.For(0, (srcHeight), y =>
             {
-                int start = 0, end = 0;
-                if (core == 0)
+                int sM1 = Math.Max(y - 1, 0);
+                int s0 = y;
+                int sP1 = Math.Min(y + 1, srcHeight - 1);
+                int sP2 = Math.Min(y + 2, srcHeight - 1);
+                uint ker4b, ker4c, ker4e, ker4f, ker4g, ker4h, ker4i, ker4j, ker4k, ker4l, ker4n, ker4o;
+                for (int x = 0; x < srcWidth; ++x)
                 {
-                    start = 0;
-                    end = srcHeight / 4;
+                    int blendResult_f = 0, blendResult_g = 0, blendResult_j = 0, blendResult_k = 0;
+
+                    int xM1 = Math.Max(x - 1, 0);
+                    int xP1 = Math.Min(x + 1, srcWidth - 1);
+                    int xP2 = Math.Min(x + 2, srcWidth - 1);
+
+                    int array_loc = x + y * srcWidth;
+
+                    ker4b = src[sM1 * srcWidth + x];
+                    ker4c = src[sM1 * srcWidth + xP1];
+
+                    ker4e = src[s0 * srcWidth + xM1];
+                    ker4f = src[s0 * srcWidth + x];
+                    ker4g = src[s0 * srcWidth + xP1];
+                    ker4h = src[s0 * srcWidth + xP2];
+
+                    ker4i = src[sP1 * srcWidth + xM1];
+                    ker4j = src[sP1 * srcWidth + x];
+                    ker4k = src[sP1 * srcWidth + xP1];
+                    ker4l = src[sP1 * srcWidth + xP2];
+
+                    ker4n = src[sP2 * srcWidth + x];
+                    ker4o = src[sP2 * srcWidth + xP1];
+
+
+                    //--------------------------------------
+
+                    if ((ker4f != ker4g || ker4j != ker4k) && (ker4f != ker4j || ker4g != ker4k))
+                    {
+                        int jg = DistYCbCr(ker4i, ker4f) + DistYCbCr(ker4f, ker4c) + DistYCbCr(ker4n, ker4k) + DistYCbCr(ker4k, ker4h) + (DistYCbCr(ker4j, ker4g) << 2);
+                        int fk = DistYCbCr(ker4e, ker4j) + DistYCbCr(ker4j, ker4o) + DistYCbCr(ker4b, ker4g) + DistYCbCr(ker4g, ker4l) + (DistYCbCr(ker4f, ker4k) << 2);
+
+                        if (jg < fk)
+                        {
+                            bool dominantGradient = dominantDirectionThreshold * jg < fk;
+                            if (ker4f != ker4g && ker4f != ker4j)
+                                blendResult_f = dominantGradient ? BlendDominant : BlendNormal;
+                            if (ker4k != ker4j && ker4k != ker4g)
+                                blendResult_k = dominantGradient ? BlendDominant : BlendNormal;
+
+                        }
+                        else if (fk < jg)
+                        {
+                            bool dominantGradient = dominantDirectionThreshold * fk < jg;
+                            if (ker4j != ker4f && ker4j != ker4k)
+                                blendResult_j = dominantGradient ? BlendDominant : BlendNormal;
+                            if (ker4g != ker4f && ker4g != ker4k)
+                                blendResult_g = dominantGradient ? BlendDominant : BlendNormal;
+                        }
+
+                    }
+                    //--------------------------------------
+
+                    results_f[array_loc] = blendResult_f;
+                    results_j[array_loc] = blendResult_j;
+                    results_g[array_loc] = blendResult_g;
+                    results_k[array_loc] = blendResult_k;
                 }
-                else if (core == 1)
+            });
+
+            for (int y = 0; y < srcHeight; ++y)
+            {
+                byte blendXy1 = 0;
+                int array_loc = 0;
+                for (int x = 0; x < srcWidth - 1; ++x, array_loc = x + y * srcWidth)
                 {
-                    start = srcHeight / 4;
-                    end = srcHeight / 2;
+                    _preProcBuffer[array_loc] = (byte)(preProcBuffer_local[x] | ((byte)results_f[array_loc] << 4));
+                    preProcBuffer_local[x] = blendXy1 = (byte)(blendXy1 | ((byte)results_j[array_loc] << 2));
+                    blendXy1 = (byte)results_k[array_loc];
+                    //if (x + 1 < srcWidth) 
+                    preProcBuffer_local[(x + 1)] = (byte)(preProcBuffer_local[(x + 1)] | ((byte)results_g[array_loc] << 6));
                 }
-                else if (core == 2)
-                {
-                    start = srcHeight / 2;
-                    end = (srcHeight / 4) * 3;
-                }
-                else if (core == 3)
-                {
-                    start = (srcHeight / 4) * 3;
-                    end = srcHeight;
-                }
+            }
+
+            Parallel.For(0, srcHeight, y =>
+            {
+                int trgi = 3 * y * trgWidth; // scale
+                int sM1 = Math.Max(y - 1, 0);
+                int s0 = y;
+                int sP1 = Math.Min(y + 1, srcHeight - 1);
+                int sP2 = Math.Min(y + 2, srcHeight - 1);
+                byte blendXy = 0;
+                //-----
+                int fg;
+                int hc;
+                bool doLineBlend;
+                bool haveShallowLine;
+                bool haveSteepLine;
+                uint px;
+                uint b, c, d, e, f, g, h, i;
+                uint ker3_0, ker3_1, ker3_2, ker3_3, ker3_4, ker3_5, ker3_6, ker3_7, ker3_8;
+                byte blend;
 
                 OutputMatrix outputMatrix = new OutputMatrix(3, trg, trgWidth);
-                byte[] preProcBuffer = new byte[srcWidth];
-                for (int y = start; y < end; ++y)
+
+                for (int x = 0; x < srcWidth; ++x, trgi += 3)
                 {
-                    int trgi = 3 * y * trgWidth; // scale
-                    int sM1 = Math.Max(y - 1, 0);
-                    int s0 = y;
-                    int sP1 = Math.Min(y + 1, srcHeight - 1);
-                    int sP2 = Math.Min(y + 2, srcHeight - 1);
-                    byte blendXy1 = 0;
-                    byte blendXy = 0;
-                    //-----
-                    int fg;
-                    int hc;
-                    bool doLineBlend;
-                    bool haveShallowLine;
-                    bool haveSteepLine;
-                    uint px;
-                    uint b, c, d, e, f, g, h, i;
-                    uint ker4b, ker4c, ker4e, ker4f, ker4g, ker4h, ker4i, ker4j, ker4k, ker4l, ker4n, ker4o;
-                    uint ker3_0, ker3_1, ker3_2, ker3_3, ker3_4, ker3_5, ker3_6, ker3_7, ker3_8;
-                    byte blend;
 
-                    for (int x = 0; x < srcWidth; ++x, trgi += 3)
+
+
+                    int xM1 = Math.Max(x - 1, 0);
+                    int xP1 = Math.Min(x + 1, srcWidth - 1);
+                    int xP2 = Math.Min(x + 2, srcWidth - 1);
+
+
+
+                    blendXy = _preProcBuffer[x + y * srcWidth];
+
+                    _FillBlock3x(trg, trgi, trgWidth, src[s0 * srcWidth + x]);
+
+
+                    if (blendXy != 0)
                     {
-                        int blendResult_f = 0, blendResult_g = 0, blendResult_j = 0, blendResult_k = 0;
 
-                        int xM1 = Math.Max(x - 1, 0);
-                        int xP1 = Math.Min(x + 1, srcWidth - 1);
-                        int xP2 = Math.Min(x + 2, srcWidth - 1);
+                        ker3_0 = src[sM1 * srcWidth + xM1];
+                        ker3_1 = src[sM1 * srcWidth + x];
+                        ker3_2 = src[sM1 * srcWidth + xP1];
 
-                        ker4b = src[sM1 * srcWidth + x];         //src[x][sM1];    //src[(sM1 + x) % srcWidth][(sM1 + x) / srcWidth];
-                        ker4c = src[sM1 * srcWidth + xP1];    //src[xP1][sM1]; //src[(sM1 + xP1) % srcWidth][(sM1 + xP1) / srcWidth];
+                        ker3_3 = src[s0 * srcWidth + xM1];
+                        ker3_4 = src[s0 * srcWidth + x];
+                        ker3_5 = src[s0 * srcWidth + xP1];
 
-                        ker4e = src[s0 * srcWidth + xM1];    //src[xM1][s0]; //src[(s0 + xM1) % srcWidth][(s0 + xM1) / srcWidth];
-                        ker4f = src[s0 * srcWidth + x];  //src[x][s0]; //src[(s0 + x) % srcWidth][(s0 + x) /srcWidth];
-                        ker4g = src[s0 * srcWidth + xP1];   //src[xP1][s0];//  //src[(s0 + xP1) % srcWidth][(s0 + xP1) / srcWidth];
-                        ker4h = src[s0 * srcWidth + xP2]; //src[(s0 + xP2) % srcWidth][(s0 + xP2)/srcWidth];
-
-                        ker4i = src[sP1 * srcWidth + xM1];  //src[xM1][sP1]; //src[(sP1 + xM1) % srcWidth][(sP1 + xM1)/srcWidth];
-                        ker4j = src[sP1 * srcWidth + x];    //src[x][sP1]; //src[(sP1 + x) % srcWidth][(sP1 + x)/srcWidth];
-                        ker4k = src[sP1 * srcWidth + xP1]; //src[xP1][sP1];// //src[(sP1 + xP1) % srcWidth][(sP1 + xP1)/srcWidth];
-                        ker4l = src[sP1 * srcWidth + xP2]; //src[xP2][sP1];// //src[(sP1 + xP2) % srcWidth][(sP1 + xP2)/srcWidth];
-
-                        ker4n = src[sP2 * srcWidth + x];  //src[x][sP2];//  //src[(sP2 + x) % srcWidth][(sP2+x)/srcWidth];
-                        ker4o = src[sP2 * srcWidth + xP1];   //src[xP1][sP2]; //src[(sP2 + xP1) % srcWidth][(sP2 + xP1) /srcWidth];
-
-
-                        //--------------------------------------
-
-                        if ((ker4f != ker4g || ker4j != ker4k) && (ker4f != ker4j || ker4g != ker4k))
-                        {
-                            int jg = DistYCbCr(ker4i, ker4f) + DistYCbCr(ker4f, ker4c) + DistYCbCr(ker4n, ker4k) + DistYCbCr(ker4k, ker4h) + (DistYCbCr(ker4j, ker4g) << 2);
-                            int fk = DistYCbCr(ker4e, ker4j) + DistYCbCr(ker4j, ker4o) + DistYCbCr(ker4b, ker4g) + DistYCbCr(ker4g, ker4l) + (DistYCbCr(ker4f, ker4k) << 2);
-
-                            if (jg < fk)
-                            {
-                                bool dominantGradient = dominantDirectionThreshold * jg < fk;
-                                if (ker4f != ker4g && ker4f != ker4j)
-                                    blendResult_f = dominantGradient ? BlendDominant : BlendNormal;
-                                if (ker4k != ker4j && ker4k != ker4g)
-                                    blendResult_k = dominantGradient ? BlendDominant : BlendNormal;
-
-                            }
-                            else if (fk < jg)
-                            {
-                                bool dominantGradient = dominantDirectionThreshold * fk < jg;
-                                if (ker4j != ker4f && ker4j != ker4k)
-                                    blendResult_j = dominantGradient ? BlendDominant : BlendNormal;
-                                if (ker4g != ker4f && ker4g != ker4k)
-                                    blendResult_g = dominantGradient ? BlendDominant : BlendNormal;
-                            }
-
-                        }
-                        //--------------------------------------
-
-                        blendXy = SetBottomR(preProcBuffer[x], blendResult_f);
-                        blendXy1 = SetTopR(blendXy1, blendResult_j);
-                        preProcBuffer[x] = blendXy1;
-                        blendXy1 = SetTopL(0, blendResult_k);
-
-                        if (x + 1 < srcWidth)
-                            preProcBuffer[x + 1] = SetBottomL(preProcBuffer[x + 1], blendResult_g);
-
-                        _FillBlock3x(trg, trgi, trgWidth, src[s0 * srcWidth + x]);
-
-                        if (blendXy == 0)
-                            continue;
-
-                        ker3_0 = src[sM1 * srcWidth + xM1]; // src[xM1][sM1]; //src[(sM1 + xM1) % srcWidth][(sM1 + xM1) / srcWidth];
-                        ker3_1 = src[sM1 * srcWidth + x]; //src[x][sM1]; //src[(sM1 + x) % srcWidth][(sM1 + x) / srcWidth];
-                        ker3_2 = src[sM1 * srcWidth + xP1]; //src[xP1][sM1]; //src[(sM1 + xP1) % srcWidth][(sM1 + xP1) / srcWidth];
-
-                        ker3_3 = src[s0 * srcWidth + xM1];  // src[xM1][s0]; //src[(s0 + xM1) % srcWidth][(s0 + xM1) / srcWidth];
-                        ker3_4 = src[s0 * srcWidth + x];  //src[x][s0]; //src[(s0 + x) % srcWidth][(s0 + x) / srcWidth];
-                        ker3_5 = src[s0 * srcWidth + xP1];  //src[xP1][s0]; //src[(s0 + xP1) % srcWidth][(s0 + xP1) / srcWidth];
-
-                        ker3_6 = src[sP1 * srcWidth + xM1]; //src[xM1][sP1];//src[(sP1 + xM1) % srcWidth][(sP1 + xM1) / srcWidth];
-                        ker3_7 = src[sP1 * srcWidth + x]; //src[x][sP1]; //src[(sP1 + x) % srcWidth][(sP1 + x) / srcWidth];
-                        ker3_8 = src[sP1 * srcWidth + xP1]; //src[xP1][sP1];// //src[(sP1 + xP1) % srcWidth][(sP1 + xP1) / srcWidth];
+                        ker3_6 = src[sP1 * srcWidth + xM1];
+                        ker3_7 = src[sP1 * srcWidth + x];
+                        ker3_8 = src[sP1 * srcWidth + xP1];
                         //--
                         //--
 
@@ -1763,140 +1842,152 @@ namespace XBRz_speed
                             }
                         }
                     }
-                    //---
                 }
+                //---
             });
+            // });
         }
+
+
         public static void ScaleImage2X(uint* src, uint* trg, int srcWidth, int srcHeight)
         {
-            int trgWidth = srcWidth << 1;
+            int trgWidth = srcWidth * 2;
 
-            Parallel.For(0, 4, core =>
+            Parallel.For(0, (srcHeight), y =>
             {
-                int start = 0, end = 0;
-                if (core == 0)
+                int sM1 = Math.Max(y - 1, 0);
+                int s0 = y;
+                int sP1 = Math.Min(y + 1, srcHeight - 1);
+                int sP2 = Math.Min(y + 2, srcHeight - 1);
+                uint ker4b, ker4c, ker4e, ker4f, ker4g, ker4h, ker4i, ker4j, ker4k, ker4l, ker4n, ker4o;
+                for (int x = 0; x < srcWidth; ++x)
                 {
-                    start = 0;
-                    end = srcHeight / 4;
-                }
-                else if (core == 1)
-                {
-                    start = srcHeight / 4;
-                    end = srcHeight / 2;
-                }
-                else if (core == 2)
-                {
-                    start = srcHeight / 2;
-                    end = (srcHeight / 4) * 3;
-                }
-                else if (core == 3)
-                {
-                    start = (srcHeight / 4) * 3;
-                    end = srcHeight;
-                }
+                    int blendResult_f = 0, blendResult_g = 0, blendResult_j = 0, blendResult_k = 0;
 
-                OutputMatrix outputMatrix = new OutputMatrix(2, trg, trgWidth);
-                byte[] preProcBuffer = new byte[srcWidth];
-                for (int y = start; y < end; ++y)
-                {
-                    int trgi = 2 * y * trgWidth;
-                    int sM1 = Math.Max(y - 1, 0);
-                    int s0 = y;
-                    int sP1 = Math.Min(y + 1, srcHeight - 1);
-                    int sP2 = Math.Min(y + 2, srcHeight - 1);
-                    byte blendXy1 = 0;
-                    byte blendXy = 0;
-                    //-----
-                    int fg;
-                    int hc;
-                    bool doLineBlend;
-                    bool haveShallowLine;
-                    bool haveSteepLine;
-                    uint px;
-                    uint b, c, d, e, f, g, h, i;
-                    uint ker4b, ker4c, ker4e, ker4f, ker4g, ker4h, ker4i, ker4j, ker4k, ker4l, ker4n, ker4o;
-                    uint ker3_0, ker3_1, ker3_2, ker3_3, ker3_4, ker3_5, ker3_6, ker3_7, ker3_8;
-                    byte blend;
+                    int xM1 = Math.Max(x - 1, 0);
+                    int xP1 = Math.Min(x + 1, srcWidth - 1);
+                    int xP2 = Math.Min(x + 2, srcWidth - 1);
 
-                    for (int x = 0; x < srcWidth; ++x, trgi += 2)
+                    int array_loc = x + y * srcWidth;
+
+                    ker4b = src[sM1 * srcWidth + x];
+                    ker4c = src[sM1 * srcWidth + xP1];
+
+                    ker4e = src[s0 * srcWidth + xM1];
+                    ker4f = src[s0 * srcWidth + x];
+                    ker4g = src[s0 * srcWidth + xP1];
+                    ker4h = src[s0 * srcWidth + xP2];
+
+                    ker4i = src[sP1 * srcWidth + xM1];
+                    ker4j = src[sP1 * srcWidth + x];
+                    ker4k = src[sP1 * srcWidth + xP1];
+                    ker4l = src[sP1 * srcWidth + xP2];
+
+                    ker4n = src[sP2 * srcWidth + x];
+                    ker4o = src[sP2 * srcWidth + xP1];
+
+
+                    //--------------------------------------
+
+                    if ((ker4f != ker4g || ker4j != ker4k) && (ker4f != ker4j || ker4g != ker4k))
                     {
-                        int blendResult_f = 0, blendResult_g = 0, blendResult_j = 0, blendResult_k = 0;
+                        int jg = DistYCbCr(ker4i, ker4f) + DistYCbCr(ker4f, ker4c) + DistYCbCr(ker4n, ker4k) + DistYCbCr(ker4k, ker4h) + (DistYCbCr(ker4j, ker4g) << 2);
+                        int fk = DistYCbCr(ker4e, ker4j) + DistYCbCr(ker4j, ker4o) + DistYCbCr(ker4b, ker4g) + DistYCbCr(ker4g, ker4l) + (DistYCbCr(ker4f, ker4k) << 2);
 
-                        int xM1 = Math.Max(x - 1, 0);
-                        int xP1 = Math.Min(x + 1, srcWidth - 1);
-                        int xP2 = Math.Min(x + 2, srcWidth - 1);
-
-
-                        ker4b = src[sM1 * srcWidth + x];         //src[x][sM1];    //src[(sM1 + x) % srcWidth][(sM1 + x) / srcWidth];
-                        ker4c = src[sM1 * srcWidth + xP1];    //src[xP1][sM1]; //src[(sM1 + xP1) % srcWidth][(sM1 + xP1) / srcWidth];
-
-                        ker4e = src[s0 * srcWidth + xM1];    //src[xM1][s0]; //src[(s0 + xM1) % srcWidth][(s0 + xM1) / srcWidth];
-                        ker4f = src[s0 * srcWidth + x];  //src[x][s0]; //src[(s0 + x) % srcWidth][(s0 + x) /srcWidth];
-                        ker4g = src[s0 * srcWidth + xP1];   //src[xP1][s0];//  //src[(s0 + xP1) % srcWidth][(s0 + xP1) / srcWidth];
-                        ker4h = src[s0 * srcWidth + xP2]; //src[(s0 + xP2) % srcWidth][(s0 + xP2)/srcWidth];
-
-                        ker4i = src[sP1 * srcWidth + xM1];  //src[xM1][sP1]; //src[(sP1 + xM1) % srcWidth][(sP1 + xM1)/srcWidth];
-                        ker4j = src[sP1 * srcWidth + x];    //src[x][sP1]; //src[(sP1 + x) % srcWidth][(sP1 + x)/srcWidth];
-                        ker4k = src[sP1 * srcWidth + xP1]; //src[xP1][sP1];// //src[(sP1 + xP1) % srcWidth][(sP1 + xP1)/srcWidth];
-                        ker4l = src[sP1 * srcWidth + xP2]; //src[xP2][sP1];// //src[(sP1 + xP2) % srcWidth][(sP1 + xP2)/srcWidth];
-
-                        ker4n = src[sP2 * srcWidth + x];  //src[x][sP2];//  //src[(sP2 + x) % srcWidth][(sP2+x)/srcWidth];
-                        ker4o = src[sP2 * srcWidth + xP1];   //src[xP1][sP2]; //src[(sP2 + xP1) % srcWidth][(sP2 + xP1) /srcWidth];
-                        //--------------------------------------
-
-                        if ((ker4f != ker4g || ker4j != ker4k) && (ker4f != ker4j || ker4g != ker4k))
+                        if (jg < fk)
                         {
-                            int jg = DistYCbCr(ker4i, ker4f) + DistYCbCr(ker4f, ker4c) + DistYCbCr(ker4n, ker4k) + DistYCbCr(ker4k, ker4h) + (DistYCbCr(ker4j, ker4g) << 2);
-                            int fk = DistYCbCr(ker4e, ker4j) + DistYCbCr(ker4j, ker4o) + DistYCbCr(ker4b, ker4g) + DistYCbCr(ker4g, ker4l) + (DistYCbCr(ker4f, ker4k) << 2);
-
-                            if (jg < fk)
-                            {
-                                bool dominantGradient = dominantDirectionThreshold * jg < fk;
-                                if (ker4f != ker4g && ker4f != ker4j)
-                                    blendResult_f = dominantGradient ? BlendDominant : BlendNormal;
-                                if (ker4k != ker4j && ker4k != ker4g)
-                                    blendResult_k = dominantGradient ? BlendDominant : BlendNormal;
-
-                            }
-                            else if (fk < jg)
-                            {
-                                bool dominantGradient = dominantDirectionThreshold * fk < jg;
-                                if (ker4j != ker4f && ker4j != ker4k)
-                                    blendResult_j = dominantGradient ? BlendDominant : BlendNormal;
-                                if (ker4g != ker4f && ker4g != ker4k)
-                                    blendResult_g = dominantGradient ? BlendDominant : BlendNormal;
-                            }
+                            bool dominantGradient = dominantDirectionThreshold * jg < fk;
+                            if (ker4f != ker4g && ker4f != ker4j)
+                                blendResult_f = dominantGradient ? BlendDominant : BlendNormal;
+                            if (ker4k != ker4j && ker4k != ker4g)
+                                blendResult_k = dominantGradient ? BlendDominant : BlendNormal;
 
                         }
-                        //--------------------------------------
+                        else if (fk < jg)
+                        {
+                            bool dominantGradient = dominantDirectionThreshold * fk < jg;
+                            if (ker4j != ker4f && ker4j != ker4k)
+                                blendResult_j = dominantGradient ? BlendDominant : BlendNormal;
+                            if (ker4g != ker4f && ker4g != ker4k)
+                                blendResult_g = dominantGradient ? BlendDominant : BlendNormal;
+                        }
 
-                        blendXy = SetBottomR(preProcBuffer[x], blendResult_f);
-                        blendXy1 = SetTopR(blendXy1, blendResult_j);
-                        preProcBuffer[x] = blendXy1;
-                        blendXy1 = SetTopL(0, blendResult_k);
+                    }
+                    //--------------------------------------
 
-                        if (x + 1 < srcWidth)
-                            preProcBuffer[x + 1] = SetBottomL(preProcBuffer[x + 1], blendResult_g);
+                    results_f[array_loc] = blendResult_f;
+                    results_j[array_loc] = blendResult_j;
+                    results_g[array_loc] = blendResult_g;
+                    results_k[array_loc] = blendResult_k;
+                }
+            });
+
+            for (int y = 0; y < srcHeight; ++y)
+            {
+                byte blendXy1 = 0;
+                int array_loc = 0;
+                for (int x = 0; x < srcWidth - 1; ++x, array_loc = x + y * srcWidth)
+                {
+                    _preProcBuffer[array_loc] = (byte)(preProcBuffer_local[x] | ((byte)results_f[array_loc] << 4));
+                    preProcBuffer_local[x] = blendXy1 = (byte)(blendXy1 | ((byte)results_j[array_loc] << 2));
+                    blendXy1 = (byte)results_k[array_loc];
+                    //if (x + 1 < srcWidth) 
+                    preProcBuffer_local[(x + 1)] = (byte)(preProcBuffer_local[(x + 1)] | ((byte)results_g[array_loc] << 6));
+                }
+            }
+
+            Parallel.For(0, srcHeight, y =>
+            {
+                int trgi = 2 * y * trgWidth; // scale
+                int sM1 = Math.Max(y - 1, 0);
+                int s0 = y;
+                int sP1 = Math.Min(y + 1, srcHeight - 1);
+                int sP2 = Math.Min(y + 2, srcHeight - 1);
+                byte blendXy = 0;
+                //-----
+                int fg;
+                int hc;
+                bool doLineBlend;
+                bool haveShallowLine;
+                bool haveSteepLine;
+                uint px;
+                uint b, c, d, e, f, g, h, i;
+                uint ker3_0, ker3_1, ker3_2, ker3_3, ker3_4, ker3_5, ker3_6, ker3_7, ker3_8;
+                byte blend;
+
+                OutputMatrix outputMatrix = new OutputMatrix(2, trg, trgWidth);
+
+                for (int x = 0; x < srcWidth; ++x, trgi += 2)
+                {
 
 
-                        _FillBlock2x(trg, trgi, trgWidth, src[s0 * srcWidth + x]);
+
+                    int xM1 = Math.Max(x - 1, 0);
+                    int xP1 = Math.Min(x + 1, srcWidth - 1);
+                    int xP2 = Math.Min(x + 2, srcWidth - 1);
 
 
-                        if (blendXy == 0)
-                            continue;
 
-                        ker3_0 = src[sM1 * srcWidth + xM1]; // src[xM1][sM1]; //src[(sM1 + xM1) % srcWidth][(sM1 + xM1) / srcWidth];
-                        ker3_1 = src[sM1 * srcWidth + x]; //src[x][sM1]; //src[(sM1 + x) % srcWidth][(sM1 + x) / srcWidth];
-                        ker3_2 = src[sM1 * srcWidth + xP1]; //src[xP1][sM1]; //src[(sM1 + xP1) % srcWidth][(sM1 + xP1) / srcWidth];
+                    blendXy = _preProcBuffer[x + y * srcWidth];
 
-                        ker3_3 = src[s0 * srcWidth + xM1];  // src[xM1][s0]; //src[(s0 + xM1) % srcWidth][(s0 + xM1) / srcWidth];
-                        ker3_4 = src[s0 * srcWidth + x];  //src[x][s0]; //src[(s0 + x) % srcWidth][(s0 + x) / srcWidth];
-                        ker3_5 = src[s0 * srcWidth + xP1];  //src[xP1][s0]; //src[(s0 + xP1) % srcWidth][(s0 + xP1) / srcWidth];
+                    _FillBlock2x(trg, trgi, trgWidth, src[s0 * srcWidth + x]);
 
-                        ker3_6 = src[sP1 * srcWidth + xM1]; //src[xM1][sP1];//src[(sP1 + xM1) % srcWidth][(sP1 + xM1) / srcWidth];
-                        ker3_7 = src[sP1 * srcWidth + x]; //src[x][sP1]; //src[(sP1 + x) % srcWidth][(sP1 + x) / srcWidth];
-                        ker3_8 = src[sP1 * srcWidth + xP1]; //src[xP1][sP1];// //src[(sP1 + xP1) % srcWidth][(sP1 + xP1) / srcWidth];
 
+                    if (blendXy != 0)
+                    {
+
+                        ker3_0 = src[sM1 * srcWidth + xM1];
+                        ker3_1 = src[sM1 * srcWidth + x];
+                        ker3_2 = src[sM1 * srcWidth + xP1];
+
+                        ker3_3 = src[s0 * srcWidth + xM1];
+                        ker3_4 = src[s0 * srcWidth + x];
+                        ker3_5 = src[s0 * srcWidth + xP1];
+
+                        ker3_6 = src[sP1 * srcWidth + xM1];
+                        ker3_7 = src[sP1 * srcWidth + x];
+                        ker3_8 = src[sP1 * srcWidth + xP1];
+                        //--
                         //--
 
                         b = ker3_1;
@@ -2129,10 +2220,25 @@ namespace XBRz_speed
                             }
                         }
                     }
-                    //---
                 }
+                //---
             });
+            // });
         }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         #region Scaler
         private class Scaler_2X

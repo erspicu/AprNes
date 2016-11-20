@@ -7,7 +7,7 @@ namespace AprNes
 {
     unsafe public partial class NesCore
     {
-        //Color Dreams https://wiki.nesdev.com/w/index.php/Color_Dreams need check! 
+        //Color Dreams https://wiki.nesdev.com/w/index.php/Color_Dreams ok 
         void mapper011write_ROM(ushort address, byte value)
         {
             PRG_Bankselect = value & 3; //Select 32 KB PRG ROM bank for CPU $8000-$FFFF
@@ -21,7 +21,7 @@ namespace AprNes
 
         byte mapper011read_CHR(int address)
         {
-            return CHR_ROM[CHR_Bankselect << 13];
+            return CHR_ROM[address + (CHR_Bankselect << 13)];
         }
     }
 }

@@ -36,7 +36,7 @@ namespace AprNes
         //ppu mask 0x2001
         bool ShowBackGround = false, ShowSprites = false;
 
-        //ppu status 0x2002
+        //ppu status 0x2002.
         bool isSpriteOverflow = false, isSprite0hit = false, isVblank = false;
 
         int vram_addr_internal = 0, vram_addr_tmp = 0, addr_range, vram_addr = 0, scrol_y = 0, FineX = 0;
@@ -336,17 +336,31 @@ namespace AprNes
             else if (vram_addr_tmp < 0x3f00) //Name Table & Attribute Table
             {
                 addr_range = vram_addr_tmp & 0xc00;
-                if (Vertical)
+
+                if (ScreenSpecial)
                 {
-                    if (addr_range < 0x800) ppu_ram[vram_addr_tmp] = ppu_ram[vram_addr_tmp | 0x800] = value;
-                    else ppu_ram[vram_addr_tmp] = ppu_ram[vram_addr_tmp & 0x37ff] = value;
+                    if (ScreenFour) ppu_ram[vram_addr_tmp] = value;
+                    else if (ScreenSingle)
+                    {
+                         ppu_ram[0x2000 | (vram_addr_tmp & 0x3ff)] = ppu_ram[0x2400 | (vram_addr_tmp & 0x3ff)] = ppu_ram[ 0x2800 | ( vram_addr_tmp & 0x3ff)] = ppu_ram[ 0x2c00 | ( vram_addr_tmp & 0x3ff)] = value;
+
+                    }
                 }
                 else
                 {
-                    if (addr_range < 0x400) ppu_ram[vram_addr_tmp] = ppu_ram[vram_addr_tmp | 0x400] = value;
-                    else if (addr_range < 0x800) ppu_ram[vram_addr_tmp] = ppu_ram[vram_addr_tmp & 0x3bff] = value;
-                    else if (addr_range < 0xc00) ppu_ram[vram_addr_tmp] = ppu_ram[vram_addr_tmp | 0x400] = value;
-                    else ppu_ram[vram_addr_tmp] = ppu_ram[vram_addr_tmp & 0x3bff] = value;
+
+                    if (Vertical)
+                    {
+                        if (addr_range < 0x800) ppu_ram[vram_addr_tmp] = ppu_ram[vram_addr_tmp | 0x800] = value;
+                        else ppu_ram[vram_addr_tmp] = ppu_ram[vram_addr_tmp & 0x37ff] = value;
+                    }
+                    else
+                    {
+                        if (addr_range < 0x400) ppu_ram[vram_addr_tmp] = ppu_ram[vram_addr_tmp | 0x400] = value;
+                        else if (addr_range < 0x800) ppu_ram[vram_addr_tmp] = ppu_ram[vram_addr_tmp & 0x3bff] = value;
+                        else if (addr_range < 0xc00) ppu_ram[vram_addr_tmp] = ppu_ram[vram_addr_tmp | 0x400] = value;
+                        else ppu_ram[vram_addr_tmp] = ppu_ram[vram_addr_tmp & 0x3bff] = value;
+                    }
                 }
             }
             else //Sprite Palette & Image Palette
