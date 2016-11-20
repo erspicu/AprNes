@@ -24,5 +24,26 @@ namespace AprNes
             return ppu_ram[address];
         }
 
+        //UNROM
+        unsafe public class Mapper002 : CMapper
+        {
+            public Mapper002(byte* prgROM, byte* chrROM) : base(prgROM, chrROM) { }
+
+            public override byte Read_CHR(int address)
+            {
+                return NesCore.ppu_ram[address];
+            }
+
+            public override byte Read_PRG(ushort address)
+            {
+                if (address < 0xc000) return PRG_ROM[(address - 0x8000) + (PRG_Bankselect << 14)];//siwtch
+                else return PRG_ROM[(address - 0xc000) + Rom_offset]; // fixed 
+            }
+
+            public override void Write_Rom(ushort address, byte value)
+            {
+                PRG_Bankselect = value & 7;
+            }
+        }
     }
 }

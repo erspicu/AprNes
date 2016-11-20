@@ -8,25 +8,23 @@ namespace AprNes
 {
     unsafe public partial class NesCore
     {
+        IMapper Mapper;
         public int[] Mapper_Allow = new int[] { 0, 1, 2, 3, 4 }; //5,7,11,66,71
 
-        int PRG_Bankselect = 0;
-        int CHR_Bankselect = 0;
-
-        int CHR0_Bankselect = 0;
-        int CHR1_Bankselect = 0;
+        public static int PRG_Bankselect = 0, CHR_Bankselect = 0;
+        public static int CHR0_Bankselect = 0, CHR1_Bankselect = 0;
 
         //for some mapper common use
-        int MapperRegBuffer = 0;
-        int MapperShiftCount = 0;
-        int Rom_offset = 0;
+        public static int MapperRegBuffer = 0;
+        public static int MapperShiftCount = 0;
+        public static int Rom_offset = 0;
 
         byte MapperRouterR_ExpansionROM(ushort address)
         {
             switch (mapper)
             {
-                case 5: return mapper005read_ExpansionROM(address);
-                default: return 0 ;
+                case 5: return AprNesUI.IsFactoryPattern ? Mapper.Read_ExpansionROM(address) : mapper005read_ExpansionROM(address);
+                default: return 0;
             }
         }
 
@@ -34,7 +32,7 @@ namespace AprNes
         {
             switch (mapper)
             {
-                case 5: mapper005write_ExpansionROM(address, value); break;
+                case 5: if (AprNesUI.IsFactoryPattern) Mapper.Write_ExpansionROM(address, value); else mapper005write_ExpansionROM(address, value); break;
                 default: break;
             }
         }
@@ -43,7 +41,7 @@ namespace AprNes
         {
             switch (mapper)
             {
-                case 5: mapper005write_RAM(address, value); break;
+                case 5: if (AprNesUI.IsFactoryPattern) Mapper.Write_Rom(address, value); else mapper005write_RAM(address, value); break;
                 default: NES_MEM[address] = value; break;
             }
         }
@@ -52,13 +50,16 @@ namespace AprNes
         {
             switch (mapper)
             {
-                case 5: return mapper005read_RPG(address);
+                case 5: return AprNesUI.IsFactoryPattern ? Mapper.Read_PRG(address) : mapper005read_RPG(address);
                 default: return NES_MEM[address];
             }
         }
 
         void MapperRouterW_PRG(ushort address, byte value)
         {
+            if (AprNesUI.IsFactoryPattern)
+                Mapper.Write_Rom(address, value);
+            else
             switch (mapper)
             {
                 case 0: break;//NROM , nothing 
@@ -77,6 +78,9 @@ namespace AprNes
 
         byte MapperRouterR_RPG(ushort address)
         {
+            if (AprNesUI.IsFactoryPattern)
+                return Mapper.Read_PRG(address);
+            else
             switch (mapper)
             {
                 case 0: return mapper000read_RPG(address);
@@ -96,6 +100,10 @@ namespace AprNes
         byte MapperRouterR_CHR(int address)
         {
             if (CHR_ROM_count == 0) return ppu_ram[address];
+
+            if (AprNesUI.IsFactoryPattern)
+                return Mapper.Read_CHR(address);
+            else
             switch (mapper)
             {
                 case 0: return mapper000read_CHR(address);

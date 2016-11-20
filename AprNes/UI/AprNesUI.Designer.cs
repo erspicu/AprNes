@@ -44,9 +44,10 @@
             // 
             this.panel1.BackColor = System.Drawing.Color.White;
             this.panel1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.panel1.Location = new System.Drawing.Point(5, 35);
+            this.panel1.Location = new System.Drawing.Point(7, 44);
+            this.panel1.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
             this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(256, 240);
+            this.panel1.Size = new System.Drawing.Size(341, 300);
             this.panel1.TabIndex = 1;
             // 
             // fps_count_timer
@@ -58,12 +59,14 @@
             // 
             this.label3.BackColor = System.Drawing.Color.Transparent;
             this.label3.Font = new System.Drawing.Font("Microsoft JhengHei", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
-            this.label3.Location = new System.Drawing.Point(208, 8);
+            this.label3.Location = new System.Drawing.Point(277, 10);
+            this.label3.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label3.Name = "label3";
-            this.label3.Size = new System.Drawing.Size(53, 20);
+            this.label3.Size = new System.Drawing.Size(71, 25);
             this.label3.TabIndex = 11;
             this.label3.Text = "fps : ";
             this.label3.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            this.label3.DoubleClick += new System.EventHandler(this.label3_DoubleClick);
             // 
             // UIOpenRom
             // 
@@ -71,9 +74,10 @@
             this.UIOpenRom.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.UIOpenRom.FlatStyle = System.Windows.Forms.FlatStyle.Popup;
             this.UIOpenRom.Font = new System.Drawing.Font("Microsoft JhengHei", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
-            this.UIOpenRom.Location = new System.Drawing.Point(5, 8);
+            this.UIOpenRom.Location = new System.Drawing.Point(7, 10);
+            this.UIOpenRom.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.UIOpenRom.Name = "UIOpenRom";
-            this.UIOpenRom.Size = new System.Drawing.Size(65, 20);
+            this.UIOpenRom.Size = new System.Drawing.Size(86, 24);
             this.UIOpenRom.TabIndex = 13;
             this.UIOpenRom.Text = "Open";
             this.UIOpenRom.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -87,9 +91,10 @@
             this.UIReset.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.UIReset.FlatStyle = System.Windows.Forms.FlatStyle.Popup;
             this.UIReset.Font = new System.Drawing.Font("Microsoft JhengHei", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
-            this.UIReset.Location = new System.Drawing.Point(73, 8);
+            this.UIReset.Location = new System.Drawing.Point(97, 10);
+            this.UIReset.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.UIReset.Name = "UIReset";
-            this.UIReset.Size = new System.Drawing.Size(65, 20);
+            this.UIReset.Size = new System.Drawing.Size(86, 24);
             this.UIReset.TabIndex = 15;
             this.UIReset.Text = "Reset";
             this.UIReset.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -103,9 +108,10 @@
             this.UIConfig.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.UIConfig.FlatStyle = System.Windows.Forms.FlatStyle.Popup;
             this.UIConfig.Font = new System.Drawing.Font("Microsoft JhengHei", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
-            this.UIConfig.Location = new System.Drawing.Point(141, 8);
+            this.UIConfig.Location = new System.Drawing.Point(188, 10);
+            this.UIConfig.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.UIConfig.Name = "UIConfig";
-            this.UIConfig.Size = new System.Drawing.Size(65, 20);
+            this.UIConfig.Size = new System.Drawing.Size(86, 24);
             this.UIConfig.TabIndex = 16;
             this.UIConfig.Text = "Config";
             this.UIConfig.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -117,9 +123,10 @@
             // 
             this.UIAbout.Font = new System.Drawing.Font("Microsoft JhengHei", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
             this.UIAbout.LinkColor = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(64)))), ((int)(((byte)(64)))));
-            this.UIAbout.Location = new System.Drawing.Point(201, 277);
+            this.UIAbout.Location = new System.Drawing.Point(268, 346);
+            this.UIAbout.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.UIAbout.Name = "UIAbout";
-            this.UIAbout.Size = new System.Drawing.Size(60, 15);
+            this.UIAbout.Size = new System.Drawing.Size(80, 19);
             this.UIAbout.TabIndex = 17;
             this.UIAbout.TabStop = true;
             this.UIAbout.Text = "About";
@@ -130,9 +137,10 @@
             // 
             this.RomInf.Font = new System.Drawing.Font("Microsoft JhengHei", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
             this.RomInf.LinkColor = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(64)))), ((int)(((byte)(64)))));
-            this.RomInf.Location = new System.Drawing.Point(5, 277);
+            this.RomInf.Location = new System.Drawing.Point(7, 346);
+            this.RomInf.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.RomInf.Name = "RomInf";
-            this.RomInf.Size = new System.Drawing.Size(60, 15);
+            this.RomInf.Size = new System.Drawing.Size(80, 19);
             this.RomInf.TabIndex = 18;
             this.RomInf.TabStop = true;
             this.RomInf.Text = "Rom Info";
@@ -140,10 +148,10 @@
             // 
             // AprNesUI
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 12F);
+            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Zoom;
-            this.ClientSize = new System.Drawing.Size(266, 294);
+            this.ClientSize = new System.Drawing.Size(355, 368);
             this.Controls.Add(this.RomInf);
             this.Controls.Add(this.UIAbout);
             this.Controls.Add(this.UIConfig);
@@ -154,6 +162,7 @@
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.KeyPreview = true;
+            this.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
             this.MaximizeBox = false;
             this.Name = "AprNesUI";
             this.SizeGripStyle = System.Windows.Forms.SizeGripStyle.Hide;
