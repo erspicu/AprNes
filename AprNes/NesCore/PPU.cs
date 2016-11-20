@@ -16,7 +16,8 @@ namespace AprNes
     {
         public int frame_count = 0, ScreenSize = 1;
         public bool LimitFPS = true;
-        int ppu_cycles = 0, scanline = 241;
+        public static int scanline = 241;
+        int ppu_cycles = 0;
 
         //Palette ref http://www.thealmightyguru.com/Games/Hacking/Wiki/index.php?title=NES_Palette & http://www.dev.bowdenweb.com/nes/nes-color-palette.html
         static readonly uint[] NesColorsData =  { 
@@ -34,7 +35,8 @@ namespace AprNes
         bool Spritesize8x16 = false, NMIable = false;
 
         //ppu mask 0x2001
-        bool ShowBackGround = false, ShowSprites = false;
+        public static bool ShowBackGround = false;
+        public static bool ShowSprites = false;
 
         //ppu status 0x2002
         bool isSpriteOverflow = false, isSprite0hit = false, isVblank = false;
@@ -42,11 +44,12 @@ namespace AprNes
         int vram_addr_internal = 0, vram_addr_tmp = 0, addr_range, vram_addr = 0, scrol_y = 0, FineX = 0;
         bool vram_latch = false;
         byte spr_ram_add = 0, ppu_2007_buffer = 0, ppu_2007_temp = 0;
-        byte* spr_ram, ppu_ram;
+        static byte* spr_ram, ppu_ram;
         uint* ScreenBuf1x, ScreenBuf2x, ScreenBuf3x, ScreenBuf4x, ScreenBuf5x, ScreenBuf6x, NesColors;
         int* Buffer_BG_array;
 
-        bool NMI_set = false, IRQ_set = false;
+        bool NMI_set = false;
+        public static bool IRQ_set = false;
 
         Stopwatch StopWatch = new Stopwatch();
         void ppu_step()

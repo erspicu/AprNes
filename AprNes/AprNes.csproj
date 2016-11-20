@@ -75,6 +75,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="NesCore\Mapper\IMapper.cs" />
     <Compile Include="NesCore\Mapper\Mapper001.cs" />
     <Compile Include="NesCore\Mapper\Mapper003.cs" />
     <Compile Include="NesCore\Mapper\Mapper004.cs" />

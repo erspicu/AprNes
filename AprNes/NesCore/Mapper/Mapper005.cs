@@ -9,11 +9,11 @@ namespace AprNes
     {
         //MMC5 https://wiki.nesdev.com/w/index.php/MMC5 editing
 
-        int CHR4_Bankselect1k = 0, CHR5_Bankselect1k = 0, CHR6_Bankselect1k = 0, CHR7_Bankselect1k = 0;
-        int CHR2_Bankselect2k = 0, CHR3_Bankselect2k = 0;
-        int PRG2_Bankselect = 0, PRG3_Bankselect = 0;
-        int PRG_BankselectRam = 0;//, PRG0_BankselectRam = 0, PRG1_BankselectRam = 0, PRG2_BankselectRam = 0; 
-        bool useRamBank0 = false, useRamBank1 = false, useRamBank2 = false;
+        public static int CHR4_Bankselect1k = 0, CHR5_Bankselect1k = 0, CHR6_Bankselect1k = 0, CHR7_Bankselect1k = 0;
+        public static int CHR2_Bankselect2k = 0, CHR3_Bankselect2k = 0;
+        public static int PRG2_Bankselect = 0, PRG3_Bankselect = 0;
+        public static int PRG_BankselectRam = 0;//, PRG0_BankselectRam = 0, PRG1_BankselectRam = 0, PRG2_BankselectRam = 0; 
+        public static bool useRamBank0 = false, useRamBank1 = false, useRamBank2 = false;
 
         byte mapper005read_ExpansionROM(ushort address)//for register configure
         {
@@ -179,6 +179,179 @@ namespace AprNes
                 else if (address < 0x1c00) return CHR_ROM[(address - 0x1800) + (CHR6_Bankselect1k << 10)];
                 else return CHR_ROM[(address - 0x1c00) + (CHR7_Bankselect1k << 10)];
             }
+        }
+    }
+
+    unsafe public class Mapper005 : CMapper
+    {
+        //MMC5 https://wiki.nesdev.com/w/index.php/MMC5 editing
+        private int CHR_Bankmode = 0, PRG_Bankmode = 0;
+
+        public Mapper005(byte* prgROM, byte* chrROM) : base(prgROM, chrROM) { }
+
+        public override byte Read_CHR(int address)
+        {
+            if (CHR_Bankmode == 0) return CHR_ROM[address + (NesCore.CHR_Bankselect << 13)]; //8k
+            else if (CHR_Bankmode == 1) //4k
+            {
+                if (address < 0x1000) return CHR_ROM[address + (NesCore.CHR0_Bankselect << 12)];
+                else return CHR_ROM[(address - 0x1000) + (NesCore.CHR1_Bankselect << 12)];
+            }
+            else if (CHR_Bankmode == 2) //2k
+            {
+                if (address < 0x800) return CHR_ROM[address + (NesCore.CHR0_Bankselect2k << 11)];
+                else if (address < 0x1000) return CHR_ROM[(address - 0x800) + (NesCore.CHR1_Bankselect2k << 11)];
+                else if (address < 0x1800) return CHR_ROM[(address - 0x1000) + (NesCore.CHR2_Bankselect2k << 11)];
+                else return CHR_ROM[(address - 0x1800) + (NesCore.CHR3_Bankselect2k << 11)];
+            }
+            else //1k
+            {
+                if (address < 0x400) return CHR_ROM[address + (NesCore.CHR0_Bankselect1k << 10)];
+                else if (address < 0x800) return CHR_ROM[(address - 0x400) + (NesCore.CHR1_Bankselect1k << 10)];
+                else if (address < 0xc00) return CHR_ROM[(address - 0x800) + (NesCore.CHR2_Bankselect1k << 10)];
+                else if (address < 0x1000) return CHR_ROM[(address - 0xc00) + (NesCore.CHR3_Bankselect1k << 10)];
+                else if (address < 0x1400) return CHR_ROM[(address - 0x1000) + (NesCore.CHR4_Bankselect1k << 10)];
+                else if (address < 0x1800) return CHR_ROM[(address - 0x1400) + (NesCore.CHR5_Bankselect1k << 10)];
+                else if (address < 0x1c00) return CHR_ROM[(address - 0x1800) + (NesCore.CHR6_Bankselect1k << 10)];
+                else return CHR_ROM[(address - 0x1c00) + (NesCore.CHR7_Bankselect1k << 10)];
+            }
+        }
+
+        public override byte Read_ExpansionROM(ushort address)
+        {
+            return 0;
+        }
+
+        public override byte Read_PRG(ushort address)
+        {
+            if (NesCore.PRG_Bankmode == 0) return 0;
+            else if (NesCore.PRG_Bankmode == 1)
+            {
+                if (address < 0xc000)
+                {
+                    if (address < 0xa000)
+                    {
+                        if (NesCore.useRamBank0) return 0;
+                        else return 0;
+                    }
+                    else
+                    {
+                        if (NesCore.useRamBank1) return 0;
+                        else return 0;
+                    }
+                }
+                else return 0;
+            }
+            else if (NesCore.PRG_Bankmode == 2)
+            {
+                if (address < 0xc000)
+                {
+                    if (address < 0xa000)
+                    {
+                        if (NesCore.useRamBank0) return 0;
+                        else return 0;
+                    }
+                    else
+                    {
+                        if (NesCore.useRamBank1) return 0;
+                        else return 0;
+                    }
+                }
+                else if (address < 0xe000)
+                {
+                    if (NesCore.useRamBank2) return 0;
+                    else return 0;
+                }
+                else return 0;
+            }
+            else //3
+            {
+                if (address < 0xa000)
+                {
+                    if (NesCore.useRamBank0) return 0;
+                    else return 0;
+                }
+                else if (address < 0xc000)
+                {
+                    if (NesCore.useRamBank1) return 0;
+                    else return 0;
+
+                }
+                else if (address < 0xe000)
+                {
+                    if (NesCore.useRamBank2) return 0;
+                    else return 0;
+                }
+                else return 0;
+            }
+        }
+
+        public override void Write_ExpansionROM(ushort address, byte value)
+        {
+            //register
+            switch (address)
+            {
+                #region audio
+                case 0x5000: break;
+                case 0x5001: break;
+                case 0x5002: break;
+                case 0x5003: break;
+                case 0x5004: break;
+                case 0x5005: break;
+                case 0x5006: break;
+                case 0x5007: break;
+                case 0x5010: break;
+                case 0x5011: break;
+                case 0x5015: break;
+                #endregion
+                case 0x5100: NesCore.PRG_Bankmode = value & 3; break; //PRG mode 
+                case 0x5101: NesCore.CHR_Bankmode = value & 3; break; //CHR mode
+                case 0x5102: break; //PRG RAM Protect 1 
+                case 0x5103: break; //PRG RAM Protect 2 
+                case 0x5104: break; //Extended RAM mode 
+                case 0x5105: break; //Nametable mapping 
+                case 0x5106: break; //Fill-mode tile 
+                case 0x5107: break; //Fill-mode color
+                case 0x5113: NesCore.PRG_BankselectRam = value & 3; break;
+                case 0x5114:
+                    NesCore.PRG0_Bankselect = value & 0x7f;
+                    NesCore.useRamBank0 = ((value & 0x80) == 0) ? true : false;
+                    break;
+                case 0x5115:
+                    NesCore.PRG1_Bankselect = value & 0x7f;
+                    NesCore.useRamBank1 = ((value & 0x80) == 0) ? true : false;
+                    break;
+                case 0x5116:
+                    NesCore.PRG2_Bankselect = value & 0x7f;
+                    NesCore.useRamBank2 = ((value & 0x80) == 0) ? true : false;
+                    break;
+                case 0x5117: NesCore.PRG3_Bankselect = value & 0x7f; break;
+                case 0x5120: NesCore.CHR0_Bankselect1k = value; break;
+                case 0x5121: NesCore.CHR0_Bankselect2k = NesCore.CHR1_Bankselect1k = value; break;
+                case 0x5122: NesCore.CHR2_Bankselect1k = value; break;
+                case 0x5123: NesCore.CHR0_Bankselect = NesCore.CHR1_Bankselect2k = NesCore.CHR3_Bankselect1k = value; break;
+                case 0x5124: NesCore.CHR4_Bankselect1k = value; break;
+                case 0x5125: NesCore.CHR2_Bankselect2k = NesCore.CHR5_Bankselect1k = value; break;
+                case 0x5126: NesCore.CHR6_Bankselect1k = value; break;
+                case 0x5127: NesCore.CHR_Bankselect = NesCore.CHR1_Bankselect = NesCore.CHR3_Bankselect2k = NesCore.CHR7_Bankselect1k = value; break;
+                case 0x5128: NesCore.CHR0_Bankselect1k = NesCore.CHR4_Bankselect1k = value; break;
+                case 0x5129: NesCore.CHR0_Bankselect2k = NesCore.CHR2_Bankselect2k = NesCore.CHR1_Bankselect1k = NesCore.CHR5_Bankselect1k = value; break;
+                case 0x512a: NesCore.CHR2_Bankselect1k = NesCore.CHR6_Bankselect1k = value; break;
+                case 0x512b: NesCore.CHR_Bankselect = NesCore.CHR0_Bankselect = NesCore.CHR1_Bankselect = NesCore.CHR1_Bankselect2k = NesCore.CHR3_Bankselect2k = NesCore.CHR3_Bankselect1k = NesCore.CHR7_Bankselect1k = value; break;
+                case 0x5130: break; //Upper CHR Bank bits 
+                case 0x5200: break; //Vertical Split Mode
+                case 0x5201: break; //Vertical Split Scroll
+                case 0x5202: break; //Vertical Split Bank  
+                case 0x5203: break; //IRQ Counter 
+                case 0x5204: break; //IRQ Status
+                case 0x5205: break; //??  Writes specify the eight-bit multiplicand; reads return the lower eight bits of the product
+                case 0x5206: break; //??  Writes specify the eight-bit multiplier; reads return the upper eight bits of the product
+            }
+        }
+
+        public override void Write_Rom(ushort address, byte value)
+        {
+            return;
         }
     }
 }

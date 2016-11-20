@@ -15,9 +15,10 @@ namespace AprNes
     unsafe public partial class NesCore
     {
         int mapper;
-        byte PRG_ROM_count, CHR_ROM_count, ROM_Control_1, ROM_Control_2, RAM_banks_count;
+        public static byte CHR_ROM_count = 0;
+        public static byte PRG_ROM_count, ROM_Control_1, ROM_Control_2, RAM_banks_count;
         byte* PRG_ROM, CHR_ROM;
-        bool Vertical = false, NesHeaderV2 = false, battery = false;
+        public static bool Vertical = false, NesHeaderV2 = false, battery = false;
 
         public string rom_file_name = "";
         string rom_sav = "";
@@ -117,6 +118,22 @@ namespace AprNes
                 //for mapper value init region 
                 if (mapper == 1) PRG_Bankselect = PRG_ROM_count - 2;
                 if (mapper == 2) Rom_offset = (PRG_ROM_count - 1) * 0x4000;
+
+                //Facotry Patttern
+                switch(mapper)
+                {
+                    case 0: Mapper = new Mapper000(PRG_ROM, CHR_ROM); break; //NROM
+                    case 1: Mapper = new Mapper001(PRG_ROM, CHR_ROM); break; //MMC1
+                    case 2: Mapper = new Mapper002(PRG_ROM, CHR_ROM); break; //UNROM
+                    case 3: Mapper = new Mapper003(PRG_ROM, CHR_ROM); break; //CNROM
+                    case 4: Mapper = new Mapper004(PRG_ROM, CHR_ROM); break; //MMC3
+                    case 5: Mapper = new Mapper005(PRG_ROM, CHR_ROM); break; //MMC5
+                    case 7: Mapper = new Mapper007(PRG_ROM, CHR_ROM); break; //AxROM
+                    case 11: Mapper = new Mapper011(PRG_ROM, CHR_ROM); break; //Color Dreams
+                    case 66: Mapper = new Mapper066(PRG_ROM, CHR_ROM); break; //GxROM
+                    case 71: Mapper = new Mapper071(PRG_ROM, CHR_ROM); break; //Camerica
+                    default: MessageBox.Show("not support mapper ! " + mapper); return false; 
+                }
 
                 //init allocate
                 ScreenBuf1x = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 61440);

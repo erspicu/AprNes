@@ -742,5 +742,12 @@ namespace AprNes
             RomInfo.StartPosition = FormStartPosition.CenterParent;
             RomInfo.ShowDialog(this);
         }
+
+        //switch the Mapper Handle Method to Normal or Factory Pattern .
+        public static bool IsFactoryPattern = false;
+        private void label3_DoubleClick(object sender, EventArgs e)
+        {
+            IsFactoryPattern = !IsFactoryPattern;
+        }
     }
 }

@@ -25,4 +25,27 @@ namespace AprNes
             return CHR_ROM[address];
         }
     }
+
+    unsafe public class Mapper071 : CMapper
+    {
+        //Camerica http://wiki.nesdev.com/w/index.php?title=INES_Mapper_071 need check!
+        public Mapper071(byte* prgROM, byte* chrROM) : base(prgROM, chrROM) { }
+
+        public override byte Read_CHR(int address)
+        {
+            return CHR_ROM[address];
+        }
+
+        public override byte Read_PRG(ushort address)
+        {
+            if (address < 0xc000) return PRG_ROM[(address - 0x8000) + (NesCore.PRG_Bankselect << 14)]; // swap
+            else return PRG_ROM[(address - 0xc000) + (NesCore.PRG_ROM_count << 14)];
+        }
+
+        public override void Write_Rom(ushort address, byte value)
+        {
+            //Select 16 KiB PRG ROM bank for CPU $8000-$BFFF
+            if (address >= 0xc000 && address <= 0xffff) NesCore.PRG_Bankselect = (value & 0xf);
+        }
+    }
 }
