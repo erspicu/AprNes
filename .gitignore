@@ -65,7 +65,6 @@ Temporary Items
 x64/
 x86/
 bld/
-[Bb]in/
 [Oo]bj/
 [Ll]og/
 
@@ -117,6 +116,9 @@ artifacts/
 *.pidb
 *.svclog
 *.scc
+*.exe
+*.vshost.exe.manifest
+*.vshost.exe.config
 
 # Chutzpah Test files
 _Chutzpah*
