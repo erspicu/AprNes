@@ -1,17 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
 using System.Drawing;
 using System.Linq;
-using System.Text;
 using System.Windows.Forms;
 using System.IO;
+using System.IO.Compression;
 using System.Diagnostics;
 using System.Threading;
 using SharpDX.DirectInput;
-using UnzipTool;
-using AprNes;
 using LangTool;
 
 namespace AprNes
@@ -25,13 +21,23 @@ namespace AprNes
         Dictionary<int, KeyMap> NES_KeyMAP = new Dictionary<int, KeyMap>();
         public Dictionary<string, KeyMap> NES_KeyMAP_joypad = new Dictionary<string, KeyMap>();
 
+        List<string> background_pics;
+
+        Stopwatch st = new Stopwatch();//test UI finish time
+
         public AprNesUI()
         {
+            st.Restart();
             InitializeComponent();
+
+            if (Directory.Exists(Application.StartupPath + "/Background"))
+                background_pics = Directory.GetFiles(Application.StartupPath + "/Background").Where(s => s.ToLower().EndsWith(".jpg") || s.ToLower().EndsWith(".png")).ToList();
+
             LangINI.init();
             LoadConfig();
-            initUIsize();
+
             initUILang();
+
             grfx = panel1.CreateGraphics();
         }
 
@@ -47,21 +53,44 @@ namespace AprNes
         {
             if (!LangINI.LangLoadOK) return;
 
-            UIOpenRom.Text = LangINI.lang_table[AppConfigure["Lang"]]["rom"];
-            UIConfig.Text = LangINI.lang_table[AppConfigure["Lang"]]["setting"];
-            UIReset.Text = LangINI.lang_table[AppConfigure["Lang"]]["reset"];
-            UIAbout.Text = LangINI.lang_table[AppConfigure["Lang"]]["about"];
+            UIOpenRom.Text = fun1ToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["rom"];
+            UIConfig.Text = fun3ToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["setting"];
+            UIReset.Text = fun2ToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["reset"];
+            UIAbout.Text = fun6ToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["about"];
+            fun5ToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["appclose"];
+            fullScreeenToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["fullscreen"];
+            normalToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["normal"];
+            screenModeToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["screenmode"];
+            RomInf.Text = fun4ToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["rominfo"]; //rominfo
         }
 
         int ScreenSize = 1;
         public void initUIsize()
         {
+            panel1.Visible = false;
             panel1.Width = 256 * ScreenSize;
             panel1.Height = 240 * ScreenSize;
-            this.Width = 272 + 256 * (ScreenSize - 1);
-            this.Height = 322 + 240 * (ScreenSize - 1);
-            UIAbout.Location = new Point(201 + 256 * (ScreenSize -1), 277 + 240 * (ScreenSize - 1));
+
+            if (ScreenCenterFull)
+            {
+                UIAbout.Visible = RomInf.Visible = UIOpenRom.Visible = UIReset.Visible = UIConfig.Visible = label3.Visible = false;
+
+                fullScreeenToolStripMenuItem_Click(null, null);
+                panel1.Visible = true;
+                //Configure_Write();
+                return;
+            }
+
+            UIAbout.Visible = RomInf.Visible = UIOpenRom.Visible = UIReset.Visible = UIConfig.Visible = label3.Visible = true;
+            panel1.Location = new Point(5, 35);
+            this.Width = 282 + 256 * (ScreenSize - 1);
+            this.Height = 332 + 240 * (ScreenSize - 1);
+            UIAbout.Location = new Point(201 + 256 * (ScreenSize - 1), 277 + 240 * (ScreenSize - 1));
             RomInf.Location = new Point(5, 277 + 240 * (ScreenSize - 1));
+            panel1.Visible = true;
+
+            Console.WriteLine("t1");
+            //Configure_Write();
         }
 
         public enum KeyMap
@@ -126,7 +155,9 @@ namespace AprNes
             foreach (string i in lines)
             {
                 List<string> keyvalue = i.Split(new char[] { '=' }).ToList();
-                AppConfigure[keyvalue[0]] = keyvalue[1];
+
+                if (keyvalue.Count == 2)
+                    AppConfigure[keyvalue[0]] = keyvalue[1];
             }
 
             LimitFPS = false;
@@ -152,10 +183,10 @@ namespace AprNes
             joypad_RIGHT = AppConfigure["joypad_RIGHT"];
 
             ScreenSize = int.Parse(AppConfigure["ScreenSize"]);
-
             Console.WriteLine("UI size : " + ScreenSize);
-
+            ScreenCenterFull = bool.Parse(AppConfigure["ScreenFull"]);
             NES_init_KeyMap();
+
         }
 
         private void NES_init_KeyMap()
@@ -225,10 +256,22 @@ namespace AprNes
             if (NES_KeyMAP_joypad.Values.Contains(KeyMap.NES_btn_RIGHT))
                 AppConfigure["joypad_RIGHT"] = NES_KeyMAP_joypad.FirstOrDefault(x => x.Value == KeyMap.NES_btn_RIGHT).Key;
 
+            AppConfigure["ScreenFull"] = ScreenCenterFull.ToString();
+
             string conf = "";
             foreach (string i in AppConfigure.Keys)
                 conf += i + "=" + AppConfigure[i] + "\r\n";
-            File.WriteAllText(ConfigureFile, conf);
+            FileWriteAllText(ConfigureFile, conf);
+        }
+
+        public void FileWriteAllText(string path, string str)
+        {
+            Console.WriteLine("Configure save !");
+            Stream s = File.OpenWrite(path);
+            StreamWriter sw = new StreamWriter(s);
+            sw.WriteLine(str);
+            sw.Close();
+            s.Close();
         }
 
         //-------------------------------------------------------
@@ -397,29 +440,19 @@ namespace AprNes
         public string rom_file = "";
         public byte[] rom_bytes;
 
-        public static byte[] ReadFully(Stream input) //copy from http://stackoverflow.com/questions/221925/creating-a-byte-array-from-a-stream
-        {
-            byte[] buffer = new byte[16 * 1024];
-            using (MemoryStream ms = new MemoryStream())
-            {
-                int read;
-                while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
-                {
-                    ms.Write(buffer, 0, read);
-                }
-                return ms.ToArray();
-            }
-        }
-
         public enum MapperName
         {
             NROM = 0,
             MMC1 = 1,
             UNROM = 2,
             CNROM = 3,
-            MMC3 = 4
+            MMC3 = 4,
+            MMC5 = 5,
+            AxROM = 7,
+            ColorDreams = 11,
+            GxROM = 66,
+            Camerica = 71
         }
-
 
         public string GetRomInfo()
         {
@@ -494,17 +527,21 @@ namespace AprNes
             FileInfo fi = new FileInfo(fd.FileName);
             if (fi.Extension.ToLower() == ".zip")
             {
-                Unzip uz = new Unzip(fi.FullName); // tks!! https://github.com/yallie/unzip good!
-                foreach (string i in uz.FileNames)
+                // tks!! https://github.com/yallie/unzip good!
+                // with .net use framework 4.6 https://msdn.microsoft.com/zh-tw/library/system.io.compression.zipfile(v=vs.110).aspx
+
+                ZipArchive archive = ZipFile.OpenRead(fi.FullName);
+                foreach (ZipArchiveEntry entry in archive.Entries)
                 {
-                    if (i.ToLower().EndsWith(".nes"))
+
+                    if (entry.FullName.ToLower().EndsWith(".nes"))
                     {
-                        nes_name = i;
-                        MemoryStream ms = new MemoryStream();
-                        uz.Extract(i, ms);
-                        ms.Position = 0;
-                        rom_bytes = ReadFully(ms);
-                        ms.Close();
+                        nes_name = entry.Name;
+                        Stream fs = entry.Open();
+                        long length = entry.Length;
+                        rom_bytes = new byte[length];
+                        fs.Read(rom_bytes, 0, (int)length);
+                        fs.Close();
                     }
                 }
             }
@@ -548,7 +585,7 @@ namespace AprNes
                 MessageBox.Show("fail !");
                 return;
             }
-            nes_t = new Thread(nes_obj.run );
+            nes_t = new Thread(nes_obj.run);
             nes_t.IsBackground = true;
             nes_t.Start();
             fps_count_timer.Enabled = true;
@@ -704,7 +741,7 @@ namespace AprNes
             running = true;
         }
 
-        private void AprNesUI_Shown(object sender, EventArgs e)
+        private void JoypadInit()
         {
             #region joypad init
             //from http://stackoverflow.com/questions/3929764/taking-input-from-a-joystick-with-c-sharp-net
@@ -734,6 +771,23 @@ namespace AprNes
                 }
             }
             #endregion
+
+        }
+
+        private void AprNesUI_Shown(object sender, EventArgs e)
+        {
+            initUIsize();
+            JoypadInit();
+            new Thread(() =>
+            {
+                Thread.Sleep(50);
+                Invoke(new MethodInvoker(() =>
+                {
+                    Opacity = 100;
+                }));
+                st.Stop();
+                Console.WriteLine("UI Finish : " + st.ElapsedMilliseconds);
+            }).Start();
         }
 
         private void RomInf_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
@@ -741,6 +795,80 @@ namespace AprNes
             AprNes_RomInfoUI RomInfo = new AprNes_RomInfoUI();
             RomInfo.StartPosition = FormStartPosition.CenterParent;
             RomInfo.ShowDialog(this);
+        }
+
+        private void fun1ToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            button1_Click(null, null);
+        }
+
+        private void fun5ToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            Close();
+        }
+
+        private void fun2ToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            label4_Click(null, null);
+        }
+
+        private void fun3ToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            label2_Click_1(null, null);
+        }
+
+        private void fun6ToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            linkLabel1_LinkClicked(null, null);
+        }
+
+        private void fun4ToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            RomInf_LinkClicked(null, null);
+        }
+
+        bool ScreenCenterFull = false;
+
+
+        private void fun8ToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            this.BackgroundImage = null;
+            this.WindowState = FormWindowState.Normal;
+            this.FormBorderStyle = FormBorderStyle.FixedSingle;
+            ScreenCenterFull = false;
+            initUIsize();
+        }
+
+        private void fullScreeenToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (this.WindowState != FormWindowState.Maximized) Opacity = 0;
+            panel1.Visible = false;
+            UIAbout.Visible = RomInf.Visible = UIOpenRom.Visible = UIReset.Visible = UIConfig.Visible = label3.Visible = false;
+            if (background_pics.Count != 0)
+                this.BackgroundImage = Image.FromFile(background_pics[new Random().Next(0, background_pics.Count)]);
+            this.FormBorderStyle = FormBorderStyle.None;
+            this.WindowState = FormWindowState.Maximized;
+            this.CenterToScreen();
+            panel1.Left = (this.ClientSize.Width - panel1.Width) / 2;
+            panel1.Top = (this.ClientSize.Height - panel1.Height) / 2;
+            label3.Location = new Point(0, 0);
+            panel1.Visible = true;
+            label3.Visible = true;
+            this.Refresh();
+            Opacity = 100;
+            ScreenCenterFull = true;
+            Configure_Write();
+        }
+
+        private void normalToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            this.BackgroundImage = null;
+            this.WindowState = FormWindowState.Normal;
+            this.FormBorderStyle = FormBorderStyle.FixedSingle;
+            label3.Location = new Point(208, 8);
+            ScreenCenterFull = false;
+            Configure_Write();
+            initUIsize();
         }
     }
 }

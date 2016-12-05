@@ -1,14 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using XBRz_speed;
+using ScalexFilter;
 using NativeWIN32API;
 using System.Diagnostics;
 using System.Threading;
 using System.Drawing;
 using System.Drawing.Imaging;
-using System.Runtime.InteropServices;
 
 namespace AprNes
 {
@@ -16,7 +13,7 @@ namespace AprNes
     {
         public int frame_count = 0, ScreenSize = 1;
         public bool LimitFPS = true;
-        int ppu_cycles = 0, scanline = 241;
+        int ppu_cycles = 0, scanline = 0; // 241;
 
         //Palette ref http://www.thealmightyguru.com/Games/Hacking/Wiki/index.php?title=NES_Palette & http://www.dev.bowdenweb.com/nes/nes-color-palette.html
         static readonly uint[] NesColorsData =  { 
@@ -43,15 +40,22 @@ namespace AprNes
         bool vram_latch = false;
         byte spr_ram_add = 0, ppu_2007_buffer = 0, ppu_2007_temp = 0;
         byte* spr_ram, ppu_ram;
-        uint* ScreenBuf1x, ScreenBuf2x, ScreenBuf3x, ScreenBuf4x, ScreenBuf5x, ScreenBuf6x, NesColors;
+        uint* ScreenBuf1x, ScreenBuf2x, ScreenBuf3x, ScreenBuf4x, ScreenBuf5x, ScreenBuf6x, ScreenBuf8x, ScreenBuf9x, NesColors; //, targetSize;
         int* Buffer_BG_array;
 
+      
         bool NMI_set = false, IRQ_set = false;
 
         Stopwatch StopWatch = new Stopwatch();
+
+        bool oddSwap = false;
         void ppu_step()
         {
-            if (scanline > -1 && scanline < 240)
+           // debug();
+
+          //  StepsLog.WriteLine("1:"+ scanline+ " "+ vram_addr.ToString("x4") + " " + vram_addr_internal.ToString("x4"));
+
+            if (scanline < 240)
             {
                 if (ppu_cycles == 254)
                 {
@@ -66,50 +70,74 @@ namespace AprNes
             }
             else if (scanline == 240 && ppu_cycles == 1)
             {
-                if (!SuppressVbl) isVblank = true;
-                if (NMIable && !SuppressNmi) NMI_set = true;
+                //if (!SuppressVbl) isVblank = true;
+                //if (NMIable && !SuppressNmi) NMI_set = true;
                 RenderScreen();
                 if (LimitFPS) while (StopWatch.Elapsed.TotalSeconds < 0.01666) Thread.Sleep(1);//0.0167
                 frame_count++;
                 StopWatch.Restart();
             }
-            else if (scanline == 260)
+            else if (scanline == 261)
             {
-                if (ppu_cycles == 1) isVblank = false;// Clear VBlank flag
-                else if (ppu_cycles == 341)
-                {
-                    scanline = -1;
-                    ppu_cycles = 1;
-                    return;
-                }
-            }
-            else if (scanline == -1)
-            {
-                if (ppu_cycles == 1) isSprite0hit = isSpriteOverflow = false;
+                if (ppu_cycles == 1) isVblank = isSprite0hit = isSpriteOverflow = false;
                 else if (ppu_cycles == 304 && (ShowBackGround || ShowSprites)) vram_addr = vram_addr_internal;
             }
 
+            ++ppu_cycles;
+
+
+            
+            if (scanline == 241 && ppu_cycles == 1)
+            {
+                if (!SuppressVbl) isVblank = true;
+                if (NMIable && !SuppressNmi) NMIInterrupt(); //NMI_set = true;
+            }
+
+
+            if (scanline == 261 && ppu_cycles == 338)
+            {
+                oddSwap = !oddSwap;
+                if (!oddSwap & ShowBackGround) ++ppu_cycles;
+            }
             if (ppu_cycles == 341)
             {
                 ppu_cycles = 0;
-                scanline++;
+                if (++scanline == 262) scanline = 0;
             }
-            ppu_cycles++;
+
+          //  StepsLog.WriteLine("2:" + scanline + " " + vram_addr.ToString("x4") + " " + vram_addr_internal.ToString("x4"));
+
         }
 
         ushort attrAddr, tileAddr, lowshift, highshift;
         int current, pixel, vram_addr_limite, attr, attrbuf, array_loc;
         int GetAttr()
         {
+
             vram_addr_limite = vram_addr & 0x3FF;
             attrAddr = (ushort)(0x23C0 | (vram_addr & 0xC00) | (((vram_addr_limite >> 2) & 0x07) | (((vram_addr_limite >> 4) & 0x38) | 0x3C0)));
             tileAddr = (ushort)((vram_addr & 0xc00) | 0x2000 | vram_addr_limite);
-            array_loc = (ppu_ram[tileAddr] << 4) + BgPatternTableAddr + +((scanline + scrol_y) & 7);
+            array_loc = (ppu_ram[tileAddr] << 4) + BgPatternTableAddr + ((scanline + scrol_y) & 7);
             lowshift = (ushort)((lowshift << 8) | MapperRouterR_CHR(array_loc));
             highshift = (ushort)((highshift << 8) | MapperRouterR_CHR(array_loc + 8));
             if ((vram_addr & 0x1F) == 0x1F) vram_addr ^= 0x41F; else vram_addr++;
             return ((ppu_ram[attrAddr] >> (((vram_addr_limite >> 4) & 0x04) | (vram_addr_limite & 0x02))) & 0x03);
         }
+
+        /*void _RenderBackGroundLine()
+        {
+
+            attr = attrbuf;
+            attrbuf = GetAttr();
+            for (int loc = 0; loc < 8; loc++)
+            {
+                current = 15 - loc - FineX;
+                array_loc = (scanline << 8) + ((th_x << 3) | loc);
+                pixel = Buffer_BG_array[array_loc] = ((lowshift >> current) & 1) | (((highshift >> current) & 1) << 1);
+                if (current >= 8) ScreenBuf1x[array_loc] = NesColors[ppu_ram[((pixel == 0) ? 0x3f00 : 0x3f00 | (attr << 2)) | pixel] & 0x3f];
+                else ScreenBuf1x[array_loc] = NesColors[ppu_ram[((pixel == 0) ? 0x3f00 : 0x3f00 | (attrbuf << 2)) | pixel] & 0x3f];
+            }
+        }*/
 
         void RenderBackGroundLine()
         {
@@ -128,6 +156,8 @@ namespace AprNes
                 attr = attrbuf;
                 attrbuf = GetAttr();
             }
+
+            GetAttr();
         }
         void RenderSpritesLine()
         {
@@ -186,16 +216,27 @@ namespace AprNes
         public bool screen_lock = false;
         void RenderScreen()
         {
+            
             screen_lock = true;
-
             if (ScreenSize != 1)
                 switch (ScreenSize)
                 {
-                    case 2: HS_XBRz.ScaleImage2X(ScreenBuf1x, ScreenBuf2x, 256, 240); break;
-                    case 3: HS_XBRz.ScaleImage3X(ScreenBuf1x, ScreenBuf3x, 256, 240); break;
-                    case 4: HS_XBRz.ScaleImage4X(ScreenBuf1x, ScreenBuf4x, 256, 240); break;
-                    case 5: HS_XBRz.ScaleImage5X(ScreenBuf1x, ScreenBuf5x, 256, 240); break;
-                    case 6: HS_XBRz.ScaleImage6X(ScreenBuf1x, ScreenBuf6x, 256, 240); break;
+                    case 2: HS_XBRz.ScaleImage2X(ScreenBuf1x, ScreenBuf2x); break;
+                    case 3: HS_XBRz.ScaleImage3X(ScreenBuf1x, ScreenBuf3x); break;
+                    case 4: HS_XBRz.ScaleImage4X(ScreenBuf1x, ScreenBuf4x); break;
+                    case 5: HS_XBRz.ScaleImage5X(ScreenBuf1x, ScreenBuf5x); break;
+                    case 6: HS_XBRz.ScaleImage6X(ScreenBuf1x, ScreenBuf6x); break;
+
+                    case 8:
+                        HS_XBRz.ScaleImage4X(ScreenBuf1x, ScreenBuf4x);
+                        ScalexTool.toScale2x_dx(ScreenBuf4x, 1024, 960 , ScreenBuf8x);
+                        break;//4x2
+                         
+                    case 9:
+                        HS_XBRz.ScaleImage3X(ScreenBuf1x, ScreenBuf3x);
+                        ScalexTool.toScale3x_dx(ScreenBuf3x, 768, 720, ScreenBuf9x);
+                        break;//3x3
+
                 }
             NativeGDI.DrawImageHighSpeedtoDevice();
             screen_lock = false;
@@ -208,9 +249,12 @@ namespace AprNes
             {
                 if ((vram_addr & 0x7000) == 0x7000)
                 {
-                    int tmp = vram_addr & 0x3E0;
-                    vram_addr &= 0xFFF;
-                    switch (tmp)
+                    //int tmp = vram_addr & 0x3E0;
+                    //vram_addr &= 0xFFF;
+                    //switch (tmp)
+                    vram_addr ^= 0x7000;
+
+                    switch (vram_addr & 0x3E0)
                     {
                         case 0x3A0: vram_addr ^= 0xBA0; break;
                         case 0x3E0: vram_addr ^= 0x3E0; break;
@@ -239,7 +283,11 @@ namespace AprNes
                 SuppressVbl = false;
                 isVblank = false;
             }
+
             vram_latch = false;
+
+            //vram_latch = true;
+
             return ppu_ststus;
         }
 
@@ -272,6 +320,9 @@ namespace AprNes
 
         void ppu_w_2000(byte value) //ok
         {
+
+            //StepsLog.WriteLine("2000:" + " " + value.ToString("x2"));
+
             // t: ...BA.. ........ = d: ......BA
             vram_addr_internal = (ushort)((vram_addr_internal & 0x73ff) | ((value & 3) << 10)); // 0xx73ff
             BaseNameTableAddr = 0x2000 | ((value & 3) << 10);
@@ -280,6 +331,8 @@ namespace AprNes
             BgPatternTableAddr = ((value & 0x10) > 0) ? 0x1000 : 0;
             Spritesize8x16 = ((value & 0x20) > 0) ? true : false;
             NMIable = ((value & 0x80) > 0) ? true : false;
+
+            // StepsLog.WriteLine("2000:" + " " + vram_addr_internal.ToString("x4") + " " + vram_addr.ToString("x4" ));
         }
 
         void ppu_w_2001(byte value) //ok
@@ -300,21 +353,39 @@ namespace AprNes
 
         void ppu_w_2005(byte value) //ok
         {
+
+
+
+            // Console.WriteLine("2005:"+value.ToString("x2"));
+
             if (vram_latch)
             {
                 scrol_y = value;
                 vram_addr_internal = (vram_addr_internal & 0x0C1F) | ((value & 0x7) << 12) | ((value & 0xF8) << 2);
+
+
+                //if(value != 0 )
+                //Console.WriteLine("Y:"+value);
             }
             else
             {//first
                 vram_addr_internal = (vram_addr_internal & 0x7fe0) | ((value & 0xf8) >> 3);
                 FineX = value & 0x07;
+
+                // Console.WriteLine("X:"+value);
             }
             vram_latch = !vram_latch;
+
+            //tepsLog.WriteLine("2005:" + " " + vram_addr_internal.ToString("x4") + " " + vram_addr.ToString("x4"));
+
         }
 
         void ppu_w_2006(byte value)//ok
         {
+            // StepsLog.WriteLine("2006:" + " " + value.ToString("x2"));
+
+            // Console.WriteLine("2006:" + value.ToString("x2"));
+
             if (!vram_latch) //first
                 vram_addr_internal = (vram_addr_internal & 0x00FF) | ((value & 0x3F) << 8);
             else
@@ -323,6 +394,8 @@ namespace AprNes
                 vram_addr = vram_addr_internal;
             }
             vram_latch = !vram_latch;
+
+            // StepsLog.WriteLine("2006:" + " " + vram_addr_internal.ToString("x4") + " " + vram_addr.ToString("x4"));
         }
 
         void ppu_w_2007(byte value)
@@ -342,7 +415,7 @@ namespace AprNes
                     if (ScreenFour) ppu_ram[vram_addr_tmp] = value;
                     else if (ScreenSingle)
                     {
-                         ppu_ram[0x2000 | (vram_addr_tmp & 0x3ff)] = ppu_ram[0x2400 | (vram_addr_tmp & 0x3ff)] = ppu_ram[ 0x2800 | ( vram_addr_tmp & 0x3ff)] = ppu_ram[ 0x2c00 | ( vram_addr_tmp & 0x3ff)] = value;
+                        ppu_ram[0x2000 | (vram_addr_tmp & 0x3ff)] = ppu_ram[0x2400 | (vram_addr_tmp & 0x3ff)] = ppu_ram[0x2800 | (vram_addr_tmp & 0x3ff)] = ppu_ram[0x2c00 | (vram_addr_tmp & 0x3ff)] = value;
 
                     }
                 }
@@ -370,23 +443,27 @@ namespace AprNes
             }
             vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x7FFF);
         }
-        int dma_cost = 0;
+        //int dma_cost = 0;
         void ppu_w_4014(byte value)//DMA 
         {
-            dma_cost = 512;
+            //Console.WriteLine(value.ToString("x2"));
+            //dma_cost = 512;
             int start_addr = value << 8;
             for (int i = 0; i < 256; i++) spr_ram[i] = NES_MEM[start_addr | i];
+            cpu_cycles += 512;
         }
         public Bitmap GetScreenFrame()
         {
             switch (ScreenSize)
             {
-                case 1: return new Bitmap(256, 240, 256 * 4, PixelFormat.Format32bppRgb, (IntPtr)ScreenBuf1x);
+                case 1: return new Bitmap(256 * 1, 240 * 1, 256 * 1 * 4, PixelFormat.Format32bppRgb, (IntPtr)ScreenBuf1x);
                 case 2: return new Bitmap(256 * 2, 240 * 2, 256 * 2 * 4, PixelFormat.Format32bppRgb, (IntPtr)ScreenBuf2x);
                 case 3: return new Bitmap(256 * 3, 240 * 3, 256 * 3 * 4, PixelFormat.Format32bppRgb, (IntPtr)ScreenBuf3x);
                 case 4: return new Bitmap(256 * 4, 240 * 4, 256 * 4 * 4, PixelFormat.Format32bppRgb, (IntPtr)ScreenBuf4x);
                 case 5: return new Bitmap(256 * 5, 240 * 5, 256 * 5 * 4, PixelFormat.Format32bppRgb, (IntPtr)ScreenBuf5x);
                 case 6: return new Bitmap(256 * 6, 240 * 6, 256 * 6 * 4, PixelFormat.Format32bppRgb, (IntPtr)ScreenBuf6x);
+                case 8: return new Bitmap(256 * 8, 240 * 8, 256 * 8 * 4, PixelFormat.Format32bppRgb, (IntPtr)ScreenBuf8x);
+                case 9: return new Bitmap(256 * 9, 240 * 9, 256 * 9 * 4, PixelFormat.Format32bppRgb, (IntPtr)ScreenBuf9x);
             }
             return null;
         }

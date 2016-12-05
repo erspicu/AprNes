@@ -1,14 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
 using System.Linq;
-using System.Text;
 using System.Windows.Forms;
-using System.IO;
 using LangTool;
-using AprNes;
+
 
 namespace AprNes
 {
@@ -34,6 +29,7 @@ namespace AprNes
             LimitFPS_checkBox.Text = LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["limitfps"];
             label18.Text = LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["langchoose"];
             label9.Text = "Shift + p " + LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["capture_path"];
+            
 
             comboBox1.Items.Clear();
 
@@ -63,6 +59,9 @@ namespace AprNes
             else if (radioButtonX4.Checked) AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "4";
             else if (radioButtonX5.Checked) AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "5";
             else if (radioButtonX6.Checked) AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "6";
+            else if (radioButtonX8.Checked) AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "8";
+            else if (radioButtonX9.Checked) AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "9";
+
 
             AprNesUI.GetInstance().NES_KeyMAP_joypad.Clear();
 

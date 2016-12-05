@@ -1,8 +1,5 @@
-﻿//#define debug
+﻿#define debug
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Drawing;
 using System.Windows.Forms;
 using System.IO;
@@ -17,7 +14,7 @@ namespace AprNes
         int mapper;
         byte PRG_ROM_count, CHR_ROM_count, ROM_Control_1, ROM_Control_2, RAM_banks_count;
         byte* PRG_ROM, CHR_ROM;
-        bool Vertical = false, NesHeaderV2 = false, battery = false , ScreenFour = false , ScreenSingle = false ,ScreenSpecial = false;
+        bool Vertical = false, NesHeaderV2 = false, battery = false, ScreenFour = false, ScreenSingle = false, ScreenSpecial = false;
 
         public string rom_file_name = "";
         string rom_sav = "";
@@ -52,8 +49,6 @@ namespace AprNes
                     for (int i = 0; i < CHR_ROM_count * 8192; i++)
                         CHR_ROM[i] = rom_bytes[PRG_ROM_count * 16384 + 16 + i];
                 }
-                //else
-                    //CHR_ROM = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8192); //new byte[8192];
 
                 ROM_Control_1 = rom_bytes[6];
                 ROM_Control_2 = rom_bytes[7];
@@ -81,7 +76,7 @@ namespace AprNes
 
                 if ((ROM_Control_1 & 8) != 0)
                 {
-                    ScreenFour =  ScreenSpecial = true;
+                    ScreenFour = ScreenSpecial = true;
                     Console.WriteLine("fourscreen mirroring : yes");
                 }
                 else Console.WriteLine("fourscreen mirroring : no");
@@ -129,6 +124,8 @@ namespace AprNes
                 ScreenBuf4x = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 983040);
                 ScreenBuf5x = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 1536000);
                 ScreenBuf6x = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 2211840);
+                ScreenBuf8x = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 3932160);
+                ScreenBuf9x = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 4976640);
                 Buffer_BG_array = (int*)Marshal.AllocHGlobal(sizeof(int) * 61440);
                 NesColors = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 64);
                 cycle_table = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
@@ -137,6 +134,8 @@ namespace AprNes
                 P1_joypad_status = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 NES_MEM = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 65536);
 
+
+                for (int i = 0; i < 61440; i++) ScreenBuf1x[i] = 0;
                 for (int i = 0; i < 16384; i++) ppu_ram[i] = 0;
                 for (int i = 0; i < 256; i++) spr_ram[i] = 0;
                 for (int i = 0; i < 256; i++) cycle_table[i] = cycle_tableData[i];
@@ -159,7 +158,7 @@ namespace AprNes
                 //init cpu pc
                 r_PC = (ushort)(Mem_r(0xfffc) | Mem_r(0xfffd) << 8);
 
-                //bind graphic device
+
                 switch (ScreenSize)
                 {
                     case 1: NativeGDI.initHighSpeed(_device, 256, 240, ScreenBuf1x, 0, 0); break;
@@ -168,14 +167,12 @@ namespace AprNes
                     case 4: NativeGDI.initHighSpeed(_device, 1024, 960, ScreenBuf4x, 0, 0); break;
                     case 5: NativeGDI.initHighSpeed(_device, 1280, 1200, ScreenBuf5x, 0, 0); break;
                     case 6: NativeGDI.initHighSpeed(_device, 1536, 1440, ScreenBuf6x, 0, 0); break;
+                    case 8: NativeGDI.initHighSpeed(_device, 2048, 1920, ScreenBuf8x, 0, 0); break; // 4x 2
+                    case 9: NativeGDI.initHighSpeed(_device, 2304, 2160, ScreenBuf9x, 0, 0); break; //3x 3
                 }
-#if debug
-                if (File.Exists(@"c:\log\log.txt")) File.Delete(@"c:\log\log.txt");
-                if (!Directory.Exists(@"c:\log")) Directory.CreateDirectory((@"c:\log"));
-                StepsLog = File.AppendText(@"c:\log\log.txt");
-#endif
 
-                HS_XBRz.initTable(256);
+
+                HS_XBRz.initTable(256, 240);
             }
             catch (Exception e)
             {
@@ -196,10 +193,14 @@ namespace AprNes
             StopWatch.Restart();
             while (true)
             {
+
                 cpu_step();
                 for (int i = 0; i < cpu_cycles * 3; i++) ppu_step();
+
+                // StepsLog.WriteLine(scount + " " + ppu_cycles + " " +scanline );
+
 #if debug
-                debug();
+                // debug();
 #endif
                 if (exit) break;
             }
@@ -209,8 +210,24 @@ namespace AprNes
         int scount = 0;
         public void debug()
         {
-            StepsLog.WriteLine(cpu_cycles.ToString("x2") + " " + opcode.ToString("x2") + " " + r_PC.ToString("x4") + " " + r_A.ToString("x2") + " " + r_X.ToString("x2") + " " + r_Y.ToString("x2") + " " + r_SP.ToString("x2") + " " + scanline + " " + ppu_cycles.ToString("x2"));
-            if (scount == 100000)
+
+            if (scount == 0)
+            {
+
+                if (File.Exists(@"c:\log\log.txt")) File.Delete(@"c:\log\log.txt");
+                if (!Directory.Exists(@"c:\log")) Directory.CreateDirectory((@"c:\log"));
+                StepsLog = File.AppendText(@"c:\log\log.txt");
+            }
+
+            StepsLog.WriteLine( flagN + " " +  opcode.ToString("x2") + " " + r_PC.ToString("x4") + " " + r_A.ToString("x2") + " " + r_X.ToString("x2") + " " + r_Y.ToString("x2") + " " + r_SP.ToString("x2"));// + " " + scanline + " " + ppu_cycles.ToString("x2"));
+
+            //if (scount > 1000000 * 50)
+            //StepsLog.WriteLine(vram_addr.ToString("x4") + " " +  vram_addr_internal.ToString ("x4"));
+            //StepsLog.WriteLine(scanline + " " + ppu_cycles.ToString("x2"));
+
+            // 1000000
+
+            if (scount == 250000)// 1000000 * 2)
             {
                 StepsLog.Flush();
                 StepsLog.Close();

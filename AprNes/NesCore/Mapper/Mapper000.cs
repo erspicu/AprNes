@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
-namespace AprNes
+﻿namespace AprNes
 {
     unsafe public partial class NesCore
     {
@@ -15,6 +10,7 @@ namespace AprNes
 
         byte mapper000read_CHR(int address)
         {
+            if (address >= 0x2000) return 0;
             return CHR_ROM[address];
         }
     }

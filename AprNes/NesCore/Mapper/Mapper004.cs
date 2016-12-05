@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
+﻿
 namespace AprNes
 {
     unsafe public partial class NesCore
@@ -132,7 +128,7 @@ namespace AprNes
             }
             if (IRQCounter == 0)
             {
-                if (IRQ_enable) IRQ_set = true;
+                if (IRQ_enable) IRQInterrupt(); // IRQ_set = true;
                 IRQReset = true;
             }
         }

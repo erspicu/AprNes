@@ -1,6 +1,4 @@
-﻿#define illegal
-using System.Windows.Forms;
-using System;
+﻿using System.Windows.Forms;
 
 namespace AprNes
 {
@@ -27,7 +25,7 @@ namespace AprNes
     };
         byte* cycle_table;
         byte r_A = 0, r_X = 0, r_Y = 0, r_SP = 0xFD, flagN = 0, flagV = 0, flagD = 0, flagI = 0, flagZ = 0, flagC = 0;
-        ushort r_PC = 0 ;
+        ushort r_PC = 0, InterruptVector;
         byte opcode;
 
         int cpu_cycles = 0, Interrupt_cycle = 0;
@@ -54,7 +52,6 @@ namespace AprNes
             Mem_w((ushort)(0x100 + r_SP--), (byte)r_PC);
             Mem_w((ushort)(0x100 + r_SP--), (byte)(GetFlag() | 0x20));
             r_PC = (ushort)(Mem_r(0xfffa) | (Mem_r(0xfffb) << 8));
-            flagI = 1;
             Interrupt_cycle = 7;
         }
 
@@ -64,18 +61,26 @@ namespace AprNes
             Mem_w((ushort)(0x100 + r_SP--), (byte)r_PC);
             Mem_w((ushort)(0x100 + r_SP--), (byte)(GetFlag() | 0x20));
             r_PC = (ushort)(Mem_r(0xfffe) | (Mem_r(0xffff) << 8));
-            flagI = 1;
             Interrupt_cycle = 7;
         }
 
         void cpu_step()
         {
+
             ushort ushort1, ushort2, ushort3;
             byte byte1, byte2, byte3;
             int int1;
 
+            /* if (IRQ_set)
+             {
+                 IRQInterrupt();
+                 IRQ_set = false;
+             }*/
+
             opcode = Mem_r(r_PC++);
             cpu_cycles = cycle_table[opcode];
+
+            // debug();
 
             cpu_cycles += Interrupt_cycle;
             Interrupt_cycle = 0;
@@ -324,9 +329,8 @@ namespace AprNes
                     break;
 
                 case 0x2C://BIT abs //FIX
-                    ushort t1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    byte1 = Mem_r(t1);
-                    if ((byte1 & 0x80) != 0) flagN = 1; else flagN = 0;
+                    byte1 = Mem_r((ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)));
+                    if ((byte1 & 0x80) > 0) flagN = 1; else flagN = 0;
                     if ((byte1 & 0x40) > 0) flagV = 1; else flagV = 0;
                     if ((byte1 & r_A) == 0) flagZ = 1; else flagZ = 0;
                     break;
@@ -362,9 +366,9 @@ namespace AprNes
                     r_PC++;
                     Mem_w((ushort)(r_SP-- + 0x100), (byte)(r_PC >> 8));
                     Mem_w((ushort)(r_SP-- + 0x100), (byte)(r_PC & 0xf));
-                    Mem_w((ushort)(r_SP-- + 0x100), (byte)(GetFlag() | 0x30));
+                    Mem_w((ushort)(r_SP-- + 0x100), (byte)(GetFlag() | 0X30));
                     flagI = 1;
-                    r_PC = (ushort)(Mem_r( 0xfffe) | (Mem_r(0xffff) << 8));
+                    r_PC = (ushort)(Mem_r(InterruptVector) | (Mem_r((ushort)(InterruptVector + 1)) << 8));
                     break;
 
                 case 0x50://BVC
@@ -926,7 +930,7 @@ namespace AprNes
                 //--- ORA END    
 
                 case 0x48: Mem_w((ushort)(r_SP-- + 0x100), r_A); break;//PHA
-                case 0x08: Mem_w((ushort)(r_SP-- + 0x100), (byte)(GetFlag() | 0x30)); break;//PHP
+                case 0x08: Mem_w((ushort)(r_SP-- + 0x100), (byte)(GetFlag() | 0X30)); break;//PHP
 
                 case 0x68://PLA
                     r_A = Mem_r((ushort)(++r_SP + 0x100));
@@ -1206,8 +1210,9 @@ namespace AprNes
                     if (r_Y == 0) flagZ = 1; else flagZ = 0;
                     r_A = r_Y;
                     break;
-#if illegal
+
                 #region illagel code
+
                 // http://visual6502.org/wiki/index.php?title=6502_all_256_Opcodes
                 // http://macgui.com/kb/article/46
 
@@ -1260,7 +1265,7 @@ namespace AprNes
                 case 0x2B: //ANC
                     r_A &= Mem_r(r_PC++);
                     if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) > 0) flagC = 1; else flagC = 0;
+                    if ((r_A & 0X80) > 0) flagC = 1; else flagC = 0;
                     flagN = flagC;
                     break;
 
@@ -1341,7 +1346,7 @@ namespace AprNes
 
                 case 0x0F: //SLO (  ASL M THEN (M "OR" A) -> A,M  )
                     ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    byte1 = Mem_r(ushort1);
+                    byte1 = Mem_r((ushort)(ushort1));
                     if ((byte1 & 0x80) > 0) flagC = 1; else flagC = 0;
                     byte1 <<= 1;
                     Mem_w(ushort1, byte1);
@@ -1387,7 +1392,7 @@ namespace AprNes
 
                 case 0x2F:// RLA
                     ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    byte2 = Mem_r(ushort1);
+                    byte2 = Mem_r((ushort)(ushort1));
                     byte1 = (byte)((byte2 << 1) | flagC);
                     Mem_w(ushort1, byte1);
                     if ((byte2 & 0x80) > 0) flagC = 1; else flagC = 0;
@@ -1468,7 +1473,7 @@ namespace AprNes
 
                 case 0x4F://SRE (LSR M  THEN (M "EOR" A) -> A )
                     ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    byte1 = Mem_r(ushort1);
+                    byte1 = Mem_r((ushort)(ushort1));
                     if ((byte1 & 1) > 0) flagC = 1; else flagC = 0;
                     byte1 >>= 1;
                     Mem_w(ushort1, byte1);
@@ -1553,7 +1558,7 @@ namespace AprNes
 
                 case 0x6F://RRA
                     ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));//ok
-                    byte2 = Mem_r(ushort1);
+                    byte2 = Mem_r((ushort)(ushort1));
                     byte1 = (byte)((byte2 >> 1) | ((flagC == 0) ? 0 : 0x80));
                     Mem_w(ushort1, byte1);
                     if ((byte2 & 1) > 0) flagC = 1; else flagC = 0;
@@ -1715,7 +1720,7 @@ namespace AprNes
                     int1 = r_A - byte1;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
                     if ((~int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
+                    if ((int1 & 0X80) != 0) flagN = 1; else flagN = 0;
                     break;
 
                 case 0xC7: //DCP
@@ -1725,7 +1730,7 @@ namespace AprNes
                     int1 = r_A - byte1;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
                     if ((~int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
+                    if ((int1 & 0X80) != 0) flagN = 1; else flagN = 0;
                     break;
 
                 case 0xCF: //DCP
@@ -1735,7 +1740,7 @@ namespace AprNes
                     int1 = r_A - byte1;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
                     if ((~int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
+                    if ((int1 & 0X80) != 0) flagN = 1; else flagN = 0;
                     break;
 
                 case 0xDF:
@@ -1745,7 +1750,7 @@ namespace AprNes
                     int1 = r_A - byte1;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
                     if ((~int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
+                    if ((int1 & 0X80) != 0) flagN = 1; else flagN = 0;
                     break;
 
                 case 0xD3: //DCP
@@ -1756,7 +1761,7 @@ namespace AprNes
                     int1 = r_A - byte1;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
                     if ((~int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
+                    if ((int1 & 0X80) != 0) flagN = 1; else flagN = 0;
                     break;
 
                 case 0xD7: //DCP
@@ -1766,7 +1771,7 @@ namespace AprNes
                     int1 = r_A - byte1;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
                     if ((~int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
+                    if ((int1 & 0X80) != 0) flagN = 1; else flagN = 0;
                     break;
 
                 case 0xDB:// DCP
@@ -1776,7 +1781,7 @@ namespace AprNes
                     int1 = r_A - byte1;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
                     if ((~int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
+                    if ((int1 & 0X80) != 0) flagN = 1; else flagN = 0;
                     break;
 
                 case 0xE3://ISC
@@ -1788,7 +1793,7 @@ namespace AprNes
                     if (((int1 ^ r_A) & (int1 ^ (byte1 ^ 0xff)) & 0x80) != 0) flagV = 1; else flagV = 0;
                     if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
                     if ((int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
+                    if ((int1 & 0X80) != 0) flagN = 1; else flagN = 0;
                     r_A = (byte)int1;
                     break;
 
@@ -1800,19 +1805,19 @@ namespace AprNes
                     if (((int1 ^ r_A) & (int1 ^ (byte1 ^ 0xff)) & 0x80) != 0) flagV = 1; else flagV = 0;
                     if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
                     if ((int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
+                    if ((int1 & 0X80) != 0) flagN = 1; else flagN = 0;
                     r_A = (byte)int1;
                     break;
 
                 case 0xEF://ISC
                     ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    byte1 = Mem_r(ushort1);
+                    byte1 = Mem_r((ushort)(ushort1));
                     Mem_w(ushort1, ++byte1);
                     int1 = r_A + (byte1 ^ 0xff) + flagC;
                     if (((int1 ^ r_A) & (int1 ^ (byte1 ^ 0xff)) & 0x80) != 0) flagV = 1; else flagV = 0;
                     if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
                     if ((int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
+                    if ((int1 & 0X80) != 0) flagN = 1; else flagN = 0;
                     r_A = (byte)int1;
                     break;
 
@@ -1825,7 +1830,7 @@ namespace AprNes
                     if (((int1 ^ r_A) & (int1 ^ (byte1 ^ 0xff)) & 0x80) != 0) flagV = 1; else flagV = 0;
                     if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
                     if ((int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
+                    if ((int1 & 0X80) != 0) flagN = 1; else flagN = 0;
                     r_A = (byte)int1;
                     break;
 
@@ -1837,7 +1842,7 @@ namespace AprNes
                     if (((int1 ^ r_A) & (int1 ^ (byte1 ^ 0xff)) & 0x80) != 0) flagV = 1; else flagV = 0;
                     if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
                     if ((int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
+                    if ((int1 & 0X80) != 0) flagN = 1; else flagN = 0;
                     r_A = (byte)int1;
                     break;
 
@@ -1849,7 +1854,7 @@ namespace AprNes
                     if (((int1 ^ r_A) & (int1 ^ (byte1 ^ 0xff)) & 0x80) != 0) flagV = 1; else flagV = 0;
                     if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
                     if ((int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
+                    if ((int1 & 0X80) != 0) flagN = 1; else flagN = 0;
                     r_A = (byte)int1;
                     break;
 
@@ -1861,11 +1866,10 @@ namespace AprNes
                     if (((int1 ^ r_A) & (int1 ^ (byte1 ^ 0xff)) & 0x80) != 0) flagV = 1; else flagV = 0;
                     if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
                     if ((int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
+                    if ((int1 & 0X80) != 0) flagN = 1; else flagN = 0;
                     r_A = (byte)int1;
                     break;
                 #endregion
-#endif
                 default: MessageBox.Show("unkonw opcode ! - 0x" + opcode.ToString("X2")); break;
             }
         }

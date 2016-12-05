@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 
 //C# Code from https://code.google.com/p/2dimagefilter
 //fix it for realtime performance
@@ -95,23 +96,30 @@ namespace XBRz_speed
 
         static int* results_f;
 
-        static byte* preProcBuffer_local; // = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
+        static byte* preProcBuffer_local;
 
-        public static unsafe void initTable(int sw)
+        static int width;
+        static int height;
+
+        public static unsafe void initTable(int _width, int _height)
         {
             if (lTable_dist != null)
                 return;
 
+
+            width = _width;
+            height = _height;
+
             lTable_dist = (int*)Marshal.AllocHGlobal(sizeof(int) * 0x1000000);
 
-            _preProcBuffer = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256 * 240);
+            _preProcBuffer = (byte*)Marshal.AllocHGlobal(sizeof(byte) * width * height);
 
-            results_f = (int*)Marshal.AllocHGlobal(sizeof(int) * 256 * 240);
-            results_j = (int*)Marshal.AllocHGlobal(sizeof(int) * 256 * 240);
-            results_k = (int*)Marshal.AllocHGlobal(sizeof(int) * 256 * 240);
-            results_g = (int*)Marshal.AllocHGlobal(sizeof(int) * 256 * 240);
+            results_f = (int*)Marshal.AllocHGlobal(sizeof(int) * width * height);
+            results_j = (int*)Marshal.AllocHGlobal(sizeof(int) * width * height);
+            results_k = (int*)Marshal.AllocHGlobal(sizeof(int) * width * height);
+            results_g = (int*)Marshal.AllocHGlobal(sizeof(int) * width * height);
 
-            preProcBuffer_local = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
+            preProcBuffer_local = (byte*)Marshal.AllocHGlobal(sizeof(byte) * width);
 
             for (int i = 0; i < 0x1000000; i++)
             {
@@ -135,47 +143,56 @@ namespace XBRz_speed
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static int GetTopL(byte b)
         {
             return ((b) & 0x3);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static int GetTopR(byte b)
         {
             return ((b >> 2) & 0x3);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static int GetBottomR(byte b)
         {
 
             return ((b >> 4) & 0x3);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static int GetBottomL(byte b)
         {
             return ((b >> 6) & 0x3);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte SetTopL(byte b, int bt)
         {
             return (byte)(b | (byte)bt);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte SetTopR(byte b, int bt)
         {
             return (byte)(b | ((byte)bt << 2));
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte SetBottomR(byte b, int bt)
         {
             return (byte)(b | ((byte)bt << 4));
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte SetBottomL(byte b, int bt)
         {
             return (byte)(b | ((byte)bt << 6));
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte Rotate(byte b, int rotDeg)
         {
             int l = (int)rotDeg << 1;
@@ -184,10 +201,17 @@ namespace XBRz_speed
         }
 
         // static byte getAlpha(uint pix) { return (byte)((pix & 0xff000000) >> 24); }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte getRed(uint pix) { return (byte)((pix & 0xff0000) >> 16); }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte getGreen(uint pix) { return (byte)((pix & 0xff00) >> 8); }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte getBlue(uint pix) { return (byte)(pix & 0xff); }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static uint Interpolate(uint pixel1, uint pixel2, int quantifier1, int quantifier2)
         {
             uint total = (uint)(quantifier1 + quantifier2);
@@ -199,17 +223,12 @@ namespace XBRz_speed
                 );
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void _AlphaBlend(int n, int m, ImagePointer dstPtr, uint col)
         {
             dstPtr.SetPixel(Interpolate(col, dstPtr.GetPixel(), n, m - n));
         }
 
-        static void _FillBlock(uint[] trg, int trgi, int pitch, uint col, int blockSize)
-        {
-            for (var y = 0; y < blockSize; ++y, trgi += pitch)
-                for (var x = 0; x < blockSize; ++x)
-                    trg[trgi + x] = col;
-        }
 
         static void _FillBlock2x(uint* trg, int trgi, int pitch, uint col)
         {
@@ -252,6 +271,7 @@ namespace XBRz_speed
             trg[trgi] = trg[trgi + 1] = trg[trgi + 2] = trg[trgi + 3] = trg[trgi + 4] = col;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void _FillBlock6x(uint* trg, int trgi, int pitch, uint col)
         {
             trg[trgi] = trg[trgi + 1] = trg[trgi + 2] = trg[trgi + 3] = trg[trgi + 4] = trg[trgi + 5] = col;
@@ -266,6 +286,8 @@ namespace XBRz_speed
             trgi += pitch;
             trg[trgi] = trg[trgi + 1] = trg[trgi + 2] = trg[trgi + 3] = trg[trgi + 4] = trg[trgi + 5] = col;
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static int DistYCbCr(uint pix1, uint pix2)
         {
             uint r_diff = ((pix1 & 0xff0000) >> 16) - ((pix2 & 0xff0000) >> 16);
@@ -274,6 +296,7 @@ namespace XBRz_speed
             return lTable_dist[(((r_diff + 255) >> 1) << 16) | (((g_diff + 255) >> 1) << 8) | ((b_diff + 255) >> 1)];
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool ColorEQ(uint pix1, uint pix2)
         {
             if (pix1 == pix2) return true;
@@ -291,6 +314,7 @@ namespace XBRz_speed
             private readonly int _n;
             private int _nr;
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public OutputMatrix(int scale, uint* output, int outWidth)
             {
                 this._n = (scale - 2) * (_MAX_ROTS * _MAX_SCALE_SQUARED);
@@ -298,12 +322,14 @@ namespace XBRz_speed
                 this._outWidth = outWidth;
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Move(int rotDeg, int outi)
             {
                 this._nr = this._n + (int)rotDeg * _MAX_SCALE_SQUARED;
                 this._outi = outi;
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public ImagePointer Reference(int i, int j)
             {
                 var rot = _MATRIX_ROTATION[this._nr + i * _MAX_SCALE + j];
@@ -318,21 +344,25 @@ namespace XBRz_speed
             private uint* _imageData;
             private int _offset;
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public ImagePointer(uint* imageData)
             {
                 this._imageData = imageData;
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Position(int offset)
             {
                 this._offset = offset;
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public uint GetPixel()
             {
                 return this._imageData[this._offset];
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void SetPixel(uint val)
             {
                 this._imageData[this._offset] = val;
@@ -340,10 +370,13 @@ namespace XBRz_speed
         }
 
 
-        public static void ScaleImage6X(uint* src, uint* trg, int srcWidth, int srcHeight)
+        public static void ScaleImage6X(uint* src, uint* trg)//, int srcWidth, int srcHeight)
         {
+            int srcHeight = height;
+            int srcWidth = width;
             int trgWidth = srcWidth * 6;
 
+            //parallel for multi core segment 1
             Parallel.For(0, (srcHeight), y =>
             {
                 int sM1 = Math.Max(y - 1, 0);
@@ -388,19 +421,15 @@ namespace XBRz_speed
                         if (jg < fk)
                         {
                             bool dominantGradient = dominantDirectionThreshold * jg < fk;
-                            if (ker4f != ker4g && ker4f != ker4j)
-                                blendResult_f = dominantGradient ? BlendDominant : BlendNormal;
-                            if (ker4k != ker4j && ker4k != ker4g)
-                                blendResult_k = dominantGradient ? BlendDominant : BlendNormal;
+                            if (ker4f != ker4g && ker4f != ker4j) blendResult_f = dominantGradient ? BlendDominant : BlendNormal;
+                            if (ker4k != ker4j && ker4k != ker4g) blendResult_k = dominantGradient ? BlendDominant : BlendNormal;
 
                         }
                         else if (fk < jg)
                         {
                             bool dominantGradient = dominantDirectionThreshold * fk < jg;
-                            if (ker4j != ker4f && ker4j != ker4k)
-                                blendResult_j = dominantGradient ? BlendDominant : BlendNormal;
-                            if (ker4g != ker4f && ker4g != ker4k)
-                                blendResult_g = dominantGradient ? BlendDominant : BlendNormal;
+                            if (ker4j != ker4f && ker4j != ker4k) blendResult_j = dominantGradient ? BlendDominant : BlendNormal;
+                            if (ker4g != ker4f && ker4g != ker4k) blendResult_g = dominantGradient ? BlendDominant : BlendNormal;
                         }
 
                     }
@@ -413,6 +442,7 @@ namespace XBRz_speed
                 }
             });
 
+            //sorry parallel processing can't use there , it must be run line by line
             for (int y = 0; y < srcHeight; ++y)
             {
                 byte blendXy1 = 0;
@@ -422,11 +452,11 @@ namespace XBRz_speed
                     _preProcBuffer[array_loc] = (byte)(preProcBuffer_local[x] | ((byte)results_f[array_loc] << 4));
                     preProcBuffer_local[x] = blendXy1 = (byte)(blendXy1 | ((byte)results_j[array_loc] << 2));
                     blendXy1 = (byte)results_k[array_loc];
-                    //if (x + 1 < srcWidth) 
                     preProcBuffer_local[(x + 1)] = (byte)(preProcBuffer_local[(x + 1)] | ((byte)results_g[array_loc] << 6));
                 }
             }
 
+            //parallel for multi core segment 2
             Parallel.For(0, srcHeight, y =>
             {
                 int trgi = 6 * y * trgWidth; // scale
@@ -450,20 +480,11 @@ namespace XBRz_speed
 
                 for (int x = 0; x < srcWidth; ++x, trgi += 6)
                 {
-
-
-
                     int xM1 = Math.Max(x - 1, 0);
                     int xP1 = Math.Min(x + 1, srcWidth - 1);
                     int xP2 = Math.Min(x + 2, srcWidth - 1);
-
-
-
                     blendXy = _preProcBuffer[x + y * srcWidth];
-
                     _FillBlock6x(trg, trgi, trgWidth, src[s0 * srcWidth + x]);
-
-
                     if (blendXy != 0)
                     {
 
@@ -479,8 +500,6 @@ namespace XBRz_speed
                         ker3_7 = src[sP1 * srcWidth + x];
                         ker3_8 = src[sP1 * srcWidth + xP1];
                         //--
-                        //--
-
                         b = ker3_1;
                         c = ker3_2;
                         d = ker3_3;
@@ -494,28 +513,18 @@ namespace XBRz_speed
 
                         if (GetBottomR(blend) != BlendNone)
                         {
-                            if (GetBottomR(blend) >= BlendDominant)
-                                doLineBlend = true;
-                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
-                                doLineBlend = false;
-                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
-                                doLineBlend = false;
-                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
-                                doLineBlend = false;
-                            else
-                                doLineBlend = true;
+                            if (GetBottomR(blend) >= BlendDominant) doLineBlend = true;
+                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g)) doLineBlend = false;
+                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c)) doLineBlend = false;
+                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i)) doLineBlend = false;
+                            else doLineBlend = true;
                             px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
 
                             outputMatrix.Move(0, trgi);
 
-                            if (!doLineBlend)
-                            {
-                                Scaler_6X.BlendCorner(px, outputMatrix);
-
-                            }
+                            if (!doLineBlend) Scaler_6X.BlendCorner(px, outputMatrix);
                             else
                             {
-
                                 fg = DistYCbCr(f, g);
                                 hc = DistYCbCr(h, c);
 
@@ -524,17 +533,13 @@ namespace XBRz_speed
 
                                 if (haveShallowLine)
                                 {
-                                    if (haveSteepLine)
-                                        Scaler_6X.BlendLineSteepAndShallow(px, outputMatrix);
-                                    else
-                                        Scaler_6X.BlendLineShallow(px, outputMatrix);
+                                    if (haveSteepLine) Scaler_6X.BlendLineSteepAndShallow(px, outputMatrix);
+                                    else Scaler_6X.BlendLineShallow(px, outputMatrix);
                                 }
                                 else
                                 {
-                                    if (haveSteepLine)
-                                        Scaler_6X.BlendLineSteep(px, outputMatrix);
-                                    else
-                                        Scaler_6X.BlendLineDiagonal(px, outputMatrix);
+                                    if (haveSteepLine) Scaler_6X.BlendLineSteep(px, outputMatrix);
+                                    else Scaler_6X.BlendLineDiagonal(px, outputMatrix);
                                 }
                             }
                         }
@@ -553,25 +558,16 @@ namespace XBRz_speed
 
                         if (GetBottomR(blend) != BlendNone)
                         {
-                            if (GetBottomR(blend) >= BlendDominant)
-                                doLineBlend = true;
-                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
-                                doLineBlend = false;
-                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
-                                doLineBlend = false;
-                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
-                                doLineBlend = false;
-                            else
-                                doLineBlend = true;
+                            if (GetBottomR(blend) >= BlendDominant) doLineBlend = true;
+                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g)) doLineBlend = false;
+                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c)) doLineBlend = false;
+                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i)) doLineBlend = false;
+                            else doLineBlend = true;
                             px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
 
                             outputMatrix.Move(1, trgi);
 
-                            if (!doLineBlend)
-                            {
-                                Scaler_6X.BlendCorner(px, outputMatrix);
-
-                            }
+                            if (!doLineBlend) Scaler_6X.BlendCorner(px, outputMatrix);
                             else
                             {
                                 fg = DistYCbCr(f, g);
@@ -582,17 +578,13 @@ namespace XBRz_speed
 
                                 if (haveShallowLine)
                                 {
-                                    if (haveSteepLine)
-                                        Scaler_6X.BlendLineSteepAndShallow(px, outputMatrix);
-                                    else
-                                        Scaler_6X.BlendLineShallow(px, outputMatrix);
+                                    if (haveSteepLine) Scaler_6X.BlendLineSteepAndShallow(px, outputMatrix);
+                                    else Scaler_6X.BlendLineShallow(px, outputMatrix);
                                 }
                                 else
                                 {
-                                    if (haveSteepLine)
-                                        Scaler_6X.BlendLineSteep(px, outputMatrix);
-                                    else
-                                        Scaler_6X.BlendLineDiagonal(px, outputMatrix);
+                                    if (haveSteepLine) Scaler_6X.BlendLineSteep(px, outputMatrix);
+                                    else Scaler_6X.BlendLineDiagonal(px, outputMatrix);
                                 }
                             }
                         }
@@ -612,25 +604,16 @@ namespace XBRz_speed
 
                         if (GetBottomR(blend) != BlendNone)
                         {
-                            if (GetBottomR(blend) >= BlendDominant)
-                                doLineBlend = true;
-                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
-                                doLineBlend = false;
-                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
-                                doLineBlend = false;
-                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
-                                doLineBlend = false;
-                            else
-                                doLineBlend = true;
+                            if (GetBottomR(blend) >= BlendDominant) doLineBlend = true;
+                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g)) doLineBlend = false;
+                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c)) doLineBlend = false;
+                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i)) doLineBlend = false;
+                            else doLineBlend = true;
                             px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
 
                             outputMatrix.Move(2, trgi);
 
-                            if (!doLineBlend)
-                            {
-                                Scaler_6X.BlendCorner(px, outputMatrix);
-
-                            }
+                            if (!doLineBlend) Scaler_6X.BlendCorner(px, outputMatrix);
                             else
                             {
                                 fg = DistYCbCr(f, g);
@@ -641,17 +624,13 @@ namespace XBRz_speed
 
                                 if (haveShallowLine)
                                 {
-                                    if (haveSteepLine)
-                                        Scaler_6X.BlendLineSteepAndShallow(px, outputMatrix);
-                                    else
-                                        Scaler_6X.BlendLineShallow(px, outputMatrix);
+                                    if (haveSteepLine) Scaler_6X.BlendLineSteepAndShallow(px, outputMatrix);
+                                    else Scaler_6X.BlendLineShallow(px, outputMatrix);
                                 }
                                 else
                                 {
-                                    if (haveSteepLine)
-                                        Scaler_6X.BlendLineSteep(px, outputMatrix);
-                                    else
-                                        Scaler_6X.BlendLineDiagonal(px, outputMatrix);
+                                    if (haveSteepLine) Scaler_6X.BlendLineSteep(px, outputMatrix);
+                                    else Scaler_6X.BlendLineDiagonal(px, outputMatrix);
                                 }
                             }
                         }
@@ -667,25 +646,17 @@ namespace XBRz_speed
                         blend = Rotate(blendXy, 3);
                         if (GetBottomR(blend) != BlendNone)
                         {
-                            if (GetBottomR(blend) >= BlendDominant)
-                                doLineBlend = true;
-                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g))
-                                doLineBlend = false;
-                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c))
-                                doLineBlend = false;
-                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i))
-                                doLineBlend = false;
-                            else
-                                doLineBlend = true;
+                            if (GetBottomR(blend) >= BlendDominant) doLineBlend = true;
+                            else if (GetTopR(blend) != BlendNone && !ColorEQ(e, g)) doLineBlend = false;
+                            else if (GetBottomL(blend) != BlendNone && !ColorEQ(e, c)) doLineBlend = false;
+                            else if (ColorEQ(g, h) && ColorEQ(h, i) && ColorEQ(i, f) && ColorEQ(f, c) && !ColorEQ(e, i)) doLineBlend = false;
+                            else doLineBlend = true;
                             px = DistYCbCr(e, f) <= DistYCbCr(e, h) ? f : h;
 
                             outputMatrix.Move(3, trgi);
 
                             if (!doLineBlend)
-                            {
                                 Scaler_6X.BlendCorner(px, outputMatrix);
-
-                            }
                             else
                             {
                                 fg = DistYCbCr(f, g);
@@ -696,17 +667,13 @@ namespace XBRz_speed
 
                                 if (haveShallowLine)
                                 {
-                                    if (haveSteepLine)
-                                        Scaler_6X.BlendLineSteepAndShallow(px, outputMatrix);
-                                    else
-                                        Scaler_6X.BlendLineShallow(px, outputMatrix);
+                                    if (haveSteepLine) Scaler_6X.BlendLineSteepAndShallow(px, outputMatrix);
+                                    else Scaler_6X.BlendLineShallow(px, outputMatrix);
                                 }
                                 else
                                 {
-                                    if (haveSteepLine)
-                                        Scaler_6X.BlendLineSteep(px, outputMatrix);
-                                    else
-                                        Scaler_6X.BlendLineDiagonal(px, outputMatrix);
+                                    if (haveSteepLine) Scaler_6X.BlendLineSteep(px, outputMatrix);
+                                    else Scaler_6X.BlendLineDiagonal(px, outputMatrix);
                                 }
                             }
                         }
@@ -714,11 +681,13 @@ namespace XBRz_speed
                 }
                 //---
             });
-            // });
+
         }
 
-        public static void ScaleImage5X(uint* src, uint* trg, int srcWidth, int srcHeight)
+        public static void ScaleImage5X(uint* src, uint* trg)//, int srcWidth, int srcHeight)
         {
+            int srcHeight = height;
+            int srcWidth = width;
             int trgWidth = srcWidth * 5;
 
             Parallel.For(0, (srcHeight), y =>
@@ -1093,8 +1062,10 @@ namespace XBRz_speed
             // });
         }
 
-        public static void ScaleImage4X(uint* src, uint* trg, int srcWidth, int srcHeight)
+        public static void ScaleImage4X(uint* src, uint* trg)
         {
+            int srcHeight = height;
+            int srcWidth = width;
             int trgWidth = srcWidth * 4;
 
             Parallel.For(0, (srcHeight), y =>
@@ -1471,8 +1442,10 @@ namespace XBRz_speed
         }
 
 
-        public static void ScaleImage3X(uint* src, uint* trg, int srcWidth, int srcHeight)
+        public static void ScaleImage3X(uint* src, uint* trg)
         {
+            int srcHeight = height;
+            int srcWidth = width;
             int trgWidth = srcWidth * 3;
 
             Parallel.For(0, (srcHeight), y =>
@@ -1849,78 +1822,80 @@ namespace XBRz_speed
         }
 
 
-        public static void ScaleImage2X(uint* src, uint* trg, int srcWidth, int srcHeight)
+        public static void ScaleImage2X(uint* src, uint* trg)
         {
+            int srcHeight = height;
+            int srcWidth = width;
             int trgWidth = srcWidth * 2;
 
             Parallel.For(0, (srcHeight), y =>
-            {
-                int sM1 = Math.Max(y - 1, 0);
-                int s0 = y;
-                int sP1 = Math.Min(y + 1, srcHeight - 1);
-                int sP2 = Math.Min(y + 2, srcHeight - 1);
-                uint ker4b, ker4c, ker4e, ker4f, ker4g, ker4h, ker4i, ker4j, ker4k, ker4l, ker4n, ker4o;
-                for (int x = 0; x < srcWidth; ++x)
                 {
-                    int blendResult_f = 0, blendResult_g = 0, blendResult_j = 0, blendResult_k = 0;
+                    int sM1 = Math.Max(y - 1, 0);
+                    int s0 = y;
+                    int sP1 = Math.Min(y + 1, srcHeight - 1);
+                    int sP2 = Math.Min(y + 2, srcHeight - 1);
+                    uint ker4b, ker4c, ker4e, ker4f, ker4g, ker4h, ker4i, ker4j, ker4k, ker4l, ker4n, ker4o;
+                    for (int x = 0; x < srcWidth; ++x)
+                    {
+                        int blendResult_f = 0, blendResult_g = 0, blendResult_j = 0, blendResult_k = 0;
 
-                    int xM1 = Math.Max(x - 1, 0);
-                    int xP1 = Math.Min(x + 1, srcWidth - 1);
-                    int xP2 = Math.Min(x + 2, srcWidth - 1);
+                        int xM1 = Math.Max(x - 1, 0);
+                        int xP1 = Math.Min(x + 1, srcWidth - 1);
+                        int xP2 = Math.Min(x + 2, srcWidth - 1);
 
-                    int array_loc = x + y * srcWidth;
+                        int array_loc = x + y * srcWidth;
 
-                    ker4b = src[sM1 * srcWidth + x];
-                    ker4c = src[sM1 * srcWidth + xP1];
+                        ker4b = src[sM1 * srcWidth + x];
+                        ker4c = src[sM1 * srcWidth + xP1];
 
-                    ker4e = src[s0 * srcWidth + xM1];
-                    ker4f = src[s0 * srcWidth + x];
-                    ker4g = src[s0 * srcWidth + xP1];
-                    ker4h = src[s0 * srcWidth + xP2];
+                        ker4e = src[s0 * srcWidth + xM1];
+                        ker4f = src[s0 * srcWidth + x];
+                        ker4g = src[s0 * srcWidth + xP1];
+                        ker4h = src[s0 * srcWidth + xP2];
 
-                    ker4i = src[sP1 * srcWidth + xM1];
-                    ker4j = src[sP1 * srcWidth + x];
-                    ker4k = src[sP1 * srcWidth + xP1];
-                    ker4l = src[sP1 * srcWidth + xP2];
+                        ker4i = src[sP1 * srcWidth + xM1];
+                        ker4j = src[sP1 * srcWidth + x];
+                        ker4k = src[sP1 * srcWidth + xP1];
+                        ker4l = src[sP1 * srcWidth + xP2];
 
-                    ker4n = src[sP2 * srcWidth + x];
-                    ker4o = src[sP2 * srcWidth + xP1];
+                        ker4n = src[sP2 * srcWidth + x];
+                        ker4o = src[sP2 * srcWidth + xP1];
 
 
                     //--------------------------------------
 
                     if ((ker4f != ker4g || ker4j != ker4k) && (ker4f != ker4j || ker4g != ker4k))
-                    {
-                        int jg = DistYCbCr(ker4i, ker4f) + DistYCbCr(ker4f, ker4c) + DistYCbCr(ker4n, ker4k) + DistYCbCr(ker4k, ker4h) + (DistYCbCr(ker4j, ker4g) << 2);
-                        int fk = DistYCbCr(ker4e, ker4j) + DistYCbCr(ker4j, ker4o) + DistYCbCr(ker4b, ker4g) + DistYCbCr(ker4g, ker4l) + (DistYCbCr(ker4f, ker4k) << 2);
-
-                        if (jg < fk)
                         {
-                            bool dominantGradient = dominantDirectionThreshold * jg < fk;
-                            if (ker4f != ker4g && ker4f != ker4j)
-                                blendResult_f = dominantGradient ? BlendDominant : BlendNormal;
-                            if (ker4k != ker4j && ker4k != ker4g)
-                                blendResult_k = dominantGradient ? BlendDominant : BlendNormal;
+                            int jg = DistYCbCr(ker4i, ker4f) + DistYCbCr(ker4f, ker4c) + DistYCbCr(ker4n, ker4k) + DistYCbCr(ker4k, ker4h) + (DistYCbCr(ker4j, ker4g) << 2);
+                            int fk = DistYCbCr(ker4e, ker4j) + DistYCbCr(ker4j, ker4o) + DistYCbCr(ker4b, ker4g) + DistYCbCr(ker4g, ker4l) + (DistYCbCr(ker4f, ker4k) << 2);
+
+                            if (jg < fk)
+                            {
+                                bool dominantGradient = dominantDirectionThreshold * jg < fk;
+                                if (ker4f != ker4g && ker4f != ker4j)
+                                    blendResult_f = dominantGradient ? BlendDominant : BlendNormal;
+                                if (ker4k != ker4j && ker4k != ker4g)
+                                    blendResult_k = dominantGradient ? BlendDominant : BlendNormal;
+
+                            }
+                            else if (fk < jg)
+                            {
+                                bool dominantGradient = dominantDirectionThreshold * fk < jg;
+                                if (ker4j != ker4f && ker4j != ker4k)
+                                    blendResult_j = dominantGradient ? BlendDominant : BlendNormal;
+                                if (ker4g != ker4f && ker4g != ker4k)
+                                    blendResult_g = dominantGradient ? BlendDominant : BlendNormal;
+                            }
 
                         }
-                        else if (fk < jg)
-                        {
-                            bool dominantGradient = dominantDirectionThreshold * fk < jg;
-                            if (ker4j != ker4f && ker4j != ker4k)
-                                blendResult_j = dominantGradient ? BlendDominant : BlendNormal;
-                            if (ker4g != ker4f && ker4g != ker4k)
-                                blendResult_g = dominantGradient ? BlendDominant : BlendNormal;
-                        }
-
-                    }
                     //--------------------------------------
 
                     results_f[array_loc] = blendResult_f;
-                    results_j[array_loc] = blendResult_j;
-                    results_g[array_loc] = blendResult_g;
-                    results_k[array_loc] = blendResult_k;
-                }
-            });
+                        results_j[array_loc] = blendResult_j;
+                        results_g[array_loc] = blendResult_g;
+                        results_k[array_loc] = blendResult_k;
+                    }
+                });
 
             for (int y = 0; y < srcHeight; ++y)
             {
@@ -2476,6 +2451,7 @@ namespace XBRz_speed
                 output.Reference(5, _SCALE - 2).SetPixel(col);
             }
 
+
             public static void BlendLineSteepAndShallow(uint col, OutputMatrix output) //ok
             {
                 _AlphaBlend(1, 4, output.Reference(0, _SCALE - 1), col);
@@ -2500,10 +2476,9 @@ namespace XBRz_speed
                 output.Reference(_SCALE - 1, 3).SetPixel(col);
             }
 
+
             public static void BlendLineDiagonal(uint col, OutputMatrix output) //ok
             {
-
-
                 _AlphaBlend(1, 2, output.Reference(_SCALE - 1, _SCALE / 2), col);
                 _AlphaBlend(1, 2, output.Reference(_SCALE - 2, _SCALE / 2 + 1), col);
                 _AlphaBlend(1, 2, output.Reference(_SCALE - 3, _SCALE / 2 + 2), col);
@@ -2513,6 +2488,7 @@ namespace XBRz_speed
                 output.Reference(_SCALE - 1, _SCALE - 2).SetPixel(col);
 
             }
+
 
             public static void BlendCorner(uint col, OutputMatrix output) //ok
             {
