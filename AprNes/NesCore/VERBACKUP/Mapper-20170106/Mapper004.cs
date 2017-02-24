@@ -1,83 +1,16 @@
 ﻿
 namespace AprNes
 {
-    unsafe public class Mapper004 : IMapper
+    unsafe public partial class NesCore
     {
         //MMC3 https://wiki.nesdev.com/w/index.php/MMC3
-
-        byte* PRG_ROM, CHR_ROM, ppu_ram , NES_MEM ;
-        int CHR_ROM_count;
-        int PRG_ROM_count;
-        int* Vertical;
-
-        bool IRQ_enable = false, IRQReset = false, IRQResteVbl = false;
-        int IRQlatchVal = 0, IRQCounter = 0, BankReg = 0;
-        int CHR0_Bankselect1k = 0, CHR1_Bankselect1k = 0, CHR2_Bankselect1k = 0, CHR3_Bankselect1k = 0;
-        int CHR0_Bankselect2k = 0, CHR1_Bankselect2k = 0;
-        int PRG0_Bankselect = 0, PRG1_Bankselect = 0;
-        int PRG_Bankmode;
-        int CHR_Bankmode;
-
-        public  void Mapper04step_IRQ()
-        {
-            if (NesCore.ShowBackGround ||  NesCore.ShowSprites)
-            {
-                if (IRQResteVbl)
-                {
-                    IRQCounter = IRQlatchVal;
-                    IRQResteVbl = false;
-                }
-                if (IRQReset)
-                {
-                    IRQCounter = IRQlatchVal;
-                    IRQReset = false;
-                }
-                else if (IRQCounter > 0) IRQCounter--;
-            }
-            if (IRQCounter == 0)
-            {
-                if (IRQ_enable)  NesCore.IRQInterrupt(); // IRQ_set = true;
-                IRQReset = true;
-            }
-        }
-
-        public void MapperInit(byte* _PRG_ROM, byte* _CHR_ROM, byte* _ppu_ram, int _PRG_ROM_count, int _CHR_ROM_count, int* _Vertical)
-        {
-            PRG_ROM = _PRG_ROM;
-            CHR_ROM = _CHR_ROM;
-            ppu_ram = _ppu_ram;
-            CHR_ROM_count = _CHR_ROM_count;
-            PRG_ROM_count = _PRG_ROM_count;
-            Vertical = _Vertical;
-
-
-            NES_MEM = NesCore.NES_MEM;
-        }
-
-        public byte MapperR_ExpansionROM(ushort address)
-        {
-            return 0;
-          //  throw new NotImplementedException();
-        }
-
-        public void MapperW_ExpansionROM(ushort address, byte value)
-        {
-          //  throw new NotImplementedException();
-        }
-
-        public void MapperW_RAM(ushort address, byte value)
-        {
-            NES_MEM[address] = value;
-        }
-
-        public byte MapperR_RAM(ushort address)
-        {
-            return NES_MEM[address];
-        }
-
-        public void MapperW_PRG(ushort address, byte value)
-        {
-            //$8000-$9FFF, $A000-$BFFF, $C000-$DFFF, and $E000-$FFFF
+        static bool IRQ_enable = false, IRQReset = false, IRQResteVbl = false;
+        static int IRQlatchVal = 0, IRQCounter = 0, BankReg = 0;
+        static int CHR0_Bankselect1k = 0, CHR1_Bankselect1k = 0, CHR2_Bankselect1k = 0, CHR3_Bankselect1k = 0;
+        static int CHR0_Bankselect2k = 0, CHR1_Bankselect2k = 0;
+        static int PRG0_Bankselect = 0, PRG1_Bankselect = 0;
+        static void mapper004write_ROM(ushort address, byte value)
+        {   //$8000-$9FFF, $A000-$BFFF, $C000-$DFFF, and $E000-$FFFF
             if ((address & 1) == 0)//even
             {
                 if (address < 0xa000)//$8000-$9FFF (Bank select)
@@ -86,7 +19,7 @@ namespace AprNes
                     PRG_Bankmode = (value & 0x40) >> 6;
                     CHR_Bankmode = (value & 0x80) >> 7;
                 }
-                else if (address < 0xc000) *Vertical = ((value & 1) > 0) ? 0 : 1; //(0: vertical; 1: horizontal) $A000-$BFFF (Mirroring)
+                else if (address < 0xc000) Vertical = ((value & 1) > 0) ? false : true; //(0: vertical; 1: horizontal) $A000-$BFFF (Mirroring)
                 else if (address < 0xe000) IRQlatchVal = value;//$C000-$DFFF (IRQ latch) 
                 else//$E000-$FFFF IRQ disable
                 {
@@ -111,7 +44,7 @@ namespace AprNes
                 else if (address < 0xe000)//$C000-$DFFF (IRQ reload)
                 {
                     IRQCounter |= 0x80;
-                    if ( NesCore.scanline < 240) IRQReset = true;
+                    if (scanline < 240) IRQReset = true;
                     else
                     {
                         IRQResteVbl = true;
@@ -121,8 +54,7 @@ namespace AprNes
                 else IRQ_enable = true; //$E000-$FFFF (IRQ enable) 
             }
         }
-
-        public byte MapperR_RPG(ushort address)
+        static byte mapper004read_RPG(ushort address)
         {
             if (PRG_Bankmode == 0) //0: $8000-$9FFF swappable, $C000-$DFFF fixed to second-last bank;
             {
@@ -140,12 +72,8 @@ namespace AprNes
                 else return PRG_ROM[(address - 0xe000) + (((PRG_ROM_count << 1) - 1) << 13)];//$E000-$FFFF fixed
             }
         }
-
-        public byte MapperR_CHR(int address)
+        static byte mapper004read_CHR(int address)
         {
-
-            if (CHR_ROM_count == 0) return ppu_ram[address];
-
             if (CHR_Bankmode == 0) //0: two 2 KB banks at $0000-$0FFF,four 1 KB banks at $1000-$1FFF; ok
             {
                 if (address < 0x1000)//2k * 2
@@ -181,6 +109,28 @@ namespace AprNes
                 }
             }
         }
+
+        static void mapper04step_IRQ()
+        {
+            if (ShowBackGround || ShowSprites)
+            {
+                if (IRQResteVbl)
+                {
+                    IRQCounter = IRQlatchVal;
+                    IRQResteVbl = false;
+                }
+                if (IRQReset)
+                {
+                    IRQCounter = IRQlatchVal;
+                    IRQReset = false;
+                }
+                else if (IRQCounter > 0) IRQCounter--;
+            }
+            if (IRQCounter == 0)
+            {
+                if (IRQ_enable) IRQInterrupt(); // IRQ_set = true;
+                IRQReset = true;
+            }
+        }
     }
 }
-

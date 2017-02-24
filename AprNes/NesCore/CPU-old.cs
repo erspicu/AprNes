@@ -1,7 +1,6 @@
 ﻿#define illegal
 using System.Windows.Forms;
 using System;
-using System.Runtime.CompilerServices;
 
 namespace AprNes
 {
@@ -34,15 +33,11 @@ namespace AprNes
         static int cpu_cycles = 0, Interrupt_cycle = 0;
         static public bool exit = false;
 
-        static ushort interrupt_vector;
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte GetFlag()
         {
             return (byte)((flagN << 7) | (flagV << 6) | (flagD << 3) | (flagI << 2) | (flagZ << 1) | flagC);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void SetFlag(byte flag)
         {
             flagN = (byte)((flag & 0x80) >> 7);
@@ -53,64 +48,38 @@ namespace AprNes
             flagC = (byte)(flag & 0x1);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void NMIInterrupt()
         {
-            //  Console.WriteLine("nmi");
-            Mem_w((ushort)(0x100 | r_SP--), (byte)(r_PC >> 8));
-            Mem_w((ushort)(0x100 | r_SP--), (byte)r_PC);
-            Mem_w((ushort)(0x100 | r_SP--), (byte)(GetFlag() | 0x20));
+            Mem_w((ushort)(0x100 + r_SP--), (byte)(r_PC >> 8));
+            Mem_w((ushort)(0x100 + r_SP--), (byte)r_PC);
+            Mem_w((ushort)(0x100 + r_SP--), (byte)(GetFlag() | 0x20));
             r_PC = (ushort)(Mem_r(0xfffa) | (Mem_r(0xfffb) << 8));
             flagI = 1;
             Interrupt_cycle = 7;
-            NMIing = true;
         }
 
-        static bool softreset = false;
-        public static void SoftReset()
-        {
-            softreset = true;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void ResetInterrupt()
-        {
-            Console.WriteLine("soft reset !");
-            r_SP -= 3;
-            r_PC = (ushort)(Mem_r(0xfffc) | (Mem_r(0xfffd) << 8));
-            flagI = 1;
-            Interrupt_cycle = 7;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void IRQInterrupt()
         {
-            Mem_w((ushort)(0x100 | r_SP--), (byte)(r_PC >> 8));
-            Mem_w((ushort)(0x100 | r_SP--), (byte)r_PC);
-            Mem_w((ushort)(0x100 | r_SP--), (byte)(GetFlag() | 0x20));
+            Mem_w((ushort)(0x100 + r_SP--), (byte)(r_PC >> 8));
+            Mem_w((ushort)(0x100 + r_SP--), (byte)r_PC);
+            Mem_w((ushort)(0x100 + r_SP--), (byte)(GetFlag() | 0x20));
             r_PC = (ushort)(Mem_r(0xfffe) | (Mem_r(0xffff) << 8));
             flagI = 1;
             Interrupt_cycle = 7;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void cpu_step()
         {
             ushort ushort1, ushort2, ushort3;
             byte byte1, byte2, byte3;
             int int1;
 
-            if (softreset)
-            {
-                ResetInterrupt();
-                softreset = false;
-            }
-
-
             opcode = Mem_r(r_PC++);
-            cpu_cycles = cycle_table[opcode];
 
             //debug();
+            //
+
+            cpu_cycles = cycle_table[opcode];
 
             cpu_cycles += Interrupt_cycle;
             Interrupt_cycle = 0;
@@ -408,6 +377,13 @@ namespace AprNes
                         }
                         r_PC = (ushort)(byte2 | (byte3 << 8));
                     }
+                    /*
+                    ushort1 = (ushort)((sbyte)Mem_r(r_PC++) + r_PC);
+                    if (flagZ == 1)
+                    {
+                        if ((ushort1 & 0xff00) != (((r_PC - 2) & 0xff00))) cpu_cycles += 2; else cpu_cycles += 1;
+                        r_PC = ushort1;
+                    }*/
                     break;
 
                 case 0x24://BIT zp fix
@@ -511,11 +487,11 @@ namespace AprNes
                 case 00://BRK
                     Mem_r(r_PC);//dummy read fixed 2017.01.19
                     r_PC++;
-                    Mem_w((ushort)(r_SP-- | 0x100), (byte)(r_PC >> 8));
-                    Mem_w((ushort)(r_SP-- | 0x100), (byte)r_PC); //fixed 2017.01.20
-                    Mem_w((ushort)(r_SP-- | 0x100), (byte)(GetFlag() | 0x30));
+                    Mem_w((ushort)(r_SP-- + 0x100), (byte)(r_PC >> 8));
+                    Mem_w((ushort)(r_SP-- + 0x100), (byte)(r_PC & 0xff)); //fixed 2017.01.20
+                    Mem_w((ushort)(r_SP-- + 0x100), (byte)(GetFlag() | 0x30));
                     flagI = 1;
-                    r_PC = (ushort)(Mem_r(0xfffe) | (Mem_r((ushort)(0xffff)) << 8));
+                    r_PC = (ushort)(Mem_r(0xfffe) | (Mem_r(0xffff) << 8));
                     break;
 
                 case 0x50://BVC branch ,cycle fixed 2017.01.18
@@ -576,9 +552,7 @@ namespace AprNes
 
                 case 0x18: flagC = 0; break;//CLC
                 case 0xD8: flagD = 0; break;//CLD
-
-                case 0x58: Mem_r(r_PC); flagI = 0; break;//CLI
-
+                case 0x58: flagI = 0; break;//CLI
                 case 0xB8: flagV = 0; break;//CLV
 
                 //--- CMP BEGIN
@@ -876,8 +850,8 @@ namespace AprNes
 
                 case 0x20://JSR abs
                     ushort1 = (ushort)(r_PC + 1);
-                    Mem_w((ushort)(r_SP-- | 0x100), (byte)(ushort1 >> 8));
-                    Mem_w((ushort)(r_SP-- | 0x100), (byte)ushort1);
+                    Mem_w((ushort)(r_SP-- + 0x100), (byte)(ushort1 >> 8));
+                    Mem_w((ushort)(r_SP-- + 0x100), (byte)ushort1);
                     r_PC = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
                     break;
 
@@ -910,9 +884,7 @@ namespace AprNes
                     byte2 = Mem_r(r_PC++); //heigh
                     ushort1 = (ushort)(byte1 | (byte2 << 8));
                     byte1 += r_X;
-                    //
                     r_A = Mem_r((ushort)(byte1 | (byte2 << 8)));
-                    //
                     if (byte1 < r_X) r_A = Mem_r((ushort)(byte1 | ((++byte2) << 8)));//dummy read fiexed 2017.01.17
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (r_A == 0) flagZ = 1; else flagZ = 0;
@@ -941,9 +913,7 @@ namespace AprNes
                     ushort1 = (ushort)(byte1 | (byte2 << 8));
                     byte1 += r_Y;
                     r_A = Mem_r((ushort)(byte1 | (byte2 << 8)));
-                    //
                     if (byte1 < r_Y) r_A = Mem_r((ushort)(byte1 | ((++byte2) << 8)));//dummy read fiexed 2017.01.17
-                                                                                     //
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (r_A == 0) flagZ = 1; else flagZ = 0;
                     if ((ushort1 & 0xff00) != ((ushort1 + r_Y) & 0xff00)) cpu_cycles++;
@@ -1167,16 +1137,16 @@ namespace AprNes
                     break;
                 //--- ORA END    
 
-                case 0x48: Mem_w((ushort)(r_SP-- | 0x100), r_A); break;//PHA
-                case 0x08: Mem_w((ushort)(r_SP-- | 0x100), (byte)(GetFlag() | 0x30)); break;//PHP
+                case 0x48: Mem_w((ushort)(r_SP-- + 0x100), r_A); break;//PHA
+                case 0x08: Mem_w((ushort)(r_SP-- + 0x100), (byte)(GetFlag() | 0x30)); break;//PHP
 
                 case 0x68://PLA
-                    r_A = Mem_r((ushort)(++r_SP | 0x100));
+                    r_A = Mem_r((ushort)(++r_SP + 0x100));
                     if (r_A == 0) flagZ = 1; else flagZ = 0;
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
                     break;
 
-                case 0x28: SetFlag(Mem_r((ushort)(++r_SP | 0x100))); break;//PLP
+                case 0x28: SetFlag(Mem_r((ushort)(++r_SP + 0x100))); break;//PLP
 
                 //----ROL begin
                 case 0x2A://ROL acc //fix
@@ -1290,7 +1260,7 @@ namespace AprNes
                 case 0x7E://ROR abs,x
                     ushort2 = (ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)) + r_X);
                     ushort1 = Mem_r(ushort2);
-                    Mem_w(ushort2, (byte)ushort1);//dummy write fixed
+                    Mem_w(ushort2, (byte)ushort1 );//dummy write fixed
                     if (flagC == 1) ushort1 |= 0x100;
                     if ((ushort1 & 0x01) > 0) flagC = 1; else flagC = 0;
                     ushort1 >>= 1;
@@ -1303,16 +1273,13 @@ namespace AprNes
 
                 case 0x40://RTI
                     Mem_r(r_PC);//dummy read fixed 2017.01.19
-
-                    SetFlag(Mem_r((ushort)(++r_SP | 0x100)));
-                    r_PC = (ushort)(Mem_r((ushort)(++r_SP | 0x100)) | (Mem_r((ushort)(++r_SP | 0x100)) << 8));
+                    SetFlag(Mem_r((ushort)(++r_SP + 0x100)));
+                    r_PC = (ushort)(Mem_r((ushort)(++r_SP + 0x100)) | (Mem_r((ushort)(++r_SP + 0x100)) << 8));
                     break;
 
                 case 0x60://RTS
-
                     Mem_r(r_PC);//dummy read fixed 2017.01.19
-
-                    r_PC = (ushort)((Mem_r((ushort)(++r_SP | 0x100)) | (Mem_r((ushort)(++r_SP | 0x100)) << 8)) + 1);
+                    r_PC = (ushort)((Mem_r((ushort)(++r_SP + 0x100)) | (Mem_r((ushort)(++r_SP + 0x100)) << 8)) +1);
                     break;
 
                 //--- SBC BEGIN
@@ -1416,12 +1383,9 @@ namespace AprNes
                     byte1 = Mem_r(r_PC++); //low
                     byte2 = Mem_r(r_PC++); //heigh
                     byte1 += r_X;
-
                     Mem_r((ushort)(byte1 | ((byte2) << 8)));
-                    //
                     if (byte1 < r_X) byte2++;
                     Mem_w((ushort)(byte1 | ((byte2) << 8)), r_A);//dummy read fiexed 2017.01.17
-                                                                 //
                     break;
                 case 0x99: Mem_w((ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)) + r_Y), r_A); break;//STA abs,Y
 
@@ -1436,11 +1400,8 @@ namespace AprNes
                     byte2 = Mem_r(byte3); //heigh
                     byte1 += r_Y;
                     Mem_r((ushort)(byte1 | ((byte2) << 8)));
-
-                    //
                     if (byte1 < r_Y) byte2++;
                     Mem_w((ushort)(byte1 | ((byte2) << 8)), r_A);//dummy read fiexed 2017.01.17
-                                                                 //
                     break;
 
                 case 0x86: NES_MEM[Mem_r(r_PC++)] = r_X; break; //STX zp
@@ -1561,9 +1522,7 @@ namespace AprNes
                     byte2 = (byte)(Mem_r(r_PC++) + r_X);
                     ushort1 = (ushort)(NES_MEM[byte2++] | (NES_MEM[byte2] << 8));
                     byte1 = Mem_r(ushort1);
-
                     Mem_w(ushort1, byte1);//dummy write fixed
-
                     if ((byte1 & 0x80) > 0) flagC = 1; else flagC = 0;
                     byte1 <<= 1;
                     Mem_w(ushort1, byte1);
@@ -1586,13 +1545,13 @@ namespace AprNes
                 case 0x13: //SLO (  ASL M THEN (M "OR" A) -> A,M  )
                     byte2 = Mem_r(r_PC++);
                     ushort1 = (ushort)((NES_MEM[byte2++] | (NES_MEM[byte2] << 8)) + r_Y);
-                    byte1 = Mem_r((ushort)(ushort1));
+                    byte1 = Mem_r((ushort)(ushort1 ));
 
                     Mem_w(ushort1, byte1);//dummy write fixed
 
                     if ((byte1 & 0x80) > 0) flagC = 1; else flagC = 0;
                     byte1 <<= 1;
-                    Mem_w((ushort)(ushort1), byte1);
+                    Mem_w((ushort)(ushort1 ), byte1);
                     r_A |= byte1;
                     if (r_A == 0) flagZ = 1; else flagZ = 0;
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
@@ -1612,9 +1571,7 @@ namespace AprNes
                 case 0x1B: //SLO (  ASL M THEN (M "OR" A) -> A,M  )
                     ushort1 = (ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)) + r_Y);
                     byte1 = Mem_r(ushort1);
-
                     Mem_w(ushort1, byte1);//dummy write fixed
-
                     if ((byte1 & 0x80) > 0) flagC = 1; else flagC = 0;
                     byte1 <<= 1;
                     Mem_w(ushort1, byte1);
@@ -1626,9 +1583,7 @@ namespace AprNes
                 case 0x0F: //SLO (  ASL M THEN (M "OR" A) -> A,M  )
                     ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
                     byte1 = Mem_r(ushort1);
-
                     Mem_w(ushort1, byte1);//dummy write fixed
-
                     if ((byte1 & 0x80) > 0) flagC = 1; else flagC = 0;
                     byte1 <<= 1;
                     Mem_w(ushort1, byte1);
@@ -1641,9 +1596,7 @@ namespace AprNes
                     ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
                     ushort1 = (ushort)(ushort2 + r_X);
                     byte1 = Mem_r(ushort1);
-
                     Mem_w(ushort1, byte1);//dummy write fixed
-
                     if ((byte1 & 0x80) > 0) flagC = 1; else flagC = 0;
                     byte1 <<= 1;
                     Mem_w(ushort1, byte1);
@@ -1656,9 +1609,7 @@ namespace AprNes
                     byte3 = (byte)(Mem_r(r_PC++) + r_X);
                     ushort1 = (ushort)(NES_MEM[byte3++] | (NES_MEM[byte3] << 8));
                     byte2 = Mem_r(ushort1);
-
                     Mem_w(ushort1, byte2);//dummy write fixed
-
                     byte1 = (byte)((byte2 << 1) | flagC);
                     Mem_w(ushort1, byte1);
                     if ((byte2 & 0x80) > 0) flagC = 1; else flagC = 0;
@@ -1695,9 +1646,7 @@ namespace AprNes
                 case 0x3F://RLA
                     ushort1 = (ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)) + r_X);
                     byte2 = Mem_r(ushort1);
-
                     Mem_w(ushort1, byte2);//dummy write fixed
-
                     byte1 = (byte)((byte2 << 1) | flagC);
                     Mem_w(ushort1, byte1);
                     if ((byte2 & 0x80) > 0) flagC = 1; else flagC = 0;
@@ -1709,9 +1658,7 @@ namespace AprNes
                 case 0x3B://RLA
                     ushort1 = (ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)) + r_Y);
                     byte2 = Mem_r(ushort1);
-
                     Mem_w(ushort1, byte2);//dummy write fixed
-
                     byte1 = (byte)((byte2 << 1) | flagC);
                     Mem_w(ushort1, byte1);
                     if ((byte2 & 0x80) > 0) flagC = 1; else flagC = 0;
@@ -1723,10 +1670,8 @@ namespace AprNes
                 case 0x33: //RLA    ( ROL M  THEN (M "AND" A) -> A )   
                     byte3 = Mem_r(r_PC++);
                     ushort1 = (ushort)((NES_MEM[byte3++] | (NES_MEM[byte3] << 8)) + r_Y);
-                    byte2 = Mem_r((ushort)(ushort1));
-
+                    byte2 = Mem_r((ushort)(ushort1 ));
                     Mem_w(ushort1, byte2);//dummy write fixed
-
                     byte1 = (byte)(byte2 << 1);
                     byte1 |= (byte)(flagC);
                     Mem_w(ushort1, byte1);
@@ -1752,9 +1697,7 @@ namespace AprNes
                     byte2 = (byte)(Mem_r(r_PC++) + r_X);
                     ushort1 = (ushort)(NES_MEM[byte2++] | (NES_MEM[byte2] << 8));
                     byte1 = Mem_r(ushort1);
-
                     Mem_w(ushort1, byte1);//dummy write fixed
-
                     if ((byte1 & 1) > 0) flagC = 1; else flagC = 0;
                     byte1 >>= 1;
                     Mem_w(ushort1, byte1);
@@ -1777,9 +1720,7 @@ namespace AprNes
                 case 0x4F://SRE (LSR M  THEN (M "EOR" A) -> A )
                     ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
                     byte1 = Mem_r(ushort1);
-
                     Mem_w(ushort1, byte1);//dummy write fixed
-
                     if ((byte1 & 1) > 0) flagC = 1; else flagC = 0;
                     byte1 >>= 1;
                     Mem_w(ushort1, byte1);
@@ -1791,9 +1732,7 @@ namespace AprNes
                 case 0x5F://SRE  
                     ushort1 = (ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)) + r_X);
                     byte1 = Mem_r(ushort1);
-
                     Mem_w(ushort1, byte1);//dummy write fixed
-
                     if ((byte1 & 1) != 0) flagC = 1; else flagC = 0;
                     byte1 >>= 1;
                     Mem_w(ushort1, byte1);
@@ -1805,9 +1744,7 @@ namespace AprNes
                 case 0x5B://SRE  
                     ushort1 = (ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)) + r_Y);
                     byte1 = Mem_r(ushort1);
-
                     Mem_w(ushort1, byte1);//dummy write fixed
-
                     if ((byte1 & 1) != 0) flagC = 1; else flagC = 0;
                     byte1 >>= 1;
                     Mem_w(ushort1, byte1);
@@ -1818,14 +1755,12 @@ namespace AprNes
 
                 case 0x53://SRE (LSR M  THEN (M "EOR" A) -> A )
                     byte2 = Mem_r(r_PC++);
-                    ushort1 = (ushort)((NES_MEM[byte2++] | (NES_MEM[byte2] << 8)) + +r_Y);
-                    byte1 = Mem_r((ushort)(ushort1));
-
+                    ushort1 = (ushort)((NES_MEM[byte2++] | (NES_MEM[byte2] << 8))+ +r_Y);
+                    byte1 = Mem_r((ushort)(ushort1 ));
                     Mem_w(ushort1, byte1);//dummy write fixed
-
                     if ((byte1 & 1) > 0) flagC = 1; else flagC = 0;
                     byte1 >>= 1;
-                    Mem_w(ushort1, byte1);
+                    Mem_w(ushort1 , byte1);
                     r_A ^= byte1;
                     if (r_A == 0) flagZ = 1; else flagZ = 0;
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
@@ -1846,9 +1781,7 @@ namespace AprNes
                     byte3 = (byte)(Mem_r(r_PC++) + r_X);
                     ushort1 = (ushort)(NES_MEM[byte3++] | (NES_MEM[byte3] << 8));
                     byte2 = Mem_r(ushort1);
-
                     Mem_w(ushort1, byte2);//dummy write fixed
-
                     byte1 = (byte)((byte2 >> 1) | ((flagC == 0) ? 0 : 0x80));
                     Mem_w(ushort1, byte1);
                     if ((byte2 & 1) > 0) flagC = 1; else flagC = 0;
@@ -1877,9 +1810,7 @@ namespace AprNes
                 case 0x6F://RRA
                     ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));//ok
                     byte2 = Mem_r(ushort1);
-
                     Mem_w(ushort1, byte2);//dummy write fixed
-
                     byte1 = (byte)((byte2 >> 1) | ((flagC == 0) ? 0 : 0x80));
                     Mem_w(ushort1, byte1);
                     if ((byte2 & 1) > 0) flagC = 1; else flagC = 0;
@@ -1895,9 +1826,7 @@ namespace AprNes
                     byte3 = Mem_r(r_PC++);
                     ushort1 = (ushort)((NES_MEM[byte3++] | (NES_MEM[byte3] << 8)) + r_Y);
                     byte2 = Mem_r(ushort1);
-
                     Mem_w(ushort1, byte2);//dummy write fixed
-
                     byte1 = (byte)((byte2 >> 1) | ((flagC == 0) ? 0 : 0x80));
                     Mem_w(ushort1, byte1);
                     if ((byte2 & 1) > 0) flagC = 1; else flagC = 0;
@@ -1926,9 +1855,7 @@ namespace AprNes
                 case 0x7B:// RRA (ROR M THEN (A + M + C) -> A  )
                     ushort1 = (ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)) + r_Y);
                     byte2 = Mem_r(ushort1);
-
                     Mem_w(ushort1, byte2);//dummy write fixed
-
                     byte1 = (byte)((byte2 >> 1) | ((flagC == 0) ? 0 : 0x80));
                     Mem_w(ushort1, byte1);
                     if ((byte2 & 1) > 0) flagC = 1; else flagC = 0;
@@ -1943,9 +1870,7 @@ namespace AprNes
                 case 0x7F: //RRA
                     ushort1 = (ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)) + r_X);
                     byte2 = Mem_r(ushort1);
-
                     Mem_w(ushort1, byte2);//dummy write fixed
-
                     byte1 = (byte)((byte2 >> 1) | ((flagC == 0) ? 0 : 0x80));
                     Mem_w(ushort1, byte1);
                     if ((byte2 & 1) > 0) flagC = 1; else flagC = 0;
@@ -2046,9 +1971,7 @@ namespace AprNes
                     byte2 = (byte)(Mem_r(r_PC++) + r_X);
                     ushort1 = (ushort)((NES_MEM[byte2++] | (NES_MEM[byte2] << 8)));
                     byte1 = Mem_r(ushort1);
-
                     Mem_w(ushort1, byte1);//dummy write fixed
-
                     Mem_w(ushort1, --byte1);
                     int1 = r_A - byte1;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
@@ -2069,9 +1992,7 @@ namespace AprNes
                 case 0xCF: //DCP
                     ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
                     byte1 = Mem_r(ushort1);
-
                     Mem_w(ushort1, byte1);//dummy write fixed
-
                     Mem_w(ushort1, --byte1);
                     int1 = r_A - byte1;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
@@ -2082,9 +2003,7 @@ namespace AprNes
                 case 0xDF:
                     ushort1 = (ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)) + r_X);
                     byte1 = Mem_r(ushort1);
-
                     Mem_w(ushort1, byte1);//dummy write fixed
-
                     Mem_w(ushort1, --byte1);
                     int1 = r_A - byte1;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
@@ -2096,9 +2015,7 @@ namespace AprNes
                     byte2 = Mem_r(r_PC++);
                     ushort3 = (ushort)((NES_MEM[byte2++] | (NES_MEM[byte2] << 8)) + r_Y);
                     byte1 = Mem_r(ushort3);
-
                     Mem_w(ushort3, byte1);//dummy write fixed
-
                     Mem_w(ushort3, --byte1);
                     int1 = r_A - byte1;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
@@ -2119,9 +2036,7 @@ namespace AprNes
                 case 0xDB:// DCP
                     ushort1 = (ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)) + r_Y);
                     byte1 = Mem_r(ushort1);
-
                     Mem_w(ushort1, byte1);//dummy write fixed
-
                     Mem_w(ushort1, --byte1);
                     int1 = r_A - byte1;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
@@ -2133,9 +2048,7 @@ namespace AprNes
                     byte2 = (byte)(Mem_r(r_PC++) + r_X);
                     ushort3 = (ushort)((NES_MEM[byte2++] | (NES_MEM[byte2] << 8)));
                     byte1 = Mem_r(ushort3);
-
                     Mem_w(ushort3, byte1);//dummy write fixed
-
                     Mem_w(ushort3, ++byte1);
                     int1 = r_A + (byte1 ^ 0xff) + flagC;
                     if (((int1 ^ r_A) & (int1 ^ (byte1 ^ 0xff)) & 0x80) != 0) flagV = 1; else flagV = 0;
@@ -2160,9 +2073,7 @@ namespace AprNes
                 case 0xEF://ISC
                     ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
                     byte1 = Mem_r(ushort1);
-
                     Mem_w(ushort1, byte1);//dummy write fixed
-
                     Mem_w(ushort1, ++byte1);
                     int1 = r_A + (byte1 ^ 0xff) + flagC;
                     if (((int1 ^ r_A) & (int1 ^ (byte1 ^ 0xff)) & 0x80) != 0) flagV = 1; else flagV = 0;
@@ -2176,9 +2087,7 @@ namespace AprNes
                     byte2 = Mem_r(r_PC++);
                     ushort3 = (ushort)(((NES_MEM[byte2++] | (NES_MEM[byte2] << 8))) + r_Y);
                     byte1 = Mem_r(ushort3);
-
                     Mem_w(ushort3, byte1);//dummy write fixed
-
                     Mem_w(ushort3, ++byte1);
                     int1 = r_A + (byte1 ^ 0xff) + flagC;
                     if (((int1 ^ r_A) & (int1 ^ (byte1 ^ 0xff)) & 0x80) != 0) flagV = 1; else flagV = 0;
@@ -2203,9 +2112,7 @@ namespace AprNes
                 case 0xFB://ISC
                     ushort1 = (ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)) + r_Y);
                     byte1 = Mem_r(ushort1);
-
                     Mem_w(ushort1, byte1);//dummy write fixed
-
                     Mem_w(ushort1, ++byte1);
                     int1 = r_A + (byte1 ^ 0xff) + flagC;
                     if (((int1 ^ r_A) & (int1 ^ (byte1 ^ 0xff)) & 0x80) != 0) flagV = 1; else flagV = 0;
@@ -2218,9 +2125,7 @@ namespace AprNes
                 case 0xFF://ISC
                     ushort1 = (ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)) + r_X);
                     byte1 = Mem_r(ushort1);
-
                     Mem_w(ushort1, byte1);//dummy write fixed
-
                     Mem_w(ushort1, ++byte1);
                     int1 = r_A + (byte1 ^ 0xff) + flagC;
                     if (((int1 ^ r_A) & (int1 ^ (byte1 ^ 0xff)) & 0x80) != 0) flagV = 1; else flagV = 0;
@@ -2234,7 +2139,7 @@ namespace AprNes
                 default: MessageBox.Show("unkonw opcode ! - 0x" + opcode.ToString("X2")); break;
             }
 
-
+            
         }
     }
 }

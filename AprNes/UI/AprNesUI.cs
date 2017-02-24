@@ -7,8 +7,8 @@ using System.IO;
 using System.IO.Compression;
 using System.Diagnostics;
 using System.Threading;
-using SharpDX.DirectInput;
 using LangTool;
+using NativeTools;
 
 namespace AprNes
 {
@@ -23,6 +23,8 @@ namespace AprNes
 
         List<string> background_pics;
 
+        joystick _joystick = new joystick();
+
         Stopwatch st = new Stopwatch();//test UI finish time
 
         public AprNesUI()
@@ -35,10 +37,9 @@ namespace AprNes
 
             LangINI.init();
             LoadConfig();
-
             initUILang();
-
             grfx = panel1.CreateGraphics();
+
         }
 
         protected static AprNesUI instance;
@@ -71,13 +72,22 @@ namespace AprNes
             panel1.Width = 256 * ScreenSize;
             panel1.Height = 240 * ScreenSize;
 
+            if (AppConfigure["filter"] == "scanline")
+            {
+                switch (ScreenSize)
+                {
+                    case 2: panel1.Width = 600; break;
+                    case 4: panel1.Width = 1196; break;
+                    case 6: panel1.Width = 1792; break;
+                }
+            }
+
             if (ScreenCenterFull)
             {
                 UIAbout.Visible = RomInf.Visible = UIOpenRom.Visible = UIReset.Visible = UIConfig.Visible = label3.Visible = false;
 
                 fullScreeenToolStripMenuItem_Click(null, null);
                 panel1.Visible = true;
-                //Configure_Write();
                 return;
             }
 
@@ -85,12 +95,21 @@ namespace AprNes
             panel1.Location = new Point(5, 35);
             this.Width = 282 + 256 * (ScreenSize - 1);
             this.Height = 332 + 240 * (ScreenSize - 1);
-            UIAbout.Location = new Point(201 + 256 * (ScreenSize - 1), 277 + 240 * (ScreenSize - 1));
+
+            if (AppConfigure["filter"] == "scanline")
+            {
+                switch (ScreenSize)
+                {
+                    case 2: Width = 600; break;
+                    case 4: Width = 1196; break;
+                    case 6: Width = 1792; break;
+                }
+                Width += 26;
+            }
+            UIAbout.Location = new Point(Width - 82, 277 + 240 * (ScreenSize - 1));
+
             RomInf.Location = new Point(5, 277 + 240 * (ScreenSize - 1));
             panel1.Visible = true;
-
-            Console.WriteLine("t1");
-            //Configure_Write();
         }
 
         public enum KeyMap
@@ -148,6 +167,7 @@ namespace AprNes
                 AppConfigure["joypad_LEFT"] = "";
                 AppConfigure["joypad_RIGHT"] = "";
                 AppConfigure["Lang"] = "en-us";
+                AppConfigure["filter"] = "xbrz";
                 Configure_Write();
             }
 
@@ -271,171 +291,161 @@ namespace AprNes
             StreamWriter sw = new StreamWriter(s);
             sw.WriteLine(str);
             sw.Close();
-            s.Close();
         }
 
-        //-------------------------------------------------------
-
-        DirectInput directInput = new DirectInput();
-        class JoyPadListener
+        string JoyPadWayName(string xy_name, int value)
         {
-            Joystick joystick;
-            public JoyPadListener(Joystick joypad)
+            string tmp = "";
+
+            if (xy_name == "X")
             {
-                joystick = joypad;
+                if (value == 0)
+                    return "LEFT";
+
+                if (value == 65535)
+                    return "RIGHT";
             }
 
-            private string JoyPadWayName(string xy_name, int value)
+            if (xy_name == "Y")
             {
-                string tmp = "";
+                if (value == 0)
+                    return "UP";
 
-                if (xy_name == "X")
-                {
-                    if (value == 0)
-                        return "LEFT";
-
-                    if (value == 65535)
-                        return "RIGHT";
-                }
-
-                if (xy_name == "Y")
-                {
-                    if (value == 0)
-                        return "UP";
-
-                    if (value == 65535)
-                        return "DOWN";
-                }
-
-                return tmp;
+                if (value == 65535)
+                    return "DOWN";
             }
-            public void start()
+
+            return tmp;
+        }
+        bool app_running = true;
+        void polling_listener()
+        {
+            while (app_running)
             {
-
-                while (true)
+                Thread.Sleep(_joystick.PeriodMin);
+                List<joystickEvent> event_list = _joystick.joy_event_captur();
+                foreach (joystickEvent joy_event in event_list)
                 {
-                    Thread.Sleep(10);
-
-                    joystick.Poll();
-
-                    JoystickUpdate[] datas = joystick.GetBufferedData();
-                    foreach (JoystickUpdate state in datas)
+                    //for configure
+                    if (configure)
                     {
-                        AprNesUI.GetInstance().Invoke(new MethodInvoker(() =>
-                        {
-                            if (AprNes_ConfigureUI.GetInstance().Visible == true)
-                            {
-                                AprNes_ConfigureUI.GetInstance().Setup_JoyPad_define(joystick.Information.InstanceGuid.ToString(), state.Offset.ToString(), state.RawOffset, state.Value);
-                            }
-                        }));
 
+                        AprNesUI.GetInstance().Invoke(new MethodInvoker(() =>
+                         {
+                             if (joy_event.event_type == 0) //方向鍵觸發
+                             {
+                                 if (joy_event.way_type == 0)
+                                     AprNes_ConfigureUI.GetInstance().Setup_JoyPad_define(joy_event.joystick_id.ToString(), "X", 0, joy_event.way_value);
+                                 else
+                                     AprNes_ConfigureUI.GetInstance().Setup_JoyPad_define(joy_event.joystick_id.ToString(), "Y", 0, joy_event.way_value);
+                             }
+                             else //一般按鈕觸發                             
+                                 AprNes_ConfigureUI.GetInstance().Setup_JoyPad_define(joy_event.joystick_id.ToString(), "Button " + joy_event.button_id.ToString(), joy_event.button_id, 128);
+                         }));
+                        break;
+                    }
+
+                    //for gaming..
+                    if (running)
+                    {
                         KeyMap joy = KeyMap.NES_btn_A;
-                        if (state.Offset.ToString().StartsWith("Buttons"))
+                        if (joy_event.event_type == 1)
                         {
-                            string key = joystick.Information.InstanceGuid.ToString() + "," + state.Offset.ToString() + "," + state.RawOffset.ToString();
+                            string key = joy_event.joystick_id.ToString() + "," + "Button " + joy_event.button_id.ToString() + "," + joy_event.button_id.ToString();
                             if (AprNesUI.GetInstance().NES_KeyMAP_joypad.ContainsKey(key))
                                 joy = AprNesUI.GetInstance().NES_KeyMAP_joypad[key];
                             else
                                 continue;
                         }
-
-                        if (AprNesUI.GetInstance().running == true)
+                        else
                         {
+                            string XY = (joy_event.way_type == 0) ? "X" : "Y";
+                            string key = joy_event.joystick_id.ToString() + "," + JoyPadWayName(XY, joy_event.way_value) + "," + "0" + "," + joy_event.way_value;
 
-                            if (state.Offset.ToString().StartsWith("X") || state.Offset.ToString().StartsWith("Y"))
+                            if (AprNesUI.GetInstance().NES_KeyMAP_joypad.ContainsKey(key))
+                                joy = AprNesUI.GetInstance().NES_KeyMAP_joypad[key];
+                            else
                             {
-                                string key = joystick.Information.InstanceGuid.ToString() + "," + JoyPadWayName(state.Offset.ToString(), state.Value) + "," + state.RawOffset.ToString() + "," + state.Value.ToString();
+                                string key_a = joy_event.joystick_id.ToString() + "," + JoyPadWayName(XY, 0) + "," + "0" + "," + "0";
+                                string key_b = joy_event.joystick_id.ToString() + "," + JoyPadWayName(XY, 65535) + "," + "0" + "," + "65535";
 
-                                if (AprNesUI.GetInstance().NES_KeyMAP_joypad.ContainsKey(key))
-                                    joy = AprNesUI.GetInstance().NES_KeyMAP_joypad[key];
-                                else
+                                if (NES_KeyMAP_joypad.ContainsKey(key_a) || (AprNesUI.GetInstance().NES_KeyMAP_joypad.ContainsKey(key_b)))
                                 {
-                                    string key_a = joystick.Information.InstanceGuid.ToString() + "," + JoyPadWayName(state.Offset.ToString(), 0) + "," + state.RawOffset.ToString() + "," + "0";
-                                    string key_b = joystick.Information.InstanceGuid.ToString() + "," + JoyPadWayName(state.Offset.ToString(), 65535) + "," + state.RawOffset.ToString() + "," + "65535";
-
-                                    if (AprNesUI.GetInstance().NES_KeyMAP_joypad.ContainsKey(key_a) || (AprNesUI.GetInstance().NES_KeyMAP_joypad.ContainsKey(key_b)))
+                                    if (XY == "X")
                                     {
-                                        if (state.Offset.ToString() == "X")
-                                        {
-                                            AprNesUI.GetInstance().nes_obj.P1_ButtonUnPress((byte)KeyMap.NES_btn_LEFT);
-                                            AprNesUI.GetInstance().nes_obj.P1_ButtonUnPress((byte)KeyMap.NES_btn_RIGHT);
-                                        }
-
-                                        if (state.Offset.ToString() == "Y")
-                                        {
-                                            AprNesUI.GetInstance().nes_obj.P1_ButtonUnPress((byte)KeyMap.NES_btn_UP);
-                                            AprNesUI.GetInstance().nes_obj.P1_ButtonUnPress((byte)KeyMap.NES_btn_DOWN);
-                                        }
+                                        NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_LEFT);
+                                        NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_RIGHT);
                                     }
-                                    continue;
+
+                                    if (XY == "Y")
+                                    {
+                                        NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_UP);
+                                        NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_DOWN);
+                                    }
                                 }
+                                continue;
                             }
 
-                            switch (joy)
-                            {
-                                case KeyMap.NES_btn_A:
-                                    {
-                                        if (state.Value == 128)
-                                            AprNesUI.GetInstance().nes_obj.P1_ButtonPress((byte)KeyMap.NES_btn_A);
-                                        else
-                                            AprNesUI.GetInstance().nes_obj.P1_ButtonUnPress((byte)KeyMap.NES_btn_A);
+                        }
 
-                                    }
-                                    break;
-                                case KeyMap.NES_btn_B:
-                                    {
-                                        if (state.Value == 128)
-                                            AprNesUI.GetInstance().nes_obj.P1_ButtonPress((byte)KeyMap.NES_btn_B);
-                                        else
-                                            AprNesUI.GetInstance().nes_obj.P1_ButtonUnPress((byte)KeyMap.NES_btn_B);
-                                    }
-                                    break;
+                        switch (joy)
+                        {
+                            case KeyMap.NES_btn_A:
+                                {
+                                    if (joy_event.button_event == 1)
+                                        NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_A);
+                                    else
+                                        NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_A);
 
-                                case KeyMap.NES_btn_SELECT:
-                                    {
-                                        if (state.Value == 128)
-                                            AprNesUI.GetInstance().nes_obj.P1_ButtonPress((byte)KeyMap.NES_btn_SELECT);
-                                        else
-                                            AprNesUI.GetInstance().nes_obj.P1_ButtonUnPress((byte)KeyMap.NES_btn_SELECT);
-                                    }
-                                    break;
-                                case KeyMap.NES_btn_START:
-                                    {
-                                        if (state.Value == 128)
-                                            AprNesUI.GetInstance().nes_obj.P1_ButtonPress((byte)KeyMap.NES_btn_START);
-                                        else
-                                            AprNesUI.GetInstance().nes_obj.P1_ButtonUnPress((byte)KeyMap.NES_btn_START);
-                                    }
-                                    break;
+                                }
+                                break;
+                            case KeyMap.NES_btn_B:
+                                {
+                                    if (joy_event.button_event == 1)
+                                        NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_B);
+                                    else
+                                        NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_B);
+                                }
+                                break;
 
-                                case KeyMap.NES_btn_UP:
-                                    AprNesUI.GetInstance().nes_obj.P1_ButtonPress((byte)KeyMap.NES_btn_UP);
-                                    break;
+                            case KeyMap.NES_btn_SELECT:
+                                {
+                                    if (joy_event.button_event == 1)
+                                        NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_SELECT);
+                                    else
+                                        NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_SELECT);
+                                }
+                                break;
+                            case KeyMap.NES_btn_START:
+                                {
+                                    if (joy_event.button_event == 1)
+                                        NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_START);
+                                    else
+                                        NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_START);
+                                }
+                                break;
 
-                                case KeyMap.NES_btn_DOWN:
-                                    AprNesUI.GetInstance().nes_obj.P1_ButtonPress((byte)KeyMap.NES_btn_DOWN);
-                                    break;
-                                case KeyMap.NES_btn_LEFT:
-                                    AprNesUI.GetInstance().nes_obj.P1_ButtonPress((byte)KeyMap.NES_btn_LEFT);
-                                    break;
+                            case KeyMap.NES_btn_UP:
+                                NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_UP);
+                                break;
 
-                                case KeyMap.NES_btn_RIGHT:
-                                    AprNesUI.GetInstance().nes_obj.P1_ButtonPress((byte)KeyMap.NES_btn_RIGHT);
-                                    break;
-                            }
+                            case KeyMap.NES_btn_DOWN:
+                                NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_DOWN);
+                                break;
+                            case KeyMap.NES_btn_LEFT:
+                                NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_LEFT);
+                                break;
 
+                            case KeyMap.NES_btn_RIGHT:
+                                NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_RIGHT);
+                                break;
                         }
                     }
                 }
             }
         }
 
-        List<Guid> joypads = new List<Guid>();
-
-        //-------------------------------------------------------
-
         Thread nes_t = null;
-        public NesCore nes_obj = null;
         bool running = false;
         public string rom_file = "";
         public byte[] rom_bytes;
@@ -515,9 +525,17 @@ namespace AprNes
             }
         }
 
+        void VideoOutputDeal(object sender, EventArgs e)
+        {
+            RenderObj.Render();
+        }
+
         public string rom_file_name = "";
         public string nes_name = "";
-        private void button1_Click(object sender, EventArgs e)
+
+        InterfaceGraphic RenderObj;
+
+        unsafe private void button1_Click(object sender, EventArgs e)
         {
 
             OpenFileDialog fd = new OpenFileDialog();
@@ -528,8 +546,7 @@ namespace AprNes
             if (fi.Extension.ToLower() == ".zip")
             {
                 // tks!! https://github.com/yallie/unzip good!
-                // with .net use framework 4.6 https://msdn.microsoft.com/zh-tw/library/system.io.compression.zipfile(v=vs.110).aspx
-
+                // replace with .net use framework 4.6 https://msdn.microsoft.com/zh-tw/library/system.io.compression.zipfile(v=vs.110).aspx
                 ZipArchive archive = ZipFile.OpenRead(fi.FullName);
                 foreach (ZipArchiveEntry entry in archive.Entries)
                 {
@@ -557,7 +574,7 @@ namespace AprNes
             {
                 try
                 {
-                    nes_obj.exit = true;
+                    NesCore.exit = true;
                     Thread.Sleep(50);
                     nes_t.Abort();
                 }
@@ -567,14 +584,20 @@ namespace AprNes
                 }
             }
 
-            if (nes_obj != null) nes_obj.SaveRam();
+            NesCore.SaveRam();
+            NesCore.exit = false;
+            NesCore.LimitFPS = LimitFPS;
+            NesCore.rom_file_name = rom_file_name;
 
-            nes_obj = null;
-            nes_obj = new NesCore();
-            nes_obj.LimitFPS = LimitFPS;
-            nes_obj.ScreenSize = ScreenSize;
-            nes_obj.rom_file_name = rom_file_name;
-            bool init_result = nes_obj.init(grfx, rom_bytes);
+            bool init_result = NesCore.init(rom_bytes);
+
+            if (RenderObj != null) RenderObj.freeMem();
+            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType("AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
+            RenderObj.init(NesCore.ScreenBuf1x, grfx);
+
+            NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
+            NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
+
             Console.WriteLine("init finsih");
 
             if (!init_result)
@@ -585,7 +608,7 @@ namespace AprNes
                 MessageBox.Show("fail !");
                 return;
             }
-            nes_t = new Thread(nes_obj.run);
+            nes_t = new Thread(NesCore.run);
             nes_t.IsBackground = true;
             nes_t.Start();
             fps_count_timer.Enabled = true;
@@ -597,15 +620,18 @@ namespace AprNes
         {
             this.Invoke((MethodInvoker)delegate
             {
-                fps = nes_obj.frame_count;
-                nes_obj.frame_count = 0;
+                fps = NesCore.frame_count;
+                NesCore.frame_count = 0;
                 label3.Text = "fps : " + fps;
             });
         }
 
         private void AprNesUI_FormClosing(object sender, FormClosingEventArgs e)
         {
-            if (nes_obj != null) nes_obj.SaveRam();
+            app_running = false;
+            NesCore.exit = true;
+            NesCore.SaveRam();
+            Thread.Sleep(10);
         }
 
         //http://stackoverflow.com/questions/11754874/keydown-not-firing-for-up-down-left-and-right
@@ -621,7 +647,7 @@ namespace AprNes
                 return true; ;
             }
             if (NES_KeyMAP.ContainsKey(keyboard_key))
-                nes_obj.P1_ButtonPress((byte)NES_KeyMAP[keyboard_key]);
+                NesCore.P1_ButtonPress((byte)NES_KeyMAP[keyboard_key]);
             return true;
         }
 
@@ -633,29 +659,32 @@ namespace AprNes
             if (writing == true)
                 return;
             writing = true;
-            while (nes_obj.screen_lock)
+            while (NesCore.screen_lock)
                 Thread.Sleep(0);
-            nes_t.Suspend();
+
+            NesCore._event.Reset();
+
             DateTime dt = DateTime.Now;
             string stamp = (dt.ToLongDateString() + " " + dt.ToLongTimeString()).Replace(":", "-");
             try
             {
-                nes_obj.GetScreenFrame().Save(AppConfigure["CaptureScreenPath"] + @"\Screen-" + stamp + ".png", System.Drawing.Imaging.ImageFormat.Png);
+                RenderObj.GetOutput().Save(AppConfigure["CaptureScreenPath"] + @"\Screen-" + stamp + ".png", System.Drawing.Imaging.ImageFormat.Png);
             }
-            catch { }
-            nes_t.Resume();
+            catch (Exception e) { Console.WriteLine("i:" + e.Message); }
+
+            NesCore._event.Set();
+
             Console.WriteLine("Screen-" + stamp + ".png" + " write finish !");
             writing = false;
 
             MessageBox.Show(AppConfigure["CaptureScreenPath"] + @"\Screen-" + stamp + ".png" + " " + "save!");
         }
 
-
         private void AprNesUI_KeyUp(object sender, KeyEventArgs e)
         {
             if (!running) return;
             if (NES_KeyMAP.ContainsKey(e.KeyValue))
-                nes_obj.P1_ButtonUnPress((byte)NES_KeyMAP[e.KeyValue]);
+                NesCore.P1_ButtonUnPress((byte)NES_KeyMAP[e.KeyValue]);
         }
 
         bool LimitFPS = true;
@@ -671,19 +700,14 @@ namespace AprNes
             (sender as Label).BackColor = Color.WhiteSmoke;
         }
 
-        private void label2_Click(object sender, EventArgs e)
-        {
-            LimitFPS = !LimitFPS;
-            if (nes_obj != null) nes_obj.LimitFPS = LimitFPS;
-        }
-
+        bool configure = false;
         private void label2_Click_1(object sender, EventArgs e)
         {
-
+            configure = true;
             AprNes_ConfigureUI.GetInstance().StartPosition = FormStartPosition.CenterParent;
             AprNes_ConfigureUI.GetInstance().init();
             AprNes_ConfigureUI.GetInstance().ShowDialog(this);
-
+            configure = false;
         }
         private void linkLabel1_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
         {
@@ -697,87 +721,33 @@ namespace AprNes
             Reset();
         }
 
-        public void Reset()
+        unsafe public void Reset()
         {
             if (!running) return;
 
-            running = false;
-            fps_count_timer.Enabled = true;
-            label3.Text = "fps : ";
+            NesCore.SaveRam();
+            NesCore.LimitFPS = LimitFPS;
+            NesCore.rom_file_name = rom_file_name;
 
-            if (nes_t != null)
-            {
-                try
-                {
-                    nes_obj.exit = true;
-                    Thread.Sleep(50);
-                    nes_t.Abort();
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(ex.Message);
-                }
-            }
+            NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
+            NesCore._event.Reset();
+            while (NesCore.screen_lock) Thread.Sleep(1);
+            if (RenderObj != null) RenderObj.freeMem();
+            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType("AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
+            RenderObj.init(NesCore.ScreenBuf1x, grfx);
+            NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
+            NesCore._event.Set();
 
-            try
-            {
-                if (nes_obj != null)
-                    nes_obj.SaveRam();
-            }
-            catch
-            {
-            }
-            nes_obj = null;
-            nes_obj = new NesCore();
-            nes_obj.LimitFPS = LimitFPS;
-            nes_obj.ScreenSize = ScreenSize;
-            nes_obj.rom_file_name = rom_file_name;
-            bool init_result = nes_obj.init(grfx, rom_bytes);
-            Console.WriteLine("init finsih");
-            nes_t = new Thread(nes_obj.run);
-            nes_t.IsBackground = true;
-            nes_t.Start();
-            fps_count_timer.Enabled = true;
-            running = true;
-        }
-
-        private void JoypadInit()
-        {
-            #region joypad init
-            //from http://stackoverflow.com/questions/3929764/taking-input-from-a-joystick-with-c-sharp-net
-            var joystickGuid = Guid.Empty;
-
-            if (joystickGuid == Guid.Empty)
-                foreach (var deviceInstance in directInput.GetDevices(DeviceType.Joystick, DeviceEnumerationFlags.AllDevices))
-                    joypads.Add(deviceInstance.InstanceGuid);
-
-            if (joypads.Count == 0)
-            {
-                Console.WriteLine("No joystick/Gamepad found.");
-            }
-            else
-            {
-
-                foreach (Guid i in joypads)
-                {
-                    Console.WriteLine("Found Joystick/Gamepad with GUID: {0}", i.ToString());
-
-                    Joystick joystick = new Joystick(directInput, i);
-                    joystick.Properties.BufferSize = 128;
-                    joystick.Acquire();
-
-                    JoyPadListener JoyPadListener_obj = new JoyPadListener(joystick);
-                    new Thread(JoyPadListener_obj.start).Start();
-                }
-            }
-            #endregion
+            NesCore.SoftReset();
 
         }
 
         private void AprNesUI_Shown(object sender, EventArgs e)
         {
             initUIsize();
-            JoypadInit();
+            _joystick.Init();
+            new Thread(polling_listener).Start();
+
             new Thread(() =>
             {
                 Thread.Sleep(50);
@@ -787,6 +757,7 @@ namespace AprNes
                 }));
                 st.Stop();
                 Console.WriteLine("UI Finish : " + st.ElapsedMilliseconds);
+                Debug.WriteLine("UI Finish : " + st.ElapsedMilliseconds);
             }).Start();
         }
 
@@ -828,7 +799,6 @@ namespace AprNes
         }
 
         bool ScreenCenterFull = false;
-
 
         private void fun8ToolStripMenuItem_Click(object sender, EventArgs e)
         {

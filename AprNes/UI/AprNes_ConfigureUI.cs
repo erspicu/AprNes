@@ -29,7 +29,8 @@ namespace AprNes
             LimitFPS_checkBox.Text = LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["limitfps"];
             label18.Text = LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["langchoose"];
             label9.Text = "Shift + p " + LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["capture_path"];
-            
+            groupBox3.Text = LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["scanline"];
+
 
             comboBox1.Items.Clear();
 
@@ -53,16 +54,63 @@ namespace AprNes
 
         public void BeforClose()
         {
-            if (radioButtonX1.Checked) AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "1";
-            else if (radioButtonX2.Checked) AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "2";
-            else if (radioButtonX3.Checked) AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "3";
-            else if (radioButtonX4.Checked) AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "4";
-            else if (radioButtonX5.Checked) AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "5";
-            else if (radioButtonX6.Checked) AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "6";
-            else if (radioButtonX8.Checked) AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "8";
-            else if (radioButtonX9.Checked) AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "9";
 
+            if (radioButtonX2s.Checked)
+            {
+                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "2";
+                AprNesUI.GetInstance().AppConfigure["filter"] = "scanline";
+            }
+            else if (radioButtonX4s.Checked)
+            {
+                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "4";
+                AprNesUI.GetInstance().AppConfigure["filter"] = "scanline";
+            }
+            else if (radioButtonX6s.Checked)
+            {
+                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "6";
+                AprNesUI.GetInstance().AppConfigure["filter"] = "scanline";
+            }
 
+            if (radioButtonX1.Checked)
+            {
+                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "1";
+                AprNesUI.GetInstance().AppConfigure["filter"] = "xbrz";
+            }
+            else if (radioButtonX2.Checked)
+            {
+                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "2";
+                AprNesUI.GetInstance().AppConfigure["filter"] = "xbrz";
+            }
+            else if (radioButtonX3.Checked)
+            {
+                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "3";
+                AprNesUI.GetInstance().AppConfigure["filter"] = "xbrz";
+            }
+            else if (radioButtonX4.Checked)
+            {
+                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "4";
+                AprNesUI.GetInstance().AppConfigure["filter"] = "xbrz";
+            }
+            else if (radioButtonX5.Checked)
+            {
+                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "5";
+                AprNesUI.GetInstance().AppConfigure["filter"] = "xbrz";
+            }
+            else if (radioButtonX6.Checked)
+            {
+                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "6";
+                AprNesUI.GetInstance().AppConfigure["filter"] = "xbrz";
+            }
+            else if (radioButtonX8.Checked)
+            {
+                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "8";
+                AprNesUI.GetInstance().AppConfigure["filter"] = "xbrz";
+            }
+            else if (radioButtonX9.Checked)
+            {
+                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "9";
+                AprNesUI.GetInstance().AppConfigure["filter"] = "xbrz";
+            }
             AprNesUI.GetInstance().NES_KeyMAP_joypad.Clear();
 
             foreach (string key in NES_KeyMAP_joypad_config.Keys)
@@ -103,7 +151,7 @@ namespace AprNes
             if (joypad_A.Focused)
             {
                 if (value != 128) return;
-                if (!btn_name.StartsWith("Buttons"))
+                if (!btn_name.StartsWith("Button"))
                 {
                     MessageBox.Show("非Button類型輸入!");
                     return;
@@ -121,7 +169,7 @@ namespace AprNes
             }
             else if (joypad_B.Focused)
             {
-                if (!btn_name.StartsWith("Buttons"))
+                if (!btn_name.StartsWith("Button"))
                 {
                     MessageBox.Show("非Button類型輸入!");
                     return;
@@ -139,7 +187,7 @@ namespace AprNes
             }
             else if (joypad_START.Focused)
             {
-                if (!btn_name.StartsWith("Buttons"))
+                if (!btn_name.StartsWith("Button"))
                 {
                     MessageBox.Show("非Button類型輸入!");
                     return;
@@ -158,7 +206,7 @@ namespace AprNes
             else if (joypad_SELECT.Focused)
             {
 
-                if (!btn_name.StartsWith("Buttons"))
+                if (!btn_name.StartsWith("Button"))
                 {
                     MessageBox.Show("非Button類型輸入!");
                     return;
@@ -183,8 +231,14 @@ namespace AprNes
                     MessageBox.Show("非 X Y 方向鍵類型輸入!");
                     return;
                 }
-                if (value == 32511) return;
-                joypad_UP.Text = JoyPadWayName(btn_name, value);
+                if (value == 32511)
+                {
+                    return;
+                }
+                string name = JoyPadWayName(btn_name, value);
+                if (name == "") return;
+                joypad_UP.Text = name;
+                Console.WriteLine(value);
 
                 if (NES_KeyMAP_joypad_config.Values.Contains(AprNesUI.KeyMap.NES_btn_UP))
                 {
@@ -204,7 +258,9 @@ namespace AprNes
                     return;
                 }
                 if (value == 32511) return;
-                joypad_DOWN.Text = JoyPadWayName(btn_name, value);
+                string name = JoyPadWayName(btn_name, value);
+                if (name == "") return;
+                joypad_DOWN.Text = name;
 
                 if (NES_KeyMAP_joypad_config.Values.Contains(AprNesUI.KeyMap.NES_btn_DOWN))
                 {
@@ -224,7 +280,9 @@ namespace AprNes
                     return;
                 }
                 if (value == 32511) return;
-                joypad_LEFT.Text = JoyPadWayName(btn_name, value);
+                string name = JoyPadWayName(btn_name, value);
+                if (name == "") return;
+                joypad_LEFT.Text = name;
 
                 if (NES_KeyMAP_joypad_config.Values.Contains(AprNesUI.KeyMap.NES_btn_LEFT))
                 {
@@ -244,7 +302,9 @@ namespace AprNes
                     return;
                 }
                 if (value == 32511) return;
-                joypad_RIGHT.Text = JoyPadWayName(btn_name, value);
+                string name = JoyPadWayName(btn_name, value);
+                if (name == "") return;
+                joypad_RIGHT.Text = name;
 
                 if (NES_KeyMAP_joypad_config.Values.Contains(AprNesUI.KeyMap.NES_btn_RIGHT))
                 {
@@ -333,7 +393,20 @@ namespace AprNes
                     joypad_RIGHT.Text = tmp[1];
                 }
             }
-            (groupBox4.Controls.Find("radioButtonX" + AprNesUI.GetInstance().AppConfigure["ScreenSize"], true)[0] as RadioButton).Checked = true;
+
+
+            switch (AprNesUI.GetInstance().AppConfigure["filter"])
+            {
+                case "xbrz":
+                    (groupBox4.Controls.Find("radioButtonX" + AprNesUI.GetInstance().AppConfigure["ScreenSize"] , true)[0] as RadioButton).Checked = true;
+                    break;
+
+                case "scanline":
+                    (groupBox3.Controls.Find("radioButtonX" + AprNesUI.GetInstance().AppConfigure["ScreenSize"] + "s", true)[0] as RadioButton).Checked = true;
+                    break;
+            }
+
+
 
             if (AprNesUI.GetInstance().AppConfigure["LimitFPS"] == "1") LimitFPS_checkBox.Checked = true;
             else LimitFPS_checkBox.Checked = false;
@@ -369,6 +442,62 @@ namespace AprNes
         }
 
         int key_A = 0, key_B = 0, key_SELECT = 0, key_START = 0, key_RIGHT = 0, key_LEFT = 0, key_UP = 0, key_DOWN = 0;
+
+
+        private void radioButtonX_CheckedChanged(object sender, EventArgs e)
+        {
+
+            if ((sender as RadioButton).Checked == false) return;
+
+            radioButtonX2s.CheckedChanged += null;
+            radioButtonX4s.CheckedChanged += null;
+            radioButtonX6s.CheckedChanged += null;
+
+            radioButtonX2s.Checked = false;
+            radioButtonX4s.Checked = false;
+            radioButtonX6s.Checked = false;
+
+            radioButtonX2s.CheckedChanged += new System.EventHandler(this.radioButtonXs_CheckedChanged);
+            radioButtonX4s.CheckedChanged += new System.EventHandler(this.radioButtonXs_CheckedChanged);
+            radioButtonX6s.CheckedChanged += new System.EventHandler(this.radioButtonXs_CheckedChanged);
+        }
+
+        private void radioButtonXs_CheckedChanged(object sender, EventArgs e)
+        {
+
+            if ((sender as RadioButton).Checked == false) return;
+
+            radioButtonX1.CheckedChanged += null;
+            radioButtonX2.CheckedChanged += null;
+            radioButtonX3.CheckedChanged += null;
+            radioButtonX4.CheckedChanged += null;
+            radioButtonX5.CheckedChanged += null;
+            radioButtonX6.CheckedChanged += null;
+            radioButtonX8.CheckedChanged += null;
+            radioButtonX9.CheckedChanged += null;
+
+
+            radioButtonX1.Checked = false;
+            radioButtonX2.Checked = false;
+            radioButtonX3.Checked = false;
+            radioButtonX4.Checked = false;
+            radioButtonX5.Checked = false;
+            radioButtonX6.Checked = false;
+            radioButtonX8.Checked = false;
+            radioButtonX9.Checked = false;
+
+
+            radioButtonX1.CheckedChanged += new System.EventHandler(this.radioButtonX_CheckedChanged);
+            radioButtonX2.CheckedChanged += new System.EventHandler(this.radioButtonX_CheckedChanged);
+            radioButtonX3.CheckedChanged += new System.EventHandler(this.radioButtonX_CheckedChanged);
+            radioButtonX4.CheckedChanged += new System.EventHandler(this.radioButtonX_CheckedChanged);
+            radioButtonX5.CheckedChanged += new System.EventHandler(this.radioButtonX_CheckedChanged);
+            radioButtonX6.CheckedChanged += new System.EventHandler(this.radioButtonX_CheckedChanged);
+            radioButtonX8.CheckedChanged += new System.EventHandler(this.radioButtonX_CheckedChanged);
+            radioButtonX9.CheckedChanged += new System.EventHandler(this.radioButtonX_CheckedChanged);
+
+        }
+
         private void textBox_KeyConfig_KeyUp(object sender, KeyEventArgs e)
         {
 

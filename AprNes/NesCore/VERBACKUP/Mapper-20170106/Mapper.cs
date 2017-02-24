@@ -2,20 +2,20 @@
 {
     unsafe public partial class NesCore
     {
-        public int[] Mapper_Allow = new int[] { 0, 1, 2, 3, 4, 7, 11, 66 }; //5,7,11,66,71
+        static public int[] Mapper_Allow = new int[] { 0, 1, 2, 3, 4, 7, 11, 66 }; //5,7,11,66,71
 
-        int PRG_Bankselect = 0;
-        int CHR_Bankselect = 0;
+        static int PRG_Bankselect = 0;
+        static int CHR_Bankselect = 0;
 
-        int CHR0_Bankselect = 0;
-        int CHR1_Bankselect = 0;
+        static int CHR0_Bankselect = 0;
+        static int CHR1_Bankselect = 0;
 
         //for some mapper common use
-        int MapperRegBuffer = 0;
-        int MapperShiftCount = 0;
-        int Rom_offset = 0;
+        static int MapperRegBuffer = 0;
+        static int MapperShiftCount = 0;
+        static int Rom_offset = 0;
 
-        byte MapperRouterR_ExpansionROM(ushort address)
+        static byte MapperRouterR_ExpansionROM(ushort address)
         {
             switch (mapper)
             {
@@ -24,7 +24,7 @@
             }
         }
 
-        void MapperRouterW_ExpansionROM(ushort address, byte value)
+        static void MapperRouterW_ExpansionROM(ushort address, byte value)
         {
             switch (mapper)
             {
@@ -33,7 +33,7 @@
             }
         }
 
-        void MapperRouterW_RAM(ushort address, byte value)
+        static void MapperRouterW_RAM(ushort address, byte value)
         {
             switch (mapper)
             {
@@ -42,7 +42,7 @@
             }
         }
 
-        byte MapperRouterR_RAM(ushort address)
+        static byte MapperRouterR_RAM(ushort address)
         {
             switch (mapper)
             {
@@ -51,7 +51,7 @@
             }
         }
 
-        void MapperRouterW_PRG(ushort address, byte value)
+        static void MapperRouterW_PRG(ushort address, byte value)
         {
             switch (mapper)
             {
@@ -69,7 +69,7 @@
             }
         }
 
-        byte MapperRouterR_RPG(ushort address)
+        static byte MapperRouterR_RPG(ushort address)
         {
             switch (mapper)
             {
@@ -87,7 +87,7 @@
             }
         }
 
-        byte MapperRouterR_CHR(int address)
+        static byte MapperRouterR_CHR(int address)
         {
             if (CHR_ROM_count == 0) return ppu_ram[address];
             switch (mapper)

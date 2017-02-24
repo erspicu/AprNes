@@ -1,47 +1,21 @@
-﻿
-namespace AprNes
+﻿namespace AprNes
 {
-    unsafe public class Mapper005 : IMapper
+    unsafe public partial class NesCore
     {
         //MMC5 https://wiki.nesdev.com/w/index.php/MMC5 editing
 
-        byte* PRG_ROM, CHR_ROM, ppu_ram;
-        int CHR_ROM_count;
-        int PRG_ROM_count;
-        int* Vertical;
+        static int CHR4_Bankselect1k = 0, CHR5_Bankselect1k = 0, CHR6_Bankselect1k = 0, CHR7_Bankselect1k = 0;
+        static int CHR2_Bankselect2k = 0, CHR3_Bankselect2k = 0;
+        static int PRG2_Bankselect = 0, PRG3_Bankselect = 0;
+        static int PRG_BankselectRam = 0;//, PRG0_BankselectRam = 0, PRG1_BankselectRam = 0, PRG2_BankselectRam = 0; 
+        static bool useRamBank0 = false, useRamBank1 = false, useRamBank2 = false;
 
-        int CHR4_Bankselect1k = 0, CHR5_Bankselect1k = 0, CHR6_Bankselect1k = 0, CHR7_Bankselect1k = 0;
-        int CHR2_Bankselect2k = 0, CHR3_Bankselect2k = 0;
-        int PRG2_Bankselect = 0, PRG3_Bankselect = 0;
-        int PRG_BankselectRam = 0;
-        bool useRamBank0 = false, useRamBank1 = false, useRamBank2 = false;
-        int PRG_Bankmode;
-        int CHR_Bankmode;
-        int CHR1_Bankselect;
-        int PRG0_Bankselect;
-
-        int CHR0_Bankselect1k = 0, CHR1_Bankselect1k = 0, CHR2_Bankselect1k = 0, CHR3_Bankselect1k = 0;
-        int CHR0_Bankselect2k = 0, CHR1_Bankselect2k = 0;
-        int PRG1_Bankselect = 0;
-        int CHR_Bankselect;
-        int CHR0_Bankselect;
-
-        public void MapperInit(byte* _PRG_ROM, byte* _CHR_ROM, byte* _ppu_ram, int _PRG_ROM_count, int _CHR_ROM_count, int* _Vertical)
+        static byte mapper005read_ExpansionROM(ushort address)//for register configure
         {
-            PRG_ROM = _PRG_ROM;
-            CHR_ROM = _CHR_ROM;
-            ppu_ram = _ppu_ram;
-            CHR_ROM_count = _CHR_ROM_count;
-            PRG_ROM_count = _PRG_ROM_count;
-            Vertical = _Vertical;
+            return 0;
         }
 
-        public byte MapperR_ExpansionROM(ushort address) { return 0; }
-        public void MapperW_ExpansionROM(ushort address, byte value) { }
-        public void MapperW_RAM(ushort address, byte value) { }
-        public byte MapperR_RAM(ushort address) { return 0; }
-
-        public void MapperW_PRG(ushort address, byte value)
+        static void mapper005write_ExpansionROM(ushort address, byte value)//for register configure
         {
             //register
             switch (address)
@@ -103,8 +77,14 @@ namespace AprNes
                 case 0x5206: break; //??  Writes specify the eight-bit multiplier; reads return the upper eight bits of the product
             }
         }
-
-        public byte MapperR_RPG(ushort address)
+        static void mapper005write_RAM(ushort address, byte value)
+        {
+        }
+        static byte mapper005read_RAM(ushort address, byte value)
+        {
+            return 0;
+        }
+        static byte mapper005read_RPG(ushort address)
         {
             if (PRG_Bankmode == 0) return 0;
             else if (PRG_Bankmode == 1)
@@ -168,7 +148,7 @@ namespace AprNes
             }
         }
 
-        public byte MapperR_CHR(int address)
+        static byte mapper005read_CHR(int address)
         {
             if (CHR_Bankmode == 0) return CHR_ROM[address + (CHR_Bankselect << 13)]; //8k
             else if (CHR_Bankmode == 1) //4k
@@ -197,4 +177,3 @@ namespace AprNes
         }
     }
 }
-

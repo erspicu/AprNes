@@ -249,6 +249,21 @@ namespace XBRz_speed
 
         static void _FillBlock4x(uint* trg, int trgi, int pitch, uint col)
         {
+            /*
+            ulong* t = (ulong*)trg;
+            ulong _col = col | ((ulong)col << 32);
+            int _trgi = trgi>>1;
+            int _pitch = pitch >> 1;
+            t[_trgi] = t[_trgi + 1 ] = _col;
+            _trgi += _pitch;
+            t[_trgi] = t[_trgi + 1] = _col;
+            _trgi += _pitch;
+            t[_trgi] = t[_trgi + 1] = _col;
+            _trgi += _pitch;
+            t[_trgi] = t[_trgi + 1] = _col;*/
+
+
+            
             trg[trgi] = trg[trgi + 1] = trg[trgi + 2] = trg[trgi + 3] = col;
             trgi += pitch;
             trg[trgi] = trg[trgi + 1] = trg[trgi + 2] = trg[trgi + 3] = col;
@@ -274,6 +289,25 @@ namespace XBRz_speed
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void _FillBlock6x(uint* trg, int trgi, int pitch, uint col)
         {
+            /*
+            ulong* t = (ulong*)trg;
+            ulong _col = col | ((ulong)col << 32);
+            int _trgi = trgi >> 1;
+            int _pitch = pitch >> 1;
+
+            t[_trgi] = t[_trgi + 1] = t[_trgi + 2] =  _col;
+            _trgi += _pitch;
+            t[_trgi] = t[_trgi + 1] = t[_trgi + 2] = _col;
+            _trgi += _pitch;
+            t[_trgi] = t[_trgi + 1] = t[_trgi + 2] = _col;
+            _trgi += _pitch;
+            t[_trgi] = t[_trgi + 1] = t[_trgi + 2] = _col;
+            _trgi += _pitch;
+            t[_trgi] = t[_trgi + 1] = t[_trgi + 2] = _col;
+            _trgi += _pitch;
+            t[_trgi] = t[_trgi + 1] = t[_trgi + 2] = _col;*/
+
+
             trg[trgi] = trg[trgi + 1] = trg[trgi + 2] = trg[trgi + 3] = trg[trgi + 4] = trg[trgi + 5] = col;
             trgi += pitch;
             trg[trgi] = trg[trgi + 1] = trg[trgi + 2] = trg[trgi + 3] = trg[trgi + 4] = trg[trgi + 5] = col;
@@ -290,20 +324,62 @@ namespace XBRz_speed
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static int DistYCbCr(uint pix1, uint pix2)
         {
-            uint r_diff = ((pix1 & 0xff0000) >> 16) - ((pix2 & 0xff0000) >> 16);
-            uint g_diff = ((pix1 & 0xff00) >> 8) - ((pix2 & 0xff00) >> 8);
-            uint b_diff = (pix1 & 0xff) - (pix2 & 0xff);
-            return lTable_dist[(((r_diff + 255) >> 1) << 16) | (((g_diff + 255) >> 1) << 8) | ((b_diff + 255) >> 1)];
+
+            /*byte* p1 = (byte*)&pix1;
+            byte* p2 = (byte*)&pix2;
+
+            int r_diff = p1[2] - p2[2];
+            int g_diff = p1[1] - p2[1];
+            int b_diff = p1[0] - p2[0];
+
+            int t;
+            byte* _t = (byte*)&t;
+            _t[2] = (byte)((r_diff + 255) >> 1);
+            _t[1] = (byte)((g_diff + 255) >> 1);
+            _t[0] = (byte)((b_diff + 255) >> 1);
+            return lTable_dist[t];
+            */
+
+
+
+            /*
+            uint r_diff = (((pix1 & 0xff0000) >> 16) - ((pix2 & 0xff0000) >> 16));
+            uint g_diff = (((pix1 & 0xff00) >> 8) - ((pix2 & 0xff00) >> 8));
+            uint b_diff = ((pix1 & 0xff) - (pix2 & 0xff));
+            */
+            return lTable_dist[((((((pix1 & 0xff0000) >> 16) - ((pix2 & 0xff0000) >> 16)) + 255) >> 1) << 16) | ((((((pix1 & 0xff00) >> 8) - ((pix2 & 0xff00) >> 8)) + 255) >> 1) << 8) | ((((pix1 & 0xff) - (pix2 & 0xff)) + 255) >> 1)];
+
+            //return lTable_dist[(((r_diff + 255) >> 1) << 16) | (((g_diff + 255) >> 1) << 8) | ((b_diff + 255) >> 1)];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool ColorEQ(uint pix1, uint pix2)
         {
             if (pix1 == pix2) return true;
+
+            /*
             uint r_diff = ((pix1 & 0xff0000) >> 16) - ((pix2 & 0xff0000) >> 16);
             uint g_diff = ((pix1 & 0xff00) >> 8) - ((pix2 & 0xff00) >> 8);
-            uint b_diff = (pix1 & 0xff) - (pix2 & 0xff);
-            return lTable_dist[(((r_diff + 255) >> 1) << 16) | (((g_diff + 255) >> 1) << 8) | ((b_diff + 255) >> 1)] < eqColorThres;
+            uint b_diff = (pix1 & 0xff) - (pix2 & 0xff);*/
+
+            /*byte* p1 = (byte*)&pix1;
+            byte* p2 = (byte*)&pix2;
+
+            int r_diff = p1[2] - p2[2];
+            int g_diff = p1[1] - p2[1];
+            int b_diff = p1[0] - p2[0];
+
+            int t;
+            byte* _t = (byte*)&t;
+            _t[2] = (byte)((r_diff + 255) >> 1);
+            _t[1] = (byte)((g_diff + 255) >> 1);
+            _t[0] = (byte)((b_diff + 255) >> 1);
+            return lTable_dist[t] < eqColorThres;*/
+
+
+            return lTable_dist[((((((pix1 & 0xff0000) >> 16) - ((pix2 & 0xff0000) >> 16)) + 255) >> 1) << 16) | ((((((pix1 & 0xff00) >> 8) - ((pix2 & 0xff00) >> 8)) + 255) >> 1) << 8) | ((((pix1 & 0xff) - (pix2 & 0xff)) + 255) >> 1)] < eqColorThres;
+
+           // return lTable_dist[(((r_diff + 255) >> 1) << 16) | (((g_diff + 255) >> 1) << 8) | ((b_diff + 255) >> 1)] < eqColorThres;
         }
 
         class OutputMatrix
