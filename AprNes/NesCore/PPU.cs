@@ -183,7 +183,7 @@ namespace AprNes
                         RenderSpritesLine();
 
                 }
-                else if (ppu_cycles_x == 256 && ShowBackGround) UpdateVramRegister();
+                else if (ppu_cycles_x == 256 && (ShowBackGround || ShowSprites)) UpdateVramRegister();
                 else if (ppu_cycles_x == 260)
                 {
                     // MMC3 IRQ: clock on visible scanlines (A12 rising edge during sprite fetches)
@@ -361,7 +361,7 @@ namespace AprNes
                     array_loc = (scanline << 8) + screenX;
                     if (oam_th == 0 && !isSprite0hit && pixel != 0 && Buffer_BG_array[array_loc] != 0 && screenX != 255 && ShowBackGround)
                         isSprite0hit = true;
-                    if (pixel != 0 && (Buffer_BG_array[array_loc] == 0 || !priority))
+                    if (pixel != 0 && (!ShowBackGround || Buffer_BG_array[array_loc] == 0 || !priority))
                         ScreenBuf1x[array_loc] = NesColors[ppu_ram[0x3f10 + ((sprite_attr & 3) << 2) | pixel] & 0x3f];
                 }
             }
