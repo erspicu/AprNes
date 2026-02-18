@@ -70,6 +70,8 @@ namespace AprNes
         public static void SoftReset()
         {
             softreset = true;
+            closeAudio();
+            initAPU();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

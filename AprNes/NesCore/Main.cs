@@ -188,6 +188,9 @@ namespace AprNes
 
                 //init cpu pc
                 r_PC = (ushort)(Mem_r(0xfffc) | Mem_r(0xfffd) << 8);
+
+                //init APU & audio output
+                initAPU();
             }
             catch (Exception e)
             {
@@ -211,6 +214,7 @@ namespace AprNes
         }
         static public void run()
         {
+            timeBeginPeriod(1); // 設定 1ms 計時器精度，確保 Thread.Sleep(1) 準確
             StopWatch.Restart();
             while (!exit)
             {
@@ -223,6 +227,7 @@ namespace AprNes
                 } while (--cpu_cycles > 0);
 
             }
+            timeEndPeriod(1);
             Console.WriteLine("exit..");
         }
 

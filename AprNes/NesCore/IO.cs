@@ -16,7 +16,7 @@ namespace AprNes
                 case 0x2005: return openbus;
                 case 0x2006: return openbus;
                 case 0x2007: return ppu_r_2007();
-                case 0x4015: return 0;
+                case 0x4015: return apu_r_4015();
                 case 0x4016: return gamepad_r_4016();
                 default: return 0x40; //fix 2017.01.19
             }
@@ -57,7 +57,13 @@ namespace AprNes
                 case 0x4014: ppu_w_4014(val); break;
                 case 0x4015: apu_4015(val); break;
                 case 0x4016: gamepad_w_4016(val); break;
-                case 0x4017: break;//
+                case 0x4017:                          // Frame counter mode
+                    ctrmode        = ((val & 0x80) != 0) ? 5 : 4;
+                    apuintflag     = (val & 0x40) != 0;
+                    framectr       = 0;
+                    framectrdiv    = framectrreload;
+                    if (ctrmode == 5) clockframecounter(); // 5-step: 立即觸發
+                    break;
                 default: break;
             }
         }
