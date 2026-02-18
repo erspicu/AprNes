@@ -10,7 +10,7 @@ namespace AprNes
         int PRG_ROM_count;
         int* Vertical;
 
-        bool IRQ_enable = false, IRQReset = false, IRQResteVbl = false;
+        bool IRQ_enable = false, IRQReset = false;
         int IRQlatchVal = 0, IRQCounter = 0, BankReg = 0;
         int CHR0_Bankselect1k = 0, CHR1_Bankselect1k = 0, CHR2_Bankselect1k = 0, CHR3_Bankselect1k = 0;
         int CHR0_Bankselect2k = 0, CHR1_Bankselect2k = 0;
@@ -18,27 +18,23 @@ namespace AprNes
         int PRG_Bankmode;
         int CHR_Bankmode;
 
-        public  void Mapper04step_IRQ()
+        public void Mapper04step_IRQ()
         {
-            if (NesCore.ShowBackGround ||  NesCore.ShowSprites)
+            // Clocked by PPU A12 rising edge, once per scanline when rendering is enabled.
+            // If counter==0 or reload requested: reload from latch, then check for IRQ.
+            // Otherwise decrement, then check for IRQ.
+            if (IRQCounter == 0 || IRQReset)
             {
-                if (IRQResteVbl)
-                {
-                    IRQCounter = IRQlatchVal;
-                    IRQResteVbl = false;
-                }
-                if (IRQReset)
-                {
-                    IRQCounter = IRQlatchVal;
-                    IRQReset = false;
-                }
-                else if (IRQCounter > 0) IRQCounter--;
+                IRQCounter = IRQlatchVal;
+                IRQReset = false;
             }
-            if (IRQCounter == 0)
+            else
             {
-                if (IRQ_enable)  NesCore.IRQInterrupt(); // IRQ_set = true;
-                IRQReset = true;
+                IRQCounter--;
             }
+
+            if (IRQCounter == 0 && IRQ_enable)
+                NesCore.IRQInterrupt();
         }
 
         public void MapperInit(byte* _PRG_ROM, byte* _CHR_ROM, byte* _ppu_ram, int _PRG_ROM_count, int _CHR_ROM_count, int* _Vertical)
@@ -91,7 +87,6 @@ namespace AprNes
                 else//$E000-$FFFF IRQ disable
                 {
                     IRQ_enable = false;
-                    IRQCounter = IRQlatchVal;
                 }
             }
             else//odd
@@ -110,13 +105,7 @@ namespace AprNes
                 else if (address < 0xc000) return; //$A000-$BFFF (PRG RAM protect) nothing do
                 else if (address < 0xe000)//$C000-$DFFF (IRQ reload)
                 {
-                    IRQCounter |= 0x80;
-                    if ( NesCore.scanline < 240) IRQReset = true;
-                    else
-                    {
-                        IRQResteVbl = true;
-                        IRQReset = false;
-                    }
+                    IRQReset = true; // reload counter from latch on next A12 rising edge
                 }
                 else IRQ_enable = true; //$E000-$FFFF (IRQ enable) 
             }

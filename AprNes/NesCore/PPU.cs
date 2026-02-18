@@ -34,6 +34,7 @@ namespace AprNes
 
         //ppu mask 0x2001
         public static bool ShowBackGround = false, ShowSprites = false;
+        static bool ShowBgLeft8 = true, ShowSprLeft8 = true; // bit1/bit2: show in leftmost 8 pixels
 
         //ppu status 0x2002.
         static bool isSpriteOverflow = false, isSprite0hit = false, isVblank = false;
@@ -185,11 +186,16 @@ namespace AprNes
                 else if (ppu_cycles_x == 256 && ShowBackGround) UpdateVramRegister();
                 else if (ppu_cycles_x == 260)
                 {
-                    if (SpPatternTableAddr == 0x1000 && BgPatternTableAddr == 0)
-                    {
-                        if (mapper == 4) (MapperObj as Mapper004).Mapper04step_IRQ();
-                    }
+                    // MMC3 IRQ: clock on visible scanlines (A12 rising edge during sprite fetches)
+                    if ((ShowBackGround || ShowSprites) && mapper == 4)
+                        (MapperObj as Mapper004).Mapper04step_IRQ();
                 }
+            }
+            else if (scanline == 261 && ppu_cycles_x == 260)
+            {
+                // MMC3 IRQ: also clock on pre-render scanline 261 (hardware clocks here too)
+                if ((ShowBackGround || ShowSprites) && mapper == 4)
+                    (MapperObj as Mapper004).Mapper04step_IRQ();
             }
             else if (scanline == 240 && ppu_cycles_x == 1)
             {
@@ -239,7 +245,7 @@ namespace AprNes
             vram_addr_limite = vram_addr & 0x3FF;
             attrAddr = (ushort)(0x23C0 | (vram_addr & 0xC00) | (((vram_addr_limite >> 2) & 0x07) | (((vram_addr_limite >> 4) & 0x38) | 0x3C0)));
             tileAddr = (ushort)((vram_addr & 0xc00) | 0x2000 | vram_addr_limite);
-            array_loc = (ppu_ram[tileAddr] << 4) + BgPatternTableAddr + ((scanline + scrol_y) & 7);
+            array_loc = (ppu_ram[tileAddr] << 4) + BgPatternTableAddr + ((vram_addr >> 12) & 7);
             lowshift = (ushort)((lowshift << 8) | MapperObj.MapperR_CHR(array_loc));
             highshift = (ushort)((highshift << 8) | MapperObj.MapperR_CHR(array_loc + 8));
             if ((vram_addr & 0x1F) == 0x1F) vram_addr ^= 0x41F; else vram_addr++;
@@ -256,9 +262,15 @@ namespace AprNes
                 {
                     current = 15 - loc - FineX;
                     array_loc = (scanline << 8) + ((x << 3) | loc);
-                    pixel = Buffer_BG_array[array_loc] = ((lowshift >> current) & 1) | (((highshift >> current) & 1) << 1);
+                    int bgPixel = ((lowshift >> current) & 1) | (((highshift >> current) & 1) << 1);
+                    // left 8 pixels clip: treat as transparent for BG when ShowBgLeft8 is off
+                    bool inLeft8 = ((x << 3) | loc) < 8;
+                    Buffer_BG_array[array_loc] = (!ShowBgLeft8 && inLeft8) ? 0 : bgPixel;
+                    pixel = bgPixel;
 
-                    if (current >= 8)
+                    if (!ShowBgLeft8 && inLeft8)
+                        ScreenBuf1x[array_loc] = NesColors[ppu_ram[0x3f00] & 0x3f]; // universal BG color
+                    else if (current >= 8)
                         ScreenBuf1x[array_loc] = NesColors[ppu_ram[((pixel == 0) ? 0x3f00 : 0x3f00 | (attr << 2)) | pixel] & 0x3f];
                     else
                         ScreenBuf1x[array_loc] = NesColors[ppu_ram[((pixel == 0) ? 0x3f00 : 0x3f00 | (attrbuf << 2)) | pixel] & 0x3f];
@@ -272,39 +284,51 @@ namespace AprNes
 
         static void RenderSpritesLine()
         {
-            int spriteCount = 0, line_t = 0, loc_t, oam_addr = 0, line, tile_th_t, y_loc = 0, offset, mask;
-            byte tile_th, tile_hbyte, tile_lbyte;
-            bool flip_x = false;
-            for (int oam_th = 63; oam_th >= 0; oam_th--)
+            // Pass 1: scan OAM 0→63, pick first 8 sprites visible on this scanline.
+            // NES secondary OAM evaluation: hardware only renders the first 8 per scanline.
+            int* sel = stackalloc int[8];
+            int selCount = 0, spriteCount = 0;
+            int height = Spritesize8x16 ? 15 : 7;
+
+            for (int oam_th = 0; oam_th < 64; oam_th++)
             {
-                oam_addr = oam_th << 2;
-                y_loc = spr_ram[oam_addr];
+                int raw_y = spr_ram[oam_th << 2];
+                // OAM Y = display_top - 1, so display range is [raw_y+1, raw_y+1+height]
+                // i.e., scanline > raw_y && scanline - raw_y <= height + 1
+                if (scanline <= raw_y || scanline - raw_y > height + 1) continue;
+                if (++spriteCount == 9) isSpriteOverflow = true;
+                if (selCount < 8) sel[selCount++] = oam_th;
+            }
 
-                if ((!(y_loc > scanline || scanline - y_loc > (Spritesize8x16 ? 15 : 7))) && ((++spriteCount) == 9))//this line ref halfnes way
-                    isSpriteOverflow = true;
+            if (!ShowSprites) return;
 
-                if (!ShowSprites) continue;
+            // Pass 2: render in reverse OAM order so lower index (higher priority) wins.
+            for (int si = selCount - 1; si >= 0; si--)
+            {
+                int oam_th = sel[si];
+                int oam_addr = oam_th << 2;
+                int y_loc = spr_ram[oam_addr] + 1; // display top row (OAM Y is top-1)
 
-                y_loc++;
+                int offset, tile_th_t, line, line_t;
+                byte tile_th;
+
                 if (Spritesize8x16)
                 {
-                    if (scanline < y_loc || scanline > (y_loc + 15)) continue;//15
                     byte byte0 = spr_ram[oam_addr | 1];
-                    tile_th = (byte)((byte0 & 0xfe) >> 0);
-                    if ((byte0 & 1) > 0) offset = 256; else offset = 0;
+                    tile_th = (byte)(byte0 & 0xfe);
+                    offset = (byte0 & 1) != 0 ? 256 : 0;
                 }
                 else
                 {
-                    if (scanline < y_loc || scanline > (y_loc + 7)) continue;//7
                     tile_th = spr_ram[oam_addr | 1];
                     offset = SpPatternTableAddr >> 4;
                 }
 
-
                 byte sprite_attr = spr_ram[oam_addr | 2];
                 byte x_loc = spr_ram[oam_addr | 3];
-                bool priority = ((sprite_attr & 0x20) > 0) ? true : false;
-                if (scanline >= y_loc && scanline <= (y_loc + 7))
+                bool priority = (sprite_attr & 0x20) != 0;
+
+                if (scanline <= y_loc + 7)
                 {
                     tile_th_t = tile_th + offset;
                     line = scanline - y_loc;
@@ -312,26 +336,32 @@ namespace AprNes
                 else
                 {
                     tile_th_t = tile_th + offset + 1;
-                    line = (scanline - y_loc) - 8;
+                    line = scanline - y_loc - 8;
                 }
 
-                if ((sprite_attr & 0x80) > 0) line_t = (7 - line); else line_t = line;
+                if ((sprite_attr & 0x80) != 0)
+                {
+                    line_t = 7 - line;
+                    if (Spritesize8x16) tile_th_t ^= 1; // 8x16 vflip: swap top/bottom tile
+                }
+                else line_t = line;
 
-                tile_hbyte = MapperObj.MapperR_CHR((tile_th_t << 4) | (line_t + 8));
-                tile_lbyte = MapperObj.MapperR_CHR((tile_th_t << 4) | line_t);
-                flip_x = ((sprite_attr & 0x40) > 0) ? true : false;
+                byte tile_hbyte = MapperObj.MapperR_CHR((tile_th_t << 4) | (line_t + 8));
+                byte tile_lbyte = MapperObj.MapperR_CHR((tile_th_t << 4) | line_t);
+                bool flip_x = (sprite_attr & 0x40) != 0;
 
                 for (int loc = 0; loc < 8; loc++)
                 {
-                    if ((x_loc + loc) > 255) continue;
-                    if (flip_x) loc_t = (7 - loc); else loc_t = loc;
-                    mask = 1 << (7 - loc_t);
-                    pixel = (((tile_hbyte & mask) << 1) + (tile_lbyte & mask)) >> ((7 - loc_t));
-                    array_loc = ((scanline) << 8) + (x_loc + loc);
-                    if (oam_th == 0 && !isSprite0hit && pixel != 0 && Buffer_BG_array[array_loc] != 0 && (x_loc + loc) != 255 && ShowBackGround)
-                        isSprite0hit = true; //fixed 2017.0119 add  (x_loc + loc) != 255
-
-                    if (pixel != 0 && (Buffer_BG_array[array_loc] == 0 || (Buffer_BG_array[array_loc] != 0 && !priority)))
+                    int screenX = x_loc + loc;
+                    if (screenX > 255) continue;
+                    if (!ShowSprLeft8 && screenX < 8) continue;
+                    int loc_t = flip_x ? (7 - loc) : loc;
+                    int mask = 1 << (7 - loc_t);
+                    pixel = (((tile_hbyte & mask) << 1) + (tile_lbyte & mask)) >> (7 - loc_t);
+                    array_loc = (scanline << 8) + screenX;
+                    if (oam_th == 0 && !isSprite0hit && pixel != 0 && Buffer_BG_array[array_loc] != 0 && screenX != 255 && ShowBackGround)
+                        isSprite0hit = true;
+                    if (pixel != 0 && (Buffer_BG_array[array_loc] == 0 || !priority))
                         ScreenBuf1x[array_loc] = NesColors[ppu_ram[0x3f10 + ((sprite_attr & 3) << 2) | pixel] & 0x3f];
                 }
             }
@@ -441,8 +471,10 @@ namespace AprNes
         {
             openbus = value;
 
-            ShowBackGround = ((value & 0x8) > 0) ? true : false;
-            ShowSprites = ((value & 0x10) > 0) ? true : false;
+            ShowBgLeft8  = (value & 0x02) != 0; // bit1: show BG in leftmost 8 pixels
+            ShowSprLeft8 = (value & 0x04) != 0; // bit2: show sprites in leftmost 8 pixels
+            ShowBackGround = (value & 0x08) != 0;
+            ShowSprites    = (value & 0x10) != 0;
         }
 
         static void ppu_w_2003(byte value) //ok
