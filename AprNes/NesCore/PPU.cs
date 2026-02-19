@@ -94,17 +94,6 @@ namespace AprNes
             vram_addr = (vram_addr & ~0x041F) | (vram_addr_internal & 0x041F);
         }
 
-        // ---- A12 detection for MMC3 IRQ ----
-        static int ppu_a12_state = 0;
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void Clock_A12(int chrAddr)
-        {
-            int a12 = (chrAddr >> 12) & 1;
-            if (a12 == 1 && ppu_a12_state == 0 && (ShowBackGround || ShowSprites) && mapper == 4)
-                (MapperObj as Mapper004).Mapper04step_IRQ();
-            ppu_a12_state = a12;
-        }
-
         // ---- Tile fetch state ----
         static byte NTVal = 0, ATVal = 0, lowTile = 0, highTile = 0;
         static int ioaddr = 0;
@@ -172,14 +161,12 @@ namespace AprNes
                         break;
                     case 4:
                         ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
-                        Clock_A12(ioaddr);
                         break;
                     case 5:
                         lowTile = MapperObj.MapperR_CHR(ioaddr);
                         break;
                     case 6:
                         ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
-                        Clock_A12(ioaddr);
                         break;
                     case 7:
                         highTile = MapperObj.MapperR_CHR(ioaddr);
@@ -200,12 +187,6 @@ namespace AprNes
             else if (ppu_cycles_x == 257)
             {
                 CopyHoriV();
-                // Clock A12 for sprite fetch region start (visible scanlines only)
-                if (scanline < 240)
-                {
-                    int sprAddr = Spritesize8x16 ? 0 : SpPatternTableAddr;
-                    Clock_A12(sprAddr | 0x10); // bit 12 of sprAddr determines A12
-                }
             }
 
             // Pre-render scanline: continuous vert(v) = vert(t) copy at cycles 280-304
@@ -247,8 +228,16 @@ namespace AprNes
                     // Sprite evaluation + rendering at cycle 257 (after BG tiles complete at cycle 255)
                     if (ppu_cycles_x == 257)
                         RenderSpritesLine();
+
+                    // MMC3 IRQ: clock on visible scanlines at cycle 260 (A12 rising edge, sprite fetch region)
+                    if (ppu_cycles_x == 260 && renderingEnabled && mapper == 4)
+                        (MapperObj as Mapper004).Mapper04step_IRQ();
                 }
             }
+
+            // MMC3 IRQ: also clock on pre-render scanline 261 at cycle 260
+            if (scanline == 261 && ppu_cycles_x == 260 && renderingEnabled && mapper == 4)
+                (MapperObj as Mapper004).Mapper04step_IRQ();
 
             // Screen output at scanline 240 cycle 1 (matches ppu_step timing)
             if (scanline == 240 && ppu_cycles_x == 1)
