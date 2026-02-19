@@ -221,8 +221,8 @@ namespace AprNes
                 cpu_step();
                 do
                 {
-                    ppu_step(); ppu_step(); ppu_step();//3x cpu cycles
-                    //ppu_step_new(); ppu_step_new(); ppu_step_new();//3x cpu cycles
+                    //ppu_step(); ppu_step(); ppu_step();//3x cpu cycles (batch, legacy)
+                    ppu_step_new(); ppu_step_new(); ppu_step_new();//3x cpu cycles (cycle-accurate)
                     apu_step();//1x cpu cycles
                 } while (--cpu_cycles > 0);
 

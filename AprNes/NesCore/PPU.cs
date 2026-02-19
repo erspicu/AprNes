@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Threading;
 using System.Runtime.CompilerServices;
@@ -43,7 +43,7 @@ namespace AprNes
         static bool vram_latch = false;
         static byte ppu_2007_buffer = 0, ppu_2007_temp = 0;
         static byte* spr_ram, ppu_ram;
-        public static uint* ScreenBuf1x;
+        static public uint* ScreenBuf1x;
         static uint* NesColors; //, targetSize;
         static int* Buffer_BG_array;
         static byte spr_ram_add = 0;
@@ -52,235 +52,253 @@ namespace AprNes
         static bool oddSwap = false;
         //https://wiki.nesdev.com/w/index.php/PPU_scrolling
 
-        #region editing new way
-        //打算把PPU的timing跟rendering整個做法重寫,尚未完成
+        #region cycle-accurate PPU
 
-        //Coarse X increment
+        // Coarse X increment
         static void CXinc()
         {
-            if ((vram_addr & 0x001F) == 31) // if coarse X == 31
+            if ((vram_addr & 0x001F) == 31)
             {
-                vram_addr &= ~0x001F;// coarse X = 0
-                vram_addr ^= 0x0400;// switch horizontal nametable
+                vram_addr &= ~0x001F;
+                vram_addr ^= 0x0400;
             }
             else
-                vram_addr += 1;// increment coarse X
+                vram_addr += 1;
         }
 
-        //Y increment
+        // Y increment
         static void Yinc()
         {
-            if ((vram_addr & 0x7000) != 0x7000) // if fine Y < 7
-                vram_addr += 0x1000;// increment fine Y
+            if ((vram_addr & 0x7000) != 0x7000)
+                vram_addr += 0x1000;
             else
             {
-                vram_addr &= ~0x7000;// fine Y = 0
-                int y = (vram_addr & 0x03E0) >> 5;// let y = coarse Y
+                vram_addr &= ~0x7000;
+                int y = (vram_addr & 0x03E0) >> 5;
                 if (y == 29)
                 {
-                    y = 0; // coarse Y = 0
-                    vram_addr ^= 0x0800;// switch vram_addr ertical nametable
+                    y = 0;
+                    vram_addr ^= 0x0800;
                 }
                 else if (y == 31)
-                    y = 0;// coarse Y = 0, nametable not switched
+                    y = 0;
                 else
-                    y += 1;// increment coarse Y
-                vram_addr = (vram_addr & ~0x03E0) | (y << 5); // put coarse Y back into vram_addr 
+                    y += 1;
+                vram_addr = (vram_addr & ~0x03E0) | (y << 5);
             }
         }
-        static void getadd()
-        {
-            int tile_addr = 0x2000 | (vram_addr & 0x0FFF);
-            int attr_addr = 0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07);
-        }
-        //hori(v) = hori(t) update
+
+        // hori(v) = hori(t)
         static void CopyHoriV()
         {
-            vram_addr &= ~0x41f;
-            vram_addr |= vram_addr_internal & 0x41f;
+            vram_addr = (vram_addr & ~0x041F) | (vram_addr_internal & 0x041F);
         }
-        static int tileattr = 0, tilepat = 0, ioaddr = 0, pat_addr = 0;
-        static uint bg_shift_pat = 0, bg_shift_attr = 0;
 
-        static byte NTVal = 0;
-        static byte ATVal = 0;
-        static byte lowTile = 0;
-        static byte highTile = 0;
+        // ---- A12 detection for MMC3 IRQ ----
+        static int ppu_a12_state = 0;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Clock_A12(int chrAddr)
+        {
+            int a12 = (chrAddr >> 12) & 1;
+            if (a12 == 1 && ppu_a12_state == 0 && (ShowBackGround || ShowSprites) && mapper == 4)
+                (MapperObj as Mapper004).Mapper04step_IRQ();
+            ppu_a12_state = a12;
+        }
 
+        // ---- Tile fetch state ----
+        static byte NTVal = 0, ATVal = 0, lowTile = 0, highTile = 0;
+        static int ioaddr = 0;
+
+        // ---- BG shift registers (16-bit, two tiles: high=current, low=next) ----
+        static ushort lowshift = 0, highshift = 0;
+
+        // ---- Attribute delay queue (4 slots ring buffer) ----
+        // Phase-3 writes attribute into queue; phase-7 render reads it.
+        // 2 entries pre-loaded from previous scanline's prefetch (cycles 320-335).
+        static byte[] bg_at_queue = new byte[4];
+        static int bg_at_q_wr = 0, bg_at_q_rd = 0;
+
+        // Render 8 BG pixels at screen positions [ppu_cycles_x-7 .. ppu_cycles_x]
+        // using shift registers BEFORE reload (high byte = current tile data).
+        static void RenderBGTile()
+        {
+            byte renderAttr = bg_at_queue[bg_at_q_rd & 3];
+            byte nextAttr   = bg_at_queue[(bg_at_q_rd + 1) & 3];
+            bg_at_q_rd++;
+
+            int baseX = ppu_cycles_x - 7;
+            int scanOff = scanline << 8;
+            for (int loc = 0; loc < 8; loc++)
+            {
+                int screenX = baseX + loc;
+                if (screenX > 255) break;
+
+                bool inLeft8 = screenX < 8;
+                int bit = 15 - loc - FineX;           // 1..15 always (FineX 0..7, loc 0..7)
+                byte attrUse = (bit >= 8) ? renderAttr : nextAttr;
+                int bgPixel = ((lowshift >> bit) & 1) | (((highshift >> bit) & 1) << 1);
+
+                int slot = scanOff + screenX;
+                Buffer_BG_array[slot] = (!ShowBgLeft8 && inLeft8) ? 0 : bgPixel;
+
+                if (!ShowBgLeft8 && inLeft8)
+                    ScreenBuf1x[slot] = NesColors[ppu_ram[0x3f00] & 0x3f];
+                else if (bgPixel == 0)
+                    ScreenBuf1x[slot] = NesColors[ppu_ram[0x3f00] & 0x3f];
+                else
+                    ScreenBuf1x[slot] = NesColors[ppu_ram[(0x3f00 | (attrUse << 2)) + bgPixel] & 0x3f];
+            }
+        }
+
+        // Per-8-cycle tile fetch: runs each PPU cycle on visible/pre-render scanlines when rendering enabled.
+        // BG tiles fetched at cycles 0-255 (visible) and 320-335 (next-scanline prefetch).
+        // A12 transitions detected at CHR address setup cycles (phase 4 and 6).
         static void ppu_rendering_tick()
         {
-            bool tile_decode_mode = ((0x10FFFF & (1u << (ppu_cycles_x / 16))) != 0) ? true : false;  // When x is 0..255, 320..335
-            if (tile_decode_mode)
+            if (ppu_cycles_x < 256 || (ppu_cycles_x >= 320 && ppu_cycles_x < 336))
             {
                 switch (ppu_cycles_x & 7)
                 {
-                    case 0: ioaddr = 0x2000 + (vram_addr & 0xFFF); break; //get NT address
-                    case 1: NTVal = ppu_ram[ioaddr]; break; //get NT content
-                    case 2: ioaddr = 0x23C0 | (vram_addr & 0xC00) | (vram_addr >> 4 & 0x38) | (vram_addr >> 2 & 0x7); break;//get AT address
-                    case 3: ATVal = (byte)(ppu_ram[ioaddr] >> (((vram_addr >> 4 & 0x04) | (vram_addr & 0x02)))); break;//get AT content
-                    case 4: ioaddr = BgPatternTableAddr | (NTVal << 4) | (vram_addr >> 12 & 7); break;//get low tile address
-                    case 5: lowTile = MapperObj.MapperR_CHR(ioaddr); break;//get low tile content
-                    case 6: ioaddr = BgPatternTableAddr | (NTVal << 4) | (vram_addr >> 12 & 7) | 8; break;//get high tile address
-                    case 7: highTile = MapperObj.MapperR_CHR(ioaddr); break;//get high tile content
+                    case 0:
+                        ioaddr = 0x2000 | (vram_addr & 0x0FFF);
+                        break;
+                    case 1:
+                        NTVal = ppu_ram[ioaddr];
+                        break;
+                    case 2:
+                        ioaddr = 0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07);
+                        break;
+                    case 3:
+                        ATVal = (byte)((ppu_ram[ioaddr] >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
+                        // Queue attribute for visible rendering and next-scanline prefetch only
+                        if (scanline < 240 || ppu_cycles_x >= 320)
+                            bg_at_queue[bg_at_q_wr++ & 3] = ATVal;
+                        break;
+                    case 4:
+                        ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
+                        Clock_A12(ioaddr);
+                        break;
+                    case 5:
+                        lowTile = MapperObj.MapperR_CHR(ioaddr);
+                        break;
+                    case 6:
+                        ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
+                        Clock_A12(ioaddr);
+                        break;
+                    case 7:
+                        highTile = MapperObj.MapperR_CHR(ioaddr);
+                        // Render 8 pixels using shift registers BEFORE reload (visible only, BG on)
+                        if (scanline < 240 && ppu_cycles_x < 256 && ShowBackGround)
+                            RenderBGTile();
+                        // Load shift registers (high = old-low = previous tile, low = new tile)
+                        lowshift  = (ushort)((lowshift  << 8) | lowTile);
+                        highshift = (ushort)((highshift << 8) | highTile);
+                        CXinc();
+                        break;
                 }
             }
-            else if (ppu_cycles_x < 320) { }
-            //ignore unused NT fetches
+            else if (ppu_cycles_x == 256)
+            {
+                Yinc();
+            }
+            else if (ppu_cycles_x == 257)
+            {
+                CopyHoriV();
+                // Clock A12 for sprite fetch region start (visible scanlines only)
+                if (scanline < 240)
+                {
+                    int sprAddr = Spritesize8x16 ? 0 : SpPatternTableAddr;
+                    Clock_A12(sprAddr | 0x10); // bit 12 of sprAddr determines A12
+                }
+            }
+
+            // Pre-render scanline: continuous vert(v) = vert(t) copy at cycles 280-304
+            if (scanline == 261 && ppu_cycles_x >= 280 && ppu_cycles_x <= 304)
+                vram_addr = (vram_addr & ~0x7BE0) | (vram_addr_internal & 0x7BE0);
         }
-        static void ppu_rendering_pixel()
-        {
-        }
-        static bool oddlatch = false;
-        static int scanline_end = 341;
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_step_new()
         {
-            //for openbus value counter
+            // Open bus decay
             if (--open_bus_decay_timer == 0)
             {
                 open_bus_decay_timer = 77777;
                 openbus = 0;
             }
+
+            bool renderingEnabled = ShowBackGround || ShowSprites;
+
             if (scanline < 240 || scanline == 261)
             {
-                if (ShowBackGround || ShowSprites) ppu_rendering_tick();
-                if (scanline != 261 && ppu_cycles_x < 256) ppu_rendering_pixel();
-            }
-            ppu_cycles_x++;
-            if (ppu_cycles_x == scanline_end)
-            {
-                ppu_cycles_x = 0;
-                scanline_end = 341;
-                if (++scanline == 262)
+                if (renderingEnabled)
+                    ppu_rendering_tick();
+
+                if (scanline < 240)
                 {
-                    scanline = 0;
-                    if (oddlatch && ShowBackGround) scanline_end = 340;
-                    oddlatch = !oddlatch;
+                    // When BG disabled: fill scanline with backdrop color and clear priority buffer
+                    if (ppu_cycles_x == 0 && !ShowBackGround)
+                    {
+                        uint bgColor = NesColors[ppu_ram[0x3f00] & 0x3f];
+                        int scanOff = scanline << 8;
+                        for (int i = 0; i < 256; i++)
+                        {
+                            ScreenBuf1x[scanOff + i] = bgColor;
+                            Buffer_BG_array[scanOff + i] = 0;
+                        }
+                    }
 
-                }
-            }
-        }
-        #endregion
-
-        static int open_bus_decay_timer = 77777;
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void ppu_step()
-        {
-            if (--open_bus_decay_timer == 0)
-            {
-                open_bus_decay_timer = 77777;
-                openbus = 0;
-            }
-
-            if (scanline < 240)
-            {
-
-                if (ppu_cycles_x == 254)
-                {
-                    if (ShowBackGround)
-                        RenderBackGroundLine();
-                    if (ShowSprites || ShowBackGround)
+                    // Sprite evaluation + rendering at cycle 257 (after BG tiles complete at cycle 255)
+                    if (ppu_cycles_x == 257)
                         RenderSpritesLine();
+                }
+            }
 
-                }
-                else if (ppu_cycles_x == 256 && (ShowBackGround || ShowSprites)) UpdateVramRegister();
-                else if (ppu_cycles_x == 260)
-                {
-                    // MMC3 IRQ: clock on visible scanlines (A12 rising edge during sprite fetches)
-                    if ((ShowBackGround || ShowSprites) && mapper == 4)
-                        (MapperObj as Mapper004).Mapper04step_IRQ();
-                }
-            }
-            else if (scanline == 261 && ppu_cycles_x == 260)
-            {
-                // MMC3 IRQ: also clock on pre-render scanline 261 (hardware clocks here too)
-                if ((ShowBackGround || ShowSprites) && mapper == 4)
-                    (MapperObj as Mapper004).Mapper04step_IRQ();
-            }
-            else if (scanline == 240 && ppu_cycles_x == 1)
+            // Screen output at scanline 240 cycle 1 (matches ppu_step timing)
+            if (scanline == 240 && ppu_cycles_x == 1)
             {
                 RenderScreen();
-                if (LimitFPS) while (StopWatch.Elapsed.TotalSeconds < 0.01666) Thread.Sleep(1);//0.0167
+                if (LimitFPS) while (StopWatch.Elapsed.TotalSeconds < 0.01666) Thread.Sleep(1);
                 frame_count++;
                 StopWatch.Restart();
             }
-            ++ppu_cycles_x;
 
+            // Advance cycle counter
+            ppu_cycles_x++;
+
+            // VBlank start at scanline 241, cycle 1 (post-increment)
             if (scanline == 241 && ppu_cycles_x == 1)
             {
-                if (!SuppressVbl)
-                {
-                    isVblank = true;
-                }
+                if (!SuppressVbl) isVblank = true;
                 if (NMIable) NMIInterrupt();
             }
 
+            // Pre-render: clear PPU status flags at cycle 1 (post-increment)
+            if (scanline == 261 && ppu_cycles_x == 1)
+                isVblank = isSprite0hit = isSpriteOverflow = false;
+
+            // Odd frame skip: on odd frames, skip cycle 338 of pre-render (same as ppu_step)
             if (scanline == 261 && ppu_cycles_x == 338)
             {
                 oddSwap = !oddSwap;
-                if (!oddSwap & ShowBackGround) ++ppu_cycles_x;
+                if (!oddSwap && ShowBackGround) ppu_cycles_x++;
             }
+
+            // Advance scanline
             if (ppu_cycles_x == 341)
             {
                 if (++scanline == 262) scanline = 0;
                 ppu_cycles_x = 0;
             }
-
-            if (scanline == 261)
-            {
-                if (ppu_cycles_x == 1) isVblank = isSprite0hit = isSpriteOverflow = false;
-                else if (ppu_cycles_x == 304 && (ShowBackGround || ShowSprites)) vram_addr = vram_addr_internal;
-            }
-
         }
+
+        #endregion
+
+        static int open_bus_decay_timer = 77777;
 
         static bool NMIing = false;
 
-        static ushort attrAddr, tileAddr, lowshift, highshift;
-        static int current, pixel, vram_addr_limite, attr, attrbuf, array_loc;
-
-        static int GetAttr()
-        {
-
-            vram_addr_limite = vram_addr & 0x3FF;
-            attrAddr = (ushort)(0x23C0 | (vram_addr & 0xC00) | (((vram_addr_limite >> 2) & 0x07) | (((vram_addr_limite >> 4) & 0x38) | 0x3C0)));
-            tileAddr = (ushort)((vram_addr & 0xc00) | 0x2000 | vram_addr_limite);
-            array_loc = (ppu_ram[tileAddr] << 4) + BgPatternTableAddr + ((vram_addr >> 12) & 7);
-            lowshift = (ushort)((lowshift << 8) | MapperObj.MapperR_CHR(array_loc));
-            highshift = (ushort)((highshift << 8) | MapperObj.MapperR_CHR(array_loc + 8));
-            if ((vram_addr & 0x1F) == 0x1F) vram_addr ^= 0x41F; else vram_addr++;
-            return ((ppu_ram[attrAddr] >> (((vram_addr_limite >> 4) & 0x04) | (vram_addr_limite & 0x02))) & 0x03);
-        }
-
-        static void RenderBackGroundLine()
-        {
-            attr = GetAttr();
-            attrbuf = GetAttr();
-            for (int x = 0; x < 32; x++)
-            {
-                for (int loc = 0; loc < 8; loc++)
-                {
-                    current = 15 - loc - FineX;
-                    array_loc = (scanline << 8) + ((x << 3) | loc);
-                    int bgPixel = ((lowshift >> current) & 1) | (((highshift >> current) & 1) << 1);
-                    // left 8 pixels clip: treat as transparent for BG when ShowBgLeft8 is off
-                    bool inLeft8 = ((x << 3) | loc) < 8;
-                    Buffer_BG_array[array_loc] = (!ShowBgLeft8 && inLeft8) ? 0 : bgPixel;
-                    pixel = bgPixel;
-
-                    if (!ShowBgLeft8 && inLeft8)
-                        ScreenBuf1x[array_loc] = NesColors[ppu_ram[0x3f00] & 0x3f]; // universal BG color
-                    else if (current >= 8)
-                        ScreenBuf1x[array_loc] = NesColors[ppu_ram[((pixel == 0) ? 0x3f00 : 0x3f00 | (attr << 2)) | pixel] & 0x3f];
-                    else
-                        ScreenBuf1x[array_loc] = NesColors[ppu_ram[((pixel == 0) ? 0x3f00 : 0x3f00 | (attrbuf << 2)) | pixel] & 0x3f];
-                }
-                attr = attrbuf;
-                attrbuf = GetAttr();
-            }
-
-            GetAttr();
-        }
+        static int pixel, array_loc;
 
         static void RenderSpritesLine()
         {
@@ -376,34 +394,11 @@ namespace AprNes
             _event.WaitOne();
         }
 
-        static void UpdateVramRegister()
-        {
-            if ((vram_addr & 0x1F) == 0x1F) vram_addr ^= 0x41F; else vram_addr++;
-            if (ShowBackGround || ShowSprites)
-            {
-                if ((vram_addr & 0x7000) == 0x7000)
-                {
-                    vram_addr ^= 0x7000;
-                    switch (vram_addr & 0x3E0)
-                    {
-                        case 0x3A0: vram_addr ^= 0xBA0; break;
-                        case 0x3E0: vram_addr ^= 0x3E0; break;
-                        default: vram_addr += 0x20; break;
-                    }
-                }
-                else
-                    vram_addr += 0x1000;
-                vram_addr = (vram_addr & 0x7BE0) | (vram_addr_internal & 0x41F);
-            }
-        }
-
         static bool SuppressNmi = false, SuppressVbl = false;
         //ref http://wiki.nesdev.com/w/index.php/PPU_scrolling
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ppu_r_2002() //ok
         {
-
-
             openbus = (byte)(((isVblank) ? 0x80 : 0) | ((isSprite0hit) ? 0x40 : 0) | ((isSpriteOverflow) ? 0x20 : 0) | (openbus & 0x1f));
 
             if (ppu_cycles_x == 1 && scanline == 240)
@@ -426,29 +421,7 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ppu_r_2007()
         {
-
             return ppu_read_fun[vram_addr](vram_addr);
-
-            //old way 暫時保留參考
-            /*
-             int vram_addr_wrap = 0;
-             if ((vram_addr & 0x3F00) == 0x3F00)
-             {
-                 ppu_2007_temp = ppu_ram[vram_addr & ((vram_addr & 0x03) == 0 ? 0x0C : 0x1F) + 0x3f00];
-                 vram_addr_wrap = vram_addr & 0x2FFF;
-                 if (vram_addr_wrap < 0x2000) ppu_2007_buffer = MapperObj.MapperR_CHR(vram_addr_wrap);
-                 else ppu_2007_buffer = ppu_ram[vram_addr_wrap];
-             }
-             else
-             {
-                 ppu_2007_temp = ppu_2007_buffer; //need read from buffer
-                 vram_addr_wrap = vram_addr & 0x3FFF;
-                 if (vram_addr_wrap < 0x2000) ppu_2007_buffer = MapperObj.MapperR_CHR(vram_addr_wrap);//Pattern Table 
-                 else if (vram_addr_wrap < 0x3F00) ppu_2007_buffer = ppu_ram[vram_addr_wrap]; //Name Table & Attribute Table
-                 else ppu_2007_buffer = ppu_ram[vram_addr_wrap & ((vram_addr_wrap & 0x03) == 0 ? 0x0C : 0x1F) + 0x3f00]; // //Sprite Palette & Image Palette   
-             }
-             vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x7FFF);
-             return openbus = ppu_2007_temp;*/
         }
 
         static byte openbus;
@@ -492,7 +465,7 @@ namespace AprNes
         static byte ppu_r_2004() //ok
         {
             if ((spr_ram_add + 3) % 3 == 0) open_bus_decay_timer = 77777;//fixed add
-            return openbus = spr_ram[spr_ram_add] &= 0xE3; //fixed 
+            return openbus = spr_ram[spr_ram_add] &= 0xE3; //fixed
         }
 
         static void ppu_w_2005(byte value) //ok
@@ -512,8 +485,6 @@ namespace AprNes
         }
         static void ppu_w_2006(byte value)//ok
         {
-
-
             openbus = value;
             if (!vram_latch) //first
                 vram_addr_internal = (vram_addr_internal & 0x00FF) | ((value & 0x3F) << 8);
@@ -528,47 +499,8 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_w_2007(byte value)
         {
-
             open_bus_decay_timer = 77777;
             ppu_write_fun[vram_addr](value);
-
-            //old way 暫時保留參考
-            /*int vram_addr_wrap = 0;
-            openbus = value;
-            vram_addr_wrap = vram_addr & 0x3FFF;
-            if (vram_addr_wrap < 0x2000)
-            {
-                if (CHR_ROM_count == 0) ppu_ram[vram_addr_wrap] = value;
-            }
-            else if (vram_addr_wrap < 0x3f00) //Name Table & Attribute Table
-            {
-                addr_range = vram_addr_wrap & 0xc00;
-                if (ScreenSpecial)
-                {
-                    if (ScreenFour) ppu_ram[vram_addr_wrap] = value;
-                    else if (ScreenSingle)
-                    {
-                        ppu_ram[0x2000 | (vram_addr_wrap & 0x3ff)] = ppu_ram[0x2400 | (vram_addr_wrap & 0x3ff)] = ppu_ram[0x2800 | (vram_addr_wrap & 0x3ff)] = ppu_ram[0x2c00 | (vram_addr_wrap & 0x3ff)] = value;
-                    }
-                }
-                else
-                {
-                    if (*Vertical != 0)
-                    {
-                        if (addr_range < 0x800) ppu_ram[vram_addr_wrap] = ppu_ram[vram_addr_wrap | 0x800] = value;
-                        else ppu_ram[vram_addr_wrap] = ppu_ram[vram_addr_wrap & 0x37ff] = value;
-                    }
-                    else
-                    {
-                        if (addr_range < 0x400) ppu_ram[vram_addr_wrap] = ppu_ram[vram_addr_wrap | 0x400] = value;
-                        else if (addr_range < 0x800) ppu_ram[vram_addr_wrap] = ppu_ram[vram_addr_wrap & 0x3bff] = value;
-                        else if (addr_range < 0xc00) ppu_ram[vram_addr_wrap] = ppu_ram[vram_addr_wrap | 0x400] = value;
-                        else ppu_ram[vram_addr_wrap] = ppu_ram[vram_addr_wrap & 0x3bff] = value;
-                    }
-                }
-            }
-            else ppu_ram[(vram_addr_wrap & ((vram_addr_wrap & 0x03) == 0 ? 0x0C : 0x1F)) + 0x3f00] = value; //Sprite Palette & Image Palette
-            vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x7FFF);*/
         }
 
         static void ppu_w_4014(byte value)//DMA , fixex 2017.01.16 pass sprite_ram test
