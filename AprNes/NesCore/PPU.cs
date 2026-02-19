@@ -289,16 +289,21 @@ namespace AprNes
         static void RenderSpritesLine()
         {
             // Pass 1: scan OAM 0→63, pick first 8 sprites visible on this scanline.
+            // NES hardware only performs sprite evaluation when rendering is enabled.
             int* sel = stackalloc int[8];
             int selCount = 0, spriteCount = 0;
             int height = Spritesize8x16 ? 15 : 7;
+            bool renderingEnabled = ShowBackGround || ShowSprites;
 
-            for (int oam_th = 0; oam_th < 64; oam_th++)
+            if (renderingEnabled)
             {
-                int raw_y = spr_ram[oam_th << 2];
-                if (scanline <= raw_y || scanline - raw_y > height + 1) continue;
-                if (++spriteCount == 9) isSpriteOverflow = true;
-                if (selCount < 8) sel[selCount++] = oam_th;
+                for (int oam_th = 0; oam_th < 64; oam_th++)
+                {
+                    int raw_y = spr_ram[oam_th << 2];
+                    if (scanline < raw_y || scanline - raw_y > height) continue;
+                    if (++spriteCount == 9) isSpriteOverflow = true;
+                    if (selCount < 8) sel[selCount++] = oam_th;
+                }
             }
 
             if (!ShowSprites) return;
@@ -319,7 +324,7 @@ namespace AprNes
             {
                 int oam_th = sel[si];
                 int oam_addr = oam_th << 2;
-                int y_loc = spr_ram[oam_addr] + 1;
+                int y_loc = spr_ram[oam_addr];
 
                 int offset, tile_th_t, line, line_t;
                 byte tile_th;
@@ -415,7 +420,7 @@ namespace AprNes
         {
             openbus = (byte)(((isVblank) ? 0x80 : 0) | ((isSprite0hit) ? 0x40 : 0) | ((isSpriteOverflow) ? 0x20 : 0) | (openbus & 0x1f));
 
-            if (ppu_cycles_x == 1 && scanline == 240)
+            if (ppu_cycles_x == 1 && scanline == 241)
             {
                 SuppressVbl = true;
             }
@@ -473,10 +478,12 @@ namespace AprNes
             spr_ram[spr_ram_add++] = value;
         }
 
-        static byte ppu_r_2004() //ok
+        static byte ppu_r_2004()
         {
-            if ((spr_ram_add + 3) % 3 == 0) open_bus_decay_timer = 77777;//fixed add
-            return openbus = spr_ram[spr_ram_add] &= 0xE3; //fixed
+            byte val = spr_ram[spr_ram_add];
+            if ((spr_ram_add & 3) == 2) val &= 0xE3; // mask unimplemented bits of attribute byte only
+            open_bus_decay_timer = 77777;
+            return openbus = val;
         }
 
         static void ppu_w_2005(byte value) //ok
