@@ -34,8 +34,6 @@ namespace AprNes
         static int cpu_cycles = 0, Interrupt_cycle = 0;
         static public bool exit = false;
 
-        static ushort interrupt_vector;
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte GetFlag()
         {
@@ -63,7 +61,6 @@ namespace AprNes
             r_PC = (ushort)(Mem_r(0xfffa) | (Mem_r(0xfffb) << 8));
             flagI = 1;
             Interrupt_cycle = 7;
-            NMIing = true;
         }
 
         static bool softreset = false;

@@ -39,7 +39,7 @@ namespace AprNes
         //ppu status 0x2002.
         static bool isSpriteOverflow = false, isSprite0hit = false, isVblank = false;
 
-        static int vram_addr_internal = 0, addr_range, vram_addr = 0, scrol_y = 0, FineX = 0;
+        static int vram_addr_internal = 0, vram_addr = 0, scrol_y = 0, FineX = 0;
         static bool vram_latch = false;
         static byte ppu_2007_buffer = 0, ppu_2007_temp = 0;
         static byte* spr_ram, ppu_ram;
@@ -47,7 +47,7 @@ namespace AprNes
         static uint* NesColors; //, targetSize;
         static int* Buffer_BG_array;
         static byte spr_ram_add = 0;
-        static bool NMI_set = false, IRQ_set = false;
+
         static Stopwatch StopWatch = new Stopwatch();
         static bool oddSwap = false;
         //https://wiki.nesdev.com/w/index.php/PPU_scrolling
@@ -284,8 +284,6 @@ namespace AprNes
 
         static int open_bus_decay_timer = 77777;
 
-        static bool NMIing = false;
-
         static int pixel, array_loc;
 
         static void RenderSpritesLine()
@@ -410,7 +408,7 @@ namespace AprNes
             _event.WaitOne();
         }
 
-        static bool SuppressNmi = false, SuppressVbl = false;
+        static bool SuppressVbl = false;
         //ref http://wiki.nesdev.com/w/index.php/PPU_scrolling
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ppu_r_2002() //ok
@@ -419,15 +417,12 @@ namespace AprNes
 
             if (ppu_cycles_x == 1 && scanline == 240)
             {
-                SuppressNmi = true;
                 SuppressVbl = true;
             }
             else
             {
-                SuppressNmi = false;
                 SuppressVbl = false;
                 isVblank = false;
-                interrupt_vector = 0xfffe;
             }
 
             vram_latch = false;

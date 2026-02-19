@@ -122,17 +122,10 @@ namespace AprNes
         // =====================================================================
         // 原有 APU 欄位 (保留相容)
         // =====================================================================
-        static int samplerate = APU_SAMPLE_RATE;
-        static double cyclespersample;
-        static int sprdma_count;
-        static int apucycle = 0, remainder = 0;
+        static int apucycle = 0;
         static int[] noiseperiod;
-        static long accum = 0;
-        static bool soundFiltering = false;
         static int framectrreload;
         static int framectrdiv = 7456;
-        static int dckiller = 0;
-        static int lpaccum  = 0;
         static bool apuintflag = true, statusdmcint = false, statusframeint = false;
         static int framectr = 0, ctrmode = 4;
         static bool[] lenCtrEnable = { true, true, true, true };
@@ -174,7 +167,6 @@ namespace AprNes
         static int[]  sweepperiod   = { 15, 15 };
         static int[]  sweepshift    = { 0, 0 };
         static int[]  sweeppos      = { 0, 0 };
-        static int    cyclesperframe;
 
         // Duty 波形查找表
         static int[,] DUTYLOOKUP = new int[,] {
@@ -213,9 +205,7 @@ namespace AprNes
 
             framectrreload = 7456;
             framectrdiv    = 7456;
-            cyclesperframe = 29781;
             apucycle       = 0;
-            cyclespersample = CPU_FREQ / APU_SAMPLE_RATE;
 
             // 重置各聲道狀態
             _pulseTimer[0]  = _pulseTimer[1]  = 0;

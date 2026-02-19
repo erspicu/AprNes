@@ -32,7 +32,7 @@ namespace AprNes
         static int mapper;
         static byte PRG_ROM_count, CHR_ROM_count, ROM_Control_1, ROM_Control_2, RAM_banks_count;
         static byte* PRG_ROM, CHR_ROM;
-        static bool NesHeaderV2 = false, battery = false, ScreenFour = false, ScreenSingle = false, ScreenSpecial = false;
+        static bool NesHeaderV2 = false, battery = false, ScreenFour = false;
         static public string rom_file_name = "";
         static string rom_sav = "";
 
@@ -108,7 +108,7 @@ namespace AprNes
 
                 if ((ROM_Control_1 & 8) != 0)
                 {
-                    ScreenFour = ScreenSpecial = true;
+                    ScreenFour = true;
                     Console.WriteLine("fourscreen mirroring : yes");
                 }
                 else Console.WriteLine("fourscreen mirroring : no");
