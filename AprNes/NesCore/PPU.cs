@@ -112,19 +112,17 @@ namespace AprNes
         // ---- BG shift registers (16-bit, two tiles: high=current, low=next) ----
         static ushort lowshift = 0, highshift = 0;
 
-        // ---- Attribute delay queue (4 slots ring buffer) ----
-        // Phase-3 writes attribute into queue; phase-7 render reads it.
-        // 2 entries pre-loaded from previous scanline's prefetch (cycles 320-335).
-        static byte[] bg_at_queue = new byte[4];
-        static int bg_at_q_wr = 0, bg_at_q_rd = 0;
+        // ---- Attribute 3-stage pipeline ----
+        // Phase-3 shifts ATVal into p1; phase-7 render reads p3 (2 groups later).
+        // This correctly delays attribute by 2 fetch groups with no index drift.
+        static byte bg_attr_p1 = 0, bg_attr_p2 = 0, bg_attr_p3 = 0;
 
         // Render 8 BG pixels at screen positions [ppu_cycles_x-7 .. ppu_cycles_x]
         // using shift registers BEFORE reload (high byte = current tile data).
         static void RenderBGTile()
         {
-            byte renderAttr = bg_at_queue[bg_at_q_rd & 3];
-            byte nextAttr   = bg_at_queue[(bg_at_q_rd + 1) & 3];
-            bg_at_q_rd++;
+            byte renderAttr = bg_attr_p3;
+            byte nextAttr   = bg_attr_p2;
 
             int baseX = ppu_cycles_x - 7;
             int scanOff = scanline << 8;
@@ -170,9 +168,7 @@ namespace AprNes
                         break;
                     case 3:
                         ATVal = (byte)((ppu_ram[ioaddr] >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
-                        // Queue attribute for visible rendering and next-scanline prefetch only
-                        if (scanline < 240 || ppu_cycles_x >= 320)
-                            bg_at_queue[bg_at_q_wr++ & 3] = ATVal;
+                        bg_attr_p3 = bg_attr_p2; bg_attr_p2 = bg_attr_p1; bg_attr_p1 = ATVal;
                         break;
                     case 4:
                         ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
@@ -234,7 +230,7 @@ namespace AprNes
                 if (renderingEnabled)
                     ppu_rendering_tick();
 
-                if (scanline < 240)
+                if (scanline >= 0 && scanline < 240)
                 {
                     // When BG disabled: fill scanline with backdrop color and clear priority buffer
                     if (ppu_cycles_x == 0 && !ShowBackGround)
