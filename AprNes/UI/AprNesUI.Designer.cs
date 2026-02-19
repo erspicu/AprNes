@@ -56,13 +56,15 @@
             this.panel1.BackColor = System.Drawing.Color.White;
             this.panel1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.panel1.ContextMenuStrip = this.contextMenuStrip1;
-            this.panel1.Location = new System.Drawing.Point(5, 35);
+            this.panel1.Location = new System.Drawing.Point(8, 52);
+            this.panel1.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
             this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(256, 240);
+            this.panel1.Size = new System.Drawing.Size(383, 359);
             this.panel1.TabIndex = 1;
             // 
             // contextMenuStrip1
             // 
+            this.contextMenuStrip1.ImageScalingSize = new System.Drawing.Size(24, 24);
             this.contextMenuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.fun1ToolStripMenuItem,
             this.fun2ToolStripMenuItem,
@@ -72,47 +74,47 @@
             this.fun6ToolStripMenuItem,
             this.screenModeToolStripMenuItem});
             this.contextMenuStrip1.Name = "contextMenuStrip1";
-            this.contextMenuStrip1.Size = new System.Drawing.Size(153, 158);
+            this.contextMenuStrip1.Size = new System.Drawing.Size(192, 214);
             // 
             // fun1ToolStripMenuItem
             // 
             this.fun1ToolStripMenuItem.Name = "fun1ToolStripMenuItem";
-            this.fun1ToolStripMenuItem.Size = new System.Drawing.Size(152, 22);
+            this.fun1ToolStripMenuItem.Size = new System.Drawing.Size(191, 30);
             this.fun1ToolStripMenuItem.Text = "Open";
             this.fun1ToolStripMenuItem.Click += new System.EventHandler(this.fun1ToolStripMenuItem_Click);
             // 
             // fun2ToolStripMenuItem
             // 
             this.fun2ToolStripMenuItem.Name = "fun2ToolStripMenuItem";
-            this.fun2ToolStripMenuItem.Size = new System.Drawing.Size(152, 22);
+            this.fun2ToolStripMenuItem.Size = new System.Drawing.Size(191, 30);
             this.fun2ToolStripMenuItem.Text = "Reset";
             this.fun2ToolStripMenuItem.Click += new System.EventHandler(this.fun2ToolStripMenuItem_Click);
             // 
             // fun3ToolStripMenuItem
             // 
             this.fun3ToolStripMenuItem.Name = "fun3ToolStripMenuItem";
-            this.fun3ToolStripMenuItem.Size = new System.Drawing.Size(152, 22);
+            this.fun3ToolStripMenuItem.Size = new System.Drawing.Size(191, 30);
             this.fun3ToolStripMenuItem.Text = "Config";
             this.fun3ToolStripMenuItem.Click += new System.EventHandler(this.fun3ToolStripMenuItem_Click);
             // 
             // fun4ToolStripMenuItem
             // 
             this.fun4ToolStripMenuItem.Name = "fun4ToolStripMenuItem";
-            this.fun4ToolStripMenuItem.Size = new System.Drawing.Size(152, 22);
+            this.fun4ToolStripMenuItem.Size = new System.Drawing.Size(191, 30);
             this.fun4ToolStripMenuItem.Text = "Rom Info";
             this.fun4ToolStripMenuItem.Click += new System.EventHandler(this.fun4ToolStripMenuItem_Click);
             // 
             // fun5ToolStripMenuItem
             // 
             this.fun5ToolStripMenuItem.Name = "fun5ToolStripMenuItem";
-            this.fun5ToolStripMenuItem.Size = new System.Drawing.Size(152, 22);
+            this.fun5ToolStripMenuItem.Size = new System.Drawing.Size(191, 30);
             this.fun5ToolStripMenuItem.Text = "Exit";
             this.fun5ToolStripMenuItem.Click += new System.EventHandler(this.fun5ToolStripMenuItem_Click);
             // 
             // fun6ToolStripMenuItem
             // 
             this.fun6ToolStripMenuItem.Name = "fun6ToolStripMenuItem";
-            this.fun6ToolStripMenuItem.Size = new System.Drawing.Size(152, 22);
+            this.fun6ToolStripMenuItem.Size = new System.Drawing.Size(191, 30);
             this.fun6ToolStripMenuItem.Text = "About";
             this.fun6ToolStripMenuItem.Click += new System.EventHandler(this.fun6ToolStripMenuItem_Click);
             // 
@@ -122,20 +124,20 @@
             this.fullScreeenToolStripMenuItem,
             this.normalToolStripMenuItem});
             this.screenModeToolStripMenuItem.Name = "screenModeToolStripMenuItem";
-            this.screenModeToolStripMenuItem.Size = new System.Drawing.Size(152, 22);
+            this.screenModeToolStripMenuItem.Size = new System.Drawing.Size(191, 30);
             this.screenModeToolStripMenuItem.Text = "Screen Mode";
             // 
             // fullScreeenToolStripMenuItem
             // 
             this.fullScreeenToolStripMenuItem.Name = "fullScreeenToolStripMenuItem";
-            this.fullScreeenToolStripMenuItem.Size = new System.Drawing.Size(140, 22);
+            this.fullScreeenToolStripMenuItem.Size = new System.Drawing.Size(207, 34);
             this.fullScreeenToolStripMenuItem.Text = "FullScreeen";
             this.fullScreeenToolStripMenuItem.Click += new System.EventHandler(this.fullScreeenToolStripMenuItem_Click);
             // 
             // normalToolStripMenuItem
             // 
             this.normalToolStripMenuItem.Name = "normalToolStripMenuItem";
-            this.normalToolStripMenuItem.Size = new System.Drawing.Size(140, 22);
+            this.normalToolStripMenuItem.Size = new System.Drawing.Size(207, 34);
             this.normalToolStripMenuItem.Text = "Normal";
             this.normalToolStripMenuItem.Click += new System.EventHandler(this.normalToolStripMenuItem_Click);
             // 
@@ -148,9 +150,10 @@
             // 
             this.label3.BackColor = System.Drawing.Color.Transparent;
             this.label3.Font = new System.Drawing.Font("微軟正黑體", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
-            this.label3.Location = new System.Drawing.Point(208, 8);
+            this.label3.Location = new System.Drawing.Point(312, 15);
+            this.label3.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label3.Name = "label3";
-            this.label3.Size = new System.Drawing.Size(65, 20);
+            this.label3.Size = new System.Drawing.Size(98, 30);
             this.label3.TabIndex = 11;
             this.label3.Text = "fps : ";
             this.label3.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
@@ -161,9 +164,10 @@
             this.UIOpenRom.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.UIOpenRom.FlatStyle = System.Windows.Forms.FlatStyle.Popup;
             this.UIOpenRom.Font = new System.Drawing.Font("微軟正黑體", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
-            this.UIOpenRom.Location = new System.Drawing.Point(5, 8);
+            this.UIOpenRom.Location = new System.Drawing.Point(8, 15);
+            this.UIOpenRom.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.UIOpenRom.Name = "UIOpenRom";
-            this.UIOpenRom.Size = new System.Drawing.Size(65, 20);
+            this.UIOpenRom.Size = new System.Drawing.Size(96, 29);
             this.UIOpenRom.TabIndex = 13;
             this.UIOpenRom.Text = "Open";
             this.UIOpenRom.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -177,9 +181,10 @@
             this.UIReset.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.UIReset.FlatStyle = System.Windows.Forms.FlatStyle.Popup;
             this.UIReset.Font = new System.Drawing.Font("微軟正黑體", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
-            this.UIReset.Location = new System.Drawing.Point(73, 8);
+            this.UIReset.Location = new System.Drawing.Point(110, 15);
+            this.UIReset.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.UIReset.Name = "UIReset";
-            this.UIReset.Size = new System.Drawing.Size(65, 20);
+            this.UIReset.Size = new System.Drawing.Size(96, 29);
             this.UIReset.TabIndex = 15;
             this.UIReset.Text = "Reset";
             this.UIReset.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -193,9 +198,10 @@
             this.UIConfig.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.UIConfig.FlatStyle = System.Windows.Forms.FlatStyle.Popup;
             this.UIConfig.Font = new System.Drawing.Font("微軟正黑體", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
-            this.UIConfig.Location = new System.Drawing.Point(141, 8);
+            this.UIConfig.Location = new System.Drawing.Point(212, 15);
+            this.UIConfig.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.UIConfig.Name = "UIConfig";
-            this.UIConfig.Size = new System.Drawing.Size(65, 20);
+            this.UIConfig.Size = new System.Drawing.Size(96, 29);
             this.UIConfig.TabIndex = 16;
             this.UIConfig.Text = "Config";
             this.UIConfig.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -207,9 +213,10 @@
             // 
             this.UIAbout.Font = new System.Drawing.Font("微軟正黑體", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
             this.UIAbout.LinkColor = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(64)))), ((int)(((byte)(64)))));
-            this.UIAbout.Location = new System.Drawing.Point(201, 277);
+            this.UIAbout.Location = new System.Drawing.Point(302, 416);
+            this.UIAbout.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.UIAbout.Name = "UIAbout";
-            this.UIAbout.Size = new System.Drawing.Size(60, 15);
+            this.UIAbout.Size = new System.Drawing.Size(90, 22);
             this.UIAbout.TabIndex = 17;
             this.UIAbout.TabStop = true;
             this.UIAbout.Text = "About";
@@ -220,9 +227,10 @@
             // 
             this.RomInf.Font = new System.Drawing.Font("微軟正黑體", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
             this.RomInf.LinkColor = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(64)))), ((int)(((byte)(64)))));
-            this.RomInf.Location = new System.Drawing.Point(5, 277);
+            this.RomInf.Location = new System.Drawing.Point(8, 416);
+            this.RomInf.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.RomInf.Name = "RomInf";
-            this.RomInf.Size = new System.Drawing.Size(60, 15);
+            this.RomInf.Size = new System.Drawing.Size(90, 22);
             this.RomInf.TabIndex = 18;
             this.RomInf.TabStop = true;
             this.RomInf.Text = "Rom Info";
@@ -230,10 +238,10 @@
             // 
             // AprNesUI
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 12F);
+            this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 18F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Zoom;
-            this.ClientSize = new System.Drawing.Size(266, 294);
+            this.ClientSize = new System.Drawing.Size(399, 441);
             this.ContextMenuStrip = this.contextMenuStrip1;
             this.Controls.Add(this.panel1);
             this.Controls.Add(this.RomInf);
@@ -246,6 +254,7 @@
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.KeyPreview = true;
+            this.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
             this.MaximizeBox = false;
             this.Name = "AprNesUI";
             this.Opacity = 0D;

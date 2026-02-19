@@ -213,15 +213,18 @@ namespace AprNes
 
                 if (scanline >= 0 && scanline < 240)
                 {
-                    // When BG disabled: fill scanline with backdrop color and clear priority buffer
-                    if (ppu_cycles_x == 0 && !ShowBackGround)
+                    // At start of each visible scanline: always zero Buffer_BG_array to prevent
+                    // stale data from prior frames causing incorrect sprite priority decisions.
+                    if (ppu_cycles_x == 0)
                     {
-                        uint bgColor = NesColors[ppu_ram[0x3f00] & 0x3f];
                         int scanOff = scanline << 8;
                         for (int i = 0; i < 256; i++)
-                        {
-                            ScreenBuf1x[scanOff + i] = bgColor;
                             Buffer_BG_array[scanOff + i] = 0;
+                        if (!ShowBackGround)
+                        {
+                            uint bgColor = NesColors[ppu_ram[0x3f00] & 0x3f];
+                            for (int i = 0; i < 256; i++)
+                                ScreenBuf1x[scanOff + i] = bgColor;
                         }
                     }
 
@@ -288,7 +291,6 @@ namespace AprNes
         static void RenderSpritesLine()
         {
             // Pass 1: scan OAM 0→63, pick first 8 sprites visible on this scanline.
-            // NES secondary OAM evaluation: hardware only renders the first 8 per scanline.
             int* sel = stackalloc int[8];
             int selCount = 0, spriteCount = 0;
             int height = Spritesize8x16 ? 15 : 7;
@@ -296,8 +298,6 @@ namespace AprNes
             for (int oam_th = 0; oam_th < 64; oam_th++)
             {
                 int raw_y = spr_ram[oam_th << 2];
-                // OAM Y = display_top - 1, so display range is [raw_y+1, raw_y+1+height]
-                // i.e., scanline > raw_y && scanline - raw_y <= height + 1
                 if (scanline <= raw_y || scanline - raw_y > height + 1) continue;
                 if (++spriteCount == 9) isSpriteOverflow = true;
                 if (selCount < 8) sel[selCount++] = oam_th;
@@ -305,12 +305,23 @@ namespace AprNes
 
             if (!ShowSprites) return;
 
-            // Pass 2: render in reverse OAM order so lower index (higher priority) wins.
+            // Per-pixel sprite winner buffers.
+            // NES hardware picks ONE winning sprite per pixel (lowest OAM index with opaque pixel).
+            // That winner's priority bit then decides the BG/sprite composite for ALL sprites at that pixel.
+            // This implements the "sprite priority quirk": a behind-BG mask sprite (low OAM index,
+            // priority=1) can suppress a front sprite (high OAM index, priority=0) at the same pixel.
+            uint* sprColor    = stackalloc uint[256];
+            byte* sprPriority = stackalloc byte[256]; // 1 = behind BG, 0 = in front
+            byte* sprSet      = stackalloc byte[256]; // 1 = a winning sprite pixel exists here
+            for (int i = 0; i < 256; i++) sprSet[i] = 0;
+
+            // Pass 2: evaluate sprites in reverse OAM order so lower-index sprites overwrite higher,
+            // making the lowest-index sprite the final winner at each pixel.
             for (int si = selCount - 1; si >= 0; si--)
             {
                 int oam_th = sel[si];
                 int oam_addr = oam_th << 2;
-                int y_loc = spr_ram[oam_addr] + 1; // display top row (OAM Y is top-1)
+                int y_loc = spr_ram[oam_addr] + 1;
 
                 int offset, tile_th_t, line, line_t;
                 byte tile_th;
@@ -345,7 +356,7 @@ namespace AprNes
                 if ((sprite_attr & 0x80) != 0)
                 {
                     line_t = 7 - line;
-                    if (Spritesize8x16) tile_th_t ^= 1; // 8x16 vflip: swap top/bottom tile
+                    if (Spritesize8x16) tile_th_t ^= 1;
                 }
                 else line_t = line;
 
@@ -361,12 +372,32 @@ namespace AprNes
                     int loc_t = flip_x ? (7 - loc) : loc;
                     int mask = 1 << (7 - loc_t);
                     pixel = (((tile_hbyte & mask) << 1) + (tile_lbyte & mask)) >> (7 - loc_t);
+                    if (pixel == 0) continue;
+
                     array_loc = (scanline << 8) + screenX;
-                    if (oam_th == 0 && !isSprite0hit && pixel != 0 && Buffer_BG_array[array_loc] != 0 && screenX != 255 && ShowBackGround)
+
+                    // Sprite 0 hit detection
+                    if (oam_th == 0 && !isSprite0hit && Buffer_BG_array[array_loc] != 0 && screenX != 255 && ShowBackGround)
                         isSprite0hit = true;
-                    if (pixel != 0 && (!ShowBackGround || Buffer_BG_array[array_loc] == 0 || !priority))
-                        ScreenBuf1x[array_loc] = NesColors[ppu_ram[0x3f10 + ((sprite_attr & 3) << 2) | pixel] & 0x3f];
+
+                    // Record as winner at this column (lower OAM index will overwrite later)
+                    sprSet[screenX]      = 1;
+                    sprPriority[screenX] = (byte)(priority ? 1 : 0);
+                    sprColor[screenX]    = NesColors[ppu_ram[0x3f10 + ((sprite_attr & 3) << 2) | pixel] & 0x3f];
                 }
+            }
+
+            // Pass 3: composite — draw winning sprite pixel only if:
+            //   BG is disabled, OR BG pixel is transparent, OR winning sprite is front-priority.
+            // A behind-BG winner (priority=1) with opaque BG blocks ALL sprites at that pixel,
+            // correctly implementing the mask-sprite trick used by SMB3.
+            int scanOff = scanline << 8;
+            for (int screenX = 0; screenX < 256; screenX++)
+            {
+                if (sprSet[screenX] == 0) continue;
+                array_loc = scanOff + screenX;
+                if (!ShowBackGround || Buffer_BG_array[array_loc] == 0 || sprPriority[screenX] == 0)
+                    ScreenBuf1x[array_loc] = sprColor[screenX];
             }
         }
 
