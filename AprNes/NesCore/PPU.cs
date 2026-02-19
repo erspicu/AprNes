@@ -134,6 +134,21 @@ namespace AprNes
                     ScreenBuf1x[slot] = NesColors[ppu_ram[0x3f00] & 0x3f];
                 else
                     ScreenBuf1x[slot] = NesColors[ppu_ram[(0x3f00 | (attrUse << 2)) + bgPixel] & 0x3f];
+
+                // Sprite 0 hit detection (per-pixel, cycle-accurate)
+                if (sprite0_on_line && !isSprite0hit && screenX != 255)
+                {
+                    int sprCol = screenX - sprite0_line_x;
+                    if (sprCol >= 0 && sprCol < 8 && bgPixel != 0
+                        && !(!ShowBgLeft8 && inLeft8) && !(!ShowSprLeft8 && inLeft8))
+                    {
+                        int loc_t = sprite0_flip_x ? (7 - sprCol) : sprCol;
+                        int mask = 1 << (7 - loc_t);
+                        int sprPixel = (((sprite0_tile_high & mask) << 1) + (sprite0_tile_low & mask)) >> (7 - loc_t);
+                        if (sprPixel != 0)
+                            isSprite0hit = true;
+                    }
+                }
             }
         }
 
@@ -226,6 +241,7 @@ namespace AprNes
                             for (int i = 0; i < 256; i++)
                                 ScreenBuf1x[scanOff + i] = bgColor;
                         }
+                        PrecomputeSprite0Line();
                     }
 
                     // Sprite evaluation + rendering at cycle 257 (after BG tiles complete at cycle 255)
@@ -257,8 +273,12 @@ namespace AprNes
             // VBlank start at scanline 241, cycle 1 (post-increment)
             if (scanline == 241 && ppu_cycles_x == 1)
             {
-                if (!SuppressVbl) isVblank = true;
-                if (NMIable) NMIInterrupt();
+                if (!SuppressVbl)
+                {
+                    isVblank = true;
+                    if (NMIable) NMIInterrupt();
+                }
+                SuppressVbl = false;
             }
 
             // Pre-render: clear PPU status flags at cycle 1 (post-increment)
@@ -283,6 +303,68 @@ namespace AprNes
         #endregion
 
         static int open_bus_decay_timer = 77777;
+
+        // Pre-computed sprite 0 data for per-pixel hit detection during BG rendering
+        static bool sprite0_on_line;
+        static int sprite0_line_x;
+        static byte sprite0_tile_low, sprite0_tile_high;
+        static bool sprite0_flip_x;
+
+        // Pre-compute sprite 0 tile data for the current scanline so hit detection
+        // can happen per-pixel inside RenderBGTile() at the correct PPU cycle.
+        static void PrecomputeSprite0Line()
+        {
+            sprite0_on_line = false;
+            if (isSprite0hit) return;
+            if (!ShowBackGround || !ShowSprites) return;
+
+            int raw_y = spr_ram[0];
+            int height = Spritesize8x16 ? 15 : 7;
+            if (scanline < raw_y || scanline - raw_y > height) return;
+
+            sprite0_on_line = true;
+            sprite0_line_x = spr_ram[3];
+
+            byte sprite_attr = spr_ram[2];
+            sprite0_flip_x = (sprite_attr & 0x40) != 0;
+
+            int y_loc = raw_y;
+            int offset, tile_th_t, line, line_t;
+            byte tile_th;
+
+            if (Spritesize8x16)
+            {
+                byte byte0 = spr_ram[1];
+                tile_th = (byte)(byte0 & 0xfe);
+                offset = (byte0 & 1) != 0 ? 256 : 0;
+            }
+            else
+            {
+                tile_th = spr_ram[1];
+                offset = SpPatternTableAddr >> 4;
+            }
+
+            if (scanline <= y_loc + 7)
+            {
+                tile_th_t = tile_th + offset;
+                line = scanline - y_loc;
+            }
+            else
+            {
+                tile_th_t = tile_th + offset + 1;
+                line = scanline - y_loc - 8;
+            }
+
+            if ((sprite_attr & 0x80) != 0)
+            {
+                line_t = 7 - line;
+                if (Spritesize8x16) tile_th_t ^= 1;
+            }
+            else line_t = line;
+
+            sprite0_tile_high = MapperObj.MapperR_CHR((tile_th_t << 4) | (line_t + 8));
+            sprite0_tile_low = MapperObj.MapperR_CHR((tile_th_t << 4) | line_t);
+        }
 
         static int pixel, array_loc;
 
@@ -379,10 +461,6 @@ namespace AprNes
 
                     array_loc = (scanline << 8) + screenX;
 
-                    // Sprite 0 hit detection
-                    if (oam_th == 0 && !isSprite0hit && Buffer_BG_array[array_loc] != 0 && screenX != 255 && ShowBackGround)
-                        isSprite0hit = true;
-
                     // Record as winner at this column (lower OAM index will overwrite later)
                     sprSet[screenX]      = 1;
                     sprPriority[screenX] = (byte)(priority ? 1 : 0);
@@ -453,7 +531,10 @@ namespace AprNes
             SpPatternTableAddr = ((value & 8) > 0) ? 0x1000 : 0;
             BgPatternTableAddr = ((value & 0x10) > 0) ? 0x1000 : 0;
             Spritesize8x16 = ((value & 0x20) > 0) ? true : false;
+            bool wasNMIable = NMIable;
             NMIable = ((value & 0x80) > 0) ? true : false;
+            // Rising edge: enabling NMI while VBL flag is already set fires NMI immediately
+            if (!wasNMIable && NMIable && isVblank) NMIInterrupt();
         }
 
         static void ppu_w_2001(byte value) //ok
