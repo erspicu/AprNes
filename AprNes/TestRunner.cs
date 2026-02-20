@@ -161,6 +161,10 @@ namespace AprNes
             // Input events
             List<InputEvent> inputEvents = ParseInput(inputSpec);
 
+            // Screen stability tracking (for non-$6000-protocol test detection)
+            uint prevHash = 0;
+            int stableFrameCount = 0;
+
             // Wire up VideoOutput handler
             EventHandler handler = null;
             handler = (sender, e) =>
@@ -221,10 +225,73 @@ namespace AprNes
                     }
                 }
 
+                // --- Screen stability detection (early exit for non-$6000-protocol tests) ---
+                // Old blargg tests don't use $6000; they display results on screen and
+                // store the result code at $F0 (1=pass, >=2=fail). Detect when the screen
+                // stops changing to avoid waiting for the full timeout.
+                if (waitResult && !testStarted && frameCount > 120)
+                {
+                    uint hash = 1;
+                    bool hasContent = false;
+                    uint firstPx = NesCore.ScreenBuf1x[0];
+                    for (int i = 0; i < 256 * 240; i += 37)
+                    {
+                        uint px = NesCore.ScreenBuf1x[i];
+                        hash = hash * 31 + px;
+                        if (px != firstPx) hasContent = true;
+                    }
+
+                    if (hash == prevHash && hasContent)
+                        stableFrameCount++;
+                    else
+                    {
+                        prevHash = hash;
+                        stableFrameCount = 0;
+                    }
+
+                    if (stableFrameCount >= 90) // ~1.5 seconds of stable screen
+                    {
+                        // Only exit early if screen explicitly shows pass/fail text.
+                        // Tests that display a title while running internally (e.g.
+                        // cpu_timing_test6 "16 SECONDS") would falsely trigger otherwise.
+                        bool earlyPass = NametableContains("Passed") || NametableContains("PASSED");
+                        bool earlyFail = NametableContains("Failed") || NametableContains("FAILED");
+
+                        // Also check old blargg "$01"/"$02" format
+                        if (!earlyPass && !earlyFail)
+                        {
+                            int oldCode = DetectOldBlarggScreenCode();
+                            if (oldCode == 0) earlyPass = true;
+                            else if (oldCode > 0) earlyFail = true;
+                        }
+
+                        // Also check error count format: " 0/" = zero errors = pass
+                        if (!earlyPass && !earlyFail && NametableContains(" 0/"))
+                            earlyPass = true;
+
+                        // Old blargg multi-test: "All tests complete" = pass
+                        if (!earlyPass && !earlyFail && NametableContains("All tests complete"))
+                            earlyPass = true;
+
+                        if (earlyPass || earlyFail)
+                        {
+                            resultCode = earlyFail ? (byte)1 : (byte)0;
+                            Console.Error.WriteLine("[TestRunner] Screen stable at frame " + frameCount
+                                + ", detected " + (earlyFail ? "Failed" : "Passed") + " on screen");
+                            done = true;
+                            NesCore.exit = true;
+                            return;
+                        }
+                        // Screen stable but no result text yet — keep waiting
+                    }
+                }
+
                 if (maxFrames > 0 && frameCount >= maxFrames)
                 {
-                    // time limit reached; read current status
-                    resultCode = NesCore.NES_MEM[0x6000];
+                    if (HasBlarggSignature())
+                        resultCode = NesCore.NES_MEM[0x6000];
+                    else
+                        resultCode = DetectNonProtocolResult();
                     done = true;
                     NesCore.exit = true;
                     return;
@@ -233,7 +300,16 @@ namespace AprNes
                 // max-wait safety (frame-based)
                 if (frameCount >= (int)(maxWait * 60.0988))
                 {
-                    resultCode = NesCore.NES_MEM[0x6000];
+                    if (testStarted || HasBlarggSignature())
+                    {
+                        resultCode = NesCore.NES_MEM[0x6000];
+                    }
+                    else
+                    {
+                        resultCode = DetectNonProtocolResult();
+                        Console.Error.WriteLine("[TestRunner] Timeout at frame " + frameCount
+                            + ", no $6000 protocol. result=0x" + resultCode.ToString("X2"));
+                    }
                     done = true;
                     NesCore.exit = true;
                 }
@@ -324,24 +400,121 @@ namespace AprNes
             return passed ? 0 : 1;
         }
 
+        static bool HasBlarggSignature()
+        {
+            return NesCore.NES_MEM[0x6001] == 0xDE
+                && NesCore.NES_MEM[0x6002] == 0xB0
+                && NesCore.NES_MEM[0x6003] == 0x61;
+        }
+
+        // Search PPU nametable 0 ($2000-$23BF) for ASCII text.
+        // Blargg test ROMs use a font where tile index = ASCII code.
+        static bool NametableContains(string text)
+        {
+            byte* nt = NesCore.ppu_ram;
+            if (nt == null) return false;
+            int len = text.Length;
+            // Nametable 0: 30 rows × 32 cols = 960 bytes at $2000
+            for (int off = 0x2000; off <= 0x23BF - len + 1; off++)
+            {
+                bool match = true;
+                for (int k = 0; k < len; k++)
+                {
+                    if (nt[off + k] != (byte)text[k]) { match = false; break; }
+                }
+                if (match) return true;
+            }
+            return false;
+        }
+
+        // Detect old blargg "$XX" screen format (e.g. "$01"=pass, "$02"-"$0F"=fail)
+        // Returns -1 if no match, 0 for pass ($01), 1+ for fail code
+        static int DetectOldBlarggScreenCode()
+        {
+            byte* nt = NesCore.ppu_ram;
+            if (nt == null) return -1;
+
+            for (int off = 0x2000; off <= 0x23BF - 2; off++)
+            {
+                if (nt[off] == (byte)'$' && nt[off + 1] == (byte)'0')
+                {
+                    byte c = nt[off + 2];
+                    if (c == (byte)'1') return 0;  // $01 = pass
+                    if (c >= (byte)'2' && c <= (byte)'9') return c - (byte)'0';
+                    if (c >= (byte)'A' && c <= (byte)'F') return 10 + (c - (byte)'A');
+                    if (c >= (byte)'a' && c <= (byte)'f') return 10 + (c - (byte)'a');
+                }
+            }
+            return -1;
+        }
+
+        // Determine result for non-$6000-protocol tests by reading the screen.
+        // Priority: nametable text > old "$XX" format > error count > $F0 byte > unknown
+        static byte DetectNonProtocolResult()
+        {
+            // Check PPU nametable for "Passed"/"PASSED"/"Failed"/"FAILED"
+            bool hasPassed = NametableContains("Passed") || NametableContains("PASSED");
+            bool hasFailed = NametableContains("Failed") || NametableContains("FAILED");
+
+            if (hasFailed)
+                return 1; // fail
+            if (hasPassed)
+                return 0; // pass
+
+            // Check old blargg "$01"/"$02" screen format
+            int oldCode = DetectOldBlarggScreenCode();
+            if (oldCode >= 0)
+                return (byte)oldCode;
+
+            // Check error count format: " 0/" means zero errors = pass
+            if (NametableContains(" 0/"))
+                return 0; // pass (zero errors)
+
+            // Old blargg multi-test format: "All tests complete" = pass
+            if (NametableContains("All tests complete"))
+                return 0; // pass
+
+            // Fallback: old blargg $F0 protocol (1 = pass, 2-15 = fail code)
+            byte f0 = NesCore.NES_MEM[0xF0];
+            if (f0 == 1) return 0;       // pass
+            if (f0 >= 2 && f0 <= 15) return f0; // fail code
+
+            // Can't determine — return 0xFF (timeout/unknown)
+            return 0xFF;
+        }
+
         static string ReadBlarggText()
         {
-            // blargg test protocol: $6001-$6003 should be 0xDE, 0xB0, 0x61
-            byte sig1 = NesCore.NES_MEM[0x6001];
-            byte sig2 = NesCore.NES_MEM[0x6002];
-            byte sig3 = NesCore.NES_MEM[0x6003];
-
-            if (sig1 != 0xDE || sig2 != 0xB0 || sig3 != 0x61)
-                return "(no blargg signature)";
-
-            StringBuilder sb = new StringBuilder();
-            for (int addr = 0x6004; addr < 0x6800; addr++)
+            if (HasBlarggSignature())
             {
-                byte c = NesCore.NES_MEM[addr];
-                if (c == 0) break;
-                sb.Append((char)c);
+                StringBuilder sb = new StringBuilder();
+                for (int addr = 0x6004; addr < 0x6800; addr++)
+                {
+                    byte c = NesCore.NES_MEM[addr];
+                    if (c == 0) break;
+                    sb.Append((char)c);
+                }
+                return sb.ToString();
             }
-            return sb.ToString();
+
+            // Non-protocol: report what we found
+            bool hasPassed = NametableContains("Passed") || NametableContains("PASSED");
+            bool hasFailed = NametableContains("Failed") || NametableContains("FAILED");
+
+            if (hasPassed) return "(screen: Passed)";
+            if (hasFailed) return "(screen: Failed)";
+
+            int oldCode = DetectOldBlarggScreenCode();
+            if (oldCode == 0) return "(screen: $01 = passed)";
+            if (oldCode > 0)  return "(screen: $0" + oldCode.ToString("X") + " = failed)";
+
+            if (NametableContains(" 0/")) return "(screen: 0 errors = passed)";
+            if (NametableContains("All tests complete")) return "(screen: All tests complete = passed)";
+
+            byte f0 = NesCore.NES_MEM[0xF0];
+            if (f0 == 1)   return "(no $6000 signature, $F0=0x01 = passed)";
+            if (f0 >= 2 && f0 <= 15) return "(no $6000 signature, $F0=0x" + f0.ToString("X2") + " = failed)";
+            return "(no $6000 signature, $F0=0x" + f0.ToString("X2") + ")";
         }
 
         static void SaveScreenshot(string path)

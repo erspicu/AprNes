@@ -127,6 +127,9 @@ namespace AprNes
         // Per-step reload values for frame counter (non-uniform, matching real NES NTSC timing)
         // 4-step: steps fire at CPU cycles 7457, 14913, 22371, 29829 from $4017 write
         // 5-step: steps fire at CPU cycles 7457, 14913, 22371, 29829, 37282
+        // Per-step reload values for frame counter (non-uniform, matching real NES NTSC timing)
+        // 4-step: steps fire at CPU cycles 7457, 14913, 22371, 29829 from $4017 write
+        // 5-step: steps fire at CPU cycles 7457, 14913, 22371, 29829, 37282
         static int[] frameReload4 = { 7457, 7456, 7458, 7458 };
         static int[] frameReload5 = { 7457, 7456, 7458, 7458, 7453 };
         static int framectrdiv = 7457;

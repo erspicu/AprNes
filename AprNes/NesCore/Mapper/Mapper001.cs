@@ -8,7 +8,7 @@ namespace AprNes
         int CHR_ROM_count;
 
         //MMC1 http://wiki.nesdev.com/w/index.php/MMC1
-        int PRG_Bankmode = 0 , CHR_Bankmode = 0 , Mirroring_type = 0 ;
+        int PRG_Bankmode = 3 , CHR_Bankmode = 0 , Mirroring_type = 0 ; // PRG mode 3 on power-up (fix last bank at $C000)
         int CHR0_Bankselect = 0;
         int CHR1_Bankselect = 0;
         int PRG_Bankselect = 0;
@@ -68,8 +68,10 @@ namespace AprNes
                 // $8000-$9FFF
                 Mirroring_type = MapperRegBuffer & 3; //(0: one-screen, lower bank; 1: one-screen, upper bank; 2: vertical; 3: horizontal)
 
-                if (Mirroring_type == 2) *Vertical = 1;
-                else if (Mirroring_type == 3) *Vertical = 0;
+                if (Mirroring_type == 0) *Vertical = 2;      // one-screen, lower bank
+                else if (Mirroring_type == 1) *Vertical = 3;  // one-screen, upper bank
+                else if (Mirroring_type == 2) *Vertical = 1;  // vertical
+                else *Vertical = 0;                            // horizontal
 
                 PRG_Bankmode = (MapperRegBuffer & 0xc) >> 2;
                 //0, 1: switch 32 KB at $8000, ignoring low bit of bank number;
@@ -106,10 +108,11 @@ namespace AprNes
 
             if (CHR_Bankmode > 0) //4K
             {
-                if (address < 0x1000) return CHR_ROM[address + (CHR0_Bankselect << 12)];
-                else return CHR_ROM[(address - 0x1000) + (CHR1_Bankselect << 12)];
+                int banks4k = CHR_ROM_count * 2;
+                if (address < 0x1000) return CHR_ROM[address + ((CHR0_Bankselect % banks4k) << 12)];
+                else return CHR_ROM[(address - 0x1000) + ((CHR1_Bankselect % banks4k) << 12)];
             }
-            else return CHR_ROM[address + 0x2000 * (CHR0_Bankselect >> 1)];
+            else return CHR_ROM[address + 0x2000 * ((CHR0_Bankselect >> 1) % CHR_ROM_count)];
         }
 
 

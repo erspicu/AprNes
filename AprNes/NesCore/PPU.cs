@@ -42,7 +42,8 @@ namespace AprNes
         static int vram_addr_internal = 0, vram_addr = 0, scrol_y = 0, FineX = 0;
         static bool vram_latch = false;
         static byte ppu_2007_buffer = 0, ppu_2007_temp = 0;
-        static byte* spr_ram, ppu_ram;
+        static byte* spr_ram;
+        static public byte* ppu_ram;
         static public uint* ScreenBuf1x;
         static uint* NesColors; //, targetSize;
         static int* Buffer_BG_array;
@@ -321,17 +322,15 @@ namespace AprNes
             if (isSprite0hit) return;
             if (!ShowBackGround || !ShowSprites) return;
 
-            int raw_y = spr_ram[0];
+            int y_loc = spr_ram[0] + 1; // NES hardware: sprites display at OAM_Y + 1
             int height = Spritesize8x16 ? 15 : 7;
-            if (scanline < raw_y || scanline - raw_y > height) return;
+            if (scanline < y_loc || scanline - y_loc > height) return;
 
             sprite0_on_line = true;
             sprite0_line_x = spr_ram[3];
 
             byte sprite_attr = spr_ram[2];
             sprite0_flip_x = (sprite_attr & 0x40) != 0;
-
-            int y_loc = raw_y;
             int offset, tile_th_t, line, line_t;
             byte tile_th;
 
@@ -384,9 +383,15 @@ namespace AprNes
             {
                 for (int oam_th = 0; oam_th < 64; oam_th++)
                 {
-                    int raw_y = spr_ram[oam_th << 2];
-                    if (scanline < raw_y || scanline - raw_y > height) continue;
-                    if (++spriteCount == 9) isSpriteOverflow = true;
+                    int oam_y = spr_ram[oam_th << 2];
+                    // Overflow evaluation uses raw OAM Y (hardware evaluates before 1-scanline pipeline delay)
+                    if (scanline >= oam_y && scanline - oam_y <= height)
+                    {
+                        if (++spriteCount == 9) isSpriteOverflow = true;
+                    }
+                    // Selection for rendering uses Y+1 (sprites display one scanline later)
+                    int render_y = oam_y + 1;
+                    if (scanline < render_y || scanline - render_y > height) continue;
                     if (selCount < 8) sel[selCount++] = oam_th;
                 }
             }
@@ -409,7 +414,7 @@ namespace AprNes
             {
                 int oam_th = sel[si];
                 int oam_addr = oam_th << 2;
-                int y_loc = spr_ram[oam_addr];
+                int y_loc = spr_ram[oam_addr] + 1; // NES hardware: sprites display at OAM_Y + 1
 
                 int offset, tile_th_t, line, line_t;
                 byte tile_th;
@@ -565,6 +570,7 @@ namespace AprNes
         }
 
         static byte openbus;
+        static byte cpubus;  // CPU data bus value (last byte read/written by CPU)
 
         static void ppu_w_2000(byte value) //ok
         {
@@ -653,7 +659,7 @@ namespace AprNes
         static void ppu_w_4014(byte value)//DMA , fixex 2017.01.16 pass sprite_ram test
         {
             int oam_address = value << 8;
-            for (int i = 0; i < 256; i++) spr_ram[spr_ram_add++] = NES_MEM[oam_address++];
+            for (int i = 0; i < 256; i++) spr_ram[spr_ram_add++] = Mem_r((ushort)(oam_address++));
             // OAM DMA: 1 dummy cycle (halt) + 256 × 2 (read/write) = 513 cycles
             // On real NES, odd-cycle start adds 1 more (514), but 513 is the base.
             cpu_cycles += 513;

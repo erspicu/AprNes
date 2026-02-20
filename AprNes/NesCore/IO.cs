@@ -18,7 +18,7 @@ namespace AprNes
                 case 0x2007: return ppu_r_2007();
                 case 0x4015: return apu_r_4015();
                 case 0x4016: return gamepad_r_4016();
-                default: return openbus;
+                default: return cpubus; // APU write-only registers return CPU data bus value
             }
         }
 

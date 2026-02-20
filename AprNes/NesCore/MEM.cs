@@ -12,12 +12,15 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte Mem_r(ushort address)
         {
-            return mem_read_fun[address](address);
+            byte val = mem_read_fun[address](address);
+            cpubus = val;
+            return val;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void Mem_w(ushort address, byte value)
         {
+            cpubus = value;
             mem_write_fun[address](address, value);
         }
 
@@ -39,6 +42,7 @@ namespace AprNes
             {
                 if (address < 0x2000) mem_write_fun[address] = new Action<ushort, byte>((addr, val) => { NES_MEM[addr & 0x7ff] = val; });
                 else if (address < 0x4020) mem_write_fun[address] = new Action<ushort, byte>(IO_write);
+                else if (address < 0x4100) mem_write_fun[address] = new Action<ushort, byte>((addr, val) => { }); // $4020-$40FF: open bus (no effect on write)
                 else if (address < 0x6000) mem_write_fun[address] = new Action<ushort, byte>(MapperObj.MapperW_ExpansionROM);
                 else if (address < 0x8000) mem_write_fun[address] = new Action<ushort, byte>(MapperObj.MapperW_RAM);
                 else mem_write_fun[address] = new Action<ushort, byte>(MapperObj.MapperW_PRG);
@@ -47,6 +51,7 @@ namespace AprNes
             {
                 if (address < 0x2000) mem_read_fun[address] = new Func<ushort, byte>((addr) => { return NES_MEM[addr & 0x7ff]; });
                 else if (address < 0x4020) mem_read_fun[address] = new Func<ushort, byte>(IO_read);
+                else if (address < 0x4100) mem_read_fun[address] = new Func<ushort, byte>((addr) => { return cpubus; }); // $4020-$40FF: CPU open bus
                 else if (address < 0x6000) mem_read_fun[address] = new Func<ushort, byte>(MapperObj.MapperR_ExpansionROM);
                 else if (address < 0x8000) mem_read_fun[address] = new Func<ushort, byte>(MapperObj.MapperR_RAM);
                 else mem_read_fun[address] = new Func<ushort, byte>(MapperObj.MapperR_RPG);
@@ -176,7 +181,14 @@ namespace AprNes
                        int _vram_addr_wrap = vram_addr & 0x2FFF; // $3000-$3EFF mirrors $2000-$2EFF
                        int _addr_range = _vram_addr_wrap & 0xc00;
                        openbus = val;
-                       if (*Vertical != 0)
+                       int mirror = *Vertical;
+                       if (mirror >= 2)
+                       {
+                           // One-screen mirroring: all 4 nametables map to same 1KB
+                           int rel = _vram_addr_wrap & 0x3FF;
+                           ppu_ram[0x2000 + rel] = ppu_ram[0x2400 + rel] = ppu_ram[0x2800 + rel] = ppu_ram[0x2C00 + rel] = val;
+                       }
+                       else if (mirror == 1)
                        {
                            if (_addr_range < 0x800) ppu_ram[_vram_addr_wrap] = ppu_ram[_vram_addr_wrap | 0x800] = val;
                            else ppu_ram[_vram_addr_wrap] = ppu_ram[_vram_addr_wrap & 0x37ff] = val;
