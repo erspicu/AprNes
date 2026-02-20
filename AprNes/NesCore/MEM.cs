@@ -125,7 +125,7 @@ namespace AprNes
 
 
                             ppu_2007_temp = ppu_2007_buffer; //need read from buffer
-                            ppu_2007_buffer = ppu_ram[val & 0x3FFF]; //Name Table & Attribute Table
+                            ppu_2007_buffer = ppu_ram[val & 0x2FFF]; //Name Table & Attribute Table ($3000-$3EFF mirrors $2000-$2EFF)
                             vram_addr = (ushort)((val + VramaddrIncrement) & 0x7FFF);
                             openbus = ppu_2007_temp;
                             open_bus_decay_timer = 77777;//fixed add
@@ -173,7 +173,7 @@ namespace AprNes
                 {
                     ppu_write_fun[address] = new Action<byte>((val) =>
                    {
-                       int _vram_addr_wrap = vram_addr & 0x3FFF;
+                       int _vram_addr_wrap = vram_addr & 0x2FFF; // $3000-$3EFF mirrors $2000-$2EFF
                        int _addr_range = _vram_addr_wrap & 0xc00;
                        openbus = val;
                        if (*Vertical != 0)

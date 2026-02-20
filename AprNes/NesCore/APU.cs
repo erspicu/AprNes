@@ -207,8 +207,22 @@ namespace AprNes
         {
             framectrdiv = 7457;
             framectr = 0;
-            ctrmode = 4;
+            // ctrmode 和 apuintflag 保留 (nesdev: "$4017 mode unchanged on reset")
             apucycle = 0;
+
+            // 清除 IRQ flags
+            statusframeint = false;
+            statusdmcint = false;
+
+            // 模擬 $4015=$00: 停止所有聲道
+            for (int i = 0; i < 4; i++)
+            {
+                lenCtrEnable[i] = false;
+                lengthctr[i] = 0;
+            }
+            dmcsamplesleft = 0;
+
+            // 重置音色產生器
             _pulseTimer[0] = _pulseTimer[1] = 0;
             _pulsePeriod[0] = _pulsePeriod[1] = 0;
             _pulseSeq[0] = _pulseSeq[1] = 0;
@@ -229,10 +243,11 @@ namespace AprNes
             dmcperiods  = new int[] { 428,380,340,320,286,254,226,214,190,160,142,128,106,84,72,54 };
             noiseperiod = new int[] { 4,8,16,32,64,96,128,160,202,254,380,508,762,1016,2034,4068 };
 
-            framectrdiv    = 7457;
-            apucycle       = 0;
+            framectrdiv = 7457;
+            apucycle    = 0;
+            framectr = 0; ctrmode = 4;
 
-            // 重置各聲道狀態
+            // 聲道計時器重置
             _pulseTimer[0]  = _pulseTimer[1]  = 0;
             _pulsePeriod[0] = _pulsePeriod[1] = 0;
             _pulseSeq[0]    = _pulseSeq[1]    = 0;
@@ -243,7 +258,41 @@ namespace AprNes
             _noiseMode = false; _noiseOut = 0;
             _sampleAccum = 0.0;
             _dckiller    = 0;
-            framectr = 0; ctrmode = 4;
+
+            // Power-on 狀態 (模擬 $4015=$00, $4017=$00)
+            for (int i = 0; i < 4; i++)
+            {
+                lenCtrEnable[i] = false;
+                lengthctr[i] = 0;
+                volume[i] = 0;
+                lenctrHalt[i] = false;
+                envelopeValue[i] = 0;
+                envelopeCounter[i] = 0;
+                envelopePos[i] = 0;
+                envConstVolume[i] = false;
+                envelopeStartFlag[i] = false;
+            }
+            for (int i = 0; i < 2; i++)
+            {
+                sweepenable[i] = false;
+                sweepnegate[i] = false;
+                sweepsilence[i] = false;
+                sweepreload[i] = false;
+                sweepperiod[i] = 0;
+                sweepshift[i] = 0;
+                sweeppos[i] = 0;
+            }
+            linearctr = 0; linctrreload = 0; linctrflag = false;
+            apuintflag = false;      // $4017=$00: IRQ 未禁止
+            statusframeint = false;
+            statusdmcint = false;
+
+            // DMC 完整重置
+            dmcrate = dmcperiods[0]; dmcpos = 0;
+            dmcshiftregister = 0; dmcbuffer = 0;
+            dmcvalue = 0; dmcsamplelength = 1; dmcsamplesleft = 0;
+            dmcstartaddr = 0xC000; dmcaddr = 0xC000; dmcbitsleft = 8;
+            dmcsilence = true; dmcirq = false; dmcloop = false; dmcBufferEmpty = true;
 
             // 初始化查找表
             SQUARELOOKUP = initSquareLookup();
@@ -763,6 +812,7 @@ namespace AprNes
         static void apu_4010(byte val)
         {
             dmcirq  = (val & 0x80) != 0;
+            if (!dmcirq) statusdmcint = false;   // disable 時清除 DMC IRQ flag
             dmcloop = (val & 0x40) != 0;
             dmcrate = dmcperiods[val & 0x0F];
         }

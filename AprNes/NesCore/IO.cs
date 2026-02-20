@@ -60,15 +60,17 @@ namespace AprNes
                 case 0x4017:                          // Frame counter mode
                     ctrmode        = ((val & 0x80) != 0) ? 5 : 4;
                     apuintflag     = (val & 0x40) != 0;
+                    if (apuintflag) statusframeint = false; // 只有 bit6 設定時才清除 frame IRQ flag
                     framectr       = 0;
-                    // Reset delay: on real NES, write happens on last cycle of STA
-                    // (3 cycles into the instruction) and reset takes effect 3-4 cycles
-                    // later. Our model executes atomically before catch-up, so add offset
-                    // to compensate for the ~7 cycle difference (4 for STA + 3 for reset).
                     if (ctrmode == 5)
                     {
-                        clockframecounter(); // 5-step: 立即觸發, framectr becomes 1
-                        framectrdiv = frameReload5[framectr] + 7;
+                        // Mode 1: 立即 clock length/envelope/sweep (不推進 framectr)
+                        setenvelope();
+                        setlinctr();
+                        setlength();
+                        setsweep();
+                        setvolumes();
+                        framectrdiv = frameReload5[0] + 7;
                     }
                     else
                     {

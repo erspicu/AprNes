@@ -1,0 +1,189 @@
+=== Starting test run ===
+PASS: apu_mixer/dmc.nes
+PASS: apu_mixer/noise.nes
+PASS: apu_mixer/square.nes
+PASS: apu_mixer/triangle.nes
+PASS: apu_reset/4015_cleared.nes
+PASS: apu_reset/4017_timing.nes
+FAIL(1): apu_reset/4017_written.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+PASS: apu_reset/irq_flag_cleared.nes
+PASS: apu_reset/len_ctrs_enabled.nes
+PASS: apu_reset/works_immediately.nes
+FAIL(1): apu_test/apu_test.nes -- iNes header PRG-ROM count : 8 CHR-ROM count : 0 
+PASS: apu_test/rom_singles/1-len_ctr.nes
+PASS: apu_test/rom_singles/2-len_table.nes
+PASS: apu_test/rom_singles/3-irq_flag.nes
+FAIL(1): apu_test/rom_singles/4-jitter.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): apu_test/rom_singles/5-len_timing.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): apu_test/rom_singles/6-irq_flag_timing.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+PASS: apu_test/rom_singles/7-dmc_basics.nes
+FAIL(1): apu_test/rom_singles/8-dmc_rates.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+PASS: blargg_apu_2005.07.30/01.len_ctr.nes
+PASS: blargg_apu_2005.07.30/02.len_table.nes
+PASS: blargg_apu_2005.07.30/03.irq_flag.nes
+PASS: blargg_apu_2005.07.30/04.clock_jitter.nes
+PASS: blargg_apu_2005.07.30/05.len_timing_mode0.nes
+PASS: blargg_apu_2005.07.30/06.len_timing_mode1.nes
+PASS: blargg_apu_2005.07.30/07.irq_flag_timing.nes
+PASS: blargg_apu_2005.07.30/08.irq_timing.nes
+PASS: blargg_apu_2005.07.30/09.reset_timing.nes
+PASS: blargg_apu_2005.07.30/10.len_halt_timing.nes
+PASS: blargg_apu_2005.07.30/11.len_reload_timing.nes
+PASS: blargg_nes_cpu_test5/cpu.nes
+PASS: blargg_nes_cpu_test5/official.nes
+PASS: blargg_ppu_tests_2005.09.15b/palette_ram.nes
+PASS: blargg_ppu_tests_2005.09.15b/power_up_palette.nes
+PASS: blargg_ppu_tests_2005.09.15b/sprite_ram.nes
+PASS: blargg_ppu_tests_2005.09.15b/vbl_clear_time.nes
+PASS: blargg_ppu_tests_2005.09.15b/vram_access.nes
+PASS: branch_timing_tests/1.Branch_Basics.nes
+PASS: branch_timing_tests/2.Backward_Branch.nes
+PASS: branch_timing_tests/3.Forward_Branch.nes
+PASS: cpu_dummy_reads/cpu_dummy_reads.nes
+PASS: cpu_dummy_writes/cpu_dummy_writes_oam.nes
+PASS: cpu_dummy_writes/cpu_dummy_writes_ppumem.nes
+PASS: cpu_exec_space/test_cpu_exec_space_ppuio.nes
+FAIL(1): cpu_exec_space/test_cpu_exec_space_apu.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): cpu_interrupts_v2/cpu_interrupts.nes -- iNes header PRG-ROM count : 5 CHR-ROM count : 0 
+PASS: cpu_interrupts_v2/rom_singles/1-cli_latency.nes
+PASS: cpu_interrupts_v2/rom_singles/2-nmi_and_brk.nes
+PASS: cpu_interrupts_v2/rom_singles/3-nmi_and_irq.nes
+FAIL(1): cpu_interrupts_v2/rom_singles/4-irq_and_dma.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): cpu_interrupts_v2/rom_singles/5-branch_delays_irq.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+PASS: cpu_reset/registers.nes
+PASS: cpu_reset/ram_after_reset.nes
+PASS: cpu_timing_test6/cpu_timing_test.nes
+PASS: dmc_dma_during_read4/dma_2007_read.nes
+PASS: dmc_dma_during_read4/dma_2007_write.nes
+PASS: dmc_dma_during_read4/dma_4016_read.nes
+PASS: dmc_dma_during_read4/double_2007_read.nes
+PASS: dmc_dma_during_read4/read_write_2007.nes
+FAIL(1): instr_misc/instr_misc.nes -- iNes header PRG-ROM count : 4 CHR-ROM count : 0 
+PASS: instr_misc/rom_singles/01-abs_x_wrap.nes
+PASS: instr_misc/rom_singles/02-branch_wrap.nes
+FAIL(1): instr_misc/rom_singles/03-dummy_reads.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): instr_misc/rom_singles/04-dummy_reads_apu.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+PASS: instr_test-v3/all_instrs.nes
+PASS: instr_test-v3/official_only.nes
+PASS: instr_test-v3/rom_singles/01-implied.nes
+PASS: instr_test-v3/rom_singles/02-immediate.nes
+PASS: instr_test-v3/rom_singles/03-zero_page.nes
+PASS: instr_test-v3/rom_singles/04-zp_xy.nes
+PASS: instr_test-v3/rom_singles/05-absolute.nes
+PASS: instr_test-v3/rom_singles/06-abs_xy.nes
+PASS: instr_test-v3/rom_singles/07-ind_x.nes
+PASS: instr_test-v3/rom_singles/08-ind_y.nes
+PASS: instr_test-v3/rom_singles/09-branches.nes
+PASS: instr_test-v3/rom_singles/10-stack.nes
+PASS: instr_test-v3/rom_singles/11-jmp_jsr.nes
+PASS: instr_test-v3/rom_singles/12-rts.nes
+PASS: instr_test-v3/rom_singles/13-rti.nes
+PASS: instr_test-v3/rom_singles/14-brk.nes
+PASS: instr_test-v3/rom_singles/15-special.nes
+PASS: instr_test-v5/all_instrs.nes
+PASS: instr_test-v5/official_only.nes
+PASS: instr_test-v5/rom_singles/01-basics.nes
+PASS: instr_test-v5/rom_singles/02-implied.nes
+PASS: instr_test-v5/rom_singles/03-immediate.nes
+PASS: instr_test-v5/rom_singles/04-zero_page.nes
+PASS: instr_test-v5/rom_singles/05-zp_xy.nes
+PASS: instr_test-v5/rom_singles/06-absolute.nes
+PASS: instr_test-v5/rom_singles/07-abs_xy.nes
+PASS: instr_test-v5/rom_singles/08-ind_x.nes
+PASS: instr_test-v5/rom_singles/09-ind_y.nes
+PASS: instr_test-v5/rom_singles/10-branches.nes
+PASS: instr_test-v5/rom_singles/11-stack.nes
+PASS: instr_test-v5/rom_singles/12-jmp_jsr.nes
+PASS: instr_test-v5/rom_singles/13-rts.nes
+PASS: instr_test-v5/rom_singles/14-rti.nes
+PASS: instr_test-v5/rom_singles/15-brk.nes
+PASS: instr_test-v5/rom_singles/16-special.nes
+FAIL(1): instr_timing/instr_timing.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 0 
+FAIL(1): instr_timing/rom_singles/1-instr_timing.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+PASS: instr_timing/rom_singles/2-branch_timing.nes
+PASS: nes_instr_test/rom_singles/01-implied.nes
+PASS: nes_instr_test/rom_singles/02-immediate.nes
+PASS: nes_instr_test/rom_singles/03-zero_page.nes
+PASS: nes_instr_test/rom_singles/04-zp_xy.nes
+PASS: nes_instr_test/rom_singles/05-absolute.nes
+PASS: nes_instr_test/rom_singles/06-abs_xy.nes
+PASS: nes_instr_test/rom_singles/07-ind_x.nes
+PASS: nes_instr_test/rom_singles/08-ind_y.nes
+PASS: nes_instr_test/rom_singles/09-branches.nes
+PASS: nes_instr_test/rom_singles/10-stack.nes
+PASS: nes_instr_test/rom_singles/11-special.nes
+PASS: oam_read/oam_read.nes
+PASS: ppu_open_bus/ppu_open_bus.nes
+FAIL(1): ppu_read_buffer/test_ppu_read_buffer.nes -- iNes header PRG-ROM count : 1 CHR-ROM count : 4 
+FAIL(1): ppu_vbl_nmi/ppu_vbl_nmi.nes -- iNes header PRG-ROM count : 16 CHR-ROM count : 0 
+PASS: ppu_vbl_nmi/rom_singles/01-vbl_basics.nes
+FAIL(1): ppu_vbl_nmi/rom_singles/02-vbl_set_time.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): ppu_vbl_nmi/rom_singles/03-vbl_clear_time.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): ppu_vbl_nmi/rom_singles/04-nmi_control.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+PASS: ppu_vbl_nmi/rom_singles/05-nmi_timing.nes
+FAIL(1): ppu_vbl_nmi/rom_singles/06-suppression.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): ppu_vbl_nmi/rom_singles/07-nmi_on_timing.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): ppu_vbl_nmi/rom_singles/08-nmi_off_timing.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+PASS: ppu_vbl_nmi/rom_singles/09-even_odd_frames.nes
+FAIL(1): ppu_vbl_nmi/rom_singles/10-even_odd_timing.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+PASS: read_joy3/test_buttons.nes
+PASS: read_joy3/count_errors.nes
+PASS: read_joy3/count_errors_fast.nes
+PASS: read_joy3/thorough_test.nes
+FAIL(1): sprdma_and_dmc_dma/sprdma_and_dmc_dma.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): sprdma_and_dmc_dma/sprdma_and_dmc_dma_512.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+PASS: sprite_hit_tests_2005.10.05/01.basics.nes
+PASS: sprite_hit_tests_2005.10.05/02.alignment.nes
+PASS: sprite_hit_tests_2005.10.05/03.corners.nes
+PASS: sprite_hit_tests_2005.10.05/04.flip.nes
+PASS: sprite_hit_tests_2005.10.05/05.left_clip.nes
+PASS: sprite_hit_tests_2005.10.05/06.right_edge.nes
+PASS: sprite_hit_tests_2005.10.05/07.screen_bottom.nes
+PASS: sprite_hit_tests_2005.10.05/08.double_height.nes
+PASS: sprite_hit_tests_2005.10.05/09.timing_basics.nes
+PASS: sprite_hit_tests_2005.10.05/10.timing_order.nes
+PASS: sprite_hit_tests_2005.10.05/11.edge_timing.nes
+PASS: sprite_overflow_tests/1.Basics.nes
+PASS: sprite_overflow_tests/2.Details.nes
+PASS: sprite_overflow_tests/3.Timing.nes
+PASS: sprite_overflow_tests/4.Obscure.nes
+PASS: sprite_overflow_tests/5.Emulator.nes
+PASS: vbl_nmi_timing/1.frame_basics.nes
+PASS: vbl_nmi_timing/2.vbl_timing.nes
+PASS: vbl_nmi_timing/3.even_odd_frames.nes
+PASS: vbl_nmi_timing/4.vbl_clear_timing.nes
+PASS: vbl_nmi_timing/5.nmi_suppression.nes
+PASS: vbl_nmi_timing/6.nmi_disable.nes
+PASS: vbl_nmi_timing/7.nmi_timing.nes
+
+=== FINAL RESULTS ===
+PASS: 130 / TOTAL: 156 / FAIL: 26
+
+=== ALL FAILURES ===
+FAIL(1): apu_reset/4017_written.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): apu_test/apu_test.nes -- iNes header PRG-ROM count : 8 CHR-ROM count : 0 
+FAIL(1): apu_test/rom_singles/4-jitter.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): apu_test/rom_singles/5-len_timing.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): apu_test/rom_singles/6-irq_flag_timing.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): apu_test/rom_singles/8-dmc_rates.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): cpu_exec_space/test_cpu_exec_space_apu.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): cpu_interrupts_v2/cpu_interrupts.nes -- iNes header PRG-ROM count : 5 CHR-ROM count : 0 
+FAIL(1): cpu_interrupts_v2/rom_singles/4-irq_and_dma.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): cpu_interrupts_v2/rom_singles/5-branch_delays_irq.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): instr_misc/instr_misc.nes -- iNes header PRG-ROM count : 4 CHR-ROM count : 0 
+FAIL(1): instr_misc/rom_singles/03-dummy_reads.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): instr_misc/rom_singles/04-dummy_reads_apu.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): instr_timing/instr_timing.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 0 
+FAIL(1): instr_timing/rom_singles/1-instr_timing.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): ppu_read_buffer/test_ppu_read_buffer.nes -- iNes header PRG-ROM count : 1 CHR-ROM count : 4 
+FAIL(1): ppu_vbl_nmi/ppu_vbl_nmi.nes -- iNes header PRG-ROM count : 16 CHR-ROM count : 0 
+FAIL(1): ppu_vbl_nmi/rom_singles/02-vbl_set_time.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): ppu_vbl_nmi/rom_singles/03-vbl_clear_time.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): ppu_vbl_nmi/rom_singles/04-nmi_control.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): ppu_vbl_nmi/rom_singles/06-suppression.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): ppu_vbl_nmi/rom_singles/07-nmi_on_timing.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): ppu_vbl_nmi/rom_singles/08-nmi_off_timing.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): ppu_vbl_nmi/rom_singles/10-even_odd_timing.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): sprdma_and_dmc_dma/sprdma_and_dmc_dma.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+FAIL(1): sprdma_and_dmc_dma/sprdma_and_dmc_dma_512.nes -- iNes header PRG-ROM count : 2 CHR-ROM count : 1 
+
