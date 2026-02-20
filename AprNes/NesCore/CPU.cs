@@ -1733,8 +1733,10 @@ namespace AprNes
 
                 case 0x13: //SLO (  ASL M THEN (M "OR" A) -> A,M  )
                     byte2 = Mem_r(r_PC++);
-                    ushort1 = (ushort)((NES_MEM[byte2++] | (NES_MEM[byte2] << 8)) + r_Y);
-                    byte1 = Mem_r((ushort)(ushort1));
+                    ushort2 = (ushort)(NES_MEM[byte2++] | (NES_MEM[byte2] << 8));
+                    ushort1 = (ushort)(ushort2 + r_Y);
+                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
+                    byte1 = Mem_r(ushort1);
 
                     Mem_w(ushort1, byte1);//dummy write fixed
 
@@ -1758,7 +1760,9 @@ namespace AprNes
                     break;
 
                 case 0x1B: //SLO (  ASL M THEN (M "OR" A) -> A,M  )
-                    ushort1 = (ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)) + r_Y);
+                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
+                    ushort1 = (ushort)(ushort2 + r_Y);
+                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte1 = Mem_r(ushort1);
 
                     Mem_w(ushort1, byte1);//dummy write fixed
@@ -1788,6 +1792,7 @@ namespace AprNes
                 case 0x1F: //SLO (  ASL M THEN (M "OR" A) -> A,M  )
                     ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
                     ushort1 = (ushort)(ushort2 + r_X);
+                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte1 = Mem_r(ushort1);
 
                     Mem_w(ushort1, byte1);//dummy write fixed
@@ -1841,7 +1846,9 @@ namespace AprNes
                     break;
 
                 case 0x3F://RLA
-                    ushort1 = (ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)) + r_X);
+                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
+                    ushort1 = (ushort)(ushort2 + r_X);
+                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte2 = Mem_r(ushort1);
 
                     Mem_w(ushort1, byte2);//dummy write fixed
@@ -1855,7 +1862,9 @@ namespace AprNes
                     break;
 
                 case 0x3B://RLA
-                    ushort1 = (ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)) + r_Y);
+                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
+                    ushort1 = (ushort)(ushort2 + r_Y);
+                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte2 = Mem_r(ushort1);
 
                     Mem_w(ushort1, byte2);//dummy write fixed
@@ -1868,10 +1877,12 @@ namespace AprNes
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
                     break;
 
-                case 0x33: //RLA    ( ROL M  THEN (M "AND" A) -> A )   
+                case 0x33: //RLA    ( ROL M  THEN (M "AND" A) -> A )
                     byte3 = Mem_r(r_PC++);
-                    ushort1 = (ushort)((NES_MEM[byte3++] | (NES_MEM[byte3] << 8)) + r_Y);
-                    byte2 = Mem_r((ushort)(ushort1));
+                    ushort2 = (ushort)(NES_MEM[byte3++] | (NES_MEM[byte3] << 8));
+                    ushort1 = (ushort)(ushort2 + r_Y);
+                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
+                    byte2 = Mem_r(ushort1);
 
                     Mem_w(ushort1, byte2);//dummy write fixed
 
@@ -1936,8 +1947,10 @@ namespace AprNes
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
                     break;
 
-                case 0x5F://SRE  
-                    ushort1 = (ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)) + r_X);
+                case 0x5F://SRE
+                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
+                    ushort1 = (ushort)(ushort2 + r_X);
+                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte1 = Mem_r(ushort1);
 
                     Mem_w(ushort1, byte1);//dummy write fixed
@@ -1950,8 +1963,10 @@ namespace AprNes
                     if ((r_A & 0x80) != 0) flagN = 1; else flagN = 0;
                     break;
 
-                case 0x5B://SRE  
-                    ushort1 = (ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)) + r_Y);
+                case 0x5B://SRE
+                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
+                    ushort1 = (ushort)(ushort2 + r_Y);
+                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte1 = Mem_r(ushort1);
 
                     Mem_w(ushort1, byte1);//dummy write fixed
@@ -1966,8 +1981,10 @@ namespace AprNes
 
                 case 0x53://SRE (LSR M  THEN (M "EOR" A) -> A )
                     byte2 = Mem_r(r_PC++);
-                    ushort1 = (ushort)((NES_MEM[byte2++] | (NES_MEM[byte2] << 8)) + +r_Y);
-                    byte1 = Mem_r((ushort)(ushort1));
+                    ushort2 = (ushort)(NES_MEM[byte2++] | (NES_MEM[byte2] << 8));
+                    ushort1 = (ushort)(ushort2 + r_Y);
+                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
+                    byte1 = Mem_r(ushort1);
 
                     Mem_w(ushort1, byte1);//dummy write fixed
 
@@ -2041,7 +2058,9 @@ namespace AprNes
 
                 case 0x73:// RRA (ROR M THEN (A + M + C) -> A  ) ok
                     byte3 = Mem_r(r_PC++);
-                    ushort1 = (ushort)((NES_MEM[byte3++] | (NES_MEM[byte3] << 8)) + r_Y);
+                    ushort2 = (ushort)(NES_MEM[byte3++] | (NES_MEM[byte3] << 8));
+                    ushort1 = (ushort)(ushort2 + r_Y);
+                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte2 = Mem_r(ushort1);
 
                     Mem_w(ushort1, byte2);//dummy write fixed
@@ -2072,7 +2091,9 @@ namespace AprNes
                     break;
 
                 case 0x7B:// RRA (ROR M THEN (A + M + C) -> A  )
-                    ushort1 = (ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)) + r_Y);
+                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
+                    ushort1 = (ushort)(ushort2 + r_Y);
+                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte2 = Mem_r(ushort1);
 
                     Mem_w(ushort1, byte2);//dummy write fixed
@@ -2089,7 +2110,9 @@ namespace AprNes
                     break;
 
                 case 0x7F: //RRA
-                    ushort1 = (ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)) + r_X);
+                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
+                    ushort1 = (ushort)(ushort2 + r_X);
+                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte2 = Mem_r(ushort1);
 
                     Mem_w(ushort1, byte2);//dummy write fixed
@@ -2122,6 +2145,7 @@ namespace AprNes
                     ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
                     byte1 = (byte)(r_Y & (((ushort1 & 0xff00) >> 8) + 1));
                     ushort1 = (ushort)((ushort1 & 0xff00) | (byte)(ushort1 + r_X));
+                    Mem_r(ushort1); // dummy read at wrong-page address
                     if ((ushort1 & 0xff) < r_X) ushort1 = (ushort)((ushort1 & 0xff) | (byte1 << 8));
                     Mem_w(ushort1, byte1);
                     break;
@@ -2130,7 +2154,38 @@ namespace AprNes
                     ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
                     byte1 = (byte)(r_X & (((ushort1 & 0xff00) >> 8) + 1));
                     ushort1 = (ushort)((ushort1 & 0xff00) | (byte)(ushort1 + r_Y));
+                    Mem_r(ushort1); // dummy read at wrong-page address
                     if ((ushort1 & 0xff) < r_Y) ushort1 = (ushort)((ushort1 & 0xff) | (byte1 << 8));
+                    Mem_w(ushort1, byte1);
+                    break;
+
+                case 0x9B://TAS/SHS abs,Y - SP = A & X, write SP & (H+1)
+                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
+                    r_SP = (byte)(r_A & r_X);
+                    byte1 = (byte)(r_SP & (((ushort1 & 0xff00) >> 8) + 1));
+                    ushort1 = (ushort)((ushort1 & 0xff00) | (byte)(ushort1 + r_Y));
+                    Mem_r(ushort1); // dummy read at wrong-page address
+                    if ((ushort1 & 0xff) < r_Y) ushort1 = (ushort)((ushort1 & 0xff) | (byte1 << 8));
+                    Mem_w(ushort1, byte1);
+                    break;
+
+                case 0x9F://SHA/AXA abs,Y - write A & X & (H+1)
+                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
+                    byte1 = (byte)(r_A & r_X & (((ushort1 & 0xff00) >> 8) + 1));
+                    ushort1 = (ushort)((ushort1 & 0xff00) | (byte)(ushort1 + r_Y));
+                    Mem_r(ushort1); // dummy read at wrong-page address
+                    if ((ushort1 & 0xff) < r_Y) ushort1 = (ushort)((ushort1 & 0xff) | (byte1 << 8));
+                    Mem_w(ushort1, byte1);
+                    break;
+
+                case 0x93://SHA/AXA (ind),Y - write A & X & (H+1)
+                    byte2 = Mem_r(r_PC++);
+                    ushort2 = (ushort)(NES_MEM[byte2++] | (NES_MEM[byte2] << 8));
+                    ushort1 = (ushort)(ushort2 + r_Y);
+                    byte1 = (byte)(r_A & r_X & (((ushort2 >> 8) & 0xFF) + 1));
+                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
+                    if ((ushort1 & 0xFF00) != (ushort2 & 0xFF00))
+                        ushort1 = (ushort)((ushort1 & 0xFF) | (byte1 << 8));
                     Mem_w(ushort1, byte1);
                     break;
 
@@ -2170,16 +2225,34 @@ namespace AprNes
                     break;
 
                 case 0xBF://LAX
-                    r_X = r_A = Mem_r((ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)) + r_Y));
+                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
+                    ushort1 = (ushort)(ushort2 + r_Y);
+                    if ((ushort1 & 0xFF00) != (ushort2 & 0xFF00)) // page cross
+                        Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
+                    r_X = r_A = Mem_r(ushort1);
                     if (r_X == 0) flagZ = 1; else flagZ = 0;
                     if ((r_X & 0x80) != 0) flagN = 1; else flagN = 0;
                     break;
 
                 case 0xB3://LAX
                     byte1 = Mem_r(r_PC++);
-                    r_X = r_A = Mem_r((ushort)((NES_MEM[byte1++] | (NES_MEM[byte1] << 8)) + r_Y));
+                    ushort2 = (ushort)(NES_MEM[byte1++] | (NES_MEM[byte1] << 8));
+                    ushort1 = (ushort)(ushort2 + r_Y);
+                    if ((ushort1 & 0xFF00) != (ushort2 & 0xFF00)) // page cross
+                        Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
+                    r_X = r_A = Mem_r(ushort1);
                     if (r_X == 0) flagZ = 1; else flagZ = 0;
                     if ((r_X & 0x80) != 0) flagN = 1; else flagN = 0;
+                    break;
+
+                case 0xBB://LAS/LAR abs,Y - A = X = SP = M & SP
+                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
+                    ushort1 = (ushort)(ushort2 + r_Y);
+                    if ((ushort1 & 0xFF00) != (ushort2 & 0xFF00)) // page cross
+                        Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
+                    r_A = r_X = r_SP = (byte)(Mem_r(ushort1) & r_SP);
+                    if (r_A == 0) flagZ = 1; else flagZ = 0;
+                    if ((r_A & 0x80) != 0) flagN = 1; else flagN = 0;
                     break;
 
                 case 0xCB:// AXS
@@ -2227,8 +2300,10 @@ namespace AprNes
                     if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
                     break;
 
-                case 0xDF:
-                    ushort1 = (ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)) + r_X);
+                case 0xDF: //DCP
+                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
+                    ushort1 = (ushort)(ushort2 + r_X);
+                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte1 = Mem_r(ushort1);
 
                     Mem_w(ushort1, byte1);//dummy write fixed
@@ -2242,7 +2317,9 @@ namespace AprNes
 
                 case 0xD3: //DCP
                     byte2 = Mem_r(r_PC++);
-                    ushort3 = (ushort)((NES_MEM[byte2++] | (NES_MEM[byte2] << 8)) + r_Y);
+                    ushort2 = (ushort)(NES_MEM[byte2++] | (NES_MEM[byte2] << 8));
+                    ushort3 = (ushort)(ushort2 + r_Y);
+                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort3 & 0x00FF))); // dummy read at wrong-page address
                     byte1 = Mem_r(ushort3);
 
                     Mem_w(ushort3, byte1);//dummy write fixed
@@ -2265,7 +2342,9 @@ namespace AprNes
                     break;
 
                 case 0xDB:// DCP
-                    ushort1 = (ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)) + r_Y);
+                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
+                    ushort1 = (ushort)(ushort2 + r_Y);
+                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte1 = Mem_r(ushort1);
 
                     Mem_w(ushort1, byte1);//dummy write fixed
@@ -2322,7 +2401,9 @@ namespace AprNes
 
                 case 0xF3://ISC
                     byte2 = Mem_r(r_PC++);
-                    ushort3 = (ushort)(((NES_MEM[byte2++] | (NES_MEM[byte2] << 8))) + r_Y);
+                    ushort2 = (ushort)(NES_MEM[byte2++] | (NES_MEM[byte2] << 8));
+                    ushort3 = (ushort)(ushort2 + r_Y);
+                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort3 & 0x00FF))); // dummy read at wrong-page address
                     byte1 = Mem_r(ushort3);
 
                     Mem_w(ushort3, byte1);//dummy write fixed
@@ -2349,7 +2430,9 @@ namespace AprNes
                     break;
 
                 case 0xFB://ISC
-                    ushort1 = (ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)) + r_Y);
+                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
+                    ushort1 = (ushort)(ushort2 + r_Y);
+                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte1 = Mem_r(ushort1);
 
                     Mem_w(ushort1, byte1);//dummy write fixed
@@ -2364,7 +2447,9 @@ namespace AprNes
                     break;
 
                 case 0xFF://ISC
-                    ushort1 = (ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)) + r_X);
+                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
+                    ushort1 = (ushort)(ushort2 + r_X);
+                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte1 = Mem_r(ushort1);
 
                     Mem_w(ushort1, byte1);//dummy write fixed
