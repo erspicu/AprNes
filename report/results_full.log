@@ -654,3 +654,136 @@ Passed
 PASS | ram_after_reset.nes | ram_after_reset
 
 Passed
+PASS | dmc.nes | dmc channel mixing test
+
+1. Should play short tone.
+
+2. Should be nearly silent.
+
+3. Should play short tone.
+
+Some clicking might occur between the two tones.Also, a faint tone might be audible through headphones.
+PASS | noise.nes | noise channel mixing test
+
+1. Should play short tone.
+
+2. Should fade noise in,
+and out, without any tone.
+
+3. Should play short tone.
+
+Some clicking might occur between the two tones.Also, a faint tone might be audible through headphones.
+PASS | square.nes | square channel mixing test
+
+1. Should play short tone.
+
+2. Should be nearly silent.
+
+3. Should play short tone.
+
+Some clicking might occur between the two tones.Also, a faint tone might be audible through headphones.
+PASS | triangle.nes | triangle channel mixing test
+
+1. Should play short tone.
+
+2. Should be nearly silent.
+
+3. Should play short tone.
+
+Some clicking might occur between the two tones.Also, a faint tone might be audible through headphones.
+FAIL(2) | 4015_cleared.nes | At power, $4015 should be cleared
+
+4015_cleared
+
+Failed #2
+FAIL(3) | 4017_timing.nes | Delay after effective $4017 write: 0
+
+Frame IRQ flag should be set sooner after power/reset
+
+4017_timing
+
+Failed #3
+FAIL(2) | 4017_written.nes | At power, $4017 should be written with $00
+
+4017_written
+
+Failed #2
+FAIL(3) | irq_flag_cleared.nes | At reset, flag should be clear
+
+irq_flag_cleared
+
+Failed #3
+FAIL(2) | len_ctrs_enabled.nes | At power, length counters should be enabled
+
+len_ctrs_enabled
+
+Failed #2
+FAIL(2) | works_immediately.nes | At power, writes should work immediately
+
+works_immediately
+
+Failed #2
+FAIL(1) | apu_test.nes | Channel: 0
+
+Writing $80 to $4017 should clock length immediately
+
+1-len_ctr
+
+Failed #4
+
+While running test 1 of 8
+FAIL(4) | 1-len_ctr.nes | Channel: 0
+
+Writing $80 to $4017 should clock length immediately
+
+1-len_ctr
+
+Failed #4
+FAIL(1) | 2-len_table.nes | Channel: 0
+
+2-len_table
+
+Failed
+FAIL(7) | 3-irq_flag.nes | Writing $40 or $C0 to $4017 should clear flag
+
+3-irq_flag
+
+Failed #7
+FAIL(5) | 4-jitter.nes | Odd jitter not handled properly
+
+4-jitter
+
+Failed #5
+FAIL(3) | 5-len_timing.nes | Channel: 0
+
+First length of mode 0 is too late
+
+5-len_timing
+
+Failed #3
+FAIL(2) | 6-irq_flag_timing.nes | Flag first set too soon
+
+6-irq_flag_timing
+
+Failed #2
+FAIL(12) | 7-dmc_basics.nes | Disabling IRQ flag should clear it
+
+7-dmc_basics
+
+Failed #12
+FAIL(3) | 8-dmc_rates.nes | Rate 0's period is too long
+
+8-dmc_rates
+
+Failed #3
+PASS | 01.len_ctr.nes | (no blargg signature)
+PASS | 02.len_table.nes | (no blargg signature)
+PASS | 03.irq_flag.nes | (no blargg signature)
+PASS | 04.clock_jitter.nes | (no blargg signature)
+PASS | 05.len_timing_mode0.nes | (no blargg signature)
+PASS | 06.len_timing_mode1.nes | (no blargg signature)
+PASS | 07.irq_flag_timing.nes | (no blargg signature)
+PASS | 08.irq_timing.nes | (no blargg signature)
+PASS | 09.reset_timing.nes | (no blargg signature)
+PASS | 10.len_halt_timing.nes | (no blargg signature)
+PASS | 11.len_reload_timing.nes | (no blargg signature)
