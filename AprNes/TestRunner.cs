@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
@@ -7,8 +8,66 @@ using System.Threading;
 
 namespace AprNes
 {
+    // 按鍵事件：在指定 frame 按下按鈕，持續 holdFrames 後放開
+    struct InputEvent
+    {
+        public int buttonIndex; // 0=A,1=B,2=Select,3=Start,4=Up,5=Down,6=Left,7=Right
+        public int pressFrame;
+        public int releaseFrame;
+    }
+
     unsafe static class TestRunner
     {
+        const double NES_FPS = 60.0988;
+        const int DEFAULT_HOLD_FRAMES = 10; // ~166ms
+
+        // 解析 --input 參數，格式: "A:1.0,B:2.0,Select:3.0,Start:4.0,Up:5.0,Down:6.0,Left:7.0,Right:8.0"
+        static List<InputEvent> ParseInput(string input)
+        {
+            var events = new List<InputEvent>();
+            if (string.IsNullOrEmpty(input)) return events;
+
+            foreach (string entry in input.Split(','))
+            {
+                string[] parts = entry.Trim().Split(':');
+                if (parts.Length < 2) continue;
+
+                int btnIdx = ButtonNameToIndex(parts[0].Trim());
+                if (btnIdx < 0) continue;
+
+                double sec;
+                if (!double.TryParse(parts[1].Trim(), out sec)) continue;
+
+                int hold = DEFAULT_HOLD_FRAMES;
+                if (parts.Length >= 3)
+                {
+                    double holdSec;
+                    if (double.TryParse(parts[2].Trim(), out holdSec))
+                        hold = Math.Max(1, (int)(holdSec * NES_FPS));
+                }
+
+                int pf = (int)(sec * NES_FPS);
+                events.Add(new InputEvent { buttonIndex = btnIdx, pressFrame = pf, releaseFrame = pf + hold });
+            }
+            return events;
+        }
+
+        static int ButtonNameToIndex(string name)
+        {
+            switch (name.ToLower())
+            {
+                case "a":      return 0;
+                case "b":      return 1;
+                case "select": return 2;
+                case "start":  return 3;
+                case "up":     return 4;
+                case "down":   return 5;
+                case "left":   return 6;
+                case "right":  return 7;
+                default:       return -1;
+            }
+        }
+
         public static int Run(string[] args)
         {
             string romPath = null;
@@ -19,6 +78,8 @@ namespace AprNes
             double maxWait = 30;
             string debugLog = null;
             int debugMax = 15000;
+            double softResetSec = -1; // <0 means not set
+            string inputSpec = null;
 
             // Parse arguments
             for (int i = 0; i < args.Length; i++)
@@ -49,12 +110,18 @@ namespace AprNes
                     case "--debug-max":
                         if (i + 1 < args.Length) int.TryParse(args[++i], out debugMax);
                         break;
+                    case "--soft-reset":
+                        if (i + 1 < args.Length) double.TryParse(args[++i], out softResetSec);
+                        break;
+                    case "--input":
+                        if (i + 1 < args.Length) inputSpec = args[++i];
+                        break;
                 }
             }
 
             if (romPath == null)
             {
-                Console.Error.WriteLine("Usage: AprNes.exe --rom <file.nes> [--time <seconds>] [--wait-result] [--max-wait <seconds>] [--screenshot <out.png>] [--log <results.log>] [--debug-log <path>] [--debug-max <n>]");
+                Console.Error.WriteLine("Usage: AprNes.exe --rom <file.nes> [--time <seconds>] [--wait-result] [--max-wait <seconds>] [--soft-reset <seconds>] [--input \"A:1.0,B:2.0,...\"] [--screenshot <out.png>] [--log <results.log>] [--debug-log <path>] [--debug-max <n>]");
                 return 2;
             }
 
@@ -86,19 +153,60 @@ namespace AprNes
             byte resultCode = 0x80;
             bool testStarted = false; // true once $6000 >= 0x80
 
+            // Soft reset state
+            int softResetFrame = (softResetSec > 0) ? (int)(softResetSec * NES_FPS) : 0;
+            bool softResetDone = false;
+            int resetRequestFrame = -1; // frame when $6000==$81 detected
+
+            // Input events
+            List<InputEvent> inputEvents = ParseInput(inputSpec);
+
             // Wire up VideoOutput handler
             EventHandler handler = null;
             handler = (sender, e) =>
             {
                 frameCount++;
 
+                // --- 模擬手把輸入 ---
+                for (int ie = 0; ie < inputEvents.Count; ie++)
+                {
+                    var ev = inputEvents[ie];
+                    if (frameCount == ev.pressFrame)
+                        NesCore.P1_ButtonPress((byte)ev.buttonIndex);
+                    else if (frameCount == ev.releaseFrame)
+                        NesCore.P1_ButtonUnPress((byte)ev.buttonIndex);
+                }
+
+                // --- Soft reset: explicit --soft-reset time ---
+                if (!softResetDone && softResetFrame > 0 && frameCount >= softResetFrame)
+                {
+                    Console.Error.WriteLine("[TestRunner] Soft reset at frame " + frameCount);
+                    NesCore.SoftReset();
+                    softResetDone = true;
+                }
+
                 if (waitResult)
                 {
                     // blargg test protocol:
                     // $6000 = $80 means "test running"
+                    // $6000 = $81 means "press reset now" (delay >= 100ms ≈ 6 frames)
                     // $6000 < $80 means "test finished" (0 = pass, N = fail code)
-                    // Must wait for test to start ($80) before checking for completion
                     byte status = NesCore.NES_MEM[0x6000];
+
+                    // Auto-detect $81: test requests soft reset
+                    if (!softResetDone && status == 0x81 && resetRequestFrame < 0)
+                    {
+                        resetRequestFrame = frameCount;
+                    }
+                    // Trigger soft reset ~100ms (6 frames) after $81 detected
+                    if (!softResetDone && resetRequestFrame >= 0
+                        && frameCount >= resetRequestFrame + 6)
+                    {
+                        Console.Error.WriteLine("[TestRunner] Auto soft reset at frame " + frameCount + " ($6000=$81 at frame " + resetRequestFrame + ")");
+                        NesCore.SoftReset();
+                        softResetDone = true;
+                    }
+
                     if (!testStarted)
                     {
                         if (status >= 0x80)

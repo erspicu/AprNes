@@ -56,7 +56,9 @@ namespace AprNes
 
             UIOpenRom.Text = fun1ToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["rom"];
             UIConfig.Text = fun3ToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["setting"];
-            UIReset.Text = fun2ToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["reset"];
+            UIReset.Text = LangINI.lang_table[AppConfigure["Lang"]]["reset"];
+            fun2ToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["reset"] + " (Soft)";
+            fun7ToolStripMenuItem.Text = "Hard Reset";
             UIAbout.Text = fun6ToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["about"];
             fun5ToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["appclose"];
             fullScreeenToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["fullscreen"];
@@ -457,6 +459,7 @@ namespace AprNes
         bool running = false;
         public string rom_file = "";
         public byte[] rom_bytes;
+        byte[] current_rom_bytes;  // 保存已解壓的 ROM 資料供 Hard Reset 使用
 
         public enum MapperName
         {
@@ -583,6 +586,7 @@ namespace AprNes
             }
 
             rom_file_name = fd.FileName.Remove(fd.FileName.Length - 4, 4);
+            current_rom_bytes = rom_bytes;  // 保存供 Hard Reset 使用
 
             if (nes_t != null)
             {
@@ -751,10 +755,58 @@ namespace AprNes
             RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType("AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
             RenderObj.init(NesCore.ScreenBuf1x, grfx);
             NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
+
+            NesCore.SoftReset();   // 設 flag（模擬線程暫停中，無 race condition）
+            NesCore._event.Set();  // 恢復模擬線程，cpu_step 中偵測 softreset flag
+        }
+
+        unsafe public void HardReset()
+        {
+            if (!running || current_rom_bytes == null) return;
+
+            // 停止模擬線程
+            NesCore.exit = true;
             NesCore._event.Set();
+            if (nes_t != null)
+            {
+                nes_t.Join(500);
+                if (nes_t.IsAlive) nes_t.Abort();
+            }
 
-            NesCore.SoftReset();
+            NesCore.SaveRam();
+            NesCore.closeAudio();
 
+            // 完整重新初始化（等同 power cycle）
+            NesCore.exit = false;
+            NesCore.LimitFPS = LimitFPS;
+            NesCore.rom_file_name = rom_file_name;
+
+            bool init_result = NesCore.init(current_rom_bytes);
+
+            if (RenderObj != null) RenderObj.freeMem();
+            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType("AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
+            RenderObj.init(NesCore.ScreenBuf1x, grfx);
+
+            NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
+            NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
+
+            if (!init_result)
+            {
+                fps_count_timer.Enabled = false;
+                running = false;
+                label3.Text = "fps : ";
+                MessageBox.Show("Hard Reset fail !");
+                return;
+            }
+
+            nes_t = new Thread(NesCore.run);
+            nes_t.IsBackground = true;
+            nes_t.Start();
+        }
+
+        private void fun7ToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            HardReset();
         }
 
         ToolStripMenuItem _soundMenuItem;

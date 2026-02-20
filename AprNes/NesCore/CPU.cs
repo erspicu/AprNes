@@ -49,6 +49,7 @@ namespace AprNes
         static public string DebugLogPath = @"c:\ai_project\AprNes\emu_debug.log";
         static public void dbgInit()
         {
+            if (!HeadlessMode) { dbgLog = null; return; }
             if (System.IO.File.Exists(DebugLogPath))
                 System.IO.File.Delete(DebugLogPath);
             dbgLog = System.IO.File.AppendText(DebugLogPath);
@@ -98,8 +99,6 @@ namespace AprNes
         public static void SoftReset()
         {
             softreset = true;
-            closeAudio();
-            initAPU();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -113,6 +112,7 @@ namespace AprNes
             nmi_delayed = false;
             irq_pending = false;
             Interrupt_cycle = 7;
+            apuSoftReset();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

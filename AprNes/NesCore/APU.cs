@@ -200,6 +200,28 @@ namespace AprNes
         }
 
         // =====================================================================
+        // APU Soft Reset — 只重置內部狀態，不碰 WaveOut 音效設備
+        // 在模擬線程內由 ResetInterrupt() 呼叫，避免跨線程存取
+        // =====================================================================
+        static void apuSoftReset()
+        {
+            framectrdiv = 7457;
+            framectr = 0;
+            ctrmode = 4;
+            apucycle = 0;
+            _pulseTimer[0] = _pulseTimer[1] = 0;
+            _pulsePeriod[0] = _pulsePeriod[1] = 0;
+            _pulseSeq[0] = _pulseSeq[1] = 0;
+            _pulseDuty[0] = _pulseDuty[1] = 0;
+            _pulseOut[0] = _pulseOut[1] = 0;
+            _triTimer = _triPeriod = _triSeq = _triOut = 0;
+            _noiseTimer = 0; _noisePeriodIdx = 0; _noiseLfsr = 1;
+            _noiseMode = false; _noiseOut = 0;
+            _sampleAccum = 0.0;
+            _dckiller = 0;
+        }
+
+        // =====================================================================
         // 初始化 APU
         // =====================================================================
         static void initAPU()

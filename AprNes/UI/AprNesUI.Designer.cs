@@ -34,6 +34,7 @@
             this.contextMenuStrip1 = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.fun1ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.fun2ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.fun7ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.fun3ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.fun4ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.fun5ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -68,6 +69,7 @@
             this.contextMenuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.fun1ToolStripMenuItem,
             this.fun2ToolStripMenuItem,
+            this.fun7ToolStripMenuItem,
             this.fun3ToolStripMenuItem,
             this.fun4ToolStripMenuItem,
             this.fun5ToolStripMenuItem,
@@ -84,12 +86,19 @@
             this.fun1ToolStripMenuItem.Click += new System.EventHandler(this.fun1ToolStripMenuItem_Click);
             // 
             // fun2ToolStripMenuItem
-            // 
+            //
             this.fun2ToolStripMenuItem.Name = "fun2ToolStripMenuItem";
             this.fun2ToolStripMenuItem.Size = new System.Drawing.Size(191, 30);
-            this.fun2ToolStripMenuItem.Text = "Reset";
+            this.fun2ToolStripMenuItem.Text = "Soft Reset";
             this.fun2ToolStripMenuItem.Click += new System.EventHandler(this.fun2ToolStripMenuItem_Click);
-            // 
+            //
+            // fun7ToolStripMenuItem
+            //
+            this.fun7ToolStripMenuItem.Name = "fun7ToolStripMenuItem";
+            this.fun7ToolStripMenuItem.Size = new System.Drawing.Size(191, 30);
+            this.fun7ToolStripMenuItem.Text = "Hard Reset";
+            this.fun7ToolStripMenuItem.Click += new System.EventHandler(this.fun7ToolStripMenuItem_Click);
+            //
             // fun3ToolStripMenuItem
             // 
             this.fun3ToolStripMenuItem.Name = "fun3ToolStripMenuItem";
@@ -282,6 +291,7 @@
         private System.Windows.Forms.ContextMenuStrip contextMenuStrip1;
         private System.Windows.Forms.ToolStripMenuItem fun1ToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem fun2ToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem fun7ToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem fun3ToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem fun4ToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem fun5ToolStripMenuItem;
