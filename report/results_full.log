@@ -1,0 +1,656 @@
+PASS | cpu.nes | (no blargg signature)
+PASS | official.nes | (no blargg signature)
+PASS | palette_ram.nes | (no blargg signature)
+PASS | power_up_palette.nes | (no blargg signature)
+PASS | sprite_ram.nes | (no blargg signature)
+PASS | vbl_clear_time.nes | (no blargg signature)
+PASS | vram_access.nes | (no blargg signature)
+PASS | 1.Branch_Basics.nes | (no blargg signature)
+PASS | 2.Backward_Branch.nes | (no blargg signature)
+PASS | 3.Forward_Branch.nes | (no blargg signature)
+PASS | cpu_dummy_reads.nes | (no blargg signature)
+PASS | cpu_dummy_writes_oam.nes | [0;37mTEST: cpu_dummy_writes_oam
+[0;33mThis program verifies that the
+CPU does 2x writes properly.
+Any read-modify-write opcode
+should first write the origi-
+nal value; then the calculated
+value exactly 1 cycle later.
+
+Requirement: OAM memory reads
+MUST be reliable. This is
+often the case on emulators,
+but NOT on the real NES.
+Nevertheless, this test can be
+used to see if the CPU in the
+emulator is built properly.
+
+[0;37m[0;37mTesting OAM.  The screen will go blank for a moment now.
+[0;37mOK; [0;37mVerifying opcodes...
+[1;34m0E[1;34m2E[1;34m4E[1;34m6E[1;34mCE[1;34mEE [1;34m1E[1;34m3E[1;34m5E[1;34m7E[1;34mDE[1;34mFE 
+[1;34m0F[1;34m2F[1;34m4F[1;34m6F[1;34mCF[1;34mEF [1;34m1F[1;34m3F[1;34m5F[1;34m7F[1;34mDF[1;34mFF 
+[1;34m03[1;34m23[1;34m43[1;34m63[1;34mC3[1;34mE3 [1;34m13[1;34m33[1;34m53[1;34m73[1;34mD3[1;34mF3 
+[1;34m1B[1;34m3B[1;34m5B[1;34m7B[1;34mDB[1;34mFB              
+[0;37m
+Passed
+PASS | cpu_dummy_writes_ppumem.nes | [0;37mTEST: cpu_dummy_writes_ppumem
+[0;33mThis program verifies that the
+CPU does 2x writes properly.
+Any read-modify-write opcode
+should first write the origi-
+nal value; then the calculated
+value exactly 1 cycle later.
+
+[0;37mVerifying open bus behavior.
+[0;33m      W- W- WR W- W- W- W- WR
+2000+ 0  1  2  3  4  5  6  7 
+[0;33m  R0:[1;34m 0[1;34m- 0[1;34m- 0[1;34m0[1;34m 0[1;34m- 0[1;34m- 0[1;34m- 0[1;34m- 0[1;34m0[1;34m
+[0;33m  R1:[1;34m 0[1;34m- 0[1;34m- 0[1;34m0[1;34m 0[1;34m- 0[1;34m- 0[1;34m- 0[1;34m- 0[1;34m0[1;34m
+[0;33m  R3:[1;34m 0[1;34m- 0[1;34m- 0[1;34m0[1;34m 0[1;34m- 0[1;34m- 0[1;34m- 0[1;34m- 0[1;34m0[1;34m
+[0;33m  R5:[1;34m 0[1;34m- 0[1;34m- 0[1;34m0[1;34m 0[1;34m- 0[1;34m- 0[1;34m- 0[1;34m- 0[1;34m0[1;34m
+[0;33m  R6:[1;34m 0[1;34m- 0[1;34m- 0[1;34m0[1;34m 0[1;34m- 0[1;34m- 0[1;34m- 0[1;34m- 0[1;34m0[1;34m
+[0;37mOK; [0;37mVerifying opcodes...
+[1;34m0E[1;34m2E[1;34m4E[1;34m6E[1;34mCE[1;34mEE [1;34m1E[1;34m3E[1;34m5E[1;34m7E[1;34mDE[1;34mFE 
+[1;34m0F[1;34m2F[1;34m4F[1;34m6F[1;34mCF[1;34mEF [1;34m1F[1;34m3F[1;34m5F[1;34m7F[1;34mDF[1;34mFF 
+[1;34m03[1;34m23[1;34m43[1;34m63[1;34mC3[1;34mE3 [1;34m13[1;34m33[1;34m53[1;34m73[1;34mD3[1;34mF3 
+[1;34m1B[1;34m3B[1;34m5B[1;34m7B[1;34mDB[1;34mFB              
+[0;37m
+Passed
+FAIL(1) | cpu_interrupts.nes | 53 +0
+53 +1
+53 +2
+53 +3
+53 +4
+53 +5
+53 +6
+53 +7
+53 +8
+53 +9
+53 +10
+53 +11
+53 +12
+0 +13
+...
+7 +524
+7 +525
+7 +526
+7 +527
+
+E18B8AB5
+4-irq_and_dma
+
+Failed
+
+While running test 4 of 5
+PASS | 1-cli_latency.nes | 1-cli_latency
+
+Passed
+PASS | 2-nmi_and_brk.nes | NMI BRK 00
+27  36  00 
+26  36  00 
+26  36  00 
+36  00  00 
+36  00  00 
+36  00  00 
+36  00  00 
+36  00  00 
+27  36  00 
+27  36  00 
+
+2-nmi_and_brk
+
+Passed
+PASS | 3-nmi_and_irq.nes | NMI BRK
+23  00 
+21  00 
+21  00 
+20  00 
+20  00 
+20  00 
+20  00 
+20  00 
+20  00 
+20  00 
+25  20 
+25  20 
+
+3-nmi_and_irq
+
+Passed
+FAIL(1) | 4-irq_and_dma.nes | 53 +0
+53 +1
+53 +2
+53 +3
+53 +4
+53 +5
+53 +6
+53 +7
+53 +8
+53 +9
+53 +10
+53 +11
+53 +12
+0 +13
+...
+7 +524
+7 +525
+7 +526
+7 +527
+
+E18B8AB5
+4-irq_and_dma
+
+Failed
+FAIL(1) | 5-branch_delays_irq.nes | test_jmp
+T+ CK PC
+00 02 04 
+01 02 04 
+02 03 07 
+03 02 07 
+04 02 07 
+05 02 08 
+06 02 08 
+07 03 08 
+08 02 08 
+09 02 08 
+
+
+39412764
+5-branch_delays_irq
+
+Failed
+75 05 00 35 EE 
+
+71AD45E8
+At power A,X,Y=0 P=$34 S=$FD
+
+registers
+
+Failed #2
+disappears
+PASS | cpu_timing_test.nes | (no blargg signature)
+FAIL(128) | instr_misc.nes | 1F 1B 13 3F 3B 33 5F 5B 53 7F 7B 73 DF DB D3 FF FB F3 9C BF 48 46 24 7B 55 6A 6A 4B
+PASS | 01-abs_x_wrap.nes | 01-abs_x_wrap
+
+Passed
+PASS | 02-branch_wrap.nes | 02-branch_wrap
+
+Passed
+FAIL(4) | 03-dummy_reads.nes | STA abs,x
+
+03-dummy_reads
+
+Failed #4
+FAIL(2) | 04-dummy_reads_apu.nes | 1F 1B 13 3F 3B 33 5F 5B 53 7F 7B 73 DF DB D3 FF FB F3 9C BF C5 A0 30 9B 53 D3 FA C2 B2 73 9B 76 04 8E 
+Unofficial opcodes failed
+
+04-dummy_reads_apu
+
+Failed #2
+PASS | all_instrs.nes | All 15 tests passed
+PASS | official_only.nes | All 15 tests passed
+PASS | 01-implied.nes | 01-implied
+
+Passed
+PASS | 02-immediate.nes | 02-immediate
+
+Passed
+PASS | 03-zero_page.nes | 03-zero_page
+
+Passed
+PASS | 04-zp_xy.nes | 04-zp_xy
+
+Passed
+PASS | 05-absolute.nes | 05-absolute
+
+Passed
+PASS | 06-abs_xy.nes | 06-abs_xy
+
+Passed
+PASS | 07-ind_x.nes | 07-ind_x
+
+Passed
+PASS | 08-ind_y.nes | 08-ind_y
+
+Passed
+PASS | 09-branches.nes | 09-branches
+
+Passed
+PASS | 10-stack.nes | 10-stack
+
+Passed
+PASS | 11-jmp_jsr.nes | 11-jmp_jsr
+
+Passed
+PASS | 12-rts.nes | 12-rts
+
+Passed
+PASS | 13-rti.nes | 13-rti
+
+Passed
+PASS | 14-brk.nes | 14-brk
+
+Passed
+PASS | 15-special.nes | 15-special
+
+Passed
+PASS | all_instrs.nes | All 16 tests passed
+PASS | official_only.nes | All 16 tests passed
+PASS | 01-basics.nes | 01-basics
+
+Passed
+PASS | 02-implied.nes | 02-implied
+
+Passed
+PASS | 03-immediate.nes | 03-immediate
+
+Passed
+PASS | 04-zero_page.nes | 04-zero_page
+
+Passed
+PASS | 05-zp_xy.nes | 05-zp_xy
+
+Passed
+PASS | 06-absolute.nes | 06-absolute
+
+Passed
+PASS | 07-abs_xy.nes | 07-abs_xy
+
+Passed
+PASS | 08-ind_x.nes | 08-ind_x
+
+Passed
+PASS | 09-ind_y.nes | 09-ind_y
+
+Passed
+PASS | 10-branches.nes | 10-branches
+
+Passed
+PASS | 11-stack.nes | 11-stack
+
+Passed
+PASS | 12-jmp_jsr.nes | 12-jmp_jsr
+
+Passed
+PASS | 13-rts.nes | 13-rts
+
+Passed
+PASS | 14-rti.nes | 14-rti
+
+Passed
+PASS | 15-brk.nes | 15-brk
+
+Passed
+PASS | 16-special.nes | 16-special
+
+Passed
+FAIL(1) | instr_timing.nes | Instruction timing test
+
+Takes about 25 seconds. Doesn't time the 8 branches and 12 illegal instructions.
+
+Official instructions...
+
+NOPs and alternate SBC...
+
+Unofficial instructions...
+8B was 0, should be 2
+93 was 0, should be 6
+9B was 0, should be 5
+9F was 0, should be 5
+B3 was 5, should be 6 (cross)
+BB was 0, should be 4
+BF was 4, should be 5 (cross)
+
+Unofficial instruction timing is wrong
+
+1-instr_timing
+
+Failed #4
+
+While running test 1 of 2
+FAIL(4) | 1-instr_timing.nes | Instruction timing test
+
+Takes about 25 seconds. Doesn't time the 8 branches and 12 illegal instructions.
+
+Official instructions...
+
+NOPs and alternate SBC...
+
+Unofficial instructions...
+8B was 0, should be 2
+93 was 0, should be 6
+9B was 0, should be 5
+9F was 0, should be 5
+B3 was 5, should be 6 (cross)
+BB was 0, should be 4
+BF was 4, should be 5 (cross)
+
+Unofficial instruction timing is wrong
+
+1-instr_timing
+
+Failed #4
+PASS | 2-branch_timing.nes | 2-branch_timing
+
+Passed
+PASS | 01-implied.nes | 01-implied
+
+Passed
+PASS | 02-immediate.nes | 02-immediate
+
+Passed
+PASS | 03-zero_page.nes | 03-zero_page
+
+Passed
+PASS | 04-zp_xy.nes | 04-zp_xy
+
+Passed
+PASS | 05-absolute.nes | 05-absolute
+
+Passed
+PASS | 06-abs_xy.nes | 06-abs_xy
+
+Passed
+PASS | 07-ind_x.nes | 07-ind_x
+
+Passed
+PASS | 08-ind_y.nes | 08-ind_y
+
+Passed
+PASS | 09-branches.nes | 09-branches
+
+Passed
+PASS | 10-stack.nes | 10-stack
+
+Passed
+PASS | 11-special.nes | 11-special
+
+Passed
+PASS | oam_read.nes | ----------------
+----------------
+----------------
+----------------
+----------------
+----------------
+----------------
+----------------
+----------------
+----------------
+----------------
+----------------
+----------------
+----------------
+----------------
+----------------
+
+oam_read
+
+Passed
+PASS | ppu_open_bus.nes | ppu_open_bus
+
+Passed
+FAIL(1) | ppu_vbl_nmi.nes | T+ 1 2
+00 - V
+01 - V
+02 - V
+03 - V
+04 - V
+05 V -
+06 V -
+07 V -
+08 V -
+
+4103C340
+02-vbl_set_time
+
+Failed
+
+While running test 2 of 10
+PASS | 01-vbl_basics.nes | 01-vbl_basics
+
+Passed
+FAIL(1) | 02-vbl_set_time.nes | T+ 1 2
+00 - V
+01 - V
+02 - V
+03 - V
+04 - V
+05 V -
+06 V -
+07 V -
+08 V -
+
+4103C340
+02-vbl_set_time
+
+Failed
+FAIL(1) | 03-vbl_clear_time.nes | 00 V
+01 V
+02 V
+03 V
+04 V
+05 V
+06 V
+07 V
+08 V
+
+F9DC4B60
+03-vbl_clear_time
+
+Failed
+FAIL(11) | 04-nmi_control.nes | Immediate occurence should be after NEXT instruction
+
+04-nmi_control
+
+Failed #11
+PASS | 05-nmi_timing.nes | 00 4
+01 4
+02 4
+03 3
+04 3
+05 3
+06 3
+07 3
+08 3
+09 2
+
+05-nmi_timing
+
+Passed
+FAIL(1) | 06-suppression.nes | 00 - N
+01 - N
+02 - N
+03 - N
+04 - N
+05 V N
+06 V N
+07 V N
+08 V N
+09 V N
+
+3FE15516
+06-suppression
+
+Failed
+FAIL(1) | 07-nmi_on_timing.nes | 00 N
+01 N
+02 N
+03 N
+04 N
+05 N
+06 N
+07 N
+08 N
+
+6BA71A6F
+07-nmi_on_timing
+
+Failed
+FAIL(1) | 08-nmi_off_timing.nes | 03 -
+04 -
+05 -
+06 -
+07 -
+08 -
+09 -
+0A -
+0B -
+0C -
+
+FA8C430B
+08-nmi_off_timing
+
+Failed
+PASS | 09-even_odd_frames.nes | 00 01 01 02 
+09-even_odd_frames
+
+Passed
+FAIL(3) | 10-even_odd_timing.nes | 08 07 
+Clock is skipped too late, relative to enabling BG
+
+10-even_odd_timing
+
+Failed #3
+PASS | 01.basics.nes | (no blargg signature)
+PASS | 02.alignment.nes | (no blargg signature)
+PASS | 03.corners.nes | (no blargg signature)
+PASS | 04.flip.nes | (no blargg signature)
+PASS | 05.left_clip.nes | (no blargg signature)
+PASS | 06.right_edge.nes | (no blargg signature)
+PASS | 07.screen_bottom.nes | (no blargg signature)
+PASS | 08.double_height.nes | (no blargg signature)
+PASS | 09.timing_basics.nes | (no blargg signature)
+PASS | 10.timing_order.nes | (no blargg signature)
+PASS | 11.edge_timing.nes | (no blargg signature)
+PASS | 1.Basics.nes | (no blargg signature)
+PASS | 2.Details.nes | (no blargg signature)
+PASS | 3.Timing.nes | (no blargg signature)
+PASS | 4.Obscure.nes | (no blargg signature)
+PASS | 5.Emulator.nes | (no blargg signature)
+PASS | 1.frame_basics.nes | (no blargg signature)
+PASS | 2.vbl_timing.nes | (no blargg signature)
+PASS | 3.even_odd_frames.nes | (no blargg signature)
+PASS | 4.vbl_clear_timing.nes | (no blargg signature)
+PASS | 5.nmi_suppression.nes | (no blargg signature)
+PASS | 6.nmi_disable.nes | (no blargg signature)
+PASS | 7.nmi_timing.nes | (no blargg signature)
+FAIL(1) | sprdma_and_dmc_dma.nes | T+ Clocks (decimal)
+00 399
+01 399
+02 399
+03 399
+04 399
+05 399
+06 399
+07 399
+08 399
+09 399
+0A 399
+0B 399
+0C 399
+0D 399
+0E 399
+0F 399
+
+20F46455
+SPRDMA and DMC DMA
+
+Failed
+FAIL(1) | sprdma_and_dmc_dma_512.nes | T+ Clocks (decimal)
+00 399
+01 399
+02 399
+03 399
+04 399
+05 399
+06 399
+07 399
+08 399
+09 399
+0A 399
+0B 399
+0C 399
+0D 399
+0E 399
+0F 399
+
+20F46455
+SPRDMA and DMC DMA
+
+Failed
+PASS | dma_2007_read.nes | (no blargg signature)
+PASS | dma_2007_write.nes | (no blargg signature)
+PASS | dma_4016_read.nes | (no blargg signature)
+PASS | double_2007_read.nes | (no blargg signature)
+PASS | read_write_2007.nes | (no blargg signature)
+PASS | test_buttons.nes | (no blargg signature)
+PASS | count_errors.nes | (no blargg signature)
+PASS | count_errors_fast.nes | (no blargg signature)
+PASS | thorough_test.nes | (no blargg signature)
+FAIL(54) | test_ppu_read_buffer.nes | [0;37mTEST:test_ppu_read_buffer
+-----------------------------
+Testing basic PPU memory I/O.
+[0;37mPerforming tests that combine
+sprite 0 hit flag, $4014 DMA
+and the RAM mirroring...
+[0;33mGraphical artifacts during
+this test are OK and expected.
+
+[0;37m              Hi   No-Hi
+[0;37mDirect poke  [0;33m OK  [0;33m OK  
+[0;37mDMA with ROM  [0;33m OK  [0;37m ??21
+[0;37mDMA + PPU bus[0;33m OK  [0;37m ??21
+Side-effect failure:
+0 reads seen, 32 expected.
+[0;37mDMA with 0800 [0;33m OK  [0;37m ??21
+[0;37mDMA with 0900 [0;33m OK  [0;37m ??21
+[0;37mDMA with 0A00 [0;33m OK  [0;37m ??21
+[0;37mDMA with 0B00 [0;33m OK  [0;37m ??21
+[0;37mDMA with 0C00 [0;33m OK  [0;37m ??21
+[0;37mDMA with 0D00 [0;33m OK  [0;37m ??21
+[0;37mDMA with 0E00 [0;33m OK  [0;37m ??21
+[0;37mDMA with 0F00 [0;33m OK  [0;37m ??21
+[0;37mDMA with 1000 [0;33m OK  [0;37m ??21
+[0;37mDMA with 1100 [0;33m OK  [0;37m ??21
+[0;37mDMA with 1200 [0;33m OK  [0;37m ??21
+[0;37mDMA with 1300 [0;33m OK  [0;37m ??21
+[0;37mDMA with 1400 [0;37m FAIL[0;33m OK  
+[0;37mDMA with 1500 [0;37m FAIL[0;33m OK  
+[0;37mDMA with 1600 [0;37m FAIL[0;33m OK  
+[0;37mDMA with 1700 [0;37m FAIL[0;33m OK  
+[0;37mDMA with 1800 [0;37m FAIL[0;33m OK  
+[0;37mDMA with 1900 [0;37m FAIL[0;33m OK  
+[0;37mDMA with 1A00 [0;37m FAIL[0;33m OK  
+[0;37mDMA with 1B00 [0;37m FAIL[0;33m OK  
+[0;37mDMA with 1C00 [0;37m FAIL[0;33m OK  
+[0;37mDMA with 1D00 [0;37m FAIL[0;33m OK  
+[0;37mDMA with 1E00 [0;37m FAIL[0;33m OK  
+[0;37mDMA with 1F00 [0;37m FAIL[0;33m OK  
+[0;37mDMA with RAM  
+
+[0;37m-----------------------------
+ This next test wil take a while.
+ In order to distract you with
+ entertainment, art is provided.
+ Contemplate on the art while
+ the test is in progress.
+
+
+
+[0;37m-----------------------------
+Failed tests:[0;33m 69 67 65 54
+[0;37m-----------------------------
+[0;37mPPU memory range 3000-3EFE
+should be a mirror of the
+PPU memory range 2000-2EFE.
+
+Failed #54
+PASS | registers.nes | A  X  Y  P  S
+34 56 78 FF 0F 
+
+registers
+
+Passed
+PASS | ram_after_reset.nes | ram_after_reset
+
+Passed
