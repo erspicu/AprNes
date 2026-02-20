@@ -18,7 +18,7 @@ namespace AprNes
                 case 0x2007: return ppu_r_2007();
                 case 0x4015: return apu_r_4015();
                 case 0x4016: return gamepad_r_4016();
-                default: return 0x40; //fix 2017.01.19
+                default: return openbus;
             }
         }
 
@@ -61,8 +61,19 @@ namespace AprNes
                     ctrmode        = ((val & 0x80) != 0) ? 5 : 4;
                     apuintflag     = (val & 0x40) != 0;
                     framectr       = 0;
-                    framectrdiv    = framectrreload;
-                    if (ctrmode == 5) clockframecounter(); // 5-step: 立即觸發
+                    // Reset delay: on real NES, write happens on last cycle of STA
+                    // (3 cycles into the instruction) and reset takes effect 3-4 cycles
+                    // later. Our model executes atomically before catch-up, so add offset
+                    // to compensate for the ~7 cycle difference (4 for STA + 3 for reset).
+                    if (ctrmode == 5)
+                    {
+                        clockframecounter(); // 5-step: 立即觸發, framectr becomes 1
+                        framectrdiv = frameReload5[framectr] + 7;
+                    }
+                    else
+                    {
+                        framectrdiv = frameReload4[0] + 7;
+                    }
                     break;
                 default: break;
             }

@@ -1,19 +1,22 @@
-﻿using System;
+using System;
 using System.Windows.Forms;
 
 namespace AprNes
 {
     static class Program
     {
-        /// <summary>
-        /// The main entry point for the application.
-        /// </summary>
         [STAThread]
-        static void Main()
+        static int Main(string[] args)
         {
+            if (args.Length > 0)
+            {
+                return TestRunner.Run(args);
+            }
+
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.Run(AprNesUI.GetInstance());
+            return 0;
         }
     }
 }

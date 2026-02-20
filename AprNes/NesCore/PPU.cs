@@ -276,8 +276,11 @@ namespace AprNes
                 if (!SuppressVbl)
                 {
                     isVblank = true;
-                    if (NMIable) NMIInterrupt();
+                    if (NMIable) nmi_pending = true;
+                    if (NMIable) dbgWrite("VBL_SET: sl=241 cx=1 NMIable=True nmi_pending=" + nmi_pending);
                 }
+                else if (NMIable)
+                    dbgWrite("VBL_SUPPRESSED: sl=241 cx=1");
                 SuppressVbl = false;
             }
 
@@ -285,11 +288,11 @@ namespace AprNes
             if (scanline == 261 && ppu_cycles_x == 1)
                 isVblank = isSprite0hit = isSpriteOverflow = false;
 
-            // Odd frame skip: on odd frames, skip cycle 338 of pre-render (same as ppu_step)
-            if (scanline == 261 && ppu_cycles_x == 338)
+            // Odd frame skip: on odd frames with rendering enabled, skip last idle cycle of pre-render
+            if (scanline == 261 && ppu_cycles_x == 339)
             {
                 oddSwap = !oddSwap;
-                if (!oddSwap && ShowBackGround) ppu_cycles_x++;
+                if (!oddSwap && (ShowBackGround || ShowSprites)) ppu_cycles_x++;
             }
 
             // Advance scanline
@@ -496,11 +499,54 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ppu_r_2002() //ok
         {
+            // VBL look-ahead: check if VBL will start during this instruction's PPU cycles.
+            // Without this, $2002 reads are "stale" (see PPU state from before this instruction),
+            // causing sync_vbl to converge incorrectly. This lightweight check avoids
+            // running full ppu_step_new (which would trigger mapper IRQs mid-instruction).
+            // Use cpu_cycles*3: scan ALL PPU clocks of the instruction. On real NES, the
+            // $2002 read happens on the LAST CPU cycle (e.g. cycle 4 of BIT abs), so VBL
+            // events anywhere in the instruction are visible to the read. The first BIT in
+            // sync_vbl's fine loop must "own" all VBL events within its execution range.
+            bool lookahead_hit = false;
+            if (!isVblank && cpu_cycles > 1)
+            {
+                int ppu_remaining = cpu_cycles * 3;
+                int cx = ppu_cycles_x;
+                int sl = scanline;
+                for (int i = 0; i < ppu_remaining; i++)
+                {
+                    cx++;
+                    if (cx == 341) { if (++sl == 262) sl = 0; cx = 0; }
+                    if (sl == 241 && cx == 1)
+                    {
+                        lookahead_hit = true;
+                        dbgWrite("LOOKAHEAD: VBL predicted at ppu=(" + scanline + "," + ppu_cycles_x + ") cpu_cycles=" + cpu_cycles + " SuppressVbl=" + SuppressVbl + " NMIable=" + NMIable);
+                        if (!SuppressVbl)
+                        {
+                            isVblank = true;
+                            if (NMIable) nmi_pending = true;
+                        }
+                        break;
+                    }
+                }
+            }
+
             openbus = (byte)(((isVblank) ? 0x80 : 0) | ((isSprite0hit) ? 0x40 : 0) | ((isSpriteOverflow) ? 0x20 : 0) | (openbus & 0x1f));
+            // Log $2002 reads only when VBL detected (reduce sync_vbl noise)
+            if (lookahead_hit || (isVblank && scanline == 241))
+                dbgWrite("R2002: sl=" + scanline + " cx=" + ppu_cycles_x + " val=$" + openbus.ToString("X2") + " isVbl=" + isVblank + " lookahead=" + lookahead_hit + " PC=$" + r_PC.ToString("X4"));
 
             if (ppu_cycles_x == 1 && scanline == 241)
             {
                 SuppressVbl = true;
+            }
+            else if (lookahead_hit)
+            {
+                // Look-ahead predicted VBL at (241,1) which is coming during this
+                // instruction's PPU catch-up. The read already "consumed" VBL (returned $80).
+                // Set SuppressVbl so ppu_step_new doesn't re-set isVblank when it reaches (241,1).
+                SuppressVbl = true;
+                isVblank = false;
             }
             else
             {
@@ -534,7 +580,9 @@ namespace AprNes
             bool wasNMIable = NMIable;
             NMIable = ((value & 0x80) > 0) ? true : false;
             // Rising edge: enabling NMI while VBL flag is already set fires NMI immediately
-            if (!wasNMIable && NMIable && isVblank) NMIInterrupt();
+            if (!wasNMIable && NMIable && isVblank) nmi_pending = true;
+            if (wasNMIable != NMIable)
+                dbgWrite("W2000_NMI: " + (NMIable ? "ON" : "OFF") + " sl=" + scanline + " cx=" + ppu_cycles_x + " isVbl=" + isVblank + " PC=$" + r_PC.ToString("X4"));
         }
 
         static void ppu_w_2001(byte value) //ok
@@ -606,7 +654,9 @@ namespace AprNes
         {
             int oam_address = value << 8;
             for (int i = 0; i < 256; i++) spr_ram[spr_ram_add++] = NES_MEM[oam_address++];
-            cpu_cycles += 512;
+            // OAM DMA: 1 dummy cycle (halt) + 256 × 2 (read/write) = 513 cycles
+            // On real NES, odd-cycle start adds 1 more (514), but 513 is the base.
+            cpu_cycles += 513;
         }
     }
 }

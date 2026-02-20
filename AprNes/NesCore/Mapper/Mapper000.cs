@@ -18,8 +18,8 @@ namespace AprNes
 
         public byte MapperR_ExpansionROM(ushort address) { return 0; }
         public void MapperW_ExpansionROM(ushort address, byte value) { }
-        public void MapperW_RAM(ushort address, byte value) { }
-        public byte MapperR_RAM(ushort address) { return 0; }
+        public void MapperW_RAM(ushort address, byte value) { NesCore.NES_MEM[address] = value; }
+        public byte MapperR_RAM(ushort address) { return NesCore.NES_MEM[address]; }
         public void MapperW_PRG(ushort address, byte value) { }
 
         public byte MapperR_RPG(ushort address)

@@ -33,7 +33,7 @@ namespace AprNes
                 IRQCounter--;
             }
 
-            if (IRQCounter == 0 && IRQ_enable)
+            if (IRQCounter == 0 && IRQ_enable && NesCore.FlagI_public == 0)
                 NesCore.IRQInterrupt();
         }
 

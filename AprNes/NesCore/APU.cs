@@ -124,8 +124,12 @@ namespace AprNes
         // =====================================================================
         static int apucycle = 0;
         static int[] noiseperiod;
-        static int framectrreload;
-        static int framectrdiv = 7456;
+        // Per-step reload values for frame counter (non-uniform, matching real NES NTSC timing)
+        // 4-step: steps fire at CPU cycles 7457, 14913, 22371, 29829 from $4017 write
+        // 5-step: steps fire at CPU cycles 7457, 14913, 22371, 29829, 37282
+        static int[] frameReload4 = { 7457, 7456, 7458, 7458 };
+        static int[] frameReload5 = { 7457, 7456, 7458, 7458, 7453 };
+        static int framectrdiv = 7457;
         static bool apuintflag = true, statusdmcint = false, statusframeint = false;
         static int framectr = 0, ctrmode = 4;
         static bool[] lenCtrEnable = { true, true, true, true };
@@ -203,8 +207,7 @@ namespace AprNes
             dmcperiods  = new int[] { 428,380,340,320,286,254,226,214,190,160,142,128,106,84,72,54 };
             noiseperiod = new int[] { 4,8,16,32,64,96,128,160,202,254,380,508,762,1016,2034,4068 };
 
-            framectrreload = 7456;
-            framectrdiv    = 7456;
+            framectrdiv    = 7457;
             apucycle       = 0;
 
             // 重置各聲道狀態
@@ -336,11 +339,11 @@ namespace AprNes
         {
             apucycle++;
 
-            // Frame Counter：每 7456 CPU cycles 觸發一次 (~240Hz)
+            // Frame Counter：non-uniform step intervals matching real NES (~240Hz)
             if (--framectrdiv <= 0)
             {
-                framectrdiv = framectrreload;
-                clockframecounter();
+                clockframecounter(); // increments framectr
+                framectrdiv = (ctrmode == 4) ? frameReload4[framectr] : frameReload5[framectr];
             }
 
             // Pulse & Noise 計時器：每 2 個 CPU cycles 計數一次 (APU clock)

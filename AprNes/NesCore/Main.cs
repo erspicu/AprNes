@@ -44,8 +44,13 @@ namespace AprNes
 
         static public ManualResetEvent _event = new ManualResetEvent(true);
 
-        //static InterfaceGraphic RenderObj;
-
+        static public void ShowError(string msg)
+        {
+            if (HeadlessMode)
+                Console.Error.WriteLine("ERROR: " + msg);
+            else
+                MessageBox.Show(msg);
+        }
 
         static public bool init(byte[] rom_bytes) //for Hard Reset effect
         {
@@ -55,7 +60,7 @@ namespace AprNes
                 //https://github.com/dsedivec/inestool/blob/master/inestool.py
                 if (!(rom_bytes[0] == 'N' && rom_bytes[1] == 'E' && rom_bytes[2] == 'S' && rom_bytes[3] == 0x1a))
                 {
-                    MessageBox.Show("Bad Magic Number !");
+                    ShowError("Bad Magic Number !");
                     return false;
                 }
                 Console.WriteLine("iNes header");
@@ -135,7 +140,7 @@ namespace AprNes
 
                 if (!mapper_pass)
                 {
-                    MessageBox.Show("not support mapper ! " + mapper);
+                    ShowError("not support mapper ! " + mapper);
                     return false;
                 }
                 if (NesHeaderV2)
@@ -190,10 +195,13 @@ namespace AprNes
 
                 //init APU & audio output
                 initAPU();
+
+                //init debug log
+                dbgInit();
             }
             catch (Exception e)
             {
-                MessageBox.Show(e.Message);
+                ShowError(e.Message);
                 return false;
             }
             return true;
@@ -217,13 +225,117 @@ namespace AprNes
             StopWatch.Restart();
             while (!exit)
             {
+                bool irq_just_fired = false;
+                // === Interrupt service point (before instruction fetch) ===
+                // NMI is edge-triggered and takes priority over IRQ.
+                if (nmi_pending)
+                {
+                    nmi_pending = false;
+                    dbgWrite("NMI_FIRE: sl=" + scanline + " cx=" + ppu_cycles_x + " PC=$" + r_PC.ToString("X4") + " flags=$" + GetFlag().ToString("X2") + " I=" + flagI);
+                    NMIInterrupt();
+                    nmi_trace_count = 25;
+                }
+                else if (irq_pending && !nmi_delayed)
+                {
+                    // IRQ is level-triggered. Skip if NMI is delayed (will fire next iteration).
+                    irq_pending = false;
+                    dbgWrite("IRQ_FIRE: sl=" + scanline + " cx=" + ppu_cycles_x + " PC=$" + r_PC.ToString("X4") + " flags=$" + GetFlag().ToString("X2") + " I=" + flagI);
+                    IRQInterrupt();
+                    irq_just_fired = true;
+                }
+                // Transfer delayed NMI: VBL on last cycle of prev instruction
+                // becomes pending NOW (after NMI check), so it fires after the
+                // NEXT instruction — matching real NES 1-instruction delay.
+                if (nmi_delayed)
+                {
+                    nmi_delayed = false;
+                    nmi_pending = true;
+                }
+                byte prevFlagI_run = flagI; // capture I flag before instruction for IRQ delay
                 cpu_step();
+                int initial_cpu_cycles = cpu_cycles;
+                bool nmi_was_pending = false;
+                bool nmi_late_in_cycle = false; // true if VBL on sub-step 1 or 2 (not 0)
+                int cycles_remaining = cpu_cycles;
                 do
                 {
-                    ppu_step_new(); ppu_step_new(); ppu_step_new();
+                    ppu_step_new();
+                    // Check if VBL fired on sub-step 0 (first PPU dot of CPU cycle)
+                    bool vbl_on_step0 = (nmi_pending && !nmi_was_pending);
+                    ppu_step_new(); ppu_step_new();
+                    // Track if nmi_pending was set during this CPU cycle
+                    if (nmi_pending && !nmi_was_pending)
+                    {
+                        nmi_was_pending = true;
+                        cycles_remaining = cpu_cycles; // snapshot: how many cycles left (including this one)
+                        nmi_late_in_cycle = !vbl_on_step0; // VBL on sub-step 1 or 2
+                    }
                     apu_step();//1x cpu cycles
                 } while (--cpu_cycles > 0);
-
+                // NMI edge detection: on real 6502, NMI is sampled at the rising edge
+                // of φ2 (early in each CPU cycle). If VBL fires at PPU sub-step 0 (the
+                // very start of the CPU cycle), the edge is detected in this cycle and
+                // NMI fires after the current instruction. If VBL fires at sub-step 1 or 2
+                // (mid/late cycle), the edge misses the sampling point and is detected at
+                // the start of the NEXT CPU cycle — causing a 1-instruction delay when
+                // this was the last cycle of the instruction.
+                if (nmi_was_pending && cycles_remaining == 1 && nmi_late_in_cycle
+                    && opcode != 0x00 && !irq_just_fired)
+                {
+                    nmi_pending = false;
+                    nmi_delayed = true;
+                }
+                // IRQ-NMI hijacking: if NMI asserts during IRQ's 7-cycle vectoring
+                // overhead, redirect to NMI vector. IRQ already pushed the correct
+                // return address and flags to the stack, so NMI handler's RTI will
+                // return to the right place with original flags restored.
+                // On real NES, vector fetch is on cycles 6-7. NMI detected on cycles
+                // 1-5 hijacks the vector; cycles 6-7 are too late (vector already fetched).
+                if (irq_just_fired && nmi_pending && nmi_was_pending
+                    && cycles_remaining > (initial_cpu_cycles - 5))
+                {
+                    dbgWrite("IRQ_NMI_HIJACK: sl=" + scanline + " cx=" + ppu_cycles_x
+                        + " PC=$" + r_PC.ToString("X4") + " cycles_remaining=" + cycles_remaining
+                        + " initial=" + initial_cpu_cycles);
+                    nmi_pending = false;
+                    r_PC = (ushort)(Mem_r(0xfffa) | (Mem_r(0xfffb) << 8));
+                    nmi_trace_count = 25;
+                }
+                // BRK NMI hijacking: if BRK just executed and NMI fired during its cycles,
+                // redirect to NMI vector (BRK already pushed flags with B bit and return addr).
+                // On real NES, vector fetch is on BRK's last 2 cycles (6-7). If NMI is detected
+                // only on those cycles, it's too late to hijack — BRK uses IRQ vector, NMI fires
+                // after the next instruction.
+                if (nmi_pending && opcode == 0x00)
+                {
+                    if (nmi_was_pending && cycles_remaining <= 3)
+                    {
+                        // VBL on BRK's last 3 cycles (5-7): too late to hijack vector
+                        // NMI detection has 1-cycle latency, so cycle 5 NMI misses
+                        // the vector fetch at cycle 6
+                        dbgWrite("BRK_LATE_NMI: sl=" + scanline + " cx=" + ppu_cycles_x + " PC=$" + r_PC.ToString("X4") + " cycles_remaining=" + cycles_remaining);
+                        nmi_pending = false;
+                        nmi_delayed = true;
+                    }
+                    else
+                    {
+                        dbgWrite("BRK_HIJACK: sl=" + scanline + " cx=" + ppu_cycles_x + " PC=$" + r_PC.ToString("X4") + " SP=$" + r_SP.ToString("X2")
+                            + " stk=[" + NES_MEM[0x100 + ((r_SP + 1) & 0xFF)].ToString("X2") + " " + NES_MEM[0x100 + ((r_SP + 2) & 0xFF)].ToString("X2") + " " + NES_MEM[0x100 + ((r_SP + 3) & 0xFF)].ToString("X2") + "]");
+                        nmi_pending = false;
+                        r_PC = (ushort)(Mem_r(0xfffa) | (Mem_r(0xfffb) << 8));
+                        nmi_trace_count = 25;
+                    }
+                }
+                // === IRQ polling (end of instruction, for next instruction) ===
+                // IRQ is level-triggered: fires as long as source is asserted and I=0.
+                // CLI/SEI/PLP: I flag change delayed 1 instruction → use prevFlagI_run
+                // RTI: immediate effect → use flagI
+                // BRK: already handles interrupt internally → skip
+                if (opcode != 0x00)
+                {
+                    byte irqPollI = (opcode == 0x40) ? flagI : prevFlagI_run;
+                    irq_pending = (irqPollI == 0 && (statusframeint || statusdmcint));
+                }
             }
             timeEndPeriod(1);
             Console.WriteLine("exit..");
