@@ -94,6 +94,8 @@ namespace AprNes
             r_PC = (ushort)(lo | (hi << 8));
             flagI = 1;
             nmi_pending = false;
+            nmi_delay = false;
+            nmi_output_prev = false;
             irq_pending = false;
             statusmapperint = false;
             apuSoftReset();

@@ -51,6 +51,8 @@ namespace AprNes
 
         static Stopwatch StopWatch = new Stopwatch();
         static bool oddSwap = false;
+        static bool nmi_output_prev = false;  // NMI edge detection: previous NMI output level
+        static bool nmi_delay = false;        // 1-cycle NMI delay: edge detected → delay → pending
         //https://wiki.nesdev.com/w/index.php/PPU_scrolling
 
         #region cycle-accurate PPU
@@ -289,16 +291,12 @@ namespace AprNes
                 if (!SuppressVbl)
                 {
                     isVblank = true;
-                    if (NMIable) nmi_pending = true;
-                    if (NMIable) dbgWrite("VBL_SET: sl=241 cx=1 NMIable=True nmi_pending=" + nmi_pending);
                 }
-                else if (NMIable)
-                    dbgWrite("VBL_SUPPRESSED: sl=241 cx=1");
                 SuppressVbl = false;
             }
 
-            // Pre-render: clear PPU status flags at cycle 1 (post-increment)
-            if (scanline == 261 && ppu_cycles_x == 1)
+            // Pre-render: clear PPU status flags at cycle 2 (post-increment)
+            if (scanline == 261 && ppu_cycles_x == 2)
                 isVblank = isSprite0hit = isSpriteOverflow = false;
 
             // Odd frame skip: on odd frames with rendering enabled, skip last idle cycle of pre-render
@@ -514,19 +512,23 @@ namespace AprNes
         static bool SuppressVbl = false;
         //ref http://wiki.nesdev.com/w/index.php/PPU_scrolling
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static byte ppu_r_2002() //ok
+        static byte ppu_r_2002()
         {
-            // tick-on-access: PPU is already up-to-date, no lookahead needed
-            openbus = (byte)(((isVblank) ? 0x80 : 0) | ((isSprite0hit) ? 0x40 : 0) | ((isSpriteOverflow) ? 0x20 : 0) | (openbus & 0x1f));
+            bool vblFlag = isVblank;
 
-            // VBL suppression: reading $2002 on the exact dot VBL is set
-            if (ppu_cycles_x == 1 && scanline == 241)
-                SuppressVbl = true;
-            else
-                SuppressVbl = false;
+            // VBL suppression at exact VBL set dot (sl=241, cx=1):
+            // VBL was just set by tick; suppress flag read and NMI
+            if (scanline == 241 && ppu_cycles_x == 1)
+            {
+                vblFlag = false;
+            }
+
+            openbus = (byte)((vblFlag ? 0x80 : 0) | ((isSprite0hit) ? 0x40 : 0) | ((isSpriteOverflow) ? 0x20 : 0) | (openbus & 0x1f));
 
             isVblank = false;
-            nmi_pending = false; // reading $2002 clears VBL and cancels pending NMI
+            nmi_delay = false;         // Cancel not-yet-promoted NMI (same-cycle $2002 read)
+            nmi_output_prev = false;   // Reset edge state to prevent false rising edge on next tick
+            // Note: nmi_pending is NOT cleared — once promoted, $2002 can't cancel it
             vram_latch = false;
             return openbus;
         }
@@ -553,10 +555,17 @@ namespace AprNes
             Spritesize8x16 = ((value & 0x20) > 0) ? true : false;
             bool wasNMIable = NMIable;
             NMIable = ((value & 0x80) > 0) ? true : false;
-            // Rising edge: enabling NMI while VBL flag is already set fires NMI immediately
-            if (!wasNMIable && NMIable && isVblank) nmi_pending = true;
-            if (wasNMIable != NMIable)
-                dbgWrite("W2000_NMI: " + (NMIable ? "ON" : "OFF") + " sl=" + scanline + " cx=" + ppu_cycles_x + " isVbl=" + isVblank + " PC=$" + r_PC.ToString("X4"));
+
+            // NMI edge detection for $2000 writes:
+            // Falling edge (disable NMI): cancel nmi_delay (not yet promoted)
+            //   but NOT nmi_pending — once promoted, NMI cannot be cancelled by disable
+            // Rising edge (enable NMI): let next tick() detect it (natural delay)
+            bool nmi_output = isVblank && NMIable;
+            if (!nmi_output && nmi_output_prev)
+            {
+                nmi_delay = false;
+                nmi_output_prev = false;
+            }
         }
 
         static void ppu_w_2001(byte value) //ok

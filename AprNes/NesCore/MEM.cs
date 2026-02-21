@@ -16,7 +16,20 @@ namespace AprNes
         {
             if (in_tick) return;
             in_tick = true;
-            ppu_step_new(); ppu_step_new(); ppu_step_new();
+
+            // Promote nmi_delay from previous cycle → nmi_pending (1-cycle hardware delay)
+            if (nmi_delay) { nmi_pending = true; nmi_delay = false; }
+
+            // Per-dot NMI edge detection: rising edge → nmi_delay (not nmi_pending)
+            for (int i = 0; i < 3; i++)
+            {
+                ppu_step_new();
+                bool nmi_output = isVblank && NMIable;
+                if (nmi_output && !nmi_output_prev)
+                    nmi_delay = true;       // Rising edge → 1-cycle delay before pending
+                nmi_output_prev = nmi_output;
+            }
+
             apu_step();
             in_tick = false;
         }

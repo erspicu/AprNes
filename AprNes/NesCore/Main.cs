@@ -258,14 +258,11 @@ namespace AprNes
                 if (nmi_pending)
                 {
                     nmi_pending = false;
-                    dbgWrite("NMI_FIRE: sl=" + scanline + " cx=" + ppu_cycles_x + " PC=$" + r_PC.ToString("X4") + " flags=$" + GetFlag().ToString("X2") + " I=" + flagI);
                     NMIInterrupt();
-                    nmi_trace_count = 25;
                 }
                 else if (irq_pending)
                 {
                     irq_pending = false;
-                    dbgWrite("IRQ_FIRE: sl=" + scanline + " cx=" + ppu_cycles_x + " PC=$" + r_PC.ToString("X4") + " flags=$" + GetFlag().ToString("X2") + " I=" + flagI);
                     IRQInterrupt();
                 }
 
