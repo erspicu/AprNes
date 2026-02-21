@@ -139,7 +139,7 @@ namespace AprNes
 
         // DMC 欄位
         static int[] dmcperiods;
-        static int dmcrate = 0x36, dmcpos = 0, dmcshiftregister = 0, dmcbuffer = 0,
+        static int dmcrate = 0x36, dmctimer = 0x36, dmcshiftregister = 0, dmcbuffer = 0,
                    dmcvalue = 0, dmcsamplelength = 1, dmcsamplesleft = 0,
                    dmcstartaddr = 0xc000, dmcaddr = 0xc000, dmcbitsleft = 8;
         static bool dmcsilence = true, dmcirq = false, dmcloop = false, dmcBufferEmpty = true;
@@ -304,7 +304,7 @@ namespace AprNes
             statusdmcint = false;
 
             // DMC 完整重置
-            dmcrate = dmcperiods[0]; dmcpos = 0;
+            dmcrate = dmcperiods[0]; dmctimer = dmcrate;
             dmcshiftregister = 0; dmcbuffer = 0;
             dmcvalue = 0; dmcsamplelength = 1; dmcsamplesleft = 0;
             dmcstartaddr = 0xC000; dmcaddr = 0xC000; dmcbitsleft = 8;
@@ -657,9 +657,19 @@ namespace AprNes
             if (dmcBufferEmpty && dmcsamplesleft > 0)
                 dmcfillbuffer();
 
-            dmcpos = (dmcpos + 1) % dmcrate;
-            if (dmcpos == 0)
+            if (--dmctimer <= 0)
             {
+                dmctimer = dmcrate; // reload with current period
+
+                // NES hardware order: output → shift → decrement → check zero
+                if (!dmcsilence)
+                {
+                    dmcvalue += ((dmcshiftregister & 1) != 0) ? 2 : -2;
+                    if (dmcvalue > 0x7f) dmcvalue = 0x7f;
+                    if (dmcvalue < 0)    dmcvalue  = 0;
+                    dmcshiftregister >>= 1;
+                }
+                --dmcbitsleft;
                 if (dmcbitsleft <= 0)
                 {
                     dmcbitsleft = 8;
@@ -671,14 +681,6 @@ namespace AprNes
                         dmcshiftregister  = dmcbuffer;
                         dmcBufferEmpty    = true;
                     }
-                }
-                if (!dmcsilence)
-                {
-                    dmcvalue += ((dmcshiftregister & 1) != 0) ? 2 : -2;
-                    if (dmcvalue > 0x7f) dmcvalue = 0x7f;
-                    if (dmcvalue < 0)    dmcvalue  = 0;
-                    dmcshiftregister >>= 1;
-                    --dmcbitsleft;
                 }
             }
         }
@@ -709,7 +711,6 @@ namespace AprNes
         {
             dmcaddr        = dmcstartaddr;
             dmcsamplesleft = dmcsamplelength;
-            dmcsilence     = false;
         }
 
         // =====================================================================

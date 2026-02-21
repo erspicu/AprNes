@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AprNes - 測試方法論</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f172a;--surface:#1e293b;--surface2:#283548;--border:#334155;
+  --text:#e2e8f0;--text-dim:#94a3b8;
+  --pass:#22c55e;--pass-bg:rgba(34,197,94,.15);
+  --fail:#ef4444;--fail-bg:rgba(239,68,68,.15);
+  --accent:#3b82f6;--accent2:#8b5cf6;
+}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;line-height:1.6;padding:2rem;min-height:100vh;max-width:960px;margin:0 auto}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+h1{font-size:1.8rem;margin-bottom:.25rem;letter-spacing:-.02em;text-align:center}
+h2{font-size:1.2rem;margin:2rem 0 .75rem;padding-bottom:.4rem;border-bottom:1px solid var(--border);color:var(--accent)}
+h3{font-size:.95rem;margin:1.2rem 0 .5rem;color:var(--text)}
+p{margin-bottom:.75rem;font-size:.88rem;color:var(--text-dim)}
+.back{display:inline-block;margin-bottom:1.5rem;font-size:.85rem}
+.subtitle{text-align:center;color:var(--text-dim);font-size:.88rem;margin-bottom:2rem}
+
+/* Overview cards */
+.overview{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.85rem;margin:1.2rem 0 2rem}
+.ov-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1rem;text-align:center}
+.ov-card .num{font-size:1.8rem;font-weight:700;color:var(--accent)}
+.ov-card .lbl{font-size:.78rem;color:var(--text-dim);margin-top:.2rem}
+
+/* Section cards */
+.section{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.2rem 1.5rem;margin-bottom:1rem}
+.section h3{margin-top:0;color:var(--accent);font-size:.95rem}
+.section p{font-size:.82rem}
+.section ul{margin:.5rem 0 .75rem 1.2rem;font-size:.82rem;color:var(--text-dim)}
+.section li{margin-bottom:.3rem}
+
+/* Code blocks */
+code{background:var(--bg);padding:.15rem .4rem;border-radius:3px;font-size:.78rem;font-family:Consolas,Monaco,'Courier New',monospace}
+pre{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:1rem;margin:.75rem 0;overflow-x:auto;font-size:.78rem;font-family:Consolas,Monaco,'Courier New',monospace;color:var(--text-dim);line-height:1.5}
+
+/* Flow diagram */
+.flow{display:flex;align-items:center;justify-content:center;gap:.5rem;flex-wrap:wrap;margin:1rem 0;font-size:.82rem}
+.flow .step{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:.5rem .8rem;text-align:center;min-width:100px}
+.flow .step .title{font-weight:600;font-size:.78rem;color:var(--accent)}
+.flow .step .desc{font-size:.7rem;color:var(--text-dim);margin-top:.2rem}
+.flow .arrow{color:var(--text-dim);font-size:1.2rem}
+
+/* Protocol table */
+table{width:100%;border-collapse:collapse;margin:.75rem 0;font-size:.82rem}
+th{background:var(--surface2);text-align:left;padding:.5rem .75rem;font-weight:600;font-size:.78rem;border:1px solid var(--border)}
+td{padding:.45rem .75rem;border:1px solid var(--border);color:var(--text-dim)}
+tr:hover td{background:var(--surface2)}
+
+/* Suite coverage */
+.suite-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.65rem;margin:.75rem 0}
+.suite-item{display:flex;align-items:center;gap:.5rem;padding:.4rem .65rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:.78rem}
+.suite-item .count{font-weight:600;min-width:24px;text-align:center;font-size:.75rem;padding:.1rem .3rem;border-radius:4px}
+.suite-item .count.c-blue{background:rgba(59,130,246,.15);color:var(--accent)}
+.suite-item .name{color:var(--text-dim)}
+
+.footer{text-align:center;color:var(--text-dim);font-size:.75rem;margin-top:2rem;padding-top:1rem;border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+
+<a href="index.html" class="back">&larr; 返回測試報告</a>
+<h1>AprNes 測試方法論</h1>
+<p class="subtitle">透過硬體測試 ROM 驗證 NES 模擬器精確度</p>
+
+<div class="overview">
+  <div class="ov-card"><div class="num">174</div><div class="lbl">測試 ROM</div></div>
+  <div class="ov-card"><div class="num">30+</div><div class="lbl">測試套件</div></div>
+  <div class="ov-card"><div class="num">5</div><div class="lbl">子系統</div></div>
+  <div class="ov-card"><div class="num">&lt;3 分鐘</div><div class="lbl">完整執行</div></div>
+</div>
+
+<!-- ───────────────── 第 1 節 ───────────────── -->
+<h2>1. 測試內容</h2>
+
+<div class="section">
+<p>AprNes 使用<strong>硬體驗證測試 ROM</strong>，這些 ROM 最初是為了驗證真實 NES 主機行為而編寫的。
+它們是實際的 NES 程式（6502 機器碼），用於測試特定硬體功能並回報通過/失敗結果。
+所有主流 NES 模擬器專案都使用相同的 ROM 來衡量精確度。</p>
+
+<p>測試涵蓋所有主要 NES 子系統：</p>
+<ul>
+  <li><strong>CPU</strong> &mdash; 所有官方 6502 指令、定址模式、時序、虛擬讀取/寫入、中斷行為（NMI/IRQ/BRK 互動）、分支時序、重設行為</li>
+  <li><strong>PPU</strong> &mdash; VBlank/NMI 時序、精靈 0 命中、精靈溢位、開放匯流排行為、調色盤 RAM、VRAM 存取、讀取緩衝區、奇偶影格切換</li>
+  <li><strong>APU</strong> &mdash; 影格計數器時序（模式 0/1）、長度計數器、IRQ 旗標時序、時脈抖動、DMC 速率、聲道混音、重設行為</li>
+  <li><strong>Mapper</strong> &mdash; MMC3（Mapper 004）IRQ 計數器時脈、A12 偵測、掃描線時序、Rev A/B 行為</li>
+  <li><strong>I/O</strong> &mdash; 控制器讀取精確度、DPCM 干擾、DMA 時序</li>
+</ul>
+</div>
+
+<!-- ───────────────── 第 2 節 ───────────────── -->
+<h2>2. 測試 ROM 來源</h2>
+
+<div class="section">
+<p>所有 ROM 來自 <strong>nes-test-roms</strong> 合集，主要作者包括：</p>
+<ul>
+  <li><strong>blargg (Shay Green)</strong> &mdash; 最全面的 NES 測試 ROM 作者。他的套件涵蓋 CPU 指令（v3/v5）、APU 時序、PPU VBL/NMI、精靈命中/溢位等。兩種結果協定：傳統型（畫面偵測）與現代型（$6000 記憶體映射）。</li>
+  <li><strong>bisqwit</strong> &mdash; CPU 時序測試</li>
+  <li><strong>其他社群作者</strong> &mdash; MMC3 IRQ 測試、DMA 互動測試、控制器測試</li>
+</ul>
+<p>這些 ROM 與 Mesen、Nestopia、FCEUX 及其他參考模擬器使用的完全相同。通過這些測試代表模擬已達到週期精確或接近週期精確的程度。</p>
+</div>
+
+<!-- ───────────────── 第 3 節 ───────────────── -->
+<h2>3. 測試執行器架構</h2>
+
+<div class="flow">
+  <div class="step"><div class="title">Bash 腳本</div><div class="desc">run_tests_report.sh</div></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step"><div class="title">MSBuild</div><div class="desc">編譯模擬器</div></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step"><div class="title">無頭模擬器</div><div class="desc">TestRunner.cs</div></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step"><div class="title">結果偵測</div><div class="desc">$6000 / 畫面掃描</div></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step"><div class="title">HTML 報告</div><div class="desc">JSON + 截圖</div></div>
+</div>
+
+<div class="section">
+<h3>無頭模式</h3>
+<p>模擬器內建 <code>TestRunner.cs</code>，以無頭模式運行 &mdash; 沒有視窗、沒有音效、沒有幀率限制。CPU/PPU/APU 全部以最高速度運行。單個測試 ROM 通常在 1 秒內完成。</p>
+
+<h3>調度腳本</h3>
+<p>一個 bash 腳本（<code>run_tests_report.sh</code>）處理完整的流程：</p>
+<ol style="margin:.5rem 0 .75rem 1.2rem;font-size:.82rem;color:var(--text-dim)">
+  <li>使用 MSBuild 編譯專案</li>
+  <li>將 174 個 ROM 檔案逐一透過無頭模擬器執行</li>
+  <li>擷取最終畫面為 PNG，轉換為無損 WebP</li>
+  <li>將結果收集為 JSON 陣列</li>
+  <li>產生包含嵌入資料的單一 HTML 報告檔案</li>
+</ol>
+</div>
+
+<!-- ───────────────── 第 4 節 ───────────────── -->
+<h2>4. 結果偵測機制</h2>
+
+<div class="section">
+<h3>機制 A：$6000 記憶體協定</h3>
+<p>現代 blargg 測試 ROM 使用記憶體映射狀態協定。測試執行器每幀輪詢位址 <code>$6000</code>：</p>
+
+<table>
+  <tr><th>$6000 值</th><th>意義</th><th>動作</th></tr>
+  <tr><td><code>$80</code></td><td>測試進行中</td><td>繼續等待</td></tr>
+  <tr><td><code>$81</code></td><td>要求重設</td><td>等待 100ms 後執行軟重設</td></tr>
+  <tr><td><code>$00</code></td><td>測試通過</td><td>以代碼 0 結束</td></tr>
+  <tr><td><code>$01-$7F</code></td><td>測試失敗（錯誤代碼 N）</td><td>以代碼 N 結束</td></tr>
+</table>
+
+<p>結果文字從 <code>$6004+</code> 讀取，為以 null 結尾的 ASCII 字串。這提供了詳細的錯誤訊息，例如「Flag first set too late」或「Length counter not clocked correctly」。</p>
+
+<h3>機制 B：畫面穩定偵測</h3>
+<p>較舊的 blargg 測試（2005 年版）不使用 $6000 協定。它們將結果直接渲染到 PPU 名稱表。測試執行器透過多步驟啟發式方法處理這些情況：</p>
+<ol style="margin:.5rem 0 .75rem 1.2rem;font-size:.82rem;color:var(--text-dim)">
+  <li>在 120 幀（約 2 秒）後，開始每幀取樣畫面緩衝區</li>
+  <li>計算幀緩衝區的雜湊值（每隔 37 個像素取樣以提高速度）</li>
+  <li>當雜湊值連續 90 幀（約 1.5 秒）保持一致時，畫面判定為「穩定」</li>
+  <li>掃描 PPU 名稱表（字元映射）尋找已知結果字串：
+    <ul>
+      <li><code>"Passed"</code> / <code>"PASSED"</code> &rarr; 通過</li>
+      <li><code>"Failed"</code> / <code>"FAILED"</code> &rarr; 失敗</li>
+      <li><code>"$01"</code>（畫面上的十六進位值）&rarr; 通過</li>
+      <li><code>"$02"</code> ~ <code>"$FF"</code>（畫面上的十六進位值）&rarr; 失敗</li>
+      <li><code>"All tests complete"</code> &rarr; 通過</li>
+      <li><code>" 0/"</code>（零錯誤計數）&rarr; 通過</li>
+    </ul>
+  </li>
+</ol>
+<p>此方法直接讀取 PPU 名稱表（而非對像素進行 OCR），因此快速且可靠。</p>
+</div>
+
+<!-- ───────────────── 第 5 節 ───────────────── -->
+<h2>5. 自動化功能</h2>
+
+<div class="section">
+<h3>自動軟重設</h3>
+<p>部分測試 ROM 會寫入 <code>$81</code> 到 <code>$6000</code> 以要求主機重設（測試開機/重設行為）。執行器偵測到此情況後，會在延遲 100ms 後自動執行軟重設，模擬使用者按下重設按鈕的操作。每個 ROM 最多支援 10 次連續重設。</p>
+
+<h3>模擬控制器輸入</h3>
+<p>控制器讀取測試需要實際的按鈕輸入。<code>--input</code> 參數可排程定時按鈕事件：</p>
+<pre>--input "A:2.0,B:4.0,Select:6.0,Start:8.0,Up:10.0,Down:12.0,Left:14.0,Right:16.0"</pre>
+<p>每個按鈕在指定時間（秒）被按下，並持續 10 幀（約 166ms）。這使得 <code>read_joy3/test_buttons</code> 等測試能驗證所有 8 個按鈕是否被正確依序偵測。</p>
+
+<h3>截圖擷取</h3>
+<p>每個測試的最終畫面會被擷取為 256x240 PNG，然後轉換為無損 WebP（通常縮小 60-80%）。截圖作為視覺佐證 &mdash; 許多測試 ROM 會在畫面上以文字顯示結果，確切展示通過或失敗的項目。</p>
+
+<h3>逾時安全機制</h3>
+<p>每個 ROM 有可設定的 <code>--max-wait</code> 逾時時間（預設 30 秒，較長測試為 120 秒）。若測試 ROM 進入無限迴圈或當機，執行器會優雅地終止它並回報最後已知狀態。</p>
+</div>
+
+<!-- ───────────────── 第 6 節 ───────────────── -->
+<h2>6. 測試套件涵蓋範圍</h2>
+
+<div class="suite-grid">
+  <div class="suite-item"><span class="count c-blue">4</span><span class="name">apu_mixer &mdash; 聲道混音</span></div>
+  <div class="suite-item"><span class="count c-blue">6</span><span class="name">apu_reset &mdash; APU 開機/重設</span></div>
+  <div class="suite-item"><span class="count c-blue">9</span><span class="name">apu_test &mdash; APU 影格計數器</span></div>
+  <div class="suite-item"><span class="count c-blue">11</span><span class="name">blargg_apu_2005 &mdash; APU 時序</span></div>
+  <div class="suite-item"><span class="count c-blue">2</span><span class="name">blargg_cpu_test5 &mdash; CPU 指令</span></div>
+  <div class="suite-item"><span class="count c-blue">5</span><span class="name">blargg_ppu_tests &mdash; PPU 基礎</span></div>
+  <div class="suite-item"><span class="count c-blue">3</span><span class="name">branch_timing &mdash; 分支週期計數</span></div>
+  <div class="suite-item"><span class="count c-blue">1</span><span class="name">cpu_dummy_reads &mdash; 虛擬讀取週期</span></div>
+  <div class="suite-item"><span class="count c-blue">2</span><span class="name">cpu_dummy_writes &mdash; 虛擬寫入週期</span></div>
+  <div class="suite-item"><span class="count c-blue">2</span><span class="name">cpu_exec_space &mdash; 從 I/O 執行</span></div>
+  <div class="suite-item"><span class="count c-blue">6</span><span class="name">cpu_interrupts_v2 &mdash; NMI/IRQ 互動</span></div>
+  <div class="suite-item"><span class="count c-blue">2</span><span class="name">cpu_reset &mdash; CPU 重設行為</span></div>
+  <div class="suite-item"><span class="count c-blue">1</span><span class="name">cpu_timing_test6 &mdash; 指令時序</span></div>
+  <div class="suite-item"><span class="count c-blue">5</span><span class="name">dmc_dma_during_read &mdash; DMC DMA 衝突</span></div>
+  <div class="suite-item"><span class="count c-blue">5</span><span class="name">instr_misc &mdash; 雜項指令測試</span></div>
+  <div class="suite-item"><span class="count c-blue">17</span><span class="name">instr_test-v3 &mdash; 全部 6502 指令</span></div>
+  <div class="suite-item"><span class="count c-blue">18</span><span class="name">instr_test-v5 &mdash; 全部 6502 指令（v5）</span></div>
+  <div class="suite-item"><span class="count c-blue">3</span><span class="name">instr_timing &mdash; 指令週期時序</span></div>
+  <div class="suite-item"><span class="count c-blue">6</span><span class="name">mmc3_irq_tests &mdash; MMC3 IRQ 計數器</span></div>
+  <div class="suite-item"><span class="count c-blue">6</span><span class="name">mmc3_test &mdash; MMC3 行為</span></div>
+  <div class="suite-item"><span class="count c-blue">6</span><span class="name">mmc3_test_2 &mdash; MMC3 行為（v2）</span></div>
+  <div class="suite-item"><span class="count c-blue">11</span><span class="name">nes_instr_test &mdash; CPU 指令（替代版）</span></div>
+  <div class="suite-item"><span class="count c-blue">1</span><span class="name">oam_read &mdash; OAM 讀取行為</span></div>
+  <div class="suite-item"><span class="count c-blue">1</span><span class="name">ppu_open_bus &mdash; PPU 開放匯流排</span></div>
+  <div class="suite-item"><span class="count c-blue">1</span><span class="name">ppu_read_buffer &mdash; PPU 讀取緩衝區</span></div>
+  <div class="suite-item"><span class="count c-blue">11</span><span class="name">ppu_vbl_nmi &mdash; VBlank/NMI 時序</span></div>
+  <div class="suite-item"><span class="count c-blue">4</span><span class="name">read_joy3 &mdash; 控制器讀取</span></div>
+  <div class="suite-item"><span class="count c-blue">2</span><span class="name">sprdma_and_dmc_dma &mdash; DMA 衝突</span></div>
+  <div class="suite-item"><span class="count c-blue">11</span><span class="name">sprite_hit_tests &mdash; 精靈 0 命中</span></div>
+  <div class="suite-item"><span class="count c-blue">5</span><span class="name">sprite_overflow &mdash; 精靈溢位</span></div>
+  <div class="suite-item"><span class="count c-blue">7</span><span class="name">vbl_nmi_timing &mdash; VBL/NMI 時序</span></div>
+</div>
+
+<!-- ───────────────── 第 7 節 ───────────────── -->
+<h2>7. 命令列介面</h2>
+
+<div class="section">
+<p>無頭測試執行器透過模擬器執行檔直接呼叫：</p>
+<pre>AprNes.exe --rom &lt;file.nes&gt; [選項]</pre>
+
+<table>
+  <tr><th>選項</th><th>說明</th></tr>
+  <tr><td><code>--rom &lt;path&gt;</code></td><td>要載入的 ROM 檔案（必填）</td></tr>
+  <tr><td><code>--wait-result</code></td><td>監控 $6000 / 畫面以偵測測試結果</td></tr>
+  <tr><td><code>--max-wait &lt;sec&gt;</code></td><td>逾時秒數（預設：30）</td></tr>
+  <tr><td><code>--time &lt;sec&gt;</code></td><td>精確執行 N 秒後停止</td></tr>
+  <tr><td><code>--screenshot &lt;path&gt;</code></td><td>將最終畫面儲存為 PNG</td></tr>
+  <tr><td><code>--log &lt;path&gt;</code></td><td>將結果寫入檔案</td></tr>
+  <tr><td><code>--soft-reset &lt;sec&gt;</code></td><td>在第 N 秒觸發軟重設</td></tr>
+  <tr><td><code>--input &lt;spec&gt;</code></td><td>排程按鈕輸入（例如 "A:2.0,B:4.0"）</td></tr>
+  <tr><td><code>--debug-log &lt;path&gt;</code></td><td>寫入 CPU 追蹤日誌</td></tr>
+</table>
+
+<p>結束代碼：<code>0</code> = 通過、<code>1-127</code> = 失敗（測試錯誤代碼）、<code>255</code> = 逾時/無結果。</p>
+</div>
+
+<div class="footer"><a href="index.html">測試報告</a> | AprNes 測試方法論</div>
+
+</body>
+</html>

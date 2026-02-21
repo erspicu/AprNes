@@ -1,6 +1,6 @@
 # AprNes 待修復問題清單
 
-**基線**: 134 PASS / 40 FAIL / 174 TOTAL (2026-02-21)
+**基線**: 136 PASS / 38 FAIL / 174 TOTAL (2026-02-21)
 
 優先權排序原則：**影響大 + 好修** 排最前面
 
@@ -12,27 +12,9 @@
 - ~~Bug C: APU frame counter timing~~ → **+6 PASS** (BUGFIX9)
   - frameReload 修正、$4017 offset +7→+2、even/odd jitter
   - IRQ 三連 assert (pre-fire / step 3 / post-fire)
-
----
-
-## P1 — 簡單修復（共 3 個測試）
-
-### Bug K: PPU 暫存器鏡像不完整
-- **影響**: 1 個測試 FAIL
-- **難度**: 低（一行修復）
-- **失敗測試**:
-  - `instr_misc/instr_misc` — "Test requires $2002 mirroring every 8 bytes to $3FFA" (#2, 子測試 03-dummy_reads)
-- **根因**: `$2000-$3FFF` 範圍內 PPU 暫存器應每 8 bytes 鏡像。IO_read/IO_write 可能只處理了 `$2000-$2007`。
-- **修復**: 在 IO_read/IO_write 中 `addr = (ushort)(0x2000 | (addr & 7))` 對 `$2000-$3FFF` 全範圍生效。
-
-### Bug L: DMC 速率表偏差
-- **影響**: 2 個測試 FAIL
-- **難度**: 低（校正查表值）
-- **失敗測試**:
-  - `apu_test/8-dmc_rates` — "Rate 0's period is too long" (#3)
-  - `apu_test/apu_test` — 因 test 8 失敗而整體 FAIL
-- **根因**: DMC rate index 0 的 period 值不正確。
-- **修復**: 對照 nesdev wiki 的 NTSC DMC rate table 校正。
+- ~~Bug L: DMC timer 計時器行為~~ → **+2 PASS** (BUGFIX10)
+  - DMC timer 從 up-counter 改為 down-counter
+  - $4010 更改速率時不重置倒數，僅在 reload 時生效
 
 ---
 
@@ -134,11 +116,10 @@
 已完成: Bug A (MMC3 A12) + Bug C (APU frame counter)
   113 → 125 → 128 → 134 PASS
 
-下一步 (簡單): Bug K + L — PPU mirror + DMC rate
-  → 預期 +3，達到 ~137 PASS
+已完成: Bug L (DMC timer) → 136 PASS
 
-Phase 4: Bug D — APU reset/power-on + length timing
-  → 預期 +2~6，達到 ~140 PASS
+下一步: Bug D — APU reset/power-on + length timing
+  → 預期 +2~6，達到 ~142 PASS
 
 Phase 5: Bug B — PPU VBL/NMI timing（最大群組）
   → 預期 +14，達到 ~154 PASS
@@ -155,4 +136,4 @@ Phase 8: Bug G + H — sprite timing + misc
 
 ---
 
-*最後更新: 2026-02-21*
+*最後更新: 2026-02-22*

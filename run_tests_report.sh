@@ -119,7 +119,7 @@ for rom in 4015_cleared.nes 4017_timing.nes 4017_written.nes irq_flag_cleared.ne
 done
 
 # apu_test merged + singles (9)
-run_test "apu_test" "apu_test.nes" "--max-wait 120"
+run_test "apu_test" "apu_test.nes" "--max-wait 60"
 for rom in 1-len_ctr.nes 2-len_table.nes 3-irq_flag.nes 4-jitter.nes 5-len_timing.nes 6-irq_flag_timing.nes 7-dmc_basics.nes 8-dmc_rates.nes; do
     run_test "apu_test/rom_singles" "$rom" "--max-wait 30"
 done
@@ -131,7 +131,7 @@ done
 
 # blargg_nes_cpu_test5 (2)
 for rom in cpu.nes official.nes; do
-    run_test "blargg_nes_cpu_test5" "$rom" "--max-wait 120"
+    run_test "blargg_nes_cpu_test5" "$rom" "--max-wait 60"
 done
 
 # blargg_ppu_tests_2005.09.15b (5)
@@ -158,7 +158,7 @@ for rom in test_cpu_exec_space_ppuio.nes test_cpu_exec_space_apu.nes; do
 done
 
 # cpu_interrupts_v2 merged + singles (6)
-run_test "cpu_interrupts_v2" "cpu_interrupts.nes" "--max-wait 120"
+run_test "cpu_interrupts_v2" "cpu_interrupts.nes" "--max-wait 60"
 for rom in 1-cli_latency.nes 2-nmi_and_brk.nes 3-nmi_and_irq.nes 4-irq_and_dma.nes 5-branch_delays_irq.nes; do
     run_test "cpu_interrupts_v2/rom_singles" "$rom" "--max-wait 30"
 done
@@ -169,7 +169,7 @@ for rom in registers.nes ram_after_reset.nes; do
 done
 
 # cpu_timing_test6 (1)
-run_test "cpu_timing_test6" "cpu_timing_test.nes" "--max-wait 120"
+run_test "cpu_timing_test6" "cpu_timing_test.nes" "--max-wait 60"
 
 # dmc_dma_during_read4 (5)
 for rom in dma_2007_read.nes dma_2007_write.nes dma_4016_read.nes double_2007_read.nes read_write_2007.nes; do
@@ -177,27 +177,27 @@ for rom in dma_2007_read.nes dma_2007_write.nes dma_4016_read.nes double_2007_re
 done
 
 # instr_misc merged + singles (5)
-run_test "instr_misc" "instr_misc.nes" "--max-wait 120"
+run_test "instr_misc" "instr_misc.nes" "--max-wait 60"
 for rom in 01-abs_x_wrap.nes 02-branch_wrap.nes 03-dummy_reads.nes 04-dummy_reads_apu.nes; do
     run_test "instr_misc/rom_singles" "$rom" "--max-wait 30"
 done
 
 # instr_test-v3 (17)
-run_test "instr_test-v3" "all_instrs.nes" "--max-wait 120"
-run_test "instr_test-v3" "official_only.nes" "--max-wait 120"
+run_test "instr_test-v3" "all_instrs.nes" "--max-wait 60"
+run_test "instr_test-v3" "official_only.nes" "--max-wait 60"
 for rom in 01-implied.nes 02-immediate.nes 03-zero_page.nes 04-zp_xy.nes 05-absolute.nes 06-abs_xy.nes 07-ind_x.nes 08-ind_y.nes 09-branches.nes 10-stack.nes 11-jmp_jsr.nes 12-rts.nes 13-rti.nes 14-brk.nes 15-special.nes; do
     run_test "instr_test-v3/rom_singles" "$rom" "--max-wait 30"
 done
 
 # instr_test-v5 (18)
-run_test "instr_test-v5" "all_instrs.nes" "--max-wait 120"
-run_test "instr_test-v5" "official_only.nes" "--max-wait 120"
+run_test "instr_test-v5" "all_instrs.nes" "--max-wait 60"
+run_test "instr_test-v5" "official_only.nes" "--max-wait 60"
 for rom in 01-basics.nes 02-implied.nes 03-immediate.nes 04-zero_page.nes 05-zp_xy.nes 06-absolute.nes 07-abs_xy.nes 08-ind_x.nes 09-ind_y.nes 10-branches.nes 11-stack.nes 12-jmp_jsr.nes 13-rts.nes 14-rti.nes 15-brk.nes 16-special.nes; do
     run_test "instr_test-v5/rom_singles" "$rom" "--max-wait 30"
 done
 
 # instr_timing (3)
-run_test "instr_timing" "instr_timing.nes" "--max-wait 120"
+run_test "instr_timing" "instr_timing.nes" "--max-wait 60"
 for rom in 1-instr_timing.nes 2-branch_timing.nes; do
     run_test "instr_timing/rom_singles" "$rom" "--max-wait 30"
 done
@@ -232,7 +232,7 @@ run_test "ppu_open_bus" "ppu_open_bus.nes" "--max-wait 30"
 run_test "ppu_read_buffer" "test_ppu_read_buffer.nes" "--max-wait 30"
 
 # ppu_vbl_nmi merged + singles (11)
-run_test "ppu_vbl_nmi" "ppu_vbl_nmi.nes" "--max-wait 120"
+run_test "ppu_vbl_nmi" "ppu_vbl_nmi.nes" "--max-wait 60"
 for rom in 01-vbl_basics.nes 02-vbl_set_time.nes 03-vbl_clear_time.nes 04-nmi_control.nes 05-nmi_timing.nes 06-suppression.nes 07-nmi_on_timing.nes 08-nmi_off_timing.nes 09-even_odd_frames.nes 10-even_odd_timing.nes; do
     run_test "ppu_vbl_nmi/rom_singles" "$rom" "--max-wait 30"
 done
