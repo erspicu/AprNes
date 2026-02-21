@@ -164,12 +164,14 @@ namespace AprNes
                 {
                     case 0:
                         ioaddr = 0x2000 | (vram_addr & 0x0FFF);
+                        if (mapper == 4) NotifyMapperA12(ioaddr);
                         break;
                     case 1:
                         NTVal = ppu_ram[ioaddr];
                         break;
                     case 2:
                         ioaddr = 0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07);
+                        if (mapper == 4) NotifyMapperA12(ioaddr);
                         break;
                     case 3:
                         ATVal = (byte)((ppu_ram[ioaddr] >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
@@ -177,12 +179,14 @@ namespace AprNes
                         break;
                     case 4:
                         ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
+                        if (mapper == 4) NotifyMapperA12(ioaddr);
                         break;
                     case 5:
                         lowTile = MapperObj.MapperR_CHR(ioaddr);
                         break;
                     case 6:
                         ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
+                        if (mapper == 4) NotifyMapperA12(ioaddr);
                         break;
                     case 7:
                         highTile = MapperObj.MapperR_CHR(ioaddr);
@@ -204,10 +208,25 @@ namespace AprNes
             {
                 CopyHoriV();
             }
+            else if (ppu_cycles_x >= 260 && ppu_cycles_x < 320 && mapper == 4)
+            {
+                int phase = (ppu_cycles_x - 256) & 7;
+                if (phase == 0) NotifyMapperA12(0x2000);                // dummy NT fetch, A12=0
+                else if (phase == 4) NotifyMapperA12(SpPatternTableAddr); // sprite CHR fetch
+            }
 
             // Pre-render scanline: continuous vert(v) = vert(t) copy at cycles 280-304
             if (scanline == 261 && ppu_cycles_x >= 280 && ppu_cycles_x <= 304)
+            {
                 vram_addr = (vram_addr & ~0x7BE0) | (vram_addr_internal & 0x7BE0);
+                if (mapper == 4) NotifyMapperA12(vram_addr);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void NotifyMapperA12(int address)
+        {
+            ((Mapper004)MapperObj).NotifyA12(address, scanline * 341 + ppu_cycles_x);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -249,15 +268,8 @@ namespace AprNes
                     if (ppu_cycles_x == 257)
                         RenderSpritesLine();
 
-                    // MMC3 IRQ: clock on visible scanlines at cycle 260 (A12 rising edge, sprite fetch region)
-                    if (ppu_cycles_x == 260 && renderingEnabled && mapper == 4)
-                        (MapperObj as Mapper004).Mapper04step_IRQ();
                 }
             }
-
-            // MMC3 IRQ: also clock on pre-render scanline 261 at cycle 260
-            if (scanline == 261 && ppu_cycles_x == 260 && renderingEnabled && mapper == 4)
-                (MapperObj as Mapper004).Mapper04step_IRQ();
 
             // Screen output at scanline 240 cycle 1 (matches ppu_step timing)
             if (scanline == 240 && ppu_cycles_x == 1)
@@ -601,6 +613,7 @@ namespace AprNes
             {
                 vram_addr_internal = (vram_addr_internal & 0x7F00) | value;
                 vram_addr = vram_addr_internal;
+                if (mapper == 4) NotifyMapperA12(vram_addr);
             }
             vram_latch = !vram_latch;
         }

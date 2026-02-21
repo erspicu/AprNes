@@ -12,11 +12,35 @@ namespace AprNes
 
         bool IRQ_enable = false, IRQReset = false;
         int IRQlatchVal = 0, IRQCounter = 0, BankReg = 0;
+
+        // A12 rising-edge tracking for IRQ clocking
+        int lastA12 = 0;
+        int a12LowSince = -100;  // PPU absolute cycle when A12 last went low
+        const int A12_FILTER = 16;
         int CHR0_Bankselect1k = 0, CHR1_Bankselect1k = 0, CHR2_Bankselect1k = 0, CHR3_Bankselect1k = 0;
         int CHR0_Bankselect2k = 0, CHR1_Bankselect2k = 0;
         int PRG0_Bankselect = 0, PRG1_Bankselect = 0;
         int PRG_Bankmode;
         int CHR_Bankmode;
+
+        public void NotifyA12(int address, int ppuAbsCycle)
+        {
+            int a12 = (address >> 12) & 1;
+            if (a12 != 0 && lastA12 == 0)
+            {
+                // Rising edge 0→1: clock IRQ counter if A12 was low long enough
+                int elapsed = ppuAbsCycle - a12LowSince;
+                if (elapsed < 0) elapsed += 341 * 262;
+                if (elapsed >= A12_FILTER)
+                    Mapper04step_IRQ();
+            }
+            else if (a12 == 0 && lastA12 != 0)
+            {
+                // Falling edge 1→0: record when A12 went low
+                a12LowSince = ppuAbsCycle;
+            }
+            lastA12 = a12;
+        }
 
         public void Mapper04step_IRQ()
         {

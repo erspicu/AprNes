@@ -1,38 +1,17 @@
 # AprNes 待修復問題清單
 
-**基線**: 113 PASS / 61 FAIL / 174 TOTAL (2026-02-21)
+**基線**: 125 PASS / 49 FAIL / 174 TOTAL (2026-02-21)
 
 優先權排序原則：**影響大 + 好修** 排最前面
 
 ---
 
-## P1 — 高影響、預期可修（共 17 個測試）
+## 已修復 — Bug A: MMC3 IRQ A12 Clocking ✓
 
-### Bug A: MMC3 IRQ counter 不支援 $2006 手動 A12 clocking
-- **影響**: 17 個 MMC3 測試中的 16 個 FAIL（幾乎全軍覆沒）
-- **難度**: 中等
-- **失敗測試**:
-  - `mmc3_irq_tests/1.Clocking` — Failed #3: "Should decrement when A12 is toggled via $2006"
-  - `mmc3_irq_tests/2.Details` — Failed #2: counter 不能在 reload=255 時正常工作
-  - `mmc3_irq_tests/3.A12_clocking` — Failed #4: A12 變化偵測不正確
-  - `mmc3_irq_tests/5.MMC3_rev_A` — Failed #2
-  - `mmc3_irq_tests/6.MMC3_rev_B` — Failed #2
-  - `mmc3_test/1-clocking` — "Should decrement when A12 is toggled via PPUADDR"
-  - `mmc3_test/2-details` — 同上系列
-  - `mmc3_test/3-A12_clocking` — 同上系列
-  - `mmc3_test/4-scanline_timing` — "Scanline 0 IRQ should occur later when $2000=$08"
-  - `mmc3_test/5-MMC3` — MMC3 特定行為
-  - `mmc3_test/6-MMC6` — MMC6 行為（需要 MMC6 支援）
-  - `mmc3_test_2/rom_singles/1~6` — 同 mmc3_test 系列（6個）
-- **根因**: 目前 MMC3 IRQ counter 只在 PPU scanline cycle 260 時 clock。真實硬體中，
-  A12 (PPU address bit 12) 從 0→1 的 rising edge 也會 clock counter，包括 CPU 透過
-  $2006/$2007 改變 VRAM address 時。需要在 PPU address bus 上追蹤 A12 狀態變化，
-  而非只在固定 cycle clock。
-- **修復方向**:
-  1. 在 PPU 中追蹤 A12 (vram_addr bit 12) 的狀態
-  2. 每次 vram_addr 變化時（$2006 寫入、$2007 讀寫），檢查 A12 rising edge
-  3. A12 rising edge 時呼叫 mapper IRQ clock（需要 low-pass filter，忽略 <N PPU cycle 內的重複 clock）
-  4. 保留 scanline 260 的 clock 作為 fallback（或完全由 A12 驅動）
+> **BUGFIX8** (2026-02-21): 從 hardcoded cycle 260 改為 PPU address bus A12 rising edge 驅動。
+> 結果: 113→125 PASS (+12), 61→49 FAIL, 0 退化。
+> 仍 FAIL: rev_A (預期)、MMC6 (不同晶片)、scanline_timing ×2、MMC3_alt。
+> 詳見 `bugfix/2026-02-21_BUGFIX8.md`。
 
 ---
 

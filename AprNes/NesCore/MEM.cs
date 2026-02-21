@@ -101,6 +101,7 @@ namespace AprNes
 
 
                             vram_addr = (ushort)((val + VramaddrIncrement) & 0x7FFF);
+                            if (mapper == 4) NotifyMapperA12(vram_addr);
                             openbus = ppu_2007_temp;
                             open_bus_decay_timer = 77777;//fixed add
 
@@ -119,6 +120,7 @@ namespace AprNes
                             ppu_2007_temp = (byte)((openbus & 0xC0) | (ppu_2007_temp & 0x3F));//add openbus fix
 
                             vram_addr = (ushort)((val + VramaddrIncrement) & 0x7FFF);
+                            if (mapper == 4) NotifyMapperA12(vram_addr);
                             openbus = ppu_2007_temp;
                             open_bus_decay_timer = 77777;//fixed add
                             return openbus;
@@ -136,8 +138,9 @@ namespace AprNes
                         ppu_read_fun[address] = new Func<int, byte>((val) =>
                         {
                             ppu_2007_temp = ppu_2007_buffer; //need read from buffer
-                            ppu_2007_buffer = MapperObj.MapperR_CHR(val & 0x3FFF);//Pattern Table 
+                            ppu_2007_buffer = MapperObj.MapperR_CHR(val & 0x3FFF);//Pattern Table
                             vram_addr = (ushort)((val + VramaddrIncrement) & 0x7FFF);
+                            if (mapper == 4) NotifyMapperA12(vram_addr);
                             openbus = ppu_2007_temp;
                             open_bus_decay_timer = 77777;//fixed add
                             return openbus;
@@ -152,6 +155,7 @@ namespace AprNes
                             ppu_2007_temp = ppu_2007_buffer; //need read from buffer
                             ppu_2007_buffer = ppu_ram[val & 0x2FFF]; //Name Table & Attribute Table ($3000-$3EFF mirrors $2000-$2EFF)
                             vram_addr = (ushort)((val + VramaddrIncrement) & 0x7FFF);
+                            if (mapper == 4) NotifyMapperA12(vram_addr);
                             openbus = ppu_2007_temp;
                             open_bus_decay_timer = 77777;//fixed add
                             return openbus;
@@ -164,8 +168,9 @@ namespace AprNes
                         {
                             ppu_2007_temp = ppu_2007_buffer; //need read from buffer
                             int _vram_addr_wrap = val & 0x2FFF;
-                            ppu_2007_buffer = ppu_ram[_vram_addr_wrap & ((_vram_addr_wrap & 0x03) == 0 ? 0x0C : 0x1F) + 0x3f00]; // //Sprite Palette & Image Palette   
+                            ppu_2007_buffer = ppu_ram[_vram_addr_wrap & ((_vram_addr_wrap & 0x03) == 0 ? 0x0C : 0x1F) + 0x3f00]; // //Sprite Palette & Image Palette
                             vram_addr = (ushort)((val + VramaddrIncrement) & 0x7FFF);
+                            if (mapper == 4) NotifyMapperA12(vram_addr);
                             openbus = ppu_2007_temp;
                             open_bus_decay_timer = 77777;//fixed add
                             return openbus;
@@ -192,6 +197,7 @@ namespace AprNes
                         openbus = val;
                         if (CHR_ROM_count == 0) ppu_ram[_vram_addr_wrap] = val;
                         vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x7FFF);
+                        if (mapper == 4) NotifyMapperA12(vram_addr);
                     });
                 }
                 else if (vram_addr_wrap < 0x3f00) //Name Table & Attribute Table
@@ -221,6 +227,7 @@ namespace AprNes
                            else ppu_ram[_vram_addr_wrap] = ppu_ram[_vram_addr_wrap & 0x3bff] = val;
                        }
                        vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x7FFF);
+                       if (mapper == 4) NotifyMapperA12(vram_addr);
                    });
                 }
                 else
@@ -231,6 +238,7 @@ namespace AprNes
                        openbus = val;
                        ppu_ram[(_vram_addr_wrap & ((_vram_addr_wrap & 0x03) == 0 ? 0x0C : 0x1F)) + 0x3f00] = val; //Sprite Palette & Image Palette
                        vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x7FFF);
+                       if (mapper == 4) NotifyMapperA12(vram_addr);
                    });
                 }
 
