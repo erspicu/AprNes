@@ -147,6 +147,7 @@ namespace AprNes
 
         // Length counter 欄位
         static int[] lengthctr = { 0, 0, 0, 0 };
+        static int[] lengthctr_snapshot = { 0, 0, 0, 0 }; // snapshot for $4015 reads (pre-step values)
         static int[] lenctrload = {
             10, 254, 20, 2, 40, 4, 80, 6,
             160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22,
@@ -223,7 +224,7 @@ namespace AprNes
                 setsweep();
                 setvolumes();
             }
-            framectrdiv = 7450; // match power-on advance
+            framectrdiv = 7449; // match power-on advance (with tick-before-write compensation)
             irqAssertCycles = 0;
 
             // 清除 IRQ flags
@@ -259,7 +260,7 @@ namespace AprNes
             dmcperiods  = new int[] { 428,380,340,320,286,254,226,214,190,160,142,128,106,84,72,54 };
             noiseperiod = new int[] { 4,8,16,32,64,96,128,160,202,254,380,508,762,1016,2034,4068 };
 
-            framectrdiv = 7450; // 7458 + 1(even jitter) - 9(power-on advance)
+            framectrdiv = 7449; // 7458 + 1(even jitter) - 9(power-on advance) - 1(tick-before-write compensation)
             irqAssertCycles = 0;
             apucycle    = 0;
             framectr = 0; ctrmode = 4;
@@ -429,16 +430,18 @@ namespace AprNes
             lengthClockThisCycle[0] = lengthClockThisCycle[1] =
             lengthClockThisCycle[2] = lengthClockThisCycle[3] = false;
 
+            // Snapshot lengthctr for $4015 reads (pre-step values, compensates tick-before-read)
+            lengthctr_snapshot[0] = lengthctr[0];
+            lengthctr_snapshot[1] = lengthctr[1];
+            lengthctr_snapshot[2] = lengthctr[2];
+            lengthctr_snapshot[3] = lengthctr[3];
+
             // Mode 0: IRQ post-fire (1 cycle after step 3)
             if (irqAssertCycles > 0 && !apuintflag)
             {
                 statusframeint = true;
                 --irqAssertCycles;
             }
-
-            // Mode 0: IRQ pre-fire (1 cycle before step 3)
-            if (framectrdiv == 2 && framectr == 3 && ctrmode == 4 && !apuintflag)
-                statusframeint = true;
 
             // Frame Counter：non-uniform step intervals matching real NES (~240Hz)
             if (--framectrdiv <= 0)
@@ -559,7 +562,7 @@ namespace AprNes
             if (!apuintflag && framectr == 3 && ctrmode == 4)
             {
                 statusframeint = true;
-                irqAssertCycles = 1; // post-fire: assert flag 1 more cycle after step 3
+                irqAssertCycles = 2; // post-fire: assert flag 2 more cycles after step 3 (fire + 2 post = 3 total)
             }
 
             ++framectr;
@@ -717,16 +720,17 @@ namespace AprNes
             dmcsamplesleft = dmcsamplelength;
         }
 
+
         // =====================================================================
         // 讀取 $4015 狀態暫存器
         // =====================================================================
         static byte apu_r_4015()
         {
             byte status = 0;
-            if (lengthctr[0] > 0) status |= 0x01;
-            if (lengthctr[1] > 0) status |= 0x02;
-            if (lengthctr[2] > 0) status |= 0x04;
-            if (lengthctr[3] > 0) status |= 0x08;
+            if (lengthctr_snapshot[0] > 0) status |= 0x01;
+            if (lengthctr_snapshot[1] > 0) status |= 0x02;
+            if (lengthctr_snapshot[2] > 0) status |= 0x04;
+            if (lengthctr_snapshot[3] > 0) status |= 0x08;
             if (dmcsamplesleft > 0) status |= 0x10;
             if (statusframeint)     status |= 0x40;
             if (statusdmcint)       status |= 0x80;

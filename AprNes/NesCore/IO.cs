@@ -73,11 +73,11 @@ namespace AprNes
                         setlength();
                         setsweep();
                         setvolumes();
-                        framectrdiv = frameReload5[0] + jitter;
+                        framectrdiv = frameReload5[0] + jitter - 1;
                     }
                     else
                     {
-                        framectrdiv = frameReload4[0] + jitter;
+                        framectrdiv = frameReload4[0] + jitter - 1;
                     }
                     break;
                 default: break;

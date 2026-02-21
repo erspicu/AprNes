@@ -638,8 +638,11 @@ namespace AprNes
             ppu_write_fun[vram_addr](value);
         }
 
+        static bool oam_dma_occurred = false;
+
         static void ppu_w_4014(byte value)//DMA , fixex 2017.01.16 pass sprite_ram test
         {
+            oam_dma_occurred = true;
             tick(); // halt cycle
             int oam_address = value << 8;
             for (int i = 0; i < 256; i++)

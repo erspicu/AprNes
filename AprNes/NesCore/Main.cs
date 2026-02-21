@@ -267,13 +267,16 @@ namespace AprNes
                 }
 
                 byte prevFlagI_run = flagI; // capture I flag before instruction for IRQ delay
+                branch_taken_no_cross = false;
+                oam_dma_occurred = false;
                 cpu_step();
 
                 // === IRQ polling (end of instruction, for next instruction) ===
-                if (opcode != 0x00)
+                // Suppress poll on: BRK (opcode 0x00), taken branch without page cross, OAM DMA
+                if (opcode != 0x00 && !branch_taken_no_cross && !oam_dma_occurred)
                 {
                     byte irqPollI = (opcode == 0x40) ? flagI : prevFlagI_run;
-                    irq_pending = (irqPollI == 0 && (statusframeint || statusdmcint || statusmapperint));
+                    irq_pending = (irqPollI == 0 && irqLineAtFetch);
                 }
             }
             timeEndPeriod(1);
