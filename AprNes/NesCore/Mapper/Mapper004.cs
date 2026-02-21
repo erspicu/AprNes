@@ -33,8 +33,8 @@ namespace AprNes
                 IRQCounter--;
             }
 
-            if (IRQCounter == 0 && IRQ_enable && NesCore.FlagI_public == 0)
-                NesCore.IRQInterrupt();
+            if (IRQCounter == 0 && IRQ_enable)
+                NesCore.statusmapperint = true; // assert /IRQ line, polled at instruction boundary
         }
 
         public void MapperInit(byte* _PRG_ROM, byte* _CHR_ROM, byte* _ppu_ram, int _PRG_ROM_count, int _CHR_ROM_count, int* _Vertical)
@@ -84,9 +84,10 @@ namespace AprNes
                 }
                 else if (address < 0xc000) *Vertical = ((value & 1) > 0) ? 0 : 1; //(0: vertical; 1: horizontal) $A000-$BFFF (Mirroring)
                 else if (address < 0xe000) IRQlatchVal = value;//$C000-$DFFF (IRQ latch) 
-                else//$E000-$FFFF IRQ disable
+                else//$E000-$FFFF IRQ disable + acknowledge
                 {
                     IRQ_enable = false;
+                    NesCore.statusmapperint = false; // acknowledge: de-assert /IRQ line
                 }
             }
             else//odd

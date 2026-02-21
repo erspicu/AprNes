@@ -14,7 +14,7 @@ namespace AprNes
         static public bool exit = false;
         static bool nmi_pending = false;
         static bool irq_pending = false; // IRQ should fire before next instruction
-        static public byte FlagI_public { get { return flagI; } }
+        static public bool statusmapperint = false; // mapper IRQ line asserted (MMC3 etc.)
         static int nmi_trace_count = 0; // trace instructions after NMI
 
         // Headless mode (console test runner)
@@ -95,6 +95,7 @@ namespace AprNes
             flagI = 1;
             nmi_pending = false;
             irq_pending = false;
+            statusmapperint = false;
             apuSoftReset();
         }
 

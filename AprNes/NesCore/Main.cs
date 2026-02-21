@@ -247,7 +247,7 @@ namespace AprNes
                 if (opcode != 0x00)
                 {
                     byte irqPollI = (opcode == 0x40) ? flagI : prevFlagI_run;
-                    irq_pending = (irqPollI == 0 && (statusframeint || statusdmcint));
+                    irq_pending = (irqPollI == 0 && (statusframeint || statusdmcint || statusmapperint));
                 }
             }
             timeEndPeriod(1);
