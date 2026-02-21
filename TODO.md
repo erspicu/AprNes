@@ -1,6 +1,6 @@
 # AprNes 待修復問題清單
 
-**基線**: 154 PASS / 20 FAIL / 174 TOTAL (2026-02-22)
+**基線**: 156 PASS / 18 FAIL / 174 TOTAL (2026-02-22)
 
 優先權排序原則：**影響大 + 好修** 排最前面
 
@@ -23,6 +23,11 @@
   - Per-dot edge detection in tick()
   - VBL clear cx=1→2, VBL flag 抑制 at (sl=241,cx=1)
   - $2002 read 不清 nmi_pending, $2000 falling edge 不清 nmi_pending
+- ~~Bug M: MMC3 scanline timing~~ → **+2 PASS** (BUGFIX13)
+  - BG A12 notification 移至 phase 3,7（模擬真實 NES bus timing）
+  - Sprite A12 notification 移至 phase 2,6，sprite fetch 從 cx=257 開始
+  - 新增 garbage NT A12 通知 at cx=337
+  - VBL gap detection: 跨 VBL 時不重置 a12LowSince
 
 ---
 
@@ -35,13 +40,7 @@
   - `blargg_apu_2005/10.len_halt_timing` — Length counter halt timing ($03)
   - `blargg_apu_2005/11.len_reload_timing` — Length counter reload timing ($03，test 4 已修但 test 3 新露出)
 
-### Bug M: MMC3 掃描線時序微調
-- **影響**: 2 個測試 FAIL
-- **難度**: 中
-- **失敗測試**:
-  - `mmc3_test/4-scanline_timing` — "Scanline 0 IRQ should occur later when $2000=$08"
-  - `mmc3_test_2/rom_singles/4-scanline_timing` — 同上
-- **根因**: `$2000` bit 3=1 時 sprite pattern table 在 `$1000`，A12 上升沿時機改變。
+### ~~Bug M: MMC3 掃描線時序微調~~ ✅ 已修復 (BUGFIX13)
 
 ---
 
@@ -100,8 +99,7 @@
 
 已完成: Bug B (PPU VBL/NMI timing) → 154 PASS ★
 
-下一步: Bug M — MMC3 scanline timing 微調
-  → 預期 +2，達到 ~156 PASS
+已完成: Bug M (MMC3 scanline timing) → 156 PASS ★
 
 Phase 7: Bug E + F — CPU interrupt + DMC DMA（最難）
   → 預期 +10，達到 ~166 PASS
@@ -112,4 +110,4 @@ Phase 8: Bug D 剩餘 + Bug G + H — APU timing + sprite + misc
 
 ---
 
-*最後更新: 2026-02-22 (Bug B complete)*
+*最後更新: 2026-02-22 (Bug M complete — 156 PASS)*

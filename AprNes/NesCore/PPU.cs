@@ -157,7 +157,8 @@ namespace AprNes
 
         // Per-8-cycle tile fetch: runs each PPU cycle on visible/pre-render scanlines when rendering enabled.
         // BG tiles fetched at cycles 0-255 (visible) and 320-335 (next-scanline prefetch).
-        // A12 transitions detected at CHR address setup cycles (phase 4 and 6).
+        // A12 notifications at phases 3 (AT addr, A12=0) and 7 (CHR high addr, A12=BG table bit12),
+        // shifted +3 from address-setup phases to match real NES bus timing relative to our PPU cycle base.
         static void ppu_rendering_tick()
         {
             if (ppu_cycles_x < 256 || (ppu_cycles_x >= 320 && ppu_cycles_x < 336))
@@ -166,31 +167,29 @@ namespace AprNes
                 {
                     case 0:
                         ioaddr = 0x2000 | (vram_addr & 0x0FFF);
-                        if (mapper == 4) NotifyMapperA12(ioaddr);
                         break;
                     case 1:
                         NTVal = ppu_ram[ioaddr];
                         break;
                     case 2:
                         ioaddr = 0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07);
-                        if (mapper == 4) NotifyMapperA12(ioaddr);
                         break;
                     case 3:
                         ATVal = (byte)((ppu_ram[ioaddr] >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
                         bg_attr_p3 = bg_attr_p2; bg_attr_p2 = bg_attr_p1; bg_attr_p1 = ATVal;
+                        if (mapper == 4) NotifyMapperA12(ioaddr);
                         break;
                     case 4:
                         ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
-                        if (mapper == 4) NotifyMapperA12(ioaddr);
                         break;
                     case 5:
                         lowTile = MapperObj.MapperR_CHR(ioaddr);
                         break;
                     case 6:
                         ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
-                        if (mapper == 4) NotifyMapperA12(ioaddr);
                         break;
                     case 7:
+                        if (mapper == 4) NotifyMapperA12(ioaddr);
                         highTile = MapperObj.MapperR_CHR(ioaddr);
                         // Render 8 pixels using shift registers BEFORE reload (visible only, BG on)
                         if (scanline < 240 && ppu_cycles_x < 256 && ShowBackGround)
@@ -206,23 +205,28 @@ namespace AprNes
             {
                 Yinc();
             }
-            else if (ppu_cycles_x == 257)
+            else if (ppu_cycles_x >= 257 && ppu_cycles_x < 320)
             {
-                CopyHoriV();
-            }
-            else if (ppu_cycles_x >= 260 && ppu_cycles_x < 320 && mapper == 4)
-            {
-                int phase = (ppu_cycles_x - 256) & 7;
-                if (phase == 0) NotifyMapperA12(0x2000);                // dummy NT fetch, A12=0
-                else if (phase == 4) NotifyMapperA12(SpPatternTableAddr); // sprite CHR fetch
+                if (ppu_cycles_x == 257) CopyHoriV();
+
+                if (mapper == 4)
+                {
+                    int phase = (ppu_cycles_x - 257) & 7;
+                    if (phase == 2) NotifyMapperA12(0x2000);                // garbage NT fetch, A12=0
+                    else if (phase == 6) NotifyMapperA12(SpPatternTableAddr); // sprite CHR fetch
+                }
             }
 
             // Pre-render scanline: continuous vert(v) = vert(t) copy at cycles 280-304
             if (scanline == 261 && ppu_cycles_x >= 280 && ppu_cycles_x <= 304)
             {
                 vram_addr = (vram_addr & ~0x7BE0) | (vram_addr_internal & 0x7BE0);
-                if (mapper == 4) NotifyMapperA12(vram_addr);
             }
+
+            // Garbage NT fetches at dots 337-340: notify A12=0 to create falling edge
+            // after BG prefetch CHR (A12=1 for BG=$1000), needed for scanline-boundary timing
+            if (mapper == 4 && ppu_cycles_x == 337)
+                NotifyMapperA12(0x2000);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

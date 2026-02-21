@@ -17,6 +17,7 @@ namespace AprNes
         // A12 rising-edge tracking for IRQ clocking
         int lastA12 = 0;
         int a12LowSince = -100;  // PPU absolute cycle when A12 last went low
+        int lastNotifyTime = -100;  // PPU absolute cycle of last A12 notification
         const int A12_FILTER = 16;
         int CHR0_Bankselect1k = 0, CHR1_Bankselect1k = 0, CHR2_Bankselect1k = 0, CHR3_Bankselect1k = 0;
         int CHR0_Bankselect2k = 0, CHR1_Bankselect2k = 0;
@@ -27,6 +28,12 @@ namespace AprNes
         public void NotifyA12(int address, int ppuAbsCycle)
         {
             int a12 = (address >> 12) & 1;
+
+            // How long since the last A12 notification (detects VBL gaps)
+            int sinceLast = ppuAbsCycle - lastNotifyTime;
+            if (sinceLast < 0) sinceLast += 341 * 262;
+            lastNotifyTime = ppuAbsCycle;
+
             if (a12 != 0 && lastA12 == 0)
             {
                 // Rising edge 0→1: clock IRQ counter if A12 was low long enough
@@ -37,8 +44,12 @@ namespace AprNes
             }
             else if (a12 == 0 && lastA12 != 0)
             {
-                // Falling edge 1→0: record when A12 went low
-                a12LowSince = ppuAbsCycle;
+                // Falling edge 1→0: record when A12 went low.
+                // But only if notifications have been continuous (within same rendering period).
+                // After a long gap (VBL), A12 was already low on the bus, so the old
+                // a12LowSince is more accurate — don't reset it.
+                if (sinceLast < 341)
+                    a12LowSince = ppuAbsCycle;
             }
             lastA12 = a12;
         }
@@ -59,7 +70,9 @@ namespace AprNes
             }
 
             if (IRQCounter == 0 && IRQ_enable)
+            {
                 NesCore.statusmapperint = true; // assert /IRQ line, polled at instruction boundary
+            }
         }
 
         public void MapperInit(byte* _PRG_ROM, byte* _CHR_ROM, byte* _ppu_ram, int _PRG_ROM_count, int _CHR_ROM_count, int* _Vertical)
