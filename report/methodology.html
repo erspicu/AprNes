@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AprNes - Testing Methodology</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f172a;--surface:#1e293b;--surface2:#283548;--border:#334155;
+  --text:#e2e8f0;--text-dim:#94a3b8;
+  --pass:#22c55e;--pass-bg:rgba(34,197,94,.15);
+  --fail:#ef4444;--fail-bg:rgba(239,68,68,.15);
+  --accent:#3b82f6;--accent2:#8b5cf6;
+}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;line-height:1.6;padding:2rem;min-height:100vh;max-width:960px;margin:0 auto}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+h1{font-size:1.8rem;margin-bottom:.25rem;letter-spacing:-.02em;text-align:center}
+h2{font-size:1.2rem;margin:2rem 0 .75rem;padding-bottom:.4rem;border-bottom:1px solid var(--border);color:var(--accent)}
+h3{font-size:.95rem;margin:1.2rem 0 .5rem;color:var(--text)}
+p{margin-bottom:.75rem;font-size:.88rem;color:var(--text-dim)}
+.back{display:inline-block;margin-bottom:1.5rem;font-size:.85rem}
+.subtitle{text-align:center;color:var(--text-dim);font-size:.88rem;margin-bottom:2rem}
+
+/* Overview cards */
+.overview{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.85rem;margin:1.2rem 0 2rem}
+.ov-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1rem;text-align:center}
+.ov-card .num{font-size:1.8rem;font-weight:700;color:var(--accent)}
+.ov-card .lbl{font-size:.78rem;color:var(--text-dim);margin-top:.2rem}
+
+/* Section cards */
+.section{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.2rem 1.5rem;margin-bottom:1rem}
+.section h3{margin-top:0;color:var(--accent);font-size:.95rem}
+.section p{font-size:.82rem}
+.section ul{margin:.5rem 0 .75rem 1.2rem;font-size:.82rem;color:var(--text-dim)}
+.section li{margin-bottom:.3rem}
+
+/* Code blocks */
+code{background:var(--bg);padding:.15rem .4rem;border-radius:3px;font-size:.78rem;font-family:Consolas,Monaco,'Courier New',monospace}
+pre{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:1rem;margin:.75rem 0;overflow-x:auto;font-size:.78rem;font-family:Consolas,Monaco,'Courier New',monospace;color:var(--text-dim);line-height:1.5}
+
+/* Flow diagram */
+.flow{display:flex;align-items:center;justify-content:center;gap:.5rem;flex-wrap:wrap;margin:1rem 0;font-size:.82rem}
+.flow .step{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:.5rem .8rem;text-align:center;min-width:100px}
+.flow .step .title{font-weight:600;font-size:.78rem;color:var(--accent)}
+.flow .step .desc{font-size:.7rem;color:var(--text-dim);margin-top:.2rem}
+.flow .arrow{color:var(--text-dim);font-size:1.2rem}
+
+/* Protocol table */
+table{width:100%;border-collapse:collapse;margin:.75rem 0;font-size:.82rem}
+th{background:var(--surface2);text-align:left;padding:.5rem .75rem;font-weight:600;font-size:.78rem;border:1px solid var(--border)}
+td{padding:.45rem .75rem;border:1px solid var(--border);color:var(--text-dim)}
+tr:hover td{background:var(--surface2)}
+
+/* Suite coverage */
+.suite-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.65rem;margin:.75rem 0}
+.suite-item{display:flex;align-items:center;gap:.5rem;padding:.4rem .65rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:.78rem}
+.suite-item .count{font-weight:600;min-width:24px;text-align:center;font-size:.75rem;padding:.1rem .3rem;border-radius:4px}
+.suite-item .count.c-blue{background:rgba(59,130,246,.15);color:var(--accent)}
+.suite-item .name{color:var(--text-dim)}
+
+.footer{text-align:center;color:var(--text-dim);font-size:.75rem;margin-top:2rem;padding-top:1rem;border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+
+<a href="index.html" class="back">&larr; Back to Test Report</a>
+<h1>AprNes Testing Methodology</h1>
+<p class="subtitle">NES emulator accuracy verification through hardware test ROMs</p>
+
+<div class="overview">
+  <div class="ov-card"><div class="num">174</div><div class="lbl">Test ROMs</div></div>
+  <div class="ov-card"><div class="num">30+</div><div class="lbl">Test Suites</div></div>
+  <div class="ov-card"><div class="num">5</div><div class="lbl">Subsystems</div></div>
+  <div class="ov-card"><div class="num">&lt;3 min</div><div class="lbl">Full Run</div></div>
+</div>
+
+<!-- ───────────────── Section 1 ───────────────── -->
+<h2>1. What We Test</h2>
+
+<div class="section">
+<p>AprNes uses <strong>hardware verification test ROMs</strong> originally written to validate real NES console behavior.
+These are actual NES programs (6502 machine code) that exercise specific hardware features and report pass/fail.
+The same ROMs are used by every major NES emulator project to measure accuracy.</p>
+
+<p>Test coverage spans all major NES subsystems:</p>
+<ul>
+  <li><strong>CPU</strong> &mdash; All official 6502 instructions, addressing modes, timing, dummy reads/writes, interrupt behavior (NMI/IRQ/BRK interactions), branch timing, reset behavior</li>
+  <li><strong>PPU</strong> &mdash; VBlank/NMI timing, sprite 0 hit, sprite overflow, open bus behavior, palette RAM, VRAM access, read buffer, even/odd frame toggle</li>
+  <li><strong>APU</strong> &mdash; Frame counter timing (mode 0/1), length counter, IRQ flag timing, clock jitter, DMC rates, channel mixing, reset behavior</li>
+  <li><strong>Mapper</strong> &mdash; MMC3 (Mapper 004) IRQ counter clocking, A12 detection, scanline timing, Rev A/B behavior</li>
+  <li><strong>I/O</strong> &mdash; Controller reading accuracy, DPCM interference, DMA timing</li>
+</ul>
+</div>
+
+<!-- ───────────────── Section 2 ───────────────── -->
+<h2>2. Test ROM Sources</h2>
+
+<div class="section">
+<p>All ROMs come from the <strong>nes-test-roms</strong> collection, primarily authored by:</p>
+<ul>
+  <li><strong>blargg (Shay Green)</strong> &mdash; The most comprehensive NES test ROM author. His suites cover CPU instructions (v3/v5), APU timing, PPU VBL/NMI, sprite hit/overflow, and more. Two result protocols: legacy (screen-based) and modern ($6000 memory-mapped).</li>
+  <li><strong>bisqwit</strong> &mdash; CPU timing tests</li>
+  <li><strong>other community authors</strong> &mdash; MMC3 IRQ tests, DMA interaction tests, controller tests</li>
+</ul>
+<p>These are the same ROMs used by Mesen, Nestopia, FCEUX, and other reference emulators. Passing them indicates cycle-accurate or near-cycle-accurate emulation.</p>
+</div>
+
+<!-- ───────────────── Section 3 ───────────────── -->
+<h2>3. Test Runner Architecture</h2>
+
+<div class="flow">
+  <div class="step"><div class="title">Bash Script</div><div class="desc">run_tests_report.sh</div></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step"><div class="title">MSBuild</div><div class="desc">Compile emulator</div></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step"><div class="title">Headless Emulator</div><div class="desc">TestRunner.cs</div></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step"><div class="title">Result Detection</div><div class="desc">$6000 / Screen scan</div></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step"><div class="title">HTML Report</div><div class="desc">JSON + Screenshots</div></div>
+</div>
+
+<div class="section">
+<h3>Headless Mode</h3>
+<p>The emulator has a built-in <code>TestRunner.cs</code> that runs in headless mode &mdash; no window, no audio, no frame rate limiter. The CPU/PPU/APU all tick at maximum speed. A single test ROM typically completes in under 1 second.</p>
+
+<h3>Orchestration Script</h3>
+<p>A bash script (<code>run_tests_report.sh</code>) handles the full pipeline:</p>
+<ol style="margin:.5rem 0 .75rem 1.2rem;font-size:.82rem;color:var(--text-dim)">
+  <li>Build the project with MSBuild</li>
+  <li>Run each of 174 ROM files through the headless emulator</li>
+  <li>Capture the final frame as PNG, convert to lossless WebP</li>
+  <li>Collect results into a JSON array</li>
+  <li>Generate a single-file HTML report with embedded data</li>
+</ol>
+</div>
+
+<!-- ───────────────── Section 4 ───────────────── -->
+<h2>4. Result Detection Mechanisms</h2>
+
+<div class="section">
+<h3>Mechanism A: $6000 Memory Protocol</h3>
+<p>Modern blargg test ROMs use a memory-mapped status protocol. The test runner polls address <code>$6000</code> every frame:</p>
+
+<table>
+  <tr><th>$6000 Value</th><th>Meaning</th><th>Action</th></tr>
+  <tr><td><code>$80</code></td><td>Test running</td><td>Continue waiting</td></tr>
+  <tr><td><code>$81</code></td><td>Reset requested</td><td>Wait 100ms, then soft reset</td></tr>
+  <tr><td><code>$00</code></td><td>Test passed</td><td>Exit with code 0</td></tr>
+  <tr><td><code>$01-$7F</code></td><td>Test failed (error code N)</td><td>Exit with code N</td></tr>
+</table>
+
+<p>Result text is read from <code>$6004+</code> as null-terminated ASCII. This gives detailed error messages like "Flag first set too late" or "Length counter not clocked correctly".</p>
+
+<h3>Mechanism B: Screen Stability Detection</h3>
+<p>Older blargg tests (2005 era) don't use the $6000 protocol. They render results directly to the PPU nametable. The test runner handles these with a multi-step heuristic:</p>
+<ol style="margin:.5rem 0 .75rem 1.2rem;font-size:.82rem;color:var(--text-dim)">
+  <li>After 120 frames (~2 sec), start sampling the screen buffer every frame</li>
+  <li>Compute a hash of the framebuffer (sampling every 37th pixel for speed)</li>
+  <li>When the hash stays identical for 90 consecutive frames (~1.5 sec), the screen is "stable"</li>
+  <li>Scan the PPU nametable (character map) for known result strings:
+    <ul>
+      <li><code>"Passed"</code> / <code>"PASSED"</code> &rarr; PASS</li>
+      <li><code>"Failed"</code> / <code>"FAILED"</code> &rarr; FAIL</li>
+      <li><code>"$01"</code> (hex on screen) &rarr; PASS</li>
+      <li><code>"$02"</code> ~ <code>"$FF"</code> (hex on screen) &rarr; FAIL</li>
+      <li><code>"All tests complete"</code> &rarr; PASS</li>
+      <li><code>" 0/"</code> (zero error count) &rarr; PASS</li>
+    </ul>
+  </li>
+</ol>
+<p>This approach reads the PPU nametable directly (not OCR on pixels), making it fast and reliable.</p>
+</div>
+
+<!-- ───────────────── Section 5 ───────────────── -->
+<h2>5. Automation Features</h2>
+
+<div class="section">
+<h3>Auto Soft Reset</h3>
+<p>Some test ROMs write <code>$81</code> to <code>$6000</code> to request a console reset (testing power-on/reset behavior). The runner detects this and automatically performs a soft reset after a 100ms delay, mimicking a human pressing the reset button. Supports up to 10 sequential resets per ROM.</p>
+
+<h3>Simulated Controller Input</h3>
+<p>Controller read tests need actual button presses. The <code>--input</code> parameter schedules timed button events:</p>
+<pre>--input "A:2.0,B:4.0,Select:6.0,Start:8.0,Up:10.0,Down:12.0,Left:14.0,Right:16.0"</pre>
+<p>Each button is pressed at the specified time (seconds) and held for 10 frames (~166ms). This lets tests like <code>read_joy3/test_buttons</code> verify that all 8 buttons are correctly detected in sequence.</p>
+
+<h3>Screenshot Capture</h3>
+<p>The final frame of each test is captured as a 256x240 PNG, then converted to lossless WebP (typically 60-80% smaller). Screenshots serve as visual evidence &mdash; many test ROMs display their results on screen as text, showing exactly what passed or failed.</p>
+
+<h3>Timeout Safety</h3>
+<p>Each ROM has a configurable <code>--max-wait</code> timeout (default 30 seconds, 120 for longer tests). If a test ROM enters an infinite loop or hangs, the runner terminates it gracefully and reports the last known state.</p>
+</div>
+
+<!-- ───────────────── Section 6 ───────────────── -->
+<h2>6. Test Suite Coverage</h2>
+
+<div class="suite-grid">
+  <div class="suite-item"><span class="count c-blue">4</span><span class="name">apu_mixer &mdash; Channel mixing</span></div>
+  <div class="suite-item"><span class="count c-blue">6</span><span class="name">apu_reset &mdash; APU power/reset</span></div>
+  <div class="suite-item"><span class="count c-blue">9</span><span class="name">apu_test &mdash; APU frame counter</span></div>
+  <div class="suite-item"><span class="count c-blue">11</span><span class="name">blargg_apu_2005 &mdash; APU timing</span></div>
+  <div class="suite-item"><span class="count c-blue">2</span><span class="name">blargg_cpu_test5 &mdash; CPU instructions</span></div>
+  <div class="suite-item"><span class="count c-blue">5</span><span class="name">blargg_ppu_tests &mdash; PPU basics</span></div>
+  <div class="suite-item"><span class="count c-blue">3</span><span class="name">branch_timing &mdash; Branch cycle count</span></div>
+  <div class="suite-item"><span class="count c-blue">1</span><span class="name">cpu_dummy_reads &mdash; Dummy read cycles</span></div>
+  <div class="suite-item"><span class="count c-blue">2</span><span class="name">cpu_dummy_writes &mdash; Dummy write cycles</span></div>
+  <div class="suite-item"><span class="count c-blue">2</span><span class="name">cpu_exec_space &mdash; Execution from I/O</span></div>
+  <div class="suite-item"><span class="count c-blue">6</span><span class="name">cpu_interrupts_v2 &mdash; NMI/IRQ interaction</span></div>
+  <div class="suite-item"><span class="count c-blue">2</span><span class="name">cpu_reset &mdash; CPU reset behavior</span></div>
+  <div class="suite-item"><span class="count c-blue">1</span><span class="name">cpu_timing_test6 &mdash; Instruction timing</span></div>
+  <div class="suite-item"><span class="count c-blue">5</span><span class="name">dmc_dma_during_read &mdash; DMC DMA conflicts</span></div>
+  <div class="suite-item"><span class="count c-blue">5</span><span class="name">instr_misc &mdash; Misc instruction tests</span></div>
+  <div class="suite-item"><span class="count c-blue">17</span><span class="name">instr_test-v3 &mdash; All 6502 instructions</span></div>
+  <div class="suite-item"><span class="count c-blue">18</span><span class="name">instr_test-v5 &mdash; All 6502 instructions (v5)</span></div>
+  <div class="suite-item"><span class="count c-blue">3</span><span class="name">instr_timing &mdash; Instruction cycle timing</span></div>
+  <div class="suite-item"><span class="count c-blue">6</span><span class="name">mmc3_irq_tests &mdash; MMC3 IRQ counter</span></div>
+  <div class="suite-item"><span class="count c-blue">6</span><span class="name">mmc3_test &mdash; MMC3 behavior</span></div>
+  <div class="suite-item"><span class="count c-blue">6</span><span class="name">mmc3_test_2 &mdash; MMC3 behavior (v2)</span></div>
+  <div class="suite-item"><span class="count c-blue">11</span><span class="name">nes_instr_test &mdash; CPU instructions (alt)</span></div>
+  <div class="suite-item"><span class="count c-blue">1</span><span class="name">oam_read &mdash; OAM read behavior</span></div>
+  <div class="suite-item"><span class="count c-blue">1</span><span class="name">ppu_open_bus &mdash; PPU open bus</span></div>
+  <div class="suite-item"><span class="count c-blue">1</span><span class="name">ppu_read_buffer &mdash; PPU read buffer</span></div>
+  <div class="suite-item"><span class="count c-blue">11</span><span class="name">ppu_vbl_nmi &mdash; VBlank/NMI timing</span></div>
+  <div class="suite-item"><span class="count c-blue">4</span><span class="name">read_joy3 &mdash; Controller reading</span></div>
+  <div class="suite-item"><span class="count c-blue">2</span><span class="name">sprdma_and_dmc_dma &mdash; DMA conflicts</span></div>
+  <div class="suite-item"><span class="count c-blue">11</span><span class="name">sprite_hit_tests &mdash; Sprite 0 hit</span></div>
+  <div class="suite-item"><span class="count c-blue">5</span><span class="name">sprite_overflow &mdash; Sprite overflow</span></div>
+  <div class="suite-item"><span class="count c-blue">7</span><span class="name">vbl_nmi_timing &mdash; VBL/NMI timing</span></div>
+</div>
+
+<!-- ───────────────── Section 7 ───────────────── -->
+<h2>7. Command-Line Interface</h2>
+
+<div class="section">
+<p>The headless test runner is invoked directly via the emulator executable:</p>
+<pre>AprNes.exe --rom &lt;file.nes&gt; [options]</pre>
+
+<table>
+  <tr><th>Option</th><th>Description</th></tr>
+  <tr><td><code>--rom &lt;path&gt;</code></td><td>ROM file to load (required)</td></tr>
+  <tr><td><code>--wait-result</code></td><td>Monitor $6000 / screen for test result</td></tr>
+  <tr><td><code>--max-wait &lt;sec&gt;</code></td><td>Timeout in seconds (default: 30)</td></tr>
+  <tr><td><code>--time &lt;sec&gt;</code></td><td>Run for exactly N seconds, then stop</td></tr>
+  <tr><td><code>--screenshot &lt;path&gt;</code></td><td>Save final frame as PNG</td></tr>
+  <tr><td><code>--log &lt;path&gt;</code></td><td>Write result line to file</td></tr>
+  <tr><td><code>--soft-reset &lt;sec&gt;</code></td><td>Trigger soft reset at N seconds</td></tr>
+  <tr><td><code>--input &lt;spec&gt;</code></td><td>Schedule button presses (e.g. "A:2.0,B:4.0")</td></tr>
+  <tr><td><code>--debug-log &lt;path&gt;</code></td><td>Write CPU trace log</td></tr>
+</table>
+
+<p>Exit codes: <code>0</code> = pass, <code>1-127</code> = fail (test error code), <code>255</code> = timeout/no result.</p>
+</div>
+
+<div class="footer"><a href="index.html">Test Report</a> | AprNes Testing Methodology</div>
+
+</body>
+</html>
