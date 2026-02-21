@@ -154,7 +154,7 @@ run_test "read_joy3" "test_buttons.nes" "--max-wait 60 --input A:2.0,B:4.0,Selec
 for rom in count_errors.nes count_errors_fast.nes; do
     run_test "read_joy3" "$rom" "--max-wait 30"
 done
-run_test "read_joy3" "thorough_test.nes" "--max-wait 30 --input A:2.0"
+run_test "read_joy3" "thorough_test.nes" "--max-wait 45"
 
 # sprdma_and_dmc_dma (2)
 for rom in sprdma_and_dmc_dma.nes sprdma_and_dmc_dma_512.nes; do

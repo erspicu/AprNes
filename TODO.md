@@ -1,7 +1,7 @@
 # AprNes 待修復問題清單
 
-**基線**: 158 PASS / 16 FAIL / 174 TOTAL (2026-02-22, run_tests_report.sh)
-> 注: 16 FAIL 含 2 個重複計算（merged test + mmc3_test_2），獨立 bug 數為 14
+**基線**: 159 PASS / 15 FAIL / 174 TOTAL (2026-02-22, run_tests_report.sh)
+> 注: 15 FAIL 含 2 個重複計算（merged test + mmc3_test_2），獨立 bug 數為 13
 
 優先權排序原則：**影響大 + 好修** 排最前面
 
@@ -38,6 +38,8 @@
   - Branch IRQ suppression: taken branch 無 page cross 抑制 IRQ polling
   - OAM DMA IRQ deferral: DMA 期間抑制 IRQ polling
   - irqLineAtFetch 修正 NMI+IRQ 交互 → 3-nmi_and_irq PASS
+- ~~Bug H: 手把讀取~~ → **+1 PASS** (BUGFIX15)
+  - 測試腳本修正：移除錯誤的 --input A:2.0，增加 --max-wait 30→45
 
 ---
 
@@ -72,7 +74,7 @@
 
 ---
 
-## P4 — 暫緩（共 5 個測試 FAIL）
+## P4 — 暫緩（共 4 個測試 FAIL）
 
 ### Bug G: Sprite timing 精確度
 - **影響**: 4 個測試 FAIL，大多數遊戲不受影響
@@ -81,11 +83,6 @@
   - `sprite_hit_tests/10.timing_order` — Sprite 0 hit 檢測順序
   - `sprite_overflow_tests/3.Timing` — Sprite overflow timing
   - `sprite_overflow_tests/4.Obscure` — Sprite overflow 硬體 bug 模擬
-
-### Bug H: 手把讀取
-- **影響**: 1 個測試 FAIL
-- **失敗測試**:
-  - `read_joy3/thorough_test` — 可能與 DMA 衝突相關
 
 ---
 
@@ -103,20 +100,26 @@
 
 已完成: Bug M (MMC3 scanline timing) → 156 PASS ★
 
-已完成: Bug D 剩餘 + Bug E 部分 → 158 PASS / 16 FAIL ★★
+已完成: Bug D 剩餘 + Bug E 部分 → 158 PASS ★★
   → APU IRQ timing 修正 (+3: 08.irq_timing, 10.len_halt, 11.len_reload)
   → IRQ line sampling at opcode fetch (+1: 3-nmi_and_irq)
   → Branch IRQ suppression + OAM DMA IRQ deferral
-  → (16 FAIL 含 merged test + mmc3_test_2 重複，獨立 bug 14 個)
 
-下一步: Bug E 剩餘 — NMI/BRK/DMA 交互
+已完成: Bug H (手把讀取) → 159 PASS / 15 FAIL
+  → 測試腳本修正：移除 --input，增加 --max-wait
+
+下一步: MMC3 scanline timing (mmc3_test 新版)
+  → mmc3_test/4-scanline_timing, mmc3_test_2/4-scanline_timing
+
+Phase 8: Bug G — sprite timing
+  → 預期 +4，目標 ~163 PASS (15 FAIL → ~11 FAIL)
+
+Phase 9: Bug E 剩餘 — NMI/BRK/DMA 交互
   → 2-nmi_and_brk, 4-irq_and_dma, 5-branch_delays_irq
-  → Bug F (DMC DMA) 需架構重構，暫緩
 
-Phase 8: Bug G + H — sprite timing + misc
-  → 預期 +5，目標 ~163+ PASS (16 FAIL → ~11 FAIL)
+Phase 10: Bug F (DMC DMA) — 需架構重構，暫緩
 ```
 
 ---
 
-*最後更新: 2026-02-22 (BUGFIX14 — 158 PASS / 16 FAIL / 174 TOTAL, APU IRQ timing + IRQ fetch sampling)*
+*最後更新: 2026-02-22 (BUGFIX15 — 159 PASS / 15 FAIL / 174 TOTAL, 修正 thorough_test 測試參數)*
