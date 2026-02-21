@@ -63,6 +63,8 @@ namespace AprNes
                     apuintflag     = (val & 0x40) != 0;
                     if (apuintflag) statusframeint = false; // 只有 bit6 設定時才清除 frame IRQ flag
                     framectr       = 0;
+                    irqAssertCycles = 0;
+                    int jitter = 2 + (apucycle & 1); // even/odd CPU cycle jitter
                     if (ctrmode == 5)
                     {
                         // Mode 1: 立即 clock length/envelope/sweep (不推進 framectr)
@@ -71,11 +73,11 @@ namespace AprNes
                         setlength();
                         setsweep();
                         setvolumes();
-                        framectrdiv = frameReload5[0] + 7;
+                        framectrdiv = frameReload5[0] + jitter;
                     }
                     else
                     {
-                        framectrdiv = frameReload4[0] + 7;
+                        framectrdiv = frameReload4[0] + jitter;
                     }
                     break;
                 default: break;

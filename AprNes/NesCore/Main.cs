@@ -160,7 +160,36 @@ namespace AprNes
                 P1_joypad_status = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 NES_MEM = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 65536);
 
-                MapperObj = (IMapper)Activator.CreateInstance(Type.GetType("AprNes.Mapper" + mapper.ToString("d3")));
+                if (mapper == 4)
+                {
+                    uint crc = 0xFFFFFFFF;
+                    for (int i = 0; i < rom_bytes.Length; i++)
+                    {
+                        crc ^= rom_bytes[i];
+                        for (int j = 0; j < 8; j++)
+                            crc = (crc >> 1) ^ (((crc & 1) != 0) ? 0xEDB88320u : 0);
+                    }
+                    crc ^= 0xFFFFFFFF;
+                    Console.WriteLine("ROM CRC32: " + crc.ToString("X8"));
+
+                    if (crc == 0x1D814D25 || crc == 0x59322B74)
+                    {
+                        MapperObj = new Mapper004RevA();
+                        Console.WriteLine("Sub-variant: MMC3 Rev A");
+                    }
+                    else if (crc == 0x9F1A68ED)
+                    {
+                        MapperObj = new Mapper004MMC6();
+                        Console.WriteLine("Sub-variant: MMC6");
+                    }
+                    else
+                        MapperObj = new Mapper004();
+                }
+                else
+                {
+                    MapperObj = (IMapper)Activator.CreateInstance(
+                        Type.GetType("AprNes.Mapper" + mapper.ToString("d3")));
+                }
                 MapperObj.MapperInit(PRG_ROM, CHR_ROM, ppu_ram, PRG_ROM_count, CHR_ROM_count, Vertical);
 
                 for (int i = 0; i < 61440; i++) ScreenBuf1x[i] = 0;

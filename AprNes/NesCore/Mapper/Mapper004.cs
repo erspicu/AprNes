@@ -10,8 +10,9 @@ namespace AprNes
         int PRG_ROM_count;
         int* Vertical;
 
-        bool IRQ_enable = false, IRQReset = false;
-        int IRQlatchVal = 0, IRQCounter = 0, BankReg = 0;
+        protected bool IRQ_enable = false, IRQReset = false;
+        protected int IRQlatchVal = 0, IRQCounter = 0;
+        int BankReg = 0;
 
         // A12 rising-edge tracking for IRQ clocking
         int lastA12 = 0;
@@ -42,7 +43,7 @@ namespace AprNes
             lastA12 = a12;
         }
 
-        public void Mapper04step_IRQ()
+        public virtual void Mapper04step_IRQ()
         {
             // Clocked by PPU A12 rising edge, once per scanline when rendering is enabled.
             // If counter==0 or reload requested: reload from latch, then check for IRQ.
@@ -85,17 +86,17 @@ namespace AprNes
           //  throw new NotImplementedException();
         }
 
-        public void MapperW_RAM(ushort address, byte value)
+        public virtual void MapperW_RAM(ushort address, byte value)
         {
             NES_MEM[address] = value;
         }
 
-        public byte MapperR_RAM(ushort address)
+        public virtual byte MapperR_RAM(ushort address)
         {
             return NES_MEM[address];
         }
 
-        public void MapperW_PRG(ushort address, byte value)
+        public virtual void MapperW_PRG(ushort address, byte value)
         {
             //$8000-$9FFF, $A000-$BFFF, $C000-$DFFF, and $E000-$FFFF
             if ((address & 1) == 0)//even

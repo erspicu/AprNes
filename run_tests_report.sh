@@ -63,12 +63,20 @@ run_test() {
     fi
 
     local rom_base="${rom%.nes}"
-    local ss_rel="screenshots/${suite}/${rom_base}.png"
-    local ss_path="$REPORT_DIR/$ss_rel"
-    mkdir -p "$(dirname "$ss_path")"
+    local ss_rel="screenshots/${suite}/${rom_base}.webp"
+    local ss_png_path="$REPORT_DIR/screenshots/${suite}/${rom_base}.png"
+    local ss_webp_path="$REPORT_DIR/$ss_rel"
+    mkdir -p "$(dirname "$ss_png_path")"
 
     TOTAL=$((TOTAL+1))
-    output=$("$EXE" --rom "$rompath" --wait-result --screenshot "$ss_path" $extra_args 2>&1) && rc=0 || rc=$?
+    output=$("$EXE" --rom "$rompath" --wait-result --screenshot "$ss_png_path" $extra_args 2>&1) && rc=0 || rc=$?
+
+    # Convert PNG to lossless WebP and remove original
+    if [ -f "$ss_png_path" ]; then
+        python -c "
+from PIL import Image; Image.open(r'$ss_png_path').save(r'$ss_webp_path','WEBP',lossless=True,method=6)
+" 2>/dev/null && rm -f "$ss_png_path"
+    fi
 
     if [ $rc -eq 0 ]; then
         PASS=$((PASS+1))

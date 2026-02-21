@@ -125,15 +125,13 @@ namespace AprNes
         static int apucycle = 0;
         static int[] noiseperiod;
         // Per-step reload values for frame counter (non-uniform, matching real NES NTSC timing)
-        // 4-step: steps fire at CPU cycles 7457, 14913, 22371, 29829 from $4017 write
-        // 5-step: steps fire at CPU cycles 7457, 14913, 22371, 29829, 37282
-        // Per-step reload values for frame counter (non-uniform, matching real NES NTSC timing)
-        // 4-step: steps fire at CPU cycles 7457, 14913, 22371, 29829 from $4017 write
-        // 5-step: steps fire at CPU cycles 7457, 14913, 22371, 29829, 37282
-        static int[] frameReload4 = { 7457, 7456, 7458, 7458 };
-        static int[] frameReload5 = { 7457, 7456, 7458, 7458, 7453 };
-        static int framectrdiv = 7457;
+        // 4-step: steps fire at CPU cycles 7460, 14916, 22374, 29832 from $4017 write (+2 offset)
+        // 5-step: steps fire at CPU cycles 7460, 14916, 22374, 29832, 37284
+        static int[] frameReload4 = { 7458, 7456, 7458, 7458 };
+        static int[] frameReload5 = { 7458, 7456, 7458, 7458, 7452 };
+        static int framectrdiv = 7458;
         static bool apuintflag = true, statusdmcint = false, statusframeint = false;
+        static int irqAssertCycles = 0; // post-fire: assert IRQ flag for extra cycles after step 3
         static int framectr = 0, ctrmode = 4;
         static byte last4017Val = 0;  // track last value written to $4017 for reset
         static bool[] lenCtrEnable = { true, true, true, true };
@@ -224,7 +222,8 @@ namespace AprNes
                 setsweep();
                 setvolumes();
             }
-            framectrdiv = 7457;
+            framectrdiv = 7458;
+            irqAssertCycles = 0;
 
             // 清除 IRQ flags
             statusframeint = false;
@@ -259,7 +258,8 @@ namespace AprNes
             dmcperiods  = new int[] { 428,380,340,320,286,254,226,214,190,160,142,128,106,84,72,54 };
             noiseperiod = new int[] { 4,8,16,32,64,96,128,160,202,254,380,508,762,1016,2034,4068 };
 
-            framectrdiv = 7457;
+            framectrdiv = 7458;
+            irqAssertCycles = 0;
             apucycle    = 0;
             framectr = 0; ctrmode = 4;
 
@@ -426,6 +426,17 @@ namespace AprNes
         {
             apucycle++;
 
+            // Mode 0: IRQ post-fire (1 cycle after step 3)
+            if (irqAssertCycles > 0 && !apuintflag)
+            {
+                statusframeint = true;
+                --irqAssertCycles;
+            }
+
+            // Mode 0: IRQ pre-fire (1 cycle before step 3)
+            if (framectrdiv == 2 && framectr == 3 && ctrmode == 4 && !apuintflag)
+                statusframeint = true;
+
             // Frame Counter：non-uniform step intervals matching real NES (~240Hz)
             if (--framectrdiv <= 0)
             {
@@ -542,8 +553,11 @@ namespace AprNes
                 setlength();
                 setsweep();
             }
-            if (!apuintflag && framectr == 3 && ctrmode == 4 && !statusframeint)
+            if (!apuintflag && framectr == 3 && ctrmode == 4)
+            {
                 statusframeint = true;
+                irqAssertCycles = 1; // post-fire: assert flag 1 more cycle after step 3
+            }
 
             ++framectr;
             framectr %= ctrmode;
