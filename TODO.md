@@ -1,6 +1,6 @@
 # AprNes 待修復問題清單
 
-**基線**: 136 PASS / 38 FAIL / 174 TOTAL (2026-02-21)
+**基線**: 139 PASS / 35 FAIL / 174 TOTAL (2026-02-22)
 
 優先權排序原則：**影響大 + 好修** 排最前面
 
@@ -15,6 +15,9 @@
 - ~~Bug L: DMC timer 計時器行為~~ → **+2 PASS** (BUGFIX10)
   - DMC timer 從 up-counter 改為 down-counter
   - $4010 更改速率時不重置倒數，僅在 reload 時生效
+- ~~Bug D: APU $4017 reset/power-on~~ → **+3 PASS** (BUGFIX11)
+  - Power-on/reset advance: framectrdiv = 7450 (模擬 9-cycle 提前寫入)
+  - Length counter reload suppression: 在 length clock 同 cycle 寫入時抑制 reload
 
 ---
 
@@ -41,21 +44,12 @@
   3. $2002 讀取在 VBL set 同 cycle 時的 suppression
   4. Odd frame pre-render scanline 少 1 PPU cycle
 
-### Bug D: APU $4017 reset/power-on + length counter timing
-- **影響**: 6 個測試 FAIL
-- **難度**: 中等
-- **失敗測試**:
-  - `apu_reset/4017_timing` — "Frame IRQ flag should be set sooner after power/reset" (#3)
-  - `apu_reset/4017_written` — "At power, $4017 should be written with $00" (#2)
-  - `blargg_apu_2005/08.irq_timing` — IRQ 觸發 timing ($02)
-  - `blargg_apu_2005/09.reset_timing` — Reset 後 timing ($04)
+### Bug D: APU $4017 reset/power-on (部分完成)
+- **已修復**: 3/6 測試 — 4017_timing, 4017_written, 09.reset_timing
+- **剩餘 3 個測試 FAIL**:
+  - `blargg_apu_2005/08.irq_timing` — IRQ 觸發 timing ($02)，需 IRQ line/flag 分離
   - `blargg_apu_2005/10.len_halt_timing` — Length counter halt timing ($03)
-  - `blargg_apu_2005/11.len_reload_timing` — Length counter reload timing ($04)
-- **根因**:
-  - Power-on 時未模擬 `$4017 = $00` 寫入
-  - Reset 後 frame counter 的延遲啟動行為
-  - Length counter halt/reload 在 frame counter clock 邊界的精確行為
-- **修復方向**: power-on 時觸發 $4017 寫入；精確對齊 length counter halt/reload 時序
+  - `blargg_apu_2005/11.len_reload_timing` — Length counter reload timing ($03，test 4 已修但 test 3 新露出)
 
 ---
 
@@ -118,22 +112,21 @@
 
 已完成: Bug L (DMC timer) → 136 PASS
 
-下一步: Bug D — APU reset/power-on + length timing
-  → 預期 +2~6，達到 ~142 PASS
+已完成: Bug D (APU reset/power-on) → 139 PASS
 
-Phase 5: Bug B — PPU VBL/NMI timing（最大群組）
-  → 預期 +14，達到 ~154 PASS
+下一步: Bug B — PPU VBL/NMI timing（最大群組）
+  → 預期 +14，達到 ~153 PASS
 
 Phase 6: Bug M — MMC3 scanline timing 微調
-  → 預期 +2，達到 ~156 PASS
+  → 預期 +2，達到 ~155 PASS
 
 Phase 7: Bug E + F — CPU interrupt + DMC DMA（最難）
-  → 預期 +10，達到 ~166 PASS
+  → 預期 +10，達到 ~165 PASS
 
-Phase 8: Bug G + H — sprite timing + misc
-  → 預期 +5，目標 ~171 PASS
+Phase 8: Bug D 剩餘 + Bug G + H — APU timing + sprite + misc
+  → 預期 +8，目標 ~173 PASS
 ```
 
 ---
 
-*最後更新: 2026-02-22*
+*最後更新: 2026-02-22 (Bug D partial)*

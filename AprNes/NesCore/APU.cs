@@ -135,6 +135,7 @@ namespace AprNes
         static int framectr = 0, ctrmode = 4;
         static byte last4017Val = 0;  // track last value written to $4017 for reset
         static bool[] lenCtrEnable = { true, true, true, true };
+        static bool[] lengthClockThisCycle = { false, false, false, false };
         static int[] volume = new int[4];
 
         // DMC 欄位
@@ -222,7 +223,7 @@ namespace AprNes
                 setsweep();
                 setvolumes();
             }
-            framectrdiv = 7458;
+            framectrdiv = 7450; // match power-on advance
             irqAssertCycles = 0;
 
             // 清除 IRQ flags
@@ -258,7 +259,7 @@ namespace AprNes
             dmcperiods  = new int[] { 428,380,340,320,286,254,226,214,190,160,142,128,106,84,72,54 };
             noiseperiod = new int[] { 4,8,16,32,64,96,128,160,202,254,380,508,762,1016,2034,4068 };
 
-            framectrdiv = 7458;
+            framectrdiv = 7450; // 7458 + 1(even jitter) - 9(power-on advance)
             irqAssertCycles = 0;
             apucycle    = 0;
             framectr = 0; ctrmode = 4;
@@ -425,6 +426,8 @@ namespace AprNes
         static void apu_step()
         {
             apucycle++;
+            lengthClockThisCycle[0] = lengthClockThisCycle[1] =
+            lengthClockThisCycle[2] = lengthClockThisCycle[3] = false;
 
             // Mode 0: IRQ post-fire (1 cycle after step 3)
             if (irqAssertCycles > 0 && !apuintflag)
@@ -581,6 +584,7 @@ namespace AprNes
                 if (!lenctrHalt[i] && lengthctr[i] > 0)
                 {
                     --lengthctr[i];
+                    lengthClockThisCycle[i] = true;
                     if (lengthctr[i] == 0) setvolumes();
                 }
             }
@@ -762,7 +766,7 @@ namespace AprNes
             _pulsePeriod[0] = (_pulsePeriod[0] & 0xFF) | ((val & 7) << 8);
             _pulseTimer[0]  = _pulsePeriod[0];
             _pulseSeq[0]    = 0;
-            if (lenCtrEnable[0])
+            if (lenCtrEnable[0] && !(lengthClockThisCycle[0] && lengthctr[0] > 0))
                 lengthctr[0] = lenctrload[(val >> 3) & 0x1F];
             envelopeStartFlag[0] = true;
         }
@@ -794,7 +798,7 @@ namespace AprNes
             _pulsePeriod[1] = (_pulsePeriod[1] & 0xFF) | ((val & 7) << 8);
             _pulseTimer[1]  = _pulsePeriod[1];
             _pulseSeq[1]    = 0;
-            if (lenCtrEnable[1])
+            if (lenCtrEnable[1] && !(lengthClockThisCycle[1] && lengthctr[1] > 0))
                 lengthctr[1] = lenctrload[(val >> 3) & 0x1F];
             envelopeStartFlag[1] = true;
         }
@@ -815,7 +819,7 @@ namespace AprNes
         {
             _triPeriod = (_triPeriod & 0xFF) | ((val & 7) << 8);
             _triTimer  = _triPeriod;
-            if (lenCtrEnable[2])
+            if (lenCtrEnable[2] && !(lengthClockThisCycle[2] && lengthctr[2] > 0))
                 lengthctr[2] = lenctrload[(val >> 3) & 0x1F];
             linctrflag = true;
         }
@@ -835,7 +839,7 @@ namespace AprNes
         // $400F: Noise length counter
         static void apu_400f(byte val)
         {
-            if (lenCtrEnable[3])
+            if (lenCtrEnable[3] && !(lengthClockThisCycle[3] && lengthctr[3] > 0))
                 lengthctr[3] = lenctrload[(val >> 3) & 0x1F];
             envelopeStartFlag[3] = true;
         }
