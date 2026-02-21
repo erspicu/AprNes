@@ -9,9 +9,22 @@ namespace AprNes
     {
         public static byte* NES_MEM;
 
+        static bool in_tick = false;  // prevent recursive tick from DMC fetch
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void tick()
+        {
+            if (in_tick) return;
+            in_tick = true;
+            ppu_step_new(); ppu_step_new(); ppu_step_new();
+            apu_step();
+            in_tick = false;
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte Mem_r(ushort address)
         {
+            tick();
             byte val = mem_read_fun[address](address);
             cpubus = val;
             return val;
@@ -20,9 +33,16 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void Mem_w(ushort address, byte value)
         {
+            tick();
             cpubus = value;
             mem_write_fun[address](address, value);
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static byte ZP_r(byte addr) { tick(); return NES_MEM[addr]; }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void ZP_w(byte addr, byte value) { tick(); NES_MEM[addr] = value; }
 
         static Action<ushort, byte>[] mem_write_fun = null;
         static Func<ushort, byte>[] mem_read_fun = null;

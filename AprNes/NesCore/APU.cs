@@ -135,6 +135,7 @@ namespace AprNes
         static int framectrdiv = 7457;
         static bool apuintflag = true, statusdmcint = false, statusframeint = false;
         static int framectr = 0, ctrmode = 4;
+        static byte last4017Val = 0;  // track last value written to $4017 for reset
         static bool[] lenCtrEnable = { true, true, true, true };
         static int[] volume = new int[4];
 
@@ -208,10 +209,22 @@ namespace AprNes
         // =====================================================================
         static void apuSoftReset()
         {
-            framectrdiv = 7457;
-            framectr = 0;
-            // ctrmode 和 apuintflag 保留 (nesdev: "$4017 mode unchanged on reset")
             apucycle = 0;
+
+            // Re-apply last $4017 value (nesdev: "at reset, $4017 rewritten with last value")
+            ctrmode    = ((last4017Val & 0x80) != 0) ? 5 : 4;
+            apuintflag = (last4017Val & 0x40) != 0;
+            if (apuintflag) statusframeint = false;
+            framectr   = 0;
+            if (ctrmode == 5)
+            {
+                setenvelope();
+                setlinctr();
+                setlength();
+                setsweep();
+                setvolumes();
+            }
+            framectrdiv = 7457;
 
             // 清除 IRQ flags
             statusframeint = false;

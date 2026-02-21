@@ -7,34 +7,12 @@ namespace AprNes
 {
     unsafe public partial class NesCore
     {
-        //table port from  https://github.com/bfirsh/jsnes/blob/master/source/cpu.js
-        static byte[] cycle_tableData = new byte[]{
-    /*0x00*/ 7,6,2,8,3,3,5,5,3,2,2,2,4,4,6,6,
-    /*0x10*/ 2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
-    /*0x20*/ 6,6,2,8,3,3,5,5,4,2,2,2,4,4,6,6,
-    /*0x30*/ 2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
-    /*0x40*/ 6,6,2,8,3,3,5,5,3,2,2,2,3,4,6,6,
-    /*0x50*/ 2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
-    /*0x60*/ 6,6,2,8,3,3,5,5,4,2,2,2,5,4,6,6,
-    /*0x70*/ 2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
-    /*0x80*/ 2,6,2,6,3,3,3,3,2,2,2,2,4,4,4,4,
-    /*0x90*/ 2,6,2,6,4,4,4,4,2,5,2,5,5,5,5,5,
-    /*0xA0*/ 2,6,2,6,3,3,3,3,2,2,2,2,4,4,4,4,
-    /*0xB0*/ 2,5,2,5,4,4,4,4,2,4,2,4,4,4,4,4,
-    /*0xC0*/ 2,6,2,8,3,3,5,5,2,2,2,2,4,4,6,6,
-    /*0xD0*/ 2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
-    /*0xE0*/ 2,6,2,8,3,3,5,5,2,2,2,2,4,4,6,6,
-    /*0xF0*/ 2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7
-    };
-        static byte* cycle_table;
         static byte r_A = 0, r_X = 0, r_Y = 0, r_SP = 0xFD, flagN = 0, flagV = 0, flagD = 0, flagI = 1, flagZ = 0, flagC = 0;
         static ushort r_PC = 0;
         static byte opcode;
 
-        static int cpu_cycles = 0, Interrupt_cycle = 0;
         static public bool exit = false;
         static bool nmi_pending = false;
-        static bool nmi_delayed = false; // NMI edge detected on last CPU cycle, delay 1 instruction
         static bool irq_pending = false; // IRQ should fire before next instruction
         static public byte FlagI_public { get { return flagI; } }
         static int nmi_trace_count = 0; // trace instructions after NMI
@@ -86,13 +64,15 @@ namespace AprNes
         static void NMIInterrupt()
         {
             byte pushed_flags = (byte)(GetFlag() | 0x20);
-            dbgWrite("NMI_PUSH: PC=$" + r_PC.ToString("X4") + " flags=$" + pushed_flags.ToString("X2") + " SP=$" + r_SP.ToString("X2") + " vec=$" + (Mem_r(0xfffa) | (Mem_r(0xfffb) << 8)).ToString("X4"));
-            Mem_w((ushort)(0x100 | r_SP--), (byte)(r_PC >> 8));
-            Mem_w((ushort)(0x100 | r_SP--), (byte)r_PC);
-            Mem_w((ushort)(0x100 | r_SP--), pushed_flags);
-            r_PC = (ushort)(Mem_r(0xfffa) | (Mem_r(0xfffb) << 8));
+            dbgWrite("NMI_PUSH: PC=$" + r_PC.ToString("X4") + " flags=$" + pushed_flags.ToString("X2") + " SP=$" + r_SP.ToString("X2"));
+            Mem_r(r_PC); Mem_r(r_PC); // cycles 1-2: dummy reads
+            Mem_w((ushort)(0x100 | r_SP--), (byte)(r_PC >> 8)); // cycle 3: push PCH
+            Mem_w((ushort)(0x100 | r_SP--), (byte)r_PC); // cycle 4: push PCL
+            Mem_w((ushort)(0x100 | r_SP--), pushed_flags); // cycle 5: push P
+            byte lo = Mem_r(0xfffa); // cycle 6: vector low
+            byte hi = Mem_r(0xfffb); // cycle 7: vector high
+            r_PC = (ushort)(lo | (hi << 8));
             flagI = 1;
-            Interrupt_cycle = 7;
         }
 
         static bool softreset = false;
@@ -105,25 +85,33 @@ namespace AprNes
         static void ResetInterrupt()
         {
             Console.WriteLine("soft reset !");
-            r_SP -= 3;
-            r_PC = (ushort)(Mem_r(0xfffc) | (Mem_r(0xfffd) << 8));
+            Mem_r(r_PC); Mem_r(r_PC); // cycles 1-2: dummy reads
+            Mem_r((ushort)(0x100 | r_SP--)); // cycle 3: dummy stack access
+            Mem_r((ushort)(0x100 | r_SP--)); // cycle 4: dummy stack access
+            Mem_r((ushort)(0x100 | r_SP--)); // cycle 5: dummy stack access
+            byte lo = Mem_r(0xfffc); // cycle 6: reset vector low
+            byte hi = Mem_r(0xfffd); // cycle 7: reset vector high
+            r_PC = (ushort)(lo | (hi << 8));
             flagI = 1;
             nmi_pending = false;
-            nmi_delayed = false;
             irq_pending = false;
-            Interrupt_cycle = 7;
             apuSoftReset();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void IRQInterrupt()
         {
-            Mem_w((ushort)(0x100 | r_SP--), (byte)(r_PC >> 8));
-            Mem_w((ushort)(0x100 | r_SP--), (byte)r_PC);
-            Mem_w((ushort)(0x100 | r_SP--), (byte)(GetFlag() | 0x20));
-            r_PC = (ushort)(Mem_r(0xfffe) | (Mem_r(0xffff) << 8));
+            Mem_r(r_PC); Mem_r(r_PC); // cycles 1-2: dummy reads
+            Mem_w((ushort)(0x100 | r_SP--), (byte)(r_PC >> 8)); // cycle 3: push PCH
+            Mem_w((ushort)(0x100 | r_SP--), (byte)r_PC); // cycle 4: push PCL
+            Mem_w((ushort)(0x100 | r_SP--), (byte)(GetFlag() | 0x20)); // cycle 5: push P
+            // Check if NMI asserted during IRQ vectoring — hijack to NMI vector
+            ushort vector = (nmi_pending) ? (ushort)0xfffa : (ushort)0xfffe;
+            if (nmi_pending) nmi_pending = false;
+            byte lo = Mem_r(vector); // cycle 6: vector low
+            byte hi = Mem_r((ushort)(vector + 1)); // cycle 7: vector high
+            r_PC = (ushort)(lo | (hi << 8));
             flagI = 1;
-            Interrupt_cycle = 7;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -139,16 +127,12 @@ namespace AprNes
                 softreset = false;
             }
 
-
-            byte prevFlagI = flagI;
             ushort trace_pc = r_PC; // save PC before opcode fetch for tracing
             opcode = Mem_r(r_PC++);
-            cpu_cycles = cycle_table[opcode];
 
             //debug();
 
-            cpu_cycles += Interrupt_cycle;
-            Interrupt_cycle = 0;
+            // Interrupt_cycle removed — NMI/IRQ/Reset now tick via their own Mem_r/Mem_w
 
             // Pre-instruction trace when tracking NMI handler
             if (nmi_trace_count > 0)
@@ -171,7 +155,7 @@ namespace AprNes
                     break;
 
                 case 0x65: //ADC  Zero Page  
-                    byte1 = NES_MEM[Mem_r(r_PC++)];
+                    byte1 = ZP_r(Mem_r(r_PC++));
                     int1 = byte1 + r_A + flagC;
                     if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
                     if (int1 > 0xff) flagC = 1; else flagC = 0;
@@ -180,8 +164,8 @@ namespace AprNes
                     r_A = (byte)int1;
                     break;
 
-                case 0x75://ADC Zero Page,X 
-                    byte1 = NES_MEM[(byte)(Mem_r(r_PC++) + r_X)];
+                case 0x75://ADC Zero Page,X
+                    byte2 = Mem_r(r_PC++); ZP_r(byte2); byte1 = ZP_r((byte)(byte2 + r_X));
                     int1 = byte1 + r_A + flagC;
                     if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
                     if (int1 > 0xff) flagC = 1; else flagC = 0;
@@ -206,7 +190,6 @@ namespace AprNes
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
                         Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                        cpu_cycles++;
                     }
                     byte1 = Mem_r(ushort2);
                     int1 = byte1 + r_A + flagC;
@@ -223,7 +206,6 @@ namespace AprNes
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
                         Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                        cpu_cycles++;
                     }
                     byte1 = Mem_r(ushort2);
                     int1 = byte1 + r_A + flagC;
@@ -234,9 +216,9 @@ namespace AprNes
                     r_A = (byte)int1;
                     break;
 
-                case 0x61: //ADC (Indirect,X) 
-                    byte2 = (byte)(Mem_r(r_PC++) + r_X);
-                    byte1 = Mem_r((ushort)(NES_MEM[byte2++] | (NES_MEM[byte2] << 8)));
+                case 0x61: //ADC (Indirect,X)
+                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
+                    byte1 = Mem_r((ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8)));
                     int1 = byte1 + r_A + flagC;
                     if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
                     if (int1 > 0xff) flagC = 1; else flagC = 0;
@@ -247,12 +229,11 @@ namespace AprNes
 
                 case 0x71: //ADC (Indirect),Y
                     byte2 = Mem_r(r_PC++);
-                    ushort1 = (ushort)(NES_MEM[byte2++] | (NES_MEM[byte2] << 8));
+                    ushort1 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
                     ushort2 = (ushort)(ushort1 + r_Y);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
                         Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                        cpu_cycles++;
                     }
                     byte1 = Mem_r(ushort2);
                     int1 = byte1 + r_A + flagC;
@@ -272,14 +253,14 @@ namespace AprNes
                     break;
 
                 case 0x25: //AND  Zero Page  
-                    int1 = NES_MEM[Mem_r(r_PC++)] & r_A;
+                    int1 = ZP_r(Mem_r(r_PC++)) & r_A;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
                     if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
                     r_A = (byte)int1;
                     break;
 
-                case 0x35://AND Zero Page,X 
-                    int1 = NES_MEM[(byte)(Mem_r(r_PC++) + r_X)] & r_A;
+                case 0x35://AND Zero Page,X
+                    byte2 = Mem_r(r_PC++); ZP_r(byte2); int1 = ZP_r((byte)(byte2 + r_X)) & r_A;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
                     if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
                     r_A = (byte)int1;
@@ -298,7 +279,6 @@ namespace AprNes
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
                         Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                        cpu_cycles++;
                     }
                     int1 = Mem_r(ushort2) & r_A;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
@@ -312,7 +292,6 @@ namespace AprNes
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
                         Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                        cpu_cycles++;
                     }
                     int1 = Mem_r(ushort2) & r_A;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
@@ -320,9 +299,9 @@ namespace AprNes
                     r_A = (byte)int1;
                     break;
 
-                case 0x21: //AND (Indirect,X) 
-                    byte1 = (byte)(Mem_r(r_PC++) + r_X);
-                    ushort1 = (ushort)(NES_MEM[byte1++] | (NES_MEM[byte1] << 8));
+                case 0x21: //AND (Indirect,X)
+                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte1 = (byte)(byte3 + r_X);
+                    ushort1 = (ushort)(ZP_r(byte1) | (ZP_r((byte)(byte1 + 1)) << 8));
                     int1 = Mem_r(ushort1) & r_A;
                     if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
                     if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
@@ -331,12 +310,11 @@ namespace AprNes
 
                 case 0x31: //AND (Indirect),Y
                     byte1 = Mem_r(r_PC++);
-                    ushort1 = (ushort)(NES_MEM[byte1++] | (NES_MEM[byte1] << 8));
+                    ushort1 = (ushort)(ZP_r(byte1) | (ZP_r((byte)(byte1 + 1)) << 8));
                     ushort2 = (ushort)(ushort1 + r_Y);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
                         Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                        cpu_cycles++;
                     }
                     int1 = Mem_r(ushort2) & r_A;
                     if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
@@ -346,6 +324,7 @@ namespace AprNes
                 //--- AND END 
 
                 case 0x0A://ASL acc
+                    Mem_r(r_PC); // dummy read
                     if ((r_A & 0x80) > 0) flagC = 1; else flagC = 0;
                     r_A <<= 1;
                     if (r_A == 0) flagZ = 1; else flagZ = 0;
@@ -354,22 +333,24 @@ namespace AprNes
 
                 case 0x06://ASL zp
                     byte2 = Mem_r(r_PC++);
-                    byte1 = NES_MEM[byte2];
+                    byte1 = ZP_r(byte2);
+                    ZP_w(byte2, byte1); // dummy write
                     if ((byte1 & 0x80) > 0) flagC = 1; else flagC = 0;
                     byte1 <<= 1;
                     if (byte1 == 0) flagZ = 1; else flagZ = 0;
                     if ((byte1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    NES_MEM[byte2] = byte1;
+                    ZP_w(byte2, byte1);
                     break;
 
                 case 0x16://ASL zp,x
-                    byte2 = (byte)(Mem_r(r_PC++) + r_X);
-                    byte1 = NES_MEM[byte2];
+                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
+                    byte1 = ZP_r(byte2);
+                    ZP_w(byte2, byte1); // dummy write
                     if ((byte1 & 0x80) > 0) flagC = 1; else flagC = 0;
                     byte1 <<= 1;
                     if (byte1 == 0) flagZ = 1; else flagZ = 0;
                     if ((byte1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    NES_MEM[byte2] = byte1;
+                    ZP_w(byte2, byte1);
                     break;
 
                 case 0x0E://ASL abs
@@ -396,92 +377,41 @@ namespace AprNes
                     Mem_w(ushort2, byte1);
                     break;
 
-                case 0x90://BCC branch ,cycle fixed 2017.01.18
+                case 0x90://BCC
                     byte1 = Mem_r(r_PC++);
                     if (flagC == 0)
                     {
-                        cpu_cycles += 1;
-                        byte2 = (byte)(r_PC + byte1);
-                        byte3 = (byte)(r_PC >> 8);
-                        if (byte1 >= 0x80)
-                        {
-                            if (byte2 >= byte1)
-                            {
-                                cpu_cycles += 1;
-                                byte3--;
-                            }
-                        }
-                        else
-                        {
-                            if (byte2 < byte1)
-                            {
-                                cpu_cycles += 1;
-                                byte3++;
-                            }
-
-                        }
-                        r_PC = (ushort)(byte2 | (byte3 << 8));
+                        tick(); // taken
+                        ushort1 = r_PC;
+                        r_PC = (ushort)(r_PC + (sbyte)byte1);
+                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) tick(); // page cross
                     }
                     break;
 
-                case 0xB0://BCS branch ,cycle fixed 2017.01.18
+                case 0xB0://BCS
                     byte1 = Mem_r(r_PC++);
                     if (flagC == 1)
                     {
-                        cpu_cycles += 1;
-                        byte2 = (byte)(r_PC + byte1);
-                        byte3 = (byte)(r_PC >> 8);
-                        if (byte1 >= 0x80)
-                        {
-                            if (byte2 >= byte1)
-                            {
-                                cpu_cycles += 1;
-                                byte3--;
-                            }
-                        }
-                        else
-                        {
-                            if (byte2 < byte1)
-                            {
-                                cpu_cycles += 1;
-                                byte3++;
-                            }
-
-                        }
-                        r_PC = (ushort)(byte2 | (byte3 << 8));
+                        tick(); // taken
+                        ushort1 = r_PC;
+                        r_PC = (ushort)(r_PC + (sbyte)byte1);
+                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) tick(); // page cross
                     }
                     break;
 
-                case 0xF0://BEQ branch ,cycle fixed 2017.01.18
+                case 0xF0://BEQ
                     byte1 = Mem_r(r_PC++);
                     if (flagZ == 1)
                     {
-                        cpu_cycles += 1;
-                        byte2 = (byte)(r_PC + byte1);
-                        byte3 = (byte)(r_PC >> 8);
-                        if (byte1 >= 0x80)
-                        {
-                            if (byte2 >= byte1)
-                            {
-                                cpu_cycles += 1;
-                                byte3--;
-                            }
-                        }
-                        else
-                        {
-                            if (byte2 < byte1)
-                            {
-                                cpu_cycles += 1;
-                                byte3++;
-                            }
-
-                        }
-                        r_PC = (ushort)(byte2 | (byte3 << 8));
+                        tick(); // taken
+                        ushort1 = r_PC;
+                        r_PC = (ushort)(r_PC + (sbyte)byte1);
+                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) tick(); // page cross
                     }
                     break;
 
                 case 0x24://BIT zp fix
-                    byte1 = NES_MEM[Mem_r(r_PC++)];
+                    byte1 = ZP_r(Mem_r(r_PC++));
                     if ((byte1 & 0x80) > 0) flagN = 1; else flagN = 0;
                     if ((byte1 & 0x40) > 0) flagV = 1; else flagV = 0;
                     if ((byte1 & r_A) == 0) flagZ = 1; else flagZ = 0;
@@ -495,161 +425,80 @@ namespace AprNes
                     if ((byte1 & r_A) == 0) flagZ = 1; else flagZ = 0;
                     break;
 
-                case 0x30://BMI branch ,cycle fixed 2017.01.18
+                case 0x30://BMI
                     byte1 = Mem_r(r_PC++);
                     if (flagN == 1)
                     {
-                        cpu_cycles += 1;
-                        byte2 = (byte)(r_PC + byte1);
-                        byte3 = (byte)(r_PC >> 8);
-                        if (byte1 >= 0x80)
-                        {
-                            if (byte2 >= byte1)
-                            {
-                                cpu_cycles += 1;
-                                byte3--;
-                            }
-                        }
-                        else
-                        {
-                            if (byte2 < byte1)
-                            {
-                                cpu_cycles += 1;
-                                byte3++;
-                            }
-
-                        }
-                        r_PC = (ushort)(byte2 | (byte3 << 8));
+                        tick(); // taken
+                        ushort1 = r_PC;
+                        r_PC = (ushort)(r_PC + (sbyte)byte1);
+                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) tick(); // page cross
                     }
                     break;
 
-                case 0xD0://BNE branch ,cycle fixed 2017.01.18
+                case 0xD0://BNE
                     byte1 = Mem_r(r_PC++);
                     if (flagZ == 0)
                     {
-                        cpu_cycles += 1;
-                        byte2 = (byte)(r_PC + byte1);
-                        byte3 = (byte)(r_PC >> 8);
-                        if (byte1 >= 0x80)
-                        {
-                            if (byte2 >= byte1)
-                            {
-                                cpu_cycles += 1;
-                                byte3--;
-                            }
-                        }
-                        else
-                        {
-                            if (byte2 < byte1)
-                            {
-                                cpu_cycles += 1;
-                                byte3++;
-                            }
-
-                        }
-                        r_PC = (ushort)(byte2 | (byte3 << 8));
+                        tick(); // taken
+                        ushort1 = r_PC;
+                        r_PC = (ushort)(r_PC + (sbyte)byte1);
+                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) tick(); // page cross
                     }
                     break;
 
-                case 0x10://BPL branch ,cycle fixed 2017.01.18
+                case 0x10://BPL
                     byte1 = Mem_r(r_PC++);
                     if (flagN == 0)
                     {
-                        cpu_cycles += 1;
-                        byte2 = (byte)(r_PC + byte1);
-                        byte3 = (byte)(r_PC >> 8);
-                        if (byte1 >= 0x80)
-                        {
-                            if (byte2 >= byte1)
-                            {
-                                cpu_cycles += 1;
-                                byte3--;
-                            }
-                        }
-                        else
-                        {
-                            if (byte2 < byte1)
-                            {
-                                cpu_cycles += 1;
-                                byte3++;
-                            }
-                        }
-                        r_PC = (ushort)(byte2 | (byte3 << 8));
+                        tick(); // taken
+                        ushort1 = r_PC;
+                        r_PC = (ushort)(r_PC + (sbyte)byte1);
+                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) tick(); // page cross
                     }
                     break;
 
-                case 00://BRK
-                    Mem_r(r_PC);//dummy read fixed 2017.01.19
+                case 00://BRK — 7 cycles with NMI hijacking support
+                    Mem_r(r_PC);//dummy read (padding byte)
                     r_PC++;
-                    Mem_w((ushort)(r_SP-- | 0x100), (byte)(r_PC >> 8));
-                    Mem_w((ushort)(r_SP-- | 0x100), (byte)r_PC); //fixed 2017.01.20
-                    Mem_w((ushort)(r_SP-- | 0x100), (byte)(GetFlag() | 0x30));
+                    Mem_w((ushort)(r_SP-- | 0x100), (byte)(r_PC >> 8)); // push PCH
+                    Mem_w((ushort)(r_SP-- | 0x100), (byte)r_PC); // push PCL
+                    Mem_w((ushort)(r_SP-- | 0x100), (byte)(GetFlag() | 0x30)); // push P with B
                     flagI = 1;
-                    r_PC = (ushort)(Mem_r(0xfffe) | (Mem_r((ushort)(0xffff)) << 8));
+                    // NMI hijacking: if NMI asserted during BRK, use NMI vector
+                    ushort brk_vector = (nmi_pending) ? (ushort)0xfffa : (ushort)0xfffe;
+                    if (nmi_pending) nmi_pending = false;
+                    r_PC = (ushort)(Mem_r(brk_vector) | (Mem_r((ushort)(brk_vector + 1)) << 8));
                     break;
 
-                case 0x50://BVC branch ,cycle fixed 2017.01.18
+                case 0x50://BVC
                     byte1 = Mem_r(r_PC++);
                     if (flagV == 0)
                     {
-                        cpu_cycles += 1;
-                        byte2 = (byte)(r_PC + byte1);
-                        byte3 = (byte)(r_PC >> 8);
-                        if (byte1 >= 0x80)
-                        {
-                            if (byte2 >= byte1)
-                            {
-                                cpu_cycles += 1;
-                                byte3--;
-                            }
-                        }
-                        else
-                        {
-                            if (byte2 < byte1)
-                            {
-                                cpu_cycles += 1;
-                                byte3++;
-                            }
-
-                        }
-                        r_PC = (ushort)(byte2 | (byte3 << 8));
+                        tick(); // taken
+                        ushort1 = r_PC;
+                        r_PC = (ushort)(r_PC + (sbyte)byte1);
+                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) tick(); // page cross
                     }
                     break;
 
-                case 0x70://BVS branch ,cycle fixed 2017.01.18
+                case 0x70://BVS
                     byte1 = Mem_r(r_PC++);
                     if (flagV == 1)
                     {
-                        cpu_cycles += 1;
-                        byte2 = (byte)(r_PC + byte1);
-                        byte3 = (byte)(r_PC >> 8);
-                        if (byte1 >= 0x80)
-                        {
-                            if (byte2 >= byte1)
-                            {
-                                cpu_cycles += 1;
-                                byte3--;
-                            }
-                        }
-                        else
-                        {
-                            if (byte2 < byte1)
-                            {
-                                cpu_cycles += 1;
-                                byte3++;
-                            }
-
-                        }
-                        r_PC = (ushort)(byte2 | (byte3 << 8));
+                        tick(); // taken
+                        ushort1 = r_PC;
+                        r_PC = (ushort)(r_PC + (sbyte)byte1);
+                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) tick(); // page cross
                     }
                     break;
 
-                case 0x18: flagC = 0; break;//CLC
-                case 0xD8: flagD = 0; break;//CLD
+                case 0x18: Mem_r(r_PC); flagC = 0; break;//CLC
+                case 0xD8: Mem_r(r_PC); flagD = 0; break;//CLD
 
                 case 0x58: Mem_r(r_PC); flagI = 0; break;//CLI
 
-                case 0xB8: flagV = 0; break;//CLV
+                case 0xB8: Mem_r(r_PC); flagV = 0; break;//CLV
 
                 //--- CMP BEGIN
                 case 0xC9: //CMP  Immediate  
@@ -661,15 +510,15 @@ namespace AprNes
                     break;
 
                 case 0xC5: //CMP  Zero Page  
-                    byte1 = NES_MEM[Mem_r(r_PC++)];
+                    byte1 = ZP_r(Mem_r(r_PC++));
                     int1 = r_A - byte1;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
                     if (r_A >= byte1) flagC = 1; else flagC = 0;
                     if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
                     break;
 
-                case 0xD5://CMP Zero Page,X 
-                    byte1 = NES_MEM[(byte)(Mem_r(r_PC++) + r_X)];
+                case 0xD5://CMP Zero Page,X
+                    byte2 = Mem_r(r_PC++); ZP_r(byte2); byte1 = ZP_r((byte)(byte2 + r_X));
                     int1 = r_A - byte1;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
                     if (r_A >= byte1) flagC = 1; else flagC = 0;
@@ -690,7 +539,6 @@ namespace AprNes
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
                         Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                        cpu_cycles++;
                     }
                     byte1 = Mem_r(ushort2);
                     int1 = r_A - byte1;
@@ -705,7 +553,6 @@ namespace AprNes
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
                         Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                        cpu_cycles++;
                     }
                     byte1 = Mem_r(ushort2);
                     int1 = r_A - byte1;
@@ -715,8 +562,8 @@ namespace AprNes
                     break;
 
                 case 0xC1: //CMP (Indirect,X)  fix
-                    byte2 = (byte)(Mem_r(r_PC++) + r_X);
-                    ushort1 = (ushort)(NES_MEM[byte2++] | (NES_MEM[byte2] << 8));
+                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
+                    ushort1 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
                     byte1 = Mem_r(ushort1);
                     int1 = r_A - byte1;
                     if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
@@ -726,12 +573,11 @@ namespace AprNes
 
                 case 0xD1: //CMP (Indirect),Y
                     byte2 = Mem_r(r_PC++);
-                    ushort1 = (ushort)(NES_MEM[byte2++] | (NES_MEM[byte2] << 8));
+                    ushort1 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
                     ushort2 = (ushort)(ushort1 + r_Y);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
                         Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                        cpu_cycles++;
                     }
                     byte1 = Mem_r(ushort2);
                     int1 = r_A - byte1;
@@ -750,7 +596,7 @@ namespace AprNes
                     break;
 
                 case 0xE4: //CPX  Zero Page  
-                    byte1 = NES_MEM[Mem_r(r_PC++)];
+                    byte1 = ZP_r(Mem_r(r_PC++));
                     int1 = r_X - byte1;// +(byte)flagC;
                     if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
                     if (r_X >= byte1) flagC = 1; else flagC = 0;
@@ -775,7 +621,7 @@ namespace AprNes
                     break;
 
                 case 0xC4: //CPY  Zero Page  
-                    byte1 = NES_MEM[Mem_r(r_PC++)];
+                    byte1 = ZP_r(Mem_r(r_PC++));
                     int1 = r_Y - byte1;// +(byte)flagC;
                     if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
                     if (r_Y >= byte1) flagC = 1; else flagC = 0;
@@ -793,16 +639,18 @@ namespace AprNes
 
                 case 0xC6://DEC zp
                     byte1 = Mem_r(r_PC++);
-                    byte2 = NES_MEM[byte1];
-                    NES_MEM[byte1] = --byte2;
+                    byte2 = ZP_r(byte1);
+                    ZP_w(byte1, byte2); // dummy write
+                    ZP_w(byte1, --byte2);
                     if ((byte2 & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (byte2 == 0) flagZ = 1; else flagZ = 0;
                     break;
 
                 case 0xD6://DEC zp,x
-                    byte1 = (byte)(Mem_r(r_PC++) + r_X);
-                    byte2 = NES_MEM[byte1];
-                    NES_MEM[byte1] = --byte2;
+                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte1 = (byte)(byte3 + r_X);
+                    byte2 = ZP_r(byte1);
+                    ZP_w(byte1, byte2); // dummy write
+                    ZP_w(byte1, --byte2);
                     if ((byte2 & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (byte2 == 0) flagZ = 1; else flagZ = 0;
                     break;
@@ -828,11 +676,13 @@ namespace AprNes
                     break;
 
                 case 0xCA://DEX
+                    Mem_r(r_PC); // dummy read
                     if ((--r_X & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (r_X == 0) flagZ = 1; else flagZ = 0;
                     break;
 
                 case 0x88://DEY //fix
+                    Mem_r(r_PC); // dummy read
                     if ((--r_Y & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (r_Y == 0) flagZ = 1; else flagZ = 0;
                     break;
@@ -846,14 +696,14 @@ namespace AprNes
                     break;
 
                 case 0x45: //EOR  Zero Page  
-                    int1 = NES_MEM[Mem_r(r_PC++)] ^ r_A;
+                    int1 = ZP_r(Mem_r(r_PC++)) ^ r_A;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
                     if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
                     r_A = (byte)int1;
                     break;
 
-                case 0x55://EOR Zero Page,X 
-                    int1 = NES_MEM[(byte)(Mem_r(r_PC++) + r_X)] ^ r_A;
+                case 0x55://EOR Zero Page,X
+                    byte2 = Mem_r(r_PC++); ZP_r(byte2); int1 = ZP_r((byte)(byte2 + r_X)) ^ r_A;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
                     if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
                     r_A = (byte)int1;
@@ -872,7 +722,6 @@ namespace AprNes
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
                         Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                        cpu_cycles++;
                     }
                     int1 = Mem_r(ushort2) ^ r_A;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
@@ -886,7 +735,6 @@ namespace AprNes
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
                         Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                        cpu_cycles++;
                     }
                     int1 = Mem_r(ushort2) ^ r_A;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
@@ -894,9 +742,9 @@ namespace AprNes
                     r_A = (byte)int1;
                     break;
 
-                case 0x41: //EOR (Indirect,X) 
-                    byte1 = (byte)(Mem_r(r_PC++) + r_X);
-                    int1 = Mem_r((ushort)((NES_MEM[byte1++] | (NES_MEM[byte1] << 8)))) ^ r_A;
+                case 0x41: //EOR (Indirect,X)
+                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte1 = (byte)(byte3 + r_X);
+                    int1 = Mem_r((ushort)(ZP_r(byte1) | (ZP_r((byte)(byte1 + 1)) << 8))) ^ r_A;
                     if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
                     if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
                     r_A = (byte)int1;
@@ -904,12 +752,11 @@ namespace AprNes
 
                 case 0x51: //EOR (Indirect),Y
                     byte1 = Mem_r(r_PC++);
-                    ushort1 = (ushort)(NES_MEM[byte1++] | (NES_MEM[byte1] << 8));
+                    ushort1 = (ushort)(ZP_r(byte1) | (ZP_r((byte)(byte1 + 1)) << 8));
                     ushort2 = (ushort)(ushort1 + r_Y);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
                         Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                        cpu_cycles++;
                     }
                     int1 = Mem_r(ushort2) ^ r_A;
                     if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
@@ -920,16 +767,18 @@ namespace AprNes
 
                 case 0xE6://INC zp
                     byte1 = Mem_r(r_PC++);
-                    byte2 = NES_MEM[byte1];
-                    NES_MEM[byte1] = ++byte2;
+                    byte2 = ZP_r(byte1);
+                    ZP_w(byte1, byte2); // dummy write
+                    ZP_w(byte1, ++byte2);
                     if ((byte2 & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (byte2 == 0) flagZ = 1; else flagZ = 0;
                     break;
 
                 case 0xF6://INC zp,x
-                    byte1 = (byte)(Mem_r(r_PC++) + r_X);
-                    byte2 = NES_MEM[byte1];
-                    NES_MEM[byte1] = ++byte2;
+                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte1 = (byte)(byte3 + r_X);
+                    byte2 = ZP_r(byte1);
+                    ZP_w(byte1, byte2); // dummy write
+                    ZP_w(byte1, ++byte2);
                     if ((byte2 & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (byte2 == 0) flagZ = 1; else flagZ = 0;
                     break;
@@ -955,11 +804,13 @@ namespace AprNes
                     break;
 
                 case 0xE8://INX
+                    Mem_r(r_PC); // dummy read
                     if ((++r_X & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (r_X == 0) flagZ = 1; else flagZ = 0;
                     break;
 
                 case 0xC8://INY
+                    Mem_r(r_PC); // dummy read
                     if ((++r_Y & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (r_Y == 0) flagZ = 1; else flagZ = 0;
                     break;
@@ -974,11 +825,12 @@ namespace AprNes
                     r_PC = (ushort)(Mem_r((ushort)((byte1++) | (byte2 << 8))) | (Mem_r((ushort)(byte1 | (byte2 << 8))) << 8));
                     break;
 
-                case 0x20://JSR abs
-                    ushort1 = (ushort)(r_PC + 1);
-                    Mem_w((ushort)(r_SP-- | 0x100), (byte)(ushort1 >> 8));
-                    Mem_w((ushort)(r_SP-- | 0x100), (byte)ushort1);
-                    r_PC = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
+                case 0x20://JSR abs — 6 cycles: fetch low, read(S), push PCH, push PCL, fetch high
+                    byte1 = Mem_r(r_PC++); // cycle 2: fetch addr low
+                    Mem_r((ushort)(r_SP | 0x100)); // cycle 3: dummy read stack
+                    Mem_w((ushort)(r_SP-- | 0x100), (byte)(r_PC >> 8)); // cycle 4: push PCH
+                    Mem_w((ushort)(r_SP-- | 0x100), (byte)r_PC); // cycle 5: push PCL
+                    r_PC = (ushort)(byte1 | (Mem_r(r_PC) << 8)); // cycle 6: fetch addr high
                     break;
 
                 case 0xA9://LDA imm
@@ -988,13 +840,13 @@ namespace AprNes
                     break;
 
                 case 0xA5://LDA zp
-                    r_A = NES_MEM[Mem_r(r_PC++)];
+                    r_A = ZP_r(Mem_r(r_PC++));
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (r_A == 0) flagZ = 1; else flagZ = 0;
                     break;
 
                 case 0xB5://LDA zp,x
-                    r_A = NES_MEM[(byte)(Mem_r(r_PC++) + r_X)];
+                    byte2 = Mem_r(r_PC++); ZP_r(byte2); r_A = ZP_r((byte)(byte2 + r_X));
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (r_A == 0) flagZ = 1; else flagZ = 0;
                     break
@@ -1016,7 +868,6 @@ namespace AprNes
                     if (byte1 < r_X) r_A = Mem_r((ushort)(byte1 | ((++byte2) << 8)));//dummy read fiexed 2017.01.17
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((ushort1 & 0xff00) != ((ushort1 + r_X) & 0xff00)) cpu_cycles++;
                     break;
 
                 case 0xB9://LDA abs,y
@@ -1025,7 +876,6 @@ namespace AprNes
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
                         Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                        cpu_cycles++;
                     }
                     r_A = Mem_r(ushort2);
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
@@ -1033,16 +883,16 @@ namespace AprNes
                     break;
 
                 case 0xA1://LDA (indirect,x)
-                    byte1 = (byte)(Mem_r(r_PC++) + r_X);
-                    r_A = Mem_r((ushort)(NES_MEM[byte1++] | (NES_MEM[byte1] << 8)));
+                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte1 = (byte)(byte3 + r_X);
+                    r_A = Mem_r((ushort)(ZP_r(byte1) | (ZP_r((byte)(byte1 + 1)) << 8)));
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (r_A == 0) flagZ = 1; else flagZ = 0;
                     break;
 
                 case 0xB1://LDA (indirect),y
                     byte3 = Mem_r(r_PC++);
-                    byte1 = NES_MEM[byte3++];
-                    byte2 = NES_MEM[byte3];
+                    byte1 = ZP_r(byte3);
+                    byte2 = ZP_r((byte)(byte3 + 1));
                     ushort1 = (ushort)(byte1 | (byte2 << 8));
                     byte1 += r_Y;
                     r_A = Mem_r((ushort)(byte1 | (byte2 << 8)));
@@ -1051,7 +901,6 @@ namespace AprNes
                                                                                      //
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((ushort1 & 0xff00) != ((ushort1 + r_Y) & 0xff00)) cpu_cycles++;
                     break;
 
                 case 0xA2://LDX imm
@@ -1061,13 +910,13 @@ namespace AprNes
                     break;
 
                 case 0xA6://LDX zp
-                    r_X = NES_MEM[Mem_r(r_PC++)];
+                    r_X = ZP_r(Mem_r(r_PC++));
                     if ((r_X & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (r_X == 0) flagZ = 1; else flagZ = 0;
                     break;
 
                 case 0xB6://LDX zp,y
-                    r_X = NES_MEM[(byte)(Mem_r(r_PC++) + r_Y)];
+                    byte2 = Mem_r(r_PC++); ZP_r(byte2); r_X = ZP_r((byte)(byte2 + r_Y));
                     if ((r_X & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (r_X == 0) flagZ = 1; else flagZ = 0;
                     break;
@@ -1084,7 +933,6 @@ namespace AprNes
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
                         Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                        cpu_cycles++;
                     }
                     r_X = Mem_r(ushort2);
                     if ((r_X & 0x80) > 0) flagN = 1; else flagN = 0;
@@ -1098,13 +946,13 @@ namespace AprNes
                     break;
 
                 case 0xA4://LDY zp
-                    r_Y = NES_MEM[Mem_r(r_PC++)];
+                    r_Y = ZP_r(Mem_r(r_PC++));
                     if ((r_Y & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (r_Y == 0) flagZ = 1; else flagZ = 0;
                     break;
 
                 case 0xB4://LDY zp,x
-                    r_Y = NES_MEM[(byte)(Mem_r(r_PC++) + r_X)];
+                    byte2 = Mem_r(r_PC++); ZP_r(byte2); r_Y = ZP_r((byte)(byte2 + r_X));
                     if ((r_Y & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (r_Y == 0) flagZ = 1; else flagZ = 0;
                     break;
@@ -1121,7 +969,6 @@ namespace AprNes
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
                         Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                        cpu_cycles++;
                     }
                     r_Y = Mem_r(ushort2);
                     if ((r_Y & 0x80) > 0) flagN = 1; else flagN = 0;
@@ -1130,6 +977,7 @@ namespace AprNes
 
                 //----- LSR begin
                 case 0x4A://LSR acc
+                    Mem_r(r_PC); // dummy read
                     if ((r_A & 0x01) > 0) flagC = 1; else flagC = 0;
                     r_A >>= 1;
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
@@ -1138,22 +986,24 @@ namespace AprNes
 
                 case 0x46://LSR zp fix
                     byte2 = Mem_r(r_PC++);
-                    byte1 = NES_MEM[byte2];
+                    byte1 = ZP_r(byte2);
+                    ZP_w(byte2, byte1); // dummy write
                     if ((byte1 & 1) > 0) flagC = 1; else flagC = 0;
                     byte1 >>= 1;
                     if ((byte1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
                     if ((byte1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    NES_MEM[byte2] = byte1;
+                    ZP_w(byte2, byte1);
                     break;
 
                 case 0x56://LSR zp,x
-                    byte2 = (byte)(Mem_r(r_PC++) + r_X);
-                    byte1 = NES_MEM[byte2];
+                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
+                    byte1 = ZP_r(byte2);
+                    ZP_w(byte2, byte1); // dummy write
                     if ((byte1 & 1) > 0) flagC = 1; else flagC = 0;
                     byte1 >>= 1;
                     if ((byte1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
                     if ((byte1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    NES_MEM[byte2] = byte1;
+                    ZP_w(byte2, byte1);
                     break;
 
                 case 0x4E://LSR abs fix
@@ -1181,7 +1031,7 @@ namespace AprNes
                     break;
                 //---- LSR END
 
-                case 0xEA: break;//NOP
+                case 0xEA: Mem_r(r_PC); break;//NOP
 
                 //--- ORA BEGIN
                 case 0x09: //ORA  Immediate  
@@ -1192,14 +1042,14 @@ namespace AprNes
                     break;
 
                 case 0x05: //ORA  Zero Page  
-                    int1 = NES_MEM[Mem_r(r_PC++)] | r_A;
+                    int1 = ZP_r(Mem_r(r_PC++)) | r_A;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
                     if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
                     r_A = (byte)int1;
                     break;
 
-                case 0x15://ORA Zero Page,X 
-                    int1 = NES_MEM[(byte)(Mem_r(r_PC++) + r_X)] | r_A;
+                case 0x15://ORA Zero Page,X
+                    byte2 = Mem_r(r_PC++); ZP_r(byte2); int1 = ZP_r((byte)(byte2 + r_X)) | r_A;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
                     if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
                     r_A = (byte)int1;
@@ -1221,21 +1071,11 @@ namespace AprNes
                     {
                         byte2++;
                         ushort2 = Mem_r((ushort)(byte1 | ((byte2) << 8)));
-                        cpu_cycles++;
                     }
                     int1 = ushort2 | r_A;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
                     if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
                     r_A = (byte)int1;
-
-                    /*
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort2 = (ushort)(ushort1 + r_X);
-                    int1 = Mem_r(ushort2) | r_A;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    if ((ushort1 & 0xff00) != (ushort2 & 0xff00)) cpu_cycles++;*/
                     break;
 
                 case 0x19: //ORA  Absolute,Y
@@ -1247,27 +1087,16 @@ namespace AprNes
                     {
                         byte2++;
                         ushort2 = Mem_r((ushort)(byte1 | ((byte2) << 8)));
-                        cpu_cycles++;
                     }
                     int1 = ushort2 | r_A;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
                     if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
                     r_A = (byte)int1;
-
-
-                    /*
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort2 = (ushort)(ushort1 + r_Y);
-                    int1 = Mem_r(ushort2) | r_A;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    if ((ushort1 & 0xff00) != (ushort2 & 0xff00)) cpu_cycles++;*/
                     break;
 
-                case 0x01: //ORA (Indirect,X) 
-                    byte1 = (byte)(Mem_r(r_PC++) + r_X);
-                    int1 = Mem_r((ushort)(NES_MEM[byte1++] | (NES_MEM[byte1] << 8))) | r_A;
+                case 0x01: //ORA (Indirect,X)
+                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte1 = (byte)(byte3 + r_X);
+                    int1 = Mem_r((ushort)(ZP_r(byte1) | (ZP_r((byte)(byte1 + 1)) << 8))) | r_A;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
                     if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
                     r_A = (byte)int1;
@@ -1275,12 +1104,11 @@ namespace AprNes
 
                 case 0x11: //ORA (Indirect),Y
                     byte1 = Mem_r(r_PC++);
-                    ushort1 = (ushort)(NES_MEM[byte1++] | (NES_MEM[byte1] << 8));
+                    ushort1 = (ushort)(ZP_r(byte1) | (ZP_r((byte)(byte1 + 1)) << 8));
                     ushort2 = (ushort)(ushort1 + r_Y);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
                         Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                        cpu_cycles++;
                     }
                     int1 = Mem_r(ushort2) | r_A;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
@@ -1289,19 +1117,22 @@ namespace AprNes
                     break;
                 //--- ORA END    
 
-                case 0x48: Mem_w((ushort)(r_SP-- | 0x100), r_A); break;//PHA
-                case 0x08: Mem_w((ushort)(r_SP-- | 0x100), (byte)(GetFlag() | 0x30)); break;//PHP
+                case 0x48: Mem_r(r_PC); Mem_w((ushort)(r_SP-- | 0x100), r_A); break;//PHA
+                case 0x08: Mem_r(r_PC); Mem_w((ushort)(r_SP-- | 0x100), (byte)(GetFlag() | 0x30)); break;//PHP
 
                 case 0x68://PLA
+                    Mem_r(r_PC); // dummy read
+                    Mem_r((ushort)(r_SP | 0x100)); // dummy read stack
                     r_A = Mem_r((ushort)(++r_SP | 0x100));
                     if (r_A == 0) flagZ = 1; else flagZ = 0;
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
                     break;
 
-                case 0x28: SetFlag(Mem_r((ushort)(++r_SP | 0x100))); break;//PLP
+                case 0x28: Mem_r(r_PC); Mem_r((ushort)(r_SP | 0x100)); SetFlag(Mem_r((ushort)(++r_SP | 0x100))); break;//PLP
 
                 //----ROL begin
                 case 0x2A://ROL acc //fix
+                    Mem_r(r_PC); // dummy read
                     ushort1 = (ushort)(r_A << 1);
                     if (flagC == 1) ushort1 |= 0x1;
                     if ((r_A & 0x80) != 0) flagC = 1; else flagC = 0;
@@ -1312,24 +1143,26 @@ namespace AprNes
 
                 case 0x26://ROL zp //fix
                     byte2 = Mem_r(r_PC++);
-                    byte1 = NES_MEM[byte2];
+                    byte1 = ZP_r(byte2);
+                    ZP_w(byte2, byte1); // dummy write
                     ushort1 = (ushort)(byte1 << 1);
                     if (flagC == 1) ushort1 |= 0x1;
                     if ((byte1 & 0x80) != 0) flagC = 1; else flagC = 0;
                     if ((ushort1 & 0x80) > 0) flagN = 1; else flagN = 0;
                     if ((ushort1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    NES_MEM[byte2] = (byte)ushort1; //!!!!!
+                    ZP_w(byte2, (byte)ushort1);
                     break;
 
                 case 0x36://ROL zp,x
-                    byte2 = (byte)(Mem_r(r_PC++) + r_X);
-                    byte1 = NES_MEM[byte2];
+                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
+                    byte1 = ZP_r(byte2);
+                    ZP_w(byte2, byte1); // dummy write
                     ushort1 = (ushort)(byte1 << 1);
                     if (flagC == 1) ushort1 |= 0x1;
                     if ((byte1 & 0x80) != 0) flagC = 1; else flagC = 0;
                     if ((ushort1 & 0x80) > 0) flagN = 1; else flagN = 0;
                     if ((ushort1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    NES_MEM[byte2] = (byte)ushort1; //!!!!!
+                    ZP_w(byte2, (byte)ushort1);
                     break;
 
                 case 0x2E://ROL abs fix
@@ -1363,6 +1196,7 @@ namespace AprNes
 
                 //---- ROR begin
                 case 0x6A://ROR acc
+                    Mem_r(r_PC); // dummy read
                     ushort1 = r_A;
                     if (flagC == 1) ushort1 |= 0x100;
                     if ((ushort1 & 0x01) > 0) flagC = 1; else flagC = 0;
@@ -1374,26 +1208,28 @@ namespace AprNes
 
                 case 0x66://ROR zp
                     byte1 = Mem_r(r_PC++);
-                    ushort1 = NES_MEM[byte1];
+                    ushort1 = ZP_r(byte1);
+                    ZP_w(byte1, (byte)ushort1); // dummy write
                     if (flagC == 1) ushort1 |= 0x100;
                     if ((ushort1 & 0x01) > 0) flagC = 1; else flagC = 0;
                     ushort1 >>= 1;
                     if ((ushort1 & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (ushort1 == 0) flagZ = 1; else flagZ = 0;
                     ushort1 = (byte)ushort1;
-                    NES_MEM[byte1] = (byte)ushort1;
+                    ZP_w(byte1, (byte)ushort1);
                     break;
 
                 case 0x76://ROR zp,x
-                    byte1 = (byte)(Mem_r(r_PC++) + r_X);
-                    ushort1 = NES_MEM[byte1];
+                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte1 = (byte)(byte3 + r_X);
+                    ushort1 = ZP_r(byte1);
+                    ZP_w(byte1, (byte)ushort1); // dummy write
                     if (flagC == 1) ushort1 |= 0x100;
                     if ((ushort1 & 0x01) > 0) flagC = 1; else flagC = 0;
                     ushort1 >>= 1;
                     if ((ushort1 & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (ushort1 == 0) flagZ = 1; else flagZ = 0;
                     ushort1 = (byte)ushort1;
-                    NES_MEM[byte1] = (byte)ushort1;
+                    ZP_w(byte1, (byte)ushort1);
                     break;
 
                 case 0x6E://ROR abs
@@ -1426,17 +1262,17 @@ namespace AprNes
                 // ----ROR end
 
                 case 0x40://RTI
-                    Mem_r(r_PC);//dummy read fixed 2017.01.19
-
+                    Mem_r(r_PC);//dummy read
+                    Mem_r((ushort)(r_SP | 0x100)); // dummy read stack (pre-increment S)
                     SetFlag(Mem_r((ushort)(++r_SP | 0x100)));
                     r_PC = (ushort)(Mem_r((ushort)(++r_SP | 0x100)) | (Mem_r((ushort)(++r_SP | 0x100)) << 8));
                     break;
 
                 case 0x60://RTS
-
-                    Mem_r(r_PC);//dummy read fixed 2017.01.19
-
+                    Mem_r(r_PC);//dummy read
+                    Mem_r((ushort)(r_SP | 0x100)); // dummy read stack (pre-increment S)
                     r_PC = (ushort)((Mem_r((ushort)(++r_SP | 0x100)) | (Mem_r((ushort)(++r_SP | 0x100)) << 8)) + 1);
+                    tick(); // cycle 6: increment PC
                     break;
 
                 //--- SBC BEGIN
@@ -1451,7 +1287,7 @@ namespace AprNes
                     break;
 
                 case 0xE5: //SBC  Zero Page  
-                    byte1 = (byte)(NES_MEM[Mem_r(r_PC++)] ^ 0xFF);
+                    byte1 = (byte)(ZP_r(Mem_r(r_PC++)) ^ 0xFF);
                     int1 = r_A + byte1 + flagC;
                     if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
                     if (int1 > 0xff) flagC = 1; else flagC = 0;
@@ -1460,8 +1296,8 @@ namespace AprNes
                     r_A = (byte)int1;
                     break;
 
-                case 0xF5://SBC Zero Page,X 
-                    byte1 = (byte)(NES_MEM[(byte)(Mem_r(r_PC++) + r_X)] ^ 0xFF);
+                case 0xF5://SBC Zero Page,X
+                    byte2 = Mem_r(r_PC++); ZP_r(byte2); byte1 = (byte)(ZP_r((byte)(byte2 + r_X)) ^ 0xFF);
                     int1 = r_A + byte1 + flagC;
                     if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
                     if (int1 > 0xff) flagC = 1; else flagC = 0;
@@ -1486,7 +1322,6 @@ namespace AprNes
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
                         Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                        cpu_cycles++;
                     }
                     byte1 = (byte)(Mem_r(ushort2) ^ 0xFF);
                     int1 = r_A + byte1 + flagC;
@@ -1503,7 +1338,6 @@ namespace AprNes
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
                         Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                        cpu_cycles++;
                     }
                     byte1 = (byte)(Mem_r(ushort2) ^ 0xFF);
                     int1 = r_A + byte1 + flagC;
@@ -1514,9 +1348,9 @@ namespace AprNes
                     r_A = (byte)int1;
                     break;
 
-                case 0xE1: //SBC (Indirect,X) 
-                    byte2 = (byte)(Mem_r(r_PC++) + r_X);
-                    byte1 = (byte)(Mem_r((ushort)(NES_MEM[byte2++] | (NES_MEM[byte2] << 8))) ^ 0xFF);
+                case 0xE1: //SBC (Indirect,X)
+                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
+                    byte1 = (byte)(Mem_r((ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8))) ^ 0xFF);
                     int1 = r_A + byte1 + flagC;
                     if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
                     if (int1 > 0xff) flagC = 1; else flagC = 0;
@@ -1527,12 +1361,11 @@ namespace AprNes
 
                 case 0xF1: //SBC (Indirect),Y
                     byte2 = Mem_r(r_PC++);
-                    ushort1 = (ushort)(NES_MEM[byte2++] | (NES_MEM[byte2] << 8));
+                    ushort1 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
                     ushort2 = (ushort)(ushort1 + r_Y);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
                         Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                        cpu_cycles++;
                     }
                     byte1 = (byte)(Mem_r(ushort2) ^ 0xFF);
                     int1 = r_A + byte1 + flagC;
@@ -1543,11 +1376,11 @@ namespace AprNes
                     r_A = (byte)int1;
                     break;
                 //--- SBC END
-                case 0x38: flagC = 1; break; //SEC
-                case 0xF8: flagD = 1; break; // SED NES 6502 此 FLAG 無作用
-                case 0x78: flagI = 1; break; //SEI
-                case 0x85: NES_MEM[Mem_r(r_PC++)] = r_A; break;//STA zp
-                case 0x95: NES_MEM[(byte)(Mem_r(r_PC++) + r_X)] = r_A; break;//STA zp,x
+                case 0x38: Mem_r(r_PC); flagC = 1; break; //SEC
+                case 0xF8: Mem_r(r_PC); flagD = 1; break; // SED NES 6502 此 FLAG 無作用
+                case 0x78: Mem_r(r_PC); flagI = 1; break; //SEI
+                case 0x85: ZP_w(Mem_r(r_PC++), r_A); break;//STA zp
+                case 0x95: byte2 = Mem_r(r_PC++); ZP_r(byte2); ZP_w((byte)(byte2 + r_X), r_A); break;//STA zp,x
                 case 0x8D: Mem_w((ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)), r_A); break;//STA abs
                 case 0x9D:  //STA abs,x
                     byte1 = Mem_r(r_PC++); //low
@@ -1568,14 +1401,14 @@ namespace AprNes
                     break;
 
                 case 0x81://STA (indirect,x)
-                    byte1 = (byte)(Mem_r(r_PC++) + r_X);
-                    Mem_w((ushort)(NES_MEM[byte1++] | (NES_MEM[byte1] << 8)), r_A);
+                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte1 = (byte)(byte3 + r_X);
+                    Mem_w((ushort)(ZP_r(byte1) | (ZP_r((byte)(byte1 + 1)) << 8)), r_A);
                     break;
 
                 case 0x91://STA (indirect),y
                     byte3 = Mem_r(r_PC++);
-                    byte1 = Mem_r(byte3++); //low
-                    byte2 = Mem_r(byte3); //heigh
+                    byte1 = ZP_r(byte3); //low
+                    byte2 = ZP_r((byte)(byte3 + 1)); //heigh
                     byte1 += r_Y;
                     Mem_r((ushort)(byte1 | ((byte2) << 8)));
 
@@ -1585,40 +1418,45 @@ namespace AprNes
                                                                  //
                     break;
 
-                case 0x86: NES_MEM[Mem_r(r_PC++)] = r_X; break; //STX zp
-                case 0x96: NES_MEM[(byte)(Mem_r(r_PC++) + r_Y)] = r_X; break; //STX zp,y
+                case 0x86: ZP_w(Mem_r(r_PC++), r_X); break; //STX zp
+                case 0x96: byte2 = Mem_r(r_PC++); ZP_r(byte2); ZP_w((byte)(byte2 + r_Y), r_X); break; //STX zp,y
                 case 0x8E: Mem_w((ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)), r_X); break; //STX abs //fixed 1/3
-                case 0x84: NES_MEM[Mem_r(r_PC++)] = r_Y; break;//STY  zp
-                case 0x94: NES_MEM[(byte)(Mem_r(r_PC++) + r_X)] = r_Y; break;//STY zp,x
+                case 0x84: ZP_w(Mem_r(r_PC++), r_Y); break;//STY  zp
+                case 0x94: byte2 = Mem_r(r_PC++); ZP_r(byte2); ZP_w((byte)(byte2 + r_X), r_Y); break;//STY zp,x
                 case 0x8C: Mem_w((ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)), r_Y); break;//STY abs 
 
                 case 0xAA: //TAX
+                    Mem_r(r_PC); // dummy read
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (r_A == 0) flagZ = 1; else flagZ = 0;
                     r_X = r_A;
                     break;
 
                 case 0xA8://TAY
+                    Mem_r(r_PC); // dummy read
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (r_A == 0) flagZ = 1; else flagZ = 0;
                     r_Y = r_A;
                     break;
 
                 case 0xBA://TSX
+                    Mem_r(r_PC); // dummy read
                     if ((r_SP & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (r_SP == 0) flagZ = 1; else flagZ = 0;
                     r_X = r_SP;
                     break;
 
                 case 0x8A://TXA
+                    Mem_r(r_PC); // dummy read
                     if ((r_X & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (r_X == 0) flagZ = 1; else flagZ = 0;
                     r_A = r_X;
                     break;
 
-                case 0x9A: r_SP = r_X; break; //TXS
+                case 0x9A: Mem_r(r_PC); r_SP = r_X; break; //TXS
 
                 case 0x98: //TYA
+                    Mem_r(r_PC); // dummy read
                     if ((r_Y & 0x80) > 0) flagN = 1; else flagN = 0;
                     if (r_Y == 0) flagZ = 1; else flagZ = 0;
                     r_A = r_Y;
@@ -1635,23 +1473,28 @@ namespace AprNes
                 case 0x7A:
                 case 0xDA:
                 case 0xFA:
+                    Mem_r(r_PC); // dummy read
                     break;
 
-                case 0x80:
+                case 0x80: // NOP imm
                 case 0x82:
                 case 0x89:
                 case 0xC2:
                 case 0xE2:
-                case 0x04:
+                    Mem_r(r_PC++); // read and discard operand
+                    break;
+                case 0x04: // NOP zp
                 case 0x44:
                 case 0x64:
-                case 0x14:
+                    ZP_r(Mem_r(r_PC++)); // fetch addr + read zp
+                    break;
+                case 0x14: // NOP zp,x
                 case 0x34:
                 case 0x54:
                 case 0xD4:
                 case 0xF4:
                 case 0x74:
-                    r_PC += 1;
+                    byte2 = Mem_r(r_PC++); ZP_r(byte2); ZP_r((byte)(byte2 + r_X)); // fetch addr + dummy + read indexed
                     break;
 
                 case 0x0C: // NOP abs (unofficial)
@@ -1665,7 +1508,6 @@ namespace AprNes
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
                         Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF))); // dummy read wrong page
-                        cpu_cycles++;
                     }
                     Mem_r(ushort2); // read and discard
                     break;
@@ -1687,6 +1529,12 @@ namespace AprNes
                     flagN = flagC;
                     break;
 
+                case 0x8B: //XAA/ANE #imm (unstable)
+                    r_A = (byte)((r_A | 0xFF) & r_X & Mem_r(r_PC++));
+                    if (r_A == 0) flagZ = 1; else flagZ = 0;
+                    if ((r_A & 0x80) != 0) flagN = 1; else flagN = 0;
+                    break;
+
                 case 0x4B: //ALR
                     r_A &= Mem_r(r_PC++);
                     if ((r_A & 0x1) != 0) flagC = 1; else flagC = 0;
@@ -1706,8 +1554,8 @@ namespace AprNes
                     break;
 
                 case 0x03: //SLO (  ASL M THEN (M "OR" A) -> A,M  )
-                    byte2 = (byte)(Mem_r(r_PC++) + r_X);
-                    ushort1 = (ushort)(NES_MEM[byte2++] | (NES_MEM[byte2] << 8));
+                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
+                    ushort1 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
                     byte1 = Mem_r(ushort1);
 
                     Mem_w(ushort1, byte1);//dummy write fixed
@@ -1722,18 +1570,19 @@ namespace AprNes
 
                 case 0x07: //SLO (  ASL M THEN (M "OR" A) -> A,M  )
                     byte2 = Mem_r(r_PC++);
-                    byte1 = NES_MEM[byte2];
+                    byte1 = ZP_r(byte2);
+                    ZP_w(byte2, byte1); // dummy write
                     if ((byte1 & 0x80) > 0) flagC = 1; else flagC = 0;
                     byte1 <<= 1;
-                    NES_MEM[byte2] = byte1;
+                    ZP_w(byte2, byte1);
                     r_A |= byte1;
                     if (r_A == 0) flagZ = 1; else flagZ = 0;
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
                     break;
 
-                case 0x13: //SLO (  ASL M THEN (M "OR" A) -> A,M  )
+                case 0x13: //SLO (ind),Y
                     byte2 = Mem_r(r_PC++);
-                    ushort2 = (ushort)(NES_MEM[byte2++] | (NES_MEM[byte2] << 8));
+                    ushort2 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
                     ushort1 = (ushort)(ushort2 + r_Y);
                     Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte1 = Mem_r(ushort1);
@@ -1749,11 +1598,12 @@ namespace AprNes
                     break;
 
                 case 0x17: //SLO (  ASL M THEN (M "OR" A) -> A,M  )
-                    byte2 = (byte)(Mem_r(r_PC++) + r_X);
-                    byte1 = NES_MEM[byte2];
+                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
+                    byte1 = ZP_r(byte2);
+                    ZP_w(byte2, byte1); // dummy write
                     if ((byte1 & 0x80) > 0) flagC = 1; else flagC = 0;
                     byte1 <<= 1;
-                    NES_MEM[byte2] = byte1;
+                    ZP_w(byte2, byte1);
                     r_A |= byte1;
                     if (r_A == 0) flagZ = 1; else flagZ = 0;
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
@@ -1805,9 +1655,9 @@ namespace AprNes
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
                     break;
 
-                case 0x23: //RLA    ( ROL M  THEN (M "AND" A) -> A )   
-                    byte3 = (byte)(Mem_r(r_PC++) + r_X);
-                    ushort1 = (ushort)(NES_MEM[byte3++] | (NES_MEM[byte3] << 8));
+                case 0x23: //RLA    ( ROL M  THEN (M "AND" A) -> A )
+                    byte1 = Mem_r(r_PC++); ZP_r(byte1); byte3 = (byte)(byte1 + r_X);
+                    ushort1 = (ushort)(ZP_r(byte3) | (ZP_r((byte)(byte3 + 1)) << 8));
                     byte2 = Mem_r(ushort1);
 
                     Mem_w(ushort1, byte2);//dummy write fixed
@@ -1820,11 +1670,12 @@ namespace AprNes
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
                     break;
 
-                case 0x27: //RLA    ( ROL M  THEN (M "AND" A) -> A )  
+                case 0x27: //RLA    ( ROL M  THEN (M "AND" A) -> A )
                     byte3 = Mem_r(r_PC++);
-                    byte2 = NES_MEM[byte3];
+                    byte2 = ZP_r(byte3);
+                    ZP_w(byte3, byte2); // dummy write
                     byte1 = (byte)((byte2 << 1) | flagC);
-                    NES_MEM[byte3] = byte1;
+                    ZP_w(byte3, byte1);
                     if ((byte2 & 0x80) > 0) flagC = 1; else flagC = 0;
                     r_A &= byte1;
                     if (r_A == 0) flagZ = 1; else flagZ = 0;
@@ -1877,9 +1728,9 @@ namespace AprNes
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
                     break;
 
-                case 0x33: //RLA    ( ROL M  THEN (M "AND" A) -> A )
+                case 0x33: //RLA (ind),Y
                     byte3 = Mem_r(r_PC++);
-                    ushort2 = (ushort)(NES_MEM[byte3++] | (NES_MEM[byte3] << 8));
+                    ushort2 = (ushort)(ZP_r(byte3) | (ZP_r((byte)(byte3 + 1)) << 8));
                     ushort1 = (ushort)(ushort2 + r_Y);
                     Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte2 = Mem_r(ushort1);
@@ -1895,21 +1746,22 @@ namespace AprNes
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
                     break;
 
-                case 0x37: //RLA    ( ROL M  THEN (M "AND" A) -> A )   
-                    byte3 = (byte)(Mem_r(r_PC++) + r_X);
-                    byte2 = NES_MEM[byte3];
+                case 0x37: //RLA    ( ROL M  THEN (M "AND" A) -> A )
+                    byte1 = Mem_r(r_PC++); ZP_r(byte1); byte3 = (byte)(byte1 + r_X);
+                    byte2 = ZP_r(byte3);
+                    ZP_w(byte3, byte2); // dummy write
                     byte1 = (byte)(byte2 << 1);
                     byte1 |= (byte)(flagC);
-                    NES_MEM[byte3] = byte1;
+                    ZP_w(byte3, byte1);
                     if ((byte2 & 0x80) > 0) flagC = 1; else flagC = 0;
                     r_A &= byte1;
                     if (r_A == 0) flagZ = 1; else flagZ = 0;
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
                     break;
 
-                case 0x43://SRE (LSR M  THEN (M "EOR" A) -> A ) 
-                    byte2 = (byte)(Mem_r(r_PC++) + r_X);
-                    ushort1 = (ushort)(NES_MEM[byte2++] | (NES_MEM[byte2] << 8));
+                case 0x43://SRE (LSR M  THEN (M "EOR" A) -> A )
+                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
+                    ushort1 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
                     byte1 = Mem_r(ushort1);
 
                     Mem_w(ushort1, byte1);//dummy write fixed
@@ -1924,10 +1776,11 @@ namespace AprNes
 
                 case 0x47://SRE (LSR M  THEN (M "EOR" A) -> A )
                     byte2 = Mem_r(r_PC++);
-                    byte1 = NES_MEM[byte2];
+                    byte1 = ZP_r(byte2);
+                    ZP_w(byte2, byte1); // dummy write
                     if ((byte1 & 1) > 0) flagC = 1; else flagC = 0;
                     byte1 >>= 1;
-                    NES_MEM[byte2] = byte1;
+                    ZP_w(byte2, byte1);
                     r_A ^= byte1;
                     if (r_A == 0) flagZ = 1; else flagZ = 0;
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
@@ -1979,9 +1832,9 @@ namespace AprNes
                     if ((r_A & 0x80) != 0) flagN = 1; else flagN = 0;
                     break;
 
-                case 0x53://SRE (LSR M  THEN (M "EOR" A) -> A )
+                case 0x53://SRE (ind),Y
                     byte2 = Mem_r(r_PC++);
-                    ushort2 = (ushort)(NES_MEM[byte2++] | (NES_MEM[byte2] << 8));
+                    ushort2 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
                     ushort1 = (ushort)(ushort2 + r_Y);
                     Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte1 = Mem_r(ushort1);
@@ -1997,19 +1850,20 @@ namespace AprNes
                     break;
 
                 case 0x57://SRE (LSR M  THEN (M "EOR" A) -> A )
-                    byte2 = (byte)(Mem_r(r_PC++) + r_X);
-                    byte1 = NES_MEM[byte2];
+                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
+                    byte1 = ZP_r(byte2);
+                    ZP_w(byte2, byte1); // dummy write
                     if ((byte1 & 1) > 0) flagC = 1; else flagC = 0;
                     byte1 >>= 1;
-                    NES_MEM[byte2] = byte1;
+                    ZP_w(byte2, byte1);
                     r_A ^= byte1;
                     if (r_A == 0) flagZ = 1; else flagZ = 0;
                     if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
                     break;
 
-                case 0x63:// RRA (ROR M THEN (A + M + C) -> A  )  ok 
-                    byte3 = (byte)(Mem_r(r_PC++) + r_X);
-                    ushort1 = (ushort)(NES_MEM[byte3++] | (NES_MEM[byte3] << 8));
+                case 0x63:// RRA (ROR M THEN (A + M + C) -> A  )  ok
+                    byte1 = Mem_r(r_PC++); ZP_r(byte1); byte3 = (byte)(byte1 + r_X);
+                    ushort1 = (ushort)(ZP_r(byte3) | (ZP_r((byte)(byte3 + 1)) << 8));
                     byte2 = Mem_r(ushort1);
 
                     Mem_w(ushort1, byte2);//dummy write fixed
@@ -2027,9 +1881,10 @@ namespace AprNes
 
                 case 0x67:// RRA (ROR M THEN (A + M + C) -> A  ) ok
                     byte3 = Mem_r(r_PC++);
-                    byte2 = NES_MEM[byte3];
+                    byte2 = ZP_r(byte3);
+                    ZP_w(byte3, byte2); // dummy write
                     byte1 = (byte)((byte2 >> 1) | ((flagC == 0) ? 0 : 0x80));
-                    NES_MEM[byte3] = byte1;
+                    ZP_w(byte3, byte1);
                     if ((byte2 & 1) > 0) flagC = 1; else flagC = 0;
                     int1 = r_A + byte1 + flagC;
                     if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
@@ -2056,9 +1911,9 @@ namespace AprNes
                     if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
                     break;
 
-                case 0x73:// RRA (ROR M THEN (A + M + C) -> A  ) ok
+                case 0x73:// RRA (ind),Y
                     byte3 = Mem_r(r_PC++);
-                    ushort2 = (ushort)(NES_MEM[byte3++] | (NES_MEM[byte3] << 8));
+                    ushort2 = (ushort)(ZP_r(byte3) | (ZP_r((byte)(byte3 + 1)) << 8));
                     ushort1 = (ushort)(ushort2 + r_Y);
                     Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte2 = Mem_r(ushort1);
@@ -2077,10 +1932,11 @@ namespace AprNes
                     break;
 
                 case 0x77:// RRA (ROR M THEN (A + M + C) -> A  ) ok
-                    byte3 = (byte)(Mem_r(r_PC++) + r_X);
-                    byte2 = NES_MEM[byte3];
+                    byte1 = Mem_r(r_PC++); ZP_r(byte1); byte3 = (byte)(byte1 + r_X);
+                    byte2 = ZP_r(byte3);
+                    ZP_w(byte3, byte2); // dummy write
                     byte1 = (byte)((byte2 >> 1) | ((flagC == 0) ? 0 : 0x80));
-                    NES_MEM[byte3] = byte1;
+                    ZP_w(byte3, byte1);
                     if ((byte2 & 1) > 0) flagC = 1; else flagC = 0;
                     int1 = r_A + byte1 + flagC;
                     if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
@@ -2128,9 +1984,9 @@ namespace AprNes
                     if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
                     break;
 
-                case 0x83://SAX ( (A "AND" (MSB(adr)+1)  "AND" X) -> M 
-                    byte1 = (byte)(Mem_r(r_PC++) + r_X);
-                    Mem_w((ushort)(NES_MEM[byte1++] | (NES_MEM[byte1] << 8)), (byte)(r_X & r_A));
+                case 0x83://SAX (ind,X)
+                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte1 = (byte)(byte3 + r_X);
+                    Mem_w((ushort)(ZP_r(byte1) | (ZP_r((byte)(byte1 + 1)) << 8)), (byte)(r_X & r_A));
                     break;
 
                 case 0x87://SAX ( (A "AND" (MSB(adr)+1)  "AND" X) -> M 
@@ -2180,7 +2036,7 @@ namespace AprNes
 
                 case 0x93://SHA/AXA (ind),Y - write A & X & (H+1)
                     byte2 = Mem_r(r_PC++);
-                    ushort2 = (ushort)(NES_MEM[byte2++] | (NES_MEM[byte2] << 8));
+                    ushort2 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
                     ushort1 = (ushort)(ushort2 + r_Y);
                     byte1 = (byte)(r_A & r_X & (((ushort2 >> 8) & 0xFF) + 1));
                     Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
@@ -2189,25 +2045,25 @@ namespace AprNes
                     Mem_w(ushort1, byte1);
                     break;
 
-                case 0x97://SAX ( (A "AND" (MSB(adr)+1)  "AND" X) -> M 
-                    NES_MEM[(byte)(Mem_r(r_PC++) + r_Y)] = (byte)(r_X & r_A);
+                case 0x97://SAX zp,y
+                    byte2 = Mem_r(r_PC++); ZP_r(byte2); ZP_w((byte)(byte2 + r_Y), (byte)(r_X & r_A));
                     break;
 
-                case 0xB7://SAX ( (A "AND" (MSB(adr)+1)  "AND" X) -> M 
-                    r_X = r_A = NES_MEM[(byte)(Mem_r(r_PC++) + r_Y)];
+                case 0xB7://LAX zp,y
+                    byte2 = Mem_r(r_PC++); ZP_r(byte2); r_X = r_A = ZP_r((byte)(byte2 + r_Y));
                     if (r_X == 0) flagZ = 1; else flagZ = 0;
                     if ((r_X & 0x80) != 0) flagN = 1; else flagN = 0;
                     break;
 
-                case 0xA3://LAX
-                    byte1 = (byte)(Mem_r(r_PC++) + r_X);
-                    r_X = r_A = Mem_r((ushort)(NES_MEM[byte1++] | (NES_MEM[byte1] << 8)));
+                case 0xA3://LAX (ind,X)
+                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte1 = (byte)(byte3 + r_X);
+                    r_X = r_A = Mem_r((ushort)(ZP_r(byte1) | (ZP_r((byte)(byte1 + 1)) << 8)));
                     if (r_X == 0) flagZ = 1; else flagZ = 0;
                     if ((r_X & 0x80) != 0) flagN = 1; else flagN = 0;
                     break;
 
                 case 0xA7://LAX
-                    r_X = r_A = NES_MEM[Mem_r(r_PC++)];
+                    r_X = r_A = ZP_r(Mem_r(r_PC++));
                     if (r_X == 0) flagZ = 1; else flagZ = 0;
                     if ((r_X & 0x80) != 0) flagN = 1; else flagN = 0;
                     break;
@@ -2234,9 +2090,9 @@ namespace AprNes
                     if ((r_X & 0x80) != 0) flagN = 1; else flagN = 0;
                     break;
 
-                case 0xB3://LAX
+                case 0xB3://LAX (ind),Y
                     byte1 = Mem_r(r_PC++);
-                    ushort2 = (ushort)(NES_MEM[byte1++] | (NES_MEM[byte1] << 8));
+                    ushort2 = (ushort)(ZP_r(byte1) | (ZP_r((byte)(byte1 + 1)) << 8));
                     ushort1 = (ushort)(ushort2 + r_Y);
                     if ((ushort1 & 0xFF00) != (ushort2 & 0xFF00)) // page cross
                         Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
@@ -2263,9 +2119,9 @@ namespace AprNes
                     r_X = (byte)int1;
                     break;
 
-                case 0xC3: //DCP
-                    byte2 = (byte)(Mem_r(r_PC++) + r_X);
-                    ushort1 = (ushort)((NES_MEM[byte2++] | (NES_MEM[byte2] << 8)));
+                case 0xC3: //DCP (ind,X)
+                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
+                    ushort1 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
                     byte1 = Mem_r(ushort1);
 
                     Mem_w(ushort1, byte1);//dummy write fixed
@@ -2279,8 +2135,9 @@ namespace AprNes
 
                 case 0xC7: //DCP
                     byte2 = Mem_r(r_PC++);
-                    byte1 = NES_MEM[byte2];
-                    NES_MEM[byte2] = --byte1;
+                    byte1 = ZP_r(byte2);
+                    ZP_w(byte2, byte1); // dummy write
+                    ZP_w(byte2, --byte1);
                     int1 = r_A - byte1;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
                     if ((~int1) >> 8 != 0) flagC = 1; else flagC = 0;
@@ -2315,9 +2172,9 @@ namespace AprNes
                     if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
                     break;
 
-                case 0xD3: //DCP
+                case 0xD3: //DCP (ind),Y
                     byte2 = Mem_r(r_PC++);
-                    ushort2 = (ushort)(NES_MEM[byte2++] | (NES_MEM[byte2] << 8));
+                    ushort2 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
                     ushort3 = (ushort)(ushort2 + r_Y);
                     Mem_r((ushort)((ushort2 & 0xFF00) | (ushort3 & 0x00FF))); // dummy read at wrong-page address
                     byte1 = Mem_r(ushort3);
@@ -2332,9 +2189,10 @@ namespace AprNes
                     break;
 
                 case 0xD7: //DCP
-                    byte2 = (byte)(Mem_r(r_PC++) + r_X);
-                    byte1 = NES_MEM[byte2];
-                    NES_MEM[byte2] = --byte1;
+                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
+                    byte1 = ZP_r(byte2);
+                    ZP_w(byte2, byte1); // dummy write
+                    ZP_w(byte2, --byte1);
                     int1 = r_A - byte1;
                     if (int1 == 0) flagZ = 1; else flagZ = 0;
                     if ((~int1) >> 8 != 0) flagC = 1; else flagC = 0;
@@ -2356,9 +2214,9 @@ namespace AprNes
                     if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
                     break;
 
-                case 0xE3://ISC
-                    byte2 = (byte)(Mem_r(r_PC++) + r_X);
-                    ushort3 = (ushort)((NES_MEM[byte2++] | (NES_MEM[byte2] << 8)));
+                case 0xE3://ISC (ind,X)
+                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
+                    ushort3 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
                     byte1 = Mem_r(ushort3);
 
                     Mem_w(ushort3, byte1);//dummy write fixed
@@ -2374,8 +2232,9 @@ namespace AprNes
 
                 case 0xE7://ISC
                     byte2 = Mem_r(r_PC++);
-                    byte1 = NES_MEM[byte2];
-                    NES_MEM[byte2] = ++byte1;
+                    byte1 = ZP_r(byte2);
+                    ZP_w(byte2, byte1); // dummy write
+                    ZP_w(byte2, ++byte1);
                     int1 = r_A + (byte1 ^ 0xff) + flagC;
                     if (((int1 ^ r_A) & (int1 ^ (byte1 ^ 0xff)) & 0x80) != 0) flagV = 1; else flagV = 0;
                     if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
@@ -2399,9 +2258,9 @@ namespace AprNes
                     r_A = (byte)int1;
                     break;
 
-                case 0xF3://ISC
+                case 0xF3://ISC (ind),Y
                     byte2 = Mem_r(r_PC++);
-                    ushort2 = (ushort)(NES_MEM[byte2++] | (NES_MEM[byte2] << 8));
+                    ushort2 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
                     ushort3 = (ushort)(ushort2 + r_Y);
                     Mem_r((ushort)((ushort2 & 0xFF00) | (ushort3 & 0x00FF))); // dummy read at wrong-page address
                     byte1 = Mem_r(ushort3);
@@ -2418,9 +2277,10 @@ namespace AprNes
                     break;
 
                 case 0xF7://ISC
-                    byte2 = (byte)(Mem_r(r_PC++) + r_X);
-                    byte1 = NES_MEM[byte2];
-                    NES_MEM[byte2] = ++byte1;
+                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
+                    byte1 = ZP_r(byte2);
+                    ZP_w(byte2, byte1); // dummy write
+                    ZP_w(byte2, ++byte1);
                     int1 = r_A + (byte1 ^ 0xff) + flagC;
                     if (((int1 ^ r_A) & (int1 ^ (byte1 ^ 0xff)) & 0x80) != 0) flagV = 1; else flagV = 0;
                     if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
@@ -2474,13 +2334,13 @@ namespace AprNes
                 if (opcode == 0x68) // PLA
                     dbgWrite("  PLA -> A=$" + r_A.ToString("X2"));
                 else if (opcode == 0x85) // STA zp
-                    dbgWrite("  STA_ZP: addr=$" + Mem_r((ushort)(trace_pc + 1)).ToString("X2") + " val=$" + r_A.ToString("X2") + " verify=$" + NES_MEM[Mem_r((ushort)(trace_pc + 1))].ToString("X2"));
+                    { byte trAddr = NES_MEM[(ushort)(trace_pc + 1)]; dbgWrite("  STA_ZP: addr=$" + trAddr.ToString("X2") + " val=$" + r_A.ToString("X2") + " verify=$" + NES_MEM[trAddr].ToString("X2")); }
                 else if (opcode == 0x86) // STX zp
-                    dbgWrite("  STX_ZP: addr=$" + Mem_r((ushort)(trace_pc + 1)).ToString("X2") + " val=$" + r_X.ToString("X2"));
+                    dbgWrite("  STX_ZP: addr=$" + NES_MEM[(ushort)(trace_pc + 1)].ToString("X2") + " val=$" + r_X.ToString("X2"));
                 else if (opcode == 0x40) // RTI
                     dbgWrite("  RTI -> PC=$" + r_PC.ToString("X4") + " P=$" + (GetFlag() | 0x20).ToString("X2"));
                 else if (opcode == 0xa5) // LDA zp
-                    dbgWrite("  LDA_ZP: addr=$" + Mem_r((ushort)(trace_pc + 1)).ToString("X2") + " val=$" + r_A.ToString("X2"));
+                    dbgWrite("  LDA_ZP: addr=$" + NES_MEM[(ushort)(trace_pc + 1)].ToString("X2") + " val=$" + r_A.ToString("X2"));
             }
 
             // IRQ polling moved to run loop (Main.cs) for correct NMI/IRQ priority

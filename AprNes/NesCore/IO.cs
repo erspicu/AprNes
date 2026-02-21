@@ -58,6 +58,7 @@ namespace AprNes
                 case 0x4015: apu_4015(val); break;
                 case 0x4016: gamepad_w_4016(val); break;
                 case 0x4017:                          // Frame counter mode
+                    last4017Val    = val;
                     ctrmode        = ((val & 0x80) != 0) ? 5 : 4;
                     apuintflag     = (val & 0x40) != 0;
                     if (apuintflag) statusframeint = false; // 只有 bit6 設定時才清除 frame IRQ flag

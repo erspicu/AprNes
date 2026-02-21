@@ -155,8 +155,11 @@ namespace AprNes
 
             // Soft reset state
             int softResetFrame = (softResetSec > 0) ? (int)(softResetSec * NES_FPS) : 0;
-            bool softResetDone = false;
-            int resetRequestFrame = -1; // frame when $6000==$81 detected
+            bool explicitResetDone = false;  // for --soft-reset flag (one-shot)
+            int resetRequestFrame = -1;      // frame when $6000==$81 detected
+            bool waitForTestRestart = false; // after auto-reset, wait for $6000 != $81
+            int autoResetCount = 0;
+            const int MAX_AUTO_RESETS = 10;
 
             // Input events
             List<InputEvent> inputEvents = ParseInput(inputSpec);
@@ -182,11 +185,11 @@ namespace AprNes
                 }
 
                 // --- Soft reset: explicit --soft-reset time ---
-                if (!softResetDone && softResetFrame > 0 && frameCount >= softResetFrame)
+                if (!explicitResetDone && softResetFrame > 0 && frameCount >= softResetFrame)
                 {
                     Console.Error.WriteLine("[TestRunner] Soft reset at frame " + frameCount);
                     NesCore.SoftReset();
-                    softResetDone = true;
+                    explicitResetDone = true;
                 }
 
                 if (waitResult)
@@ -197,18 +200,26 @@ namespace AprNes
                     // $6000 < $80 means "test finished" (0 = pass, N = fail code)
                     byte status = NesCore.NES_MEM[0x6000];
 
-                    // Auto-detect $81: test requests soft reset
-                    if (!softResetDone && status == 0x81 && resetRequestFrame < 0)
+                    // Auto-detect $81: test requests soft reset (supports multiple resets)
+                    if (status == 0x81 && resetRequestFrame < 0
+                        && !waitForTestRestart && autoResetCount < MAX_AUTO_RESETS)
                     {
                         resetRequestFrame = frameCount;
                     }
+                    // After reset, wait for $6000 to leave $81 before detecting again
+                    if (waitForTestRestart && status != 0x81)
+                    {
+                        waitForTestRestart = false;
+                    }
                     // Trigger soft reset ~100ms (6 frames) after $81 detected
-                    if (!softResetDone && resetRequestFrame >= 0
+                    if (resetRequestFrame >= 0
                         && frameCount >= resetRequestFrame + 6)
                     {
-                        Console.Error.WriteLine("[TestRunner] Auto soft reset at frame " + frameCount + " ($6000=$81 at frame " + resetRequestFrame + ")");
+                        Console.Error.WriteLine("[TestRunner] Auto soft reset #" + (autoResetCount + 1) + " at frame " + frameCount + " ($6000=$81 at frame " + resetRequestFrame + ")");
                         NesCore.SoftReset();
-                        softResetDone = true;
+                        resetRequestFrame = -1;
+                        waitForTestRestart = true;
+                        autoResetCount++;
                     }
 
                     if (!testStarted)

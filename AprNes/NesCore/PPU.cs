@@ -504,61 +504,17 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ppu_r_2002() //ok
         {
-            // VBL look-ahead: check if VBL will start during this instruction's PPU cycles.
-            // Without this, $2002 reads are "stale" (see PPU state from before this instruction),
-            // causing sync_vbl to converge incorrectly. This lightweight check avoids
-            // running full ppu_step_new (which would trigger mapper IRQs mid-instruction).
-            // Use cpu_cycles*3: scan ALL PPU clocks of the instruction. On real NES, the
-            // $2002 read happens on the LAST CPU cycle (e.g. cycle 4 of BIT abs), so VBL
-            // events anywhere in the instruction are visible to the read. The first BIT in
-            // sync_vbl's fine loop must "own" all VBL events within its execution range.
-            bool lookahead_hit = false;
-            if (!isVblank && cpu_cycles > 1)
-            {
-                int ppu_remaining = cpu_cycles * 3;
-                int cx = ppu_cycles_x;
-                int sl = scanline;
-                for (int i = 0; i < ppu_remaining; i++)
-                {
-                    cx++;
-                    if (cx == 341) { if (++sl == 262) sl = 0; cx = 0; }
-                    if (sl == 241 && cx == 1)
-                    {
-                        lookahead_hit = true;
-                        dbgWrite("LOOKAHEAD: VBL predicted at ppu=(" + scanline + "," + ppu_cycles_x + ") cpu_cycles=" + cpu_cycles + " SuppressVbl=" + SuppressVbl + " NMIable=" + NMIable);
-                        if (!SuppressVbl)
-                        {
-                            isVblank = true;
-                            if (NMIable) nmi_pending = true;
-                        }
-                        break;
-                    }
-                }
-            }
-
+            // tick-on-access: PPU is already up-to-date, no lookahead needed
             openbus = (byte)(((isVblank) ? 0x80 : 0) | ((isSprite0hit) ? 0x40 : 0) | ((isSpriteOverflow) ? 0x20 : 0) | (openbus & 0x1f));
-            // Log $2002 reads only when VBL detected (reduce sync_vbl noise)
-            if (lookahead_hit || (isVblank && scanline == 241))
-                dbgWrite("R2002: sl=" + scanline + " cx=" + ppu_cycles_x + " val=$" + openbus.ToString("X2") + " isVbl=" + isVblank + " lookahead=" + lookahead_hit + " PC=$" + r_PC.ToString("X4"));
 
+            // VBL suppression: reading $2002 on the exact dot VBL is set
             if (ppu_cycles_x == 1 && scanline == 241)
-            {
                 SuppressVbl = true;
-            }
-            else if (lookahead_hit)
-            {
-                // Look-ahead predicted VBL at (241,1) which is coming during this
-                // instruction's PPU catch-up. The read already "consumed" VBL (returned $80).
-                // Set SuppressVbl so ppu_step_new doesn't re-set isVblank when it reaches (241,1).
-                SuppressVbl = true;
-                isVblank = false;
-            }
             else
-            {
                 SuppressVbl = false;
-                isVblank = false;
-            }
 
+            isVblank = false;
+            nmi_pending = false; // reading $2002 clears VBL and cancels pending NMI
             vram_latch = false;
             return openbus;
         }
@@ -658,11 +614,14 @@ namespace AprNes
 
         static void ppu_w_4014(byte value)//DMA , fixex 2017.01.16 pass sprite_ram test
         {
+            tick(); // halt cycle
             int oam_address = value << 8;
-            for (int i = 0; i < 256; i++) spr_ram[spr_ram_add++] = Mem_r((ushort)(oam_address++));
-            // OAM DMA: 1 dummy cycle (halt) + 256 × 2 (read/write) = 513 cycles
-            // On real NES, odd-cycle start adds 1 more (514), but 513 is the base.
-            cpu_cycles += 513;
+            for (int i = 0; i < 256; i++)
+            {
+                byte data = Mem_r((ushort)(oam_address + i)); // read cycle (tick via Mem_r)
+                tick(); // write cycle
+                spr_ram[spr_ram_add++] = data;
+            }
         }
     }
 }
