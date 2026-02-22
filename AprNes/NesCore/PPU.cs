@@ -42,6 +42,7 @@ namespace AprNes
         static int vram_addr_internal = 0, vram_addr = 0, scrol_y = 0, FineX = 0;
         static bool vram_latch = false;
         static byte ppu_2007_buffer = 0, ppu_2007_temp = 0;
+        static int ppu2007ReadCooldown = 0; // 6 PPU dots cooldown after $2007 read (Mesen2: _ignoreVramRead)
         static byte* spr_ram;
         static public byte* ppu_ram;
         static public uint* ScreenBuf1x;
@@ -223,6 +224,9 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_step_new()
         {
+            // $2007 read cooldown (suppresses rapid consecutive reads)
+            if (ppu2007ReadCooldown > 0) ppu2007ReadCooldown--;
+
             // Open bus decay
             if (--open_bus_decay_timer == 0)
             {
@@ -600,7 +604,11 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ppu_r_2007()
         {
-            return ppu_read_fun[vram_addr](vram_addr);
+            if (ppu2007ReadCooldown > 0)
+                return openbus; // suppress rapid consecutive $2007 reads
+            byte result = ppu_read_fun[vram_addr](vram_addr);
+            ppu2007ReadCooldown = 6; // 6 PPU dots ≈ 2 CPU cycles
+            return result;
         }
 
         static byte openbus;

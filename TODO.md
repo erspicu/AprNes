@@ -1,6 +1,6 @@
 # AprNes 待修復問題清單
 
-**基線**: 171 PASS / 3 FAIL / 174 TOTAL (2026-02-22, run_tests.sh)
+**基線**: 172 PASS / 2 FAIL / 174 TOTAL (2026-02-22, run_tests.sh)
 
 優先權排序原則：**影響大 + 好修** 排最前面
 
@@ -59,16 +59,16 @@
   - PPU.cs: ppu_w_4014() bus state tracking for OAM DMA
   - TestRunner.cs: --expected-crc 支援 CRC-only 測試
   - 4/5 DMC 測試修復，1/5 (double_2007_read) 為不同問題
+- ~~Bug I: PPU $2007 read cooldown~~ → **+1 PASS** (BUGFIX20)
+  - ppu2007ReadCooldown: 6 PPU dot cooldown after $2007 read（Mesen2: _ignoreVramRead）
+  - ppu_r_2007() cooldown 檢查：cooldown > 0 時返回 openbus
+  - ppu_step_new() 每 dot 遞減 cooldown
+  - DMC phantom reads 前清除 cooldown（APU.cs）
+  - dmc_dma_during_read4 套件 5/5 全數通過
 
 ---
 
-## P3 — 未修復（共 3 個測試 FAIL）
-
-### Bug I: PPU $2007 data buffer latching delay
-- **影響**: 1 個測試 FAIL
-- **問題**: page-crossing dummy read to $2007 立即更新 buffer，真實 NES 有延遲
-- **失敗測試**:
-  - `dmc_dma_during_read4/double_2007_read` — CRC D84F6815（期望 85CFD627/F018C287/440EF923/E52F41A5）
+## P3 — 未修復（共 2 個測試 FAIL）
 
 ### Bug H 剩餘: 手把讀取精確度
 - **影響**: 2 個測試 FAIL
@@ -120,8 +120,13 @@
   → Phantom reads: $4016 halt-only, other regs every no-op cycle
   → cpuBusAddr/cpuBusIsWrite tracking + dmc_stolen_tick()
   → TestRunner --expected-crc for CRC-only tests
+
+已完成: Bug I (PPU $2007 read cooldown) → 172 PASS / 2 FAIL ★★★★★
+  → ppu2007ReadCooldown 6-dot cooldown (Mesen2 _ignoreVramRead)
+  → DMC phantom reads bypass cooldown
+  → dmc_dma_during_read4 套件 5/5 全數通過
 ```
 
 ---
 
-*最後更新: 2026-02-22 (BUGFIX19 — 171 PASS / 3 FAIL / 174 TOTAL, DMC DMA cycle stealing)*
+*最後更新: 2026-02-22 (BUGFIX20 — 172 PASS / 2 FAIL / 174 TOTAL, PPU $2007 read cooldown)*

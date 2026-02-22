@@ -793,6 +793,10 @@ namespace AprNes
                         // Phantom reads: CPU repeats last read on all no-op DMA cycles
                         if (!cpuBusIsWrite)
                         {
+                            // DMA phantom reads bypass $2007 read cooldown
+                            // (each DMA cycle is a separate bus transaction with full side effects)
+                            ppu2007ReadCooldown = 0;
+
                             // Joypad $4016/$4017: /OE contiguity rule (NES-001)
                             // Controllers see 1 read per contiguous set → only halt cycle
                             if (cpuBusAddr == 0x4016 || cpuBusAddr == 0x4017)
