@@ -393,6 +393,148 @@ public static void run();                    // main emulation loop (blocks unti
 <p>This architecture makes the QA system <strong>portable</strong>: any NES emulator that exposes these interfaces can use the same bash scripts and test ROM collection for automated regression testing, regardless of its internal implementation.</p>
 </div>
 
+<h2>9. AI-Assisted Development Workflow with Claude Code</h2>
+
+<div class="section">
+<h3>9.1 Overview</h3>
+<p>AprNes uses <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a> (Anthropic's CLI agent) as an AI pair-programmer that directly invokes the test shell scripts, reads failure output, diagnoses root causes, edits source code, and verifies fixes — all within a single iterative loop. The test infrastructure described in Sections 1-8 is the foundation that makes this workflow possible.</p>
+
+<div class="flow">
+  <div class="step"><div class="title">TODO.md</div><div class="desc">Pick next bug</div></div>
+  <div class="arrow">&rarr;</div>
+  <div class="step"><div class="title">Analyse</div><div class="desc">Run failing tests<br>Read test ROM source</div></div>
+  <div class="arrow">&rarr;</div>
+  <div class="step"><div class="title">Plan</div><div class="desc">Root cause + fix design</div></div>
+  <div class="arrow">&rarr;</div>
+  <div class="step"><div class="title">Implement</div><div class="desc">Edit emulator code</div></div>
+  <div class="arrow">&rarr;</div>
+  <div class="step"><div class="title">Verify</div><div class="desc">Build &amp; run tests</div></div>
+  <div class="arrow">&rarr;</div>
+  <div class="step"><div class="title">Document</div><div class="desc">bugfix/ + TODO.md<br>git commit &amp; push</div></div>
+</div>
+</div>
+
+<div class="section">
+<h3>9.2 Prerequisites</h3>
+<ul>
+  <li><strong>Claude Code CLI</strong> — installed and authenticated (<code>npm install -g @anthropic-ai/claude-code</code>)</li>
+  <li><strong>Project memory</strong> — <code>.claude/</code> directory with <code>MEMORY.md</code> recording architecture, build commands, and conventions so the agent retains context across sessions</li>
+  <li><strong>Test scripts</strong> — <code>run_tests.sh</code> (quick validation) and <code>run_tests_report.sh</code> (full report with JSON/screenshots) on PATH</li>
+  <li><strong>Test ROMs</strong> — <code>nes-test-roms-master/checked/</code> containing all test suites</li>
+  <li><strong>TODO.md</strong> — prioritised bug list with failure details, serving as the task queue</li>
+</ul>
+</div>
+
+<div class="section">
+<h3>9.3 Step-by-Step Workflow</h3>
+
+<h3>Phase 1: Task Selection</h3>
+<p>The developer tells Claude Code to read <code>TODO.md</code> and continue with the next task. Claude picks the highest-priority unfinished bug and identifies the relevant failing tests.</p>
+<pre>User: 閱讀 TODO.MD，繼續後面任務
+Claude: [reads TODO.md, identifies "Bug G — Sprite timing" as next target]
+        [runs 4 failing tests with --screenshots to capture current state]</pre>
+
+<h3>Phase 2: Root Cause Analysis</h3>
+<p>Claude uses the test infrastructure to diagnose the bug:</p>
+<ul>
+  <li><strong>Run failing test ROMs</strong> individually via the headless CLI, capturing exit codes and screen output</li>
+  <li><strong>Read test ROM assembly source</strong> to understand exactly what the test expects (cycle counts, flag timing, etc.)</li>
+  <li><strong>Read emulator source code</strong> (PPU.cs, CPU.cs, APU.cs, etc.) to find the discrepancy</li>
+  <li><strong>Cross-reference</strong> NES hardware documentation (nesdev wiki) with the emulator implementation</li>
+</ul>
+<pre># Claude runs each failing test to see the exact failure message
+./AprNes/bin/Debug/AprNes.exe --wait-result --max-wait 30 \
+  --rom nes-test-roms-master/checked/sprite_hit_tests_2005.10.05/09.timing_basics.nes
+# → FAIL #3: "upper-left corner too late"</pre>
+
+<h3>Phase 3: Plan Mode</h3>
+<p>For non-trivial fixes, Claude enters <strong>plan mode</strong> — a read-only state where it designs the implementation strategy without modifying any files. The plan includes:</p>
+<ul>
+  <li>Root cause explanation with hardware timing details</li>
+  <li>Specific code changes with line-level locations</li>
+  <li>Regression risk analysis (which existing PASS tests might break)</li>
+  <li>Verification commands to run after implementation</li>
+</ul>
+<p>The developer reviews and approves the plan before any code is changed.</p>
+
+<h3>Phase 4: Implementation</h3>
+<p>Claude edits the emulator source files using precise text replacements. Each change is targeted and minimal — only modifying what the plan specified.</p>
+
+<h3>Phase 5: Build &amp; Verify</h3>
+<p>Claude invokes the build toolchain and test scripts directly:</p>
+<pre># 1. Build
+powershell -NoProfile -Command "MSBuild.exe AprNes.sln /p:Configuration=Debug /t:Rebuild"
+
+# 2. Run target tests (the ones we're trying to fix)
+./AprNes/bin/Debug/AprNes.exe --wait-result --max-wait 30 \
+  --rom nes-test-roms-master/checked/sprite_hit_tests_2005.10.05/09.timing_basics.nes
+
+# 3. Run regression suite (related tests that might break)
+for rom in 01.basics.nes 02.alignment.nes ... 11.edge_timing.nes; do
+  ./AprNes/bin/Debug/AprNes.exe --wait-result --max-wait 30 \
+    --rom "nes-test-roms-master/checked/sprite_hit_tests_2005.10.05/$rom"
+done
+
+# 4. Full regression (all 174 tests)
+bash run_tests.sh</pre>
+<p>If any test fails unexpectedly, Claude reads the failure output, adjusts the fix, and re-runs. This inner loop repeats until all target tests pass with zero regressions.</p>
+
+<h3>Phase 6: Documentation &amp; Commit</h3>
+<p>Once verified, Claude:</p>
+<ul>
+  <li>Updates <code>TODO.md</code> — marks the bug as completed, updates the baseline count</li>
+  <li>Creates <code>bugfix/YYYY-MM-DD_BUGFIXNN.md</code> — detailed record of problem, root cause, fix, and test results</li>
+  <li>Commits with a descriptive message: <code>fix sprite timing: per-pixel hit + cycle-accurate overflow: 165 PASS / 9 FAIL (+4)</code></li>
+  <li>Pushes to remote</li>
+</ul>
+
+<h3>Phase 7: Report Generation (on demand)</h3>
+<p>The developer can request a full HTML report at any time:</p>
+<pre>bash run_tests_report.sh --json --screenshots
+# → report/index.html (interactive dashboard with screenshots)</pre>
+</div>
+
+<div class="section">
+<h3>9.4 Key Files in the Workflow</h3>
+
+<table>
+  <tr><th>File</th><th>Role</th></tr>
+  <tr><td><code>TODO.md</code></td><td>Prioritised bug list — the task queue that drives each session</td></tr>
+  <tr><td><code>.claude/memory/MEMORY.md</code></td><td>Persistent agent memory: architecture, build commands, conventions</td></tr>
+  <tr><td><code>bugfix/YYYY-MM-DD_BUGFIXNN.md</code></td><td>Per-fix documentation: problem, root cause, changes, verification</td></tr>
+  <tr><td><code>run_tests.sh</code></td><td>Quick validation — runs all 174 tests, outputs PASS/FAIL counts</td></tr>
+  <tr><td><code>run_tests_report.sh</code></td><td>Full report — JSON data + screenshots + HTML dashboard</td></tr>
+  <tr><td><code>report/index.html</code></td><td>Generated interactive test report with filterable results</td></tr>
+</table>
+</div>
+
+<div class="section">
+<h3>9.5 Why This Works</h3>
+<ul>
+  <li><strong>Deterministic feedback</strong> — Test ROMs produce binary PASS/FAIL with exact failure descriptions (e.g. "upper-left corner too late"), giving the AI precise signals to work with</li>
+  <li><strong>Headless CLI</strong> — The emulator's <code>--wait-result</code> mode returns machine-readable exit codes (0=pass, 1=fail), enabling automated verification loops</li>
+  <li><strong>Structured knowledge</strong> — <code>TODO.md</code> provides prioritised task context; <code>MEMORY.md</code> carries architectural knowledge across sessions; <code>bugfix/</code> records capture the reasoning behind each change</li>
+  <li><strong>Fast iteration</strong> — Build + single test takes ~5 seconds; full 174-test regression under 10 minutes. The AI can try multiple approaches in one session</li>
+  <li><strong>Human oversight</strong> — Plan mode ensures the developer reviews the approach before any code changes. Git commits are explicit checkpoints</li>
+</ul>
+</div>
+
+<div class="section">
+<h3>9.6 Example Session: BUGFIX17 (Sprite Timing)</h3>
+<p>A single Claude Code session progressed from 161 PASS → 165 PASS (+4) by:</p>
+<ol style="margin:.5rem 0 .75rem 1.2rem;font-size:.82rem;color:var(--text-dim)">
+  <li>Reading <code>TODO.md</code> → identified Bug G (4 failing sprite tests)</li>
+  <li>Running each failing test → captured exact failure messages (#3 "too late", #5 "set too late", #2 "byte offset bug")</li>
+  <li>Reading test ROM assembly source (09.timing_basics.asm, 3.Timing.a, 4.Obscure.a) → understood expected cycle counts</li>
+  <li>Reading PPU.cs → found batch rendering at phase 7 (7-dot latency) and cycle-257 overflow detection</li>
+  <li>Entered plan mode → designed 3 fixes: per-pixel hit detection, cycle-accurate overflow, hardware overflow bug</li>
+  <li>Implemented all 3 fixes in PPU.cs (~+120 lines, -40 lines)</li>
+  <li>Built → ran 4 target tests (all PASS) → ran sprite regression (14 tests, all PASS) → ran full suite (165 PASS / 9 FAIL)</li>
+  <li>Updated TODO.md, created BUGFIX17.md, committed and pushed</li>
+</ol>
+<p>Total: 3 root causes identified, 3 fixes implemented, 0 regressions — all within a single conversation.</p>
+</div>
+
 <div class="footer"><a href="index.html">Test Report</a> | AprNes Testing Methodology</div>
 
 </body>

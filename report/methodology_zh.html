@@ -393,6 +393,148 @@ public static void run();                    // 主模擬迴圈（阻塞直到 e
 <p>此架構使 QA 系統具有<strong>可移植性</strong>：任何開放這些介面的 NES 模擬器都能使用相同的 bash 腳本和測試 ROM 合集進行自動化回歸測試，不受其內部實作方式限制。</p>
 </div>
 
+<h2>9. 以 Claude Code 驅動的 AI 輔助開發流程</h2>
+
+<div class="section">
+<h3>9.1 概述</h3>
+<p>AprNes 使用 <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>（Anthropic 的 CLI 代理工具）作為 AI 配對程式設計師，直接呼叫測試 shell 腳本、讀取失敗輸出、診斷根因、編輯原始碼並驗證修復 — 全部在一個迭代迴圈中完成。第 1-8 節描述的測試基礎建設是此流程得以運作的基石。</p>
+
+<div class="flow">
+  <div class="step"><div class="title">TODO.md</div><div class="desc">選取下個 bug</div></div>
+  <div class="arrow">&rarr;</div>
+  <div class="step"><div class="title">分析</div><div class="desc">跑失敗測試<br>讀測試 ROM 原始碼</div></div>
+  <div class="arrow">&rarr;</div>
+  <div class="step"><div class="title">規劃</div><div class="desc">根因 + 修復設計</div></div>
+  <div class="arrow">&rarr;</div>
+  <div class="step"><div class="title">實作</div><div class="desc">編輯模擬器程式碼</div></div>
+  <div class="arrow">&rarr;</div>
+  <div class="step"><div class="title">驗證</div><div class="desc">編譯 &amp; 跑測試</div></div>
+  <div class="arrow">&rarr;</div>
+  <div class="step"><div class="title">記錄</div><div class="desc">bugfix/ + TODO.md<br>git commit &amp; push</div></div>
+</div>
+</div>
+
+<div class="section">
+<h3>9.2 前置條件</h3>
+<ul>
+  <li><strong>Claude Code CLI</strong> — 安裝並認證（<code>npm install -g @anthropic-ai/claude-code</code>）</li>
+  <li><strong>專案記憶</strong> — <code>.claude/</code> 目錄中的 <code>MEMORY.md</code> 記錄架構、編譯指令和慣例，讓 AI 跨對話保留上下文</li>
+  <li><strong>測試腳本</strong> — <code>run_tests.sh</code>（快速驗證）和 <code>run_tests_report.sh</code>（含 JSON/截圖的完整報告）</li>
+  <li><strong>測試 ROM</strong> — <code>nes-test-roms-master/checked/</code> 包含所有測試套件</li>
+  <li><strong>TODO.md</strong> — 按優先權排序的 bug 清單，附帶失敗詳情，作為任務佇列</li>
+</ul>
+</div>
+
+<div class="section">
+<h3>9.3 逐步流程</h3>
+
+<h3>階段 1：任務選取</h3>
+<p>開發者告訴 Claude Code 讀取 <code>TODO.md</code> 並繼續下個任務。Claude 選取最高優先權的未完成 bug，識別相關的失敗測試。</p>
+<pre>User: 閱讀 TODO.MD，繼續後面任務
+Claude: [讀取 TODO.md，識別 "Bug G — Sprite timing" 為下個目標]
+        [跑 4 個失敗測試並截圖，記錄當前狀態]</pre>
+
+<h3>階段 2：根因分析</h3>
+<p>Claude 利用測試基礎建設來診斷 bug：</p>
+<ul>
+  <li><strong>逐個執行失敗的測試 ROM</strong>，透過 headless CLI 擷取 exit code 和畫面輸出</li>
+  <li><strong>閱讀測試 ROM 組語原始碼</strong>，了解測試期望的精確行為（cycle 計數、flag 時序等）</li>
+  <li><strong>閱讀模擬器原始碼</strong>（PPU.cs、CPU.cs、APU.cs 等）找出差異</li>
+  <li><strong>交叉比對</strong> NES 硬體文件（nesdev wiki）與模擬器實作</li>
+</ul>
+<pre># Claude 逐個跑失敗測試，看精確的錯誤訊息
+./AprNes/bin/Debug/AprNes.exe --wait-result --max-wait 30 \
+  --rom nes-test-roms-master/checked/sprite_hit_tests_2005.10.05/09.timing_basics.nes
+# → FAIL #3: "upper-left corner too late"</pre>
+
+<h3>階段 3：規劃模式</h3>
+<p>對於非簡單的修復，Claude 進入<strong>規劃模式（plan mode）</strong>— 一個唯讀狀態，在不修改任何檔案的情況下設計實作策略。規劃內容包括：</p>
+<ul>
+  <li>含硬體時序細節的根因解釋</li>
+  <li>具體的程式碼修改，精確到行號</li>
+  <li>回歸風險分析（哪些現有 PASS 測試可能被影響）</li>
+  <li>實作後要執行的驗證命令</li>
+</ul>
+<p>開發者審核並批准規劃後，才開始修改程式碼。</p>
+
+<h3>階段 4：實作</h3>
+<p>Claude 使用精確的文字替換編輯模擬器原始碼。每個變更都是有針對性且最小化的 — 只修改規劃中指定的內容。</p>
+
+<h3>階段 5：編譯與驗證</h3>
+<p>Claude 直接呼叫編譯工具鏈和測試腳本：</p>
+<pre># 1. 編譯
+powershell -NoProfile -Command "MSBuild.exe AprNes.sln /p:Configuration=Debug /t:Rebuild"
+
+# 2. 跑目標測試（我們要修的那些）
+./AprNes/bin/Debug/AprNes.exe --wait-result --max-wait 30 \
+  --rom nes-test-roms-master/checked/sprite_hit_tests_2005.10.05/09.timing_basics.nes
+
+# 3. 跑回歸套件（可能受影響的相關測試）
+for rom in 01.basics.nes 02.alignment.nes ... 11.edge_timing.nes; do
+  ./AprNes/bin/Debug/AprNes.exe --wait-result --max-wait 30 \
+    --rom "nes-test-roms-master/checked/sprite_hit_tests_2005.10.05/$rom"
+done
+
+# 4. 完整回歸（全部 174 個測試）
+bash run_tests.sh</pre>
+<p>如果有測試意外失敗，Claude 讀取失敗輸出、調整修復、重新執行。這個內部迴圈重複直到所有目標測試通過且零回歸。</p>
+
+<h3>階段 6：記錄與提交</h3>
+<p>驗證通過後，Claude：</p>
+<ul>
+  <li>更新 <code>TODO.md</code> — 將 bug 標記為已完成，更新基線數字</li>
+  <li>建立 <code>bugfix/YYYY-MM-DD_BUGFIXNN.md</code> — 詳細記錄問題、根因、修復和測試結果</li>
+  <li>提交描述性的 commit message：<code>fix sprite timing: per-pixel hit + cycle-accurate overflow: 165 PASS / 9 FAIL (+4)</code></li>
+  <li>推送至遠端</li>
+</ul>
+
+<h3>階段 7：報告產生（按需）</h3>
+<p>開發者可隨時要求產生完整的 HTML 報告：</p>
+<pre>bash run_tests_report.sh --json --screenshots
+# → report/index.html（含截圖的互動式儀表板）</pre>
+</div>
+
+<div class="section">
+<h3>9.4 流程中的關鍵檔案</h3>
+
+<table>
+  <tr><th>檔案</th><th>角色</th></tr>
+  <tr><td><code>TODO.md</code></td><td>按優先權排序的 bug 清單 — 驅動每次工作的任務佇列</td></tr>
+  <tr><td><code>.claude/memory/MEMORY.md</code></td><td>持久化 AI 記憶：架構、編譯指令、慣例</td></tr>
+  <tr><td><code>bugfix/YYYY-MM-DD_BUGFIXNN.md</code></td><td>逐次修復的文件：問題、根因、變更、驗證</td></tr>
+  <tr><td><code>run_tests.sh</code></td><td>快速驗證 — 跑全部 174 個測試，輸出 PASS/FAIL 計數</td></tr>
+  <tr><td><code>run_tests_report.sh</code></td><td>完整報告 — JSON 資料 + 截圖 + HTML 儀表板</td></tr>
+  <tr><td><code>report/index.html</code></td><td>產出的互動式測試報告，支援篩選和瀏覽</td></tr>
+</table>
+</div>
+
+<div class="section">
+<h3>9.5 為何此流程有效</h3>
+<ul>
+  <li><strong>確定性回饋</strong> — 測試 ROM 產生二元的 PASS/FAIL，附帶精確的失敗描述（如 "upper-left corner too late"），給 AI 明確的訊號</li>
+  <li><strong>Headless CLI</strong> — 模擬器的 <code>--wait-result</code> 模式回傳機器可讀的 exit code（0=通過, 1=失敗），實現自動化驗證迴圈</li>
+  <li><strong>結構化知識</strong> — <code>TODO.md</code> 提供排序好的任務上下文；<code>MEMORY.md</code> 跨對話攜帶架構知識；<code>bugfix/</code> 記錄每次變更背後的推理</li>
+  <li><strong>快速迭代</strong> — 編譯 + 單一測試約 5 秒；完整 174 測試回歸不到 10 分鐘。AI 可以在一次對話中嘗試多種方案</li>
+  <li><strong>人工監督</strong> — 規劃模式確保開發者在任何程式碼變更前審核方案。Git commit 是明確的檢查點</li>
+</ul>
+</div>
+
+<div class="section">
+<h3>9.6 實際案例：BUGFIX17（Sprite 時序）</h3>
+<p>單次 Claude Code 對話從 161 PASS 進步到 165 PASS (+4)，過程如下：</p>
+<ol style="margin:.5rem 0 .75rem 1.2rem;font-size:.82rem;color:var(--text-dim)">
+  <li>讀取 <code>TODO.md</code> → 識別 Bug G（4 個 sprite 測試失敗）</li>
+  <li>逐個跑失敗測試 → 擷取精確錯誤訊息（#3 "too late"、#5 "set too late"、#2 "byte offset bug"）</li>
+  <li>閱讀測試 ROM 組語原始碼（09.timing_basics.asm、3.Timing.a、4.Obscure.a）→ 理解期望的 cycle 計數</li>
+  <li>閱讀 PPU.cs → 發現 phase 7 批次渲染（7-dot 延遲）和 cycle-257 overflow 偵測</li>
+  <li>進入規劃模式 → 設計 3 個修復：逐像素 hit 偵測、cycle 精確 overflow、硬體 overflow bug</li>
+  <li>在 PPU.cs 中實作全部 3 個修復（+120 行，-40 行）</li>
+  <li>編譯 → 跑 4 個目標測試（全 PASS）→ 跑 sprite 回歸（14 測試，全 PASS）→ 跑完整套件（165 PASS / 9 FAIL）</li>
+  <li>更新 TODO.md、建立 BUGFIX17.md、commit 並 push</li>
+</ol>
+<p>總計：識別 3 個根因、實作 3 個修復、0 個回歸 — 全部在單次對話中完成。</p>
+</div>
+
 <div class="footer"><a href="index.html">測試報告</a> | AprNes 測試方法論</div>
 
 </body>
