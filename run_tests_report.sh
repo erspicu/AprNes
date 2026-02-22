@@ -219,9 +219,11 @@ done
 run_test "cpu_timing_test6" "cpu_timing_test.nes" "--max-wait 120"
 
 # dmc_dma_during_read4 (5)
-for rom in dma_2007_read.nes dma_2007_write.nes dma_4016_read.nes double_2007_read.nes read_write_2007.nes; do
-    run_test "dmc_dma_during_read4" "$rom" "--max-wait 30"
-done
+run_test "dmc_dma_during_read4" "dma_2007_read.nes" "--max-wait 30 --expected-crc 159A7A8F,5E3DF9C4"
+run_test "dmc_dma_during_read4" "dma_2007_write.nes" "--max-wait 30"
+run_test "dmc_dma_during_read4" "dma_4016_read.nes" "--max-wait 30"
+run_test "dmc_dma_during_read4" "double_2007_read.nes" "--max-wait 30 --expected-crc 85CFD627,F018C287,440EF923,E52F41A5"
+run_test "dmc_dma_during_read4" "read_write_2007.nes" "--max-wait 30"
 
 # instr_misc merged + singles (5)
 run_test "instr_misc" "instr_misc.nes" "--max-wait 120"

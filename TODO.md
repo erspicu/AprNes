@@ -1,7 +1,6 @@
 # AprNes 待修復問題清單
 
-**基線**: 169 PASS / 5 FAIL / 174 TOTAL (2026-02-22, run_tests.sh)
-> 注: 5 FAIL 全為 Bug F（DMC DMA cycle stealing），需架構重構
+**基線**: 171 PASS / 3 FAIL / 174 TOTAL (2026-02-22, run_tests.sh)
 
 優先權排序原則：**影響大 + 好修** 排最前面
 
@@ -54,22 +53,28 @@
   - NMI deferral after interrupt sequences（nmi_just_deferred flag）
   - Branch taken-no-cross: irqLinePrev save/restore around extra tick
   - OAM DMA: irqLinePrev save/restore + alignment cycle（513→514 ticks）
+- ~~Bug F: DMC DMA cycle stealing~~ → **+2 PASS** (BUGFIX19)
+  - MEM.cs: cpuBusAddr/cpuBusIsWrite tracking + dmc_stolen_tick()
+  - APU.cs: dmcfillbuffer() Load/Reload type-based stolen cycle model
+  - PPU.cs: ppu_w_4014() bus state tracking for OAM DMA
+  - TestRunner.cs: --expected-crc 支援 CRC-only 測試
+  - 4/5 DMC 測試修復，1/5 (double_2007_read) 為不同問題
 
 ---
 
-## P3 — 較難修復（共 5 個測試 FAIL）
+## P3 — 未修復（共 3 個測試 FAIL）
 
-### Bug F: DMC DMA cycle stealing — ⚠️ 需架構重構
-- **影響**: 5 個測試 FAIL
-- **難度**: 極高（架構限制）
-- **問題**: tick() 同時推進 CPU 和 PPU，但真實 NES 的 DMC DMA 只偷 CPU cycles（PPU 獨立運行）
-- **需要**: 解耦 CPU/PPU 時鐘（major refactor）
+### Bug I: PPU $2007 data buffer latching delay
+- **影響**: 1 個測試 FAIL
+- **問題**: page-crossing dummy read to $2007 立即更新 buffer，真實 NES 有延遲
 - **失敗測試**:
-  - `dmc_dma_during_read4/dma_2007_read` — Timeout
-  - `dmc_dma_during_read4/dma_4016_read` — DMC DMA 干擾 $4016 讀取
-  - `dmc_dma_during_read4/double_2007_read` — Timeout
-  - `sprdma_and_dmc_dma/sprdma_and_dmc_dma` — OAM DMA cycle 全為 399
-  - `sprdma_and_dmc_dma/sprdma_and_dmc_dma_512` — 同上
+  - `dmc_dma_during_read4/double_2007_read` — CRC D84F6815（期望 85CFD627/F018C287/440EF923/E52F41A5）
+
+### Bug H 剩餘: 手把讀取精確度
+- **影響**: 2 個測試 FAIL
+- **失敗測試**:
+  - `read_joy3/count_errors` — 手把 DPCM-interference bit counting
+  - `read_joy3/count_errors_fast` — 同上（快速版）
 
 ---
 
@@ -110,9 +115,13 @@
   → Branch taken-no-cross irqLinePrev save/restore
   → OAM DMA irqLinePrev isolation + alignment cycle
 
-Phase 10: Bug F (DMC DMA) — 需架構重構，暫緩
+已完成: Bug F (DMC DMA cycle stealing) → 171 PASS / 3 FAIL ★★★★
+  → Load/Reload type-based stolen cycle model
+  → Phantom reads: $4016 halt-only, other regs every no-op cycle
+  → cpuBusAddr/cpuBusIsWrite tracking + dmc_stolen_tick()
+  → TestRunner --expected-crc for CRC-only tests
 ```
 
 ---
 
-*最後更新: 2026-02-22 (BUGFIX18 — 169 PASS / 5 FAIL / 174 TOTAL, CPU interrupt timing)*
+*最後更新: 2026-02-22 (BUGFIX19 — 171 PASS / 3 FAIL / 174 TOTAL, DMC DMA cycle stealing)*

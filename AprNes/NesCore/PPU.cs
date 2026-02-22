@@ -703,15 +703,41 @@ namespace AprNes
             // Save IRQ tracking — CPU is halted during DMA, IRQ not polled
             bool saved_irqLinePrev = irqLinePrev;
 
+            oamDmaInProgress = true;
+            oamDmaByteIndex = -1; // pre-loop phase
+
+            cpuBusAddr = 0x4014;
+            cpuBusIsWrite = true;
             tick(); // halt cycle
-            tick(); // alignment cycle (odd CPU cycle → +1 wait)
+
+            // OAM DMA alignment: OAM reads must occur on GET cycles.
+            // After halt tick, check GET/PUT phase. If next cycle would be PUT,
+            // insert alignment cycle so OAM read starts on GET.
+            // GET = apucycle odd, PUT = apucycle even (after increment in apu_step)
+            // After halt: apucycle odd → halt was GET → next is PUT → need alignment
+            //             apucycle even → halt was PUT → next is GET → no alignment
+            bool oamNeedAlignment = (apucycle & 1) == 1;
+            if (oamNeedAlignment)
+            {
+                cpuBusIsWrite = true;
+                tick(); // alignment cycle (PUT → align to GET)
+            }
+
             int oam_address = value << 8;
             for (int i = 0; i < 256; i++)
             {
+                oamDmaByteIndex = i;
+                // Mem_r sets cpuBusAddr/cpuBusIsWrite internally
                 byte data = Mem_r((ushort)(oam_address + i)); // read cycle (tick via Mem_r)
+
+                cpuBusAddr = (ushort)(oam_address + i);
+                cpuBusIsWrite = true;
                 tick(); // write cycle
                 spr_ram[spr_ram_add++] = data;
             }
+
+            oamDmaByteIndex = -1;
+            oamDmaInProgress = false;
 
             // Restore penultimate IRQ state to pre-DMA value
             // irqLineCurrent keeps real-time state so next instruction detects IRQ

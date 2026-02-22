@@ -144,6 +144,12 @@ namespace AprNes
                    dmcvalue = 0, dmcsamplelength = 1, dmcsamplesleft = 0,
                    dmcstartaddr = 0xc000, dmcaddr = 0xc000, dmcbitsleft = 8;
         static bool dmcsilence = true, dmcirq = false, dmcloop = false, dmcBufferEmpty = true;
+        static bool dmcDmaInProgress = false; // prevent re-entrant DMC fill during stolen ticks
+        static bool dmcIsLoadDma = false;      // true = Load DMA (after $4015), false = Reload DMA
+        static int dmcLoadDmaCountdown = 0;    // Load DMA scheduling delay (3-4 CPU cycles)
+        static bool dmcReloadPending = false;  // Reload DMA deferred to next tick (matches hardware behavior)
+        static bool oamDmaInProgress = false;  // true during OAM DMA (DMC overlaps with OAM cycles)
+        static int oamDmaByteIndex = -1;       // current OAM byte being transferred (0-255, -1 = halt/align)
 
         // Length counter 欄位
         static int[] lengthctr = { 0, 0, 0, 0 };
@@ -238,6 +244,10 @@ namespace AprNes
                 lengthctr[i] = 0;
             }
             dmcsamplesleft = 0;
+            dmcLoadDmaCountdown = 0;
+            dmcIsLoadDma = false;
+            dmcReloadPending = false;
+            oamDmaInProgress = false;
 
             // 重置音色產生器
             _pulseTimer[0] = _pulseTimer[1] = 0;
@@ -311,6 +321,8 @@ namespace AprNes
             dmcvalue = 0; dmcsamplelength = 1; dmcsamplesleft = 0;
             dmcstartaddr = 0xC000; dmcaddr = 0xC000; dmcbitsleft = 8;
             dmcsilence = true; dmcirq = false; dmcloop = false; dmcBufferEmpty = true;
+            dmcDmaInProgress = false; dmcIsLoadDma = false; dmcLoadDmaCountdown = 0;
+            dmcReloadPending = false; oamDmaInProgress = false; oamDmaByteIndex = -1;
 
             // 初始化查找表
             SQUARELOOKUP = initSquareLookup();
@@ -661,9 +673,6 @@ namespace AprNes
         // =====================================================================
         static void clockdmc()
         {
-            if (dmcBufferEmpty && dmcsamplesleft > 0)
-                dmcfillbuffer();
-
             if (--dmctimer <= 0)
             {
                 dmctimer = dmcrate; // reload with current period
@@ -690,14 +699,124 @@ namespace AprNes
                     }
                 }
             }
+
+            // Don't trigger new DMA during active DMA stolen ticks
+            if (dmcDmaInProgress) return;
+
+            // Handle Load DMA countdown (scheduled DMA from $4015 write)
+            if (dmcLoadDmaCountdown > 0)
+            {
+                --dmcLoadDmaCountdown;
+                if (dmcLoadDmaCountdown == 0 && dmcBufferEmpty && dmcsamplesleft > 0)
+                    dmcfillbuffer();
+                return;
+            }
+
+            // Reload DMA: buffer emptied by output unit → immediate fill
+            if (dmcBufferEmpty && dmcsamplesleft > 0)
+                dmcfillbuffer();
         }
 
         static void dmcfillbuffer()
         {
+            if (dmcDmaInProgress) return; // prevent re-entrant fill during stolen ticks
             if (dmcsamplesleft > 0)
             {
-                dmcbuffer     = Mem_r((ushort)dmcaddr++); // 從 NES 記憶體讀取 PCM 資料
+                dmcDmaInProgress = true;
+                bool isLoad = dmcIsLoadDma;
+                dmcIsLoadDma = false;
+
+                if (oamDmaInProgress)
+                {
+                    // DMC during OAM DMA — cycle cost depends on position within OAM DMA.
+                    // DMC halt/dummy/alignment overlap with remaining OAM cycles (free).
+                    // The extra cycles are what remains after OAM can no longer absorb them.
+                    //
+                    // Normal middle case (byte 0-253 on write, 0-253 on read): 2 extra
+                    //   DMC get (1) + OAM realignment (1) = 2
+                    //
+                    // Second-to-last put (byte 254, write cycle): 1 extra
+                    //   OAM's remaining read[255]+write[255] absorb halt+dummy, DMC get = 1
+                    //   No realignment needed because OAM ends right after DMC get.
+                    //
+                    // Last put (byte 255, write cycle): 3 extra
+                    //   OAM is done, DMC still needs dummy+alignment+get = 3
+                    //
+                    // Read of byte 254: 1 extra (same as write[254] — 2 OAM cycles remain)
+                    // Read of byte 255: 3 extra (same as write[255] — only 1 OAM cycle remains)
+
+                    int stolenCycles;
+                    if (oamDmaByteIndex >= 255)
+                        stolenCycles = 3; // last byte (read or write): 3 extra
+                    else if (oamDmaByteIndex == 254)
+                        stolenCycles = 1; // second-to-last byte (read or write): 1 extra
+                    else
+                        stolenCycles = 2; // normal middle case: 2 extra
+
+                    for (int sc = 0; sc < stolenCycles; sc++)
+                    {
+                        if (sc == stolenCycles - 1)
+                        {
+                            // Last stolen cycle is the actual DMA read
+                            dmc_stolen_tick();
+                            dmcbuffer = mem_read_fun[(ushort)dmcaddr]((ushort)dmcaddr);
+                            cpubus = (byte)dmcbuffer;
+                        }
+                        else
+                        {
+                            dmc_stolen_tick(); // dummy or alignment cycle
+                        }
+                    }
+                }
+                else
+                {
+                    // Standalone DMC DMA cycle stealing (NESdev Wiki "DMA" reference):
+                    //
+                    // Load DMA (from $4015 write): scheduled to halt on GET cycle
+                    //   Normal (CPU reading): halt(GET) + dummy(PUT) + get(GET) = 3 cycles
+                    //   Delayed (CPU writing): halt(PUT) + dummy(GET) + align(PUT) + get(GET) = 4 cycles
+                    //
+                    // Reload DMA (buffer emptied by output unit): scheduled to halt on PUT cycle
+                    //   Normal (CPU reading): halt(PUT) + dummy(GET) + align(PUT) + get(GET) = 4 cycles
+                    //   Delayed (CPU writing): halt(GET) + dummy(PUT) + get(GET) = 3 cycles
+                    //
+                    int haltCycles;
+                    if (isLoad)
+                        haltCycles = cpuBusIsWrite ? 3 : 2; // Load: 4 when write-delayed, 3 normally
+                    else
+                        haltCycles = cpuBusIsWrite ? 2 : 3; // Reload: 3 when write-delayed, 4 normally
+
+                    for (int i = 0; i < haltCycles; i++)
+                    {
+                        dmc_stolen_tick();
+
+                        // Phantom reads: CPU repeats last read on all no-op DMA cycles
+                        if (!cpuBusIsWrite)
+                        {
+                            // Joypad $4016/$4017: /OE contiguity rule (NES-001)
+                            // Controllers see 1 read per contiguous set → only halt cycle
+                            if (cpuBusAddr == 0x4016 || cpuBusAddr == 0x4017)
+                            {
+                                if (i == 0) // halt cycle only
+                                    mem_read_fun[cpuBusAddr](cpuBusAddr);
+                            }
+                            else
+                            {
+                                // All other registers ($2007, $2002, $4015, etc.):
+                                // every no-op cycle triggers full side effects
+                                mem_read_fun[cpuBusAddr](cpuBusAddr);
+                            }
+                        }
+                    }
+
+                    // DMA read cycle — fetch actual sample from PRG ROM
+                    dmc_stolen_tick();
+                    dmcbuffer = mem_read_fun[(ushort)dmcaddr]((ushort)dmcaddr);
+                    cpubus = (byte)dmcbuffer;
+                }
+
                 dmcBufferEmpty = false;
+                dmcaddr++;
                 if (dmcaddr > 0xffff) dmcaddr = 0x8000;
                 --dmcsamplesleft;
                 if (dmcsamplesleft == 0)
@@ -707,6 +826,7 @@ namespace AprNes
                     else if (dmcirq && !statusdmcint)
                         statusdmcint = true;
                 }
+                dmcDmaInProgress = false;
             }
             else
             {
@@ -884,8 +1004,25 @@ namespace AprNes
             if (!lenCtrEnable[2]) lengthctr[2] = 0;
             if (!lenCtrEnable[3]) lengthctr[3] = 0;
 
-            if (dmcEnable) { if (dmcsamplesleft == 0) restartdmc(); }
-            else           { dmcsamplesleft = 0; }
+            if (dmcEnable)
+            {
+                if (dmcsamplesleft == 0)
+                {
+                    restartdmc();
+                    if (dmcBufferEmpty)
+                    {
+                        dmcIsLoadDma = true;
+                        dmcLoadDmaCountdown = 3;
+                    }
+                }
+            }
+            else
+            {
+                dmcsamplesleft = 0;
+                dmcLoadDmaCountdown = 0;
+                dmcIsLoadDma = false;
+                dmcReloadPending = false;
+            }
             statusdmcint = false;
         }
     }

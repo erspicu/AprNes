@@ -10,6 +10,8 @@ namespace AprNes
         public static byte* NES_MEM;
 
         static bool in_tick = false;  // prevent recursive tick from DMC fetch
+        static ushort cpuBusAddr = 0;    // CPU current bus address (for DMC phantom reads)
+        static bool cpuBusIsWrite = false; // true = write cycle, false = read cycle
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void tick()
@@ -39,9 +41,28 @@ namespace AprNes
             in_tick = false;
         }
 
+        // Tick for DMC stolen cycles — full PPU + APU (timer must advance during DMA)
+        static void dmc_stolen_tick()
+        {
+            if (nmi_delay) { nmi_pending = true; nmi_delay = false; }
+            for (int i = 0; i < 3; i++)
+            {
+                ppu_step_new();
+                bool nmi_output = isVblank && NMIable;
+                if (nmi_output && !nmi_output_prev)
+                    nmi_delay = true;
+                nmi_output_prev = nmi_output;
+            }
+            apu_step(); // DMC timer must advance during DMA (dmcDmaInProgress prevents recursion)
+            irqLinePrev = irqLineCurrent;
+            irqLineCurrent = statusframeint || statusdmcint || statusmapperint;
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte Mem_r(ushort address)
         {
+            cpuBusAddr = address;
+            cpuBusIsWrite = false;
             tick();
             byte val = mem_read_fun[address](address);
             cpubus = val;
@@ -51,16 +72,18 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void Mem_w(ushort address, byte value)
         {
+            cpuBusAddr = address;
+            cpuBusIsWrite = true;
             tick();
             cpubus = value;
             mem_write_fun[address](address, value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static byte ZP_r(byte addr) { tick(); return NES_MEM[addr]; }
+        static byte ZP_r(byte addr) { cpuBusAddr = addr; cpuBusIsWrite = false; tick(); return NES_MEM[addr]; }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void ZP_w(byte addr, byte value) { tick(); NES_MEM[addr] = value; }
+        static void ZP_w(byte addr, byte value) { cpuBusAddr = addr; cpuBusIsWrite = true; tick(); NES_MEM[addr] = value; }
 
         static Action<ushort, byte>[] mem_write_fun = null;
         static Func<ushort, byte>[] mem_read_fun = null;

@@ -25,9 +25,7 @@ namespace AprNes
         static public byte gamepad_r_4016()
         {
             if (P1_StrobeState < 8) P1_r = P1_joypad_status[P1_StrobeState];
-            else if (P1_StrobeState >= 8 && P1_StrobeState < 19) P1_r = 0;
-            else if (P1_StrobeState == 19) P1_r = 1;
-            else P1_r = 0;
+            else P1_r = 1; // After 8 buttons, shift register returns D0=1 (NES hardware)
             P1_StrobeState++;
             if (P1_StrobeState == 24) P1_StrobeState = 0;
             return P1_r;

@@ -80,6 +80,7 @@ namespace AprNes
             int debugMax = 15000;
             double softResetSec = -1; // <0 means not set
             string inputSpec = null;
+            HashSet<string> expectedCrcs = null; // --expected-crc "CRC1,CRC2,..."
 
             // Parse arguments
             for (int i = 0; i < args.Length; i++)
@@ -115,6 +116,17 @@ namespace AprNes
                         break;
                     case "--input":
                         if (i + 1 < args.Length) inputSpec = args[++i];
+                        break;
+                    case "--expected-crc":
+                        if (i + 1 < args.Length)
+                        {
+                            expectedCrcs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                            foreach (string c in args[++i].Split(','))
+                            {
+                                string t = c.Trim();
+                                if (t.Length > 0) expectedCrcs.Add(t);
+                            }
+                        }
                         break;
                 }
             }
@@ -284,6 +296,21 @@ namespace AprNes
                         if (!earlyPass && !earlyFail && NametableContains("All tests complete"))
                             earlyPass = true;
 
+                        // CRC-based tests: match displayed CRC against expected values
+                        if (!earlyPass && !earlyFail && expectedCrcs != null && expectedCrcs.Count > 0)
+                        {
+                            string foundCrc = FindNametableCrc();
+                            if (foundCrc != null)
+                            {
+                                if (expectedCrcs.Contains(foundCrc))
+                                    earlyPass = true;
+                                else
+                                    earlyFail = true;
+                                Console.Error.WriteLine("[TestRunner] CRC on screen: " + foundCrc
+                                    + (earlyPass ? " (matched)" : " (NOT in expected set)"));
+                            }
+                        }
+
                         if (earlyPass || earlyFail)
                         {
                             resultCode = earlyFail ? (byte)1 : (byte)0;
@@ -303,6 +330,13 @@ namespace AprNes
                         resultCode = NesCore.NES_MEM[0x6000];
                     else
                         resultCode = DetectNonProtocolResult();
+                    // Override with CRC check if expected CRCs provided
+                    if (resultCode != 0 && expectedCrcs != null && expectedCrcs.Count > 0)
+                    {
+                        string foundCrc = FindNametableCrc();
+                        if (foundCrc != null && expectedCrcs.Contains(foundCrc))
+                            resultCode = 0;
+                    }
                     done = true;
                     NesCore.exit = true;
                     return;
@@ -320,6 +354,18 @@ namespace AprNes
                         resultCode = DetectNonProtocolResult();
                         Console.Error.WriteLine("[TestRunner] Timeout at frame " + frameCount
                             + ", no $6000 protocol. result=0x" + resultCode.ToString("X2"));
+                    }
+                    // Override with CRC check if expected CRCs provided
+                    if (resultCode != 0 && expectedCrcs != null && expectedCrcs.Count > 0)
+                    {
+                        string foundCrc = FindNametableCrc();
+                        if (foundCrc != null)
+                        {
+                            Console.Error.WriteLine("[TestRunner] CRC on screen: " + foundCrc
+                                + (expectedCrcs.Contains(foundCrc) ? " (matched)" : " (NOT in expected set)"));
+                            if (expectedCrcs.Contains(foundCrc))
+                                resultCode = 0;
+                        }
                     }
                     done = true;
                     NesCore.exit = true;
@@ -494,6 +540,50 @@ namespace AprNes
             return 0xFF;
         }
 
+        // Find an 8-character hex CRC in nametable, return it (uppercase) or null
+        static string FindNametableCrc()
+        {
+            byte* nt = NesCore.ppu_ram;
+            if (nt == null) return null;
+            // Scan nametable 0 for 8 consecutive hex digits
+            for (int off = 0x2000; off <= 0x23BF - 7; off++)
+            {
+                bool allHex = true;
+                char[] crc = new char[8];
+                for (int k = 0; k < 8; k++)
+                {
+                    byte b = nt[off + k];
+                    if ((b >= (byte)'0' && b <= (byte)'9') ||
+                        (b >= (byte)'A' && b <= (byte)'F') ||
+                        (b >= (byte)'a' && b <= (byte)'f'))
+                    {
+                        crc[k] = (char)b;
+                    }
+                    else { allHex = false; break; }
+                }
+                if (!allHex) continue;
+                // Must NOT be preceded or followed by another hex digit (avoid partial matches)
+                if (off > 0x2000)
+                {
+                    byte prev = nt[off - 1];
+                    if ((prev >= (byte)'0' && prev <= (byte)'9') ||
+                        (prev >= (byte)'A' && prev <= (byte)'F') ||
+                        (prev >= (byte)'a' && prev <= (byte)'f'))
+                        continue;
+                }
+                if (off + 8 <= 0x23BF)
+                {
+                    byte next = nt[off + 8];
+                    if ((next >= (byte)'0' && next <= (byte)'9') ||
+                        (next >= (byte)'A' && next <= (byte)'F') ||
+                        (next >= (byte)'a' && next <= (byte)'f'))
+                        continue;
+                }
+                return new string(crc).ToUpperInvariant();
+            }
+            return null;
+        }
+
         static string ReadBlarggText()
         {
             if (HasBlarggSignature())
@@ -521,6 +611,10 @@ namespace AprNes
 
             if (NametableContains(" 0/")) return "(screen: 0 errors = passed)";
             if (NametableContains("All tests complete")) return "(screen: All tests complete = passed)";
+
+            // CRC-based result
+            string crc = FindNametableCrc();
+            if (crc != null) return "(screen CRC: " + crc + ")";
 
             byte f0 = NesCore.NES_MEM[0xF0];
             if (f0 == 1)   return "(no $6000 signature, $F0=0x01 = passed)";
