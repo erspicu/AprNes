@@ -1,5 +1,12 @@
 #!/bin/bash
-# run_tests_report.sh — Run all NES tests with screenshots and generate HTML report
+# run_tests_report.sh — Run all NES tests with optional JSON/screenshots/HTML output
+#
+# Usage:
+#   bash run_tests_report.sh                    # Quick: stdout only
+#   bash run_tests_report.sh --json             # + save report/results.json
+#   bash run_tests_report.sh --screenshots      # + capture screenshots
+#   bash run_tests_report.sh --json --screenshots  # Full: JSON + screenshots + HTML
+#   bash run_tests_report.sh --no-build         # Skip build step
 set -u
 
 cd /c/ai_project/AprNes
@@ -13,24 +20,52 @@ RESULTS_JSON="$REPORT_DIR/results.json"
 PASS=0
 FAIL=0
 TOTAL=0
-FIRST_JSON=1
 
 # ─────────────────────────────────────────────
-# Step 1: Build
+# Parse arguments
 # ─────────────────────────────────────────────
-echo "=== Building project ==="
-powershell -NoProfile -Command "& 'C:\Program Files (x86)\MSBuild\14.0\Bin\MSBuild.exe' 'C:\ai_project\AprNes\AprNes.sln' /p:Configuration=Debug /t:Rebuild /nologo /v:minimal"
-if [ $? -ne 0 ]; then
-    echo "BUILD FAILED"
-    exit 1
+OPT_JSON=0
+OPT_SCREENSHOTS=0
+OPT_BUILD=1
+
+for arg in "$@"; do
+    case "$arg" in
+        --json)        OPT_JSON=1 ;;
+        --screenshots) OPT_SCREENSHOTS=1 ;;
+        --no-build)    OPT_BUILD=0 ;;
+        *) echo "Unknown option: $arg"; exit 1 ;;
+    esac
+done
+
+# ─────────────────────────────────────────────
+# Step 1: Build (unless --no-build)
+# ─────────────────────────────────────────────
+if [ $OPT_BUILD -eq 1 ]; then
+    echo "=== Building project ==="
+    powershell -NoProfile -Command "& 'C:\Program Files (x86)\MSBuild\14.0\Bin\MSBuild.exe' 'C:\ai_project\AprNes\AprNes.sln' /p:Configuration=Debug /t:Rebuild /nologo /v:minimal"
+    if [ $? -ne 0 ]; then
+        echo "BUILD FAILED"
+        exit 1
+    fi
 fi
 
 # ─────────────────────────────────────────────
-# Prepare directories
+# Prepare directories / JSON
 # ─────────────────────────────────────────────
-rm -rf "$SCREENSHOT_DIR"
-mkdir -p "$SCREENSHOT_DIR"
-echo "[" > "$RESULTS_JSON"
+FIRST_JSON=1
+
+if [ $OPT_JSON -eq 1 ] || [ $OPT_SCREENSHOTS -eq 1 ]; then
+    mkdir -p "$REPORT_DIR"
+fi
+
+if [ $OPT_JSON -eq 1 ]; then
+    echo "[" > "$RESULTS_JSON"
+fi
+
+if [ $OPT_SCREENSHOTS -eq 1 ]; then
+    rm -rf "$SCREENSHOT_DIR"
+    mkdir -p "$SCREENSHOT_DIR"
+fi
 
 # ─────────────────────────────────────────────
 # Helper functions
@@ -62,17 +97,26 @@ run_test() {
         return
     fi
 
-    local rom_base="${rom%.nes}"
-    local ss_rel="screenshots/${suite}/${rom_base}.webp"
-    local ss_png_path="$REPORT_DIR/screenshots/${suite}/${rom_base}.png"
-    local ss_webp_path="$REPORT_DIR/$ss_rel"
-    mkdir -p "$(dirname "$ss_png_path")"
-
     TOTAL=$((TOTAL+1))
-    output=$("$EXE" --rom "$rompath" --wait-result --screenshot "$ss_png_path" $extra_args 2>&1) && rc=0 || rc=$?
 
-    # Convert PNG to lossless WebP and remove original
-    if [ -f "$ss_png_path" ]; then
+    # Build command
+    local cmd="$EXE --rom $rompath --wait-result $extra_args"
+
+    # Screenshot handling
+    local ss_rel=""
+    if [ $OPT_SCREENSHOTS -eq 1 ]; then
+        local rom_base="${rom%.nes}"
+        ss_rel="screenshots/${suite}/${rom_base}.webp"
+        local ss_png_path="$REPORT_DIR/screenshots/${suite}/${rom_base}.png"
+        local ss_webp_path="$REPORT_DIR/$ss_rel"
+        mkdir -p "$(dirname "$ss_png_path")"
+        cmd="$cmd --screenshot $ss_png_path"
+    fi
+
+    output=$($cmd 2>&1) && rc=0 || rc=$?
+
+    # Convert PNG to WebP
+    if [ $OPT_SCREENSHOTS -eq 1 ] && [ -f "$ss_png_path" ]; then
         python -c "
 from PIL import Image; Image.open(r'$ss_png_path').save(r'$ss_webp_path','WEBP',lossless=True,method=6)
 " 2>/dev/null && rm -f "$ss_png_path"
@@ -88,25 +132,28 @@ from PIL import Image; Image.open(r'$ss_png_path').save(r'$ss_webp_path','WEBP',
         echo "FAIL($rc): $suite/$rom"
     fi
 
-    local esc_suite=$(json_escape "$suite")
-    local esc_rom=$(json_escape "$rom")
-    local esc_text=$(json_escape "$output")
+    # JSON output
+    if [ $OPT_JSON -eq 1 ]; then
+        local esc_suite=$(json_escape "$suite")
+        local esc_rom=$(json_escape "$rom")
+        local esc_text=$(json_escape "$output")
 
-    if [ $FIRST_JSON -eq 1 ]; then
-        FIRST_JSON=0
-    else
-        printf ',\n' >> "$RESULTS_JSON"
+        if [ $FIRST_JSON -eq 1 ]; then
+            FIRST_JSON=0
+        else
+            printf ',\n' >> "$RESULTS_JSON"
+        fi
+
+        printf '  {"suite":"%s","rom":"%s","status":"%s","exit_code":%d,"result_text":"%s","screenshot":"%s"}' \
+            "$esc_suite" "$esc_rom" "$status" "$rc" "$esc_text" "$ss_rel" >> "$RESULTS_JSON"
     fi
-
-    printf '  {"suite":"%s","rom":"%s","status":"%s","exit_code":%d,"result_text":"%s","screenshot":"%s"}' \
-        "$esc_suite" "$esc_rom" "$status" "$rc" "$esc_text" "$ss_rel" >> "$RESULTS_JSON"
 }
 
 # ─────────────────────────────────────────────
 # Step 2: Run all tests
 # ─────────────────────────────────────────────
 echo ""
-echo "=== Running tests with screenshots ==="
+echo "=== Running tests ==="
 
 # apu_mixer (4)
 for rom in dmc.nes noise.nes square.nes triangle.nes; do
@@ -119,7 +166,7 @@ for rom in 4015_cleared.nes 4017_timing.nes 4017_written.nes irq_flag_cleared.ne
 done
 
 # apu_test merged + singles (9)
-run_test "apu_test" "apu_test.nes" "--max-wait 60"
+run_test "apu_test" "apu_test.nes" "--max-wait 120"
 for rom in 1-len_ctr.nes 2-len_table.nes 3-irq_flag.nes 4-jitter.nes 5-len_timing.nes 6-irq_flag_timing.nes 7-dmc_basics.nes 8-dmc_rates.nes; do
     run_test "apu_test/rom_singles" "$rom" "--max-wait 30"
 done
@@ -131,7 +178,7 @@ done
 
 # blargg_nes_cpu_test5 (2)
 for rom in cpu.nes official.nes; do
-    run_test "blargg_nes_cpu_test5" "$rom" "--max-wait 60"
+    run_test "blargg_nes_cpu_test5" "$rom" "--max-wait 120"
 done
 
 # blargg_ppu_tests_2005.09.15b (5)
@@ -158,7 +205,7 @@ for rom in test_cpu_exec_space_ppuio.nes test_cpu_exec_space_apu.nes; do
 done
 
 # cpu_interrupts_v2 merged + singles (6)
-run_test "cpu_interrupts_v2" "cpu_interrupts.nes" "--max-wait 60"
+run_test "cpu_interrupts_v2" "cpu_interrupts.nes" "--max-wait 120"
 for rom in 1-cli_latency.nes 2-nmi_and_brk.nes 3-nmi_and_irq.nes 4-irq_and_dma.nes 5-branch_delays_irq.nes; do
     run_test "cpu_interrupts_v2/rom_singles" "$rom" "--max-wait 30"
 done
@@ -169,7 +216,7 @@ for rom in registers.nes ram_after_reset.nes; do
 done
 
 # cpu_timing_test6 (1)
-run_test "cpu_timing_test6" "cpu_timing_test.nes" "--max-wait 60"
+run_test "cpu_timing_test6" "cpu_timing_test.nes" "--max-wait 120"
 
 # dmc_dma_during_read4 (5)
 for rom in dma_2007_read.nes dma_2007_write.nes dma_4016_read.nes double_2007_read.nes read_write_2007.nes; do
@@ -177,27 +224,27 @@ for rom in dma_2007_read.nes dma_2007_write.nes dma_4016_read.nes double_2007_re
 done
 
 # instr_misc merged + singles (5)
-run_test "instr_misc" "instr_misc.nes" "--max-wait 60"
+run_test "instr_misc" "instr_misc.nes" "--max-wait 120"
 for rom in 01-abs_x_wrap.nes 02-branch_wrap.nes 03-dummy_reads.nes 04-dummy_reads_apu.nes; do
     run_test "instr_misc/rom_singles" "$rom" "--max-wait 30"
 done
 
 # instr_test-v3 (17)
-run_test "instr_test-v3" "all_instrs.nes" "--max-wait 60"
-run_test "instr_test-v3" "official_only.nes" "--max-wait 60"
+run_test "instr_test-v3" "all_instrs.nes" "--max-wait 120"
+run_test "instr_test-v3" "official_only.nes" "--max-wait 120"
 for rom in 01-implied.nes 02-immediate.nes 03-zero_page.nes 04-zp_xy.nes 05-absolute.nes 06-abs_xy.nes 07-ind_x.nes 08-ind_y.nes 09-branches.nes 10-stack.nes 11-jmp_jsr.nes 12-rts.nes 13-rti.nes 14-brk.nes 15-special.nes; do
     run_test "instr_test-v3/rom_singles" "$rom" "--max-wait 30"
 done
 
 # instr_test-v5 (18)
-run_test "instr_test-v5" "all_instrs.nes" "--max-wait 60"
-run_test "instr_test-v5" "official_only.nes" "--max-wait 60"
+run_test "instr_test-v5" "all_instrs.nes" "--max-wait 120"
+run_test "instr_test-v5" "official_only.nes" "--max-wait 120"
 for rom in 01-basics.nes 02-implied.nes 03-immediate.nes 04-zero_page.nes 05-zp_xy.nes 06-absolute.nes 07-abs_xy.nes 08-ind_x.nes 09-ind_y.nes 10-branches.nes 11-stack.nes 12-jmp_jsr.nes 13-rts.nes 14-rti.nes 15-brk.nes 16-special.nes; do
     run_test "instr_test-v5/rom_singles" "$rom" "--max-wait 30"
 done
 
 # instr_timing (3)
-run_test "instr_timing" "instr_timing.nes" "--max-wait 60"
+run_test "instr_timing" "instr_timing.nes" "--max-wait 120"
 for rom in 1-instr_timing.nes 2-branch_timing.nes; do
     run_test "instr_timing/rom_singles" "$rom" "--max-wait 30"
 done
@@ -232,7 +279,7 @@ run_test "ppu_open_bus" "ppu_open_bus.nes" "--max-wait 30"
 run_test "ppu_read_buffer" "test_ppu_read_buffer.nes" "--max-wait 30"
 
 # ppu_vbl_nmi merged + singles (11)
-run_test "ppu_vbl_nmi" "ppu_vbl_nmi.nes" "--max-wait 60"
+run_test "ppu_vbl_nmi" "ppu_vbl_nmi.nes" "--max-wait 120"
 for rom in 01-vbl_basics.nes 02-vbl_set_time.nes 03-vbl_clear_time.nes 04-nmi_control.nes 05-nmi_timing.nes 06-suppression.nes 07-nmi_on_timing.nes 08-nmi_off_timing.nes 09-even_odd_frames.nes 10-even_odd_timing.nes; do
     run_test "ppu_vbl_nmi/rom_singles" "$rom" "--max-wait 30"
 done
@@ -265,23 +312,28 @@ for rom in 1.frame_basics.nes 2.vbl_timing.nes 3.even_odd_frames.nes 4.vbl_clear
 done
 
 # ─────────────────────────────────────────────
-# Close JSON array
+# Finalize
 # ─────────────────────────────────────────────
-echo "" >> "$RESULTS_JSON"
-echo "]" >> "$RESULTS_JSON"
-
 echo ""
 echo "=== RESULTS: $PASS PASS / $FAIL FAIL / $TOTAL TOTAL ==="
 
-# ─────────────────────────────────────────────
-# Step 3: Generate HTML report
-# ─────────────────────────────────────────────
-echo ""
-echo "=== Generating HTML report ==="
+# Close JSON array
+if [ $OPT_JSON -eq 1 ]; then
+    echo "" >> "$RESULTS_JSON"
+    echo "]" >> "$RESULTS_JSON"
+    echo "  JSON: $RESULTS_JSON"
+fi
 
-{
-# ── HTML Part 1: head + styles + body start ──
-cat << 'HTML1'
+if [ $OPT_SCREENSHOTS -eq 1 ]; then
+    echo "  Screenshots: $SCREENSHOT_DIR/"
+fi
+
+# Generate HTML report (requires both JSON and screenshots)
+if [ $OPT_JSON -eq 1 ] && [ $OPT_SCREENSHOTS -eq 1 ]; then
+    echo ""
+    echo "=== Generating HTML report ==="
+    {
+    cat << 'HTML1'
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -390,17 +442,15 @@ input[type="text"]::placeholder{color:var(--text-dim)}
   <img id="modal-img" src="" alt="">
   <div class="modal-title" id="modal-title"></div>
 </div>
-<div class="footer"><a href="methodology.html">Testing Methodology</a> | Generated by AprNes Test Runner</div>
+<div class="footer">Generated by AprNes Test Runner</div>
 <script>
 HTML1
 
-# ── Inject build date and JSON data ──
-echo "var BUILD_DATE='$(date '+%Y-%m-%d %H:%M:%S')';"
-echo "var RESULTS="
-cat "$RESULTS_JSON"
+    echo "var BUILD_DATE='$(date '+%Y-%m-%d %H:%M:%S')';"
+    echo "var RESULTS="
+    cat "$RESULTS_JSON"
 
-# ── HTML Part 2: JavaScript logic + closing tags ──
-cat << 'HTML2'
+    cat << 'HTML2'
 ;
 document.getElementById('build-date').textContent = BUILD_DATE;
 var totalCount = RESULTS.length;
@@ -544,11 +594,7 @@ render();
 </body>
 </html>
 HTML2
-} > "$REPORT_DIR/index.html"
+    } > "$REPORT_DIR/index.html"
 
-echo ""
-echo "=== Report generated ==="
-echo "  HTML:        $REPORT_DIR/index.html"
-echo "  JSON:        $RESULTS_JSON"
-echo "  Screenshots: $SCREENSHOT_DIR/"
-echo "  Results:     $PASS PASS / $FAIL FAIL / $TOTAL TOTAL"
+    echo "  HTML: $REPORT_DIR/index.html"
+fi

@@ -157,8 +157,8 @@ namespace AprNes
 
         // Per-8-cycle tile fetch: runs each PPU cycle on visible/pre-render scanlines when rendering enabled.
         // BG tiles fetched at cycles 0-255 (visible) and 320-335 (next-scanline prefetch).
-        // A12 notifications at phases 3 (AT addr, A12=0) and 7 (CHR high addr, A12=BG table bit12),
-        // shifted +3 from address-setup phases to match real NES bus timing relative to our PPU cycle base.
+        // A12 notifications: BG at phases 0 (NT addr, A12=0) and 4 (CHR low addr, A12=BG table bit12),
+        // sprites at phases 0 (garbage NT, A12=0) and 3 (sprite CHR, A12=sprite table bit12).
         static void ppu_rendering_tick()
         {
             if (ppu_cycles_x < 256 || (ppu_cycles_x >= 320 && ppu_cycles_x < 336))
@@ -167,6 +167,7 @@ namespace AprNes
                 {
                     case 0:
                         ioaddr = 0x2000 | (vram_addr & 0x0FFF);
+                        if (mapper == 4) NotifyMapperA12(ioaddr);  // NT addr, A12=0
                         break;
                     case 1:
                         NTVal = ppu_ram[ioaddr];
@@ -177,10 +178,10 @@ namespace AprNes
                     case 3:
                         ATVal = (byte)((ppu_ram[ioaddr] >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
                         bg_attr_p3 = bg_attr_p2; bg_attr_p2 = bg_attr_p1; bg_attr_p1 = ATVal;
-                        if (mapper == 4) NotifyMapperA12(ioaddr);
                         break;
                     case 4:
                         ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
+                        if (mapper == 4) NotifyMapperA12(ioaddr);  // CHR low addr, A12=BG table bit
                         break;
                     case 5:
                         lowTile = MapperObj.MapperR_CHR(ioaddr);
@@ -189,7 +190,6 @@ namespace AprNes
                         ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
                         break;
                     case 7:
-                        if (mapper == 4) NotifyMapperA12(ioaddr);
                         highTile = MapperObj.MapperR_CHR(ioaddr);
                         // Render 8 pixels using shift registers BEFORE reload (visible only, BG on)
                         if (scanline < 240 && ppu_cycles_x < 256 && ShowBackGround)
@@ -212,8 +212,8 @@ namespace AprNes
                 if (mapper == 4)
                 {
                     int phase = (ppu_cycles_x - 257) & 7;
-                    if (phase == 2) NotifyMapperA12(0x2000);                // garbage NT fetch, A12=0
-                    else if (phase == 6) NotifyMapperA12(SpPatternTableAddr); // sprite CHR fetch
+                    if (phase == 0) NotifyMapperA12(0x2000);                // garbage NT addr, A12=0
+                    else if (phase == 3) NotifyMapperA12(SpPatternTableAddr); // sprite CHR addr (pre-output)
                 }
             }
 
@@ -223,9 +223,9 @@ namespace AprNes
                 vram_addr = (vram_addr & ~0x7BE0) | (vram_addr_internal & 0x7BE0);
             }
 
-            // Garbage NT fetches at dots 337-340: notify A12=0 to create falling edge
+            // Garbage NT fetches at dots 336-339: notify A12=0 to create falling edge
             // after BG prefetch CHR (A12=1 for BG=$1000), needed for scanline-boundary timing
-            if (mapper == 4 && ppu_cycles_x == 337)
+            if (mapper == 4 && ppu_cycles_x == 336)
                 NotifyMapperA12(0x2000);
         }
 

@@ -129,6 +129,21 @@ for rom in 1-instr_timing.nes 2-branch_timing.nes; do
     run_test "instr_timing/rom_singles" "$rom" "--max-wait 30"
 done
 
+# mmc3_irq_tests (6)
+for rom in 1.Clocking.nes 2.Details.nes 3.A12_clocking.nes 4.Scanline_timing.nes 5.MMC3_rev_A.nes 6.MMC3_rev_B.nes; do
+    run_test "mmc3_irq_tests" "$rom" "--max-wait 30"
+done
+
+# mmc3_test (6)
+for rom in 1-clocking.nes 2-details.nes 3-A12_clocking.nes 4-scanline_timing.nes 5-MMC3.nes 6-MMC6.nes; do
+    run_test "mmc3_test" "$rom" "--max-wait 30"
+done
+
+# mmc3_test_2 (6)
+for rom in 1-clocking.nes 2-details.nes 3-A12_clocking.nes 4-scanline_timing.nes 5-MMC3.nes 6-MMC3_alt.nes; do
+    run_test "mmc3_test_2/rom_singles" "$rom" "--max-wait 30"
+done
+
 # nes_instr_test (11)
 for rom in 01-implied.nes 02-immediate.nes 03-zero_page.nes 04-zp_xy.nes 05-absolute.nes 06-abs_xy.nes 07-ind_x.nes 08-ind_y.nes 09-branches.nes 10-stack.nes 11-special.nes; do
     run_test "nes_instr_test/rom_singles" "$rom" "--max-wait 30"

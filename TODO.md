@@ -1,7 +1,7 @@
 # AprNes 待修復問題清單
 
-**基線**: 159 PASS / 15 FAIL / 174 TOTAL (2026-02-22, run_tests_report.sh)
-> 注: 15 FAIL 含 2 個重複計算（merged test + mmc3_test_2），獨立 bug 數為 13
+**基線**: 161 PASS / 13 FAIL / 174 TOTAL (2026-02-22, run_tests_report.sh)
+> 注: 13 FAIL 含 1 個重複計算（merged test），獨立 bug 數為 12
 
 優先權排序原則：**影響大 + 好修** 排最前面
 
@@ -40,10 +40,15 @@
   - irqLineAtFetch 修正 NMI+IRQ 交互 → 3-nmi_and_irq PASS
 - ~~Bug H: 手把讀取~~ → **+1 PASS** (BUGFIX15)
   - 測試腳本修正：移除錯誤的 --input A:2.0，增加 --max-wait 30→45
+- ~~MMC3 scanline timing (新版)~~ → **+2 PASS** (BUGFIX16)
+  - PPU A12 notification phase alignment: sprite CHR 從 phase 4→3
+  - BG: phase 0 (NT, A12=0) + phase 4 (CHR, A12=BG table bit)
+  - Sprite: phase 0 (garbage NT, A12=0) + phase 3 (sprite CHR, A12=sprite table bit)
+  - run_tests_report.sh 重構：`--json`, `--screenshots`, `--no-build` 參數
 
 ---
 
-## P3 — 較難修復（共 12 個測試 FAIL）
+## P3 — 較難修復（共 9 個測試 FAIL）
 
 ### Bug E: CPU interrupt timing 剩餘（NMI/BRK/DMA 交互）
 - **影響**: 4 個測試 FAIL（原 5 個，已修 2 個；含 1 merged test）
@@ -65,12 +70,6 @@
   - `dmc_dma_during_read4/double_2007_read` — Timeout
   - `sprdma_and_dmc_dma/sprdma_and_dmc_dma` — OAM DMA cycle 全為 399
   - `sprdma_and_dmc_dma/sprdma_and_dmc_dma_512` — 同上
-
-### MMC3 scanline timing (mmc3_test 新版)
-- **影響**: 2 個測試 FAIL（同一 bug，mmc3_test + mmc3_test_2）
-- **失敗測試**:
-  - `mmc3_test/4-scanline_timing` — Scanline 0 IRQ should occur sooner when $2000=$08
-  - `mmc3_test_2/4-scanline_timing` — 同上（mmc3_test_2 版本）
 
 ---
 
@@ -108,11 +107,12 @@
 已完成: Bug H (手把讀取) → 159 PASS / 15 FAIL
   → 測試腳本修正：移除 --input，增加 --max-wait
 
-下一步: MMC3 scanline timing (mmc3_test 新版)
-  → mmc3_test/4-scanline_timing, mmc3_test_2/4-scanline_timing
+已完成: MMC3 scanline timing (新版) → 161 PASS / 13 FAIL ★
+  → PPU A12 notification phase alignment
+  → run_tests_report.sh 重構 + run_tests.sh 同步 mmc3 測試
 
 Phase 8: Bug G — sprite timing
-  → 預期 +4，目標 ~163 PASS (15 FAIL → ~11 FAIL)
+  → 預期 +4，目標 ~165 PASS (13 FAIL → ~9 FAIL)
 
 Phase 9: Bug E 剩餘 — NMI/BRK/DMA 交互
   → 2-nmi_and_brk, 4-irq_and_dma, 5-branch_delays_irq
@@ -122,4 +122,4 @@ Phase 10: Bug F (DMC DMA) — 需架構重構，暫緩
 
 ---
 
-*最後更新: 2026-02-22 (BUGFIX15 — 159 PASS / 15 FAIL / 174 TOTAL, 修正 thorough_test 測試參數)*
+*最後更新: 2026-02-22 (BUGFIX16 — 161 PASS / 13 FAIL / 174 TOTAL, MMC3 scanline timing + script 重構)*
