@@ -119,21 +119,36 @@ tr:hover td{background:var(--surface2)}
   <span class="arrow">&rarr;</span>
   <div class="step"><div class="title">結果偵測</div><div class="desc">$6000 / 畫面掃描</div></div>
   <span class="arrow">&rarr;</span>
-  <div class="step"><div class="title">HTML 報告</div><div class="desc">JSON + 截圖</div></div>
+  <div class="step"><div class="title">輸出</div><div class="desc">stdout / JSON / HTML</div></div>
 </div>
 
 <div class="section">
 <h3>無頭模式</h3>
 <p>模擬器內建 <code>TestRunner.cs</code>，以無頭模式運行 &mdash; 沒有視窗、沒有音效、沒有幀率限制。CPU/PPU/APU 全部以最高速度運行。單個測試 ROM 通常在 1 秒內完成。</p>
 
-<h3>調度腳本</h3>
-<p>一個 bash 腳本（<code>run_tests_report.sh</code>）處理完整的流程：</p>
+<h3>兩個腳本、兩種用途</h3>
+<p>測試工作流使用兩個互補的腳本，測試清單完全一致（174 個 ROM）：</p>
+<ul>
+  <li><strong><code>run_tests.sh</code></strong> &mdash; 輕量驗證腳本。執行所有測試並將 PASS/FAIL 輸出到 stdout，附帶失敗摘要。用於開發過程中快速回歸檢查。</li>
+  <li><strong><code>run_tests_report.sh</code></strong> &mdash; 全功能報告產生器，透過命令列參數控制模組化輸出。</li>
+</ul>
+
+<h3>報告腳本模式</h3>
+<p><code>run_tests_report.sh</code> 固定將 PASS/FAIL 結果輸出到 stdout。可選參數控制額外輸出：</p>
+<pre>bash run_tests_report.sh                        # 快速：僅 stdout
+bash run_tests_report.sh --json                 # + 儲存 report/results.json
+bash run_tests_report.sh --screenshots          # + 擷取截圖（PNG&rarr;WebP）
+bash run_tests_report.sh --json --screenshots   # 完整：JSON + 截圖 + HTML 報告
+bash run_tests_report.sh --no-build             # 跳過 MSBuild 編譯步驟</pre>
+
+<p>完整流程（啟用所有參數）執行以下步驟：</p>
 <ol style="margin:.5rem 0 .75rem 1.2rem;font-size:.82rem;color:var(--text-dim)">
-  <li>使用 MSBuild 編譯專案</li>
+  <li>使用 MSBuild 編譯專案（除非指定 <code>--no-build</code>）</li>
   <li>將 174 個 ROM 檔案逐一透過無頭模擬器執行</li>
-  <li>擷取最終畫面為 PNG，轉換為無損 WebP</li>
-  <li>將結果收集為 JSON 陣列</li>
-  <li>產生包含嵌入資料的單一 HTML 報告檔案</li>
+  <li>將每個測試的 PASS/FAIL 輸出到 stdout</li>
+  <li>若指定 <code>--screenshots</code>：擷取最終畫面為 PNG，轉換為無損 WebP</li>
+  <li>若指定 <code>--json</code>：將結果收集為 <code>report/results.json</code></li>
+  <li>若同時指定 <code>--json</code> 和 <code>--screenshots</code>：產生包含嵌入資料和截圖參照的單一 HTML 報告檔案（<code>report/index.html</code>）</li>
 </ol>
 </div>
 
@@ -186,11 +201,11 @@ tr:hover td{background:var(--surface2)}
 <pre>--input "A:2.0,B:4.0,Select:6.0,Start:8.0,Up:10.0,Down:12.0,Left:14.0,Right:16.0"</pre>
 <p>每個按鈕在指定時間（秒）被按下，並持續 10 幀（約 166ms）。這使得 <code>read_joy3/test_buttons</code> 等測試能驗證所有 8 個按鈕是否被正確依序偵測。</p>
 
-<h3>截圖擷取</h3>
-<p>每個測試的最終畫面會被擷取為 256x240 PNG，然後轉換為無損 WebP（通常縮小 60-80%）。截圖作為視覺佐證 &mdash; 許多測試 ROM 會在畫面上以文字顯示結果，確切展示通過或失敗的項目。</p>
+<h3>截圖擷取（可選）</h3>
+<p>啟用 <code>--screenshots</code> 時，每個測試的最終畫面會被擷取為 256x240 PNG，然後轉換為無損 WebP（通常縮小 60-80%）。截圖作為視覺佐證 &mdash; 許多測試 ROM 會在畫面上以文字顯示結果，確切展示通過或失敗的項目。進行快速回歸檢查時可跳過截圖以節省時間。</p>
 
 <h3>逾時安全機制</h3>
-<p>每個 ROM 有可設定的 <code>--max-wait</code> 逾時時間（預設 30 秒，較長測試為 120 秒）。若測試 ROM 進入無限迴圈或當機，執行器會優雅地終止它並回報最後已知狀態。</p>
+<p>每個 ROM 有可設定的 <code>--max-wait</code> 逾時時間（預設 30 秒，合併/多子測試 ROM 為 120 秒）。若測試 ROM 進入無限迴圈或當機，執行器會優雅地終止它並回報最後已知狀態。</p>
 </div>
 
 <!-- ───────────────── 第 6 節 ───────────────── -->

@@ -119,21 +119,36 @@ The same ROMs are used by every major NES emulator project to measure accuracy.<
   <span class="arrow">&rarr;</span>
   <div class="step"><div class="title">Result Detection</div><div class="desc">$6000 / Screen scan</div></div>
   <span class="arrow">&rarr;</span>
-  <div class="step"><div class="title">HTML Report</div><div class="desc">JSON + Screenshots</div></div>
+  <div class="step"><div class="title">Output</div><div class="desc">stdout / JSON / HTML</div></div>
 </div>
 
 <div class="section">
 <h3>Headless Mode</h3>
 <p>The emulator has a built-in <code>TestRunner.cs</code> that runs in headless mode &mdash; no window, no audio, no frame rate limiter. The CPU/PPU/APU all tick at maximum speed. A single test ROM typically completes in under 1 second.</p>
 
-<h3>Orchestration Script</h3>
-<p>A bash script (<code>run_tests_report.sh</code>) handles the full pipeline:</p>
+<h3>Two Scripts, Two Purposes</h3>
+<p>The testing workflow uses two complementary scripts with identical test lists (174 ROMs):</p>
+<ul>
+  <li><strong><code>run_tests.sh</code></strong> &mdash; Lightweight validation script. Runs all tests and prints PASS/FAIL to stdout with a failure summary. Used for quick regression checks during development.</li>
+  <li><strong><code>run_tests_report.sh</code></strong> &mdash; Full-featured report generator with modular output controlled by command-line flags.</li>
+</ul>
+
+<h3>Report Script Modes</h3>
+<p><code>run_tests_report.sh</code> always prints PASS/FAIL results to stdout. Optional flags control additional outputs:</p>
+<pre>bash run_tests_report.sh                        # Quick: stdout only
+bash run_tests_report.sh --json                 # + save report/results.json
+bash run_tests_report.sh --screenshots          # + capture screenshots (PNG&rarr;WebP)
+bash run_tests_report.sh --json --screenshots   # Full: JSON + screenshots + HTML report
+bash run_tests_report.sh --no-build             # Skip MSBuild compilation step</pre>
+
+<p>The full pipeline (with all flags) performs:</p>
 <ol style="margin:.5rem 0 .75rem 1.2rem;font-size:.82rem;color:var(--text-dim)">
-  <li>Build the project with MSBuild</li>
+  <li>Build the project with MSBuild (unless <code>--no-build</code>)</li>
   <li>Run each of 174 ROM files through the headless emulator</li>
-  <li>Capture the final frame as PNG, convert to lossless WebP</li>
-  <li>Collect results into a JSON array</li>
-  <li>Generate a single-file HTML report with embedded data</li>
+  <li>Print PASS/FAIL to stdout for every test</li>
+  <li>If <code>--screenshots</code>: capture the final frame as PNG, convert to lossless WebP</li>
+  <li>If <code>--json</code>: collect results into <code>report/results.json</code></li>
+  <li>If both <code>--json</code> and <code>--screenshots</code>: generate a single-file HTML report (<code>report/index.html</code>) with embedded data and screenshot references</li>
 </ol>
 </div>
 
@@ -186,11 +201,11 @@ The same ROMs are used by every major NES emulator project to measure accuracy.<
 <pre>--input "A:2.0,B:4.0,Select:6.0,Start:8.0,Up:10.0,Down:12.0,Left:14.0,Right:16.0"</pre>
 <p>Each button is pressed at the specified time (seconds) and held for 10 frames (~166ms). This lets tests like <code>read_joy3/test_buttons</code> verify that all 8 buttons are correctly detected in sequence.</p>
 
-<h3>Screenshot Capture</h3>
-<p>The final frame of each test is captured as a 256x240 PNG, then converted to lossless WebP (typically 60-80% smaller). Screenshots serve as visual evidence &mdash; many test ROMs display their results on screen as text, showing exactly what passed or failed.</p>
+<h3>Screenshot Capture (optional)</h3>
+<p>When enabled with <code>--screenshots</code>, the final frame of each test is captured as a 256x240 PNG, then converted to lossless WebP (typically 60-80% smaller). Screenshots serve as visual evidence &mdash; many test ROMs display their results on screen as text, showing exactly what passed or failed. For quick regression checks, screenshots can be skipped to save time.</p>
 
 <h3>Timeout Safety</h3>
-<p>Each ROM has a configurable <code>--max-wait</code> timeout (default 30 seconds, 120 for longer tests). If a test ROM enters an infinite loop or hangs, the runner terminates it gracefully and reports the last known state.</p>
+<p>Each ROM has a configurable <code>--max-wait</code> timeout (default 30 seconds, 120 for merged/multi-sub-test ROMs). If a test ROM enters an infinite loop or hangs, the runner terminates it gracefully and reports the last known state.</p>
 </div>
 
 <!-- ───────────────── Section 6 ───────────────── -->
