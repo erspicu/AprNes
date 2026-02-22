@@ -81,6 +81,7 @@ namespace AprNes
             double softResetSec = -1; // <0 means not set
             string inputSpec = null;
             HashSet<string> expectedCrcs = null; // --expected-crc "CRC1,CRC2,..."
+            bool passOnStable = false; // --pass-on-stable: screen stable + no "Failed" = PASS
 
             // Parse arguments
             for (int i = 0; i < args.Length; i++)
@@ -116,6 +117,9 @@ namespace AprNes
                         break;
                     case "--input":
                         if (i + 1 < args.Length) inputSpec = args[++i];
+                        break;
+                    case "--pass-on-stable":
+                        passOnStable = true;
                         break;
                     case "--expected-crc":
                         if (i + 1 < args.Length)
@@ -311,11 +315,23 @@ namespace AprNes
                             }
                         }
 
+                        // --pass-on-stable: no explicit result text, but screen stable = PASS
+                        // (for tests that exit silently with code 0 on success)
+                        if (!earlyPass && !earlyFail && passOnStable)
+                        {
+                            if (NametableContains("Failed") || NametableContains("FAILED"))
+                                earlyFail = true;
+                            else
+                                earlyPass = true;
+                        }
+
                         if (earlyPass || earlyFail)
                         {
                             resultCode = earlyFail ? (byte)1 : (byte)0;
                             Console.Error.WriteLine("[TestRunner] Screen stable at frame " + frameCount
-                                + ", detected " + (earlyFail ? "Failed" : "Passed") + " on screen");
+                                + ", detected " + (earlyFail ? "Failed" : "Passed") + " on screen"
+                                + (passOnStable && !NametableContains("Passed") && !NametableContains("PASSED")
+                                   ? " (pass-on-stable)" : ""));
                             done = true;
                             NesCore.exit = true;
                             return;

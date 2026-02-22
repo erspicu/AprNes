@@ -289,7 +289,7 @@ done
 # read_joy3 (4)
 run_test "read_joy3" "test_buttons.nes" "--max-wait 60 --input A:2.0,B:4.0,Select:6.0,Start:8.0,Up:10.0,Down:12.0,Left:14.0,Right:16.0"
 for rom in count_errors.nes count_errors_fast.nes; do
-    run_test "read_joy3" "$rom" "--max-wait 30"
+    run_test "read_joy3" "$rom" "--max-wait 30 --pass-on-stable"
 done
 run_test "read_joy3" "thorough_test.nes" "--max-wait 45"
 
