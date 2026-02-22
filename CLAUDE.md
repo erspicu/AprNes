@@ -24,13 +24,13 @@ AprNes/bin/Debug/AprNes.exe --rom nes-test-roms-master/checked/<suite>/<rom>.nes
 
 Exit code 0 = PASS, non-zero = FAIL. `--wait-result` blocks until the test ROM signals pass/fail or `--max-wait` timeout. Common extra flags: `--time <sec>`, `--screenshot <path.png>`, `--input <spec>` (for joypad tests, e.g. `A:2.0,B:4.0`).
 
-**重建測試結果網頁**（含截圖，完整報告）：
+**重建測試結果網頁**（截圖 + JSON，兩者缺一不可）：
 ```bash
 bash run_tests_report.sh --json --screenshots
 ```
-此指令會：自動編譯 → 跑全部 174 個測試 → 截圖（PNG→WebP）→ 產生 `report/results.json` + `report/index.html`。開啟 `report/index.html` 即可瀏覽含截圖的互動式測試報告（可篩選 pass/fail、按 suite 分組、搜尋 ROM 名稱、點圖放大）。其他用法：
+**必須同時帶 `--json` 和 `--screenshots`**，否則報告不完整。此指令會：自動編譯 → 跑全部 174 個測試 → 截圖（PNG→WebP）→ 產生 `report/results.json` + `report/index.html`。開啟 `report/index.html` 即可瀏覽含截圖的互動式測試報告（可篩選 pass/fail、按 suite 分組、搜尋 ROM 名稱、點圖放大）。其他用法：
 - `bash run_tests_report.sh --no-build --json --screenshots` — 跳過編譯，直接跑測試
-- `bash run_tests_report.sh` — 只跑測試、印 stdout，不產生報告
+- 不建議省略 `--json` 或 `--screenshots`，會導致報告缺少資料
 
 **Run GUI**: `AprNes/bin/Debug/AprNes.exe` (no args)
 
