@@ -268,6 +268,131 @@ bash run_tests_report.sh --no-build             # 跳過 MSBuild 編譯步驟</p
 <p>結束代碼：<code>0</code> = 通過、<code>1-127</code> = 失敗（測試錯誤代碼）、<code>255</code> = 逾時/無結果。</p>
 </div>
 
+<!-- ───────────────── 第 8 節 ───────────────── -->
+<h2>8. 模擬器支援 QA 流程的設計介面</h2>
+
+<p>要採用此自動化 QA 工作流，模擬器必須開放一組設計介面。以下是基於 AprNes 架構的參考 &mdash; 此模式適用於任何 NES 模擬器，不限程式語言。</p>
+
+<div class="section">
+<h3>8.1 雙重進入點：GUI 與無頭模式</h3>
+<p>模擬器應從單一執行檔支援兩種運作模式。當有命令列參數時進入無頭測試模式；否則啟動正常 GUI。</p>
+<pre>// Program.cs — 進入點
+static int Main(string[] args)
+{
+    if (args.Length > 0)
+        return TestRunner.Run(args);    // 無頭模式，回傳結束代碼
+
+    Application.Run(new MainForm());    // 正常 GUI 模式
+    return 0;
+}</pre>
+<p>重點：<code>Main()</code> 回傳 <code>int</code>（非 <code>void</code>），讓結束代碼可向呼叫腳本傳遞通過/失敗訊號。</p>
+</div>
+
+<div class="section">
+<h3>8.2 無頭模式旗標</h3>
+<p>模擬器核心需要靜態旗標，在測試模式下抑制 GUI 和音訊子系統：</p>
+
+<table>
+  <tr><th>旗標</th><th>用途</th><th>效果</th></tr>
+  <tr><td><code>HeadlessMode = true</code></td><td>抑制視窗建立</td><td>不實例化 Form/Window；渲染仍然執行以填充幀緩衝區，但不產生顯示輸出</td></tr>
+  <tr><td><code>AudioEnabled = false</code></td><td>抑制音訊輸出</td><td>APU 仍然計時（時序測試需要），但不開啟音訊裝置</td></tr>
+  <tr><td><code>LimitFPS = false</code></td><td>移除幀率限制器</td><td>模擬以最高 CPU 速度執行；30 秒的測試在不到 1 秒的實際時間內完成</td></tr>
+  <tr><td><code>exit = true</code></td><td>通知主迴圈停止</td><td>由測試執行器在偵測到結果時設定；<code>run()</code> 迴圈每幀檢查此旗標</td></tr>
+</table>
+
+<p>這些旗標讓 CPU/PPU/APU 繼續正常計時 &mdash; 只有 I/O 端點（螢幕、喇叭）被停用。這確保時序敏感的測試在無頭和 GUI 模式下產生相同的結果。</p>
+</div>
+
+<div class="section">
+<h3>8.3 逐幀回呼（VideoOutput 事件）</h3>
+<p>模擬器必須提供每幀渲染完畢後觸發的掛鈎。測試執行器訂閱此事件來輪詢結果：</p>
+<pre>// 在 NesCore（模擬器核心）中：
+public static event EventHandler VideoOutput;
+
+// 在每個 PPU 幀結束時觸發（掃描線 240，VBlank 開始後）：
+VideoOutput?.Invoke(null, null);
+
+// 在 TestRunner 中：
+NesCore.VideoOutput += (sender, e) => {
+    frameCount++;
+    byte status = NesCore.NES_MEM[0x6000];  // 輪詢測試協定
+    // ... 偵測結果，完成時設定 NesCore.exit = true
+};</pre>
+<p>此回呼驅動的設計避免了緊密輪詢迴圈，並能整合 GUI（重繪畫面）和無頭（檢查測試狀態）兩種模式。</p>
+</div>
+
+<div class="section">
+<h3>8.4 記憶體和 PPU RAM 存取</h3>
+<p>測試執行器需要直接讀取兩個記憶體區域：</p>
+
+<table>
+  <tr><th>記憶體區域</th><th>存取方式</th><th>用途</th></tr>
+  <tr><td><code>NES_MEM[0x6000..0x6FFF]</code></td><td>CPU 位址空間（WRAM）</td><td>讀取 $6000 狀態位元組和 $6004+ 結果文字（blargg 協定）</td></tr>
+  <tr><td><code>ppu_ram[0x2000..0x23BF]</code></td><td>PPU 名稱表 0</td><td>掃描畫面上的 "Passed"/"Failed" 文字（較舊的測試 ROM）</td></tr>
+  <tr><td><code>ScreenBuf1x[0..61439]</code></td><td>已渲染幀緩衝區（256x240 ARGB）</td><td>畫面穩定性雜湊 + 截圖擷取</td></tr>
+</table>
+
+<p>這些必須以靜態指標或陣列方式公開 &mdash; 每幀不需複製。測試執行器在 <code>VideoOutput</code> 回呼內同步讀取它們，因此執行緒安全由幀邊界保證。</p>
+</div>
+
+<div class="section">
+<h3>8.5 軟重設 API</h3>
+<p>部分測試 ROM 透過寫入 <code>$81</code> 到 <code>$6000</code> 來要求主機重設。模擬器必須提供 <code>SoftReset()</code> 方法，重設 CPU/APU 狀態但不重新載入 ROM：</p>
+<pre>public static void SoftReset()
+{
+    // 重設 CPU：從 $FFFC/$FFFD 讀取重設向量，清除暫存器
+    // 重設 APU：重新初始化影格計數器，靜音聲道
+    // 不完全重設 PPU（某些測試依賴 PPU 狀態在重設後存留）
+    // 不卸載 ROM，不重新初始化 mapper
+}</pre>
+<p>這與硬重設（電源循環）不同。測試執行器在偵測到 <code>$6000 == $81</code> 後延遲 100ms（約 6 幀）呼叫 <code>SoftReset()</code>。</p>
+</div>
+
+<div class="section">
+<h3>8.6 控制器輸入注入</h3>
+<p>控制器測試需要程式化的按鈕操作。模擬器必須公開按下/釋放方法：</p>
+<pre>public static void P1_ButtonPress(byte buttonIndex);   // 0=A,1=B,2=Sel,3=Start,4=Up,5=Down,6=Left,7=Right
+public static void P1_ButtonUnPress(byte buttonIndex);</pre>
+<p>測試執行器依幀號排程事件。每個按鈕在指定的幀按下，並在可設定的持續時間後釋放（預設 10 幀 &asymp; 166ms）。</p>
+</div>
+
+<div class="section">
+<h3>8.7 ROM 載入 API</h3>
+<p>模擬器需要基於位元組陣列的簡單 ROM 載入介面：</p>
+<pre>public static bool init(byte[] rom_bytes);  // 解析 iNES 標頭，設定 mapper，重設 CPU
+public static void run();                    // 主模擬迴圈（阻塞直到 exit==true）</pre>
+<p><code>init()</code> 在不支援的 mapper 或損壞標頭時回傳 <code>false</code>。<code>run()</code> 由測試執行器在背景執行緒上呼叫，透過 <code>Thread.Join()</code> 等待完成。</p>
+</div>
+
+<div class="section">
+<h3>8.8 架構總覽</h3>
+
+<div class="flow">
+  <div class="step"><div class="title">Program.cs</div><div class="desc">進入點<br>GUI / 無頭分流</div></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step"><div class="title">TestRunner.cs</div><div class="desc">參數解析<br>逐幀回呼<br>結果偵測</div></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step"><div class="title">NesCore</div><div class="desc">init() / run()<br>HeadlessMode 旗標<br>VideoOutput 事件</div></div>
+</div>
+
+<p>設計原則是<strong>最小耦合</strong>：測試執行器透過 8 個接觸點（3 個旗標、1 個事件、3 個記憶體區域、1 個重設方法）與模擬器核心互動。模擬器核心完全不需要了解測試執行器 &mdash; 它只需檢查 <code>HeadlessMode</code> 來跳過 GUI 建立，並在每幀觸發 <code>VideoOutput</code>。所有測試邏輯都在 <code>TestRunner.cs</code> 中。</p>
+
+<table>
+  <tr><th>介面</th><th>方向</th><th>類型</th></tr>
+  <tr><td><code>HeadlessMode</code></td><td>TestRunner &rarr; Core</td><td>靜態布林旗標</td></tr>
+  <tr><td><code>AudioEnabled</code></td><td>TestRunner &rarr; Core</td><td>靜態布林旗標</td></tr>
+  <tr><td><code>LimitFPS</code></td><td>TestRunner &rarr; Core</td><td>靜態布林旗標</td></tr>
+  <tr><td><code>exit</code></td><td>TestRunner &rarr; Core</td><td>靜態布林旗標</td></tr>
+  <tr><td><code>VideoOutput</code></td><td>Core &rarr; TestRunner</td><td>事件（逐幀回呼）</td></tr>
+  <tr><td><code>NES_MEM / ppu_ram / ScreenBuf1x</code></td><td>Core &rarr; TestRunner</td><td>靜態記憶體指標（唯讀）</td></tr>
+  <tr><td><code>SoftReset()</code></td><td>TestRunner &rarr; Core</td><td>靜態方法</td></tr>
+  <tr><td><code>P1_ButtonPress/UnPress()</code></td><td>TestRunner &rarr; Core</td><td>靜態方法</td></tr>
+  <tr><td><code>init(byte[]) / run()</code></td><td>TestRunner &rarr; Core</td><td>靜態方法</td></tr>
+</table>
+
+<p>此架構使 QA 系統具有<strong>可移植性</strong>：任何開放這些介面的 NES 模擬器都能使用相同的 bash 腳本和測試 ROM 合集進行自動化回歸測試，不受其內部實作方式限制。</p>
+</div>
+
 <div class="footer"><a href="index.html">測試報告</a> | AprNes 測試方法論</div>
 
 </body>

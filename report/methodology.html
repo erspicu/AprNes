@@ -268,6 +268,131 @@ bash run_tests_report.sh --no-build             # Skip MSBuild compilation step<
 <p>Exit codes: <code>0</code> = pass, <code>1-127</code> = fail (test error code), <code>255</code> = timeout/no result.</p>
 </div>
 
+<!-- ───────────────── Section 8 ───────────────── -->
+<h2>8. Emulator Design Requirements for QA Integration</h2>
+
+<p>To adopt this automated QA workflow, an emulator must expose a set of design interfaces. Below is a reference based on AprNes's architecture &mdash; the pattern is applicable to any NES emulator regardless of language.</p>
+
+<div class="section">
+<h3>8.1 Dual Entry Point: GUI vs Headless</h3>
+<p>The emulator should support two modes of operation from a single executable. When command-line arguments are present, it enters headless test mode; otherwise it launches the normal GUI.</p>
+<pre>// Program.cs — entry point
+static int Main(string[] args)
+{
+    if (args.Length > 0)
+        return TestRunner.Run(args);    // headless mode, returns exit code
+
+    Application.Run(new MainForm());    // normal GUI mode
+    return 0;
+}</pre>
+<p>Key point: <code>Main()</code> returns <code>int</code> (not <code>void</code>) so the exit code can signal pass/fail to the calling script.</p>
+</div>
+
+<div class="section">
+<h3>8.2 Headless Mode Flags</h3>
+<p>The emulator core needs static flags to suppress GUI and audio subsystems when running in test mode:</p>
+
+<table>
+  <tr><th>Flag</th><th>Purpose</th><th>Effect</th></tr>
+  <tr><td><code>HeadlessMode = true</code></td><td>Suppress window creation</td><td>No Form/Window is instantiated; rendering still runs to fill the framebuffer, but no display output occurs</td></tr>
+  <tr><td><code>AudioEnabled = false</code></td><td>Suppress audio output</td><td>APU still ticks (needed for timing tests), but no audio device is opened</td></tr>
+  <tr><td><code>LimitFPS = false</code></td><td>Remove frame rate limiter</td><td>Emulation runs at maximum CPU speed; a 30-second test completes in &lt;1 second wall time</td></tr>
+  <tr><td><code>exit = true</code></td><td>Signal the main loop to stop</td><td>Set by the test runner when a result is detected; the <code>run()</code> loop checks this flag each frame</td></tr>
+</table>
+
+<p>These flags allow the CPU/PPU/APU to continue ticking normally &mdash; only the I/O endpoints (display, speakers) are disabled. This ensures that timing-sensitive tests produce identical results in headless and GUI modes.</p>
+</div>
+
+<div class="section">
+<h3>8.3 Per-Frame Callback (VideoOutput Event)</h3>
+<p>The emulator must provide a per-frame hook that fires after each frame is fully rendered. The test runner subscribes to this event to poll for results:</p>
+<pre>// In NesCore (emulator core):
+public static event EventHandler VideoOutput;
+
+// Fired at the end of each PPU frame (scanline 240, after VBlank begins):
+VideoOutput?.Invoke(null, null);
+
+// In TestRunner:
+NesCore.VideoOutput += (sender, e) => {
+    frameCount++;
+    byte status = NesCore.NES_MEM[0x6000];  // poll test protocol
+    // ... detect result, set NesCore.exit = true when done
+};</pre>
+<p>This callback-driven design avoids tight polling loops and integrates cleanly with both GUI (refresh display) and headless (check test status) modes.</p>
+</div>
+
+<div class="section">
+<h3>8.4 Memory and PPU RAM Access</h3>
+<p>The test runner needs direct read access to two memory regions:</p>
+
+<table>
+  <tr><th>Memory Region</th><th>Access Pattern</th><th>Purpose</th></tr>
+  <tr><td><code>NES_MEM[0x6000..0x6FFF]</code></td><td>CPU address space (WRAM)</td><td>Read $6000 status byte and $6004+ result text (blargg protocol)</td></tr>
+  <tr><td><code>ppu_ram[0x2000..0x23BF]</code></td><td>PPU nametable 0</td><td>Scan for "Passed"/"Failed" text on screen (older test ROMs)</td></tr>
+  <tr><td><code>ScreenBuf1x[0..61439]</code></td><td>Rendered framebuffer (256x240 ARGB)</td><td>Screen stability hash + screenshot capture</td></tr>
+</table>
+
+<p>These must be exposed as static pointers or arrays &mdash; no copying per frame. The test runner reads them synchronously inside the <code>VideoOutput</code> callback, so thread safety is guaranteed by the frame boundary.</p>
+</div>
+
+<div class="section">
+<h3>8.5 Soft Reset API</h3>
+<p>Some test ROMs request a console reset by writing <code>$81</code> to <code>$6000</code>. The emulator must expose a <code>SoftReset()</code> method that resets CPU/APU state without reloading the ROM:</p>
+<pre>public static void SoftReset()
+{
+    // Reset CPU: read reset vector from $FFFC/$FFFD, clear registers
+    // Reset APU: reinitialize frame counter, silence channels
+    // Do NOT reset PPU fully (some tests depend on PPU state surviving reset)
+    // Do NOT unload the ROM or reinitialize mapper
+}</pre>
+<p>This is distinct from a hard reset (power cycle). The test runner calls <code>SoftReset()</code> after a 100ms delay (~6 frames) when it detects <code>$6000 == $81</code>.</p>
+</div>
+
+<div class="section">
+<h3>8.6 Controller Input Injection</h3>
+<p>Controller tests need programmatic button presses. The emulator must expose button press/release methods:</p>
+<pre>public static void P1_ButtonPress(byte buttonIndex);   // 0=A,1=B,2=Sel,3=Start,4=Up,5=Down,6=Left,7=Right
+public static void P1_ButtonUnPress(byte buttonIndex);</pre>
+<p>The test runner schedules events by frame number. Each button is pressed at the specified frame and released after a configurable hold duration (default 10 frames &asymp; 166ms).</p>
+</div>
+
+<div class="section">
+<h3>8.7 ROM Loading API</h3>
+<p>The emulator needs a simple byte-array-based ROM loading interface:</p>
+<pre>public static bool init(byte[] rom_bytes);  // parse iNES header, set up mapper, reset CPU
+public static void run();                    // main emulation loop (blocks until exit==true)</pre>
+<p><code>init()</code> returns <code>false</code> for unsupported mappers or corrupt headers. <code>run()</code> is called on a background thread by the test runner, which waits for completion via <code>Thread.Join()</code>.</p>
+</div>
+
+<div class="section">
+<h3>8.8 Architecture Summary</h3>
+
+<div class="flow">
+  <div class="step"><div class="title">Program.cs</div><div class="desc">Entry point<br>GUI / Headless fork</div></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step"><div class="title">TestRunner.cs</div><div class="desc">Argument parsing<br>Frame callback<br>Result detection</div></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step"><div class="title">NesCore</div><div class="desc">init() / run()<br>HeadlessMode flags<br>VideoOutput event</div></div>
+</div>
+
+<p>The design principle is <strong>minimal coupling</strong>: the test runner interacts with the emulator core through 8 touch points (3 flags, 1 event, 3 memory regions, 1 reset method). The emulator core requires zero knowledge of the test runner &mdash; it simply checks <code>HeadlessMode</code> to skip GUI creation and fires <code>VideoOutput</code> each frame. All test logic lives in <code>TestRunner.cs</code>.</p>
+
+<table>
+  <tr><th>Interface</th><th>Direction</th><th>Type</th></tr>
+  <tr><td><code>HeadlessMode</code></td><td>TestRunner &rarr; Core</td><td>Static bool flag</td></tr>
+  <tr><td><code>AudioEnabled</code></td><td>TestRunner &rarr; Core</td><td>Static bool flag</td></tr>
+  <tr><td><code>LimitFPS</code></td><td>TestRunner &rarr; Core</td><td>Static bool flag</td></tr>
+  <tr><td><code>exit</code></td><td>TestRunner &rarr; Core</td><td>Static bool flag</td></tr>
+  <tr><td><code>VideoOutput</code></td><td>Core &rarr; TestRunner</td><td>Event (per-frame callback)</td></tr>
+  <tr><td><code>NES_MEM / ppu_ram / ScreenBuf1x</code></td><td>Core &rarr; TestRunner</td><td>Static memory pointers (read-only)</td></tr>
+  <tr><td><code>SoftReset()</code></td><td>TestRunner &rarr; Core</td><td>Static method</td></tr>
+  <tr><td><code>P1_ButtonPress/UnPress()</code></td><td>TestRunner &rarr; Core</td><td>Static methods</td></tr>
+  <tr><td><code>init(byte[]) / run()</code></td><td>TestRunner &rarr; Core</td><td>Static methods</td></tr>
+</table>
+
+<p>This architecture makes the QA system <strong>portable</strong>: any NES emulator that exposes these interfaces can use the same bash scripts and test ROM collection for automated regression testing, regardless of its internal implementation.</p>
+</div>
+
 <div class="footer"><a href="index.html">Test Report</a> | AprNes Testing Methodology</div>
 
 </body>
