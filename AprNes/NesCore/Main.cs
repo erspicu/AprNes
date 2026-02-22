@@ -252,31 +252,48 @@ namespace AprNes
         {
             timeBeginPeriod(1); // 設定 1ms 計時器精度，確保 Thread.Sleep(1) 準確
             StopWatch.Restart();
+            bool nmi_just_deferred = false;
             while (!exit)
             {
                 // === Interrupt service point (before instruction fetch) ===
-                if (nmi_pending)
+                if (nmi_pending && !nmi_just_deferred)
                 {
                     nmi_pending = false;
                     NMIInterrupt();
+                    // NMI arose during NMI sequence → defer 1 instruction
+                    if (nmi_pending) nmi_just_deferred = true;
+                }
+                else if (nmi_just_deferred)
+                {
+                    // Deferred NMI: skip this iteration, let 1 instruction run first
+                    nmi_just_deferred = false;
                 }
                 else if (irq_pending)
                 {
                     irq_pending = false;
                     IRQInterrupt();
+                    // NMI arose during IRQ sequence → defer 1 instruction
+                    if (nmi_pending) nmi_just_deferred = true;
                 }
 
                 byte prevFlagI_run = flagI; // capture I flag before instruction for IRQ delay
-                branch_taken_no_cross = false;
-                oam_dma_occurred = false;
                 cpu_step();
 
+                // BRK: NMI arising during BRK sequence → defer 1 instruction
+                if (opcode == 0x00 && nmi_pending)
+                    nmi_just_deferred = true;
+
                 // === IRQ polling (end of instruction, for next instruction) ===
-                // Suppress poll on: BRK (opcode 0x00), taken branch without page cross, OAM DMA
-                if (opcode != 0x00 && !branch_taken_no_cross && !oam_dma_occurred)
+                // irqLinePrev holds penultimate tick's IRQ state — naturally handles:
+                //   - 2-cycle instructions (penultimate = tick 1)
+                //   - 3+ cycle instructions (penultimate = tick N-1)
+                //   - Taken branch without page cross (last-cycle suppression is inherent)
+                //   - OAM DMA (irqLinePrev saved/restored around DMA in ppu_w_4014)
+                // Suppress poll on: BRK (opcode 0x00) — handled by interrupt sequence
+                if (opcode != 0x00)
                 {
                     byte irqPollI = (opcode == 0x40) ? flagI : prevFlagI_run;
-                    irq_pending = (irqPollI == 0 && irqLineAtFetch);
+                    irq_pending = (irqPollI == 0 && irqLinePrev);
                 }
             }
             timeEndPeriod(1);

@@ -31,6 +31,11 @@ namespace AprNes
             }
 
             apu_step();
+
+            // Track IRQ line per-tick for penultimate-cycle polling
+            irqLinePrev = irqLineCurrent;
+            irqLineCurrent = statusframeint || statusdmcint || statusmapperint;
+
             in_tick = false;
         }
 

@@ -14,8 +14,8 @@ namespace AprNes
         static public bool exit = false;
         static bool nmi_pending = false;
         static bool irq_pending = false; // IRQ should fire before next instruction
-        static bool branch_taken_no_cross = false; // taken branch without page cross suppresses IRQ poll
-        static bool irqLineAtFetch = false; // IRQ line state sampled at opcode fetch (penultimate-cycle approximation)
+        static bool irqLinePrev = false; // IRQ line at penultimate tick (N-1)
+        static bool irqLineCurrent = false; // IRQ line at last tick (N)
         static public bool statusmapperint = false; // mapper IRQ line asserted (MMC3 etc.)
         static int nmi_trace_count = 0; // trace instructions after NMI
 
@@ -134,8 +134,6 @@ namespace AprNes
 
             ushort trace_pc = r_PC; // save PC before opcode fetch for tracing
             opcode = Mem_r(r_PC++);
-            // Sample IRQ line after opcode fetch tick — models penultimate-cycle polling for 2-cycle instructions
-            irqLineAtFetch = statusframeint || statusdmcint || statusmapperint;
 
             //debug();
 
@@ -388,11 +386,12 @@ namespace AprNes
                     byte1 = Mem_r(r_PC++);
                     if (flagC == 0)
                     {
+                        bool brSaved = irqLinePrev; // save before branch extra tick
                         tick(); // taken
                         ushort1 = r_PC;
                         r_PC = (ushort)(r_PC + (sbyte)byte1);
                         if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) tick(); // page cross
-                        else branch_taken_no_cross = true;
+                        else irqLinePrev = brSaved; // no cross: IRQ penultimate = pre-branch state
                     }
                     break;
 
@@ -400,11 +399,12 @@ namespace AprNes
                     byte1 = Mem_r(r_PC++);
                     if (flagC == 1)
                     {
+                        bool brSaved = irqLinePrev; // save before branch extra tick
                         tick(); // taken
                         ushort1 = r_PC;
                         r_PC = (ushort)(r_PC + (sbyte)byte1);
                         if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) tick(); // page cross
-                        else branch_taken_no_cross = true;
+                        else irqLinePrev = brSaved; // no cross: IRQ penultimate = pre-branch state
                     }
                     break;
 
@@ -412,11 +412,12 @@ namespace AprNes
                     byte1 = Mem_r(r_PC++);
                     if (flagZ == 1)
                     {
+                        bool brSaved = irqLinePrev; // save before branch extra tick
                         tick(); // taken
                         ushort1 = r_PC;
                         r_PC = (ushort)(r_PC + (sbyte)byte1);
                         if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) tick(); // page cross
-                        else branch_taken_no_cross = true;
+                        else irqLinePrev = brSaved; // no cross: IRQ penultimate = pre-branch state
                     }
                     break;
 
@@ -439,11 +440,12 @@ namespace AprNes
                     byte1 = Mem_r(r_PC++);
                     if (flagN == 1)
                     {
+                        bool brSaved = irqLinePrev; // save before branch extra tick
                         tick(); // taken
                         ushort1 = r_PC;
                         r_PC = (ushort)(r_PC + (sbyte)byte1);
                         if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) tick(); // page cross
-                        else branch_taken_no_cross = true;
+                        else irqLinePrev = brSaved; // no cross: IRQ penultimate = pre-branch state
                     }
                     break;
 
@@ -451,11 +453,12 @@ namespace AprNes
                     byte1 = Mem_r(r_PC++);
                     if (flagZ == 0)
                     {
+                        bool brSaved = irqLinePrev; // save before branch extra tick
                         tick(); // taken
                         ushort1 = r_PC;
                         r_PC = (ushort)(r_PC + (sbyte)byte1);
                         if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) tick(); // page cross
-                        else branch_taken_no_cross = true;
+                        else irqLinePrev = brSaved; // no cross: IRQ penultimate = pre-branch state
                     }
                     break;
 
@@ -463,11 +466,12 @@ namespace AprNes
                     byte1 = Mem_r(r_PC++);
                     if (flagN == 0)
                     {
+                        bool brSaved = irqLinePrev; // save before branch extra tick
                         tick(); // taken
                         ushort1 = r_PC;
                         r_PC = (ushort)(r_PC + (sbyte)byte1);
                         if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) tick(); // page cross
-                        else branch_taken_no_cross = true;
+                        else irqLinePrev = brSaved; // no cross: IRQ penultimate = pre-branch state
                     }
                     break;
 
@@ -488,11 +492,12 @@ namespace AprNes
                     byte1 = Mem_r(r_PC++);
                     if (flagV == 0)
                     {
+                        bool brSaved = irqLinePrev; // save before branch extra tick
                         tick(); // taken
                         ushort1 = r_PC;
                         r_PC = (ushort)(r_PC + (sbyte)byte1);
                         if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) tick(); // page cross
-                        else branch_taken_no_cross = true;
+                        else irqLinePrev = brSaved; // no cross: IRQ penultimate = pre-branch state
                     }
                     break;
 
@@ -500,11 +505,12 @@ namespace AprNes
                     byte1 = Mem_r(r_PC++);
                     if (flagV == 1)
                     {
+                        bool brSaved = irqLinePrev; // save before branch extra tick
                         tick(); // taken
                         ushort1 = r_PC;
                         r_PC = (ushort)(r_PC + (sbyte)byte1);
                         if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) tick(); // page cross
-                        else branch_taken_no_cross = true;
+                        else irqLinePrev = brSaved; // no cross: IRQ penultimate = pre-branch state
                     }
                     break;
 

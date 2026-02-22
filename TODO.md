@@ -1,7 +1,7 @@
 # AprNes 待修復問題清單
 
-**基線**: 165 PASS / 9 FAIL / 174 TOTAL (2026-02-22, run_tests.sh)
-> 注: 9 FAIL 含 1 個重複計算（merged test），獨立 bug 數為 8
+**基線**: 169 PASS / 5 FAIL / 174 TOTAL (2026-02-22, run_tests.sh)
+> 注: 5 FAIL 全為 Bug F（DMC DMA cycle stealing），需架構重構
 
 優先權排序原則：**影響大 + 好修** 排最前面
 
@@ -49,19 +49,15 @@
   - Per-pixel sprite 0 hit detection: 從 RenderBGTile phase 7 批次改為 ppu_step_new 逐 dot 偵測
   - Cycle-accurate sprite overflow: PrecomputeOverflow() 模擬 dots 65-256 evaluation timing
   - Sprite overflow hardware bug: byte offset m 在找到 8 sprites 後 cycles 0→1→2→3
+- ~~Bug E 剩餘: CPU interrupt timing~~ → **+4 PASS** (BUGFIX18)
+  - irqLinePrev/irqLineCurrent 取代 irqLineAtFetch（per-tick penultimate-cycle tracking）
+  - NMI deferral after interrupt sequences（nmi_just_deferred flag）
+  - Branch taken-no-cross: irqLinePrev save/restore around extra tick
+  - OAM DMA: irqLinePrev save/restore + alignment cycle（513→514 ticks）
 
 ---
 
-## P3 — 較難修復（共 9 個測試 FAIL）
-
-### Bug E: CPU interrupt timing 剩餘（NMI/BRK/DMA 交互）
-- **影響**: 4 個測試 FAIL（原 5 個，已修 2 個；含 1 merged test）
-- **難度**: 高
-- **失敗測試**:
-  - `cpu_interrupts_v2/cpu_interrupts` — merged test（因 sub-test 2,4,5 失敗）
-  - `cpu_interrupts_v2/2-nmi_and_brk` — NMI hijack BRK vector（NMI 早 ~2 cycles）
-  - `cpu_interrupts_v2/4-irq_and_dma` — IRQ + DMA cycle 交互
-  - `cpu_interrupts_v2/5-branch_delays_irq` — Branch 跨頁延遲 IRQ（test_jmp 基線失敗）
+## P3 — 較難修復（共 5 個測試 FAIL）
 
 ### Bug F: DMC DMA cycle stealing — ⚠️ 需架構重構
 - **影響**: 5 個測試 FAIL
@@ -108,12 +104,15 @@
   → Cycle-accurate sprite overflow (PrecomputeOverflow)
   → Sprite overflow hardware bug (byte offset cycling)
 
-Phase 9: Bug E 剩餘 — NMI/BRK/DMA 交互
-  → 2-nmi_and_brk, 4-irq_and_dma, 5-branch_delays_irq
+已完成: Bug E 剩餘 (CPU interrupt timing) → 169 PASS / 5 FAIL ★★★
+  → irqLinePrev/irqLineCurrent per-tick tracking (penultimate-cycle IRQ)
+  → NMI deferral after BRK/IRQ/NMI sequences
+  → Branch taken-no-cross irqLinePrev save/restore
+  → OAM DMA irqLinePrev isolation + alignment cycle
 
 Phase 10: Bug F (DMC DMA) — 需架構重構，暫緩
 ```
 
 ---
 
-*最後更新: 2026-02-22 (BUGFIX17 — 165 PASS / 9 FAIL / 174 TOTAL, sprite timing + overflow bug)*
+*最後更新: 2026-02-22 (BUGFIX18 — 169 PASS / 5 FAIL / 174 TOTAL, CPU interrupt timing)*
