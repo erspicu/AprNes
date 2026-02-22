@@ -1,7 +1,7 @@
 # AprNes 待修復問題清單
 
-**基線**: 161 PASS / 13 FAIL / 174 TOTAL (2026-02-22, run_tests_report.sh)
-> 注: 13 FAIL 含 1 個重複計算（merged test），獨立 bug 數為 12
+**基線**: 165 PASS / 9 FAIL / 174 TOTAL (2026-02-22, run_tests.sh)
+> 注: 9 FAIL 含 1 個重複計算（merged test），獨立 bug 數為 8
 
 優先權排序原則：**影響大 + 好修** 排最前面
 
@@ -45,6 +45,10 @@
   - BG: phase 0 (NT, A12=0) + phase 4 (CHR, A12=BG table bit)
   - Sprite: phase 0 (garbage NT, A12=0) + phase 3 (sprite CHR, A12=sprite table bit)
   - run_tests_report.sh 重構：`--json`, `--screenshots`, `--no-build` 參數
+- ~~Bug G: Sprite timing 精確度~~ → **+4 PASS** (BUGFIX17)
+  - Per-pixel sprite 0 hit detection: 從 RenderBGTile phase 7 批次改為 ppu_step_new 逐 dot 偵測
+  - Cycle-accurate sprite overflow: PrecomputeOverflow() 模擬 dots 65-256 evaluation timing
+  - Sprite overflow hardware bug: byte offset m 在找到 8 sprites 後 cycles 0→1→2→3
 
 ---
 
@@ -70,18 +74,6 @@
   - `dmc_dma_during_read4/double_2007_read` — Timeout
   - `sprdma_and_dmc_dma/sprdma_and_dmc_dma` — OAM DMA cycle 全為 399
   - `sprdma_and_dmc_dma/sprdma_and_dmc_dma_512` — 同上
-
----
-
-## P4 — 暫緩（共 4 個測試 FAIL）
-
-### Bug G: Sprite timing 精確度
-- **影響**: 4 個測試 FAIL，大多數遊戲不受影響
-- **失敗測試**:
-  - `sprite_hit_tests/09.timing_basics` — Sprite 0 hit timing
-  - `sprite_hit_tests/10.timing_order` — Sprite 0 hit 檢測順序
-  - `sprite_overflow_tests/3.Timing` — Sprite overflow timing
-  - `sprite_overflow_tests/4.Obscure` — Sprite overflow 硬體 bug 模擬
 
 ---
 
@@ -111,8 +103,10 @@
   → PPU A12 notification phase alignment
   → run_tests_report.sh 重構 + run_tests.sh 同步 mmc3 測試
 
-Phase 8: Bug G — sprite timing
-  → 預期 +4，目標 ~165 PASS (13 FAIL → ~9 FAIL)
+已完成: Bug G (sprite timing) → 165 PASS / 9 FAIL ★★
+  → Per-pixel sprite 0 hit detection (dot 2-255)
+  → Cycle-accurate sprite overflow (PrecomputeOverflow)
+  → Sprite overflow hardware bug (byte offset cycling)
 
 Phase 9: Bug E 剩餘 — NMI/BRK/DMA 交互
   → 2-nmi_and_brk, 4-irq_and_dma, 5-branch_delays_irq
@@ -122,4 +116,4 @@ Phase 10: Bug F (DMC DMA) — 需架構重構，暫緩
 
 ---
 
-*最後更新: 2026-02-22 (BUGFIX16 — 161 PASS / 13 FAIL / 174 TOTAL, MMC3 scanline timing + script 重構)*
+*最後更新: 2026-02-22 (BUGFIX17 — 165 PASS / 9 FAIL / 174 TOTAL, sprite timing + overflow bug)*

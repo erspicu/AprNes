@@ -137,21 +137,6 @@ namespace AprNes
                     ScreenBuf1x[slot] = NesColors[ppu_ram[0x3f00] & 0x3f];
                 else
                     ScreenBuf1x[slot] = NesColors[ppu_ram[(0x3f00 | (attrUse << 2)) + bgPixel] & 0x3f];
-
-                // Sprite 0 hit detection (per-pixel, cycle-accurate)
-                if (sprite0_on_line && !isSprite0hit && screenX != 255)
-                {
-                    int sprCol = screenX - sprite0_line_x;
-                    if (sprCol >= 0 && sprCol < 8 && bgPixel != 0
-                        && !(!ShowBgLeft8 && inLeft8) && !(!ShowSprLeft8 && inLeft8))
-                    {
-                        int loc_t = sprite0_flip_x ? (7 - sprCol) : sprCol;
-                        int mask = 1 << (7 - loc_t);
-                        int sprPixel = (((sprite0_tile_high & mask) << 1) + (sprite0_tile_low & mask)) >> (7 - loc_t);
-                        if (sprPixel != 0)
-                            isSprite0hit = true;
-                    }
-                }
             }
         }
 
@@ -247,6 +232,33 @@ namespace AprNes
 
             bool renderingEnabled = ShowBackGround || ShowSprites;
 
+            // Per-pixel sprite 0 hit detection — BEFORE ppu_rendering_tick() modifies shift registers.
+            // Shift registers hold the data loaded at the previous phase 7, so we can safely compute
+            // the current dot's BG pixel from them before the next tile fetch cycle runs.
+            if (scanline >= 0 && scanline < 240 && ppu_cycles_x >= 2 && ppu_cycles_x < 256
+                && sprite0_on_line && !isSprite0hit && renderingEnabled)
+            {
+                int screenX = ppu_cycles_x;
+                bool inLeft8 = screenX < 8;
+                if (!(!ShowBgLeft8 && inLeft8) && !(!ShowSprLeft8 && inLeft8) && screenX != 255)
+                {
+                    int sprCol = screenX - sprite0_line_x;
+                    if (sprCol >= 0 && sprCol < 8)
+                    {
+                        int bit = 15 - (ppu_cycles_x & 7) - FineX;
+                        int bgPixel = ((lowshift >> bit) & 1) | (((highshift >> bit) & 1) << 1);
+                        if (bgPixel != 0)
+                        {
+                            int loc_t = sprite0_flip_x ? (7 - sprCol) : sprCol;
+                            int mask = 1 << (7 - loc_t);
+                            int sprPx = (((sprite0_tile_high & mask) << 1) + (sprite0_tile_low & mask)) >> (7 - loc_t);
+                            if (sprPx != 0)
+                                isSprite0hit = true;
+                        }
+                    }
+                }
+            }
+
             if (scanline < 240 || scanline == 261)
             {
                 if (renderingEnabled)
@@ -268,7 +280,12 @@ namespace AprNes
                                 ScreenBuf1x[scanOff + i] = bgColor;
                         }
                         PrecomputeSprite0Line();
+                        PrecomputeOverflow();
                     }
+
+                    // Per-cycle sprite overflow flag (set at the exact evaluation cycle)
+                    if (spriteOverflowCycle >= 0 && ppu_cycles_x == spriteOverflowCycle)
+                        isSpriteOverflow = true;
 
                     // Sprite evaluation + rendering at cycle 257 (after BG tiles complete at cycle 255)
                     if (ppu_cycles_x == 257)
@@ -328,6 +345,9 @@ namespace AprNes
         static byte sprite0_tile_low, sprite0_tile_high;
         static bool sprite0_flip_x;
 
+        // Pre-computed sprite overflow cycle for cycle-accurate overflow flag timing
+        static int spriteOverflowCycle;
+
         // Pre-compute sprite 0 tile data for the current scanline so hit detection
         // can happen per-pixel inside RenderBGTile() at the correct PPU cycle.
         static void PrecomputeSprite0Line()
@@ -382,14 +402,60 @@ namespace AprNes
             sprite0_tile_low = MapperObj.MapperR_CHR((tile_th_t << 4) | line_t);
         }
 
+        // Pre-compute the PPU cycle at which sprite overflow flag should be set.
+        // Simulates NES sprite evaluation timing (dots 65-256) with the hardware
+        // overflow bug: after finding 8 sprites, byte offset m cycles 0→1→2→3,
+        // reading tile/attr/X bytes as Y coordinates.
+        static void PrecomputeOverflow()
+        {
+            spriteOverflowCycle = -1;
+            if (!ShowBackGround && !ShowSprites) return;
+
+            int height = Spritesize8x16 ? 15 : 7;
+            int evalCycle = 65;
+            int foundCount = 0;
+            int m = 0; // byte offset for overflow bug
+
+            for (int n = 0; n < 64 && evalCycle <= 256; n++)
+            {
+                if (foundCount < 8)
+                {
+                    // Normal evaluation: always read byte 0 (Y)
+                    int oam_y = spr_ram[n << 2];
+                    if (scanline >= oam_y && scanline - oam_y <= height)
+                    {
+                        foundCount++;
+                        evalCycle += 8; // in-range: 2 read + 6 copy
+                    }
+                    else
+                    {
+                        evalCycle += 2; // not in range
+                    }
+                }
+                else
+                {
+                    // Overflow bug evaluation: read byte m (cycles through 0,1,2,3)
+                    int oam_y = spr_ram[(n << 2) + m];
+                    if (scanline >= oam_y && scanline - oam_y <= height)
+                    {
+                        spriteOverflowCycle = evalCycle;
+                        return;
+                    }
+                    m = (m + 1) & 3; // bug: increment byte offset on miss
+                    evalCycle += 2;
+                }
+            }
+        }
+
         static int pixel, array_loc;
 
         static void RenderSpritesLine()
         {
             // Pass 1: scan OAM 0→63, pick first 8 sprites visible on this scanline.
             // NES hardware only performs sprite evaluation when rendering is enabled.
+            // Overflow detection is handled by PrecomputeOverflow() at cycle-accurate timing.
             int* sel = stackalloc int[8];
-            int selCount = 0, spriteCount = 0;
+            int selCount = 0;
             int height = Spritesize8x16 ? 15 : 7;
             bool renderingEnabled = ShowBackGround || ShowSprites;
 
@@ -397,14 +463,8 @@ namespace AprNes
             {
                 for (int oam_th = 0; oam_th < 64; oam_th++)
                 {
-                    int oam_y = spr_ram[oam_th << 2];
-                    // Overflow evaluation uses raw OAM Y (hardware evaluates before 1-scanline pipeline delay)
-                    if (scanline >= oam_y && scanline - oam_y <= height)
-                    {
-                        if (++spriteCount == 9) isSpriteOverflow = true;
-                    }
                     // Selection for rendering uses Y+1 (sprites display one scanline later)
-                    int render_y = oam_y + 1;
+                    int render_y = spr_ram[oam_th << 2] + 1;
                     if (scanline < render_y || scanline - render_y > height) continue;
                     if (selCount < 8) sel[selCount++] = oam_th;
                 }
