@@ -187,6 +187,15 @@ bash run_tests_report.sh --no-build             # 跳過 MSBuild 編譯步驟</p
   </li>
 </ol>
 <p>此方法直接讀取 PPU 名稱表（而非對像素進行 OCR），因此快速且可靠。</p>
+
+<h3>機制 C：CRC 比對</h3>
+<p>部分測試 ROM 的結果取決於開機時隨機的 CPU-PPU 同步狀態，會產生多個有效 CRC 值之一。這些測試在畫面上顯示 CRC，但無法使用單一 <code>check_crc</code> 呼叫。<code>--expected-crc</code> 參數接受以逗號分隔的有效 CRC 清單：</p>
+<pre>--expected-crc "159A7A8F,5E3DF9C4"</pre>
+<p>測試執行器掃描 PPU 名稱表，尋找 8 個十六進位字元組成的字串（以非十六進位字元為邊界，避免部分匹配）。找到後與期望集合進行不區分大小寫的比對。此機制同時用於畫面穩定偵測路徑和逾時備援路徑。目前用於：</p>
+<ul>
+  <li><code>dma_2007_read</code> &mdash; 2 個有效 CRC（取決於 CPU-PPU 同步）</li>
+  <li><code>double_2007_read</code> &mdash; 4 個有效 CRC（取決於 CPU-PPU 同步）</li>
+</ul>
 </div>
 
 <!-- ───────────────── 第 5 節 ───────────────── -->
@@ -262,6 +271,7 @@ bash run_tests_report.sh --no-build             # 跳過 MSBuild 編譯步驟</p
   <tr><td><code>--log &lt;path&gt;</code></td><td>將結果寫入檔案</td></tr>
   <tr><td><code>--soft-reset &lt;sec&gt;</code></td><td>在第 N 秒觸發軟重設</td></tr>
   <tr><td><code>--input &lt;spec&gt;</code></td><td>排程按鈕輸入（例如 "A:2.0,B:4.0"）</td></tr>
+  <tr><td><code>--expected-crc &lt;list&gt;</code></td><td>以逗號分隔的有效 CRC 清單，用於 CRC-only 測試（例如 "159A7A8F,5E3DF9C4"）</td></tr>
   <tr><td><code>--debug-log &lt;path&gt;</code></td><td>寫入 CPU 追蹤日誌</td></tr>
 </table>
 
@@ -533,6 +543,22 @@ bash run_tests.sh</pre>
   <li>更新 TODO.md、建立 BUGFIX17.md、commit 並 push</li>
 </ol>
 <p>總計：識別 3 個根因、實作 3 個修復、0 個回歸 — 全部在單次對話中完成。</p>
+</div>
+
+<div class="section">
+<h3>9.7 實際案例：BUGFIX19（DMC DMA Cycle Stealing）</h3>
+<p>一個跨多次對話的 Claude Code 工作流從 169 PASS 進步到 171 PASS (+2)，解決了架構上最具挑戰性的 bug — DMC DMA cycle stealing：</p>
+<ol style="margin:.5rem 0 .75rem 1.2rem;font-size:.82rem;color:var(--text-dim)">
+  <li>讀取 <code>TODO.md</code> → 識別 Bug F（5 個 DMC DMA 測試失敗，標記為「需要架構重構」）</li>
+  <li>研究 NESdev Wiki DMA 參考文件（來自 <code>ref/</code> 目錄）→ 發現 Load DMA 與 Reload DMA 的差異</li>
+  <li>閱讀測試 ROM 組語原始碼（sync_dmc.s、sprdma_and_dmc_dma.s、dma_2007_read.s、dma_4016_read.s）</li>
+  <li>進入規劃模式 → 設計 5 部分修復：CPU bus state tracking、PPU-only stolen tick、Load/Reload cycle model、phantom reads、OAM DMA bus tracking</li>
+  <li>橫跨 3 個核心檔案實作（MEM.cs、APU.cs、PPU.cs）→ +200 行 cycle-accurate DMA 模擬</li>
+  <li>發現 2 個測試（dma_2007_read、double_2007_read）產生正確 CRC 但從不印 "Passed" → 在 TestRunner.cs 新增 <code>--expected-crc</code> 參數支援 CRC-only 測試</li>
+  <li>迭代除錯：基於 parity 的模型導致 sync_dmc 收斂失敗 → 替換為基於 Load/Reload 類型的模型</li>
+  <li>完整回歸：171 PASS / 3 FAIL，0 個回歸</li>
+</ol>
+<p>此修復需要理解 NES DMA 的 bus-cycle 層級行為：GET/PUT 節奏、halt 排程、write-delay 規則、phantom read /OE 連續性。剩餘 1 個 DMC 測試失敗（double_2007_read）被識別為獨立的 PPU buffer latch 時序問題，而非 DMA bug。</p>
 </div>
 
 <div class="footer"><a href="index.html">測試報告</a> | AprNes 測試方法論</div>
