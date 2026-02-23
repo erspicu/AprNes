@@ -45,6 +45,7 @@ Temporary Items
 .git/
 .claude/
 ref/Mesen2-master/
+knowledgebase/config.json
 
 # =========================
 # Visual Studio
