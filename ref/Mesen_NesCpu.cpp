@@ -1,0 +1,622 @@
+<html><head><meta name="color-scheme" content="light dark"></head><body><pre style="word-wrap: break-word; white-space: pre-wrap;">#include "pch.h"
+#include &lt;random&gt;
+#include &lt;assert.h&gt;
+#include "Utilities/Serializer.h"
+#include "Debugger/Debugger.h"
+#include "NES/NesCpu.h"
+#include "NES/NesPpu.h"
+#include "NES/APU/NesApu.h"
+#include "NES/NesMemoryManager.h"
+#include "NES/NesControlManager.h"
+#include "NES/NesConsole.h"
+#include "Shared/MessageManager.h"
+#include "Shared/EmuSettings.h"
+#include "Shared/Emulator.h"
+#include "Shared/MemoryOperationType.h"
+
+NesCpu::NesCpu(NesConsole* console)
+{
+	_emu = console-&gt;GetEmulator();
+	_console = console;
+	_memoryManager = _console-&gt;GetMemoryManager();
+
+	Func opTable[] = { 
+	//	0					1					2					3					4					5					6							7					8					9					A							B					C							D					E							F
+		&amp;NesCpu::BRK,	&amp;NesCpu::ORA,	&amp;NesCpu::HLT,	&amp;NesCpu::SLO,	&amp;NesCpu::NOP,	&amp;NesCpu::ORA,	&amp;NesCpu::ASL_Memory,	&amp;NesCpu::SLO,	&amp;NesCpu::PHP,	&amp;NesCpu::ORA,	&amp;NesCpu::ASL_Acc,		&amp;NesCpu::AAC,	&amp;NesCpu::NOP,			&amp;NesCpu::ORA,	&amp;NesCpu::ASL_Memory,	&amp;NesCpu::SLO, //0
+		&amp;NesCpu::BPL,	&amp;NesCpu::ORA,	&amp;NesCpu::HLT,	&amp;NesCpu::SLO,	&amp;NesCpu::NOP,	&amp;NesCpu::ORA,	&amp;NesCpu::ASL_Memory,	&amp;NesCpu::SLO,	&amp;NesCpu::CLC,	&amp;NesCpu::ORA,	&amp;NesCpu::NOP,			&amp;NesCpu::SLO,	&amp;NesCpu::NOP,			&amp;NesCpu::ORA,	&amp;NesCpu::ASL_Memory,	&amp;NesCpu::SLO, //1
+		&amp;NesCpu::JSR,	&amp;NesCpu::AND,	&amp;NesCpu::HLT,	&amp;NesCpu::RLA,	&amp;NesCpu::BIT,	&amp;NesCpu::AND,	&amp;NesCpu::ROL_Memory,	&amp;NesCpu::RLA,	&amp;NesCpu::PLP,	&amp;NesCpu::AND,	&amp;NesCpu::ROL_Acc,		&amp;NesCpu::AAC,	&amp;NesCpu::BIT,			&amp;NesCpu::AND,	&amp;NesCpu::ROL_Memory,	&amp;NesCpu::RLA, //2
+		&amp;NesCpu::BMI,	&amp;NesCpu::AND,	&amp;NesCpu::HLT,	&amp;NesCpu::RLA,	&amp;NesCpu::NOP,	&amp;NesCpu::AND,	&amp;NesCpu::ROL_Memory,	&amp;NesCpu::RLA,	&amp;NesCpu::SEC,	&amp;NesCpu::AND,	&amp;NesCpu::NOP,			&amp;NesCpu::RLA,	&amp;NesCpu::NOP,			&amp;NesCpu::AND,	&amp;NesCpu::ROL_Memory,	&amp;NesCpu::RLA, //3
+		&amp;NesCpu::RTI,	&amp;NesCpu::EOR,	&amp;NesCpu::HLT,	&amp;NesCpu::SRE,	&amp;NesCpu::NOP,	&amp;NesCpu::EOR,	&amp;NesCpu::LSR_Memory,	&amp;NesCpu::SRE,	&amp;NesCpu::PHA,	&amp;NesCpu::EOR,	&amp;NesCpu::LSR_Acc,		&amp;NesCpu::ASR,	&amp;NesCpu::JMP_Abs,		&amp;NesCpu::EOR,	&amp;NesCpu::LSR_Memory,	&amp;NesCpu::SRE, //4
+		&amp;NesCpu::BVC,	&amp;NesCpu::EOR,	&amp;NesCpu::HLT,	&amp;NesCpu::SRE,	&amp;NesCpu::NOP,	&amp;NesCpu::EOR,	&amp;NesCpu::LSR_Memory,	&amp;NesCpu::SRE,	&amp;NesCpu::CLI,	&amp;NesCpu::EOR,	&amp;NesCpu::NOP,			&amp;NesCpu::SRE,	&amp;NesCpu::NOP,			&amp;NesCpu::EOR,	&amp;NesCpu::LSR_Memory,	&amp;NesCpu::SRE, //5
+		&amp;NesCpu::RTS,	&amp;NesCpu::ADC,	&amp;NesCpu::HLT,	&amp;NesCpu::RRA,	&amp;NesCpu::NOP,	&amp;NesCpu::ADC,	&amp;NesCpu::ROR_Memory,	&amp;NesCpu::RRA,	&amp;NesCpu::PLA,	&amp;NesCpu::ADC,	&amp;NesCpu::ROR_Acc,		&amp;NesCpu::ARR,	&amp;NesCpu::JMP_Ind,		&amp;NesCpu::ADC,	&amp;NesCpu::ROR_Memory,	&amp;NesCpu::RRA, //6
+		&amp;NesCpu::BVS,	&amp;NesCpu::ADC,	&amp;NesCpu::HLT,	&amp;NesCpu::RRA,	&amp;NesCpu::NOP,	&amp;NesCpu::ADC,	&amp;NesCpu::ROR_Memory,	&amp;NesCpu::RRA,	&amp;NesCpu::SEI,	&amp;NesCpu::ADC,	&amp;NesCpu::NOP,			&amp;NesCpu::RRA,	&amp;NesCpu::NOP,			&amp;NesCpu::ADC,	&amp;NesCpu::ROR_Memory,	&amp;NesCpu::RRA, //7
+		&amp;NesCpu::NOP,	&amp;NesCpu::STA,	&amp;NesCpu::NOP,	&amp;NesCpu::SAX,	&amp;NesCpu::STY,	&amp;NesCpu::STA,	&amp;NesCpu::STX,			&amp;NesCpu::SAX,	&amp;NesCpu::DEY,	&amp;NesCpu::NOP,	&amp;NesCpu::TXA,			&amp;NesCpu::ANE,	&amp;NesCpu::STY,			&amp;NesCpu::STA,	&amp;NesCpu::STX,			&amp;NesCpu::SAX, //8
+		&amp;NesCpu::BCC,	&amp;NesCpu::STA,	&amp;NesCpu::HLT,	&amp;NesCpu::SHAZ,	&amp;NesCpu::STY,	&amp;NesCpu::STA,	&amp;NesCpu::STX,			&amp;NesCpu::SAX,	&amp;NesCpu::TYA,	&amp;NesCpu::STA,	&amp;NesCpu::TXS,			&amp;NesCpu::TAS,	&amp;NesCpu::SHY,			&amp;NesCpu::STA,	&amp;NesCpu::SHX,			&amp;NesCpu::SHAA,//9
+		&amp;NesCpu::LDY,	&amp;NesCpu::LDA,	&amp;NesCpu::LDX,	&amp;NesCpu::LAX,	&amp;NesCpu::LDY,	&amp;NesCpu::LDA,	&amp;NesCpu::LDX,			&amp;NesCpu::LAX,	&amp;NesCpu::TAY,	&amp;NesCpu::LDA,	&amp;NesCpu::TAX,			&amp;NesCpu::ATX,	&amp;NesCpu::LDY,			&amp;NesCpu::LDA,	&amp;NesCpu::LDX,			&amp;NesCpu::LAX, //A
+		&amp;NesCpu::BCS,	&amp;NesCpu::LDA,	&amp;NesCpu::HLT,	&amp;NesCpu::LAX,	&amp;NesCpu::LDY,	&amp;NesCpu::LDA,	&amp;NesCpu::LDX,			&amp;NesCpu::LAX,	&amp;NesCpu::CLV,	&amp;NesCpu::LDA,	&amp;NesCpu::TSX,			&amp;NesCpu::LAS,	&amp;NesCpu::LDY,			&amp;NesCpu::LDA,	&amp;NesCpu::LDX,			&amp;NesCpu::LAX, //B
+		&amp;NesCpu::CPY,	&amp;NesCpu::CPA,	&amp;NesCpu::NOP,	&amp;NesCpu::DCP,	&amp;NesCpu::CPY,	&amp;NesCpu::CPA,	&amp;NesCpu::DEC,			&amp;NesCpu::DCP,	&amp;NesCpu::INY,	&amp;NesCpu::CPA,	&amp;NesCpu::DEX,			&amp;NesCpu::AXS,	&amp;NesCpu::CPY,			&amp;NesCpu::CPA,	&amp;NesCpu::DEC,			&amp;NesCpu::DCP, //C
+		&amp;NesCpu::BNE,	&amp;NesCpu::CPA,	&amp;NesCpu::HLT,	&amp;NesCpu::DCP,	&amp;NesCpu::NOP,	&amp;NesCpu::CPA,	&amp;NesCpu::DEC,			&amp;NesCpu::DCP,	&amp;NesCpu::CLD,	&amp;NesCpu::CPA,	&amp;NesCpu::NOP,			&amp;NesCpu::DCP,	&amp;NesCpu::NOP,			&amp;NesCpu::CPA,	&amp;NesCpu::DEC,			&amp;NesCpu::DCP, //D
+		&amp;NesCpu::CPX,	&amp;NesCpu::SBC,	&amp;NesCpu::NOP,	&amp;NesCpu::ISB,	&amp;NesCpu::CPX,	&amp;NesCpu::SBC,	&amp;NesCpu::INC,			&amp;NesCpu::ISB,	&amp;NesCpu::INX,	&amp;NesCpu::SBC,	&amp;NesCpu::NOP,			&amp;NesCpu::SBC,	&amp;NesCpu::CPX,			&amp;NesCpu::SBC,	&amp;NesCpu::INC,			&amp;NesCpu::ISB, //E
+		&amp;NesCpu::BEQ,	&amp;NesCpu::SBC,	&amp;NesCpu::HLT,	&amp;NesCpu::ISB,	&amp;NesCpu::NOP,	&amp;NesCpu::SBC,	&amp;NesCpu::INC,			&amp;NesCpu::ISB,	&amp;NesCpu::SED,	&amp;NesCpu::SBC,	&amp;NesCpu::NOP,			&amp;NesCpu::ISB,	&amp;NesCpu::NOP,			&amp;NesCpu::SBC,	&amp;NesCpu::INC,			&amp;NesCpu::ISB  //F
+	};
+
+	typedef NesAddrMode M;
+	NesAddrMode addrMode[] = {
+	//	0			1				2			3				4				5				6				7				8			9			A			B			C			D			E			F
+		M::Imp,	M::IndX,		M::None,	M::IndX,		M::Zero,		M::Zero,		M::Zero,		M::Zero,		M::Imp,	M::Imm,	M::Acc,	M::Imm,	M::Abs,	M::Abs,	M::Abs,	M::Abs,	//0
+		M::Rel,	M::IndY,		M::None,	M::IndYW,	M::ZeroX,	M::ZeroX,	M::ZeroX,	M::ZeroX,	M::Imp,	M::AbsY,	M::Imp,	M::AbsYW,M::AbsX,	M::AbsX,	M::AbsXW,M::AbsXW,//1
+		M::Other,M::IndX,		M::None,	M::IndX,		M::Zero,		M::Zero,		M::Zero,		M::Zero,		M::Imp,	M::Imm,	M::Acc,	M::Imm,	M::Abs,	M::Abs,	M::Abs,	M::Abs,	//2
+		M::Rel,	M::IndY,		M::None,	M::IndYW,	M::ZeroX,	M::ZeroX,	M::ZeroX,	M::ZeroX,	M::Imp,	M::AbsY,	M::Imp,	M::AbsYW,M::AbsX,	M::AbsX,	M::AbsXW,M::AbsXW,//3
+		M::Imp,	M::IndX,		M::None,	M::IndX,		M::Zero,		M::Zero,		M::Zero,		M::Zero,		M::Imp,	M::Imm,	M::Acc,	M::Imm,	M::Abs,	M::Abs,	M::Abs,	M::Abs,	//4
+		M::Rel,	M::IndY,		M::None,	M::IndYW,	M::ZeroX,	M::ZeroX,	M::ZeroX,	M::ZeroX,	M::Imp,	M::AbsY,	M::Imp,	M::AbsYW,M::AbsX,	M::AbsX,	M::AbsXW,M::AbsXW,//5
+		M::Imp,	M::IndX,		M::None,	M::IndX,		M::Zero,		M::Zero,		M::Zero,		M::Zero,		M::Imp,	M::Imm,	M::Acc,	M::Imm,	M::Ind,	M::Abs,	M::Abs,	M::Abs,	//6
+		M::Rel,	M::IndY,		M::None,	M::IndYW,	M::ZeroX,	M::ZeroX,	M::ZeroX,	M::ZeroX,	M::Imp,	M::AbsY,	M::Imp,	M::AbsYW,M::AbsX,	M::AbsX,	M::AbsXW,M::AbsXW,//7
+		M::Imm,	M::IndX,		M::Imm,	M::IndX,		M::Zero,		M::Zero,		M::Zero,		M::Zero,		M::Imp,	M::Imm,	M::Imp,	M::Imm,	M::Abs,	M::Abs,	M::Abs,	M::Abs,	//8
+		M::Rel,	M::IndYW,	M::None,	M::Other,	M::ZeroX,	M::ZeroX,	M::ZeroY,	M::ZeroY,	M::Imp,	M::AbsYW,M::Imp,	M::Other,M::Other,M::AbsXW,M::Other,M::Other,//9
+		M::Imm,	M::IndX,		M::Imm,	M::IndX,		M::Zero,		M::Zero,		M::Zero,		M::Zero,		M::Imp,	M::Imm,	M::Imp,	M::Imm,	M::Abs,	M::Abs,	M::Abs,	M::Abs,	//A
+		M::Rel,	M::IndY,		M::None,	M::IndY,		M::ZeroX,	M::ZeroX,	M::ZeroY,	M::ZeroY,	M::Imp,	M::AbsY,	M::Imp,	M::AbsY,	M::AbsX,	M::AbsX,	M::AbsY,	M::AbsY,	//B
+		M::Imm,	M::IndX,		M::Imm,	M::IndX,		M::Zero,		M::Zero,		M::Zero,		M::Zero,		M::Imp,	M::Imm,	M::Imp,	M::Imm,	M::Abs,	M::Abs,	M::Abs,	M::Abs,	//C
+		M::Rel,	M::IndY,		M::None,	M::IndYW,	M::ZeroX,	M::ZeroX,	M::ZeroX,	M::ZeroX,	M::Imp,	M::AbsY,	M::Imp,	M::AbsYW,M::AbsX,	M::AbsX,	M::AbsXW,M::AbsXW,//D
+		M::Imm,	M::IndX,		M::Imm,	M::IndX,		M::Zero,		M::Zero,		M::Zero,		M::Zero,		M::Imp,	M::Imm,	M::Imp,	M::Imm,	M::Abs,	M::Abs,	M::Abs,	M::Abs,	//E
+		M::Rel,	M::IndY,		M::None,	M::IndYW,	M::ZeroX,	M::ZeroX,	M::ZeroX,	M::ZeroX,	M::Imp,	M::AbsY,	M::Imp,	M::AbsYW,M::AbsX,	M::AbsX,	M::AbsXW,M::AbsXW,//F
+	};
+	
+	memcpy(_opTable, opTable, sizeof(opTable));
+	memcpy(_addrMode, addrMode, sizeof(addrMode));
+
+	_instAddrMode = NesAddrMode::None;
+	_state = {};
+	_operand = 0;
+	_spriteDmaTransfer = false;
+	_spriteDmaOffset = 0;
+	_needHalt = false;
+	_ppuOffset = 0;
+	_startClockCount = 6;
+	_endClockCount = 6;
+	_masterClock = 0;
+	_dmcDmaRunning = false;
+	_cpuWrite = false;
+	_irqMask = 0;
+	_state = {};
+	_prevRunIrq = false;
+	_runIrq = false;
+}
+
+void NesCpu::Reset(bool softReset, ConsoleRegion region)
+{
+	_state.NmiFlag = false;
+	_state.IrqFlag = 0;
+
+	_spriteDmaTransfer = false;
+	_spriteDmaOffset = 0;
+	_needHalt = false;
+	_dmcDmaRunning = false;
+	_abortDmcDma = false;
+	_isDmcDmaRead = false;
+	_cpuWrite = false;
+	_hideCrashWarning = false;
+
+	//Use _memoryManager-&gt;Read() directly to prevent clocking the PPU/APU when setting PC at reset
+	_state.PC = _memoryManager-&gt;Read(NesCpu::ResetVector) | _memoryManager-&gt;Read(NesCpu::ResetVector+1) &lt;&lt; 8;
+
+	if(softReset) {
+		SetFlags(PSFlags::Interrupt);
+		_state.SP -= 0x03;
+	} else {
+		//Used by NSF code to disable Frame Counter &amp; DMC interrupts
+		_irqMask = 0xFF;
+
+		_state.A = 0;
+		_state.SP = 0xFD;
+		_state.X = 0;
+		_state.Y = 0;
+		_state.PS = PSFlags::Interrupt;
+
+		_runIrq = false;
+	}
+
+	uint8_t ppuDivider;
+	uint8_t cpuDivider;
+	switch(region) {
+		default:
+		case ConsoleRegion::Ntsc:
+			ppuDivider = 4;
+			cpuDivider = 12;
+			break;
+
+		case ConsoleRegion::Pal:
+			ppuDivider = 5;
+			cpuDivider = 16;
+			break;
+
+		case ConsoleRegion::Dendy:
+			ppuDivider = 5;
+			cpuDivider = 15;
+			break;
+	}
+
+	_state.CycleCount = (uint64_t)-1;
+	_masterClock = 0;
+
+	uint8_t cpuOffset = 0;
+	if(_console-&gt;GetNesConfig().RandomizeCpuPpuAlignment) {
+		std::random_device rd;
+		std::mt19937 mt(rd());
+		std::uniform_int_distribution&lt;&gt; distPpu(0, ppuDivider - 1);
+		std::uniform_int_distribution&lt;&gt; distCpu(0, cpuDivider - 1);
+		_ppuOffset = distPpu(mt);
+		cpuOffset += distCpu(mt);
+
+		string ppuAlignment = " PPU: " + std::to_string(_ppuOffset) + "/" + std::to_string(ppuDivider - 1);
+		string cpuAlignment = " CPU: " + std::to_string(cpuOffset) + "/" + std::to_string(cpuDivider - 1);
+		MessageManager::Log("CPU/PPU alignment -" + ppuAlignment + cpuAlignment);
+	} else {
+		_ppuOffset = 1;
+		cpuOffset = 0;
+	}
+
+	_masterClock += cpuDivider + cpuOffset;
+
+	//The CPU takes 8 cycles before it starts executing the ROM's code after a reset/power up
+	for(int i = 0; i &lt; 8; i++) {
+		StartCpuCycle(true);
+		EndCpuCycle(true);
+	}
+}
+
+void NesCpu::Exec()
+{
+#ifndef DUMMYCPU
+	_emu-&gt;ProcessInstruction&lt;CpuType::Nes&gt;();
+#endif
+
+	uint8_t opCode = GetOPCode();
+	_instAddrMode = _addrMode[opCode];
+	_operand = FetchOperand();
+	(this-&gt;*_opTable[opCode])();
+	
+	if(_prevRunIrq || _prevNeedNmi) {
+		IRQ();
+	}
+}
+
+void NesCpu::IRQ() 
+{
+#ifndef DUMMYCPU
+	uint16_t originalPc = PC();
+#endif
+
+	if(_console-&gt;GetRegion() == ConsoleRegion::Pal) {
+		//On PAL, IRQ/NMI sequence also checks for DMA on the first read
+		ProcessPendingDma(_state.PC, MemoryOperationType::ExecOpCode);
+	}
+
+	DummyRead();  //fetch opcode (and discard it - $00 (BRK) is forced into the opcode register instead)
+	DummyRead();  //read next instruction byte (actually the same as above, since PC increment is suppressed. Also discarded.)
+	Push((uint16_t)(PC()));
+
+	if(_needNmi) {
+		_needNmi = false;
+		Push((uint8_t)(PS() | PSFlags::Reserved));
+		SetFlags(PSFlags::Interrupt);
+
+		SetPC(MemoryReadWord(NesCpu::NMIVector));
+
+		#ifndef DUMMYCPU
+		_emu-&gt;ProcessInterrupt&lt;CpuType::Nes&gt;(originalPc, _state.PC, true);
+		#endif
+	} else {
+		Push((uint8_t)(PS() | PSFlags::Reserved));
+		SetFlags(PSFlags::Interrupt);
+
+		SetPC(MemoryReadWord(NesCpu::IRQVector));
+
+		#ifndef DUMMYCPU
+		_emu-&gt;ProcessInterrupt&lt;CpuType::Nes&gt;(originalPc, _state.PC, false);
+		#endif
+	}
+}
+
+void NesCpu::BRK() {
+	Push((uint16_t)(PC() + 1));
+
+	uint8_t flags = PS() | PSFlags::Break | PSFlags::Reserved;
+	if(_needNmi) {
+		_needNmi = false;
+		Push((uint8_t)flags);
+		SetFlags(PSFlags::Interrupt);
+
+		SetPC(MemoryReadWord(NesCpu::NMIVector));
+	} else {
+		Push((uint8_t)flags);
+		SetFlags(PSFlags::Interrupt);
+
+		SetPC(MemoryReadWord(NesCpu::IRQVector));
+	}
+
+	//Ensure we don't start an NMI right after running a BRK instruction (first instruction in IRQ handler must run first - needed for nmi_and_brk test)
+	_prevNeedNmi = false;
+}
+
+void NesCpu::MemoryWrite(uint16_t addr, uint8_t value, MemoryOperationType operationType)
+{
+#ifdef DUMMYCPU
+	LogMemoryOperation(addr, value, operationType);
+#else
+	_cpuWrite = true;
+	StartCpuCycle(false);
+	_memoryManager-&gt;Write(addr, value, operationType);
+	EndCpuCycle(false);
+	_cpuWrite = false;
+#endif
+}
+
+uint8_t NesCpu::MemoryRead(uint16_t addr, MemoryOperationType operationType)
+{
+#ifdef DUMMYCPU
+	uint8_t value = _memoryManager-&gt;DebugRead(addr);
+	LogMemoryOperation(addr, value, operationType);
+	return value;
+#else 
+	ProcessPendingDma(addr, operationType);
+
+	StartCpuCycle(true);
+	uint8_t value = _memoryManager-&gt;Read(addr, operationType);
+	EndCpuCycle(true);
+	return value;
+#endif
+}
+
+uint16_t NesCpu::FetchOperand()
+{
+	switch(_instAddrMode) {
+		case NesAddrMode::Acc:
+		case NesAddrMode::Imp: DummyRead(); return 0;
+		case NesAddrMode::Imm:
+		case NesAddrMode::Rel: return GetImmediate();
+		case NesAddrMode::Zero: return GetZeroAddr();
+		case NesAddrMode::ZeroX: return GetZeroXAddr();
+		case NesAddrMode::ZeroY: return GetZeroYAddr();
+		case NesAddrMode::Ind: return GetIndAddr();
+		case NesAddrMode::IndX: return GetIndXAddr();
+		case NesAddrMode::IndY: return GetIndYAddr(false);
+		case NesAddrMode::IndYW: return GetIndYAddr(true);
+		case NesAddrMode::Abs: return GetAbsAddr();
+		case NesAddrMode::AbsX: return GetAbsXAddr(false);
+		case NesAddrMode::AbsXW: return GetAbsXAddr(true);
+		case NesAddrMode::AbsY: return GetAbsYAddr(false);
+		case NesAddrMode::AbsYW: return GetAbsYAddr(true);
+		case NesAddrMode::Other: return 0; //Do nothing, op is handled specifically
+		default: return 0;
+	}
+}
+
+void NesCpu::EndCpuCycle(bool forRead)
+{
+	_masterClock += forRead ? (_endClockCount + 1) : (_endClockCount - 1);
+	_console-&gt;GetPpu()-&gt;Run(_masterClock - _ppuOffset);
+
+	//"The internal signal goes high during φ1 of the cycle that follows the one where the edge is detected,
+	//and stays high until the NMI has been handled. "
+	_prevNeedNmi = _needNmi;
+
+	//"This edge detector polls the status of the NMI line during φ2 of each CPU cycle (i.e., during the 
+	//second half of each cycle) and raises an internal signal if the input goes from being high during 
+	//one cycle to being low during the next"
+	if(!_prevNmiFlag &amp;&amp; _state.NmiFlag) {
+		_needNmi = true;
+	}
+	_prevNmiFlag = _state.NmiFlag;
+
+	//"it's really the status of the interrupt lines at the end of the second-to-last cycle that matters."
+	//Keep the irq lines values from the previous cycle.  The before-to-last cycle's values will be used
+	_prevRunIrq = _runIrq;
+	_runIrq = ((_state.IrqFlag &amp; _irqMask) &gt; 0 &amp;&amp; !CheckFlag(PSFlags::Interrupt));
+}
+
+void NesCpu::StartCpuCycle(bool forRead)
+{
+	_masterClock += forRead ? (_startClockCount - 1) : (_startClockCount + 1);
+	_state.CycleCount++;
+	_console-&gt;GetPpu()-&gt;Run(_masterClock - _ppuOffset);
+	_console-&gt;ProcessCpuClock();
+}
+
+void NesCpu::ProcessPendingDma(uint16_t readAddress, MemoryOperationType opType)
+{
+	if(!_needHalt) {
+		return;
+	}
+
+	if(_console-&gt;GetRegion() == ConsoleRegion::Pal &amp;&amp; opType != MemoryOperationType::ExecOpCode) {
+		//On PAL, DMA can only start when the CPU attempts to read the opcode for the next instruction
+		//This also avoids the bit deletions that can happen because of DMA reads on NTSC
+		return;
+	}
+
+	uint16_t prevReadAddress = readAddress;
+	bool enableInternalRegReads = (readAddress &amp; 0xFFE0) == 0x4000;
+	bool skipFirstInputClock = false;
+	if(enableInternalRegReads &amp;&amp; _dmcDmaRunning &amp;&amp; (readAddress == 0x4016 || readAddress == 0x4017)) {
+		uint16_t dmcAddress = _console-&gt;GetApu()-&gt;GetDmcReadAddress();
+		if((dmcAddress &amp; 0x1F) == (readAddress &amp; 0x1F)) {
+			//DMC will cause a read on the same address as the CPU was reading from
+			//This will hide the reads from the controllers because /OE will be active the whole time
+			skipFirstInputClock = true;
+		}
+	}
+
+	//On Famicom, each dummy/idle read to 4016/4017 is intepreted as a read of the joypad registers
+	//On NES (or AV Famicom), only the first dummy/idle read causes side effects (e.g only a single bit is lost)
+	bool isNesBehavior = _console-&gt;GetNesConfig().ConsoleType != NesConsoleType::Hvc001;
+	bool skipDummyReads = isNesBehavior &amp;&amp; (readAddress == 0x4016 || readAddress == 0x4017);
+
+	_needHalt = false;
+
+	StartCpuCycle(true);
+	if(_abortDmcDma &amp;&amp; isNesBehavior &amp;&amp; (readAddress == 0x4016 || readAddress == 0x4017)) {
+		//Skip halt cycle dummy read on 4016/4017
+		//The DMA was aborted, and the CPU will read 4016/4017 next
+		//If 4016/4017 is read here, the controllers will see 2 separate reads
+		//even though they would only see a single read on hardware (except the original Famicom)
+	} else if(!skipFirstInputClock) {
+		_memoryManager-&gt;Read(readAddress, MemoryOperationType::DmaRead);
+	}
+	EndCpuCycle(true);
+
+	if(_abortDmcDma) {
+		_dmcDmaRunning = false;
+		_abortDmcDma = false;
+
+		if(!_spriteDmaTransfer) {
+			//If DMC DMA was cancelled and OAM DMA isn't about to start,
+			//stop processing DMA entirely. Otherwise, OAM DMA needs to run,
+			//so the DMA process has to continue.
+			_needDummyRead = false;
+			return;
+		}
+	}
+
+	uint16_t spriteDmaCounter = 0;
+	uint8_t spriteReadAddr = 0;
+	uint8_t readValue = 0;
+
+	auto processCycle = [this] {
+		//Sprite DMA cycles count as halt/dummy cycles for the DMC DMA when both run at the same time
+		if(_abortDmcDma) {
+			_dmcDmaRunning = false;
+			_abortDmcDma = false;
+			_needDummyRead = false;
+			_needHalt = false;
+		} else if(_needHalt) {
+			_needHalt = false;
+		} else if(_needDummyRead) {
+			_needDummyRead = false;
+		}
+		StartCpuCycle(true);
+	};
+
+	while(_dmcDmaRunning || _spriteDmaTransfer) {
+		bool getCycle = (_state.CycleCount &amp; 0x01) == 0;
+		if(getCycle) {
+			if(_dmcDmaRunning &amp;&amp; !_needHalt &amp;&amp; !_needDummyRead) {
+				//DMC DMA is ready to read a byte (both halt and dummy read cycles were performed before this)
+				processCycle();
+				_isDmcDmaRead = true; //used by debugger to distinguish between dmc and oam/dummy dma reads
+				readValue = ProcessDmaRead(_console-&gt;GetApu()-&gt;GetDmcReadAddress(), prevReadAddress, enableInternalRegReads, isNesBehavior);
+				_isDmcDmaRead = false;
+				EndCpuCycle(true);
+				_dmcDmaRunning = false;
+				_abortDmcDma = false;
+				_console-&gt;GetApu()-&gt;SetDmcReadBuffer(readValue);
+			} else if(_spriteDmaTransfer) {
+				//DMC DMA is not running, or not ready, run sprite DMA
+				processCycle();
+				readValue = ProcessDmaRead(_spriteDmaOffset * 0x100 + spriteReadAddr, prevReadAddress, enableInternalRegReads, isNesBehavior);
+				EndCpuCycle(true);
+				spriteReadAddr++;
+				spriteDmaCounter++;
+			} else {
+				//DMC DMA is running, but not ready (need halt/dummy read) and sprite DMA isn't runnnig, perform a dummy read
+				assert(_needHalt || _needDummyRead);
+				processCycle();
+				if(!skipDummyReads) {
+					_memoryManager-&gt;Read(readAddress, MemoryOperationType::DmaRead);
+				}
+				EndCpuCycle(true);
+			}
+		} else {
+			if(_spriteDmaTransfer &amp;&amp; (spriteDmaCounter &amp; 0x01)) {
+				//Sprite DMA write cycle (only do this if a sprite dma read was performed last cycle)
+				processCycle();
+				_memoryManager-&gt;Write(0x2004, readValue, MemoryOperationType::DmaWrite);
+				EndCpuCycle(true);
+				spriteDmaCounter++;
+				if(spriteDmaCounter == 0x200) {
+					_spriteDmaTransfer = false;
+				}
+			} else {
+				//Align to read cycle before starting sprite DMA (or align to perform DMC read)
+				processCycle();
+				if(!skipDummyReads) {
+					_memoryManager-&gt;Read(readAddress, MemoryOperationType::DmaRead);
+				}
+				EndCpuCycle(true);
+			}
+		}
+	}
+}
+
+uint8_t NesCpu::ProcessDmaRead(uint16_t addr, uint16_t&amp; prevReadAddress, bool enableInternalRegReads, bool isNesBehavior)
+{
+	//This is to reproduce a CPU bug that can occur during DMA which can cause the 2A03 to read from
+	//its internal registers (4015, 4016, 4017) at the same time as the DMA unit reads a byte from 
+	//the bus. This bug occurs if the CPU is halted while it's reading a value in the $4000-$401F range.
+	//
+	//This has a number of side effects:
+	// -It can cause a read of $4015 to occur without the program's knowledge, which would clear the frame counter's IRQ flag
+	// -It can cause additional bit deletions while reading the input (e.g more than the DMC glitch usually causes)
+	// -It can also *prevent* bit deletions from occurring at all in another scenario
+	// -It can replace/corrupt the byte that the DMA is reading, causing DMC to play the wrong sample
+
+	uint8_t val;
+	if(!enableInternalRegReads) {
+		if(addr &gt;= 0x4000 &amp;&amp; addr &lt;= 0x401F) {
+			//Nothing will respond on $4000-$401F on the external bus - return open bus value
+			val = _memoryManager-&gt;GetOpenBus();
+		} else {
+			val = _memoryManager-&gt;Read(addr, MemoryOperationType::DmaRead);
+		}
+		prevReadAddress = addr;
+		return val;
+	} else {
+		//This glitch causes the CPU to read from the internal APU/Input registers
+		//regardless of the address the DMA unit is trying to read
+		uint16_t internalAddr = 0x4000 | (addr &amp; 0x1F);
+		bool isSameAddress = internalAddr == addr;
+
+		switch(internalAddr) {
+			case 0x4015:
+				val = _memoryManager-&gt;Read(internalAddr, MemoryOperationType::DmaRead);
+				if(!isSameAddress) {
+					//Also trigger a read from the actual address the CPU was supposed to read from (external bus)
+					_memoryManager-&gt;Read(addr, MemoryOperationType::DmaRead);
+				}
+				break;
+
+			case 0x4016:
+			case 0x4017:
+				if(_console-&gt;GetRegion() == ConsoleRegion::Pal || (isNesBehavior &amp;&amp; prevReadAddress == internalAddr)) {
+					//Reading from the same input register twice in a row, skip the read entirely to avoid
+					//triggering a bit loss from the read, since the controller won't react to this read
+					//Return the same value as the last read, instead
+					//On PAL, the behavior is unknown - for now, don't cause any bit deletions
+					val = _memoryManager-&gt;GetOpenBus();
+				} else {
+					val = _memoryManager-&gt;Read(internalAddr, MemoryOperationType::DmaRead);
+				}
+
+				if(!isSameAddress) {
+					//The DMA unit is reading from a different address, read from it too (external bus)
+					uint8_t obMask = ((NesControlManager*)_console-&gt;GetControlManager())-&gt;GetOpenBusMask(internalAddr - 0x4016);
+					uint8_t externalValue = _memoryManager-&gt;Read(addr, MemoryOperationType::DmaRead);
+
+					//Merge values, keep the external value for all open bus pins on the 4016/4017 port
+					//AND all other bits together (bus conflict)
+					val = (externalValue &amp; obMask) | ((val &amp; ~obMask) &amp; (externalValue &amp; ~obMask));
+				}
+				break;
+
+			default:
+				val = _memoryManager-&gt;Read(addr, MemoryOperationType::DmaRead);
+				break;
+		}
+
+		prevReadAddress = internalAddr;
+		return val;
+	}
+}
+
+void NesCpu::RunDMATransfer(uint8_t offsetValue)
+{
+	_spriteDmaTransfer = true;
+	_spriteDmaOffset = offsetValue;
+	_needHalt = true;
+}
+
+void NesCpu::StartDmcTransfer()
+{
+	_dmcDmaRunning = true;
+	_needDummyRead = true;
+	_needHalt = true;
+}
+
+void NesCpu::StopDmcTransfer()
+{
+	if(_dmcDmaRunning) {
+		if(_needHalt) {
+			//If interrupted before the halt cycle starts, cancel DMA completely
+			//This can happen when a write prevents the DMA from starting after being queued
+			_dmcDmaRunning = false;
+			_needDummyRead = false;
+			_needHalt = false;
+		} else {
+			//Abort DMA if possible (this only appears to be possible if done within the first cycle of DMA)
+			_abortDmcDma = true;
+		}
+	}
+}
+
+void NesCpu::SetMasterClockDivider(ConsoleRegion region)
+{
+	switch(region) {
+		default:
+		case ConsoleRegion::Ntsc:
+			_startClockCount = 6;
+			_endClockCount = 6;
+			break;
+
+		case ConsoleRegion::Pal:
+			_startClockCount = 8;
+			_endClockCount = 8;
+			break;
+
+		case ConsoleRegion::Dendy:
+			_startClockCount = 7;
+			_endClockCount = 8;
+			break;
+	}
+}
+
+void NesCpu::HLT()
+{
+	//Freeze the CPU, implemented by jumping back and re-executing this op infinitely (for performance reasons)
+	_state.PC -= 1;
+
+	//Prevent IRQ/NMI
+	_prevRunIrq = false;
+	_prevNeedNmi = false;
+
+#if !defined(DUMMYCPU)
+	if(!_hideCrashWarning) {
+		_hideCrashWarning = true;
+
+		MessageManager::DisplayMessage("Error", "GameCrash", "Invalid OP code - CPU crashed.");
+		_emu-&gt;BreakIfDebugging(CpuType::Nes, BreakSource::NesBreakOnCpuCrash);
+
+		if(!_emu-&gt;IsDebugging() &amp;&amp; _console-&gt;GetRomFormat() == RomFormat::Nsf) {
+			//For NSF files, reset cpu if it ever crashes
+			_emu-&gt;Reset();
+		}
+	}
+#endif
+}
+
+void NesCpu::Serialize(Serializer &amp;s)
+{
+	SV(_state.PC);
+	SV(_state.SP);
+	SV(_state.PS);
+	SV(_state.A);
+	SV(_state.X);
+	SV(_state.Y);
+	SV(_state.CycleCount);
+
+	if(s.GetFormat() != SerializeFormat::Map) {
+		//Hide these entries from the Lua API
+		SV(_state.NmiFlag);
+		SV(_state.IrqFlag);
+		SV(_dmcDmaRunning);
+		SV(_abortDmcDma);
+		SV(_spriteDmaTransfer);
+		SV(_needDummyRead);
+		SV(_needHalt);
+		SV(_startClockCount);
+		SV(_endClockCount);
+		SV(_ppuOffset);
+		SV(_masterClock);
+		SV(_prevNeedNmi);
+		SV(_prevNmiFlag);
+		SV(_needNmi);
+	}
+}</pre></body></html>

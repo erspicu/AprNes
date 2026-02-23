@@ -302,7 +302,7 @@ namespace AprNes
             if (scanline == 240 && ppu_cycles_x == 1)
             {
                 RenderScreen();
-                if (LimitFPS) while (StopWatch.Elapsed.TotalSeconds < 0.01666) Thread.Sleep(1);
+                if (LimitFPS) while (StopWatch.Elapsed.TotalSeconds < 0.016) Thread.Sleep(1);
                 frame_count++;
                 StopWatch.Restart();
             }

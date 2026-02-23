@@ -42,6 +42,7 @@
             this.screenModeToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.fullScreeenToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.normalToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this._soundMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.fps_count_timer = new System.Windows.Forms.Timer(this.components);
             this.label3 = new System.Windows.Forms.Label();
             this.UIOpenRom = new System.Windows.Forms.Label();
@@ -58,7 +59,7 @@
             this.panel1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.panel1.ContextMenuStrip = this.contextMenuStrip1;
             this.panel1.Location = new System.Drawing.Point(8, 52);
-            this.panel1.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.panel1.Margin = new System.Windows.Forms.Padding(4);
             this.panel1.Name = "panel1";
             this.panel1.Size = new System.Drawing.Size(383, 359);
             this.panel1.TabIndex = 1;
@@ -74,9 +75,10 @@
             this.fun4ToolStripMenuItem,
             this.fun5ToolStripMenuItem,
             this.fun6ToolStripMenuItem,
-            this.screenModeToolStripMenuItem});
+            this.screenModeToolStripMenuItem,
+            this._soundMenuItem});
             this.contextMenuStrip1.Name = "contextMenuStrip1";
-            this.contextMenuStrip1.Size = new System.Drawing.Size(192, 214);
+            this.contextMenuStrip1.Size = new System.Drawing.Size(192, 274);
             // 
             // fun1ToolStripMenuItem
             // 
@@ -86,19 +88,19 @@
             this.fun1ToolStripMenuItem.Click += new System.EventHandler(this.fun1ToolStripMenuItem_Click);
             // 
             // fun2ToolStripMenuItem
-            //
+            // 
             this.fun2ToolStripMenuItem.Name = "fun2ToolStripMenuItem";
             this.fun2ToolStripMenuItem.Size = new System.Drawing.Size(191, 30);
             this.fun2ToolStripMenuItem.Text = "Soft Reset";
             this.fun2ToolStripMenuItem.Click += new System.EventHandler(this.fun2ToolStripMenuItem_Click);
-            //
+            // 
             // fun7ToolStripMenuItem
-            //
+            // 
             this.fun7ToolStripMenuItem.Name = "fun7ToolStripMenuItem";
             this.fun7ToolStripMenuItem.Size = new System.Drawing.Size(191, 30);
             this.fun7ToolStripMenuItem.Text = "Hard Reset";
             this.fun7ToolStripMenuItem.Click += new System.EventHandler(this.fun7ToolStripMenuItem_Click);
-            //
+            // 
             // fun3ToolStripMenuItem
             // 
             this.fun3ToolStripMenuItem.Name = "fun3ToolStripMenuItem";
@@ -150,6 +152,13 @@
             this.normalToolStripMenuItem.Text = "Normal";
             this.normalToolStripMenuItem.Click += new System.EventHandler(this.normalToolStripMenuItem_Click);
             // 
+            // _soundMenuItem
+            // 
+            this._soundMenuItem.Name = "_soundMenuItem";
+            this._soundMenuItem.Size = new System.Drawing.Size(191, 30);
+            this._soundMenuItem.Text = "Sound: ON";
+            this._soundMenuItem.Click += new System.EventHandler(this._soundMenuItem_Click);
+            // 
             // fps_count_timer
             // 
             this.fps_count_timer.Interval = 1000;
@@ -159,7 +168,7 @@
             // 
             this.label3.BackColor = System.Drawing.Color.Transparent;
             this.label3.Font = new System.Drawing.Font("微軟正黑體", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
-            this.label3.Location = new System.Drawing.Point(312, 15);
+            this.label3.Location = new System.Drawing.Point(313, 13);
             this.label3.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label3.Name = "label3";
             this.label3.Size = new System.Drawing.Size(98, 30);
@@ -173,7 +182,7 @@
             this.UIOpenRom.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.UIOpenRom.FlatStyle = System.Windows.Forms.FlatStyle.Popup;
             this.UIOpenRom.Font = new System.Drawing.Font("微軟正黑體", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
-            this.UIOpenRom.Location = new System.Drawing.Point(8, 15);
+            this.UIOpenRom.Location = new System.Drawing.Point(9, 13);
             this.UIOpenRom.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.UIOpenRom.Name = "UIOpenRom";
             this.UIOpenRom.Size = new System.Drawing.Size(96, 29);
@@ -190,7 +199,7 @@
             this.UIReset.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.UIReset.FlatStyle = System.Windows.Forms.FlatStyle.Popup;
             this.UIReset.Font = new System.Drawing.Font("微軟正黑體", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
-            this.UIReset.Location = new System.Drawing.Point(110, 15);
+            this.UIReset.Location = new System.Drawing.Point(111, 13);
             this.UIReset.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.UIReset.Name = "UIReset";
             this.UIReset.Size = new System.Drawing.Size(96, 29);
@@ -207,7 +216,7 @@
             this.UIConfig.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.UIConfig.FlatStyle = System.Windows.Forms.FlatStyle.Popup;
             this.UIConfig.Font = new System.Drawing.Font("微軟正黑體", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
-            this.UIConfig.Location = new System.Drawing.Point(212, 15);
+            this.UIConfig.Location = new System.Drawing.Point(213, 13);
             this.UIConfig.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.UIConfig.Name = "UIConfig";
             this.UIConfig.Size = new System.Drawing.Size(96, 29);
@@ -249,6 +258,7 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 18F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.BackColor = System.Drawing.SystemColors.Menu;
             this.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Zoom;
             this.ClientSize = new System.Drawing.Size(399, 441);
             this.ContextMenuStrip = this.contextMenuStrip1;
@@ -263,7 +273,7 @@
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.KeyPreview = true;
-            this.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.Margin = new System.Windows.Forms.Padding(4);
             this.MaximizeBox = false;
             this.Name = "AprNesUI";
             this.Opacity = 0D;
@@ -299,6 +309,7 @@
         private System.Windows.Forms.ToolStripMenuItem screenModeToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem fullScreeenToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem normalToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem _soundMenuItem;
     }
 }
 

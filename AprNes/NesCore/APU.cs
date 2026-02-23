@@ -414,23 +414,27 @@ namespace AprNes
         // =====================================================================
         static void submitBuffer(int idx)
         {
-            if (!_audioReady || _hWaveOut == IntPtr.Zero) return;
-
-            int    hdrSz = Marshal.SizeOf(typeof(WAVEHDR));
-            IntPtr ptr   = Marshal.UnsafeAddrOfPinnedArrayElement(_waveHdrs, idx);
-
-            // 等待此緩衝區播放完畢 (最多等 50ms)
-            int waited = 0;
-            while ((_waveHdrs[idx].dwFlags & WHDR_INQUEUE) != 0)
+            try
             {
-                Thread.Sleep(1);
-                if (++waited > 50) return; // 超時就放棄此 frame
-            }
+                if (!_audioReady || _hWaveOut == IntPtr.Zero) return;
 
-            waveOutUnprepareHeader(_hWaveOut, ptr, hdrSz);
-            _waveHdrs[idx].dwFlags = 0;
-            waveOutPrepareHeader(_hWaveOut, ptr, hdrSz);
-            waveOutWrite(_hWaveOut, ptr, hdrSz);
+                int hdrSz = Marshal.SizeOf(typeof(WAVEHDR));
+                IntPtr ptr = Marshal.UnsafeAddrOfPinnedArrayElement(_waveHdrs, idx);
+
+                // 等待此緩衝區播放完畢 (最多等 50ms)
+                int waited = 0;
+                while ((_waveHdrs[idx].dwFlags & WHDR_INQUEUE) != 0)
+                {
+                    Thread.Sleep(1);
+                    if (++waited > 50) return; // 超時就放棄此 frame
+                }
+
+                waveOutUnprepareHeader(_hWaveOut, ptr, hdrSz);
+                _waveHdrs[idx].dwFlags = 0;
+                waveOutPrepareHeader(_hWaveOut, ptr, hdrSz);
+                waveOutWrite(_hWaveOut, ptr, hdrSz);
+            }
+            catch (Exception ex) { }
         }
 
         // =====================================================================

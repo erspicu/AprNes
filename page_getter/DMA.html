@@ -1,0 +1,571 @@
+<!DOCTYPE html><html class="client-js" lang="en" dir="ltr"><head>
+<meta charset="UTF-8">
+<title>DMA - NESdev Wiki</title>
+<script>document.documentElement.className="client-js";RLCONF={"wgBreakFrames":false,"wgSeparatorTransformTable":["",""],"wgDigitTransformTable":["",""],"wgDefaultDateFormat":"dmy","wgMonthNames":["","January","February","March","April","May","June","July","August","September","October","November","December"],"wgRequestId":"aZqwKYQbgI5ZopRrK_BBzwAAAAc","wgCanonicalNamespace":"","wgCanonicalSpecialPageName":false,"wgNamespaceNumber":0,"wgPageName":"DMA","wgTitle":"DMA","wgCurRevisionId":23450,"wgRevisionId":23450,"wgArticleId":178,"wgIsArticle":true,"wgIsRedirect":false,"wgAction":"view","wgUserName":null,"wgUserGroups":["*"],"wgCategories":[],"wgPageViewLanguage":"en","wgPageContentLanguage":"en","wgPageContentModel":"wikitext","wgRelevantPageName":"DMA","wgRelevantArticleId":178,"wgIsProbablyEditable":false,"wgRelevantPageIsProbablyEditable":false,"wgRestrictionEdit":[],"wgRestrictionMove":[],"wgCiteReferencePreviewsActive":true};RLSTATE={"site.styles":"ready","user.styles":"ready","user":"ready","user.options":"loading","ext.cite.styles":"ready","skins.monobook.styles":"ready","jquery.makeCollapsible.styles":"ready"};
+RLPAGEMODULES=["ext.cite.ux-enhancements","site","mediawiki.page.ready","jquery.makeCollapsible","mediawiki.toc","skins.monobook.scripts"];</script>
+<script>(RLQ=window.RLQ||[]).push(function(){mw.loader.impl(function(){return["user.options@12s5i",function($,jQuery,require,module){mw.user.tokens.set({"patrolToken":"+\\","watchToken":"+\\","csrfToken":"+\\"});
+}];});});</script>
+<link rel="stylesheet" href="/w/load.php?lang=en&amp;modules=ext.cite.styles%7Cjquery.makeCollapsible.styles%7Cskins.monobook.styles&amp;only=styles&amp;skin=monobook">
+<script async="" src="/w/load.php?lang=en&amp;modules=startup&amp;only=scripts&amp;raw=1&amp;skin=monobook"></script>
+<style>
+.oo-ui-icon-alert,.mw-ui-icon-alert:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E alert %3C/title%3E%3Cpath d=%22M11.53 2.3A1.85 1.85 0 0 0 10 1.21 1.85 1.85 0 0 0 8.48 2.3L.36 16.36C-.48 17.81.21 19 1.88 19h16.24c1.67 0 2.36-1.19 1.52-2.64zM11 16H9v-2h2zm0-4H9V6h2z%22/%3E%3C/svg%3E")}.oo-ui-image-invert.oo-ui-icon-alert,.mw-ui-icon-alert-invert:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E alert %3C/title%3E%3Cg fill=%22%23fff%22%3E%3Cpath d=%22M11.53 2.3A1.85 1.85 0 0 0 10 1.21 1.85 1.85 0 0 0 8.48 2.3L.36 16.36C-.48 17.81.21 19 1.88 19h16.24c1.67 0 2.36-1.19 1.52-2.64zM11 16H9v-2h2zm0-4H9V6h2z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-image-progressive.oo-ui-icon-alert,.mw-ui-icon-alert-progressive:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E alert %3C/title%3E%3Cg fill=%22%2336c%22%3E%3Cpath d=%22M11.53 2.3A1.85 1.85 0 0 0 10 1.21 1.85 1.85 0 0 0 8.48 2.3L.36 16.36C-.48 17.81.21 19 1.88 19h16.24c1.67 0 2.36-1.19 1.52-2.64zM11 16H9v-2h2zm0-4H9V6h2z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-icon-bell,.mw-ui-icon-bell:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E bell %3C/title%3E%3Cpath d=%22M16 7a5.38 5.38 0 0 0-4.46-4.85C11.6 1.46 11.53 0 10 0S8.4 1.46 8.46 2.15A5.38 5.38 0 0 0 4 7v6l-2 2v1h16v-1l-2-2zm-6 13a3 3 0 0 0 3-3H7a3 3 0 0 0 3 3%22/%3E%3C/svg%3E")}.oo-ui-image-invert.oo-ui-icon-bell,.mw-ui-icon-bell-invert:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E bell %3C/title%3E%3Cg fill=%22%23fff%22%3E%3Cpath d=%22M16 7a5.38 5.38 0 0 0-4.46-4.85C11.6 1.46 11.53 0 10 0S8.4 1.46 8.46 2.15A5.38 5.38 0 0 0 4 7v6l-2 2v1h16v-1l-2-2zm-6 13a3 3 0 0 0 3-3H7a3 3 0 0 0 3 3%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-image-progressive.oo-ui-icon-bell,.mw-ui-icon-bell-progressive:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E bell %3C/title%3E%3Cg fill=%22%2336c%22%3E%3Cpath d=%22M16 7a5.38 5.38 0 0 0-4.46-4.85C11.6 1.46 11.53 0 10 0S8.4 1.46 8.46 2.15A5.38 5.38 0 0 0 4 7v6l-2 2v1h16v-1l-2-2zm-6 13a3 3 0 0 0 3-3H7a3 3 0 0 0 3 3%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-icon-bellOutline,.mw-ui-icon-bellOutline:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E bell %3C/title%3E%3Cpath d=%22M11.5 2.19C14.09 2.86 16 5.2 16 8v6l2 2v1H2v-1l2-2V8c0-2.8 1.91-5.14 4.5-5.81V1.5C8.5.67 9.17 0 10 0s1.5.67 1.5 1.5zM10 4C7.79 4 6 5.79 6 8v7h8V8c0-2.21-1.79-4-4-4M8 18h4c0 1.1-.9 2-2 2s-2-.9-2-2%22/%3E%3C/svg%3E")}.oo-ui-image-invert.oo-ui-icon-bellOutline,.mw-ui-icon-bellOutline-invert:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E bell %3C/title%3E%3Cg fill=%22%23fff%22%3E%3Cpath d=%22M11.5 2.19C14.09 2.86 16 5.2 16 8v6l2 2v1H2v-1l2-2V8c0-2.8 1.91-5.14 4.5-5.81V1.5C8.5.67 9.17 0 10 0s1.5.67 1.5 1.5zM10 4C7.79 4 6 5.79 6 8v7h8V8c0-2.21-1.79-4-4-4M8 18h4c0 1.1-.9 2-2 2s-2-.9-2-2%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-image-progressive.oo-ui-icon-bellOutline,.mw-ui-icon-bellOutline-progressive:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E bell %3C/title%3E%3Cg fill=%22%2336c%22%3E%3Cpath d=%22M11.5 2.19C14.09 2.86 16 5.2 16 8v6l2 2v1H2v-1l2-2V8c0-2.8 1.91-5.14 4.5-5.81V1.5C8.5.67 9.17 0 10 0s1.5.67 1.5 1.5zM10 4C7.79 4 6 5.79 6 8v7h8V8c0-2.21-1.79-4-4-4M8 18h4c0 1.1-.9 2-2 2s-2-.9-2-2%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-icon-error,.mw-ui-icon-error:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E error %3C/title%3E%3Cpath d=%22M13.728 1H6.272L1 6.272v7.456L6.272 19h7.456L19 13.728V6.272zM11 15H9v-2h2zm0-4H9V5h2z%22/%3E%3C/svg%3E")}.oo-ui-image-invert.oo-ui-icon-error,.mw-ui-icon-error-invert:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E error %3C/title%3E%3Cg fill=%22%23fff%22%3E%3Cpath d=%22M13.728 1H6.272L1 6.272v7.456L6.272 19h7.456L19 13.728V6.272zM11 15H9v-2h2zm0-4H9V5h2z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-image-progressive.oo-ui-icon-error,.mw-ui-icon-error-progressive:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E error %3C/title%3E%3Cg fill=%22%2336c%22%3E%3Cpath d=%22M13.728 1H6.272L1 6.272v7.456L6.272 19h7.456L19 13.728V6.272zM11 15H9v-2h2zm0-4H9V5h2z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-icon-message,.mw-ui-icon-message:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E message %3C/title%3E%3Cpath d=%22M0 8v8a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-10 4z%22/%3E%3Cpath d=%22M2 2a2 2 0 0 0-2 2v2l10 4 10-4V4a2 2 0 0 0-2-2z%22/%3E%3C/svg%3E")}.oo-ui-image-invert.oo-ui-icon-message,.mw-ui-icon-message-invert:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E message %3C/title%3E%3Cg fill=%22%23fff%22%3E%3Cpath d=%22M0 8v8a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-10 4z%22/%3E%3Cpath d=%22M2 2a2 2 0 0 0-2 2v2l10 4 10-4V4a2 2 0 0 0-2-2z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-image-progressive.oo-ui-icon-message,.mw-ui-icon-message-progressive:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E message %3C/title%3E%3Cg fill=%22%2336c%22%3E%3Cpath d=%22M0 8v8a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-10 4z%22/%3E%3Cpath d=%22M2 2a2 2 0 0 0-2 2v2l10 4 10-4V4a2 2 0 0 0-2-2z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-icon-notice,.mw-ui-icon-notice:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E notice %3C/title%3E%3Cpath d=%22M10 0a10 10 0 1 0 10 10A10 10 0 0 0 10 0m1 16H9v-2h2zm0-4H9V4h2z%22/%3E%3C/svg%3E")}.oo-ui-image-invert.oo-ui-icon-notice,.mw-ui-icon-notice-invert:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E notice %3C/title%3E%3Cg fill=%22%23fff%22%3E%3Cpath d=%22M10 0a10 10 0 1 0 10 10A10 10 0 0 0 10 0m1 16H9v-2h2zm0-4H9V4h2z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-image-progressive.oo-ui-icon-notice,.mw-ui-icon-notice-progressive:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E notice %3C/title%3E%3Cg fill=%22%2336c%22%3E%3Cpath d=%22M10 0a10 10 0 1 0 10 10A10 10 0 0 0 10 0m1 16H9v-2h2zm0-4H9V4h2z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-icon-speechBubble,.mw-ui-icon-speechBubble:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E speech bubble %3C/title%3E%3Cpath d=%22M6 14H0v6z%22/%3E%3Crect width=%2220%22 height=%2216%22 rx=%222%22/%3E%3C/svg%3E")}.oo-ui-image-invert.oo-ui-icon-speechBubble,.mw-ui-icon-speechBubble-invert:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E speech bubble %3C/title%3E%3Cg fill=%22%23fff%22%3E%3Cpath d=%22M6 14H0v6z%22/%3E%3Crect width=%2220%22 height=%2216%22 rx=%222%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-image-progressive.oo-ui-icon-speechBubble,.mw-ui-icon-speechBubble-progressive:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E speech bubble %3C/title%3E%3Cg fill=%22%2336c%22%3E%3Cpath d=%22M6 14H0v6z%22/%3E%3Crect width=%2220%22 height=%2216%22 rx=%222%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-icon-speechBubbleAdd,.mw-ui-icon-speechBubbleAdd:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E add speech bubble %3C/title%3E%3Cpath d=%22M3 1a2 2 0 0 0-2 2v16l4-4h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm12 8h-4v4H9V9H5V7h4V3h2v4h4z%22/%3E%3C/svg%3E")}.oo-ui-image-invert.oo-ui-icon-speechBubbleAdd,.mw-ui-icon-speechBubbleAdd-invert:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E add speech bubble %3C/title%3E%3Cg fill=%22%23fff%22%3E%3Cpath d=%22M3 1a2 2 0 0 0-2 2v16l4-4h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm12 8h-4v4H9V9H5V7h4V3h2v4h4z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-image-progressive.oo-ui-icon-speechBubbleAdd,.mw-ui-icon-speechBubbleAdd-progressive:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E add speech bubble %3C/title%3E%3Cg fill=%22%2336c%22%3E%3Cpath d=%22M3 1a2 2 0 0 0-2 2v16l4-4h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm12 8h-4v4H9V9H5V7h4V3h2v4h4z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-icon-speechBubbles,.mw-ui-icon-speechBubbles:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E speech bubbles %3C/title%3E%3Cpath d=%22M17 4v7a2 2 0 0 1-2 2H4v1a2 2 0 0 0 2 2h10l4 4V6a2 2 0 0 0-2-2zM6 10H0v6z%22/%3E%3Crect width=%2216%22 height=%2212%22 rx=%222%22/%3E%3C/svg%3E")}.oo-ui-image-invert.oo-ui-icon-speechBubbles,.mw-ui-icon-speechBubbles-invert:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E speech bubbles %3C/title%3E%3Cg fill=%22%23fff%22%3E%3Cpath d=%22M17 4v7a2 2 0 0 1-2 2H4v1a2 2 0 0 0 2 2h10l4 4V6a2 2 0 0 0-2-2zM6 10H0v6z%22/%3E%3Crect width=%2216%22 height=%2212%22 rx=%222%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-image-progressive.oo-ui-icon-speechBubbles,.mw-ui-icon-speechBubbles-progressive:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E speech bubbles %3C/title%3E%3Cg fill=%22%2336c%22%3E%3Cpath d=%22M17 4v7a2 2 0 0 1-2 2H4v1a2 2 0 0 0 2 2h10l4 4V6a2 2 0 0 0-2-2zM6 10H0v6z%22/%3E%3Crect width=%2216%22 height=%2212%22 rx=%222%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-icon-success,.mw-ui-icon-success:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E success %3C/title%3E%3Cpath d=%22M10 20a10 10 0 0 1 0-20 10 10 0 1 1 0 20m-2-5 9-8.5L15.5 5 8 12 4.5 8.5 3 10z%22/%3E%3C/svg%3E")}.oo-ui-image-invert.oo-ui-icon-success,.mw-ui-icon-success-invert:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E success %3C/title%3E%3Cg fill=%22%23fff%22%3E%3Cpath d=%22M10 20a10 10 0 0 1 0-20 10 10 0 1 1 0 20m-2-5 9-8.5L15.5 5 8 12 4.5 8.5 3 10z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-image-progressive.oo-ui-icon-success,.mw-ui-icon-success-progressive:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E success %3C/title%3E%3Cg fill=%22%2336c%22%3E%3Cpath d=%22M10 20a10 10 0 0 1 0-20 10 10 0 1 1 0 20m-2-5 9-8.5L15.5 5 8 12 4.5 8.5 3 10z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-icon-tray,.mw-ui-icon-tray:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E tray %3C/title%3E%3Cpath d=%22M3 1a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm14 12h-4l-1 2H8l-1-2H3V3h14z%22/%3E%3C/svg%3E")}.oo-ui-image-invert.oo-ui-icon-tray,.mw-ui-icon-tray-invert:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E tray %3C/title%3E%3Cg fill=%22%23fff%22%3E%3Cpath d=%22M3 1a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm14 12h-4l-1 2H8l-1-2H3V3h14z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-image-progressive.oo-ui-icon-tray,.mw-ui-icon-tray-progressive:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E tray %3C/title%3E%3Cg fill=%22%2336c%22%3E%3Cpath d=%22M3 1a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm14 12h-4l-1 2H8l-1-2H3V3h14z%22/%3E%3C/g%3E%3C/svg%3E")}
+.cite-accessibility-label{ top:-99999px;clip:rect(1px,1px,1px,1px); position:absolute !important;padding:0 !important;border:0 !important;height:1px !important;width:1px !important; overflow:hidden}:target .mw-cite-targeted-backlink{font-weight:bold}.mw-cite-up-arrow-backlink{display:none}:target .mw-cite-up-arrow-backlink{display:inline}:target .mw-cite-up-arrow{display:none}
+.mw-collapsible-toggle{float:right;-webkit-user-select:none;-moz-user-select:none;user-select:none}.mw-collapsible-toggle-default{-webkit-appearance:none;-moz-appearance:none;appearance:none;background:none;margin:0;padding:0;border:0;font:inherit}.mw-collapsible-toggle-default .mw-collapsible-text{color:#0645ad;border-radius:0.25em;text-decoration:none; }.mw-collapsible-toggle-default .mw-collapsible-text:visited{color:#6b4ba1}.mw-collapsible-toggle-default .mw-collapsible-text:visited:hover{color:#534fa3}.mw-collapsible-toggle-default .mw-collapsible-text:visited:active{color:#353262}.mw-collapsible-toggle-default .mw-collapsible-text:hover{color:#447ff5;text-decoration:underline}.mw-collapsible-toggle-default .mw-collapsible-text:active{color:#2a4b8d;text-decoration:underline}.mw-collapsible-toggle-default .mw-collapsible-text:focus-visible{outline:solid 2px #0645ad}@supports not selector(:focus-visible){.mw-collapsible-toggle-default .mw-collapsible-text:focus{outline:solid 2px #0645ad}}.mw-collapsible-toggle-default .mw-collapsible-text .cdx-icon:not(.cdx-thumbnail__placeholder__icon--vue):last-child{min-width:12px;min-height:12px;width:1em;height:1em;padding-left:4px;vertical-align:middle}.mw-underline-always .mw-collapsible-toggle-default .mw-collapsible-text{text-decoration:underline}.mw-underline-never .mw-collapsible-toggle-default .mw-collapsible-text{text-decoration:none}.mw-collapsible-toggle-default::before{content:'['}.mw-collapsible-toggle-default::after{content:']'}.mw-customtoggle,.mw-collapsible-toggle{cursor:pointer} caption .mw-collapsible-toggle,.mw-content-ltr caption .mw-collapsible-toggle,.mw-content-rtl caption .mw-collapsible-toggle,.mw-content-rtl .mw-content-ltr caption .mw-collapsible-toggle,.mw-content-ltr .mw-content-rtl caption .mw-collapsible-toggle{float:none}
+@media screen {
+	.toctoggle{-webkit-user-select:none;-moz-user-select:none;user-select:none;font-size:94%}}
+#mw-teleport-target{position:absolute;z-index:450}#mw-teleport-target{font-size:1.28em; }</style><style>
+@media screen and (max-width:550px){body.skin--responsive{      }body.skin--responsive #p-search-mobilejs,body.skin--responsive #p-tb-mobilejs,body.skin--responsive #p-lang-mobilejs,body.skin--responsive #t-contributions{display:none}body.skin--responsive #sidebar #p-tb,body.skin--responsive #sidebar #p-lang,body.skin--responsive #sidebar #p-search{display:block}body.skin--responsive #p-cactions:not(.mobile-menu-active),body.skin--responsive #p-personal:not(.mobile-menu-active),body.skin--responsive #p-tb:not(.mobile-menu-active),body.skin--responsive #p-lang:not(.mobile-menu-active),body.skin--responsive #sidebar-mobilejs:not(.mobile-menu-active){display:block;position:absolute !important; clip:rect(1px,1px,1px,1px);width:1px;height:1px;margin:-1px;border:0;padding:0;overflow:hidden}body.skin--responsive .mobile-menu-active{position:absolute;top:2em;left:0;z-index:10000;background:#fff;border:solid 1px #fabd23;border-left:0;padding:2em 2em 0 1.5em;font-size:125%}body.skin--responsive .mobile-menu-active *[id^='ca-nstab-'],body.skin--responsive .mobile-menu-active #ca-talk,body.skin--responsive .mobile-menu-active #ca-edit{display:block;position:absolute !important; clip:rect(1px,1px,1px,1px);width:1px;height:1px;margin:-1px;border:0;padding:0;overflow:hidden}body.skin--responsive .mobile-menu-active ul{padding-top:1em}body.skin--responsive .mobile-menu-active li{white-space:nowrap}body.skin--responsive .mobile-menu-active a{display:block;padding:0.65em 0}body.skin--responsive .mobile-menu-active a.feedlink{padding-left:16px}body.skin--responsive .mobile-menu-active h3:first-child{margin-right:2em}body.skin--responsive .mobile-menu-active .mw-portlet > div,body.skin--responsive .mobile-menu-active .pBody{margin-bottom:2em}body.skin--responsive .mobile-menu-active .mobile-close-button{width:20px;height:20px;background-image:url(/w/skins/MonoBook/resources/images/icon-close.svg?09057);background-position:0 0;background-repeat:no-repeat;position:absolute;top:1em;right:0.75em;cursor:pointer}body.skin--responsive .menus-cover{display:none;top:0;left:0;width:100%;height:100%;z-index:9999}body.skin--responsive .menus-cover.visible{display:block}body.skin--responsive #menus-cover{position:fixed;opacity:0.45;background-color:#fff}body.skin--responsive #menus-cover-background{position:absolute;background-color:#f9f9f9;background-image:url(/w/skins/MonoBook/resources/images/headbg.svg?1797e);background-position:0 0;background-repeat:no-repeat;opacity:0.55}body.skin--responsive #p-cactions-mobile li#ca-edit-mobile a{background-image:url(/w/skins/MonoBook/resources/images/icon-edit.svg?fbba8)}body.skin--responsive #p-cactions-mobile li#t-contributions-mobile a{background-image:url(/w/skins/MonoBook/resources/images/icon-user.svg?e00d0)}body.skin--responsive .mobile-menu-active a.mw-echo-alert{padding-left:1em;padding-right:1em}body.skin--responsive #echo-hack-badges{list-style:none;margin:0;position:absolute;top:1px;left:1.5em;pointer-events:none}body.skin--responsive #echo-hack-badges li{white-space:nowrap}body.skin--responsive #echo-hack-badges #pt-notifications-alert .mw-echo-notifications-badge,body.skin--responsive #echo-hack-badges #pt-notifications-notice .mw-echo-notifications-badge{width:1.9em;overflow:hidden;height:16;top:0;color:transparent}body.skin--responsive #echo-hack-badges #pt-notifications-alert .mw-echo-notifications-badge::before,body.skin--responsive #echo-hack-badges #pt-notifications-notice .mw-echo-notifications-badge::before{display:none}body.skin--responsive #echo-hack-badges #pt-notifications-alert .mw-echo-notifications-badge::after,body.skin--responsive #echo-hack-badges #pt-notifications-notice .mw-echo-notifications-badge::after{left:0;top:0}}</style><meta name="ResourceLoaderDynamicStyles" content="">
+<link rel="stylesheet" href="/w/load.php?lang=en&amp;modules=site.styles&amp;only=styles&amp;skin=monobook">
+<meta name="generator" content="MediaWiki 1.44.0">
+<meta name="robots" content="max-image-preview:standard">
+<meta name="format-detection" content="telephone=no">
+<meta name="description" content="The 2A03 contains a pair of DMA units, one for copying sprite data to PPU OAM and the other for copying DPCM sample data to the APU's DMC sample buffer. DMA is required for DPCM playback, and it is difficult to fill OAM without DMA. Unfortunately, DMC DMA can also result in data loss when reading registers...">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, minimum-scale=0.25, maximum-scale=5.0">
+<link rel="search" type="application/opensearchdescription+xml" href="/w/rest.php/v1/search" title="NESdev Wiki (en)">
+<link rel="EditURI" type="application/rsd+xml" href="https://www.nesdev.org/w/api.php?action=rsd">
+<link rel="alternate" type="application/atom+xml" title="NESdev Wiki Atom feed" href="/w/index.php?title=Special:RecentChanges&amp;feed=atom">
+	<meta property="og:type" content="article">
+
+	<meta property="og:site_name" content="NESdev Wiki">
+
+	<meta property="og:title" content="DMA">
+
+	<meta property="og:description" content="The 2A03 contains a pair of DMA units, one for copying sprite data to PPU OAM and the other for copying DPCM sample data to the APU's DMC sample buffer. DMA is required for DPCM playback, and it is difficult to fill OAM without DMA. Unfortunately, DMC DMA can also result in data loss when reading registers...">
+
+	<meta property="og:url" content="https://www.nesdev.org/wiki/DMA">
+
+<link rel="stylesheet" href="/w/extensions/UserVerification/resources/style.css">
+</head>
+<body class="mediawiki ltr sitedir-ltr mw-hide-empty-elt ns-0 ns-subject page-DMA rootpage-DMA skin-monobook action-view skin--responsive"><div id="globalWrapper">
+	<div id="column-content">
+		<div id="content" class="mw-body" role="main">
+			<a id="top"></a>
+			<div id="siteNotice"></div>
+			<div class="mw-indicators">
+			</div>
+			<h1 id="firstHeading" class="firstHeading mw-first-heading"><span class="mw-page-title-main">DMA</span></h1>
+			<div id="bodyContent" class="monobook-body">
+				<div id="siteSub">From NESdev Wiki</div>
+				<div id="contentSub"><div id="mw-content-subtitle"></div></div>
+				
+				<div id="jump-to-nav"></div><a href="#column-one" class="mw-jump-link">Jump to navigation</a><a href="#searchInput" class="mw-jump-link">Jump to search</a>
+				<!-- start content -->
+				<div id="mw-content-text" class="mw-body-content"><div class="mw-content-ltr mw-parser-output" lang="en" dir="ltr"><p>The 2A03 contains a pair of DMA units, one for copying sprite data to PPU <a href="/wiki/OAM" class="mw-redirect" title="OAM">OAM</a> and the other for copying DPCM sample data to the APU's <a href="/wiki/APU_DMC" title="APU DMC">DMC</a> sample buffer. DMA is required for DPCM playback, and it is difficult to fill OAM without DMA. Unfortunately, DMC DMA can also result in data loss when reading registers with side effects, such as the joypads.
+</p>
+<div id="toc" class="toc" role="navigation" aria-labelledby="mw-toc-heading"><input type="checkbox" role="button" id="toctogglecheckbox" class="toctogglecheckbox" style="display:none" aria-label="Hide the table of contents"><div class="toctitle" lang="en" dir="ltr"><h2 id="mw-toc-heading">Contents</h2><span class="toctogglespan"><label class="toctogglelabel" for="toctogglecheckbox"></label></span></div>
+<ul>
+<li class="toclevel-1 tocsection-1"><a href="#Summary"><span class="tocnumber">1</span> <span class="toctext">Summary</span></a></li>
+<li class="toclevel-1 tocsection-2"><a href="#Cadence"><span class="tocnumber">2</span> <span class="toctext">Cadence</span></a></li>
+<li class="toclevel-1 tocsection-3"><a href="#Behavior"><span class="tocnumber">3</span> <span class="toctext">Behavior</span></a>
+<ul>
+<li class="toclevel-2 tocsection-4"><a href="#OAM_DMA"><span class="tocnumber">3.1</span> <span class="toctext">OAM DMA</span></a></li>
+<li class="toclevel-2 tocsection-5"><a href="#DMC_DMA"><span class="tocnumber">3.2</span> <span class="toctext">DMC DMA</span></a>
+<ul>
+<li class="toclevel-3 tocsection-6"><a href="#Bugs"><span class="tocnumber">3.2.1</span> <span class="toctext">Bugs</span></a></li>
+</ul>
+</li>
+<li class="toclevel-2 tocsection-7"><a href="#DMC_DMA_during_OAM_DMA"><span class="tocnumber">3.3</span> <span class="toctext">DMC DMA during OAM DMA</span></a></li>
+</ul>
+</li>
+<li class="toclevel-1 tocsection-8"><a href="#Register_conflicts"><span class="tocnumber">4</span> <span class="toctext">Register conflicts</span></a></li>
+<li class="toclevel-1 tocsection-9"><a href="#References"><span class="tocnumber">5</span> <span class="toctext">References</span></a></li>
+</ul>
+</div>
+
+<div class="mw-heading mw-heading2"><h2 id="Summary">Summary</h2></div>
+<ul><li>The CPU alternates between cycles on which DMA can get (read) and cycles on which DMA can put (write). These are the first and second halves of APU cycles, respectively. At power-on, whether the first CPU cycle is get or put is random.</li>
+<li>If DMA tries to get on a put cycle, it waits and tries again next cycle. This wait is called an alignment cycle.</li>
+<li>DMA can only halt on CPU read cycles. On write cycles, the halt fails and the DMA unit tries again next CPU cycle, repeating until successful.</li>
+<li>OAM DMA halts the CPU, performs an optional alignment cycle, and then gets and puts 256 times, taking 513 or 514 cycles. It attempts to halt on the first CPU cycle after the $4014 write.</li>
+<li>DMC DMA halts the CPU, performs a dummy cycle and an optional alignment cycle, and then gets once, taking 3 or 4 cycles.</li>
+<li>The first, "load" DMC DMA after the $4015 write attempts to halt on the get cycle during the 2nd following APU cycle. The other, "reload" DMC DMAs attempt to halt on a put cycle. Failed halts try again on the next CPU cycle, repeating until successful.</li>
+<li>The DMC DMA get takes precedence over OAM DMA get, delaying it, but the DMA cycles otherwise overlap, reducing the total cycle cost. This delay can force OAM DMA to add an alignment cycle.</li>
+<li>DMC DMA has <a href="#Bugs">bugs triggered by stopping the sample at specific times</a>.</li>
+<li>DMC DMA can <a href="#Register_conflicts">corrupt joypad and PPUDATA ($2007) reads and cause extraneous reads of $4015-4017</a>.</li></ul>
+<div class="mw-heading mw-heading2"><h2 id="Cadence">Cadence</h2></div>
+<p>The DMA units cannot just read or write on any cycle as they wish. Instead, they alternate between <b>get</b> cycles where they can read and <b>put</b> cycles where they can write. If they need to perform an action that is not permitted on the current cycle, they wait.
+</p><p>Get and put cycles are aligned to the first and second halves of the APU clock, respectively (called apu_clk1 and apu_clk2 in Visual2A03). While these cycles are sometimes described as even and odd CPU cycles, this is not accurate because the CPU and APU randomly power into either of 2 alignments relative to each other. Therefore, get and put may occur on different CPU cycle parities across different power cycles.
+</p>
+<div class="mw-heading mw-heading2"><h2 id="Behavior">Behavior</h2></div>
+<p>During the DMA process, the CPU is halted and the 2A03's address and data lines are used for data transfer. The process involves a combination of no-operation cycles and access cycles. No-operation cycles come in 3 equivalent types: the halt cycle, a DMC-only dummy cycle, and an optional alignment cycle.
+</p><p>When DMA is scheduled, the associated DMA unit attempts to halt the CPU. The CPU only allows this on read cycles. If the CPU is writing, it ignores the halt and the DMA unit waits until the next cycle to try again, repeating until successful. Delays of up to 3 cycles are possible, with read-modify-write instructions having 2 consecutive writes and interrupts having 3. The halting process itself takes 1 CPU cycle, during which no useful work is done.
+</p><p>Once the CPU is halted, the DMA unit may need to perform some amount of non-access setup, taking up to 2 cycles. The exact timing of when DMA is scheduled and what kind of setup it needs depends on the type of DMA.
+</p><p>The CPU is halted using its internal RDY input. When RDY is deasserted, the 6502 core repeats the last read cycle indefinitely, making no forward progress nor handling interrupts. On 2A03 CPUs, these repeated reads are externally visible on any no-operation DMA cycle, causing data loss if reading a register with side effects. On 2A07 CPUs, it is suspected that a different address (perhaps the DMA address) is on the bus, instead, during all no-operation cycles. See <a href="#Register_conflicts">Register conflicts</a> for more information.
+</p><p>When the DMA process completes, the CPU performs the read it attempted when halted.
+</p>
+<div style="margin-left: 2em;">
+<div class="mw-collapsible mw-collapsed mw-made-collapsible" style="border:1px solid #a2a9b1; padding: 5px; display: inline-block; min-width: 25em; overflow:auto;"><button type="button" class="mw-collapsible-toggle mw-collapsible-toggle-default mw-collapsible-toggle-collapsed" aria-expanded="false" tabindex="0"><span class="mw-collapsible-text">Expand</span></button>
+<div style="font-weight:bold;line-height:1.6;">Examples - General behavior</div>
+<div class="mw-collapsible-content" style="display: none;">
+<ul><li>DMA halts normally:</li></ul>
+<pre>(halted) CPU reads from address A  &lt;- DMA halt cycle
+(halted) [DMA occurs]
+         CPU reads from address A  &lt;- CPU resumes execution
+</pre>
+<ul><li>DMA halt is delayed by writes:</li></ul>
+<pre>         CPU writes                &lt;- DMA attempts to halt
+         CPU writes                &lt;- DMA attempts to halt
+(halted) CPU reads from address A  &lt;- DMA halt cycle
+(halted) [DMA occurs]
+         CPU reads from address A  &lt;- CPU resumes execution
+</pre>
+<ul><li>DMA has a non-access cycle:</li></ul>
+<pre>(halted) CPU reads from address A  &lt;- DMA halt cycle
+(halted) CPU reads from address A  &lt;- DMA does not read or write
+(halted) DMA accesses address B
+         CPU reads from address A  &lt;- CPU resumes execution
+</pre>
+</div></div></div>
+<div class="mw-heading mw-heading3"><h3 id="OAM_DMA">OAM DMA</h3></div>
+<hr>
+<p>OAM DMA copies 256 bytes from a CPU page to PPU OAM via the <a href="/wiki/PPU_registers#OAMDATA" title="PPU registers">OAMDATA ($2004)</a> register. It is triggered by writing the page number (the high byte of the address) to <a href="/wiki/PPU_registers#OAMDMA" title="PPU registers">OAMDMA ($4014)</a>. OAM DMA is scheduled to halt the CPU on the first cycle after the register write. In the common case, it performs a halt cycle, an optional alignment cycle, and 256 get/put pairs. 
+</p><p>The 256 get/put pairs copy forward from the start of the page. Because DMA can only read on get cycles, an alignment cycle performing no useful work may be required before being able to read. All together, OAM DMA on its own takes 513 or 514 cycles, depending on whether alignment is needed.
+</p><p>OAM DMA will copy from the page most recently written to $4014. This means that read-modify-write instructions such as INC $4014, which are able to perform a second write before the CPU can be halted, will copy from the second page written, not the first.
+</p><p>OAM DMA has a lower priority than DMC DMA. If a DMC DMA get occurs during OAM DMA, OAM DMA is briefly paused. (See <a href="#DMC_DMA_during_OAM_DMA">DMC DMA during OAM DMA</a>)
+</p>
+<div style="margin-left: 2em;">
+<div class="mw-collapsible mw-collapsed mw-made-collapsible" style="border:1px solid #a2a9b1; padding: 5px; display: inline-block; min-width: 25em; overflow:auto;"><button type="button" class="mw-collapsible-toggle mw-collapsible-toggle-default mw-collapsible-toggle-collapsed" aria-expanded="false" tabindex="0"><span class="mw-collapsible-text">Expand</span></button>
+<div style="font-weight:bold;line-height:1.6;">Examples - OAM DMA</div>
+<div class="mw-collapsible-content" style="display: none;">
+<ul><li>Alignment is not needed:</li></ul>
+<pre>         (get) CPU writes to $4014
+(halted) (put) CPU reads from address A  &lt;- DMA halt cycle
+(halted) (get) DMA reads from $xx00
+(halted) (put) DMA writes to $2004
+(halted) (get) DMA reads from $xx01
+(halted) (put) DMA writes to $2004
+             ...
+(halted) (get) DMA reads from $xxFF
+(halted) (put) DMA writes to $2004       &lt;- DMA completes
+         (get) CPU reads from address A  &lt;- CPU resumes execution
+</pre>
+<ul><li>Alignment is needed:</li></ul>
+<pre>         (put) CPU writes to $4014
+(halted) (get) CPU reads from address A  &lt;- DMA halt cycle
+(halted) (put) CPU reads from address A  &lt;- DMA alignment cycle
+(halted) (get) DMA reads from $xx00
+(halted) (put) DMA writes to $2004
+(halted) (get) DMA reads from $xx01
+(halted) (put) DMA writes to $2004
+             ...
+(halted) (get) DMA reads from $xxFF
+(halted) (put) DMA writes to $2004       &lt;- DMA completes
+         (get) CPU reads from address A  &lt;- CPU resumes execution
+</pre>
+</div></div></div>
+<div class="mw-heading mw-heading3"><h3 id="DMC_DMA">DMC DMA</h3></div>
+<hr>
+<p>DMC DMA copies a single byte to the DMC unit's sample buffer. This occurs automatically after the DMC enable bit, bit 4, of the <a href="/wiki/APU#Status_($4015)" title="APU">sound channel enable register ($4015)</a> is set to 1, which starts DPCM sample playback using the current DMC settings in <a href="/wiki/APU_DMC#Overview" title="APU DMC">registers $4010-4013</a>. DMC DMA is scheduled when all of DPCM playback is enabled, there are bytes left in the sample, and the sample buffer is empty (see <a href="/wiki/APU_DMC#Memory_reader" title="APU DMC">Memory reader</a> and <a href="/wiki/APU_DMC#Output_unit" title="APU DMC">Output unit</a>). In the common cases, DMC DMA performs a halt cycle, a dummy cycle, an optional alignment cycle, and a get.
+</p><p>The exact timing depends on the type of DMC DMA. There are two types: load and reload. Load DMAs occur after $4015 D4 is set, but only if the sample buffer is empty. They are scheduled to halt the CPU on a get cycle during the 2nd APU cycle after the write (that is, the 3rd or 4th CPU cycle). Reload DMAs occur in response to the sample buffer being emptied. Unlike load DMAs, they are scheduled to halt the CPU on a put cycle.
+</p><p>After the halt, DMC DMA always performs a dummy cycle where no work is done. If the next cycle is not a get cycle, then a cycle will be spent on alignment. Then the DMA read is performed.
+</p><p>DMC DMA normally takes 3 or 4 cycles, depending on whether alignment is needed. Because load and reload DMAs schedule on different cycle types, load DMAs take 3 cycles and reload DMAs take 4 unless the halt is delayed by an odd number of cycles. However, bugs can cause additional cycles; see <a href="#Bugs">Bugs</a> below.
+</p>
+<div style="margin-left: 2em;">
+<div class="mw-collapsible mw-collapsed mw-made-collapsible" style="border:1px solid #a2a9b1; padding: 5px; display: inline-block; min-width: 25em; overflow:auto;"><button type="button" class="mw-collapsible-toggle mw-collapsible-toggle-default mw-collapsible-toggle-collapsed" aria-expanded="false" tabindex="0"><span class="mw-collapsible-text">Expand</span></button>
+<div style="font-weight:bold;line-height:1.6;">Examples - DMC DMA</div>
+<div class="mw-collapsible-content" style="display: none;">
+<ul><li>Load DMA:</li></ul>
+<pre>         (get) \ CPU writes to $4015     &lt;- DMC enabled 
+         (put) / during this APU cycle   &lt;- DMC enabled
+         (get) CPU reads
+         (put) CPU reads
+(halted) (get) CPU reads from address A  &lt;- DMA halt cycle
+(halted) (put) CPU reads from address A  &lt;- DMA dummy cycle
+(halted) (get) DMA reads from address B
+         (put) CPU reads from address A  &lt;- CPU resumes execution
+</pre>
+<ul><li>Load DMA (delayed 1 cycle):</li></ul>
+<pre>         (get) \ CPU writes to $4015     &lt;- DMC enabled 
+         (put) / during this APU cycle   &lt;- DMC enabled
+         (get) CPU reads
+         (put) CPU reads
+         (get) CPU writes                &lt;- DMA attempts to halt
+(halted) (put) CPU reads from address A  &lt;- DMA halt cycle
+(halted) (get) CPU reads from address A  &lt;- DMA dummy cycle
+(halted) (put) CPU reads from address A  &lt;- DMA alignment cycle
+(halted) (get) DMA reads from address B
+         (put) CPU reads from address A  &lt;- CPU resumes execution
+</pre>
+<ul><li>Reload DMA:</li></ul>
+<pre>(halted) (put) CPU reads from address A  &lt;- DMA halt cycle
+(halted) (get) CPU reads from address A  &lt;- DMA dummy cycle
+(halted) (put) CPU reads from address A  &lt;- DMA alignment cycle
+(halted) (get) DMA reads from address B 
+         (put) CPU reads from address A  &lt;- CPU resumes execution
+</pre>
+<ul><li>Reload DMA (delayed 1 cycle):</li></ul>
+<pre>         (put) CPU writes                &lt;- DMA attempts to halt
+(halted) (get) CPU reads from address A  &lt;- DMA halt cycle
+(halted) (put) CPU reads from address A  &lt;- DMA dummy cycle
+(halted) (get) DMA reads from address B
+         (put) CPU reads from address A  &lt;- CPU resumes execution
+</pre>
+<ul><li>Reload DMA (delayed 2 cycles):</li></ul>
+<pre>         (put) CPU writes                &lt;- DMA attempts to halt
+         (get) CPU writes                &lt;- DMA attempts to halt
+(halted) (put) CPU reads from address A  &lt;- DMA halt cycle
+(halted) (get) CPU reads from address A  &lt;- DMA dummy cycle
+(halted) (put) CPU reads from address A  &lt;- DMA alignment cycle
+(halted) (get) DMA reads from address B 
+         (put) CPU reads from address A  &lt;- CPU resumes execution
+</pre>
+<ul><li>Reload DMA (delayed 3 cycles):</li></ul>
+<pre>         (put) CPU writes                &lt;- DMA attempts to halt
+         (get) CPU writes                &lt;- DMA attempts to halt
+         (put) CPU writes                &lt;- DMA attempts to halt
+(halted) (get) CPU reads from address A  &lt;- DMA halt cycle
+(halted) (put) CPU reads from address A  &lt;- DMA dummy cycle
+(halted) (get) DMA reads from address B
+         (put) CPU reads from address A  &lt;- CPU resumes execution
+</pre>
+</div></div></div>
+<div class="mw-heading mw-heading4"><h4 id="Bugs">Bugs</h4></div>
+<p>DMC DMA suffers from two bugs<sup id="cite_ref-1" class="reference"><a href="#cite_note-1"><span class="cite-bracket">[</span>1<span class="cite-bracket">]</span></a></sup><sup id="cite_ref-2" class="reference"><a href="#cite_note-2"><span class="cite-bracket">[</span>2<span class="cite-bracket">]</span></a></sup> related to sample playback stopping around the time <a href="/wiki/APU_DMC#Output_unit" title="APU DMC">a DMC output cycle ends</a>, which is what empties the sample buffer and triggers a reload DMA. This can happen explicitly, where the sample is stopped by clearing $4015 D4, or implicitly, where a non-looping 1-byte sample is started while the sample buffer is empty shortly before a reload DMA would schedule. Implicit stops require this type of sample because the load DMA for the first byte when the sample buffer is empty is the only way to implicitly end the sample just before a reload DMA; longer samples will instead be ended by the reload DMA itself, as normal.
+</p><p>When sample playback is stopped during the APU cycle before a reload DMA would schedule (that is, on the 2nd or 3rd CPU cycle before the halt attempt), the DMA starts, but is aborted after a single cycle. If the halt is delayed due to a write cycle, the aborted DMA doesn't occur at all. This aborted DMA schedules regardless of how playback was stopped, whether explicitly or implicitly. In the implicit case, the write to begin the sample will normally be the 4th APU cycle before the reload DMA would schedule (8th or 9th CPU cycle before).
+</p><p>On RP2A03H and late RP2A03G CPUs, when playback is stopped implicitly on the same APU cycle that a reload DMA would schedule (that is, the 1st CPU cycle before the halt attempt), an unexpected reload DMA occurs from the same address. This extra byte goes into the sample buffer and is played after the first byte, as with any normal fetch. On RP2A03G CPUs, this bug was introduced sometime in 1990; earlier chips are unaffected.
+</p><p>It is not known whether 2A07 CPUs are affected by these bugs. Some clone hardware is known to be affected, and behavior on affected clones may differ from official CPUs. For example, UA6527P-based clones feature both the aborted DMA and unexpected DMA bugs, but samples take 1 APU cycle longer to end than on official CPUs, so to trigger these bugs with implicit stops, the sample-ending byte must be fetched 1 APU cycle earlier.
+</p>
+<div style="margin-left: 2em;">
+<div class="mw-collapsible mw-collapsed mw-made-collapsible" style="border:1px solid #a2a9b1; padding: 5px; display: inline-block; min-width: 25em; overflow:auto;"><button type="button" class="mw-collapsible-toggle mw-collapsible-toggle-default mw-collapsible-toggle-collapsed" aria-expanded="false" tabindex="0"><span class="mw-collapsible-text">Expand</span></button>
+<div style="font-weight:bold;line-height:1.6;">Examples - DMC DMA bugs</div>
+<div class="mw-collapsible-content" style="display: none;">
+<ul><li>Explicit-stop aborted DMA:</li></ul>
+<pre>         (get) \ CPU writes to $4015     &lt;- DMC disabled
+         (put) / during this APU cycle   &lt;- DMC disabled
+         (get) CPU reads
+(halted) (put) CPU reads from address A  &lt;- DMA halt cycle
+         (get) CPU reads from address A  &lt;- CPU resumes execution
+</pre>
+<ul><li>Implicit-stop aborted DMA:</li></ul>
+<pre>         (get) \ CPU writes to $4015     &lt;- DMC enabled w/ buffer empty
+         (put) / during this APU cycle   &lt;- DMC enabled w/ buffer empty
+         (get) CPU reads
+         (put) CPU reads
+(halted) (get) CPU reads from address A  &lt;- DMA halt cycle
+(halted) (put) CPU reads from address A  &lt;- DMA dummy cycle
+(halted) (get) DMA reads from address B
+         (put) CPU reads from address A  &lt;- CPU resumes execution
+         (get) CPU reads
+(halted) (put) CPU reads from address C  &lt;- DMA halt cycle
+         (get) CPU reads from address C  &lt;- CPU resumes execution
+</pre>
+<ul><li>Implicit-stop unexpected DMA:</li></ul>
+<pre>         (get) \ CPU writes to $4015     &lt;- DMC enabled w/ buffer empty
+         (put) / during this APU cycle   &lt;- DMC enabled w/ buffer empty
+         (get) CPU reads
+         (put) CPU reads
+(halted) (get) CPU reads from address A  &lt;- DMA halt cycle
+(halted) (put) CPU reads from address A  &lt;- DMA dummy cycle
+(halted) (get) DMA reads from address B
+(halted) (put) CPU reads from address A  &lt;- DMA halt cycle
+(halted) (get) CPU reads from address A  &lt;- DMA dummy cycle
+(halted) (put) CPU reads from address A  &lt;- DMA alignment cycle
+(halted) (get) DMA reads from address B
+         (put) CPU reads from address A  &lt;- CPU resumes execution
+</pre>
+</div></div></div>
+<p>The implicit-stop aborted DMA can be prevented with carefully placed write cycles. This can be necessary for synchronized code, where the aborted DMA's odd number of cycles can invert cycle parity. The following code synchronizes to a put cycle and uses precise write cycles to prevent any aborted DMA that may occur:
+</p>
+<pre>STx $4015 &nbsp;; Initiate DMC DMA.
+STx zp    &nbsp;; Force load DMA to the 4th cycle.
+          &nbsp;; (If on a UA6527P-based clone, place a NOP here.)
+STx zp    &nbsp;; Override the aborted DMA.
+; The first cycle of the next instruction is a put cycle.
+</pre>
+<div style="margin-left: 2em;">
+<div class="mw-collapsible mw-collapsed mw-made-collapsible" style="border:1px solid #a2a9b1; padding: 5px; display: inline-block; min-width: 25em; overflow:auto;"><button type="button" class="mw-collapsible-toggle mw-collapsible-toggle-default mw-collapsible-toggle-collapsed" aria-expanded="false" tabindex="0"><span class="mw-collapsible-text">Expand</span></button>
+<div style="font-weight:bold;line-height:1.6;">Examples - aborted DMA workaround</div>
+<div class="mw-collapsible-content" style="display: none;">
+<ul><li>Implicit-stop aborted DMA bypass (write on get):</li></ul>
+<pre>         (get) CPU writes to $4015       &lt;- DMC enabled w/ buffer empty
+         (put) CPU reads
+         (get) CPU reads
+         (put) CPU writes
+(halted) (get) CPU reads from address A  &lt;- DMA halt cycle
+(halted) (put) CPU reads from address A  &lt;- DMA dummy cycle
+(halted) (get) DMA reads from address B
+         (put) CPU reads from address A  &lt;- CPU resumes execution
+         (get) CPU reads
+         (put) CPU writes                &lt;- DMA attempts to halt
+         (get) CPU reads
+</pre>
+<ul><li>Implicit-stop aborted DMA bypass (write on put):</li></ul>
+<pre>         (put) CPU writes to $4015       &lt;- DMC enabled w/ buffer empty
+         (get) CPU reads
+         (put) CPU reads
+         (get) CPU writes                &lt;- DMA attempts to halt
+(halted) (put) CPU reads from address A  &lt;- DMA halt cycle
+(halted) (get) CPU reads from address A  &lt;- DMA halt cycle
+(halted) (put) CPU reads from address A  &lt;- DMA dummy cycle
+(halted) (get) DMA reads from address B
+         (put) CPU reads from address A  &lt;- CPU resumes execution
+         (get) CPU reads
+         (put) CPU writes                &lt;- DMA attempts to halt
+         (get) CPU reads
+</pre>
+</div></div></div>
+<div class="mw-heading mw-heading3"><h3 id="DMC_DMA_during_OAM_DMA">DMC DMA during OAM DMA</h3></div>
+<p>DMC and OAM use independent DMA units that only interact when both attempt to access memory on the same cycle. When accesses collide, DMC DMA is allowed to run and OAM DMA is paused, trying again on the next cycle. This can cause OAM DMA to have to perform an additional alignment cycle before continuing. No-operation cycles are allowed to overlap with each other and with access cycles, allowing cycles to be saved.
+</p><p>In the common case, DMC DMA occurring during OAM DMA will cost only 2 cycles: 1 cycle for the DMC DMA get and then 1 cycle for OAM DMA to align back to a get. However, if DMC DMA occurs at the end of OAM DMA, it can take 1 or 3 cycles. If it schedules for the second-to-last put, its get will occur on the first cycle after OAM DMA, taking just 1 cycle total. If it schedules for the last put, it will instead extend 3 cycles beyond the end of OAM DMA.
+</p><p>OAM DMA is sometimes used to synchronize code to avoid conflicts with DMC DMA when reading hardware registers, but because DMC DMA takes an odd number of cycles if it lands at the end, synchronization is not guaranteed.
+</p>
+<div style="margin-left: 2em;">
+<div class="mw-collapsible mw-collapsed mw-made-collapsible" style="border:1px solid #a2a9b1; padding: 5px; display: inline-block; min-width: 25em; overflow:auto;"><button type="button" class="mw-collapsible-toggle mw-collapsible-toggle-default mw-collapsible-toggle-collapsed" aria-expanded="false" tabindex="0"><span class="mw-collapsible-text">Expand</span></button>
+<div style="font-weight:bold;line-height:1.6;">Examples - DMC DMA during OAM DMA</div>
+<div class="mw-collapsible-content" style="display: none;">
+<ul><li>DMC DMA at the start of OAM DMA (write on get), taking 2 cycles</li></ul>
+<pre>         (get) CPU writes to $4014
+(halted) (put) CPU reads from address A      &lt;- DMC and OAM DMA halt cycle
+(halted) (get) OAM DMA reads from $xx00      &lt;- DMC DMA dummy cycle
+(halted) (put) OAM DMA writes to $2004       &lt;- DMC DMA alignment cycle
+(halted) (get) DMC DMA reads from address B
+(halted) (put) CPU reads from address A      &lt;- OAM DMA alignment cycle
+(halted) (get) DMA reads from $xx01
+(halted) (put) DMA writes to $2004
+             ...
+</pre>
+<ul><li>DMC DMA at the start of OAM DMA (write on put), taking 2 cycles</li></ul>
+<pre>         (put) CPU writes to $4014           &lt;- DMC DMA attempts to halt
+(halted) (get) CPU reads from address A      &lt;- DMC and OAM DMA halt cycle
+(halted) (put) CPU reads from address A      &lt;- DMC DMA dummy cycle, OAM DMA alignment cycle
+(halted) (get) DMC DMA reads from address B
+(halted) (put) CPU reads from address A      &lt;- OAM DMA alignment cycle
+(halted) (get) OAM DMA reads from $xx00
+(halted) (put) OAM DMA writes to $2004
+             ...
+</pre>
+<ul><li>DMC DMA in the middle of OAM DMA, taking 2 cycles</li></ul>
+<pre>             ...
+(halted) (get) OAM DMA reads from address C
+(halted) (put) OAM DMA writes to $2004         &lt;- DMC DMA halt cycle
+(halted) (get) OAM DMA reads from address C+1  &lt;- DMC DMA dummy cycle
+(halted) (put) OAM DMA writes to $2004         &lt;- DMC DMA alignment cycle
+(halted) (get) DMC DMA reads from address B
+(halted) (put) CPU reads from address A        &lt;- OAM DMA alignment cycle
+(halted) (get) OAM DMA reads from address C+2
+             ...
+</pre>
+<ul><li>DMC DMA on second-to-last OAM DMA put, taking 1 cycle</li></ul>
+<pre>             ...
+(halted) (get) OAM DMA reads from $xxFE
+(halted) (put) OAM DMA writes to $2004       &lt;- DMC DMA halt cycle
+(halted) (get) OAM DMA reads from $xxFF      &lt;- DMC DMA dummy cycle
+(halted) (put) OAM DMA writes to $2004       &lt;- DMC DMA alignment cycle
+(halted) (get) DMC DMA reads from address B
+         (put) CPU reads from address A      &lt;- CPU resumes execution
+</pre>
+<ul><li>DMC DMA on last OAM DMA put, taking 3 cycles</li></ul>
+<pre>             ...
+(halted) (get) OAM DMA reads from $xxFF
+(halted) (put) OAM DMA writes to $2004       &lt;- DMC DMA halt cycle
+(halted) (get) CPU reads from address A      &lt;- DMC DMA dummy cycle
+(halted) (put) CPU reads from address A      &lt;- DMC DMA alignment cycle
+(halted) (get) DMC DMA reads from address B
+         (put) CPU reads from address A      &lt;- CPU resumes execution
+</pre>
+</div></div></div>
+<div class="mw-heading mw-heading2"><h2 id="Register_conflicts">Register conflicts</h2></div>
+<p>On the 2A03, while the CPU is halted, it repeats the read cycle on which it was halted during every no-operation DMA cycle (that is, when the DMA units are not reading or writing). If the CPU was reading a register with side-effects, this can cause data to be lost. While this isn't realistically a problem with OAM DMA because of its particular timing constraints, it is a very real problem with DMC DMA that must usually be worked around. Example registers include PPUSTATUS ($2002), PPUDATA ($2007), and sound status ($4015). When conflicting with DMC DMA, these will see 2 or more extra reads. (Note that $2007 reads on adjacent cycles may have unexpected behavior.)
+</p><p>Most frequently, these DMC DMA conflicts occur with joypad reads, though the mechanism is slightly different. Joypads are clocked via direct lines from the CPU, called joypad 1 /OE and joypad 2 /OE, rather than going over the address bus. These output enables remain asserted the entire CPU cycle and even across adjacent cycles if they're both reading the same joypad register. Therefore, controllers only see a single read for each contiguous set of reads of a joypad register.
+</p><p>The console type affects joypad extra-read behavior. On the RF Famicom, additional hardware outside the 2A03 only passes joypad 1 /OE and joypad 2 /OE through during one half of the clock cycle, meaning the joypad sees a clock on every single CPU read cycle rather than just every contiguous set<sup id="cite_ref-3" class="reference"><a href="#cite_note-3"><span class="cite-bracket">[</span>3<span class="cite-bracket">]</span></a></sup>. The RF Famicom, Twin Famicom, and Famicom Titler are known to behave this way. The AV Famicom and NES-001 are confirmed to use the per-contiguous-set behavior.<sup id="cite_ref-4" class="reference"><a href="#cite_note-4"><span class="cite-bracket">[</span>4<span class="cite-bracket">]</span></a></sup>
+</p><p>This is further complicated by esoteric behavior regarding how 2A03 registers are activated: instead of checking the full 2A03 address bus, it checks bits 4-0 from the 2A03 address bus and bits 15-5 from the 6502 core. The 6502 core keeps the same address while halted, so if it was reading from $4000-401F, the DMA address can unintentionally activate 2A03 registers. This can lead to bus conflicts and an extra read from the other joypad, and can even prevent an extra read of the current joypad.<sup id="cite_ref-5" class="reference"><a href="#cite_note-5"><span class="cite-bracket">[</span>5<span class="cite-bracket">]</span></a></sup>
+</p><p>The 2A07 fixes these extra read problems, but the mechanism is not yet understood. Experimentally, the CPU still performs a read on the halting cycle; if OAM DMA is done from the $4000 page, the open bus value used by the OAM DMA is the opcode of the instruction following the $4014 write. This means that 6502 core reads still occur when halted, at least on the first cycle. Like on NTSC, this DMA also does not trigger 2A07 registers if the 6502 core is not reading from $4000-401F. Unlike NTSC, reading a joypad register when DMA reads an address that matches the other joypad register in its low 5 bits does not clock the other joypad.
+</p><p>Workarounds exist for this issue. Most commonly, <a href="/wiki/Controller_reading_code#DPCM_Safety_using_Repeated_Reads" title="Controller reading code">joypads are read multiple times</a> until the same result is seen twice in row, reducing or eliminating the chance of accepting corrupted data. However, any collisions during this time may corrupt the DPCM data, and this strategy is not suitable for all affected registers. Alternatively, <a href="/wiki/Controller_reading_code#DPCM_Safety_using_OAM_DMA" title="Controller reading code">reads synchronized using OAM DMA</a> can ensure a collision never happens, but this enforces strict timing constraints on the code and has numerous caveats, particularly for functions longer than one DMC output cycle (sample byte period).
+</p>
+<div style="margin-left: 2em;">
+<div class="mw-collapsible mw-collapsed mw-made-collapsible" style="border:1px solid #a2a9b1; padding: 5px; display: inline-block; min-width: 25em; overflow:auto;"><button type="button" class="mw-collapsible-toggle mw-collapsible-toggle-default mw-collapsible-toggle-collapsed" aria-expanded="false" tabindex="0"><span class="mw-collapsible-text">Expand</span></button>
+<div style="font-weight:bold;line-height:1.6;">Examples - Register conflicts</div>
+<div class="mw-collapsible-content" style="display: none;">
+<ul><li>DMC DMA collides with $2007 read (3 extra reads)</li></ul>
+<pre>(halted) (put) CPU reads from $2007      &lt;- DMA halt cycle
+(halted) (get) CPU reads from $2007      &lt;- DMA dummy cycle
+(halted) (put) CPU reads from $2007      &lt;- DMA alignment cycle
+(halted) (get) DMA reads from address B
+         (put) CPU reads from $2007      &lt;- CPU resumes execution
+</pre>
+<ul><li>DMC DMA collides with JOYPAD1 ($4016) read (1 or 3 extra reads)</li></ul>
+<pre>(halted) (put) CPU reads from $4016      &lt;- DMA halt cycle
+(halted) (get) CPU reads from $4016      &lt;- DMA dummy cycle
+(halted) (put) CPU reads from $4016      &lt;- DMA alignment cycle
+(halted) (get) DMA reads from $C000
+         (put) CPU reads from $4016      &lt;- CPU resumes execution
+</pre>
+<ul><li>DMC DMA collides with JOYPAD1 read (0 or 4 extra reads)
+<ul><li>The combined address from 6502 core bits 15-5 and 2A03 bits 4-0 is $4016.</li>
+<li>This triggers a bus conflict, corrupting the DMA read.</li></ul></li></ul>
+<pre>(halted) (put) CPU reads from $4016      &lt;- DMA halt cycle
+(halted) (get) CPU reads from $4016      &lt;- DMA dummy cycle
+(halted) (put) CPU reads from $4016      &lt;- DMA alignment cycle
+(halted) (get) DMA reads from $C016 and $4016
+         (put) CPU reads from $4016      &lt;- CPU resumes execution
+</pre>
+<ul><li>DMC DMA collides with JOYPAD1 read (1 extra read of JOYPAD2, 1 or 3 extra of JOYPAD1)
+<ul><li>The combined address from 6502 core bits 15-5 and 2A03 bits 4-0 is $4017.</li>
+<li>This triggers a bus conflict, corrupting the DMA read.</li></ul></li></ul>
+<pre>(halted) (put) CPU reads from $4016      &lt;- DMA halt cycle
+(halted) (get) CPU reads from $4016      &lt;- DMA dummy cycle
+(halted) (put) CPU reads from $4016      &lt;- DMA alignment cycle
+(halted) (get) DMA reads from $C017 and $4017
+         (put) CPU reads from $4016      &lt;- CPU resumes execution
+</pre>
+<ul><li>DMC DMA collides with JOYPAD1 read (1 or 3 extra reads)
+<ul><li>The combined address from 6502 core bits 15-5 and 2A03 bits 4-0 is $4015.</li>
+<li>This causes the 2A03 to read $4015 and ignore the DMA value on the external data bus.</li></ul></li></ul>
+<pre>(halted) (put) CPU reads from $4016      &lt;- DMA halt cycle
+(halted) (get) CPU reads from $4016      &lt;- DMA dummy cycle
+(halted) (put) CPU reads from $4016      &lt;- DMA alignment cycle
+(halted) (get) DMA reads from $C015, 2A03 reads from $4015 internally
+         (put) CPU reads from $4016      &lt;- CPU resumes execution
+</pre>
+</div></div></div>
+<div class="mw-heading mw-heading2"><h2 id="References">References</h2></div>
+<dl><dd><ul><li><a rel="nofollow" class="external text" href="https://github.com/emu-russia/breaks/blob/master/BreakingNESWiki_DeepL/APU/dma.md">BreakingNESWiki:</a> DMA circuit analysis</li>
+<li><a rel="nofollow" class="external text" href="https://forums.nesdev.org/viewtopic.php?t=14120">Forum post:</a> Disch's OAM/DMC DMA test results</li>
+<li><a rel="nofollow" class="external text" href="https://forums.nesdev.org/viewtopic.php?p=62690#p62690">Forum post:</a> Blargg's DMA tests</li>
+<li><a rel="nofollow" class="external text" href="https://forums.nesdev.org/viewtopic.php?p=231604#p231604">Forum post:</a> Fiskbit's aligned controller read tests</li>
+<li><a rel="nofollow" class="external text" href="https://forums.nesdev.org/viewtopic.php?p=95703#95703">Forum post:</a> cpow's Visual 2A03 DMC vs OAM DMA analysis</li></ul></dd></dl>
+<div class="mw-references-wrap"><ol class="references">
+<li id="cite_note-1"><span class="mw-cite-backlink"><a href="#cite_ref-1" aria-label="Jump up" title="Jump up">↑</a></span> <span class="reference-text"><a rel="nofollow" class="external text" href="https://forums.nesdev.org/viewtopic.php?p=250170#p250170">Forum post:</a> Fiskbit's manual DMA test suite</span>
+</li>
+<li id="cite_note-2"><span class="mw-cite-backlink"><a href="#cite_ref-2" aria-label="Jump up" title="Jump up">↑</a></span> <span class="reference-text"><a rel="nofollow" class="external text" href="https://forums.nesdev.org/viewtopic.php?p=275734#p275734">Forum post:</a> Fiskbit's explicit and implicit stop tests</span>
+</li>
+<li id="cite_note-3"><span class="mw-cite-backlink"><a href="#cite_ref-3" aria-label="Jump up" title="Jump up">↑</a></span> <span class="reference-text"><a rel="nofollow" class="external text" href="https://forums.nesdev.org/viewtopic.php?p=275946#p275946">Forum post:</a> lidnariq's RF Famicom joypad clocking explanation</span>
+</li>
+<li id="cite_note-4"><span class="mw-cite-backlink"><a href="#cite_ref-4" aria-label="Jump up" title="Jump up">↑</a></span> <span class="reference-text"><a rel="nofollow" class="external text" href="https://forums.nesdev.org/viewtopic.php?p=275468#p275468">Forum post:</a> Fiskbit's joypad read cycle breakdown</span>
+</li>
+<li id="cite_note-5"><span class="mw-cite-backlink"><a href="#cite_ref-5" aria-label="Jump up" title="Jump up">↑</a></span> <span class="reference-text"><a rel="nofollow" class="external text" href="https://forums.nesdev.org/viewtopic.php?p=275132#p275132">Forum post:</a> Fiskbit's APU register activation test</span>
+</li>
+</ol></div>
+<table class="collapsible collapsed" style="width: 100%; border: 1px solid #000; padding: 0">
+<tbody><tr>
+<th style="background-color: #CCF; font-size: 120%" colspan="2"><div style="float: left; font-size: 80%"><a href="/wiki/Template:APU_nav" title="Template:APU nav">V</a> | <a href="/w/index.php?title=Template_talk:APU_nav&amp;action=edit&amp;redlink=1" class="new" title="Template talk:APU nav (page does not exist)">T</a></div> <a href="/wiki/APU" title="APU">APU</a>
+</th></tr>
+<tr>
+<td style="background-color: #DDF"><b>Concepts</b></td>
+<td><a href="/wiki/APU_registers" title="APU registers">Registers</a> | <a href="/wiki/APU_basics" title="APU basics">Basics</a> | <a href="/wiki/APU_period_table" title="APU period table">Period table</a> 
+</td></tr>
+<tr>
+<td style="background-color: #DDF"><b>Channels</b></td>
+<td><a href="/wiki/APU_Pulse" title="APU Pulse">Pulse 1 and Pulse 2</a> | <a href="/wiki/APU_Triangle" title="APU Triangle">Triangle</a> | <a href="/wiki/APU_Noise" title="APU Noise">Noise</a> | <a href="/wiki/APU_DMC" title="APU DMC">DMC</a>
+</td></tr>
+<tr>
+<td style="background-color: #DDF"><b>Components</b></td>
+<td><a href="/wiki/APU_Envelope" title="APU Envelope">Envelope</a> | <a href="/wiki/APU_Sweep" title="APU Sweep">Sweep</a> | <a href="/wiki/APU_Frame_Counter" title="APU Frame Counter">Frame Counter</a> | <a href="/wiki/APU_Length_Counter" title="APU Length Counter">Length Counter</a> | <a class="mw-selflink selflink">DMA</a> | <a href="/wiki/APU_Mixer" title="APU Mixer">Mixer</a>
+</td></tr>
+<tr>
+<td style="background-color: #DDF"><b>Expansion audio</b></td>
+<td><a href="/wiki/FDS_audio" title="FDS audio">2C33 (Disk System)</a> | <a href="/wiki/MMC5_audio" title="MMC5 audio">MMC5</a> | <a href="/wiki/VRC6_audio" title="VRC6 audio">VRC6</a> | <a href="/wiki/VRC7_audio" title="VRC7 audio">VRC7</a> | <a href="/wiki/Namco_163_audio" title="Namco 163 audio">Namco 163</a> | <a href="/wiki/Sunsoft_5B_audio" title="Sunsoft 5B audio">Sunsoft 5B</a> | <a href="/wiki/INES_Mapper_086#Registers" title="INES Mapper 086">µPD7756</a>
+</td></tr></tbody></table>
+<!-- 
+NewPP limit report
+Cached time: 20260221230414
+Cache expiry: 86400
+Reduced expiry: false
+Complications: [show‐toc]
+CPU time usage: 0.068 seconds
+Real time usage: 0.083 seconds
+Preprocessor visited node count: 226/1000000
+Post‐expand include size: 3085/2097152 bytes
+Template argument size: 645/2097152 bytes
+Highest expansion depth: 6/100
+Expensive parser function count: 0/100
+Unstrip recursion depth: 0/20
+Unstrip post‐expand size: 2279/5000000 bytes
+-->
+<!--
+Transclusion expansion time report (%,ms,calls,template)
+100.00%   17.849      1 Template:APU_nav
+100.00%   17.849      1 -total
+ 52.01%    9.284      1 Template:Navbox
+-->
+
+<!-- Saved in parser cache with key nesdev_db-wiki_:pcache:178:|#|:idhash:canonical and timestamp 20260221230414 and revision id 23450. Rendering was triggered because: page-view
+ -->
+</div>
+<div class="printfooter" data-nosnippet="">Retrieved from "<a dir="ltr" href="https://www.nesdev.org/w/index.php?title=DMA&amp;oldid=23450">https://www.nesdev.org/w/index.php?title=DMA&amp;oldid=23450</a>"</div></div>
+				<div id="catlinks" class="catlinks catlinks-allhidden" data-mw="interface"></div>
+				<!-- end content -->
+				<div class="visualClear"></div>
+			</div>
+		</div>
+		<div class="visualClear"></div>
+	</div>
+	<div id="column-one">
+		<h2>Navigation menu</h2>
+		<div role="navigation" class="portlet" id="p-cactions" aria-labelledby="p-cactions-label">
+			<h3 id="p-cactions-label">Page actions</h3>
+			<div class="pBody">
+				<ul>
+				<li id="ca-nstab-main" class="selected mw-list-item"><a href="/wiki/DMA" title="View the content page [alt-shift-c]" accesskey="c">Page</a></li><li id="ca-talk" class="new mw-list-item"><a href="/w/index.php?title=Talk:DMA&amp;action=edit&amp;redlink=1" rel="discussion" class="new" title="Discussion about the content page (page does not exist) [alt-shift-t]" accesskey="t">Discussion</a></li><li id="ca-view" class="selected mw-list-item"><a href="/wiki/DMA">Read</a></li><li id="ca-viewsource" class="mw-list-item"><a href="/w/index.php?title=DMA&amp;action=edit" title="This page is protected.
+You can view its source [alt-shift-e]" accesskey="e">View source</a></li><li id="ca-history" class="mw-list-item"><a href="/w/index.php?title=DMA&amp;action=history" title="Past revisions of this page [alt-shift-h]" accesskey="h">History</a></li>
+				
+				</ul>
+			</div>
+		</div>
+		
+<div role="navigation" class="portlet mw-portlet mw-portlet-cactions-mobile" id="p-cactions-mobile" aria-labelledby="p-cactions-mobile-label">
+	<h3 id="p-cactions-mobile-label">Page actions</h3>
+	<div class="pBody">
+		<ul><li id="main-mobile" class="selected mw-list-item"><a href="/wiki/DMA" title="Page">Page</a></li><li id="talk-mobile" class="new mw-list-item"><a href="/w/index.php?title=Talk:DMA&amp;action=edit&amp;redlink=1" title=" (page does not exist)" class="new">Discussion</a></li><li id="ca-more" class="mw-list-item"><a href="#p-cactions">More</a></li><li id="ca-tools" class="mw-list-item"><a href="#p-tb" title="Tools">Tools</a></li></ul>
+		
+	</div>
+</div>
+
+		<div role="navigation" class="portlet" id="p-personal" aria-labelledby="p-personal-label">
+			<h3 id="p-personal-label">Personal tools</h3>
+			<div class="pBody">
+				<ul>
+				<li id="pt-createaccount" class="mw-list-item"><a href="/w/index.php?title=Special:CreateAccount&amp;returnto=DMA" title="You are encouraged to create an account and log in; however, it is not mandatory">Create account</a></li><li id="pt-login" class="mw-list-item"><a href="/w/index.php?title=Special:UserLogin&amp;returnto=DMA" title="You are encouraged to log in; however, it is not mandatory [alt-shift-o]" accesskey="o">Log in</a></li>
+				</ul>
+			</div>
+		</div>
+		<div class="portlet" id="p-logo" role="banner">
+			<a href="/wiki/Nesdev_Wiki" class="mw-wiki-logo"></a>
+		</div>
+		<div id="sidebar">
+		
+<div role="navigation" class="portlet mw-portlet mw-portlet-navigation" id="p-navigation" aria-labelledby="p-navigation-label">
+	<h3 id="p-navigation-label">Navigation</h3>
+	<div class="pBody">
+		<ul><li id="n-Wiki-main-page" class="mw-list-item"><a href="/wiki/Nesdev_Wiki">Wiki main page</a></li><li id="n-NES-reference-guide" class="mw-list-item"><a href="/wiki/NES_reference_guide">NES reference guide</a></li><li id="n-Programming-guide" class="mw-list-item"><a href="/wiki/Programming_guide">Programming guide</a></li><li id="n-Projects" class="mw-list-item"><a href="/wiki/Projects">Projects</a></li><li id="n-Offline-wiki-snapshot" class="mw-list-item"><a href="https://archive.org/details/NesDevWiki" rel="nofollow">Offline wiki snapshot</a></li><li id="n-NESdev-Forums" class="mw-list-item"><a href="https://forums.nesdev.org/" rel="nofollow">NESdev Forums</a></li><li id="n-NESdev-Discord" class="mw-list-item"><a href="https://discord.gg/SddKcS6ehE" rel="nofollow">NESdev Discord</a></li><li id="n-recentchanges" class="mw-list-item"><a href="/wiki/Special:RecentChanges" title="A list of recent changes in the wiki [alt-shift-r]" accesskey="r">Recent changes</a></li><li id="n-specialpages" class="mw-list-item"><a href="/wiki/Special:SpecialPages">Special pages</a></li></ul>
+		
+	</div>
+</div>
+
+		<div role="search" class="portlet" id="p-search">
+			<h3 id="p-search-label"><label for="searchInput">Search</label></h3>
+			<div class="pBody" id="searchBody">
+				<form action="/w/index.php" id="searchform"><input type="hidden" value="Special:Search" name="title"><input type="search" name="search" placeholder="Search NESdev Wiki" aria-label="Search NESdev Wiki" autocapitalize="sentences" spellcheck="false" title="Search NESdev Wiki [alt-shift-f]" accesskey="f" id="searchInput"><input type="submit" name="go" value="Go" title="Go to a page with this exact name if it exists" class="searchButton" id="searchButton"> <input type="submit" name="fulltext" value="Search" title="Search the pages for this text" class="searchButton mw-fallbackSearchButton" id="mw-searchButton"></form>
+			</div>
+		</div>
+		
+<div role="navigation" class="portlet mw-portlet mw-portlet-tb" id="p-tb" aria-labelledby="p-tb-label">
+	<h3 id="p-tb-label">Tools</h3>
+	<div class="pBody">
+		<ul><li id="t-whatlinkshere" class="mw-list-item"><a href="/wiki/Special:WhatLinksHere/DMA" title="A list of all wiki pages that link here [alt-shift-j]" accesskey="j">What links here</a></li><li id="t-recentchangeslinked" class="mw-list-item"><a href="/wiki/Special:RecentChangesLinked/DMA" rel="nofollow" title="Recent changes in pages linked from this page [alt-shift-k]" accesskey="k">Related changes</a></li><li id="t-print" class="mw-list-item"><a href="javascript:print();" rel="alternate" title="Printable version of this page [alt-shift-p]" accesskey="p">Printable version</a></li><li id="t-permalink" class="mw-list-item"><a href="https://www.nesdev.org/w/index.php?title=DMA&amp;oldid=23450" title="Permanent link to this revision of this page">Permanent link</a></li><li id="t-info" class="mw-list-item"><a href="/w/index.php?title=DMA&amp;action=info" title="More information about this page">Page information</a></li><li class="mw-list-item mw-list-item-js" id="t-collapsible-toggle-all"><a href="#" title="Expand all collapsible elements on the current page" role="button" aria-expanded="false">Expand all</a></li></ul>
+		
+	</div>
+</div>
+
+		
+		</div>
+		<a href="#sidebar" title="Jump to navigation" class="menu-toggle" id="sidebar-toggle"></a>
+		<a href="#p-personal" title="user tools" class="menu-toggle" id="p-personal-toggle"></a>
+		<a href="#globalWrapper" title="back to top" class="menu-toggle" id="globalWrapper-toggle"></a>
+	</div>
+	<!-- end of the left (by default at least) column -->
+	<div class="visualClear"></div>
+	<div id="footer" class="mw-footer" role="contentinfo">
+		<div id="f-poweredbyico" class="footer-icons">
+			<a href="https://www.mediawiki.org/" class="cdx-button cdx-button--fake-button cdx-button--size-large cdx-button--fake-button--enabled"><picture><source media="(min-width: 500px)" srcset="/w/resources/assets/poweredby_mediawiki.svg" width="88" height="31"><img src="/w/resources/assets/mediawiki_compact.svg" alt="Powered by MediaWiki" lang="en" width="25" height="25" loading="lazy"></picture></a>
+		</div>
+		<ul id="f-list">
+			<li id="lastmod"> This page was last edited on 19 January 2026, at 03:49.</li>
+			<li id="privacy"><a href="/wiki/Nesdev_wiki:Privacy_policy">Privacy policy</a></li><li id="about"><a href="/wiki/Nesdev_wiki:About">About NESdev Wiki</a></li><li id="disclaimers"><a href="/wiki/Nesdev_wiki:General_disclaimer">Disclaimers</a></li>
+		</ul>
+	</div>
+</div>
+<script>(RLQ=window.RLQ||[]).push(function(){mw.config.set({"wgBackendResponseTime":160,"wgPageParseReport":{"limitreport":{"cputime":"0.068","walltime":"0.083","ppvisitednodes":{"value":226,"limit":1000000},"postexpandincludesize":{"value":3085,"limit":2097152},"templateargumentsize":{"value":645,"limit":2097152},"expansiondepth":{"value":6,"limit":100},"expensivefunctioncount":{"value":0,"limit":100},"unstrip-depth":{"value":0,"limit":20},"unstrip-size":{"value":2279,"limit":5000000},"timingprofile":["100.00%   17.849      1 Template:APU_nav","100.00%   17.849      1 -total"," 52.01%    9.284      1 Template:Navbox"]},"cachereport":{"timestamp":"20260221230414","ttl":86400,"transientcontent":false}}});});</script>
+<script defer="" src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon="{&quot;version&quot;:&quot;2024.11.0&quot;,&quot;token&quot;:&quot;6c2a51884de146568600589c93ac5eda&quot;,&quot;r&quot;:1,&quot;server_timing&quot;:{&quot;name&quot;:{&quot;cfCacheStatus&quot;:true,&quot;cfEdge&quot;:true,&quot;cfExtPri&quot;:true,&quot;cfL4&quot;:true,&quot;cfOrigin&quot;:true,&quot;cfSpeedBrain&quot;:true},&quot;location_startswith&quot;:null}}" crossorigin="anonymous"></script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9d1cc49efdb7f06f',t:'MTc3MTc0NTMyMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><iframe height="1" width="1" style="position: absolute; top: 0px; left: 0px; border: none; visibility: hidden;"></iframe>
+<div id="mw-teleport-target"></div></body></html>

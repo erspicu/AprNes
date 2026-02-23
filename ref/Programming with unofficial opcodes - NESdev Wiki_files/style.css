@@ -1,0 +1,17 @@
+/* stylelint-disable selector-max-id */
+
+#userverification-form-verification #mw-input-wpinfo {
+	display: block;
+	max-width: 50em;
+}
+
+.userverification-sitenotice {
+	text-align: left;
+	font-size: large;
+	font-weight: bold;
+	margin-bottom: 12px;
+}
+
+.userverification-pager-button-delete-selected {
+	display: none;
+}

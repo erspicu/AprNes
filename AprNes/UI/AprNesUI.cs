@@ -21,7 +21,7 @@ namespace AprNes
         Dictionary<int, KeyMap> NES_KeyMAP = new Dictionary<int, KeyMap>();
         public Dictionary<string, KeyMap> NES_KeyMAP_joypad = new Dictionary<string, KeyMap>();
 
-        List<string> background_pics;
+        List<string> background_pics = new List<string>();
 
         joystick _joystick = new joystick();
 
@@ -159,7 +159,7 @@ namespace AprNes
                 AppConfigure["key_RIGHT"] = key_RIGHT.ToString();
                 AppConfigure["LimitFPS"] = "1";
                 AppConfigure["ScreenSize"] = "1";
-                AppConfigure["CaptureScreenPath"] = Application.StartupPath;
+                AppConfigure["CaptureScreenPath"] = Application.StartupPath+ @"\Screenshot";
                 AppConfigure["joypad_A"] = "";
                 AppConfigure["joypad_B"] = "";
                 AppConfigure["joypad_SELECT"] = "";
@@ -539,7 +539,7 @@ namespace AprNes
         void UpdateSoundMenuText()
         {
             if (_soundMenuItem == null) return;
-            _soundMenuItem.Text = NesCore.AudioEnabled ? "Sound: ON" : "Sound: OFF";
+            _soundMenuItem.Text = NesCore.AudioEnabled ? LangINI.lang_table[AppConfigure["Lang"]]["SoundON"] : LangINI.lang_table[AppConfigure["Lang"]]["SoundOFF"];
         }
 
         void VideoOutputDeal(object sender, EventArgs e)
@@ -809,32 +809,26 @@ namespace AprNes
             HardReset();
         }
 
-        ToolStripMenuItem _soundMenuItem;
+        private void _soundMenuItem_Click(object sender, EventArgs e)
+        {
+            NesCore.AudioEnabled = !NesCore.AudioEnabled;
+            if (!NesCore.AudioEnabled)
+                NesCore.closeAudio();
+            else if (running)
+                NesCore.openAudio();
+            UpdateSoundMenuText();
+            // 儲存設定到 ini
+            AppConfigure["Sound"] = NesCore.AudioEnabled ? "1" : "0";
+            Configure_Write();
+        }
 
         private void AprNesUI_Shown(object sender, EventArgs e)
         {
             initUIsize();
+            UpdateSoundMenuText();
+
             _joystick.Init();
             new Thread(polling_listener).Start();
-
-            // 動態加入「Sound」開關選項到右鍵選單
-            _soundMenuItem = new ToolStripMenuItem();
-            UpdateSoundMenuText();
-            _soundMenuItem.Click += (s, ev) =>
-            {
-                NesCore.AudioEnabled = !NesCore.AudioEnabled;
-                if (!NesCore.AudioEnabled)
-                    NesCore.closeAudio();
-                else if (running)
-                    NesCore.openAudio();
-                UpdateSoundMenuText();
-                // 儲存設定到 ini
-                AppConfigure["Sound"] = NesCore.AudioEnabled ? "1" : "0";
-                Configure_Write();
-            };
-            contextMenuStrip1.Items.Add(new ToolStripSeparator());
-            contextMenuStrip1.Items.Add(_soundMenuItem);
-
             new Thread(() =>
             {
                 Thread.Sleep(50);
