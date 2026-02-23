@@ -30,6 +30,12 @@
    python knowledgebase/gemini_query.py "請列表說明 6502 所有定址模式" -o addressing_modes.txt
    ```
 
+4. **更新模型清單**
+   使用 `-l` 或 `--list-models` 獲取最新可用模型並存入 `models_list.txt`：
+   ```bash
+   python knowledgebase/gemini_query.py -l
+   ```
+
 ## 注意事項
 - 本工具使用 Python 標準庫，無需安裝第三方套件（如 requests）。
 - 預設使用 `gemini-1.5-flash` 模型，若需更高精準度可於 `config.json` 改為 `gemini-1.5-pro`。

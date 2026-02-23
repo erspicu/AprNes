@@ -46,6 +46,7 @@ Temporary Items
 .claude/
 ref/Mesen2-master/
 knowledgebase/config.json
+knowledgebase/models_list.txt
 
 # =========================
 # Visual Studio

@@ -13,7 +13,6 @@ def load_config():
         return json.load(f)
 
 def call_gemini(api_key, model, prompt):
-    # Using v1beta for better features
     host = "generativelanguage.googleapis.com"
     endpoint = f"/v1beta/models/{model}:generateContent?key={api_key}"
     
@@ -42,24 +41,62 @@ def call_gemini(api_key, model, prompt):
         return result['candidates'][0]['content']['parts'][0]['text']
     except (KeyError, IndexError):
         print("Unexpected response format.")
-        print(json.dumps(result, indent=2))
         sys.exit(1)
+
+def list_models(api_key):
+    host = "generativelanguage.googleapis.com"
+    endpoint = f"/v1beta/models?key={api_key}"
+    
+    conn = http.client.HTTPSConnection(host)
+    conn.request("GET", endpoint)
+    
+    response = conn.getresponse()
+    data = response.read()
+    conn.close()
+    
+    if response.status != 200:
+        print(f"API Error: HTTP {response.status}")
+        sys.exit(1)
+        
+    result = json.loads(data.decode('utf-8'))
+    models = []
+    for m in result.get('models', []):
+        name = m.get('name', '').replace('models/', '')
+        desc = m.get('description', '')
+        models.append(f"{name} : {desc}")
+    
+    list_file = os.path.join(os.path.dirname(__file__), 'models_list.txt')
+    with open(list_file, 'w', encoding='utf-8') as f:
+        f.write("\n".join(models))
+    
+    print(f"Successfully updated model list in: {list_file}")
+    for m in models:
+        print(f" - {m.split(' : ')[0]}")
 
 def main():
     parser = argparse.ArgumentParser(description="Query Gemini API")
-    parser.add_argument("prompt", help="The question or prompt to ask Gemini")
+    parser.add_argument("prompt", nargs='?', help="The question or prompt to ask Gemini")
     parser.add_argument("-o", "--output", help="Save output to a text file")
+    parser.add_argument("-l", "--list-models", action="store_true", help="List available models and save to models_list.txt")
     
     args = parser.parse_args()
     
     config = load_config()
     api_key = config.get("api_key")
-    model = config.get("model", "gemini-1.5-flash")
     
     if not api_key:
         print("Error: API key is missing in config.json.")
         sys.exit(1)
+
+    if args.list_models:
+        list_models(api_key)
+        return
+
+    if not args.prompt:
+        parser.print_help()
+        return
         
+    model = config.get("model", "gemini-1.5-flash")
     print(f"Querying Gemini ({model})...")
     answer = call_gemini(api_key, model, args.prompt)
     
@@ -68,9 +105,7 @@ def main():
             f.write(answer)
         print(f"Response saved to: {args.output}")
     else:
-        print("
---- Response ---
-")
+        print("\n--- Response ---\n")
         print(answer)
 
 if __name__ == "__main__":
