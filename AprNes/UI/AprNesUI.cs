@@ -634,13 +634,17 @@ namespace AprNes
         }
 
         int fps = 0;
+        readonly Stopwatch _fpsSw = Stopwatch.StartNew();
         private void fps_count_timer_Tick(object sender, EventArgs e)
         {
             this.Invoke((MethodInvoker)delegate
             {
-                fps = NesCore.frame_count;
-                NesCore.frame_count = 0;
-                label3.Text = "fps : " + fps;
+                double elapsed = _fpsSw.Elapsed.TotalSeconds;
+                _fpsSw.Restart();
+                int count = System.Threading.Interlocked.Exchange(ref NesCore.frame_count, 0);
+                fps = count;
+                double actualFps = elapsed > 0 ? count / elapsed : 0;
+                label3.Text = "fps : " + actualFps.ToString("F1");
             });
         }
 

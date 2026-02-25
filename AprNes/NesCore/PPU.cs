@@ -10,7 +10,7 @@ namespace AprNes
 
     unsafe static public partial class NesCore
     {
-        static public int frame_count = 0;
+        static public volatile int frame_count = 0;
         static public bool LimitFPS = true;
         static public int ppu_cycles_x = 0, scanline = -1; // 241;
 
