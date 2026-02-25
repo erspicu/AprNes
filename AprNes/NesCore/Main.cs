@@ -252,6 +252,7 @@ namespace AprNes
         {
             timeBeginPeriod(1); // 設定 1ms 計時器精度，確保 Thread.Sleep(1) 準確
             StopWatch.Restart();
+            _fpsDeadline = 0;   // 重置 deadline，避免舊值殘留影響新 session
             bool nmi_just_deferred = false;
             while (!exit)
             {

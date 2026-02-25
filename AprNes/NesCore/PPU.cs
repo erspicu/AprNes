@@ -51,6 +51,8 @@ namespace AprNes
         static byte spr_ram_add = 0;
 
         static Stopwatch StopWatch = new Stopwatch();
+        const double NES_FRAME_SECONDS = 1.0 / 60.0988; // NTSC 正確播放率
+        static double _fpsDeadline = 0;               // 累積 deadline，供 FPS 限制使用
         static bool oddSwap = false;
         static bool nmi_output_prev = false;  // NMI edge detection: previous NMI output level
         static bool nmi_delay = false;        // 1-cycle NMI delay: edge detected → delay → pending
@@ -302,9 +304,21 @@ namespace AprNes
             if (scanline == 240 && ppu_cycles_x == 1)
             {
                 RenderScreen();
-                if (LimitFPS) while (StopWatch.Elapsed.TotalSeconds < 0.016) Thread.Sleep(1);
+                if (LimitFPS)
+                {
+                    double now = StopWatch.Elapsed.TotalSeconds;
+                    // 初次或落後太多（例如視窗拖移）：重設 deadline，避免瘋狂追幀
+                    if (_fpsDeadline < now)
+                        _fpsDeadline = now + NES_FRAME_SECONDS;
+                    // Hybrid sleep：距 deadline >1ms 就 Sleep(1)，最後 <1ms 改 spin-wait
+                    while (_fpsDeadline - StopWatch.Elapsed.TotalSeconds > 0.001)
+                        Thread.Sleep(1);
+                    while (StopWatch.Elapsed.TotalSeconds < _fpsDeadline) { }
+                    // 推進 deadline（誤差自動累積補償，不會因單幀偏差而漂移）
+                    _fpsDeadline += NES_FRAME_SECONDS;
+                }
                 frame_count++;
-                StopWatch.Restart();
+                // StopWatch 持續計時，不在此 Restart（供 deadline 絕對計時使用）
             }
 
             // Advance cycle counter
