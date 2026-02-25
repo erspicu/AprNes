@@ -7,6 +7,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Diagnostics;
 using System.Threading;
+using System.Runtime.InteropServices;
 using LangTool;
 using NativeTools;
 
@@ -14,6 +15,9 @@ namespace AprNes
 {
     public partial class AprNesUI : Form
     {
+        [DllImport("user32.dll")]
+        static extern short GetAsyncKeyState(int vKey);
+
         Graphics grfx;
         public Dictionary<string, string> AppConfigure = new Dictionary<string, string>();
         string ConfigureFile = Application.StartupPath + @"\AprNes.ini";
@@ -542,8 +546,22 @@ namespace AprNes
             _soundMenuItem.Text = NesCore.AudioEnabled ? LangINI.lang_table[AppConfigure["Lang"]]["SoundON"] : LangINI.lang_table[AppConfigure["Lang"]]["SoundOFF"];
         }
 
+        void PollKeyboard()
+        {
+            if (!running) return;
+            foreach (var kvp in NES_KeyMAP)
+            {
+                bool pressed = (GetAsyncKeyState(kvp.Key) & 0x8000) != 0;
+                if (pressed)
+                    NesCore.P1_ButtonPress((byte)kvp.Value);
+                else
+                    NesCore.P1_ButtonUnPress((byte)kvp.Value);
+            }
+        }
+
         void VideoOutputDeal(object sender, EventArgs e)
         {
+            PollKeyboard();
             RenderObj.Render();
         }
 
@@ -656,18 +674,12 @@ namespace AprNes
         //http://stackoverflow.com/questions/11754874/keydown-not-firing-for-up-down-left-and-right
         protected override bool ProcessCmdKey(ref System.Windows.Forms.Message msg, System.Windows.Forms.Keys keyData)
         {
-            //for KeyDown check  
-            if (!running) return true;
-            int keyboard_key = (int)keyData;
-
-            if (keyboard_key == 65616)
+            if ((int)keyData == 65616)
             {
-                NESCaptureScreen();
-                return true; ;
+                if (running) NESCaptureScreen();
+                return true;
             }
-            if (NES_KeyMAP.ContainsKey(keyboard_key))
-                NesCore.P1_ButtonPress((byte)NES_KeyMAP[keyboard_key]);
-            return true;
+            return base.ProcessCmdKey(ref msg, keyData);
         }
 
         bool writing = false;
