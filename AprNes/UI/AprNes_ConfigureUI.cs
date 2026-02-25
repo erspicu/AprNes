@@ -52,6 +52,22 @@ namespace AprNes
             return instance;
         }
 
+        void UpdateSoundUI()
+        {
+            SoundtrackBar.Enabled = SoundcheckBox.Checked;
+            SoundcheckBox.Text = "音效 - " + (SoundcheckBox.Checked ? SoundtrackBar.Value + "%" : "關閉");
+        }
+
+        private void SoundcheckBox_CheckedChanged(object sender, EventArgs e)
+        {
+            UpdateSoundUI();
+        }
+
+        private void SoundtrackBar_Scroll(object sender, EventArgs e)
+        {
+            UpdateSoundUI();
+        }
+
         public void BeforClose()
         {
 
@@ -118,6 +134,10 @@ namespace AprNes
 
             AprNesUI.GetInstance().AppConfigure["LimitFPS"] = "0";
             if (LimitFPS_checkBox.Checked) AprNesUI.GetInstance().AppConfigure["LimitFPS"] = "1";
+
+            // 音效設定寫入並立即生效
+            NesCore.AudioEnabled = SoundcheckBox.Checked;
+            NesCore.Volume = SoundtrackBar.Value;
 
             AprNesUI.GetInstance().AppConfigure["CaptureScreenPath"] = screen_path.Text;
             AprNesUI.GetInstance().key_A = key_A;
@@ -432,6 +452,11 @@ namespace AprNes
             key_RIGHT = int.Parse(AprNesUI.GetInstance().AppConfigure["key_RIGHT"]);
 
             LimitFPS_checkBox.Focus();
+
+            // 音效設定載入
+            SoundcheckBox.Checked = NesCore.AudioEnabled;
+            SoundtrackBar.Value = Math.Max(0, Math.Min(100, NesCore.Volume));
+            UpdateSoundUI();
         }
 
         private void choose_dir_Click(object sender, EventArgs e)

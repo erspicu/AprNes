@@ -171,6 +171,7 @@ namespace AprNes
                 AppConfigure["Lang"] = "en-us";
                 AppConfigure["filter"] = "xbrz";
                 AppConfigure["Sound"] = "1";
+                AppConfigure["Volume"] = "70";
                 Configure_Write();
             }
 
@@ -214,6 +215,12 @@ namespace AprNes
                 NesCore.AudioEnabled = AppConfigure["Sound"] == "1";
             else
                 NesCore.AudioEnabled = true;
+
+            // 讀取音量設定
+            if (AppConfigure.ContainsKey("Volume") && int.TryParse(AppConfigure["Volume"], out int vol))
+                NesCore.Volume = Math.Max(0, Math.Min(100, vol));
+            else
+                NesCore.Volume = 70;
 
             NES_init_KeyMap();
 
@@ -287,6 +294,8 @@ namespace AprNes
                 AppConfigure["joypad_RIGHT"] = NES_KeyMAP_joypad.FirstOrDefault(x => x.Value == KeyMap.NES_btn_RIGHT).Key;
 
             AppConfigure["ScreenFull"] = ScreenCenterFull.ToString();
+            AppConfigure["Sound"] = NesCore.AudioEnabled ? "1" : "0";
+            AppConfigure["Volume"] = NesCore.Volume.ToString();
 
             string conf = "";
             foreach (string i in AppConfigure.Keys)

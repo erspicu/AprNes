@@ -81,8 +81,9 @@ namespace AprNes
         static double     _sampleAccum = 0.0;
         static double     _cycPerSample = CPU_FREQ / APU_SAMPLE_RATE; // ~40.58
 
-        // 音效開關 (可由 UI 控制)
+        // 音效開關與音量 (可由 UI 控制)
         static public bool AudioEnabled = true;
+        static public int Volume = 70; // 0~100
 
         // =====================================================================
         // 各聲道狀態
@@ -542,8 +543,8 @@ namespace AprNes
             _dckiller -= mixed >> 8;
             _dckiller += (mixed > 0 ? -1 : 1);
 
-            // 縮放至 16-bit signed (-32768..32767)
-            int clamped = mixed;
+            // 縮放至 16-bit signed，套用使用者音量
+            int clamped = mixed * Volume / 100;
             if (clamped >  32767) clamped =  32767;
             if (clamped < -32768) clamped = -32768;
 
