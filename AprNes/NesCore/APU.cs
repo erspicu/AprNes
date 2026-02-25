@@ -147,7 +147,7 @@ namespace AprNes
         static bool dmcDmaInProgress = false; // prevent re-entrant DMC fill during stolen ticks
         static bool dmcIsLoadDma = false;      // true = Load DMA (after $4015), false = Reload DMA
         static int dmcLoadDmaCountdown = 0;    // Load DMA scheduling delay (3-4 CPU cycles)
-        static bool dmcReloadPending = false;  // Reload DMA deferred to next tick (matches hardware behavior)
+
         static bool oamDmaInProgress = false;  // true during OAM DMA (DMC overlaps with OAM cycles)
         static int oamDmaByteIndex = -1;       // current OAM byte being transferred (0-255, -1 = halt/align)
 
@@ -246,8 +246,6 @@ namespace AprNes
             dmcsamplesleft = 0;
             dmcLoadDmaCountdown = 0;
             dmcIsLoadDma = false;
-            dmcReloadPending = false;
-            oamDmaInProgress = false;
 
             // 重置音色產生器
             _pulseTimer[0] = _pulseTimer[1] = 0;
@@ -322,7 +320,7 @@ namespace AprNes
             dmcstartaddr = 0xC000; dmcaddr = 0xC000; dmcbitsleft = 8;
             dmcsilence = true; dmcirq = false; dmcloop = false; dmcBufferEmpty = true;
             dmcDmaInProgress = false; dmcIsLoadDma = false; dmcLoadDmaCountdown = 0;
-            dmcReloadPending = false; oamDmaInProgress = false; oamDmaByteIndex = -1;
+            oamDmaInProgress = false; oamDmaByteIndex = -1;
 
             // 初始化查找表
             SQUARELOOKUP = initSquareLookup();
@@ -434,7 +432,7 @@ namespace AprNes
                 waveOutPrepareHeader(_hWaveOut, ptr, hdrSz);
                 waveOutWrite(_hWaveOut, ptr, hdrSz);
             }
-            catch (Exception ex) { }
+            catch (Exception) { }
         }
 
         // =====================================================================
@@ -1029,7 +1027,6 @@ namespace AprNes
                 dmcsamplesleft = 0;
                 dmcLoadDmaCountdown = 0;
                 dmcIsLoadDma = false;
-                dmcReloadPending = false;
             }
             statusdmcint = false;
         }
