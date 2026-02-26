@@ -137,8 +137,8 @@ namespace AprNes
         [DllImport("user32.dll")] static extern int  GetClientRect(nint hWnd, ref RECT rc);
         [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int  MessageBoxW(nint hWnd, string text, string cap, uint type);
         [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int  DrawTextW(nint hdc, string s, int n, ref RECT rc, uint fmt);
-        [DllImport("user32.dll")] static extern nint SetBkMode(nint hdc, int mode);
-        [DllImport("user32.dll")] static extern uint SetTextColor(nint hdc, uint color);
+        [DllImport("gdi32.dll")] static extern nint SetBkMode(nint hdc, int mode);
+        [DllImport("gdi32.dll")] static extern uint SetTextColor(nint hdc, uint color);
         [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern bool SetWindowTextW(nint hWnd, string text);
         [DllImport("user32.dll")] static extern nint SetTimer(nint hWnd, nint id, uint ms, nint fn);
         [DllImport("user32.dll")] static extern bool KillTimer(nint hWnd, nint id);
