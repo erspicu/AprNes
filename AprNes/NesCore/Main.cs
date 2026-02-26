@@ -33,6 +33,15 @@ namespace AprNes
 
         static public int[] Mapper_Allow = new int[] { 0, 1, 2, 3, 4, 7, 11, 66 };
 
+        // ROM info accessors (read-only, set during init)
+        static public int  RomMapper   => mapper;
+        static public int  RomPrgCount => PRG_ROM_count;
+        static public int  RomChrCount => CHR_ROM_count;
+        static public bool RomHorizMirror => (ROM_Control_1 & 1) == 0;
+
+        // FPS limiting flag (set by UI, checked in VideoOutput handler)
+        static public bool LimitFPS = false;
+
         static int* Vertical; //  Vertical = false,
 
         static public ManualResetEvent _event = new ManualResetEvent(true);
