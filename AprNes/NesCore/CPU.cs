@@ -118,7 +118,6 @@ namespace AprNes
             flagI = 1;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void cpu_step()
         {
             ushort ushort1, ushort2, ushort3;

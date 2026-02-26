@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 
 namespace AprNes
 {
@@ -410,6 +411,7 @@ namespace AprNes
             setvolumes();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void setvolumes()
         {
             volume[0] = ((lengthctr[0] <= 0 || sweepsilence[0]) ? 0
@@ -695,6 +697,7 @@ namespace AprNes
         // =====================================================================
 
         // $4000: Pulse 1 duty/envelope
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void apu_4000(byte val)
         {
             _pulseDuty[0]       = (val >> 6) & 3;
@@ -703,6 +706,7 @@ namespace AprNes
             envelopeValue[0]    = val & 0x0F;
         }
         // $4001: Pulse 1 sweep
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void apu_4001(byte val)
         {
             sweepenable[0] = (val & 0x80) != 0;
@@ -712,6 +716,7 @@ namespace AprNes
             sweepreload[0] = true;
         }
         // $4002: Pulse 1 timer low
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void apu_4002(byte val)
         {
             _pulsePeriod[0] = (_pulsePeriod[0] & 0x700) | val;
@@ -727,6 +732,7 @@ namespace AprNes
             envelopeStartFlag[0] = true;
         }
         // $4004: Pulse 2 duty/envelope
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void apu_4004(byte val)
         {
             _pulseDuty[1]     = (val >> 6) & 3;
@@ -735,6 +741,7 @@ namespace AprNes
             envelopeValue[1]  = val & 0x0F;
         }
         // $4005: Pulse 2 sweep
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void apu_4005(byte val)
         {
             sweepenable[1] = (val & 0x80) != 0;
@@ -744,6 +751,7 @@ namespace AprNes
             sweepreload[1] = true;
         }
         // $4006: Pulse 2 timer low
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void apu_4006(byte val)
         {
             _pulsePeriod[1] = (_pulsePeriod[1] & 0x700) | val;
@@ -759,13 +767,16 @@ namespace AprNes
             envelopeStartFlag[1] = true;
         }
         // $4008: Triangle linear counter
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void apu_4008(byte val)
         {
             lenctrHalt[2] = (val & 0x80) != 0;
             linctrreload  = val & 0x7F;
         }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void apu_4009(byte val) { }
         // $400A: Triangle timer low
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void apu_400a(byte val)
         {
             _triPeriod = (_triPeriod & 0x700) | val;
@@ -780,6 +791,7 @@ namespace AprNes
             linctrflag = true;
         }
         // $400C: Noise envelope
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void apu_400c(byte val)
         {
             lenctrHalt[3]     = (val & 0x20) != 0;
@@ -787,6 +799,7 @@ namespace AprNes
             envelopeValue[3]  = val & 0x0F;
         }
         // $400E: Noise mode + period
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void apu_400e(byte val)
         {
             _noiseMode      = (val & 0x80) != 0;
@@ -800,6 +813,7 @@ namespace AprNes
             envelopeStartFlag[3] = true;
         }
         // $4010: DMC flags + rate
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void apu_4010(byte val)
         {
             dmcirq  = (val & 0x80) != 0;
@@ -808,16 +822,19 @@ namespace AprNes
             dmcrate = dmcperiods[val & 0x0F];
         }
         // $4011: DMC DAC 直接寫入
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void apu_4011(byte val)
         {
             dmcvalue = val & 0x7F;
         }
         // $4012: DMC 樣本起始位址
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void apu_4012(byte val)
         {
             dmcstartaddr = 0xC000 + val * 64;
         }
         // $4013: DMC 樣本長度
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void apu_4013(byte val)
         {
             dmcsamplelength = val * 16 + 1;

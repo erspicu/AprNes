@@ -55,6 +55,7 @@ namespace AprNes
         #region cycle-accurate PPU
 
         // Coarse X increment
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void CXinc()
         {
             if ((vram_addr & 0x001F) == 31)
@@ -89,6 +90,7 @@ namespace AprNes
         }
 
         // hori(v) = hori(t)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void CopyHoriV()
         {
             vram_addr = (vram_addr & ~0x041F) | (vram_addr_internal & 0x041F);
@@ -217,7 +219,6 @@ namespace AprNes
             ((Mapper004)MapperObj).NotifyA12(address, scanline * 341 + ppu_cycles_x);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_step_new()
         {
             // $2007 read cooldown (suppresses rapid consecutive reads)
@@ -635,6 +636,7 @@ namespace AprNes
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_w_2001(byte value) //ok
         {
             openbus = value;
@@ -645,18 +647,21 @@ namespace AprNes
             ShowSprites    = (value & 0x10) != 0;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_w_2003(byte value) //ok
         {
             openbus = value;
             spr_ram_add = value;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_w_2004(byte value) //ok
         {
             openbus = value;
             spr_ram[spr_ram_add++] = value;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ppu_r_2004()
         {
             byte val = spr_ram[spr_ram_add];

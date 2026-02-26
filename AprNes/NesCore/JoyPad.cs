@@ -7,12 +7,14 @@ namespace AprNes
         static byte* P1_joypad_status;
         static byte P1_StrobeState = 0;
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static public void P1_ButtonPress(byte v)
         {
             if (v > 7) return;
             P1_joypad_status[v] = 0x41;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static public void P1_ButtonUnPress(byte v)
         {
             if (v > 7) return;
