@@ -64,13 +64,14 @@ namespace AprNes
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        struct PAINTSTRUCT
+        unsafe struct PAINTSTRUCT
         {
             public nint  hdc;
             public int   fErase;
             public int   rcLeft, rcTop, rcRight, rcBottom;
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 32)]
-            public byte[] rgbReserved;
+            public int   fRestore;
+            public int   fIncUpdate;
+            public fixed byte rgbReserved[32];
         }
 
         [StructLayout(LayoutKind.Sequential)]

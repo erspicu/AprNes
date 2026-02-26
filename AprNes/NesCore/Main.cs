@@ -1,8 +1,6 @@
-﻿//#define debug
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
 using System.Threading;
-using System.Reflection;
 
 namespace AprNes
 {
@@ -185,8 +183,7 @@ namespace AprNes
                 }
                 else
                 {
-                    MapperObj = (IMapper)Activator.CreateInstance(
-                        Type.GetType("AprNes.Mapper" + mapper.ToString("d3")));
+                    MapperObj = CreateMapper(mapper);
                 }
                 MapperObj.MapperInit(PRG_ROM, CHR_ROM, ppu_ram, PRG_ROM_count, CHR_ROM_count, Vertical);
 
@@ -220,10 +217,23 @@ namespace AprNes
             return true;
         }
 
-        static void* GetField(string name)
+        static IMapper CreateMapper(int id)
         {
-            return Pointer.Unbox((Pointer)typeof(NesCore).GetField(name, BindingFlags.NonPublic | BindingFlags.Static).GetValue(null));
+            switch (id)
+            {
+                case   0: return new Mapper000();
+                case   1: return new Mapper001();
+                case   2: return new Mapper002();
+                case   3: return new Mapper003();
+                case   5: return new Mapper005();
+                case   7: return new Mapper007();
+                case  11: return new Mapper011();
+                case  66: return new Mapper066();
+                case  71: return new Mapper071();
+                default:  throw new NotSupportedException("Mapper " + id + " not supported");
+            }
         }
+
 
         static public void LoadSRam(byte[] data)
         {
@@ -285,41 +295,6 @@ namespace AprNes
             }
             Console.WriteLine("exit..");
         }
-
-
-#if debug
-        static StreamWriter StepsLog;
-        static int scount = 0;
-        static public void debug()
-        {
-
-            if (scount == 0)
-            {
-
-                if (File.Exists(@"c:\log\log.txt")) File.Delete(@"c:\log\log.txt");
-                if (!Directory.Exists(@"c:\log")) Directory.CreateDirectory((@"c:\log"));
-                StepsLog = File.AppendText(@"c:\log\log.txt");
-            }
-
-           StepsLog.WriteLine(opcode.ToString("x2") + " " + r_PC.ToString("x4") + " " + r_A.ToString("x2") + " " + r_X.ToString("x2") + " " + r_Y.ToString("x2") + " " + r_SP.ToString("x2"));// + " " + scanline + " " + ppu_cycles.ToString("x2"));
-
-            //if (scount > 1000000 * 50)
-            //StepsLog.WriteLine(vram_addr.ToString("x4") + " " +  vram_addr_internal.ToString ("x4"));
-            //StepsLog.WriteLine(scanline + " " + ppu_cycles.ToString("x2"));
-
-            // 1000000
-
-            if (scount == 250000*4)// 1000000 * 2)
-            {
-
-                StepsLog.Flush();
-                StepsLog.Close();
-                Console.WriteLine("ok!!!");
-                Console.ReadLine();
-            }
-            scount++;
-        }
-#endif
     }
 
 }

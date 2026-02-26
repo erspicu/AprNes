@@ -2,13 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
-using System.Windows.Forms;
 
 namespace LangTool
 {
     public class LangINI
     {
-        static string LangFile = Application.StartupPath + "/AprNesLang.ini";
+        static string LangFile = System.IO.Path.Combine(AppContext.BaseDirectory, "AprNesLang.ini");
         static List<string> lines;
         static List<string> langs = new List<string>();
         public static Dictionary<string, string> lang_map = new Dictionary<string, string>();
