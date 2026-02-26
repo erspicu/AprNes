@@ -194,11 +194,9 @@ namespace AprNes
                 for (int i = 0; i < 16384; i++) ppu_ram[i] = 0;
                 for (int i = 0; i < 256; i++) spr_ram[i] = 0;
                 for (int i = 0; i < 8; i++) P1_joypad_status[i] = 0x40;
-                for (int i = 0; i < 64; i++) NesColors[i] = NesColorsData[i];
                 for (int i = 0; i < 65536; i++) NES_MEM[i] = 0;
 
-                //int default pal
-                for (int i = 0; i < 32; i++) ppu_ram[0x3f00 + i] = defaultPal[i];
+                initPalette();
 
                 //init function array
                 init_function();
