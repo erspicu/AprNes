@@ -14,6 +14,7 @@ namespace AprNes
         const uint WM_KEYDOWN   = 0x0100;
         const uint WM_KEYUP     = 0x0101;
         const uint WM_DROPFILES = 0x0233;
+        const uint WM_COMMAND   = 0x0111;
 
         const uint CS_HREDRAW   = 0x0002;
         const uint CS_VREDRAW   = 0x0001;
@@ -24,6 +25,10 @@ namespace AprNes
         const int  DIB_RGB_COLORS = 0;
         const int  BI_RGB       = 0;
 
+        // Menu item IDs
+        const int IDM_FILE_OPEN = 1001;
+        const int IDM_FILE_EXIT = 1002;
+
         // VK codes
         const int VK_LEFT  = 0x25;
         const int VK_UP    = 0x26;
@@ -33,6 +38,11 @@ namespace AprNes
         const int VK_X     = 0x58;
         const int VK_A     = 0x41;
         const int VK_S     = 0x53;
+
+        // DrawText flags
+        const uint DT_CENTER    = 0x00000001;
+        const uint DT_VCENTER   = 0x00000004;
+        const uint DT_SINGLELINE= 0x00000020;
 
         // ── Win32 structs ──────────────────────────────────────────────────────
         [StructLayout(LayoutKind.Sequential)]
@@ -75,6 +85,9 @@ namespace AprNes
         }
 
         [StructLayout(LayoutKind.Sequential)]
+        struct RECT { public int left, top, right, bottom; }
+
+        [StructLayout(LayoutKind.Sequential)]
         struct BITMAPINFOHEADER
         {
             public uint  biSize;
@@ -88,6 +101,35 @@ namespace AprNes
             public int   biYPelsPerMeter;
             public uint  biClrUsed;
             public uint  biClrImportant;
+        }
+
+        // OPENFILENAME for GetOpenFileNameW
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        struct OPENFILENAME
+        {
+            public uint    lStructSize;
+            public nint    hwndOwner;
+            public nint    hInstance;
+            public nint    lpstrFilter;
+            public nint    lpstrCustomFilter;
+            public uint    nMaxCustFilter;
+            public uint    nFilterIndex;
+            public nint    lpstrFile;
+            public uint    nMaxFile;
+            public nint    lpstrFileTitle;
+            public uint    nMaxFileTitle;
+            public nint    lpstrInitialDir;
+            public nint    lpstrTitle;
+            public uint    Flags;
+            public ushort  nFileOffset;
+            public ushort  nFileExtension;
+            public nint    lpstrDefExt;
+            public nint    lCustData;
+            public nint    lpfnHook;
+            public nint    lpTemplateName;
+            public nint    pvReserved;
+            public uint    dwReserved;
+            public uint    FlagsEx;
         }
 
         // ── P/Invoke ───────────────────────────────────────────────────────────
@@ -114,6 +156,18 @@ namespace AprNes
         [DllImport("user32.dll")] static extern nint LoadCursorW(nint hInstance, nint lpCursorName);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         static extern int MessageBoxW(nint hWnd, string lpText, string lpCaption, uint uType);
+        [DllImport("user32.dll")] static extern int  GetClientRect(nint hWnd, ref RECT lpRect);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        static extern int DrawTextW(nint hdc, string lpchText, int nCount, ref RECT lpRect, uint uFormat);
+        [DllImport("user32.dll")] static extern nint SetBkMode(nint hdc, int mode);
+        [DllImport("user32.dll")] static extern uint SetTextColor(nint hdc, uint crColor);
+
+        // Menu API
+        [DllImport("user32.dll")] static extern nint CreateMenu();
+        [DllImport("user32.dll")] static extern nint CreatePopupMenu();
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        static extern bool AppendMenuW(nint hMenu, uint uFlags, nint uIDNewItem, string lpNewItem);
+        [DllImport("user32.dll")] static extern bool SetMenu(nint hWnd, nint hMenu);
 
         [DllImport("kernel32.dll")]
         static extern nint GetModuleHandleW(nint lpModuleName);
@@ -127,6 +181,10 @@ namespace AprNes
         [DllImport("shell32.dll")] static extern void DragAcceptFiles(nint hWnd, int fAccept);
         [DllImport("shell32.dll")] static extern uint DragQueryFileW(nint hDrop, uint iFile, nint lpszFile, uint cch);
         [DllImport("shell32.dll")] static extern void DragFinish(nint hDrop);
+
+        // Open file dialog
+        [DllImport("comdlg32.dll", CharSet = CharSet.Unicode)]
+        static extern bool GetOpenFileNameW(ref OPENFILENAME lpofn);
 
         // ── Delegate for WndProc (kept alive to prevent GC) ───────────────────
         delegate nint WndProcDelegate(nint hWnd, uint msg, nint wParam, nint lParam);
@@ -196,6 +254,15 @@ namespace AprNes
                 return;
             }
 
+            // ── Build menu bar ─────────────────────────────────────────────────
+            nint hMenuBar  = CreateMenu();
+            nint hFileMenu = CreatePopupMenu();
+            AppendMenuW(hFileMenu, 0x0000, (nint)IDM_FILE_OPEN, "開啟 ROM (&O)\tCtrl+O");
+            AppendMenuW(hFileMenu, 0x0800, nint.Zero, null);   // separator
+            AppendMenuW(hFileMenu, 0x0000, (nint)IDM_FILE_EXIT, "結束 (&X)");
+            AppendMenuW(hMenuBar,  0x0010, hFileMenu, "檔案 (&F)");
+            SetMenu(_hWnd, hMenuBar);
+
             DragAcceptFiles(_hWnd, 1);
             WaveOutPlayer.OpenAudio();
 
@@ -222,12 +289,9 @@ namespace AprNes
                 {
                     PAINTSTRUCT ps = default;
                     nint hdc = BeginPaint(hWnd, ref ps);
-                    if (NesCore.ScreenBuf1x != null)
+                    if (_running && NesCore.ScreenBuf1x != null)
                     {
                         const int scale = 2;
-                        // stretch-blit 256×240 → 512×480 using StretchDIBits would require extra API;
-                        // use SetDIBitsToDevice at 1:1 then rely on window client area for now.
-                        // For 2x, we do a simple manual scale to a temp buffer.
                         uint* src = NesCore.ScreenBuf1x;
                         int dstW = 256 * scale, dstH = 240 * scale;
                         uint* dst = (uint*)Marshal.AllocHGlobal(dstW * dstH * 4);
@@ -249,7 +313,27 @@ namespace AprNes
                             dst, ref bih2x, (uint)DIB_RGB_COLORS);
                         Marshal.FreeHGlobal((nint)dst);
                     }
+                    else
+                    {
+                        // No ROM loaded — show hint text
+                        RECT rc = default;
+                        GetClientRect(hWnd, ref rc);
+                        SetBkMode(hdc, 1); // TRANSPARENT
+                        SetTextColor(hdc, 0x00888888);
+                        DrawTextW(hdc,
+                            "拖曳 .nes 檔案至此，或使用 檔案 > 開啟 ROM",
+                            -1, ref rc,
+                            DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                    }
                     EndPaint(hWnd, ref ps);
+                    return nint.Zero;
+                }
+
+                case WM_COMMAND:
+                {
+                    int id = (int)(wParam & 0xFFFF);
+                    if (id == IDM_FILE_OPEN) OpenRomDialog();
+                    else if (id == IDM_FILE_EXIT) DestroyWindow(hWnd);
                     return nint.Zero;
                 }
 
@@ -270,7 +354,6 @@ namespace AprNes
                 case WM_DROPFILES:
                 {
                     nint hDrop = wParam;
-                    // query file name length
                     uint len = DragQueryFileW(hDrop, 0, nint.Zero, 0);
                     if (len > 0)
                     {
@@ -281,15 +364,13 @@ namespace AprNes
                         DragFinish(hDrop);
                         LoadRom(path);
                     }
-                    else
-                    {
-                        DragFinish(hDrop);
-                    }
+                    else DragFinish(hDrop);
                     return nint.Zero;
                 }
 
                 case WM_DESTROY:
                     StopEmulation();
+                    WaveOutPlayer.CloseAudio();
                     PostQuitMessage(0);
                     return nint.Zero;
             }
@@ -313,6 +394,39 @@ namespace AprNes
             }
         }
 
+        // ── Open ROM via dialog ────────────────────────────────────────────────
+        static void OpenRomDialog()
+        {
+            const uint OFN_FILEMUSTEXIST  = 0x00001000;
+            const uint OFN_PATHMUSTEXIST  = 0x00000800;
+            const uint OFN_HIDEREADONLY   = 0x00000004;
+
+            char[] fileBuffer = new char[260];
+            fileBuffer[0] = '\0';
+
+            // Filter string: "NES ROM (*.nes)\0*.nes\0All Files\0*.*\0\0"
+            string filter = "NES ROM (*.nes)\0*.nes\0All Files\0*.*\0\0";
+            fixed (char* pFilter = filter)
+            fixed (char* pFile   = fileBuffer)
+            {
+                OPENFILENAME ofn = new OPENFILENAME
+                {
+                    lStructSize = (uint)sizeof(OPENFILENAME),
+                    hwndOwner   = _hWnd,
+                    lpstrFilter = (nint)pFilter,
+                    lpstrFile   = (nint)pFile,
+                    nMaxFile    = (uint)fileBuffer.Length,
+                    Flags       = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY,
+                };
+                if (GetOpenFileNameW(ref ofn))
+                {
+                    string path = new string(pFile).TrimEnd('\0');
+                    if (!string.IsNullOrEmpty(path))
+                        LoadRom(path);
+                }
+            }
+        }
+
         // ── ROM loading ────────────────────────────────────────────────────────
         static void LoadRom(string path)
         {
@@ -332,6 +446,7 @@ namespace AprNes
                 });
                 _emuThread.IsBackground = true;
                 _emuThread.Start();
+                InvalidateRect(_hWnd, nint.Zero, 1);
             }
             catch (Exception ex)
             {
