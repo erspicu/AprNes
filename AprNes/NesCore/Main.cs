@@ -1,6 +1,5 @@
 ﻿//#define debug
 using System;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Reflection;
@@ -28,9 +27,9 @@ namespace AprNes
         static int mapper;
         static byte PRG_ROM_count, CHR_ROM_count, ROM_Control_1, ROM_Control_2, RAM_banks_count;
         static byte* PRG_ROM, CHR_ROM;
-        static bool NesHeaderV2 = false, battery = false;
+        static bool NesHeaderV2 = false;
+        static public bool HasBattery = false;
         static public string rom_file_name = "";
-        static string rom_sav = "";
 
         static IMapper MapperObj;
 
@@ -98,10 +97,14 @@ namespace AprNes
 
                 if ((ROM_Control_1 & 2) != 0)
                 {
-                    battery = true;
+                    HasBattery = true;
                     Console.WriteLine("battery-backed RAM : yes");
                 }
-                else Console.WriteLine("battery-backed RAM : no");
+                else
+                {
+                    HasBattery = false;
+                    Console.WriteLine("battery-backed RAM : no");
+                }
 
                 if ((ROM_Control_1 & 4) != 0) Console.WriteLine("trainer : yes");
                 else Console.WriteLine("trainer : no");
@@ -200,18 +203,6 @@ namespace AprNes
                 //init function array
                 init_function();
 
-                //init sram
-                if (battery == true)
-                {
-                    rom_sav = rom_file_name + ".sav";
-                    if (File.Exists(rom_sav))
-                    {
-                        byte[] sav_bytes = File.ReadAllBytes(rom_sav);
-                        for (int i = 0; i < 0x2000; i++) NES_MEM[i + 0x6000] = sav_bytes[i]; //copy to ram
-                    }
-                    else File.WriteAllBytes(rom_sav, new byte[0x2000]);
-                }
-
                 //init cpu pc (suppress ticking during init — APU not ready yet)
                 in_tick = true;
                 r_PC = (ushort)(Mem_r(0xfffc) | Mem_r(0xfffd) << 8);
@@ -236,13 +227,18 @@ namespace AprNes
             return Pointer.Unbox((Pointer)typeof(NesCore).GetField(name, BindingFlags.NonPublic | BindingFlags.Static).GetValue(null));
         }
 
-        static public void SaveRam()
+        static public void LoadSRam(byte[] data)
         {
-            if (!battery) return;
-            byte[] sav_bytes = new byte[0x2000];
-            for (int i = 0; i < 0x2000; i++) sav_bytes[i] = NES_MEM[i + 0x6000]; //copy from ram
-            File.WriteAllBytes(rom_sav, sav_bytes);
+            for (int i = 0; i < 0x2000; i++) NES_MEM[i + 0x6000] = data[i];
         }
+
+        static public byte[] DumpSRam()
+        {
+            byte[] buf = new byte[0x2000];
+            for (int i = 0; i < 0x2000; i++) buf[i] = NES_MEM[i + 0x6000];
+            return buf;
+        }
+
         static public void run()
         {
             bool nmi_just_deferred = false;

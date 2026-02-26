@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace AprNes
+﻿namespace AprNes
 {
     unsafe public class Mapper000 : IMapper
     {

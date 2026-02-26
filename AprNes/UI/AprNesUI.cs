@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -555,6 +555,24 @@ namespace AprNes
         public string rom_file_name = "";
         public string nes_name = "";
 
+        string SRamPath() => rom_file_name + ".sav";
+
+        void SaveSRam()
+        {
+            if (!NesCore.HasBattery) return;
+            File.WriteAllBytes(SRamPath(), NesCore.DumpSRam());
+        }
+
+        void LoadSRam()
+        {
+            if (!NesCore.HasBattery) return;
+            string path = SRamPath();
+            if (File.Exists(path))
+                NesCore.LoadSRam(File.ReadAllBytes(path));
+            else
+                File.WriteAllBytes(path, new byte[0x2000]);
+        }
+
         InterfaceGraphic RenderObj;
 
         unsafe private void button1_Click(object sender, EventArgs e)
@@ -607,7 +625,7 @@ namespace AprNes
                 }
             }
 
-            NesCore.SaveRam();
+            SaveSRam();
             NesCore.exit = false;
             NesCore.rom_file_name = rom_file_name;
 
@@ -630,6 +648,7 @@ namespace AprNes
                 MessageBox.Show("fail !");
                 return;
             }
+            LoadSRam();
             _fpsDeadline = 0;
             _fpsStopWatch.Restart();
             if (NesCore.AudioEnabled) WaveOutPlayer.OpenAudio();
@@ -658,7 +677,7 @@ namespace AprNes
         {
             app_running = false;
             NesCore.exit = true;
-            NesCore.SaveRam();
+            SaveSRam();
             WaveOutPlayer.CloseAudio();
             Thread.Sleep(10);
         }
@@ -774,7 +793,7 @@ namespace AprNes
         {
             if (!running) return;
 
-            NesCore.SaveRam();
+            SaveSRam();
             NesCore.rom_file_name = rom_file_name;
 
             NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
@@ -802,7 +821,7 @@ namespace AprNes
                 if (nes_t.IsAlive) nes_t.Abort();
             }
 
-            NesCore.SaveRam();
+            SaveSRam();
             WaveOutPlayer.CloseAudio();
 
             // 完整重新初始化（等同 power cycle）
@@ -827,6 +846,7 @@ namespace AprNes
                 return;
             }
 
+            LoadSRam();
             _fpsDeadline = 0;
             _fpsStopWatch.Restart();
             if (NesCore.AudioEnabled) WaveOutPlayer.OpenAudio();
