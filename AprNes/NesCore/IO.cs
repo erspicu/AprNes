@@ -1,7 +1,7 @@
 ﻿
 namespace AprNes
 {
-    public partial class NesCore
+    public unsafe partial class NesCore
     {
         static byte IO_read(ushort addr)
         {

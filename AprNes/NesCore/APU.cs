@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace AprNes
 {
@@ -7,7 +8,7 @@ namespace AprNes
     // NES APU — 實作 Pulse1/2、Triangle、Noise、DMC 五個音效聲道
     // 音效樣本透過 AudioSampleReady callback 送出，由外部播放器（WaveOutPlayer）消費。
     // =========================================================================
-    public partial class NesCore
+    public unsafe partial class NesCore
     {
         // =====================================================================
         // 音效樣本輸出介面 (由外部訂閱，例如 WaveOutPlayer)
@@ -32,11 +33,11 @@ namespace AprNes
         // =====================================================================
 
         // Pulse 1 & 2 (方波聲道)
-        static int[] _pulseTimer  = new int[2]; // 計時器目前值
-        static int[] _pulsePeriod = new int[2]; // 11-bit 週期 (從 register 寫入)
-        static int[] _pulseSeq    = new int[2]; // duty 序列位置 (0-7)
-        static int[] _pulseDuty   = new int[2]; // duty 種類 (0-3)
-        static int[] _pulseOut    = new int[2]; // 目前輸出 (0 或 1)
+        static int* _pulseTimer; // 計時器目前值
+        static int* _pulsePeriod; // 11-bit 週期 (從 register 寫入)
+        static int* _pulseSeq; // duty 序列位置 (0-7)
+        static int* _pulseDuty; // duty 種類 (0-3)
+        static int* _pulseOut; // 目前輸出 (0 或 1)
 
         // Triangle (三角波聲道)
         static int _triTimer  = 0;
@@ -56,8 +57,8 @@ namespace AprNes
         static int    _noiseOut       = 0;
 
         // 混音查找表
-        static int[] SQUARELOOKUP;
-        static int[] TNDLOOKUP;
+        static int* SQUARELOOKUP;
+        static int* TNDLOOKUP;
 
         // DC 消除狀態 (high-pass filter)
         static int _dckiller = 0;
@@ -66,23 +67,23 @@ namespace AprNes
         // 原有 APU 欄位 (保留相容)
         // =====================================================================
         static int apucycle = 0;
-        static int[] noiseperiod;
+        static int* noiseperiod;
         // Per-step reload values for frame counter (non-uniform, matching real NES NTSC timing)
         // 4-step: steps fire at CPU cycles 7460, 14916, 22374, 29832 from $4017 write (+2 offset)
         // 5-step: steps fire at CPU cycles 7460, 14916, 22374, 29832, 37284
-        static int[] frameReload4 = { 7458, 7456, 7458, 7458 };
-        static int[] frameReload5 = { 7458, 7456, 7458, 7458, 7452 };
+        static int* frameReload4;
+        static int* frameReload5;
         static int framectrdiv = 7458;
         static bool apuintflag = true, statusdmcint = false, statusframeint = false;
         static int irqAssertCycles = 0; // post-fire: assert IRQ flag for extra cycles after step 3
         static int framectr = 0, ctrmode = 4;
         static byte last4017Val = 0;  // track last value written to $4017 for reset
-        static bool[] lenCtrEnable = { true, true, true, true };
-        static bool[] lengthClockThisCycle = { false, false, false, false };
-        static int[] volume = new int[4];
+        static byte* lenCtrEnable;
+        static byte* lengthClockThisCycle;
+        static int* volume;
 
         // DMC 欄位
-        static int[] dmcperiods;
+        static int* dmcperiods;
         static int dmcrate = 0x36, dmctimer = 0x36, dmcshiftregister = 0, dmcbuffer = 0,
                    dmcvalue = 0, dmcsamplelength = 1, dmcsamplesleft = 0,
                    dmcstartaddr = 0xc000, dmcaddr = 0xc000, dmcbitsleft = 8;
@@ -95,14 +96,10 @@ namespace AprNes
         static int oamDmaByteIndex = -1;       // current OAM byte being transferred (0-255, -1 = halt/align)
 
         // Length counter 欄位
-        static int[] lengthctr = { 0, 0, 0, 0 };
-        static int[] lengthctr_snapshot = { 0, 0, 0, 0 }; // snapshot for $4015 reads (pre-step values)
-        static int[] lenctrload = {
-            10, 254, 20, 2, 40, 4, 80, 6,
-            160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22,
-            192, 24, 72, 26, 16, 28, 32, 30
-        };
-        static bool[] lenctrHalt = { true, true, true, true };
+        static int* lengthctr;
+        static int* lengthctr_snapshot; // snapshot for $4015 reads (pre-step values)
+        static int* lenctrload;
+        static byte* lenctrHalt;
 
         // Linear counter (Triangle)
         static int linearctr  = 0;
@@ -110,20 +107,20 @@ namespace AprNes
         static bool linctrflag = false;
 
         // Envelope 欄位
-        static int[]  envelopeValue     = { 15, 15, 15, 15 };
-        static int[]  envelopeCounter   = { 0, 0, 0, 0 };
-        static int[]  envelopePos       = { 0, 0, 0, 0 };
-        static bool[] envConstVolume    = { true, true, true, true };
-        static bool[] envelopeStartFlag = { false, false, false, false };
+        static int*  envelopeValue;
+        static int*  envelopeCounter;
+        static int*  envelopePos;
+        static byte* envConstVolume;
+        static byte* envelopeStartFlag;
 
         // Sweep 欄位 (Pulse 1 & 2)
-        static bool[] sweepenable   = { false, false };
-        static bool[] sweepnegate   = { false, false };
-        static bool[] sweepsilence  = { false, false };
-        static bool[] sweepreload   = { false, false };
-        static int[]  sweepperiod   = { 15, 15 };
-        static int[]  sweepshift    = { 0, 0 };
-        static int[]  sweeppos      = { 0, 0 };
+        static byte* sweepenable;
+        static byte* sweepnegate;
+        static byte* sweepsilence;
+        static byte* sweepreload;
+        static int*  sweepperiod;
+        static int*  sweepshift;
+        static int*  sweeppos;
 
         // Duty 波形查找表
         static int[,] DUTYLOOKUP = new int[,] {
@@ -132,25 +129,6 @@ namespace AprNes
             { 0, 1, 1, 1, 1, 0, 0, 0 }, // 50%
             { 1, 0, 0, 1, 1, 1, 1, 1 }  // 75%
         };
-
-        // =====================================================================
-        // 混音查找表初始化 (非線性混音，模擬 NES 實際電路)
-        // =====================================================================
-        static int[] initTndLookup()
-        {
-            int[] lookup = new int[203];
-            for (int i = 0; i < 203; ++i)
-                lookup[i] = (int)((163.67 / (24329.0 / (i == 0 ? 0.0001 : i) + 100)) * 49151);
-            return lookup;
-        }
-
-        static int[] initSquareLookup()
-        {
-            int[] lookup = new int[31];
-            for (int i = 0; i < 31; ++i)
-                lookup[i] = (int)((95.52 / (8128.0 / (i == 0 ? 0.0001 : i) + 100)) * 49151);
-            return lookup;
-        }
 
         // =====================================================================
         // APU Soft Reset — 只重置內部狀態，不碰 WaveOut 音效設備
@@ -183,7 +161,7 @@ namespace AprNes
             // 模擬 $4015=$00: 停止所有聲道
             for (int i = 0; i < 4; i++)
             {
-                lenCtrEnable[i] = false;
+                lenCtrEnable[i] = 0;
                 lengthctr[i] = 0;
             }
             dmcsamplesleft = 0;
@@ -208,8 +186,63 @@ namespace AprNes
         // =====================================================================
         static void initAPU()
         {
-            dmcperiods  = new int[] { 428,380,340,320,286,254,226,214,190,160,142,128,106,84,72,54 };
-            noiseperiod = new int[] { 4,8,16,32,64,96,128,160,202,254,380,508,762,1016,2034,4068 };
+            // Allocate pointer arrays (null-check pattern for re-init safety)
+            if (_pulseTimer  == null) _pulseTimer  = (int*)Marshal.AllocHGlobal(sizeof(int) * 2);
+            if (_pulsePeriod == null) _pulsePeriod = (int*)Marshal.AllocHGlobal(sizeof(int) * 2);
+            if (_pulseSeq    == null) _pulseSeq    = (int*)Marshal.AllocHGlobal(sizeof(int) * 2);
+            if (_pulseDuty   == null) _pulseDuty   = (int*)Marshal.AllocHGlobal(sizeof(int) * 2);
+            if (_pulseOut    == null) _pulseOut    = (int*)Marshal.AllocHGlobal(sizeof(int) * 2);
+            if (volume       == null) volume       = (int*)Marshal.AllocHGlobal(sizeof(int) * 4);
+            if (SQUARELOOKUP == null) SQUARELOOKUP = (int*)Marshal.AllocHGlobal(sizeof(int) * 31);
+            if (TNDLOOKUP    == null) TNDLOOKUP    = (int*)Marshal.AllocHGlobal(sizeof(int) * 203);
+            if (noiseperiod  == null) noiseperiod  = (int*)Marshal.AllocHGlobal(sizeof(int) * 16);
+            if (frameReload4 == null) frameReload4 = (int*)Marshal.AllocHGlobal(sizeof(int) * 4);
+            if (frameReload5 == null) frameReload5 = (int*)Marshal.AllocHGlobal(sizeof(int) * 5);
+            if (lengthctr    == null) lengthctr    = (int*)Marshal.AllocHGlobal(sizeof(int) * 4);
+            if (lengthctr_snapshot == null) lengthctr_snapshot = (int*)Marshal.AllocHGlobal(sizeof(int) * 4);
+            if (lenctrload   == null) lenctrload   = (int*)Marshal.AllocHGlobal(sizeof(int) * 32);
+            if (envelopeValue   == null) envelopeValue   = (int*)Marshal.AllocHGlobal(sizeof(int) * 4);
+            if (envelopeCounter == null) envelopeCounter = (int*)Marshal.AllocHGlobal(sizeof(int) * 4);
+            if (envelopePos     == null) envelopePos     = (int*)Marshal.AllocHGlobal(sizeof(int) * 4);
+            if (sweepperiod  == null) sweepperiod  = (int*)Marshal.AllocHGlobal(sizeof(int) * 2);
+            if (sweepshift   == null) sweepshift   = (int*)Marshal.AllocHGlobal(sizeof(int) * 2);
+            if (sweeppos     == null) sweeppos     = (int*)Marshal.AllocHGlobal(sizeof(int) * 2);
+            if (dmcperiods   == null) dmcperiods   = (int*)Marshal.AllocHGlobal(sizeof(int) * 16);
+            if (lenCtrEnable           == null) lenCtrEnable           = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 4);
+            if (lengthClockThisCycle   == null) lengthClockThisCycle   = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 4);
+            if (lenctrHalt             == null) lenctrHalt             = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 4);
+            if (envConstVolume         == null) envConstVolume         = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 4);
+            if (envelopeStartFlag      == null) envelopeStartFlag      = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 4);
+            if (sweepenable            == null) sweepenable            = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 2);
+            if (sweepnegate            == null) sweepnegate            = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 2);
+            if (sweepsilence           == null) sweepsilence           = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 2);
+            if (sweepreload            == null) sweepreload            = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 2);
+
+            // Initialize fixed data arrays
+            frameReload4[0] = 7458; frameReload4[1] = 7456; frameReload4[2] = 7458; frameReload4[3] = 7458;
+            frameReload5[0] = 7458; frameReload5[1] = 7456; frameReload5[2] = 7458; frameReload5[3] = 7458; frameReload5[4] = 7452;
+
+            { int[] _lv = { 10,254,20,2,40,4,80,6,160,8,60,10,14,12,26,14,12,16,24,18,48,20,96,22,192,24,72,26,16,28,32,30 };
+              for (int i = 0; i < 32; i++) lenctrload[i] = _lv[i]; }
+
+            noiseperiod[0]=4; noiseperiod[1]=8; noiseperiod[2]=16; noiseperiod[3]=32;
+            noiseperiod[4]=64; noiseperiod[5]=96; noiseperiod[6]=128; noiseperiod[7]=160;
+            noiseperiod[8]=202; noiseperiod[9]=254; noiseperiod[10]=380; noiseperiod[11]=508;
+            noiseperiod[12]=762; noiseperiod[13]=1016; noiseperiod[14]=2034; noiseperiod[15]=4068;
+
+            dmcperiods[0]=428; dmcperiods[1]=380; dmcperiods[2]=340; dmcperiods[3]=320;
+            dmcperiods[4]=286; dmcperiods[5]=254; dmcperiods[6]=226; dmcperiods[7]=214;
+            dmcperiods[8]=190; dmcperiods[9]=160; dmcperiods[10]=142; dmcperiods[11]=128;
+            dmcperiods[12]=106; dmcperiods[13]=84; dmcperiods[14]=72; dmcperiods[15]=54;
+
+            for (int i = 0; i < 31; i++)
+                SQUARELOOKUP[i] = (int)((95.52 / (8128.0 / (i == 0 ? 0.0001 : i) + 100)) * 49151);
+            for (int i = 0; i < 203; i++)
+                TNDLOOKUP[i] = (int)((163.67 / (24329.0 / (i == 0 ? 0.0001 : i) + 100)) * 49151);
+
+            // Default bool* arrays
+            for (int i = 0; i < 4; i++) { lenCtrEnable[i] = 1; lengthClockThisCycle[i] = 0; lenctrHalt[i] = 1; envConstVolume[i] = 1; envelopeStartFlag[i] = 0; }
+            for (int i = 0; i < 2; i++) { sweepenable[i] = 0; sweepnegate[i] = 0; sweepsilence[i] = 0; sweepreload[i] = 0; }
 
             framectrdiv = 7449; // 7458 + 1(even jitter) - 9(power-on advance) - 1(tick-before-write compensation)
             irqAssertCycles = 0;
@@ -231,22 +264,22 @@ namespace AprNes
             // Power-on 狀態 (模擬 $4015=$00, $4017=$00)
             for (int i = 0; i < 4; i++)
             {
-                lenCtrEnable[i] = false;
+                lenCtrEnable[i] = 0;
                 lengthctr[i] = 0;
                 volume[i] = 0;
-                lenctrHalt[i] = false;
+                lenctrHalt[i] = 0;
                 envelopeValue[i] = 0;
                 envelopeCounter[i] = 0;
                 envelopePos[i] = 0;
-                envConstVolume[i] = false;
-                envelopeStartFlag[i] = false;
+                envConstVolume[i] = 0;
+                envelopeStartFlag[i] = 0;
             }
             for (int i = 0; i < 2; i++)
             {
-                sweepenable[i] = false;
-                sweepnegate[i] = false;
-                sweepsilence[i] = false;
-                sweepreload[i] = false;
+                sweepenable[i] = 0;
+                sweepnegate[i] = 0;
+                sweepsilence[i] = 0;
+                sweepreload[i] = 0;
                 sweepperiod[i] = 0;
                 sweepshift[i] = 0;
                 sweeppos[i] = 0;
@@ -264,10 +297,6 @@ namespace AprNes
             dmcsilence = true; dmcirq = false; dmcloop = false; dmcBufferEmpty = true;
             dmcDmaInProgress = false; dmcIsLoadDma = false; dmcLoadDmaCountdown = 0;
             oamDmaInProgress = false; oamDmaByteIndex = -1;
-
-            // 初始化查找表
-            SQUARELOOKUP = initSquareLookup();
-            TNDLOOKUP    = initTndLookup();
         }
 
         // =====================================================================
@@ -277,7 +306,7 @@ namespace AprNes
         {
             apucycle++;
             lengthClockThisCycle[0] = lengthClockThisCycle[1] =
-            lengthClockThisCycle[2] = lengthClockThisCycle[3] = false;
+            lengthClockThisCycle[2] = lengthClockThisCycle[3] = 0;
 
             // Snapshot lengthctr for $4015 reads (pre-step values, compensates tick-before-read)
             lengthctr_snapshot[0] = lengthctr[0];
@@ -308,7 +337,7 @@ namespace AprNes
                     _pulseTimer[0] = _pulsePeriod[0];
                     _pulseSeq[0]   = (_pulseSeq[0] + 1) & 7;
                 }
-                _pulseOut[0] = (_pulsePeriod[0] >= 8 && lengthctr[0] > 0 && !sweepsilence[0])
+                _pulseOut[0] = (_pulsePeriod[0] >= 8 && lengthctr[0] > 0 && sweepsilence[0] == 0)
                     ? DUTYLOOKUP[_pulseDuty[0], _pulseSeq[0]] : 0;
 
                 // Pulse 2
@@ -317,7 +346,7 @@ namespace AprNes
                     _pulseTimer[1] = _pulsePeriod[1];
                     _pulseSeq[1]   = (_pulseSeq[1] + 1) & 7;
                 }
-                _pulseOut[1] = (_pulsePeriod[1] >= 8 && lengthctr[1] > 0 && !sweepsilence[1])
+                _pulseOut[1] = (_pulsePeriod[1] >= 8 && lengthctr[1] > 0 && sweepsilence[1] == 0)
                     ? DUTYLOOKUP[_pulseDuty[1], _pulseSeq[1]] : 0;
 
                 // Noise
@@ -363,11 +392,11 @@ namespace AprNes
 
             // Pulse 混音 (非線性查找表)
             int sqIdx = volume[0] * _pulseOut[0] + volume[1] * _pulseOut[1];
-            if (sqIdx >= SQUARELOOKUP.Length) sqIdx = SQUARELOOKUP.Length - 1;
+            if (sqIdx >= 31) sqIdx = 30;
 
             // TND 混音
             int tndIdx = 3 * _triOut + 2 * volume[3] * _noiseOut + dmcvalue;
-            if (tndIdx >= TNDLOOKUP.Length) tndIdx = TNDLOOKUP.Length - 1;
+            if (tndIdx >= 203) tndIdx = 202;
 
             int mixed = SQUARELOOKUP[sqIdx] + TNDLOOKUP[tndIdx]; // 0..~98302
 
@@ -414,22 +443,22 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void setvolumes()
         {
-            volume[0] = ((lengthctr[0] <= 0 || sweepsilence[0]) ? 0
-                : (envConstVolume[0] ? envelopeValue[0] : envelopeCounter[0]));
-            volume[1] = ((lengthctr[1] <= 0 || sweepsilence[1]) ? 0
-                : (envConstVolume[1] ? envelopeValue[1] : envelopeCounter[1]));
+            volume[0] = ((lengthctr[0] <= 0 || sweepsilence[0] != 0) ? 0
+                : (envConstVolume[0] != 0 ? envelopeValue[0] : envelopeCounter[0]));
+            volume[1] = ((lengthctr[1] <= 0 || sweepsilence[1] != 0) ? 0
+                : (envConstVolume[1] != 0 ? envelopeValue[1] : envelopeCounter[1]));
             volume[3] = (lengthctr[3] <= 0 ? 0
-                : (envConstVolume[3] ? envelopeValue[3] : envelopeCounter[3]));
+                : (envConstVolume[3] != 0 ? envelopeValue[3] : envelopeCounter[3]));
         }
 
         static void setlength()
         {
             for (int i = 0; i < 4; ++i)
             {
-                if (!lenctrHalt[i] && lengthctr[i] > 0)
+                if (lenctrHalt[i] == 0 && lengthctr[i] > 0)
                 {
                     --lengthctr[i];
-                    lengthClockThisCycle[i] = true;
+                    lengthClockThisCycle[i] = 1;
                     if (lengthctr[i] == 0) setvolumes();
                 }
             }
@@ -441,7 +470,7 @@ namespace AprNes
                 linearctr = linctrreload;
             else if (linearctr > 0)
                 --linearctr;
-            if (!lenctrHalt[2])
+            if (lenctrHalt[2] == 0)
                 linctrflag = false;
         }
 
@@ -449,9 +478,9 @@ namespace AprNes
         {
             for (int i = 0; i < 4; ++i)
             {
-                if (envelopeStartFlag[i])
+                if (envelopeStartFlag[i] != 0)
                 {
-                    envelopeStartFlag[i] = false;
+                    envelopeStartFlag[i] = 0;
                     envelopePos[i]       = envelopeValue[i] + 1;
                     envelopeCounter[i]   = 15;
                 }
@@ -464,7 +493,7 @@ namespace AprNes
                     envelopePos[i] = envelopeValue[i] + 1;
                     if (envelopeCounter[i] > 0)
                         --envelopeCounter[i];
-                    else if (lenctrHalt[i] && envelopeCounter[i] <= 0)
+                    else if (lenctrHalt[i] != 0 && envelopeCounter[i] <= 0)
                         envelopeCounter[i] = 15;
                 }
             }
@@ -474,22 +503,22 @@ namespace AprNes
         {
             for (int i = 0; i < 2; ++i)
             {
-                sweepsilence[i] = false;
-                if (sweepreload[i])
+                sweepsilence[i] = 0;
+                if (sweepreload[i] != 0)
                 {
-                    sweepreload[i] = false;
+                    sweepreload[i] = 0;
                     sweeppos[i]    = sweepperiod[i];
                 }
                 ++sweeppos[i];
                 int rawperiod     = _pulsePeriod[i]; // 使用正確的週期值
                 int shiftedperiod = rawperiod >> sweepshift[i];
-                if (sweepnegate[i])
+                if (sweepnegate[i] != 0)
                     shiftedperiod = -shiftedperiod + i; // channel 2 加 1
                 shiftedperiod += rawperiod;
 
                 if (rawperiod < 8 || shiftedperiod > 0x7ff)
-                    sweepsilence[i] = true;
-                else if (sweepenable[i] && sweepshift[i] != 0 && lengthctr[i] > 0
+                    sweepsilence[i] = 1;
+                else if (sweepenable[i] != 0 && sweepshift[i] != 0 && lengthctr[i] > 0
                          && sweeppos[i] > sweepperiod[i])
                 {
                     sweeppos[i]      = 0;
@@ -701,19 +730,19 @@ namespace AprNes
         static void apu_4000(byte val)
         {
             _pulseDuty[0]       = (val >> 6) & 3;
-            lenctrHalt[0]       = (val & 0x20) != 0;
-            envConstVolume[0]   = (val & 0x10) != 0;
+            lenctrHalt[0]       = (byte)((val & 0x20) != 0 ? 1 : 0);
+            envConstVolume[0]   = (byte)((val & 0x10) != 0 ? 1 : 0);
             envelopeValue[0]    = val & 0x0F;
         }
         // $4001: Pulse 1 sweep
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void apu_4001(byte val)
         {
-            sweepenable[0] = (val & 0x80) != 0;
+            sweepenable[0] = (byte)((val & 0x80) != 0 ? 1 : 0);
             sweepperiod[0] = (val >> 4) & 7;
-            sweepnegate[0] = (val & 0x08) != 0;
+            sweepnegate[0] = (byte)((val & 0x08) != 0 ? 1 : 0);
             sweepshift[0]  = val & 7;
-            sweepreload[0] = true;
+            sweepreload[0] = 1;
         }
         // $4002: Pulse 1 timer low
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -727,28 +756,28 @@ namespace AprNes
             _pulsePeriod[0] = (_pulsePeriod[0] & 0xFF) | ((val & 7) << 8);
             _pulseTimer[0]  = _pulsePeriod[0];
             _pulseSeq[0]    = 0;
-            if (lenCtrEnable[0] && !(lengthClockThisCycle[0] && lengthctr[0] > 0))
+            if (lenCtrEnable[0] != 0 && !(lengthClockThisCycle[0] != 0 && lengthctr[0] > 0))
                 lengthctr[0] = lenctrload[(val >> 3) & 0x1F];
-            envelopeStartFlag[0] = true;
+            envelopeStartFlag[0] = 1;
         }
         // $4004: Pulse 2 duty/envelope
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void apu_4004(byte val)
         {
             _pulseDuty[1]     = (val >> 6) & 3;
-            lenctrHalt[1]     = (val & 0x20) != 0;
-            envConstVolume[1] = (val & 0x10) != 0;
+            lenctrHalt[1]     = (byte)((val & 0x20) != 0 ? 1 : 0);
+            envConstVolume[1] = (byte)((val & 0x10) != 0 ? 1 : 0);
             envelopeValue[1]  = val & 0x0F;
         }
         // $4005: Pulse 2 sweep
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void apu_4005(byte val)
         {
-            sweepenable[1] = (val & 0x80) != 0;
+            sweepenable[1] = (byte)((val & 0x80) != 0 ? 1 : 0);
             sweepperiod[1] = (val >> 4) & 7;
-            sweepnegate[1] = (val & 0x08) != 0;
+            sweepnegate[1] = (byte)((val & 0x08) != 0 ? 1 : 0);
             sweepshift[1]  = val & 7;
-            sweepreload[1] = true;
+            sweepreload[1] = 1;
         }
         // $4006: Pulse 2 timer low
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -762,15 +791,15 @@ namespace AprNes
             _pulsePeriod[1] = (_pulsePeriod[1] & 0xFF) | ((val & 7) << 8);
             _pulseTimer[1]  = _pulsePeriod[1];
             _pulseSeq[1]    = 0;
-            if (lenCtrEnable[1] && !(lengthClockThisCycle[1] && lengthctr[1] > 0))
+            if (lenCtrEnable[1] != 0 && !(lengthClockThisCycle[1] != 0 && lengthctr[1] > 0))
                 lengthctr[1] = lenctrload[(val >> 3) & 0x1F];
-            envelopeStartFlag[1] = true;
+            envelopeStartFlag[1] = 1;
         }
         // $4008: Triangle linear counter
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void apu_4008(byte val)
         {
-            lenctrHalt[2] = (val & 0x80) != 0;
+            lenctrHalt[2] = (byte)((val & 0x80) != 0 ? 1 : 0);
             linctrreload  = val & 0x7F;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -786,7 +815,7 @@ namespace AprNes
         {
             _triPeriod = (_triPeriod & 0xFF) | ((val & 7) << 8);
             _triTimer  = _triPeriod;
-            if (lenCtrEnable[2] && !(lengthClockThisCycle[2] && lengthctr[2] > 0))
+            if (lenCtrEnable[2] != 0 && !(lengthClockThisCycle[2] != 0 && lengthctr[2] > 0))
                 lengthctr[2] = lenctrload[(val >> 3) & 0x1F];
             linctrflag = true;
         }
@@ -794,8 +823,8 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void apu_400c(byte val)
         {
-            lenctrHalt[3]     = (val & 0x20) != 0;
-            envConstVolume[3] = (val & 0x10) != 0;
+            lenctrHalt[3]     = (byte)((val & 0x20) != 0 ? 1 : 0);
+            envConstVolume[3] = (byte)((val & 0x10) != 0 ? 1 : 0);
             envelopeValue[3]  = val & 0x0F;
         }
         // $400E: Noise mode + period
@@ -808,9 +837,9 @@ namespace AprNes
         // $400F: Noise length counter
         static void apu_400f(byte val)
         {
-            if (lenCtrEnable[3] && !(lengthClockThisCycle[3] && lengthctr[3] > 0))
+            if (lenCtrEnable[3] != 0 && !(lengthClockThisCycle[3] != 0 && lengthctr[3] > 0))
                 lengthctr[3] = lenctrload[(val >> 3) & 0x1F];
-            envelopeStartFlag[3] = true;
+            envelopeStartFlag[3] = 1;
         }
         // $4010: DMC flags + rate
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -842,16 +871,16 @@ namespace AprNes
         // $4015: 聲道啟用/停用
         static void apu_4015(byte val)
         {
-            lenCtrEnable[0] = (val & 0x01) != 0;
-            lenCtrEnable[1] = (val & 0x02) != 0;
-            lenCtrEnable[2] = (val & 0x04) != 0;
-            lenCtrEnable[3] = (val & 0x08) != 0;
+            lenCtrEnable[0] = (byte)((val & 0x01) != 0 ? 1 : 0);
+            lenCtrEnable[1] = (byte)((val & 0x02) != 0 ? 1 : 0);
+            lenCtrEnable[2] = (byte)((val & 0x04) != 0 ? 1 : 0);
+            lenCtrEnable[3] = (byte)((val & 0x08) != 0 ? 1 : 0);
             bool dmcEnable  = (val & 0x10) != 0;
 
-            if (!lenCtrEnable[0]) lengthctr[0] = 0;
-            if (!lenCtrEnable[1]) lengthctr[1] = 0;
-            if (!lenCtrEnable[2]) lengthctr[2] = 0;
-            if (!lenCtrEnable[3]) lengthctr[3] = 0;
+            if (lenCtrEnable[0] == 0) lengthctr[0] = 0;
+            if (lenCtrEnable[1] == 0) lengthctr[1] = 0;
+            if (lenCtrEnable[2] == 0) lengthctr[2] = 0;
+            if (lenCtrEnable[3] == 0) lengthctr[3] = 0;
 
             if (dmcEnable)
             {
