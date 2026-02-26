@@ -31,6 +31,7 @@ namespace AprNes
         {
             st.Restart();
             InitializeComponent();
+            NesCore.OnError = msg => MessageBox.Show(msg);
 
             if (Directory.Exists(Application.StartupPath + "/Background"))
                 background_pics = Directory.GetFiles(Application.StartupPath + "/Background").Where(s => s.ToLower().EndsWith(".jpg") || s.ToLower().EndsWith(".png")).ToList();
@@ -551,11 +552,6 @@ namespace AprNes
             _soundMenuItem.Text = NesCore.AudioEnabled ? LangINI.lang_table[AppConfigure["Lang"]]["SoundON"] : LangINI.lang_table[AppConfigure["Lang"]]["SoundOFF"];
         }
 
-        void VideoOutputDeal(object sender, EventArgs e)
-        {
-            RenderObj.Render();
-        }
-
         public string rom_file_name = "";
         public string nes_name = "";
 
@@ -613,7 +609,6 @@ namespace AprNes
 
             NesCore.SaveRam();
             NesCore.exit = false;
-            NesCore.LimitFPS = LimitFPS;
             NesCore.rom_file_name = rom_file_name;
 
             bool init_result = NesCore.init(rom_bytes);
@@ -635,13 +630,15 @@ namespace AprNes
                 MessageBox.Show("fail !");
                 return;
             }
+            _fpsDeadline = 0;
+            _fpsStopWatch.Restart();
+            if (NesCore.AudioEnabled) WaveOutPlayer.OpenAudio();
             nes_t = new Thread(NesCore.run);
             nes_t.IsBackground = true;
             nes_t.Start();
             fps_count_timer.Enabled = true;
             running = true;
         }
-
         int fps = 0;
         readonly Stopwatch _fpsSw = Stopwatch.StartNew();
         private void fps_count_timer_Tick(object sender, EventArgs e)
@@ -662,7 +659,7 @@ namespace AprNes
             app_running = false;
             NesCore.exit = true;
             NesCore.SaveRam();
-            NesCore.closeAudio();
+            WaveOutPlayer.CloseAudio();
             Thread.Sleep(10);
         }
 
@@ -720,6 +717,26 @@ namespace AprNes
         }
 
         bool LimitFPS = true;
+        const double NES_FRAME_SECONDS = 1.0 / 60.0988;
+        readonly Stopwatch _fpsStopWatch = new Stopwatch();
+        double _fpsDeadline = 0;
+
+        void VideoOutputDeal(object sender, EventArgs e)
+        {
+            RenderObj.Render();
+            if (LimitFPS)
+            {
+                if (!_fpsStopWatch.IsRunning) _fpsStopWatch.Restart();
+                double now = _fpsStopWatch.Elapsed.TotalSeconds;
+                if (_fpsDeadline < now)
+                    _fpsDeadline = now + NES_FRAME_SECONDS;
+                while (_fpsDeadline - _fpsStopWatch.Elapsed.TotalSeconds > 0.001)
+                    Thread.Sleep(1);
+                while (_fpsStopWatch.Elapsed.TotalSeconds < _fpsDeadline) { }
+                _fpsDeadline += NES_FRAME_SECONDS;
+            }
+        }
+
         private void label1_MouseEnter(object sender, EventArgs e)
         {
             this.Cursor = Cursors.Hand;
@@ -758,7 +775,6 @@ namespace AprNes
             if (!running) return;
 
             NesCore.SaveRam();
-            NesCore.LimitFPS = LimitFPS;
             NesCore.rom_file_name = rom_file_name;
 
             NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
@@ -787,11 +803,10 @@ namespace AprNes
             }
 
             NesCore.SaveRam();
-            NesCore.closeAudio();
+            WaveOutPlayer.CloseAudio();
 
             // 完整重新初始化（等同 power cycle）
             NesCore.exit = false;
-            NesCore.LimitFPS = LimitFPS;
             NesCore.rom_file_name = rom_file_name;
 
             bool init_result = NesCore.init(current_rom_bytes);
@@ -812,6 +827,9 @@ namespace AprNes
                 return;
             }
 
+            _fpsDeadline = 0;
+            _fpsStopWatch.Restart();
+            if (NesCore.AudioEnabled) WaveOutPlayer.OpenAudio();
             nes_t = new Thread(NesCore.run);
             nes_t.IsBackground = true;
             nes_t.Start();
@@ -826,9 +844,9 @@ namespace AprNes
         {
             NesCore.AudioEnabled = !NesCore.AudioEnabled;
             if (!NesCore.AudioEnabled)
-                NesCore.closeAudio();
+                WaveOutPlayer.CloseAudio();
             else if (running)
-                NesCore.openAudio();
+                WaveOutPlayer.OpenAudio();
             UpdateSoundMenuText();
             // 儲存設定到 ini
             AppConfigure["Sound"] = NesCore.AudioEnabled ? "1" : "0";

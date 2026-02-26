@@ -151,8 +151,8 @@ namespace AprNes
 
             // Headless init
             NesCore.HeadlessMode = true;
+            NesCore.OnError = msg => Console.Error.WriteLine("ERROR: " + msg);
             NesCore.AudioEnabled = false;
-            NesCore.LimitFPS = false;
             if (debugLog != null)
                 NesCore.DebugLogPath = debugLog;
             NesCore.dbgMaxConfig = debugMax;

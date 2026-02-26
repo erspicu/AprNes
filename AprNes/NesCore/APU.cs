@@ -1,85 +1,26 @@
 using System;
-using System.Runtime.InteropServices;
-using System.Threading;
 
 namespace AprNes
 {
     // =========================================================================
-    // NES APU - 使用 Windows WaveOut API (winmm.dll)，無需第三方套件
-    // 實作 Pulse1/2、Triangle、Noise、DMC 五個音效聲道
+    // NES APU — 實作 Pulse1/2、Triangle、Noise、DMC 五個音效聲道
+    // 音效樣本透過 AudioSampleReady callback 送出，由外部播放器（WaveOutPlayer）消費。
     // =========================================================================
     public partial class NesCore
     {
         // =====================================================================
-        // WaveOut API 宣告 (winmm.dll - 專案已引用)
+        // 音效樣本輸出介面 (由外部訂閱，例如 WaveOutPlayer)
         // =====================================================================
-        [StructLayout(LayoutKind.Sequential)]
-        struct WAVEFORMATEX
-        {
-            public ushort wFormatTag;
-            public ushort nChannels;
-            public uint   nSamplesPerSec;
-            public uint   nAvgBytesPerSec;
-            public ushort nBlockAlign;
-            public ushort wBitsPerSample;
-            public ushort cbSize;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        struct WAVEHDR
-        {
-            public IntPtr lpData;
-            public uint   dwBufferLength;
-            public uint   dwBytesRecorded;
-            public IntPtr dwUser;
-            public uint   dwFlags;
-            public uint   dwLoops;
-            public IntPtr lpNext;
-            public IntPtr reserved;
-        }
-
-        // 提升 Windows 計時器精度 → Thread.Sleep(1) 實際睡眠 ~1ms 而非預設 ~15ms
-        [DllImport("winmm.dll")] static extern int timeBeginPeriod(int uPeriod);
-        [DllImport("winmm.dll")] static extern int timeEndPeriod(int uPeriod);
-
-        [DllImport("winmm.dll")]
-        static extern int waveOutOpen(out IntPtr hwo, int devId, ref WAVEFORMATEX fmt,
-                                      IntPtr cb, IntPtr inst, int flags);
-        [DllImport("winmm.dll")]
-        static extern int waveOutPrepareHeader(IntPtr hwo, IntPtr hdr, int sz);
-        [DllImport("winmm.dll")]
-        static extern int waveOutWrite(IntPtr hwo, IntPtr hdr, int sz);
-        [DllImport("winmm.dll")]
-        static extern int waveOutUnprepareHeader(IntPtr hwo, IntPtr hdr, int sz);
-        [DllImport("winmm.dll")]
-        static extern int waveOutClose(IntPtr hwo);
-        [DllImport("winmm.dll")]
-        static extern int waveOutReset(IntPtr hwo);
-
-        const int  WAVE_MAPPER    = -1;
-        const int  WAVE_FORMAT_PCM = 1;
-        const int  CALLBACK_NULL  = 0;
-        const uint WHDR_DONE      = 0x00000001u;
-        const uint WHDR_INQUEUE   = 0x00000010u;
+        static public Action<short> AudioSampleReady;
 
         // =====================================================================
-        // 音效緩衝區設定
+        // APU 基本常數
         // =====================================================================
-        const int    APU_SAMPLE_RATE    = 44100;
-        const int    APU_BUFFER_SAMPLES = 735;     // ~1 frame @ 60fps
-        const int    APU_NUM_BUFFERS    = 4;       // 4 個緩衝區輪流使用
-        const double CPU_FREQ           = 1789773.0; // NTSC CPU 頻率
+        const int    APU_SAMPLE_RATE = 44100;
+        const double CPU_FREQ        = 1789773.0; // NTSC CPU 頻率
 
-        static IntPtr   _hWaveOut   = IntPtr.Zero;
-        static bool     _audioReady = false;
-        static short[][] _audioBufs = new short[APU_NUM_BUFFERS][];
-        static GCHandle[] _bufPins  = new GCHandle[APU_NUM_BUFFERS];
-        static GCHandle   _hdrPin;
-        static WAVEHDR[]  _waveHdrs = new WAVEHDR[APU_NUM_BUFFERS];
-        static int        _curBuf   = 0;
-        static int        _curPos   = 0;
-        static double     _sampleAccum = 0.0;
-        static double     _cycPerSample = CPU_FREQ / APU_SAMPLE_RATE; // ~40.58
+        static double _sampleAccum  = 0.0;
+        static double _cycPerSample = CPU_FREQ / APU_SAMPLE_RATE; // ~40.58
 
         // 音效開關與音量 (可由 UI 控制)
         static public bool AudioEnabled = true;
@@ -326,114 +267,6 @@ namespace AprNes
             // 初始化查找表
             SQUARELOOKUP = initSquareLookup();
             TNDLOOKUP    = initTndLookup();
-
-            // 啟動音效輸出
-            if (AudioEnabled)
-                openAudio();
-        }
-
-        // =====================================================================
-        // 開啟 WaveOut 音效輸出
-        // =====================================================================
-        static public void openAudio()
-        {
-            closeAudio();
-
-            WAVEFORMATEX fmt = new WAVEFORMATEX {
-                wFormatTag     = WAVE_FORMAT_PCM,
-                nChannels      = 1,
-                nSamplesPerSec = APU_SAMPLE_RATE,
-                wBitsPerSample = 16,
-                nBlockAlign    = 2,
-                nAvgBytesPerSec = APU_SAMPLE_RATE * 2,
-                cbSize         = 0
-            };
-
-            if (waveOutOpen(out _hWaveOut, WAVE_MAPPER, ref fmt,
-                            IntPtr.Zero, IntPtr.Zero, CALLBACK_NULL) != 0)
-            {
-                _audioReady = false;
-                return;
-            }
-
-            // 分配並 Pin 緩衝區
-            for (int i = 0; i < APU_NUM_BUFFERS; i++)
-            {
-                _audioBufs[i] = new short[APU_BUFFER_SAMPLES];
-                _bufPins[i]   = GCHandle.Alloc(_audioBufs[i], GCHandleType.Pinned);
-            }
-
-            // Pin WAVEHDR 陣列，讓 WaveOut 能持有其位址
-            _hdrPin   = GCHandle.Alloc(_waveHdrs, GCHandleType.Pinned);
-            int hdrSz = Marshal.SizeOf(typeof(WAVEHDR));
-
-            for (int i = 0; i < APU_NUM_BUFFERS; i++)
-            {
-                _waveHdrs[i] = new WAVEHDR {
-                    lpData        = _bufPins[i].AddrOfPinnedObject(),
-                    dwBufferLength = (uint)(APU_BUFFER_SAMPLES * 2),
-                    dwFlags       = 0
-                };
-                IntPtr ptr = Marshal.UnsafeAddrOfPinnedArrayElement(_waveHdrs, i);
-                waveOutPrepareHeader(_hWaveOut, ptr, hdrSz);
-            }
-
-            _curBuf = 0;
-            _curPos = 0;
-            _audioReady = true;
-        }
-
-        // =====================================================================
-        // 關閉 WaveOut 音效輸出 (可從外部呼叫)
-        // =====================================================================
-        static public void closeAudio()
-        {
-            if (_hWaveOut == IntPtr.Zero) return;
-            _audioReady = false;
-            waveOutReset(_hWaveOut);
-
-            int hdrSz = Marshal.SizeOf(typeof(WAVEHDR));
-            for (int i = 0; i < APU_NUM_BUFFERS; i++)
-            {
-                if (_hdrPin.IsAllocated)
-                {
-                    IntPtr ptr = Marshal.UnsafeAddrOfPinnedArrayElement(_waveHdrs, i);
-                    waveOutUnprepareHeader(_hWaveOut, ptr, hdrSz);
-                }
-                if (_bufPins[i].IsAllocated) _bufPins[i].Free();
-            }
-            if (_hdrPin.IsAllocated) _hdrPin.Free();
-
-            waveOutClose(_hWaveOut);
-            _hWaveOut = IntPtr.Zero;
-        }
-
-        // =====================================================================
-        // 提交已填滿的緩衝區給 WaveOut 播放
-        // =====================================================================
-        static void submitBuffer(int idx)
-        {
-            try
-            {
-                if (!_audioReady || _hWaveOut == IntPtr.Zero) return;
-
-                int hdrSz = Marshal.SizeOf(typeof(WAVEHDR));
-                IntPtr ptr = Marshal.UnsafeAddrOfPinnedArrayElement(_waveHdrs, idx);
-
-                // 等待此緩衝區播放完畢 (最多等 50ms)
-                int waited = 0;
-                while ((_waveHdrs[idx].dwFlags & WHDR_INQUEUE) != 0)
-                {
-                    Thread.Sleep(1);
-                    if (++waited > 50) return; // 超時就放棄此 frame
-                }
-
-                waveOutUnprepareHeader(_hWaveOut, ptr, hdrSz);
-                _waveHdrs[idx].dwFlags = 0;
-                waveOutPrepareHeader(_hWaveOut, ptr, hdrSz);
-                waveOutWrite(_hWaveOut, ptr, hdrSz);
-            }
-            catch (Exception) { }
         }
 
         // =====================================================================
@@ -521,13 +354,12 @@ namespace AprNes
         }
 
         // =====================================================================
-        // 混音並寫入緩衝區
+        // 混音並送出樣本
         // =====================================================================
         static void generateSample()
         {
-            if (!_audioReady || !AudioEnabled) return;
+            if (!AudioEnabled) return;
 
-            // 更新 volume (由 frame counter 在 setvolumes() 控制)
             // Pulse 混音 (非線性查找表)
             int sqIdx = volume[0] * _pulseOut[0] + volume[1] * _pulseOut[1];
             if (sqIdx >= SQUARELOOKUP.Length) sqIdx = SQUARELOOKUP.Length - 1;
@@ -548,14 +380,7 @@ namespace AprNes
             if (clamped >  32767) clamped =  32767;
             if (clamped < -32768) clamped = -32768;
 
-            _audioBufs[_curBuf][_curPos++] = (short)clamped;
-
-            if (_curPos >= APU_BUFFER_SAMPLES)
-            {
-                _curPos = 0;
-                submitBuffer(_curBuf);
-                _curBuf = (_curBuf + 1) % APU_NUM_BUFFERS;
-            }
+            AudioSampleReady?.Invoke((short)clamped);
         }
 
         // =====================================================================

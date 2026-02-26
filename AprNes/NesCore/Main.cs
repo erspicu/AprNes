@@ -1,10 +1,6 @@
 ﻿//#define debug
 using System;
-using System.Drawing;
-using System.Windows.Forms;
 using System.IO;
-using WINAPIGDI;
-using XBRz_speed;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Reflection;
@@ -44,12 +40,11 @@ namespace AprNes
 
         static public ManualResetEvent _event = new ManualResetEvent(true);
 
+        static public Action<string> OnError;
+
         static public void ShowError(string msg)
         {
-            if (HeadlessMode)
-                Console.Error.WriteLine("ERROR: " + msg);
-            else
-                MessageBox.Show(msg);
+            OnError?.Invoke(msg);
         }
 
         static public bool init(byte[] rom_bytes) //for Hard Reset effect
@@ -250,9 +245,6 @@ namespace AprNes
         }
         static public void run()
         {
-            timeBeginPeriod(1); // 設定 1ms 計時器精度，確保 Thread.Sleep(1) 準確
-            StopWatch.Restart();
-            _fpsDeadline = 0;   // 重置 deadline，避免舊值殘留影響新 session
             bool nmi_just_deferred = false;
             while (!exit)
             {
@@ -297,7 +289,6 @@ namespace AprNes
                     irq_pending = (irqPollI == 0 && irqLinePrev);
                 }
             }
-            timeEndPeriod(1);
             Console.WriteLine("exit..");
         }
 

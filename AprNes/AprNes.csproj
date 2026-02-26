@@ -115,6 +115,7 @@
     <Compile Include="NesCore\PPU.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="TestRunner.cs" />
+    <Compile Include="WaveOutPlayer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="UI\AprNes_RomInfoUI.cs">
       <SubType>Form</SubType>
