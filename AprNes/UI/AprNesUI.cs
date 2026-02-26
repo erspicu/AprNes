@@ -37,6 +37,9 @@ namespace AprNes
                 background_pics = Directory.GetFiles(Application.StartupPath + "/Background").Where(s => s.ToLower().EndsWith(".jpg") || s.ToLower().EndsWith(".png")).ToList();
 
             LangINI.init();
+            if (LangINI.LangFileMissing)
+                MessageBox.Show("AprNesLang.ini not found.\nUI will use default text.",
+                                "Language file missing", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             LoadConfig();
             initUILang();
             grfx = panel1.CreateGraphics();
@@ -548,8 +551,11 @@ namespace AprNes
 
         void UpdateSoundMenuText()
         {
-            if (_soundMenuItem == null) return;
-            _soundMenuItem.Text = NesCore.AudioEnabled ? LangINI.lang_table[AppConfigure["Lang"]]["SoundON"] : LangINI.lang_table[AppConfigure["Lang"]]["SoundOFF"];
+            if (_soundMenuItem == null || !LangINI.LangLoadOK) return;
+            string lang = AppConfigure["Lang"];
+            _soundMenuItem.Text = NesCore.AudioEnabled
+                ? LangINI.Get(lang, "SoundON",  "Sound ON")
+                : LangINI.Get(lang, "SoundOFF", "Sound OFF");
         }
 
         public string rom_file_name = "";
