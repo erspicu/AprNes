@@ -16,6 +16,10 @@ namespace NativeTools
         [DllImport("winmm.dll")]
         public static extern int joyGetDevCaps(IntPtr uJoyID, ref JOYCAPS pjc, int cbjc);
 
+        // XInput — Xbox 手把支援 (xinput1_4.dll, Windows 8+)
+        [DllImport("xinput1_4.dll")]
+        public static extern uint XInputGetState(uint dwUserIndex, ref XINPUT_STATE pState);
+
 
         //for rendering native api
         [DllImport("gdi32.dll", EntryPoint = "SelectObject")]
@@ -135,6 +139,26 @@ namespace NativeTools
         public int Button_old;
         public int Way_X_old;
         public int Way_Y_old;
+    }
+
+    // XInput structs
+    [StructLayout(LayoutKind.Explicit)]
+    public struct XINPUT_GAMEPAD
+    {
+        [FieldOffset(0)]  public ushort wButtons;
+        [FieldOffset(2)]  public byte   bLeftTrigger;
+        [FieldOffset(3)]  public byte   bRightTrigger;
+        [FieldOffset(4)]  public short  sThumbLX;
+        [FieldOffset(6)]  public short  sThumbLY;
+        [FieldOffset(8)]  public short  sThumbRX;
+        [FieldOffset(10)] public short  sThumbRY;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct XINPUT_STATE
+    {
+        public uint          dwPacketNumber;
+        public XINPUT_GAMEPAD Gamepad;
     }
 
     public struct joystickEvent
