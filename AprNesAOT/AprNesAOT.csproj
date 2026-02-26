@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <PublishAot>true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <TrimmerRootDescriptor>AprNesAOT.xml</TrimmerRootDescriptor>
+    <AssemblyName>AprNesAOT</AssemblyName>
+    <RootNamespace>AprNes</RootNamespace>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+
+  <!-- INI 設定與語系檔：複製到輸出目錄 -->
+  <ItemGroup>
+    <Content Include="AprNesLang.ini">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="AprNes.ini">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- 共享 NesCore 源碼 -->
+  <ItemGroup>
+    <Compile Include="..\AprNes\NesCore\APU.cs" />
+    <Compile Include="..\AprNes\NesCore\CPU.cs" />
+    <Compile Include="..\AprNes\NesCore\PPU.cs" />
+    <Compile Include="..\AprNes\NesCore\MEM.cs" />
+    <Compile Include="..\AprNes\NesCore\IO.cs" />
+    <Compile Include="..\AprNes\NesCore\JoyPad.cs" />
+    <Compile Include="..\AprNes\NesCore\Main.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\IMapper.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\Mapper000.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\Mapper001.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\Mapper002.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\Mapper003.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\Mapper004.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\Mapper004RevA.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\Mapper004MMC6.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\Mapper005.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\Mapper007.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\Mapper011.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\Mapper066.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\Mapper071.cs" />
+    <!-- tool: P/Invoke 工具，AOT 相容 -->
+    <Compile Include="..\AprNes\tool\WaveOutPlayer.cs" />
+    <Compile Include="..\AprNes\tool\NativeAPIShare.cs" />
+    <Compile Include="..\AprNes\tool\joystick.cs" />
+    <Compile Include="..\AprNes\tool\LangINI.cs" />
+  </ItemGroup>
+</Project>
