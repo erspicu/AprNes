@@ -117,12 +117,16 @@ namespace NativeTools
                         event_list.Add(new joystickEvent(1, id, b + 1, 0, 0, 0));
                 }
 
-                // Main X/Y axes
-                int xNow = state.lX, xPrev = prev.lX;
-                int yNow = state.lY, yPrev = prev.lY;
-                if (xPrev != xNow || xNow != 32767)
+                // Main X/Y axes — normalize near-center noise to exact 32767
+                const int AXIS_CENTER = 32767;
+                const int AXIS_NOISE  = 256; // suppress hardware jitter at rest
+                int xNow  = (Math.Abs(state.lX - AXIS_CENTER) < AXIS_NOISE) ? AXIS_CENTER : state.lX;
+                int yNow  = (Math.Abs(state.lY - AXIS_CENTER) < AXIS_NOISE) ? AXIS_CENTER : state.lY;
+                int xPrev = (Math.Abs(prev.lX  - AXIS_CENTER) < AXIS_NOISE) ? AXIS_CENTER : prev.lX;
+                int yPrev = (Math.Abs(prev.lY  - AXIS_CENTER) < AXIS_NOISE) ? AXIS_CENTER : prev.lY;
+                if (xPrev != xNow || xNow != AXIS_CENTER)
                     event_list.Add(new joystickEvent(0, id, 0, 0, 0, xNow));
-                if (yPrev != yNow || yNow != 32767)
+                if (yPrev != yNow || yNow != AXIS_CENTER)
                     event_list.Add(new joystickEvent(0, id, 0, 0, 1, yNow));
 
                 // POV hat → X/Y events (only when main axes are neutral)

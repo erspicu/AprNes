@@ -170,6 +170,19 @@ namespace AprNes
             Close();
         }
 
+        // Returns the event_type the currently focused joypad control expects:
+        //   1 = button (A/B/Start/Select), 0 = axis (UP/DOWN/LEFT/RIGHT), -1 = none
+        public int ExpectedJoyInputType()
+        {
+            if (joypad_A.Focused || joypad_B.Focused ||
+                joypad_START.Focused || joypad_SELECT.Focused)
+                return 1;
+            if (joypad_UP.Focused || joypad_DOWN.Focused ||
+                joypad_LEFT.Focused || joypad_RIGHT.Focused)
+                return 0;
+            return -1;
+        }
+
         public void Setup_JoyPad_define(string uid, string btn_name, int raw_id, int value)
         {
 

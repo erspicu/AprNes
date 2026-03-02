@@ -361,20 +361,29 @@ namespace AprNes
                     //for configure
                     if (configure)
                     {
-
+                        bool handled = false;
                         AprNesUI.GetInstance().Invoke(new MethodInvoker(() =>
-                         {
-                             if (joy_event.event_type == 0) //方向鍵觸發
-                             {
-                                 if (joy_event.way_type == 0)
-                                     AprNes_ConfigureUI.GetInstance().Setup_JoyPad_define(joy_event.joystick_id.ToString(), "X", 0, joy_event.way_value);
-                                 else
-                                     AprNes_ConfigureUI.GetInstance().Setup_JoyPad_define(joy_event.joystick_id.ToString(), "Y", 0, joy_event.way_value);
-                             }
-                             else //一般按鈕觸發                             
-                                 AprNes_ConfigureUI.GetInstance().Setup_JoyPad_define(joy_event.joystick_id.ToString(), "Button " + joy_event.button_id.ToString(), joy_event.button_id, 128);
-                         }));
-                        break;
+                        {
+                            var cfg = AprNes_ConfigureUI.GetInstance();
+                            if (cfg == null) return;
+                            int expectedType = cfg.ExpectedJoyInputType();
+                            if (expectedType == -1) return;               // no control focused
+                            if (joy_event.event_type != expectedType) return; // wrong type, skip silently
+
+                            if (joy_event.event_type == 0) //方向鍵觸發
+                            {
+                                if (joy_event.way_type == 0)
+                                    cfg.Setup_JoyPad_define(joy_event.joystick_id.ToString(), "X", 0, joy_event.way_value);
+                                else
+                                    cfg.Setup_JoyPad_define(joy_event.joystick_id.ToString(), "Y", 0, joy_event.way_value);
+                            }
+                            else //一般按鈕觸發
+                                cfg.Setup_JoyPad_define(joy_event.joystick_id.ToString(), "Button " + joy_event.button_id.ToString(), joy_event.button_id, 128);
+
+                            handled = true;
+                        }));
+                        if (handled) break;
+                        continue;
                     }
 
                     //for gaming..
