@@ -12,6 +12,7 @@ namespace AprNes
         public AprNes_ConfigureUI()
         {
             InitializeComponent();
+            RegisterJoyActivation();
             init();
         }
 
@@ -50,6 +51,20 @@ namespace AprNes
             if (instance == null || instance.IsDisposed)
                 instance = new AprNes_ConfigureUI();
             return instance;
+        }
+
+        // Track which joypad TextBox the user last clicked/entered, instead of relying on .Focused
+        // (which is unreliable across threads / modal dialog Invoke).
+        TextBox _activeJoyControl = null;
+        void RegisterJoyActivation()
+        {
+            foreach (TextBox tb in new[] { joypad_A, joypad_B, joypad_START, joypad_SELECT,
+                                           joypad_UP, joypad_DOWN, joypad_LEFT, joypad_RIGHT })
+            {
+                TextBox captured = tb;
+                captured.Click += (s, e) => _activeJoyControl = captured;
+                captured.Enter += (s, e) => _activeJoyControl = captured;
+            }
         }
 
         void UpdateSoundUI()
@@ -170,26 +185,27 @@ namespace AprNes
             Close();
         }
 
-        // Returns the event_type the currently focused joypad control expects:
+        // Returns the event_type the currently active joypad control expects:
         //   1  = button only (A/B/Start/Select)
         //   2  = axis OR button (UP/DOWN/LEFT/RIGHT — D-pad may fire as either)
-        //  -1  = nothing focused
+        //  -1  = nothing active
         public int ExpectedJoyInputType()
         {
-            if (joypad_A.Focused || joypad_B.Focused ||
-                joypad_START.Focused || joypad_SELECT.Focused)
+            if (_activeJoyControl == joypad_A || _activeJoyControl == joypad_B ||
+                _activeJoyControl == joypad_START || _activeJoyControl == joypad_SELECT)
                 return 1;
-            if (joypad_UP.Focused || joypad_DOWN.Focused ||
-                joypad_LEFT.Focused || joypad_RIGHT.Focused)
+            if (_activeJoyControl == joypad_UP || _activeJoyControl == joypad_DOWN ||
+                _activeJoyControl == joypad_LEFT || _activeJoyControl == joypad_RIGHT)
                 return 2;
             return -1;
         }
 
         public void Setup_JoyPad_define(string uid, string btn_name, int raw_id, int value)
         {
+            TextBox target = _activeJoyControl;
+            if (target == null) return;
 
-
-            if (joypad_A.Focused)
+            if (target == joypad_A)
             {
                 if (value != 128) return;
                 if (!btn_name.StartsWith("Button"))
@@ -208,7 +224,7 @@ namespace AprNes
                 NES_KeyMAP_joypad_config[uid + "," + btn_name + "," + raw_id] = AprNesUI.KeyMap.NES_btn_A;
 
             }
-            else if (joypad_B.Focused)
+            else if (target == joypad_B)
             {
                 if (!btn_name.StartsWith("Button"))
                 {
@@ -226,7 +242,7 @@ namespace AprNes
 
                 NES_KeyMAP_joypad_config[uid + "," + btn_name + "," + raw_id] = AprNesUI.KeyMap.NES_btn_B;
             }
-            else if (joypad_START.Focused)
+            else if (target == joypad_START)
             {
                 if (!btn_name.StartsWith("Button"))
                 {
@@ -244,7 +260,7 @@ namespace AprNes
 
                 NES_KeyMAP_joypad_config[uid + "," + btn_name + "," + raw_id] = AprNesUI.KeyMap.NES_btn_START;
             }
-            else if (joypad_SELECT.Focused)
+            else if (target == joypad_SELECT)
             {
 
                 if (!btn_name.StartsWith("Button"))
@@ -263,7 +279,7 @@ namespace AprNes
 
                 NES_KeyMAP_joypad_config[uid + "," + btn_name + "," + raw_id] = AprNesUI.KeyMap.NES_btn_SELECT;
             }
-            else if (joypad_UP.Focused)
+            else if (target == joypad_UP)
             {
                 if (btn_name.StartsWith("Button"))
                 {
@@ -283,7 +299,7 @@ namespace AprNes
                     NES_KeyMAP_joypad_config.Remove(NES_KeyMAP_joypad_config.FirstOrDefault(x => x.Value == AprNesUI.KeyMap.NES_btn_UP).Key);
                 NES_KeyMAP_joypad_config[uid + "," + joypad_UP.Text + "," + raw_id + "," + value] = AprNesUI.KeyMap.NES_btn_UP;
             }
-            else if (joypad_DOWN.Focused)
+            else if (target == joypad_DOWN)
             {
                 if (btn_name.StartsWith("Button"))
                 {
@@ -303,7 +319,7 @@ namespace AprNes
                     NES_KeyMAP_joypad_config.Remove(NES_KeyMAP_joypad_config.FirstOrDefault(x => x.Value == AprNesUI.KeyMap.NES_btn_DOWN).Key);
                 NES_KeyMAP_joypad_config[uid + "," + joypad_DOWN.Text + "," + raw_id + "," + value] = AprNesUI.KeyMap.NES_btn_DOWN;
             }
-            else if (joypad_LEFT.Focused)
+            else if (target == joypad_LEFT)
             {
                 if (btn_name.StartsWith("Button"))
                 {
@@ -323,7 +339,7 @@ namespace AprNes
                     NES_KeyMAP_joypad_config.Remove(NES_KeyMAP_joypad_config.FirstOrDefault(x => x.Value == AprNesUI.KeyMap.NES_btn_LEFT).Key);
                 NES_KeyMAP_joypad_config[uid + "," + joypad_LEFT.Text + "," + raw_id + "," + value] = AprNesUI.KeyMap.NES_btn_LEFT;
             }
-            else if (joypad_RIGHT.Focused)
+            else if (target == joypad_RIGHT)
             {
                 if (btn_name.StartsWith("Button"))
                 {
@@ -370,7 +386,7 @@ namespace AprNes
         Dictionary<string, AprNesUI.KeyMap> NES_KeyMAP_joypad_config = new Dictionary<string, AprNesUI.KeyMap>();
         private void GBEMU_ConfigureUI_Shown(object sender, EventArgs e)
         {
-
+            _activeJoyControl = null;
             NES_KeyMAP_joypad_config.Clear();
             foreach (string key in AprNesUI.GetInstance().NES_KeyMAP_joypad.Keys)
                 NES_KeyMAP_joypad_config[key] = AprNesUI.GetInstance().NES_KeyMAP_joypad[key];
