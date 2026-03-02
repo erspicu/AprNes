@@ -10,12 +10,12 @@ namespace NativeTools
         // DirectInput devices (non-XInput game controllers)
         struct DiDevice
         {
-            public int                  ID;
-            public IDirectInputDevice8W Device;
-            public DIJOYSTATE           PrevState;
+            public int       ID;
+            public IntPtr    Device;
+            public DIJOYSTATE PrevState;
         }
         List<DiDevice> _diDevices = new List<DiDevice>();
-        IDirectInput8W _di;
+        IntPtr _di;
 
         public int PeriodMin = 10; // ms between polls
 
@@ -42,9 +42,8 @@ namespace NativeTools
                 _di = DirectInputNative.CreateDirectInput();
                 foreach (DiDeviceInfo info in DirectInputNative.EnumJoysticks(_di))
                 {
-                    IDirectInputDevice8W dev =
-                        DirectInputNative.OpenDevice(_di, info.GuidInstance, hwnd);
-                    if (dev == null) continue;
+                    IntPtr dev = DirectInputNative.OpenDevice(_di, info.GuidInstance, hwnd);
+                    if (dev == IntPtr.Zero) continue;
                     _diDevices.Add(new DiDevice
                     {
                         ID        = nextId++,

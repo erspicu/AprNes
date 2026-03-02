@@ -6,10 +6,9 @@ using System.Text;
 namespace NativeTools
 {
     // ──────────────────────────────────────────────────────────────────────────
-    // Structs
+    // Native structs
     // ──────────────────────────────────────────────────────────────────────────
 
-    // Minimal prefix of DIDEVICEINSTANCEW — only the fields we need
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     struct DIDEVICEINSTANCE_MIN
     {
@@ -21,7 +20,7 @@ namespace NativeTools
         public string tszInstanceName;
     }
 
-    // DIJOYSTATE — 80 bytes, matches native layout exactly
+    // DIJOYSTATE — 80 bytes
     [StructLayout(LayoutKind.Sequential)]
     struct DIJOYSTATE
     {
@@ -49,8 +48,7 @@ namespace NativeTools
         public int lMax;
     }
 
-    // Explicit layout with fixed Size to guarantee native-matching size on x64:
-    //   IntPtr(8) + 3×uint(12) + 4-byte trailing pad = 24 bytes
+    // x64: 8+4+4+4 = 20, pad to 24
     [StructLayout(LayoutKind.Explicit, Size = 24)]
     struct DIOBJECTDATAFORMAT
     {
@@ -60,7 +58,7 @@ namespace NativeTools
         [FieldOffset(16)] public uint   dwFlags;
     }
 
-    // 5×uint(20) + 4-byte pad + IntPtr(8) = 32 bytes
+    // x64: 4+4+4+4+4 = 20, pad to 24, then IntPtr at 24 → size 32
     [StructLayout(LayoutKind.Explicit, Size = 32)]
     struct DIDATAFORMAT
     {
@@ -75,68 +73,14 @@ namespace NativeTools
     [StructLayout(LayoutKind.Sequential)]
     struct SP_DEVINFO_DATA
     {
-        public uint    cbSize;
-        public Guid    ClassGuid;
-        public uint    DevInst;
-        public IntPtr  Reserved;
+        public uint   cbSize;
+        public Guid   ClassGuid;
+        public uint   DevInst;
+        public IntPtr Reserved;
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // COM interfaces
-    // ──────────────────────────────────────────────────────────────────────────
-
-    delegate int DIEnumDevicesCallback(IntPtr lpddi, IntPtr pvRef);
-
-    [ComImport]
-    [Guid("BF798031-483A-4DA2-AA99-5D64ED369700")]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    interface IDirectInput8W
-    {
-        [PreserveSig] int CreateDevice(ref Guid rguid,
-            [MarshalAs(UnmanagedType.Interface)] out IDirectInputDevice8W device, IntPtr outer);
-        [PreserveSig] int EnumDevices(uint devType, DIEnumDevicesCallback callback,
-            IntPtr pvRef, uint flags);
-        [PreserveSig] int GetDeviceStatus(ref Guid guidInstance);
-        [PreserveSig] int RunControlPanel(IntPtr hwnd, uint flags);
-        [PreserveSig] int Initialize(IntPtr hinst, uint version);
-        [PreserveSig] int FindDevice(ref Guid guidClass,
-            [MarshalAs(UnmanagedType.LPWStr)] string name, out Guid guidOut);
-        [PreserveSig] int _stub_EnumDevicesBySemantics(IntPtr a, IntPtr b, IntPtr c, IntPtr d, uint e);
-        [PreserveSig] int _stub_ConfigureDevices(IntPtr a, IntPtr b, uint c, IntPtr d);
-    }
-
-    [ComImport]
-    [Guid("54D41081-DC15-4833-A41B-748F73A38179")]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    interface IDirectInputDevice8W
-    {
-        [PreserveSig] int GetCapabilities(IntPtr lpDIDevCaps);
-        [PreserveSig] int EnumObjects(IntPtr lpCallback, IntPtr pvRef, uint dwFlags);
-        [PreserveSig] int GetProperty(IntPtr rguidProp, IntPtr pdiph);
-        [PreserveSig] int SetProperty(IntPtr rguidProp, IntPtr pdiph);
-        [PreserveSig] int Acquire();
-        [PreserveSig] int Unacquire();
-        [PreserveSig] int GetDeviceState(uint cbData, IntPtr lpvData);
-        [PreserveSig] int GetDeviceData(uint cbObjectData, IntPtr rgdod, ref uint pdwInOut, uint dwFlags);
-        [PreserveSig] int SetDataFormat(IntPtr lpdf);
-        [PreserveSig] int SetEventNotification(IntPtr hEvent);
-        [PreserveSig] int SetCooperativeLevel(IntPtr hwnd, uint dwFlags);
-        [PreserveSig] int GetObjectInfo(IntPtr pdidoi, uint dwObj, uint dwHow);
-        [PreserveSig] int GetDeviceInfo(IntPtr pdidi);
-        [PreserveSig] int RunControlPanel(IntPtr hwnd, uint dwFlags);
-        [PreserveSig] int Initialize(IntPtr hinst, uint dwVersion, ref Guid rguid);
-        [PreserveSig] int _stub_CreateEffect(IntPtr a, IntPtr b, IntPtr c, IntPtr d);
-        [PreserveSig] int _stub_EnumEffects(IntPtr a, IntPtr b, uint c);
-        [PreserveSig] int _stub_GetEffectInfo(IntPtr a, IntPtr b);
-        [PreserveSig] int _stub_GetForceFeedbackState(IntPtr a);
-        [PreserveSig] int _stub_SendForceFeedbackCommand(uint a);
-        [PreserveSig] int _stub_EnumCreatedEffectObjects(IntPtr a, IntPtr b, uint c);
-        [PreserveSig] int _stub_Escape(IntPtr a);
-        [PreserveSig] int Poll();
-    }
-
-    // ──────────────────────────────────────────────────────────────────────────
-    // Helper info struct (avoids C# 7 value tuples)
+    // Helper info struct
     // ──────────────────────────────────────────────────────────────────────────
     struct DiDeviceInfo
     {
@@ -146,7 +90,64 @@ namespace NativeTools
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // DirectInput operations
+    // Vtable slot indices
+    // IDirectInput8W vtable (IUnknown: QI=0 AddRef=1 Release=2 then DI methods)
+    // IDirectInputDevice8W vtable (same IUnknown prefix)
+    // ──────────────────────────────────────────────────────────────────────────
+    static class DI8Slot
+    {
+        public const int Release      = 2;
+        public const int CreateDevice = 3;
+        public const int EnumDevices  = 4;
+    }
+
+    static class DI8DevSlot
+    {
+        public const int Release             = 2;
+        public const int SetProperty         = 6;
+        public const int Acquire             = 7;
+        public const int GetDeviceState      = 9;
+        public const int SetDataFormat       = 11;
+        public const int SetCooperativeLevel = 13;
+        public const int Poll                = 25;
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Vtable delegate types — CallingConvention.StdCall for COM
+    // ──────────────────────────────────────────────────────────────────────────
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    delegate uint   VtReleaseFn(IntPtr self);
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    delegate int    VtDI8CreateDeviceFn(IntPtr self, ref Guid rguid, out IntPtr ppDevice, IntPtr punkOuter);
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    delegate int    VtDI8EnumDevicesFn(IntPtr self, uint devType, IntPtr callback, IntPtr pvRef, uint flags);
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    delegate int    VtDI8DevSetDataFormatFn(IntPtr self, IntPtr lpdf);
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    delegate int    VtDI8DevSetCoopLevelFn(IntPtr self, IntPtr hwnd, uint flags);
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    delegate int    VtDI8DevSetPropertyFn(IntPtr self, IntPtr rguidProp, IntPtr pdiph);
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    delegate int    VtDI8DevAcquireFn(IntPtr self);
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    delegate int    VtDI8DevPollFn(IntPtr self);
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    delegate int    VtDI8DevGetStateFn(IntPtr self, uint cbData, IntPtr lpvData);
+
+    // Callback passed to EnumDevices (must be stdcall; return 1=continue, 0=stop)
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    delegate int    DiEnumDevicesNativeCb(IntPtr lpddi, IntPtr pvRef);
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Raw vtable COM dispatch helpers
     // ──────────────────────────────────────────────────────────────────────────
     static class DirectInputNative
     {
@@ -161,7 +162,10 @@ namespace NativeTools
 
         [DllImport("dinput8.dll")]
         static extern int DirectInput8Create(IntPtr hinst, uint dwVersion, ref Guid riidltf,
-            [MarshalAs(UnmanagedType.Interface)] out IDirectInput8W ppvOut, IntPtr punkOuter);
+            out IntPtr ppvOut, IntPtr punkOuter);
+
+        [DllImport("kernel32.dll")]
+        static extern IntPtr GetModuleHandle(string moduleName);
 
         [DllImport("setupapi.dll", CharSet = CharSet.Auto, SetLastError = true)]
         static extern IntPtr SetupDiGetClassDevs(IntPtr classGuid, string enumerator,
@@ -179,100 +183,118 @@ namespace NativeTools
         [DllImport("setupapi.dll", SetLastError = true)]
         static extern bool SetupDiDestroyDeviceInfoList(IntPtr devInfoSet);
 
-        [DllImport("kernel32.dll")]
-        static extern IntPtr GetModuleHandle(string moduleName);
+        // Read vtable slot and return a callable delegate
+        static T GetVtMethod<T>(IntPtr comPtr, int slot) where T : class
+        {
+            IntPtr vtable = Marshal.ReadIntPtr(comPtr);
+            IntPtr fnPtr  = Marshal.ReadIntPtr(vtable, slot * IntPtr.Size);
+            return Marshal.GetDelegateForFunctionPointer(fnPtr, typeof(T)) as T;
+        }
 
-        // Returns a set of (PID<<16|VID) values for XInput devices (identified by "IG_" in path)
+        // Build set of (PID<<16|VID) for XInput devices (contain "IG_" in HID path)
         static HashSet<uint> GetXInputVidPids()
         {
-            var result = new HashSet<uint>();
-            IntPtr hDevInfo = SetupDiGetClassDevs(IntPtr.Zero, "HID", IntPtr.Zero,
+            var result  = new HashSet<uint>();
+            IntPtr hDev = SetupDiGetClassDevs(IntPtr.Zero, "HID", IntPtr.Zero,
                 0x00000002u | 0x00000004u); // DIGCF_PRESENT | DIGCF_ALLCLASSES
-            if (hDevInfo == new IntPtr(-1)) return result;
+            if (hDev == new IntPtr(-1)) return result;
             try
             {
-                SP_DEVINFO_DATA devInfo = new SP_DEVINFO_DATA();
-                devInfo.cbSize = (uint)Marshal.SizeOf(typeof(SP_DEVINFO_DATA));
-                for (uint idx = 0; SetupDiEnumDeviceInfo(hDevInfo, idx, ref devInfo); idx++)
+                SP_DEVINFO_DATA d = new SP_DEVINFO_DATA();
+                d.cbSize = (uint)Marshal.SizeOf(typeof(SP_DEVINFO_DATA));
+                for (uint i = 0; SetupDiEnumDeviceInfo(hDev, i, ref d); i++)
                 {
                     StringBuilder sb = new StringBuilder(512);
-                    uint reqSize;
-                    if (!SetupDiGetDeviceInstanceId(hDevInfo, ref devInfo, sb,
-                            (uint)sb.Capacity, out reqSize)) continue;
+                    uint req;
+                    if (!SetupDiGetDeviceInstanceId(hDev, ref d, sb, (uint)sb.Capacity, out req))
+                        continue;
                     string path = sb.ToString().ToUpperInvariant();
                     if (!path.Contains("IG_")) continue;
-                    int vidIdx = path.IndexOf("VID_");
-                    int pidIdx = path.IndexOf("PID_");
-                    if (vidIdx < 0 || pidIdx < 0) continue;
+                    int vi = path.IndexOf("VID_"), pi = path.IndexOf("PID_");
+                    if (vi < 0 || pi < 0) continue;
                     uint vid, pid;
-                    if (!uint.TryParse(path.Substring(vidIdx + 4, 4),
+                    if (!uint.TryParse(path.Substring(vi + 4, 4),
                             System.Globalization.NumberStyles.HexNumber, null, out vid)) continue;
-                    if (!uint.TryParse(path.Substring(pidIdx + 4, 4),
+                    if (!uint.TryParse(path.Substring(pi + 4, 4),
                             System.Globalization.NumberStyles.HexNumber, null, out pid)) continue;
                     result.Add((pid << 16) | vid);
                 }
             }
-            finally { SetupDiDestroyDeviceInfoList(hDevInfo); }
+            finally { SetupDiDestroyDeviceInfoList(hDev); }
             return result;
         }
 
-        public static IDirectInput8W CreateDirectInput()
+        // ── Public API ───────────────────────────────────────────────────────
+
+        public static IntPtr CreateDirectInput()
         {
             IntPtr hinst = GetModuleHandle(null);
-            Guid iid = IID_IDirectInput8W;
-            IDirectInput8W di;
-            int hr = DirectInput8Create(hinst, 0x0800, ref iid, out di, IntPtr.Zero);
-            if (hr != 0) throw new COMException("DirectInput8Create failed", hr);
-            return di;
+            Guid   iid   = IID_IDirectInput8W;
+            IntPtr pDI;
+            int hr = DirectInput8Create(hinst, 0x0800, ref iid, out pDI, IntPtr.Zero);
+            if (hr != 0 || pDI == IntPtr.Zero)
+                throw new Exception("DirectInput8Create failed: 0x" + hr.ToString("X8"));
+            return pDI;
         }
 
-        // Enumerate non-XInput game controllers
-        public static List<DiDeviceInfo> EnumJoysticks(IDirectInput8W di)
+        public static List<DiDeviceInfo> EnumJoysticks(IntPtr pDI)
         {
-            HashSet<uint> xInputVidPids = GetXInputVidPids();
-            List<DiDeviceInfo> devices = new List<DiDeviceInfo>();
-            DIEnumDevicesCallback cb = (lpddi, pvRef) =>
+            HashSet<uint>     xipVidPids = GetXInputVidPids();
+            List<DiDeviceInfo> devices   = new List<DiDeviceInfo>();
+
+            // Keep callback delegate alive until after EnumDevices returns
+            DiEnumDevicesNativeCb cb = (lpddi, pvRef) =>
             {
-                DIDEVICEINSTANCE_MIN inst = (DIDEVICEINSTANCE_MIN)Marshal.PtrToStructure(
-                    lpddi, typeof(DIDEVICEINSTANCE_MIN));
-                // guidProduct.Data1 encodes (PID<<16|VID) for joystick devices
-                uint data1 = BitConverter.ToUInt32(inst.guidProduct.ToByteArray(), 0);
-                if (!xInputVidPids.Contains(data1))
+                try
                 {
-                    DiDeviceInfo info = new DiDeviceInfo
-                    {
-                        GuidInstance = inst.guidInstance,
-                        GuidProduct  = inst.guidProduct,
-                        Name         = inst.tszInstanceName ?? string.Empty
-                    };
-                    devices.Add(info);
+                    DIDEVICEINSTANCE_MIN inst = (DIDEVICEINSTANCE_MIN)
+                        Marshal.PtrToStructure(lpddi, typeof(DIDEVICEINSTANCE_MIN));
+                    // guidProduct.Data1 encodes (PID<<16|VID) for HID devices
+                    uint data1 = BitConverter.ToUInt32(inst.guidProduct.ToByteArray(), 0);
+                    if (!xipVidPids.Contains(data1))
+                        devices.Add(new DiDeviceInfo
+                        {
+                            GuidInstance = inst.guidInstance,
+                            GuidProduct  = inst.guidProduct,
+                            Name         = inst.tszInstanceName ?? string.Empty
+                        });
                 }
+                catch { }
                 return 1; // DIENUM_CONTINUE
             };
-            di.EnumDevices(DI8DEVCLASS_GAMECTRL, cb, IntPtr.Zero, DIEDFL_ATTACHEDONLY);
+
+            IntPtr cbPtr = Marshal.GetFunctionPointerForDelegate(cb);
+            GetVtMethod<VtDI8EnumDevicesFn>(pDI, DI8Slot.EnumDevices)
+                (pDI, DI8DEVCLASS_GAMECTRL, cbPtr, IntPtr.Zero, DIEDFL_ATTACHEDONLY);
             GC.KeepAlive(cb);
             return devices;
         }
 
-        // Open, configure and acquire a device
-        public static IDirectInputDevice8W OpenDevice(IDirectInput8W di,
-            Guid guidInstance, IntPtr hwnd)
+        public static IntPtr OpenDevice(IntPtr pDI, Guid guidInstance, IntPtr hwnd)
         {
-            Guid gInst = guidInstance;
-            IDirectInputDevice8W device;
-            if (di.CreateDevice(ref gInst, out device, IntPtr.Zero) != 0) return null;
-            if (device.SetDataFormat(DfDIJoystick.pFormat) != 0)
-            { Marshal.ReleaseComObject(device); return null; }
-            if (device.SetCooperativeLevel(hwnd, DISCL_NONEXCLUSIVE | DISCL_BACKGROUND) != 0)
-            { Marshal.ReleaseComObject(device); return null; }
-            // Normalize all axis ranges to [0, 65535]; ignore failure for missing axes
+            Guid   gInst = guidInstance;
+            IntPtr pDev;
+            if (GetVtMethod<VtDI8CreateDeviceFn>(pDI, DI8Slot.CreateDevice)
+                    (pDI, ref gInst, out pDev, IntPtr.Zero) != 0 || pDev == IntPtr.Zero)
+                return IntPtr.Zero;
+
+            if (GetVtMethod<VtDI8DevSetDataFormatFn>(pDev, DI8DevSlot.SetDataFormat)
+                    (pDev, DfDIJoystick.pFormat) != 0)
+            { ReleaseDevice(pDev); return IntPtr.Zero; }
+
+            if (GetVtMethod<VtDI8DevSetCoopLevelFn>(pDev, DI8DevSlot.SetCooperativeLevel)
+                    (pDev, hwnd, DISCL_NONEXCLUSIVE | DISCL_BACKGROUND) != 0)
+            { ReleaseDevice(pDev); return IntPtr.Zero; }
+
+            // Normalize all axis ranges to [0, 65535] (ignore failure for missing axes)
             foreach (uint off in new uint[] { 0, 4, 8, 12, 16, 20, 24, 28 })
-                SetAxisRange(device, off, 0, 65535);
-            device.Acquire();
-            return device;
+                SetAxisRange(pDev, off, 0, 65535);
+
+            GetVtMethod<VtDI8DevAcquireFn>(pDev, DI8DevSlot.Acquire)(pDev);
+            return pDev;
         }
 
-        static void SetAxisRange(IDirectInputDevice8W device, uint offset, int min, int max)
+        static void SetAxisRange(IntPtr pDev, uint offset, int min, int max)
         {
             DIPROPRANGE r = new DIPROPRANGE
             {
@@ -289,30 +311,44 @@ namespace NativeTools
             try
             {
                 Marshal.StructureToPtr(r, ptr, false);
-                device.SetProperty(DIPROP_RANGE, ptr);
+                GetVtMethod<VtDI8DevSetPropertyFn>(pDev, DI8DevSlot.SetProperty)
+                    (pDev, DIPROP_RANGE, ptr);
             }
             finally { Marshal.FreeHGlobal(ptr); }
         }
 
-        // Poll a device and return its state; re-acquires automatically on loss
-        public static bool PollDevice(IDirectInputDevice8W device, out DIJOYSTATE state)
+        public static bool PollDevice(IntPtr pDev, out DIJOYSTATE state)
         {
             state = DefaultState();
-            device.Poll();
+            GetVtMethod<VtDI8DevPollFn>(pDev, DI8DevSlot.Poll)(pDev);
             IntPtr ptr = Marshal.AllocHGlobal(80); // sizeof(DIJOYSTATE)
             try
             {
-                int hr = device.GetDeviceState(80, ptr);
+                int hr = GetVtMethod<VtDI8DevGetStateFn>(pDev, DI8DevSlot.GetDeviceState)
+                             (pDev, 80, ptr);
                 if (hr != 0)
                 {
-                    device.Acquire();
-                    hr = device.GetDeviceState(80, ptr);
+                    GetVtMethod<VtDI8DevAcquireFn>(pDev, DI8DevSlot.Acquire)(pDev);
+                    hr = GetVtMethod<VtDI8DevGetStateFn>(pDev, DI8DevSlot.GetDeviceState)
+                             (pDev, 80, ptr);
                 }
                 if (hr != 0) return false;
                 state = (DIJOYSTATE)Marshal.PtrToStructure(ptr, typeof(DIJOYSTATE));
                 return true;
             }
             finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        public static void ReleaseDevice(IntPtr pDev)
+        {
+            if (pDev != IntPtr.Zero)
+                GetVtMethod<VtReleaseFn>(pDev, DI8DevSlot.Release)(pDev);
+        }
+
+        public static void ReleaseDI(IntPtr pDI)
+        {
+            if (pDI != IntPtr.Zero)
+                GetVtMethod<VtReleaseFn>(pDI, DI8Slot.Release)(pDI);
         }
 
         public static DIJOYSTATE DefaultState()
@@ -342,7 +378,7 @@ namespace NativeTools
 
         static DfDIJoystick()
         {
-            // Axis / POV GUIDs pinned in unmanaged heap (never freed — app lifetime)
+            // Axis/POV GUIDs pinned in unmanaged heap for app lifetime
             IntPtr pgX   = AllocGuid(new Guid("A36D02E0-C9F3-11CF-BFC7-444553540000")); // X
             IntPtr pgY   = AllocGuid(new Guid("A36D02E1-C9F3-11CF-BFC7-444553540000")); // Y
             IntPtr pgZ   = AllocGuid(new Guid("A36D02E2-C9F3-11CF-BFC7-444553540000")); // Z
@@ -359,35 +395,34 @@ namespace NativeTools
 
             List<DIOBJECTDATAFORMAT> objs = new List<DIOBJECTDATAFORMAT>
             {
-                new DIOBJECTDATAFORMAT { pguid=pgX,   dwOfs= 0, dwType=req,  dwFlags=0 }, // X axis
-                new DIOBJECTDATAFORMAT { pguid=pgY,   dwOfs= 4, dwType=req,  dwFlags=0 }, // Y axis
-                new DIOBJECTDATAFORMAT { pguid=pgZ,   dwOfs= 8, dwType=optA, dwFlags=0 }, // Z
-                new DIOBJECTDATAFORMAT { pguid=pgRx,  dwOfs=12, dwType=optA, dwFlags=0 }, // Rx
-                new DIOBJECTDATAFORMAT { pguid=pgRy,  dwOfs=16, dwType=optA, dwFlags=0 }, // Ry
-                new DIOBJECTDATAFORMAT { pguid=pgRz,  dwOfs=20, dwType=optA, dwFlags=0 }, // Rz
-                new DIOBJECTDATAFORMAT { pguid=pgSl,  dwOfs=24, dwType=optA, dwFlags=0 }, // Slider0
-                new DIOBJECTDATAFORMAT { pguid=pgSl,  dwOfs=28, dwType=optA, dwFlags=0 }, // Slider1
-                new DIOBJECTDATAFORMAT { pguid=pgPov, dwOfs=32, dwType=optP, dwFlags=0 }, // POV0
-                new DIOBJECTDATAFORMAT { pguid=pgPov, dwOfs=36, dwType=optP, dwFlags=0 }, // POV1
-                new DIOBJECTDATAFORMAT { pguid=pgPov, dwOfs=40, dwType=optP, dwFlags=0 }, // POV2
-                new DIOBJECTDATAFORMAT { pguid=pgPov, dwOfs=44, dwType=optP, dwFlags=0 }, // POV3
+                new DIOBJECTDATAFORMAT { pguid=pgX,   dwOfs= 0, dwType=req,  dwFlags=0 },
+                new DIOBJECTDATAFORMAT { pguid=pgY,   dwOfs= 4, dwType=req,  dwFlags=0 },
+                new DIOBJECTDATAFORMAT { pguid=pgZ,   dwOfs= 8, dwType=optA, dwFlags=0 },
+                new DIOBJECTDATAFORMAT { pguid=pgRx,  dwOfs=12, dwType=optA, dwFlags=0 },
+                new DIOBJECTDATAFORMAT { pguid=pgRy,  dwOfs=16, dwType=optA, dwFlags=0 },
+                new DIOBJECTDATAFORMAT { pguid=pgRz,  dwOfs=20, dwType=optA, dwFlags=0 },
+                new DIOBJECTDATAFORMAT { pguid=pgSl,  dwOfs=24, dwType=optA, dwFlags=0 },
+                new DIOBJECTDATAFORMAT { pguid=pgSl,  dwOfs=28, dwType=optA, dwFlags=0 },
+                new DIOBJECTDATAFORMAT { pguid=pgPov, dwOfs=32, dwType=optP, dwFlags=0 },
+                new DIOBJECTDATAFORMAT { pguid=pgPov, dwOfs=36, dwType=optP, dwFlags=0 },
+                new DIOBJECTDATAFORMAT { pguid=pgPov, dwOfs=40, dwType=optP, dwFlags=0 },
+                new DIOBJECTDATAFORMAT { pguid=pgPov, dwOfs=44, dwType=optP, dwFlags=0 },
             };
-            // 32 optional buttons at offsets 48–79
             for (int i = 0; i < 32; i++)
                 objs.Add(new DIOBJECTDATAFORMAT
                     { pguid = IntPtr.Zero, dwOfs = (uint)(48 + i), dwType = optB, dwFlags = 0 });
 
-            int objSize = Marshal.SizeOf(typeof(DIOBJECTDATAFORMAT)); // 24 on x64
-            IntPtr pObjArr = Marshal.AllocHGlobal(objs.Count * objSize);
+            int    objSize  = Marshal.SizeOf(typeof(DIOBJECTDATAFORMAT));
+            IntPtr pObjArr  = Marshal.AllocHGlobal(objs.Count * objSize);
             for (int i = 0; i < objs.Count; i++)
                 Marshal.StructureToPtr(objs[i], IntPtr.Add(pObjArr, i * objSize), false);
 
             DIDATAFORMAT fmt = new DIDATAFORMAT
             {
-                dwSize    = (uint)Marshal.SizeOf(typeof(DIDATAFORMAT)), // 32 on x64
-                dwObjSize = (uint)objSize,
-                dwFlags   = DIDF_ABSAXIS,
-                dwDataSize = 80,  // sizeof(DIJOYSTATE)
+                dwSize     = (uint)Marshal.SizeOf(typeof(DIDATAFORMAT)),
+                dwObjSize  = (uint)objSize,
+                dwFlags    = DIDF_ABSAXIS,
+                dwDataSize = 80,
                 dwNumObjs  = (uint)objs.Count,
                 rgodf      = pObjArr
             };
