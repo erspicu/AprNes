@@ -58,7 +58,8 @@ namespace AprNes
         const int NUM_BUFFERS    = 4;
 
         static IntPtr    _hWaveOut  = IntPtr.Zero;
-        static bool      _audioReady = false;
+        static volatile bool _audioReady = false;
+        static volatile int  _submitInProgress = 0;  // tracks SubmitBuffer in-flight count
         static short[][] _audioBufs  = new short[NUM_BUFFERS][];
         static GCHandle[] _bufPins   = new GCHandle[NUM_BUFFERS];
         static GCHandle   _hdrPin;
@@ -120,7 +121,15 @@ namespace AprNes
         {
             NesCore.AudioSampleReady -= OnSampleReady;
             if (_hWaveOut == IntPtr.Zero) return;
+
+            // Signal SubmitBuffer to abort its while-loop and stop
             _audioReady = false;
+
+            // Wait for any in-flight SubmitBuffer to exit (max ~100ms)
+            int timeout = 0;
+            while (_submitInProgress > 0 && timeout++ < 100)
+                System.Threading.Thread.Sleep(1);
+
             waveOutReset(_hWaveOut);
 
             int hdrSz = Marshal.SizeOf(typeof(WAVEHDR));
@@ -156,6 +165,7 @@ namespace AprNes
 
         static void SubmitBuffer(int idx)
         {
+            System.Threading.Interlocked.Increment(ref _submitInProgress);
             try
             {
                 if (!_audioReady || _hWaveOut == IntPtr.Zero) return;
@@ -163,13 +173,17 @@ namespace AprNes
                 int hdrSz = Marshal.SizeOf(typeof(WAVEHDR));
                 IntPtr ptr = Marshal.UnsafeAddrOfPinnedArrayElement(_waveHdrs, idx);
 
-                // 等待此緩衝區播放完畢 (最多等 50ms)
+                // 等待此緩衝區播放完畢 (最多等 50ms)；若 CloseAudio 中途呼叫則提前退出
                 int waited = 0;
                 while ((_waveHdrs[idx].dwFlags & WHDR_INQUEUE) != 0)
                 {
+                    if (!_audioReady) return;  // CloseAudio called, abort
                     Thread.Sleep(1);
                     if (++waited > 50) return;
                 }
+
+                // Final check before touching WaveOut resources
+                if (!_audioReady || _hWaveOut == IntPtr.Zero) return;
 
                 waveOutUnprepareHeader(_hWaveOut, ptr, hdrSz);
                 _waveHdrs[idx].dwFlags = 0;
@@ -177,6 +191,7 @@ namespace AprNes
                 waveOutWrite(_hWaveOut, ptr, hdrSz);
             }
             catch (Exception) { }
+            finally { System.Threading.Interlocked.Decrement(ref _submitInProgress); }
         }
     }
 }

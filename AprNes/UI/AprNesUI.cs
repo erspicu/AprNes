@@ -221,7 +221,8 @@ namespace AprNes
                 NesCore.AudioEnabled = true;
 
             // 讀取音量設定
-            if (AppConfigure.ContainsKey("Volume") && int.TryParse(AppConfigure["Volume"], out int vol))
+            int vol;
+            if (AppConfigure.ContainsKey("Volume") && int.TryParse(AppConfigure["Volume"], out vol))
                 NesCore.Volume = Math.Max(0, Math.Min(100, vol));
             else
                 NesCore.Volume = 70;
@@ -470,6 +471,7 @@ namespace AprNes
 
         Thread nes_t = null;
         bool running = false;
+        public bool IsRunning => running;
         public string rom_file = "";
         public byte[] rom_bytes;
         byte[] current_rom_bytes;  // 保存已解壓的 ROM 資料供 Hard Reset 使用

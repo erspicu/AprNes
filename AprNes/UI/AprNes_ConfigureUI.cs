@@ -156,6 +156,12 @@ namespace AprNes
             AprNesUI.GetInstance().initUIsize();
 
             AprNesUI.GetInstance().Reset();
+
+            // Sync WaveOutPlayer to the new AudioEnabled state
+            // (Reset() uses SoftReset and doesn't manage audio)
+            WaveOutPlayer.CloseAudio();
+            if (NesCore.AudioEnabled && AprNesUI.GetInstance().IsRunning)
+                WaveOutPlayer.OpenAudio();
         }
 
         private void OK(object sender, EventArgs e)
