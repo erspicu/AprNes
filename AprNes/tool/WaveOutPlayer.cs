@@ -112,7 +112,6 @@ namespace AprNes
             _curBuf = 0;
             _curPos = 0;
             _audioReady = true;
-            timeBeginPeriod(1);
             NesCore.AudioSampleReady += OnSampleReady;
         }
 
@@ -146,7 +145,6 @@ namespace AprNes
 
             waveOutClose(_hWaveOut);
             _hWaveOut = IntPtr.Zero;
-            timeEndPeriod(1);
         }
 
         static void OnSampleReady(short sample)

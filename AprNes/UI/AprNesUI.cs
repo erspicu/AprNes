@@ -6,6 +6,7 @@ using System.Windows.Forms;
 using System.IO;
 using System.IO.Compression;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Threading;
 using LangTool;
 using NativeTools;
@@ -14,6 +15,13 @@ namespace AprNes
 {
     public partial class AprNesUI : Form
     {
+        [DllImport("winmm.dll")] static extern int timeBeginPeriod(int uPeriod);
+        [DllImport("winmm.dll")] static extern int timeEndPeriod(int uPeriod);
+
+        bool _highResPeriodActive = false;
+        void BeginHighResPeriod() { if (!_highResPeriodActive) { timeBeginPeriod(1); _highResPeriodActive = true; } }
+        void EndHighResPeriod()   { if (_highResPeriodActive)  { timeEndPeriod(1);   _highResPeriodActive = false; } }
+
         Graphics grfx;
         public Dictionary<string, string> AppConfigure = new Dictionary<string, string>();
         string ConfigureFile = Application.StartupPath + @"\AprNes.ini";
@@ -623,6 +631,7 @@ namespace AprNes
             {
                 try
                 {
+                    EndHighResPeriod();
                     NesCore.exit = true;
                     Thread.Sleep(50);
                     nes_t.Abort();
@@ -660,6 +669,7 @@ namespace AprNes
             _fpsDeadline = 0;
             _fpsStopWatch.Restart();
             if (NesCore.AudioEnabled) WaveOutPlayer.OpenAudio();
+            BeginHighResPeriod();
             nes_t = new Thread(NesCore.run);
             nes_t.IsBackground = true;
             nes_t.Start();
@@ -684,6 +694,7 @@ namespace AprNes
         private void AprNesUI_FormClosing(object sender, FormClosingEventArgs e)
         {
             app_running = false;
+            EndHighResPeriod();
             NesCore.exit = true;
             SaveSRam();
             WaveOutPlayer.CloseAudio();
@@ -821,6 +832,7 @@ namespace AprNes
             if (!running || current_rom_bytes == null) return;
 
             // 停止模擬線程
+            EndHighResPeriod();
             NesCore.exit = true;
             NesCore._event.Set();
             if (nes_t != null)
@@ -858,6 +870,7 @@ namespace AprNes
             _fpsDeadline = 0;
             _fpsStopWatch.Restart();
             if (NesCore.AudioEnabled) WaveOutPlayer.OpenAudio();
+            BeginHighResPeriod();
             nes_t = new Thread(NesCore.run);
             nes_t.IsBackground = true;
             nes_t.Start();
