@@ -89,6 +89,15 @@ namespace NativeTools
             else if (deg >= 13500 && deg <= 22500) y = 65535; // S
         }
 
+        // Snap analog axis value to 3-state digital: 0 (low), 32767 (center), 65535 (high).
+        // Ensures exact values regardless of DIPROP_RANGE success or hardware quirks.
+        static int SnapAxisDigital(int v)
+        {
+            if (v < 16384) return 0;
+            if (v > 49151) return 65535;
+            return 32767;
+        }
+
         public List<joystickEvent> joy_event_captur()
         {
             List<joystickEvent> event_list = new List<joystickEvent>();
@@ -117,13 +126,13 @@ namespace NativeTools
                         event_list.Add(new joystickEvent(1, id, b + 1, 0, 0, 0));
                 }
 
-                // Main X/Y axes — normalize near-center noise to exact 32767
+                // Main X/Y axes — normalize near-center noise to exact 32767, then snap to digital
                 const int AXIS_CENTER = 32767;
                 const int AXIS_NOISE  = 256; // suppress hardware jitter at rest
-                int xNow  = (Math.Abs(state.lX - AXIS_CENTER) < AXIS_NOISE) ? AXIS_CENTER : state.lX;
-                int yNow  = (Math.Abs(state.lY - AXIS_CENTER) < AXIS_NOISE) ? AXIS_CENTER : state.lY;
-                int xPrev = (Math.Abs(prev.lX  - AXIS_CENTER) < AXIS_NOISE) ? AXIS_CENTER : prev.lX;
-                int yPrev = (Math.Abs(prev.lY  - AXIS_CENTER) < AXIS_NOISE) ? AXIS_CENTER : prev.lY;
+                int xNow  = SnapAxisDigital((Math.Abs(state.lX - AXIS_CENTER) < AXIS_NOISE) ? AXIS_CENTER : state.lX);
+                int yNow  = SnapAxisDigital((Math.Abs(state.lY - AXIS_CENTER) < AXIS_NOISE) ? AXIS_CENTER : state.lY);
+                int xPrev = SnapAxisDigital((Math.Abs(prev.lX  - AXIS_CENTER) < AXIS_NOISE) ? AXIS_CENTER : prev.lX);
+                int yPrev = SnapAxisDigital((Math.Abs(prev.lY  - AXIS_CENTER) < AXIS_NOISE) ? AXIS_CENTER : prev.lY);
                 if (xPrev != xNow || xNow != AXIS_CENTER)
                     event_list.Add(new joystickEvent(0, id, 0, 0, 0, xNow));
                 if (yPrev != yNow || yNow != AXIS_CENTER)
@@ -181,10 +190,10 @@ namespace NativeTools
                         // Left analog stick → X/Y way events (D-Pad 優先；中立時才送 analog)
                         short lx = cur.Gamepad.sThumbLX, lxP = prev.Gamepad.sThumbLX;
                         short ly = cur.Gamepad.sThumbLY, lyP = prev.Gamepad.sThumbLY;
-                        int axNow  = (Math.Abs(lx)  < XI_DEADZONE) ? 32767 : (lx  + 32768) & 0xFFFF;
-                        int axPrev = (Math.Abs(lxP) < XI_DEADZONE) ? 32767 : (lxP + 32768) & 0xFFFF;
-                        int ayNow  = (Math.Abs(ly)  < XI_DEADZONE) ? 32767 : 65535 - ((ly  + 32768) & 0xFFFF);
-                        int ayPrev = (Math.Abs(lyP) < XI_DEADZONE) ? 32767 : 65535 - ((lyP + 32768) & 0xFFFF);
+                        int axNow  = (Math.Abs(lx)  < XI_DEADZONE) ? 32767 : SnapAxisDigital((lx  + 32768) & 0xFFFF);
+                        int axPrev = (Math.Abs(lxP) < XI_DEADZONE) ? 32767 : SnapAxisDigital((lxP + 32768) & 0xFFFF);
+                        int ayNow  = (Math.Abs(ly)  < XI_DEADZONE) ? 32767 : SnapAxisDigital(65535 - ((ly  + 32768) & 0xFFFF));
+                        int ayPrev = (Math.Abs(lyP) < XI_DEADZONE) ? 32767 : SnapAxisDigital(65535 - ((lyP + 32768) & 0xFFFF));
                         if (xNow == 32767 && (axNow != axPrev || axNow != 32767))
                             event_list.Add(new joystickEvent(0, id, 0, 0, 0, axNow));
                         if (yNow == 32767 && (ayNow != ayPrev || ayNow != 32767))
