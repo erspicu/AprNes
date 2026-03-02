@@ -171,7 +171,9 @@ namespace AprNes
         }
 
         // Returns the event_type the currently focused joypad control expects:
-        //   1 = button (A/B/Start/Select), 0 = axis (UP/DOWN/LEFT/RIGHT), -1 = none
+        //   1  = button only (A/B/Start/Select)
+        //   2  = axis OR button (UP/DOWN/LEFT/RIGHT — D-pad may fire as either)
+        //  -1  = nothing focused
         public int ExpectedJoyInputType()
         {
             if (joypad_A.Focused || joypad_B.Focused ||
@@ -179,7 +181,7 @@ namespace AprNes
                 return 1;
             if (joypad_UP.Focused || joypad_DOWN.Focused ||
                 joypad_LEFT.Focused || joypad_RIGHT.Focused)
-                return 0;
+                return 2;
             return -1;
         }
 
@@ -263,94 +265,82 @@ namespace AprNes
             }
             else if (joypad_UP.Focused)
             {
-                if (btn_name.StartsWith("Button") && value == 0)
-                    return;
-                if (!btn_name.StartsWith("X") && !btn_name.StartsWith("Y"))
+                if (btn_name.StartsWith("Button"))
                 {
-                    MessageBox.Show("非 X Y 方向鍵類型輸入!");
+                    if (value == 0) return; // button release, ignore
+                    joypad_UP.Text = btn_name;
+                    if (NES_KeyMAP_joypad_config.Values.Contains(AprNesUI.KeyMap.NES_btn_UP))
+                        NES_KeyMAP_joypad_config.Remove(NES_KeyMAP_joypad_config.FirstOrDefault(x => x.Value == AprNesUI.KeyMap.NES_btn_UP).Key);
+                    NES_KeyMAP_joypad_config[uid + "," + btn_name + "," + raw_id] = AprNesUI.KeyMap.NES_btn_UP;
                     return;
                 }
-                if (value == 32511)
-                {
-                    return;
-                }
+                if (!btn_name.StartsWith("X") && !btn_name.StartsWith("Y")) return;
+                if (value == 32511 || value == 32767) return;
                 string name = JoyPadWayName(btn_name, value);
                 if (name == "") return;
                 joypad_UP.Text = name;
-                Console.WriteLine(value);
-
                 if (NES_KeyMAP_joypad_config.Values.Contains(AprNesUI.KeyMap.NES_btn_UP))
-                {
-                    string key = NES_KeyMAP_joypad_config.FirstOrDefault(x => x.Value == AprNesUI.KeyMap.NES_btn_UP).Key;
-                    NES_KeyMAP_joypad_config.Remove(key);
-                }
-
+                    NES_KeyMAP_joypad_config.Remove(NES_KeyMAP_joypad_config.FirstOrDefault(x => x.Value == AprNesUI.KeyMap.NES_btn_UP).Key);
                 NES_KeyMAP_joypad_config[uid + "," + joypad_UP.Text + "," + raw_id + "," + value] = AprNesUI.KeyMap.NES_btn_UP;
             }
             else if (joypad_DOWN.Focused)
             {
-                if (btn_name.StartsWith("Button") && value == 0)
-                    return;
-                if (!btn_name.StartsWith("X") && !btn_name.StartsWith("Y"))
+                if (btn_name.StartsWith("Button"))
                 {
-                    MessageBox.Show("非 X Y 方向鍵類型輸入!");
+                    if (value == 0) return;
+                    joypad_DOWN.Text = btn_name;
+                    if (NES_KeyMAP_joypad_config.Values.Contains(AprNesUI.KeyMap.NES_btn_DOWN))
+                        NES_KeyMAP_joypad_config.Remove(NES_KeyMAP_joypad_config.FirstOrDefault(x => x.Value == AprNesUI.KeyMap.NES_btn_DOWN).Key);
+                    NES_KeyMAP_joypad_config[uid + "," + btn_name + "," + raw_id] = AprNesUI.KeyMap.NES_btn_DOWN;
                     return;
                 }
-                if (value == 32511) return;
+                if (!btn_name.StartsWith("X") && !btn_name.StartsWith("Y")) return;
+                if (value == 32511 || value == 32767) return;
                 string name = JoyPadWayName(btn_name, value);
                 if (name == "") return;
                 joypad_DOWN.Text = name;
-
                 if (NES_KeyMAP_joypad_config.Values.Contains(AprNesUI.KeyMap.NES_btn_DOWN))
-                {
-                    string key = NES_KeyMAP_joypad_config.FirstOrDefault(x => x.Value == AprNesUI.KeyMap.NES_btn_DOWN).Key;
-                    NES_KeyMAP_joypad_config.Remove(key);
-                }
-
+                    NES_KeyMAP_joypad_config.Remove(NES_KeyMAP_joypad_config.FirstOrDefault(x => x.Value == AprNesUI.KeyMap.NES_btn_DOWN).Key);
                 NES_KeyMAP_joypad_config[uid + "," + joypad_DOWN.Text + "," + raw_id + "," + value] = AprNesUI.KeyMap.NES_btn_DOWN;
             }
             else if (joypad_LEFT.Focused)
             {
-                if (btn_name.StartsWith("Button") && value == 0)
-                    return;
-                if (!btn_name.StartsWith("X") && !btn_name.StartsWith("Y"))
+                if (btn_name.StartsWith("Button"))
                 {
-                    MessageBox.Show("非 X Y 方向鍵類型輸入!");
+                    if (value == 0) return;
+                    joypad_LEFT.Text = btn_name;
+                    if (NES_KeyMAP_joypad_config.Values.Contains(AprNesUI.KeyMap.NES_btn_LEFT))
+                        NES_KeyMAP_joypad_config.Remove(NES_KeyMAP_joypad_config.FirstOrDefault(x => x.Value == AprNesUI.KeyMap.NES_btn_LEFT).Key);
+                    NES_KeyMAP_joypad_config[uid + "," + btn_name + "," + raw_id] = AprNesUI.KeyMap.NES_btn_LEFT;
                     return;
                 }
-                if (value == 32511) return;
+                if (!btn_name.StartsWith("X") && !btn_name.StartsWith("Y")) return;
+                if (value == 32511 || value == 32767) return;
                 string name = JoyPadWayName(btn_name, value);
                 if (name == "") return;
                 joypad_LEFT.Text = name;
-
                 if (NES_KeyMAP_joypad_config.Values.Contains(AprNesUI.KeyMap.NES_btn_LEFT))
-                {
-                    string key = NES_KeyMAP_joypad_config.FirstOrDefault(x => x.Value == AprNesUI.KeyMap.NES_btn_LEFT).Key;
-                    NES_KeyMAP_joypad_config.Remove(key);
-                }
-
+                    NES_KeyMAP_joypad_config.Remove(NES_KeyMAP_joypad_config.FirstOrDefault(x => x.Value == AprNesUI.KeyMap.NES_btn_LEFT).Key);
                 NES_KeyMAP_joypad_config[uid + "," + joypad_LEFT.Text + "," + raw_id + "," + value] = AprNesUI.KeyMap.NES_btn_LEFT;
             }
             else if (joypad_RIGHT.Focused)
             {
-                if (btn_name.StartsWith("Button") && value == 0)
-                    return;
-                if (!btn_name.StartsWith("X") && !btn_name.StartsWith("Y"))
+                if (btn_name.StartsWith("Button"))
                 {
-                    MessageBox.Show("非 X Y 方向鍵類型輸入!");
+                    if (value == 0) return;
+                    joypad_RIGHT.Text = btn_name;
+                    if (NES_KeyMAP_joypad_config.Values.Contains(AprNesUI.KeyMap.NES_btn_RIGHT))
+                        NES_KeyMAP_joypad_config.Remove(NES_KeyMAP_joypad_config.FirstOrDefault(x => x.Value == AprNesUI.KeyMap.NES_btn_RIGHT).Key);
+                    NES_KeyMAP_joypad_config[uid + "," + btn_name + "," + raw_id] = AprNesUI.KeyMap.NES_btn_RIGHT;
                     return;
                 }
-                if (value == 32511) return;
+                if (!btn_name.StartsWith("X") && !btn_name.StartsWith("Y")) return;
+                if (value == 32511 || value == 32767) return;
                 string name = JoyPadWayName(btn_name, value);
                 if (name == "") return;
                 joypad_RIGHT.Text = name;
-
                 if (NES_KeyMAP_joypad_config.Values.Contains(AprNesUI.KeyMap.NES_btn_RIGHT))
-                {
-                    string key = NES_KeyMAP_joypad_config.FirstOrDefault(x => x.Value == AprNesUI.KeyMap.NES_btn_RIGHT).Key;
-                    NES_KeyMAP_joypad_config.Remove(key);
-                }
-
+                    NES_KeyMAP_joypad_config.Remove(NES_KeyMAP_joypad_config.FirstOrDefault(x => x.Value == AprNesUI.KeyMap.NES_btn_RIGHT).Key);
                 NES_KeyMAP_joypad_config[uid + "," + joypad_RIGHT.Text + "," + raw_id + "," + value] = AprNesUI.KeyMap.NES_btn_RIGHT;
             }
         }

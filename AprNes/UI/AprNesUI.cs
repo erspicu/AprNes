@@ -368,7 +368,8 @@ namespace AprNes
                             if (cfg == null) return;
                             int expectedType = cfg.ExpectedJoyInputType();
                             if (expectedType == -1) return;               // no control focused
-                            if (joy_event.event_type != expectedType) return; // wrong type, skip silently
+                            // expectedType 2 = direction controls: accept axis(0) OR button(1)
+                            if (expectedType != 2 && joy_event.event_type != expectedType) return;
 
                             if (joy_event.event_type == 0) //方向鍵觸發
                             {
@@ -467,18 +468,30 @@ namespace AprNes
                                 break;
 
                             case KeyMap.NES_btn_UP:
-                                NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_UP);
+                                if (joy_event.event_type == 0 || joy_event.button_event == 1)
+                                    NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_UP);
+                                else
+                                    NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_UP);
                                 break;
 
                             case KeyMap.NES_btn_DOWN:
-                                NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_DOWN);
+                                if (joy_event.event_type == 0 || joy_event.button_event == 1)
+                                    NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_DOWN);
+                                else
+                                    NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_DOWN);
                                 break;
                             case KeyMap.NES_btn_LEFT:
-                                NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_LEFT);
+                                if (joy_event.event_type == 0 || joy_event.button_event == 1)
+                                    NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_LEFT);
+                                else
+                                    NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_LEFT);
                                 break;
 
                             case KeyMap.NES_btn_RIGHT:
-                                NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_RIGHT);
+                                if (joy_event.event_type == 0 || joy_event.button_event == 1)
+                                    NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_RIGHT);
+                                else
+                                    NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_RIGHT);
                                 break;
                         }
                     }
