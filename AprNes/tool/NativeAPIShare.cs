@@ -9,13 +9,6 @@ namespace NativeTools
 {
     static class NativeMethods
     {
-        //REF http://www.cnblogs.com/kingthy/archive/2009/03/25/1421838.html
-        //REF https://yal.cc/c-sharp-joystick-tracking-via-winmm-dll/
-        [DllImport("winmm.dll")]
-        public static extern Int32 joyGetPos(Int32 uJoyID, ref JOYINFO pji);
-        [DllImport("winmm.dll")]
-        public static extern int joyGetDevCaps(IntPtr uJoyID, ref JOYCAPS pjc, int cbjc);
-
         // XInput — Xbox 手把支援 (xinput1_4.dll, Windows 8+)
         [DllImport("xinput1_4.dll")]
         public static extern uint XInputGetState(uint dwUserIndex, ref XINPUT_STATE pState);
@@ -89,57 +82,6 @@ namespace NativeTools
     }
 
     //--
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct JOYCAPS
-    {
-        public ushort wMid;
-        public ushort wPid;
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
-        public string szPname;
-        public int wXmin;
-        public int wXmax;
-        public int wYmin;
-        public int wYmax;
-        public int wZmin;
-        public int wZmax;
-        public int wNumButtons;
-        public int wPeriodMin;
-        public int wPeriodMax;
-        public int wRmin;
-        public int wRmax;
-        public int wUmin;
-        public int wUmax;
-        public int wVmin;
-        public int wVmax;
-        public int wCaps;
-        public int wMaxAxes;
-        public int wNumAxes;
-        public int wMaxButtons;
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
-        public string szRegKey;
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
-        public string szOEMVxD;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct JOYINFO
-    {
-        public Int32 wXpos; // Current X-coordinate.
-        public Int32 wYpos; // Current Y-coordinate.
-        public Int32 wZpos; // Current Z-coordinate.
-        public Int32 wButtons; // Current state of joystick buttons.
-    }
-
-    //custom define
-    public struct DeviceJoyInfo
-    {
-        public int ButtonCount;
-        public int ID;
-        public int Button_old;
-        public int Way_X_old;
-        public int Way_Y_old;
-    }
 
     // XInput structs
     [StructLayout(LayoutKind.Explicit)]

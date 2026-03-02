@@ -899,7 +899,7 @@ namespace AprNes
             initUIsize();
             UpdateSoundMenuText();
 
-            _joystick.Init();
+            _joystick.Init(this.Handle);
             new Thread(polling_listener).Start();
             new Thread(() =>
             {

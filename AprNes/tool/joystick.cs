@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
@@ -8,11 +7,17 @@ namespace NativeTools
 {
     class joystick
     {
-        List<DeviceJoyInfo> joyinfo_list = new List<DeviceJoyInfo>();
-        JOYCAPS joycap = new JOYCAPS();
-        JOYINFO js = new JOYINFO();
-        int JOYCAPS_size;
-        public int PeriodMin = 0;
+        // DirectInput devices (non-XInput game controllers)
+        struct DiDevice
+        {
+            public int                  ID;
+            public IDirectInputDevice8W Device;
+            public DIJOYSTATE           PrevState;
+        }
+        List<DiDevice> _diDevices = new List<DiDevice>();
+        IDirectInput8W _di;
+
+        public int PeriodMin = 10; // ms between polls
 
         // XInput state — player index 0-3, device ID = XI_ID_BASE + index
         const int XI_ID_BASE = 1000;
@@ -23,46 +28,36 @@ namespace NativeTools
         bool[]         xi_connected = new bool[4];
         bool           xi_available = true;
 
-        unsafe public void Init()
+        public void Init(IntPtr hwnd)
         {
             Stopwatch st = new Stopwatch();
             st.Restart();
 
-            PeriodMin = 0;
-            joyinfo_list.Clear();
+            _diDevices.Clear();
+            int nextId = 0;
 
-            JOYCAPS_size = Marshal.SizeOf(typeof(JOYCAPS));
-
-            for (int i = 0; i < 256; i++)
+            // DirectInput — enumerate non-XInput game controllers
+            try
             {
-                if (NativeMethods.joyGetDevCaps((IntPtr)i, ref joycap, JOYCAPS_size) == 0)
+                _di = DirectInputNative.CreateDirectInput();
+                foreach (DiDeviceInfo info in DirectInputNative.EnumJoysticks(_di))
                 {
-                    DeviceJoyInfo info = new DeviceJoyInfo();
-
-                    //set id
-                    info.ID = i;
-
-                    //check joyex
-                    if (NativeMethods.joyGetPos(i, ref js) == 0)
+                    IDirectInputDevice8W dev =
+                        DirectInputNative.OpenDevice(_di, info.GuidInstance, hwnd);
+                    if (dev == null) continue;
+                    _diDevices.Add(new DiDevice
                     {
-                        info.Way_X_old = js.wXpos;
-                        info.Way_Y_old = js.wYpos;
-                    }
-                    else continue; //裝置功能失效
-
-                    //set button count
-                    info.ButtonCount = joycap.wNumButtons;
-
-                    info.Button_old = 0;
-
-                    if (joycap.wPeriodMin > PeriodMin)
-                        PeriodMin = joycap.wPeriodMin;
-
-                    joyinfo_list.Add(info);
+                        ID        = nextId++,
+                        Device    = dev,
+                        PrevState = DirectInputNative.DefaultState()
+                    });
+                    Console.WriteLine("DirectInput device " + (nextId - 1) + ": " + info.Name);
                 }
             }
-            //取出所有目前連線遊戲手把中最慢的PeriodMin然後+2ms
-            PeriodMin += 2;
+            catch (Exception ex)
+            {
+                Console.WriteLine("DirectInput init error: " + ex.Message);
+            }
 
             // XInput 初始掃描 (Xbox / XInput 手把)
             xi_available = true;
@@ -83,52 +78,62 @@ namespace NativeTools
             Console.WriteLine("init joypad infor : " + st.ElapsedMilliseconds + " ms");
         }
 
+        // Convert DirectInput POV value (hundredths of degree) to normalised X/Y (0/32767/65535)
+        static void PovToXY(uint pov, out int x, out int y)
+        {
+            x = 32767; y = 32767;
+            if (pov == 0xFFFFFFFFu) return;
+            int deg = (int)pov; // 0–35900
+            if      (deg >= 4500  && deg <= 13500) x = 65535; // E
+            else if (deg >= 22500 && deg <= 31500) x = 0;     // W
+            if      (deg <= 4500  || deg >= 31500) y = 0;     // N
+            else if (deg >= 13500 && deg <= 22500) y = 65535; // S
+        }
+
         public List<joystickEvent> joy_event_captur()
         {
             List<joystickEvent> event_list = new List<joystickEvent>();
 
-            // WinMM polling
-            for (int i_button = 0; i_button < joyinfo_list.Count(); i_button++)
+            // DirectInput polling
+            for (int idx = 0; idx < _diDevices.Count; idx++)
             {
-                DeviceJoyInfo button_inf = joyinfo_list[i_button];
-                int button_id = button_inf.ID;
-                int button_count = button_inf.ButtonCount;
+                DiDevice dev = _diDevices[idx];
+                DIJOYSTATE state;
+                if (!DirectInputNative.PollDevice(dev.Device, out state)) continue;
 
-                NativeMethods.joyGetPos(button_id, ref js);
+                DIJOYSTATE prev = dev.PrevState;
+                dev.PrevState = state;
+                _diDevices[idx] = dev;
 
-                int button_now = js.wButtons;
-                int X_now = js.wXpos;
-                int Y_now = js.wYpos;
-                int button_old = button_inf.Button_old;
-                int X_old = button_inf.Way_X_old;
-                int Y_old = button_inf.Way_Y_old;
+                int id = dev.ID;
 
-                button_inf.Button_old = button_now;
-                button_inf.Way_X_old = X_now;
-                button_inf.Way_Y_old = Y_now;
-
-                joyinfo_list[i_button] = button_inf;
-                if (button_old != button_now || button_now != 0)
+                // Buttons (up to 32)
+                for (int b = 0; b < 32; b++)
                 {
-                    for (int i = 0; i < button_count; i++)
-                    {
-                        if ((button_now & 1) != 0)
-                            event_list.Add(new joystickEvent(1, button_inf.ID, i + 1, 1, 0, 0));
-                        else
-                        {
-                            if ((button_now & 1) != (button_old & 1))
-                                event_list.Add(new joystickEvent(1, button_inf.ID, i + 1, 0, 0, 0));
-                        }
-                        button_now >>= 1;
-                        button_old >>= 1;
-                    }
+                    bool nowP  = (state.rgbButtons[b] & 0x80) != 0;
+                    bool prevP = (prev.rgbButtons[b]  & 0x80) != 0;
+                    if (nowP)
+                        event_list.Add(new joystickEvent(1, id, b + 1, 1, 0, 0));
+                    else if (prevP)
+                        event_list.Add(new joystickEvent(1, id, b + 1, 0, 0, 0));
                 }
 
-                if (X_old != X_now || (X_now != 32767 && X_now != 32511 && X_now != 32254))
-                    event_list.Add(new joystickEvent(0, button_inf.ID, 0, 0, 0, X_now));
+                // Main X/Y axes
+                int xNow = state.lX, xPrev = prev.lX;
+                int yNow = state.lY, yPrev = prev.lY;
+                if (xPrev != xNow || xNow != 32767)
+                    event_list.Add(new joystickEvent(0, id, 0, 0, 0, xNow));
+                if (yPrev != yNow || yNow != 32767)
+                    event_list.Add(new joystickEvent(0, id, 0, 0, 1, yNow));
 
-                if (Y_old != Y_now || (Y_now != 32767 && Y_now != 32511 && Y_now != 32254))
-                    event_list.Add(new joystickEvent(0, button_inf.ID, 0, 0, 1, Y_now));
+                // POV hat → X/Y events (only when main axes are neutral)
+                int povX, povY, prevPovX, prevPovY;
+                PovToXY(state.rgdwPOV[0], out povX, out povY);
+                PovToXY(prev.rgdwPOV[0],  out prevPovX, out prevPovY);
+                if (xNow == 32767 && (prevPovX != povX || povX != 32767))
+                    event_list.Add(new joystickEvent(0, id, 0, 0, 0, povX));
+                if (yNow == 32767 && (prevPovY != povY || povY != 32767))
+                    event_list.Add(new joystickEvent(0, id, 0, 0, 1, povY));
             }
 
             // XInput polling (Xbox / XInput 手把)

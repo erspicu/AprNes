@@ -80,6 +80,7 @@
     <Compile Include="NesCore\Mapper\Mapper066.cs" />
     <Compile Include="NesCore\Mapper\Mapper071.cs" />
     <Compile Include="NesCore\Mapper\IMapper.cs" />
+    <Compile Include="tool\DirectInputHelper.cs" />
     <Compile Include="tool\joystick.cs" />
     <Compile Include="tool\LangINI.cs" />
     <Compile Include="tool\LibScanline.cs" />
