@@ -39,10 +39,12 @@ namespace AprNes
         static public int  RomChrCount => CHR_ROM_count;
         static public bool RomHorizMirror => (ROM_Control_1 & 1) == 0;
 
-        // PPU state accessors for WASM debug
-        static public bool DbgNMIable       => NMIable;
-        static public bool DbgShowBG        => ShowBackGround;
-        static public bool DbgShowSpr       => ShowSprites;
+        // PPU/CPU state accessors for WASM debug
+        static public bool   DbgNMIable     => NMIable;
+        static public bool   DbgShowBG      => ShowBackGround;
+        static public bool   DbgShowSpr     => ShowSprites;
+        static public ushort DbgPC          => r_PC;
+        static public bool   DbgNmiPending  => nmi_pending;
 
         // FPS limiting flag (set by UI, checked in VideoOutput handler)
         static public bool LimitFPS = false;

@@ -16,6 +16,12 @@ namespace AprNes
         public static int WasmSafetyHits = 0;
         /// <summary>最後一幀花了幾個 cpu_step()（正常約 8000~10000）</summary>
         public static int WasmLastSteps  = 0;
+        /// <summary>NMI 觸發累計次數（應每幀 +1）</summary>
+        public static int WasmNmiCount   = 0;
+        /// <summary>上一幀結束時的 CPU PC</summary>
+        public static ushort WasmLastPC  = 0;
+        /// <summary>版本戳記，確認新版有載入</summary>
+        public static string WasmVersion = "v20260303b";
 
         // 初始化 WASM 模式：重設關鍵狀態、訂閱音效回呼、關閉 FPS 限制
         public static void WasmInit()
@@ -26,6 +32,8 @@ namespace AprNes
             AudioEnabled = true;
             WasmSafetyHits = 0;
             WasmLastSteps  = 0;
+            WasmNmiCount   = 0;
+            WasmLastPC     = 0;
             // 避免重複訂閱
             AudioSampleReady -= WasmAudioHandler;
             AudioSampleReady += WasmAudioHandler;
@@ -56,6 +64,7 @@ namespace AprNes
                 {
                     nmi_pending = false;
                     NMIInterrupt();
+                    WasmNmiCount++;
                     if (nmi_pending) nmi_just_deferred = true;
                 }
                 else if (nmi_just_deferred)
@@ -86,6 +95,7 @@ namespace AprNes
 
             _wasmAudioCollect = false;
             WasmLastSteps = safety;
+            WasmLastPC = r_PC;
             if (frame_count == startFrame) WasmSafetyHits++;
             return _wasmAudioBuf.ToArray();
         }

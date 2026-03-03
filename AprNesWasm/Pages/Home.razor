@@ -171,8 +171,8 @@
                 int delta = fc - _lastFrameCount;
                 _lastFrameCount = fc;
                 DbgLog($"FPS={_fps} frames/s={delta} total={_totalFrames} safety={NesCore.WasmSafetyHits} lastSteps={NesCore.WasmLastSteps}");
-                DbgLog($"  ShowBG={NesCore.DbgShowBG} ShowSpr={NesCore.DbgShowSpr} NMIable={NesCore.DbgNMIable} exit={NesCore.exit}");
-                DbgLog($"  scanline={NesCore.scanline} ppu_x={NesCore.ppu_cycles_x} frame_count={fc}");
+                DbgLog($"  ShowBG={NesCore.DbgShowBG} ShowSpr={NesCore.DbgShowSpr} NMIable={NesCore.DbgNMIable} nmi={NesCore.WasmNmiCount} PC=${NesCore.WasmLastPC:X4}");
+                DbgLog($"  scanline={NesCore.scanline} ppu_x={NesCore.ppu_cycles_x} frame_count={fc} [{NesCore.WasmVersion}]");
                 _framesSinceLastUpdate = 0;
                 _lastFpsTickMs = now;
                 await InvokeAsync(StateHasChanged);
