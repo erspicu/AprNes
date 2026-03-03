@@ -40,7 +40,8 @@ namespace AprNes
             }
 
             // ── Normal WinForms mode ──────────────────────────────────────────
-            Application.SetDefaultFont(new Font("Microsoft Sans Serif", 8.25F));
+            // PerMonitorV2：讓 .NET 10 WinForms 接管 DPI 縮放，不與 manifest 衝突
+            Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             var ui = AprNesUI.GetInstance();
