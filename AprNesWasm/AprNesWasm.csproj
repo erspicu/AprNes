@@ -9,6 +9,9 @@
     <RootNamespace>AprNesWasm</RootNamespace>
     <!-- GitHub Pages 不支援 Brotli Content-Encoding，停用壓縮 -->
     <BlazorEnableCompression>false</BlazorEnableCompression>
+    <!-- AOT：預編譯 C# 為 WASM 指令，大幅提升模擬器執行效能 -->
+    <!-- 需要先安裝 wasm-tools：dotnet workload install wasm-tools（需管理員） -->
+    <!-- <RunAOTCompilation>true</RunAOTCompilation> -->
   </PropertyGroup>
 
   <ItemGroup>
