@@ -168,10 +168,10 @@
             // 
             this.label3.BackColor = System.Drawing.Color.Transparent;
             this.label3.Font = new System.Drawing.Font("微軟正黑體", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
-            this.label3.Location = new System.Drawing.Point(313, 13);
+            this.label3.Location = new System.Drawing.Point(285, 15);
             this.label3.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label3.Name = "label3";
-            this.label3.Size = new System.Drawing.Size(98, 30);
+            this.label3.Size = new System.Drawing.Size(110, 24);
             this.label3.TabIndex = 11;
             this.label3.Text = "fps : ";
             this.label3.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
@@ -182,10 +182,10 @@
             this.UIOpenRom.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.UIOpenRom.FlatStyle = System.Windows.Forms.FlatStyle.Popup;
             this.UIOpenRom.Font = new System.Drawing.Font("微軟正黑體", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
-            this.UIOpenRom.Location = new System.Drawing.Point(9, 13);
+            this.UIOpenRom.Location = new System.Drawing.Point(8, 15);
             this.UIOpenRom.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.UIOpenRom.Name = "UIOpenRom";
-            this.UIOpenRom.Size = new System.Drawing.Size(96, 29);
+            this.UIOpenRom.Size = new System.Drawing.Size(88, 24);
             this.UIOpenRom.TabIndex = 13;
             this.UIOpenRom.Text = "Open";
             this.UIOpenRom.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -199,10 +199,10 @@
             this.UIReset.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.UIReset.FlatStyle = System.Windows.Forms.FlatStyle.Popup;
             this.UIReset.Font = new System.Drawing.Font("微軟正黑體", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
-            this.UIReset.Location = new System.Drawing.Point(111, 13);
+            this.UIReset.Location = new System.Drawing.Point(100, 15);
             this.UIReset.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.UIReset.Name = "UIReset";
-            this.UIReset.Size = new System.Drawing.Size(96, 29);
+            this.UIReset.Size = new System.Drawing.Size(88, 24);
             this.UIReset.TabIndex = 15;
             this.UIReset.Text = "Reset";
             this.UIReset.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -216,10 +216,10 @@
             this.UIConfig.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.UIConfig.FlatStyle = System.Windows.Forms.FlatStyle.Popup;
             this.UIConfig.Font = new System.Drawing.Font("微軟正黑體", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
-            this.UIConfig.Location = new System.Drawing.Point(213, 13);
+            this.UIConfig.Location = new System.Drawing.Point(192, 15);
             this.UIConfig.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.UIConfig.Name = "UIConfig";
-            this.UIConfig.Size = new System.Drawing.Size(96, 29);
+            this.UIConfig.Size = new System.Drawing.Size(88, 24);
             this.UIConfig.TabIndex = 16;
             this.UIConfig.Text = "Config";
             this.UIConfig.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -231,14 +231,14 @@
             // 
             this.UIAbout.Font = new System.Drawing.Font("微軟正黑體", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
             this.UIAbout.LinkColor = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(64)))), ((int)(((byte)(64)))));
-            this.UIAbout.Location = new System.Drawing.Point(302, 416);
+            this.UIAbout.Location = new System.Drawing.Point(296, 416);
             this.UIAbout.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.UIAbout.Name = "UIAbout";
-            this.UIAbout.Size = new System.Drawing.Size(90, 22);
+            this.UIAbout.Size = new System.Drawing.Size(96, 22);
             this.UIAbout.TabIndex = 17;
             this.UIAbout.TabStop = true;
             this.UIAbout.Text = "About";
-            this.UIAbout.TextAlign = System.Drawing.ContentAlignment.TopRight;
+            this.UIAbout.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
             this.UIAbout.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.linkLabel1_LinkClicked);
             // 
             // RomInf

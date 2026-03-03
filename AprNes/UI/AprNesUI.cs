@@ -815,14 +815,18 @@ namespace AprNes
             configure = true;
             AprNes_ConfigureUI.GetInstance().StartPosition = FormStartPosition.CenterParent;
             AprNes_ConfigureUI.GetInstance().init();
+            this.TopMost = false;
             AprNes_ConfigureUI.GetInstance().ShowDialog(this);
+            this.TopMost = true;
             configure = false;
         }
         private void linkLabel1_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
         {
             AprNes_Infocs AprNesInf = new AprNes_Infocs();
             AprNesInf.StartPosition = FormStartPosition.CenterParent;
+            this.TopMost = false;
             AprNesInf.ShowDialog(this);
+            this.TopMost = true;
         }
 
         private void label4_Click(object sender, EventArgs e)
@@ -946,7 +950,9 @@ namespace AprNes
         {
             AprNes_RomInfoUI RomInfo = new AprNes_RomInfoUI();
             RomInfo.StartPosition = FormStartPosition.CenterParent;
+            this.TopMost = false;
             RomInfo.ShowDialog(this);
+            this.TopMost = true;
         }
 
         private void fun1ToolStripMenuItem_Click(object sender, EventArgs e)
