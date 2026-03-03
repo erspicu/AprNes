@@ -47,15 +47,46 @@ namespace AprNes
 
             int startFrame = frame_count;
             int safety = 0;
+            bool nmi_just_deferred = false;
+
             while (frame_count == startFrame && !exit && safety < 120000)
             {
+                // === 與 run() 完全相同的 NMI/IRQ 觸發邏輯 ===
+                if (nmi_pending && !nmi_just_deferred)
+                {
+                    nmi_pending = false;
+                    NMIInterrupt();
+                    if (nmi_pending) nmi_just_deferred = true;
+                }
+                else if (nmi_just_deferred)
+                {
+                    nmi_just_deferred = false;
+                }
+                else if (irq_pending)
+                {
+                    irq_pending = false;
+                    IRQInterrupt();
+                    if (nmi_pending) nmi_just_deferred = true;
+                }
+
+                byte prevFlagI = flagI;
                 cpu_step();
+
+                if (opcode == 0x00 && nmi_pending)
+                    nmi_just_deferred = true;
+
+                if (opcode != 0x00)
+                {
+                    byte irqPollI = (opcode == 0x40) ? flagI : prevFlagI;
+                    irq_pending = (irqPollI == 0 && irqLinePrev);
+                }
+
                 safety++;
             }
 
             _wasmAudioCollect = false;
             WasmLastSteps = safety;
-            if (frame_count == startFrame) WasmSafetyHits++; // safety limit hit — frame didn't complete
+            if (frame_count == startFrame) WasmSafetyHits++;
             return _wasmAudioBuf.ToArray();
         }
 
