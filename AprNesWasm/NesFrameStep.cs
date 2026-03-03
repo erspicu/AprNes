@@ -11,12 +11,15 @@ namespace AprNes
         static readonly List<short> _wasmAudioBuf = new List<short>(2048);
         static bool _wasmAudioCollect = false;
 
-        // 初始化 WASM 模式：訂閱音效回呼、關閉 FPS 限制
+        // 初始化 WASM 模式：重設關鍵狀態、訂閱音效回呼、關閉 FPS 限制
         public static void WasmInit()
         {
-            LimitFPS    = false;
-            HeadlessMode = true;
+            exit         = false;       // 重設（stop 後可重新載入新遊戲）
+            LimitFPS     = false;
+            HeadlessMode = false;       // WASM 不需要寫入 debug log 檔案
             AudioEnabled = true;
+            // 避免重複訂閱
+            AudioSampleReady -= WasmAudioHandler;
             AudioSampleReady += WasmAudioHandler;
         }
 

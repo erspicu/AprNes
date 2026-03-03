@@ -33,21 +33,28 @@ window.nesInterop = (() => {
     // samples: Int16Array (44100 Hz mono)
     function playAudio(samples) {
         if (!samples || samples.length === 0) return;
-        ensureAudio();
+        try {
+            ensureAudio();
+            // resume suspended context (browser autoplay policy)
+            if (audioCtx.state === 'suspended') audioCtx.resume();
 
-        const buf  = audioCtx.createBuffer(1, samples.length, SAMPLE_RATE);
-        const data = buf.getChannelData(0);
-        for (let i = 0; i < samples.length; i++)
-            data[i] = samples[i] / 32768.0;
+            const buf  = audioCtx.createBuffer(1, samples.length, SAMPLE_RATE);
+            const data = buf.getChannelData(0);
+            for (let i = 0; i < samples.length; i++)
+                data[i] = samples[i] / 32768.0;
 
-        const src = audioCtx.createBufferSource();
-        src.buffer = buf;
-        src.connect(audioCtx.destination);
+            const src = audioCtx.createBufferSource();
+            src.buffer = buf;
+            src.connect(audioCtx.destination);
 
-        const now = audioCtx.currentTime;
-        if (nextTime < now + 0.02) nextTime = now + 0.05; // re-sync if behind
-        src.start(nextTime);
-        nextTime += buf.duration;
+            const now = audioCtx.currentTime;
+            if (nextTime < now + 0.02) nextTime = now + 0.05; // re-sync if behind
+            src.start(nextTime);
+            nextTime += buf.duration;
+        } catch (e) {
+            // 音效例外不中斷遊戲
+            console.warn('playAudio error:', e);
+        }
     }
 
     // 用 requestAnimationFrame 驅動 C# game loop
@@ -56,12 +63,15 @@ window.nesInterop = (() => {
         let running = true;
         function loop() {
             if (!running) return;
-            dotNetRef.invokeMethodAsync('OnFrame').then(() => {
-                requestAnimationFrame(loop);
-            });
+            dotNetRef.invokeMethodAsync('OnFrame')
+                .then(() => { requestAnimationFrame(loop); })
+                .catch(err => {
+                    // OnFrame 例外不中斷 loop，繼續下一幀
+                    console.warn('OnFrame error:', err);
+                    requestAnimationFrame(loop);
+                });
         }
         requestAnimationFrame(loop);
-        // 傳回 stop function（存在 dotNetRef 側不需要，這裡只記錄）
         return { stop: () => { running = false; } };
     }
 

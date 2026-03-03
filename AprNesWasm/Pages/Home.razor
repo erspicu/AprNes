@@ -100,29 +100,37 @@
     {
         if (!_romLoaded || NesCore.exit) return;
 
-        // 執行一幀
-        _audioSamples.Clear();
-        NesCore.StepOneFrame();
-
-        // 取畫面並繪製
-        byte[] rgba = NesCore.GetScreenRgba();
-        await JS.InvokeVoidAsync("nesInterop.drawFrame", rgba);
-
-        // 送出音效
-        if (_audioSamples.Count > 0)
+        try
         {
-            short[] samples = _audioSamples.ToArray();
-            await JS.InvokeVoidAsync("nesInterop.playAudio", samples);
+            // 執行一幀
+            _audioSamples.Clear();
+            NesCore.StepOneFrame();
+
+            // 取畫面並繪製
+            byte[] rgba = NesCore.GetScreenRgba();
+            await JS.InvokeVoidAsync("nesInterop.drawFrame", rgba);
+
+            // 送出音效
+            if (_audioSamples.Count > 0)
+            {
+                short[] samples = _audioSamples.ToArray();
+                await JS.InvokeVoidAsync("nesInterop.playAudio", samples);
+            }
+
+            // 更新 FPS（每秒一次）
+            _framesSinceLastUpdate++;
+            long now = System.Environment.TickCount64;
+            if (now - _lastFpsTickMs >= 1000)
+            {
+                _fps = _framesSinceLastUpdate.ToString();
+                _framesSinceLastUpdate = 0;
+                _lastFpsTickMs = now;
+                await InvokeAsync(StateHasChanged);
+            }
         }
-
-        // 更新 FPS（每秒一次）
-        _framesSinceLastUpdate++;
-        long now = System.Environment.TickCount64;
-        if (now - _lastFpsTickMs >= 1000)
+        catch (Exception ex)
         {
-            _fps = _framesSinceLastUpdate.ToString();
-            _framesSinceLastUpdate = 0;
-            _lastFpsTickMs = now;
+            _errorMsg = "Frame error: " + ex.Message;
             await InvokeAsync(StateHasChanged);
         }
     }
