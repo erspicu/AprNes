@@ -99,30 +99,39 @@ namespace AprNes
         // ── .NET 8 UI 客製調整 ──────────────────────────────────────────────────
 
         /// <summary>
-        /// AutoScaleMode.Font 縮放後，若 toolbar 控制項大幅超出 ClientWidth，
-        /// 以等比縮放（X+Y）讓所有按鈕完整顯示。
-        /// 小幅溢出（≤20px）不介入，讓 WinForms 自然裁剪（與 .NET Framework 行為一致）。
+        /// AutoScaleMode.Font 縮放後修正兩個問題：
+        /// 1. Toolbar（Top&lt;50，非 Panel）：大幅溢出時等比縮放 X+Y
+        /// 2. 所有控制項：右緣超出 ClientWidth 時，往左移動貼齊
         /// </summary>
         partial void AotUIAdjust()
         {
+            int clientW = this.ClientSize.Width;
+
+            // ── 1. Toolbar 等比縮放 ─────────────────────────────────────────────
             int maxRight = 0;
             foreach (Control c in this.Controls)
                 if (c.Visible && c.Top < 50 && !(c is Panel))
                     maxRight = Math.Max(maxRight, c.Right);
 
-            int clientW = this.ClientSize.Width;
-            // 只在大幅溢出（>20px）時介入；小溢出與 FW 行為一致
-            if (maxRight <= clientW + 20) return;
+            if (maxRight > clientW + 20)
+            {
+                double scale = (clientW - 8.0) / (double)(maxRight + 4);
+                foreach (Control c in this.Controls)
+                {
+                    if (c.Visible && c.Top < 50 && !(c is Panel))
+                        c.SetBounds(
+                            (int)Math.Round(c.Left   * scale),
+                            (int)Math.Round(c.Top    * scale),
+                            (int)Math.Round(c.Width  * scale),
+                            (int)Math.Round(c.Height * scale));
+                }
+            }
 
-            double scale = (clientW - 8.0) / (double)(maxRight + 4);
+            // ── 2. 所有超出右邊界的控制項，往左移至不超出 ──────────────────────
             foreach (Control c in this.Controls)
             {
-                if (c.Visible && c.Top < 50 && !(c is Panel))
-                    c.SetBounds(
-                        (int)Math.Round(c.Left   * scale),
-                        (int)Math.Round(c.Top    * scale),
-                        (int)Math.Round(c.Width  * scale),
-                        (int)Math.Round(c.Height * scale));
+                if (c.Visible && c.Right > clientW)
+                    c.Left = clientW - c.Width - 2;
             }
         }
 
