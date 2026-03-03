@@ -65,6 +65,7 @@
     int    _framesSinceLastUpdate = 0;
     long   _lastFpsTickMs         = 0;
     int    _totalFrames           = 0;
+    int    _lastFrameCount        = 0;
 
     // Debug log
     System.Text.StringBuilder _dbg = new System.Text.StringBuilder();
@@ -166,7 +167,12 @@
             if (now - _lastFpsTickMs >= 1000)
             {
                 _fps = _framesSinceLastUpdate.ToString();
-                DbgLog($"FPS={_fps}  totalFrames={_totalFrames}  audio={_audioSamples.Count}  exit={NesCore.exit}  frame_count={NesCore.frame_count}");
+                int fc = NesCore.frame_count;
+                int delta = fc - _lastFrameCount;
+                _lastFrameCount = fc;
+                DbgLog($"FPS={_fps} frames/s={delta} total={_totalFrames} safety={NesCore.WasmSafetyHits} lastSteps={NesCore.WasmLastSteps}");
+                DbgLog($"  ShowBG={NesCore.DbgShowBG} ShowSpr={NesCore.DbgShowSpr} NMIable={NesCore.DbgNMIable} exit={NesCore.exit}");
+                DbgLog($"  scanline={NesCore.scanline} ppu_x={NesCore.ppu_cycles_x} frame_count={fc}");
                 _framesSinceLastUpdate = 0;
                 _lastFpsTickMs = now;
                 await InvokeAsync(StateHasChanged);

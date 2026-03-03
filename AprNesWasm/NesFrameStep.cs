@@ -11,6 +11,12 @@ namespace AprNes
         static readonly List<short> _wasmAudioBuf = new List<short>(2048);
         static bool _wasmAudioCollect = false;
 
+        // ── WASM 診斷計數器 ─────────────────────────────────────────────────────
+        /// <summary>StepOneFrame 觸發 safety limit 的累計次數（> 0 代表 PPU 幀沒完成）</summary>
+        public static int WasmSafetyHits = 0;
+        /// <summary>最後一幀花了幾個 cpu_step()（正常約 8000~10000）</summary>
+        public static int WasmLastSteps  = 0;
+
         // 初始化 WASM 模式：重設關鍵狀態、訂閱音效回呼、關閉 FPS 限制
         public static void WasmInit()
         {
@@ -18,6 +24,8 @@ namespace AprNes
             LimitFPS     = false;
             HeadlessMode = false;       // WASM 不需要寫入 debug log 檔案
             AudioEnabled = true;
+            WasmSafetyHits = 0;
+            WasmLastSteps  = 0;
             // 避免重複訂閱
             AudioSampleReady -= WasmAudioHandler;
             AudioSampleReady += WasmAudioHandler;
@@ -46,6 +54,8 @@ namespace AprNes
             }
 
             _wasmAudioCollect = false;
+            WasmLastSteps = safety;
+            if (frame_count == startFrame) WasmSafetyHits++; // safety limit hit — frame didn't complete
             return _wasmAudioBuf.ToArray();
         }
 
