@@ -21,7 +21,7 @@ namespace AprNes
         /// <summary>上一幀結束時的 CPU PC</summary>
         public static ushort WasmLastPC  = 0;
         /// <summary>版本戳記，確認新版有載入</summary>
-        public static string WasmVersion = "v20260303b";
+        public static string WasmVersion => BuildInfo.Timestamp;
 
         // 初始化 WASM 模式：重設關鍵狀態、訂閱音效回呼、關閉 FPS 限制
         public static void WasmInit()

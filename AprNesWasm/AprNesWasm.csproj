@@ -43,4 +43,18 @@
     <Compile Include="../AprNes/NesCore/Mapper/Mapper071.cs"     Link="NesCore/Mapper/Mapper071.cs" />
   </ItemGroup>
 
+  <!-- 每次 build 自動產生 BuildTimestamp.g.cs，方便確認非快取版本 -->
+  <Target Name="GenerateBuildTimestamp" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <_BuildTs>$([System.DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm UTC"))</_BuildTs>
+    </PropertyGroup>
+    <WriteLinesToFile
+      File="$(IntermediateOutputPath)BuildTimestamp.g.cs"
+      Lines="namespace AprNes { public static class BuildInfo { public const string Timestamp = &quot;$(_BuildTs)&quot;%3B } }"
+      Overwrite="true" />
+    <ItemGroup>
+      <Compile Include="$(IntermediateOutputPath)BuildTimestamp.g.cs" />
+    </ItemGroup>
+  </Target>
+
 </Project>
