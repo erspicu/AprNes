@@ -123,7 +123,10 @@ namespace AprNes
             UIAbout.Location = new Point(ClientSize.Width - UIAbout.Width - 5, 277 + 240 * (ScreenSize - 1));
 
             RomInf.Location = new Point(5, 277 + 240 * (ScreenSize - 1));
-            label3.Location = new Point(ClientSize.Width - label3.Width - 3, UIConfig.Top + (UIConfig.Height - label3.Height) / 2);
+            // fps label: 緊接 UIConfig 右側，寬度延伸至右邊界，不因按鈕縮放而被遮
+            int fpsX = UIConfig.Right + 3;
+            label3.Size = new System.Drawing.Size(ClientSize.Width - fpsX - 3, UIConfig.Height);
+            label3.Location = new Point(fpsX, UIConfig.Top);
             panel1.Visible = true;
         }
 
