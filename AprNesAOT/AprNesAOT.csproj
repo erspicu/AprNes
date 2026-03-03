@@ -11,7 +11,7 @@
     <AssemblyName>AprNesAOT</AssemblyName>
     <RootNamespace>AprNes</RootNamespace>
     <Optimize>true</Optimize>
-    <ApplicationHighDpiMode>SystemAware</ApplicationHighDpiMode>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <!-- INI 設定與語系檔：複製到輸出目錄 -->
