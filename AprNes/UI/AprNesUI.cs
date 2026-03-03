@@ -107,7 +107,9 @@ namespace AprNes
 
             UIAbout.Visible = RomInf.Visible = UIOpenRom.Visible = UIReset.Visible = UIConfig.Visible = label3.Visible = true;
             panel1.Location = new Point(5, 35);
-            this.Width = 282 + 256 * (ScreenSize - 1);
+            // 最小寬度：按鈕區 + fps label(最少80px) + 邊距
+            int minWidth = UIConfig.Right + 80 + 16;
+            this.Width = Math.Max(minWidth, 282 + 256 * (ScreenSize - 1));
             this.Height = 332 + 240 * (ScreenSize - 1);
 
             if (AppConfigure["filter"] == "scanline")
