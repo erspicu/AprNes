@@ -120,9 +120,10 @@ namespace AprNes
                 }
                 Width += 26;
             }
-            UIAbout.Location = new Point(Width - 82, 277 + 240 * (ScreenSize - 1));
+            UIAbout.Location = new Point(ClientSize.Width - UIAbout.Width - 5, 277 + 240 * (ScreenSize - 1));
 
             RomInf.Location = new Point(5, 277 + 240 * (ScreenSize - 1));
+            label3.Location = new Point(ClientSize.Width - label3.Width - 3, UIConfig.Top + (UIConfig.Height - label3.Height) / 2);
             panel1.Visible = true;
         }
 
@@ -1022,7 +1023,6 @@ namespace AprNes
             this.BackgroundImage = null;
             this.WindowState = FormWindowState.Normal;
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
-            label3.Location = new Point(208, 8);
             ScreenCenterFull = false;
             Configure_Write();
             initUIsize();
