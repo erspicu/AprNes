@@ -21,6 +21,7 @@ window.nesInterop = (() => {
         canvas = document.getElementById(canvasId);
         ctx    = canvas.getContext('2d');
         canvas.focus();
+        console.log('[AprNes] init canvas:', canvasId);
     }
 
     // pixels: Uint8Array (RGBA, 256×240×4 bytes)
@@ -61,18 +62,20 @@ window.nesInterop = (() => {
     // dotNetRef: DotNetObjectReference，有 [JSInvokable] OnFrame()
     function startLoop(dotNetRef) {
         let running = true;
+        let frameCount = 0;
+        console.log('[AprNes] startLoop');
         function loop() {
             if (!running) return;
             dotNetRef.invokeMethodAsync('OnFrame')
-                .then(() => { requestAnimationFrame(loop); })
+                .then(() => { frameCount++; requestAnimationFrame(loop); })
                 .catch(err => {
                     // OnFrame 例外不中斷 loop，繼續下一幀
-                    console.warn('OnFrame error:', err);
+                    console.warn('[AprNes] OnFrame error (frame ' + frameCount + '):', err);
                     requestAnimationFrame(loop);
                 });
         }
         requestAnimationFrame(loop);
-        return { stop: () => { running = false; } };
+        return { stop: () => { running = false; console.log('[AprNes] loop stopped at frame', frameCount); } };
     }
 
     function focusCanvas() {
