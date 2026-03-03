@@ -41,6 +41,20 @@
             鍵盤：Z=A　X=B　Enter=Start　Shift=Select　方向鍵
         </p>
     }
+    <div style="margin-top:6px; font-size:12px; color:#aaa; display:flex; gap:16px; align-items:center;">
+        <label style="cursor:pointer;">
+            <input type="checkbox" checked="@_audioEnabled"
+                   @onchange="OnAudioToggle" /> 音效
+        </label>
+        <label style="cursor:pointer;">
+            <input type="checkbox" checked="@_fpsLimit"
+                   @onchange="OnFpsLimitToggle" /> 限制 FPS
+        </label>
+        @if (!_fpsLimit)
+        {
+            <span style="color:#f80; font-size:11px;">⚡ 無限制</span>
+        }
+    </div>
     @if (_errorMsg != null)
     {
         <p style="color:red; margin:4px 0;">⚠️ @_errorMsg</p>
@@ -52,6 +66,8 @@
     string _romName   = "";
     string _errorMsg  = null;
     string _fps       = "0";
+    bool   _audioEnabled = true;
+    bool   _fpsLimit     = true;
 
     // frame 計數（FPS 顯示用）
     int    _framesSinceLastUpdate = 0;
@@ -120,7 +136,7 @@
             await JS.InvokeVoidAsync("nesInterop.drawFrame", rgba);
 
             // 送出音效
-            if (_audioSamples.Count > 0)
+            if (_audioEnabled && _audioSamples.Count > 0)
             {
                 short[] samples = _audioSamples.ToArray();
                 await JS.InvokeVoidAsync("nesInterop.playAudio", samples);
@@ -144,8 +160,19 @@
         }
     }
 
-    // ── 鍵盤輸入 ─────────────────────────────────────────────────────────────
-    // 索引: 0=A 1=B 2=Select 3=Start 4=Up 5=Down 6=Left 7=Right
+    // ── 選項切換 ─────────────────────────────────────────────────────────────
+    async System.Threading.Tasks.Task OnAudioToggle(ChangeEventArgs e)
+    {
+        _audioEnabled = (bool)e.Value;
+    }
+
+    async System.Threading.Tasks.Task OnFpsLimitToggle(ChangeEventArgs e)
+    {
+        _fpsLimit = (bool)e.Value;
+        await JS.InvokeVoidAsync("nesInterop.setFpsLimit", _fpsLimit);
+    }
+
+    // ── 鍵盤輸入 ─────────────────────────────────────────────────────────────    // 索引: 0=A 1=B 2=Select 3=Start 4=Up 5=Down 6=Left 7=Right
     static int KeyToButton(string key) => key switch
     {
         "z" or "Z"   => 0,  // A

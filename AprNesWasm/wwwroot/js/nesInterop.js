@@ -58,8 +58,12 @@ window.nesInterop = (() => {
         }
     }
 
-    // 用 requestAnimationFrame 驅動 C# game loop
+    // 用 requestAnimationFrame（限速）或 setTimeout(0)（不限速）驅動 C# game loop
     // dotNetRef: DotNetObjectReference，有 [JSInvokable] OnFrame()
+    let loopFpsLimit = true;
+
+    function setFpsLimit(val) { loopFpsLimit = val; }
+
     function startLoop(dotNetRef) {
         let running = true;
         let frameCount = 0;
@@ -67,14 +71,19 @@ window.nesInterop = (() => {
         function loop() {
             if (!running) return;
             dotNetRef.invokeMethodAsync('OnFrame')
-                .then(() => { frameCount++; requestAnimationFrame(loop); })
+                .then(() => {
+                    frameCount++;
+                    if (loopFpsLimit) requestAnimationFrame(loop);
+                    else setTimeout(loop, 0);
+                })
                 .catch(err => {
-                    // OnFrame 例外不中斷 loop，繼續下一幀
                     console.warn('[AprNes] OnFrame error (frame ' + frameCount + '):', err);
-                    requestAnimationFrame(loop);
+                    if (loopFpsLimit) requestAnimationFrame(loop);
+                    else setTimeout(loop, 0);
                 });
         }
-        requestAnimationFrame(loop);
+        if (loopFpsLimit) requestAnimationFrame(loop);
+        else setTimeout(loop, 0);
         return { stop: () => { running = false; console.log('[AprNes] loop stopped at frame', frameCount); } };
     }
 
@@ -82,5 +91,5 @@ window.nesInterop = (() => {
         if (canvas) canvas.focus();
     }
 
-    return { init, drawFrame, playAudio, startLoop, focusCanvas };
+    return { init, drawFrame, playAudio, startLoop, focusCanvas, setFpsLimit };
 })();
