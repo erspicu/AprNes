@@ -12,6 +12,10 @@
     <RootNamespace>AprNes</RootNamespace>
     <Optimize>true</Optimize>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- PerMonitorV2：4K/多螢幕環境各視窗依所在螢幕 DPI 獨立縮放 -->
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <!-- WFO0003：manifest 與 csproj 同時有 DPI 設定，為預期行為（manifest 共用），壓制此警告 -->
+    <NoWarn>WFO0003</NoWarn>
   </PropertyGroup>
 
   <!-- INI 設定與語系檔：複製到輸出目錄 -->
