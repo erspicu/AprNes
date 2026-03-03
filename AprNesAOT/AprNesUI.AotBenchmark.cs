@@ -95,5 +95,37 @@ namespace AprNes
 
             MessageBox.Show(result, "Benchmark 結果");
         }
+
+        // ── .NET 8 UI 客製調整 ──────────────────────────────────────────────────
+
+        /// <summary>
+        /// initUIsize() 執行後微調版面：
+        /// - form 最小寬度確保 fps label 有足夠空間
+        /// - fps label 緊接 UIConfig 右側，不被按鈕遮蔽
+        /// - UIAbout 用 ClientSize.Width 正確靠右
+        /// </summary>
+        partial void AotUIAdjust()
+        {
+            // .NET 8 AutoScale 後按鈕實際寬度可能大於設計值，確保 fps 有 80px 空間
+            int minWidth = UIConfig.Right + 80 + 16;
+            if (this.Width < minWidth) this.Width = minWidth;
+
+            // fps label 緊接 UIConfig 右側，填滿剩餘寬度
+            int fpsX = UIConfig.Right + 3;
+            label3.Size = new System.Drawing.Size(ClientSize.Width - fpsX - 3, UIConfig.Height);
+            label3.Location = new System.Drawing.Point(fpsX, UIConfig.Top);
+
+            // UIAbout 靠右對齊 client 區域
+            UIAbout.Location = new System.Drawing.Point(
+                ClientSize.Width - UIAbout.Width - 5,
+                UIAbout.Location.Y);
+            UIAbout.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+        }
+
+        /// <summary>ShowDialog 前暫停 TopMost，避免 .NET 8 子視窗被遮蔽</summary>
+        partial void AotPreShowDialog()  => this.TopMost = false;
+
+        /// <summary>ShowDialog 後恢復 TopMost</summary>
+        partial void AotPostShowDialog() => this.TopMost = true;
     }
 }

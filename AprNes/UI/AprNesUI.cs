@@ -107,9 +107,7 @@ namespace AprNes
 
             UIAbout.Visible = RomInf.Visible = UIOpenRom.Visible = UIReset.Visible = UIConfig.Visible = label3.Visible = true;
             panel1.Location = new Point(5, 35);
-            // 最小寬度：按鈕區 + fps label(最少80px) + 邊距
-            int minWidth = UIConfig.Right + 80 + 16;
-            this.Width = Math.Max(minWidth, 282 + 256 * (ScreenSize - 1));
+            this.Width = 282 + 256 * (ScreenSize - 1);
             this.Height = 332 + 240 * (ScreenSize - 1);
 
             if (AppConfigure["filter"] == "scanline")
@@ -122,14 +120,11 @@ namespace AprNes
                 }
                 Width += 26;
             }
-            UIAbout.Location = new Point(ClientSize.Width - UIAbout.Width - 5, 277 + 240 * (ScreenSize - 1));
+            UIAbout.Location = new Point(Width - 82, 277 + 240 * (ScreenSize - 1));
 
             RomInf.Location = new Point(5, 277 + 240 * (ScreenSize - 1));
-            // fps label: 緊接 UIConfig 右側，寬度延伸至右邊界，不因按鈕縮放而被遮
-            int fpsX = UIConfig.Right + 3;
-            label3.Size = new System.Drawing.Size(ClientSize.Width - fpsX - 3, UIConfig.Height);
-            label3.Location = new Point(fpsX, UIConfig.Top);
             panel1.Visible = true;
+            AotUIAdjust();
         }
 
         public enum KeyMap
@@ -821,18 +816,18 @@ namespace AprNes
             configure = true;
             AprNes_ConfigureUI.GetInstance().StartPosition = FormStartPosition.CenterParent;
             AprNes_ConfigureUI.GetInstance().init();
-            this.TopMost = false;
+            AotPreShowDialog();
             AprNes_ConfigureUI.GetInstance().ShowDialog(this);
-            this.TopMost = true;
+            AotPostShowDialog();
             configure = false;
         }
         private void linkLabel1_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
         {
             AprNes_Infocs AprNesInf = new AprNes_Infocs();
             AprNesInf.StartPosition = FormStartPosition.CenterParent;
-            this.TopMost = false;
+            AotPreShowDialog();
             AprNesInf.ShowDialog(this);
-            this.TopMost = true;
+            AotPostShowDialog();
         }
 
         private void label4_Click(object sender, EventArgs e)
@@ -956,9 +951,9 @@ namespace AprNes
         {
             AprNes_RomInfoUI RomInfo = new AprNes_RomInfoUI();
             RomInfo.StartPosition = FormStartPosition.CenterParent;
-            this.TopMost = false;
+            AotPreShowDialog();
             RomInfo.ShowDialog(this);
-            this.TopMost = true;
+            AotPostShowDialog();
         }
 
         private void fun1ToolStripMenuItem_Click(object sender, EventArgs e)
@@ -1028,6 +1023,7 @@ namespace AprNes
             this.BackgroundImage = null;
             this.WindowState = FormWindowState.Normal;
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
+            label3.Location = new Point(208, 8);
             ScreenCenterFull = false;
             Configure_Write();
             initUIsize();
@@ -1072,5 +1068,10 @@ namespace AprNes
                 $"Benchmark 結果（{seconds} 秒）\n\nJIT : {frames} 幀  ({frames / (float)seconds:F1} FPS)",
                 "Benchmark 結果");
         }
+
+        // ── AOT-only hooks (實作於 AprNesUI.AotBenchmark.cs，.NET Fx 版為空) ──
+        partial void AotUIAdjust();
+        partial void AotPreShowDialog();
+        partial void AotPostShowDialog();
     }
 }
