@@ -1,0 +1,174 @@
+﻿@page "/"
+@using System.IO
+@using AprNes
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div style="font-family:monospace; padding:10px;">
+    <h4 style="margin:0 0 8px">🎮 AprNes WASM</h4>
+
+    @if (!_romLoaded)
+    {
+        <p style="color:#888; margin:4px 0">選擇 NES ROM 檔案（Mapper 0/1/2/3/4/7/11/66）</p>
+        <InputFile OnChange="LoadRom" accept=".nes"
+                   style="display:block; margin-bottom:6px;" />
+    }
+    else
+    {
+        <div style="margin-bottom:6px;">
+            <span style="color:#4a4; font-weight:bold">▶ @_romName</span>
+            <button @onclick="StopGame"
+                    style="margin-left:12px; padding:2px 10px;">■ 停止</button>
+            <span style="color:#888; margin-left:12px; font-size:11px;">@_fps FPS</span>
+        </div>
+    }
+
+    <!-- NES 畫面 256×240 -->
+    <canvas id="nesCanvas" width="256" height="240"
+            tabindex="0"
+            style="display:block; border:2px solid #555;
+                   image-rendering:pixelated; image-rendering:crisp-edges;
+                   background:#000; outline:none;"
+            @onkeydown="OnKeyDown" @onkeydown:preventDefault="true"
+            @onkeyup="OnKeyUp"   @onkeyup:preventDefault="true">
+    </canvas>
+
+    @if (_romLoaded)
+    {
+        <p style="color:#666; font-size:11px; margin:4px 0;">
+            鍵盤：Z=A　X=B　Enter=Start　Shift=Select　方向鍵
+        </p>
+    }
+    @if (_errorMsg != null)
+    {
+        <p style="color:red; margin:4px 0;">⚠️ @_errorMsg</p>
+    }
+</div>
+
+@code {
+    bool   _romLoaded = false;
+    string _romName   = "";
+    string _errorMsg  = null;
+    string _fps       = "0";
+
+    // frame 計數（FPS 顯示用）
+    int    _framesSinceLastUpdate = 0;
+    long   _lastFpsTickMs         = 0;
+
+    // 音效樣本 buffer（每幀從 StepOneFrame 收集）
+    System.Collections.Generic.List<short> _audioSamples
+        = new System.Collections.Generic.List<short>(2048);
+
+    // ── ROM 載入 ─────────────────────────────────────────────────────────────
+    async System.Threading.Tasks.Task LoadRom(InputFileChangeEventArgs e)
+    {
+        _errorMsg = null;
+        var file  = e.File;
+        if (file == null) return;
+        _romName = file.Name;
+
+        using var ms = new MemoryStream();
+        await file.OpenReadStream(maxAllowedSize: 4 * 1024 * 1024).CopyToAsync(ms);
+        byte[] rom = ms.ToArray();
+
+        // 訂閱音效（先解除舊的再重訂，避免重複）
+        NesCore.AudioSampleReady -= CollectAudio;
+        NesCore.AudioSampleReady += CollectAudio;
+        NesCore.OnError = msg => { _errorMsg = msg; InvokeAsync(StateHasChanged); };
+
+        NesCore.WasmInit();
+        bool ok = NesCore.init(rom);
+        if (!ok) { _errorMsg = "ROM 初始化失敗（不支援的 Mapper？）"; return; }
+
+        _romLoaded = true;
+        _lastFpsTickMs = System.Environment.TickCount64;
+        StateHasChanged();
+
+        await JS.InvokeVoidAsync("nesInterop.init", "nesCanvas");
+        var dotNetRef = DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("nesInterop.startLoop", dotNetRef);
+        await JS.InvokeVoidAsync("nesInterop.focusCanvas");
+    }
+
+    void CollectAudio(short s) => _audioSamples.Add(s);
+
+    // ── 每幀由 JS requestAnimationFrame 呼叫 ──────────────────────────────
+    [JSInvokable]
+    public async System.Threading.Tasks.Task OnFrame()
+    {
+        if (!_romLoaded || NesCore.exit) return;
+
+        // 執行一幀
+        _audioSamples.Clear();
+        NesCore.StepOneFrame();
+
+        // 取畫面並繪製
+        byte[] rgba = NesCore.GetScreenRgba();
+        await JS.InvokeVoidAsync("nesInterop.drawFrame", rgba);
+
+        // 送出音效
+        if (_audioSamples.Count > 0)
+        {
+            short[] samples = _audioSamples.ToArray();
+            await JS.InvokeVoidAsync("nesInterop.playAudio", samples);
+        }
+
+        // 更新 FPS（每秒一次）
+        _framesSinceLastUpdate++;
+        long now = System.Environment.TickCount64;
+        if (now - _lastFpsTickMs >= 1000)
+        {
+            _fps = _framesSinceLastUpdate.ToString();
+            _framesSinceLastUpdate = 0;
+            _lastFpsTickMs = now;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    // ── 鍵盤輸入 ─────────────────────────────────────────────────────────────
+    // 索引: 0=A 1=B 2=Select 3=Start 4=Up 5=Down 6=Left 7=Right
+    static int KeyToButton(string key) => key switch
+    {
+        "z" or "Z"   => 0,  // A
+        "x" or "X"   => 1,  // B
+        "Shift"      => 2,  // Select
+        "Enter"      => 3,  // Start
+        "ArrowUp"    => 4,
+        "ArrowDown"  => 5,
+        "ArrowLeft"  => 6,
+        "ArrowRight" => 7,
+        _            => -1
+    };
+
+    void OnKeyDown(KeyboardEventArgs e)
+    {
+        int btn = KeyToButton(e.Key);
+        if (btn >= 0) NesCore.P1_ButtonPress((byte)btn);
+    }
+
+    void OnKeyUp(KeyboardEventArgs e)
+    {
+        int btn = KeyToButton(e.Key);
+        if (btn >= 0) NesCore.P1_ButtonUnPress((byte)btn);
+    }
+
+    // ── 停止 ─────────────────────────────────────────────────────────────────
+    void StopGame()
+    {
+        NesCore.exit = true;
+        NesCore.AudioSampleReady -= CollectAudio;
+        _romLoaded = false;
+        _fps       = "0";
+        _romName   = "";
+    }
+
+    public async System.Threading.Tasks.ValueTask DisposeAsync()
+    {
+        NesCore.exit = true;
+        NesCore.AudioSampleReady -= CollectAudio;
+        await System.Threading.Tasks.Task.CompletedTask;
+    }
+}
+

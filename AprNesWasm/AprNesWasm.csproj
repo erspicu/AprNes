@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+    <RootNamespace>AprNesWasm</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.1" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- NesCore shared source -->
+  <ItemGroup>
+    <Compile Include="../AprNes/NesCore/Main.cs"              Link="NesCore/Main.cs" />
+    <Compile Include="../AprNes/NesCore/CPU.cs"               Link="NesCore/CPU.cs" />
+    <Compile Include="../AprNes/NesCore/PPU.cs"               Link="NesCore/PPU.cs" />
+    <Compile Include="../AprNes/NesCore/APU.cs"               Link="NesCore/APU.cs" />
+    <Compile Include="../AprNes/NesCore/MEM.cs"               Link="NesCore/MEM.cs" />
+    <Compile Include="../AprNes/NesCore/IO.cs"                Link="NesCore/IO.cs" />
+    <Compile Include="../AprNes/NesCore/JoyPad.cs"            Link="NesCore/JoyPad.cs" />
+    <Compile Include="../AprNes/NesCore/Mapper/IMapper.cs"       Link="NesCore/Mapper/IMapper.cs" />
+    <Compile Include="../AprNes/NesCore/Mapper/Mapper000.cs"     Link="NesCore/Mapper/Mapper000.cs" />
+    <Compile Include="../AprNes/NesCore/Mapper/Mapper001.cs"     Link="NesCore/Mapper/Mapper001.cs" />
+    <Compile Include="../AprNes/NesCore/Mapper/Mapper002.cs"     Link="NesCore/Mapper/Mapper002.cs" />
+    <Compile Include="../AprNes/NesCore/Mapper/Mapper003.cs"     Link="NesCore/Mapper/Mapper003.cs" />
+    <Compile Include="../AprNes/NesCore/Mapper/Mapper004.cs"     Link="NesCore/Mapper/Mapper004.cs" />
+    <Compile Include="../AprNes/NesCore/Mapper/Mapper004RevA.cs" Link="NesCore/Mapper/Mapper004RevA.cs" />
+    <Compile Include="../AprNes/NesCore/Mapper/Mapper004MMC6.cs" Link="NesCore/Mapper/Mapper004MMC6.cs" />
+    <Compile Include="../AprNes/NesCore/Mapper/Mapper005.cs"     Link="NesCore/Mapper/Mapper005.cs" />
+    <Compile Include="../AprNes/NesCore/Mapper/Mapper007.cs"     Link="NesCore/Mapper/Mapper007.cs" />
+    <Compile Include="../AprNes/NesCore/Mapper/Mapper011.cs"     Link="NesCore/Mapper/Mapper011.cs" />
+    <Compile Include="../AprNes/NesCore/Mapper/Mapper066.cs"     Link="NesCore/Mapper/Mapper066.cs" />
+    <Compile Include="../AprNes/NesCore/Mapper/Mapper071.cs"     Link="NesCore/Mapper/Mapper071.cs" />
+  </ItemGroup>
+
+</Project>
