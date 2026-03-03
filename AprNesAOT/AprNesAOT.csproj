@@ -24,7 +24,10 @@
     </Content>
   </ItemGroup>
 
-  <!-- 共享 NesCore 源碼 -->
+  <!-- Benchmark CLI -->
+  <ItemGroup>
+    <Compile Include="..\AprNes\BenchmarkRunner.cs" Link="BenchmarkRunner.cs" />
+  </ItemGroup>
   <ItemGroup>
     <Compile Include="..\AprNes\NesCore\APU.cs" />
     <Compile Include="..\AprNes\NesCore\CPU.cs" />

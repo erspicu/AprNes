@@ -115,6 +115,7 @@
     <Compile Include="NesCore\MEM.cs" />
     <Compile Include="NesCore\PPU.cs" />
     <Compile Include="Program.cs" />
+    <Compile Include="BenchmarkRunner.cs" />
     <Compile Include="TestRunner.cs" />
     <Compile Include="tool\WaveOutPlayer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

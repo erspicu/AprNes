@@ -70,6 +70,19 @@ namespace AprNes
 
         public static int Run(string[] args)
         {
+            // ── benchmark mode: AprNes.exe --benchmark <rom> [seconds] [output] ──
+            if (args.Length >= 2 && args[0] == "--benchmark")
+            {
+                string rom     = args[1];
+                int    seconds = args.Length >= 3 && int.TryParse(args[2], out int s) ? s : 10;
+                string outFile = args.Length >= 4 ? args[3] : null;
+                string header  = BenchmarkRunner.BuildHeader(rom, seconds);
+                Console.Write(header);
+                if (outFile != null) File.WriteAllText(outFile, header, System.Text.Encoding.UTF8);
+                BenchmarkRunner.Run(rom, seconds, outFile, ".NET Framework 4.6.1 JIT");
+                return 0;
+            }
+
             string romPath = null;
             double timeSec = 0;
             string screenshotPath = null;
