@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AccuracyCoin Report — AprNes</title>
+<style>
+body { font-family: 'Segoe UI', Arial, sans-serif; background:#1a1a2e; color:#e0e0e0; margin:0; padding:20px; }
+h1 { color:#a3c4f3; margin-bottom:4px; }
+.meta { color:#888; font-size:.9em; margin-bottom:20px; }
+.summary { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:24px; }
+.stat { background:#16213e; border-radius:8px; padding:12px 20px; text-align:center; min-width:80px; }
+.stat .num { font-size:2em; font-weight:bold; }
+.stat .lbl { font-size:.8em; color:#aaa; }
+.pass-c  { color:#4caf50; }
+.fail-c  { color:#f44336; }
+.skip-c  { color:#ff9800; }
+.notrun-c{ color:#9e9e9e; }
+.suite { margin-bottom:28px; border:1px solid #2d3561; border-radius:8px; overflow:hidden; }
+.suite-header { background:#0f3460; padding:10px 16px; font-weight:bold; font-size:1.05em; display:flex; align-items:center; gap:10px; }
+.suite-header .suite-stats { font-size:.85em; font-weight:normal; color:#aaa; margin-left:auto; }
+table { width:100%; border-collapse:collapse; }
+th { background:#16213e; padding:8px 12px; text-align:left; font-size:.85em; color:#aaa; }
+td { padding:8px 12px; border-top:1px solid #2d3561; font-size:.9em; vertical-align:middle; }
+tr:hover td { background:#1e2a5e; }
+.badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:.8em; font-weight:bold; }
+.badge.pass   { background:#1b5e20; color:#a5d6a7; }
+.badge.fail   { background:#b71c1c; color:#ef9a9a; }
+.badge.skip   { background:#e65100; color:#ffcc80; }
+.badge.notrun { background:#424242; color:#bdbdbd; }
+.badge.draw   { background:#4a148c; color:#ce93d8; }
+.addr { font-family:monospace; color:#78909c; font-size:.82em; }
+.ss { max-width:512px; width:100%; border:2px solid #2d3561; border-radius:4px; display:block; margin:8px auto; image-rendering:pixelated; }
+.ss-missing { background:#111; color:#555; text-align:center; padding:16px; font-style:italic; }
+.page-section { background:#16213e; border:1px solid #2d3561; border-radius:8px; margin-bottom:24px; padding:16px; }
+.page-section h3 { margin:0 0 10px; color:#a3c4f3; }
+.page-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:12px; }
+.page-card { background:#1a1a2e; border:1px solid #2d3561; border-radius:6px; padding:10px; text-align:center; }
+.page-card h4 { margin:0 0 8px; color:#ccc; font-size:.9em; }
+.draw-section { background:#1a0a2e; border:1px solid #4a148c; border-radius:8px; padding:16px; margin-bottom:24px; }
+.draw-section h3 { color:#ce93d8; margin:0 0 10px; }
+.draw-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:12px; }
+.draw-card { background:#12001e; border:1px solid #4a148c; border-radius:6px; padding:10px; text-align:center; }
+.draw-card h4 { margin:0 0 8px; color:#ce93d8; font-size:.9em; }
+</style>
+</head>
+<body>
+<h1>🪙 AccuracyCoin Report — AprNes</h1>
+<div class="meta">Generated: 2026-03-04 00:15 | ROM: AccuracyCoin.nes (Mapper 0/NROM)</div>
+
+<div class="summary">
+  <div class="stat"><div class="num pass-c">0</div><div class="lbl">PASS</div></div>
+  <div class="stat"><div class="num fail-c">0</div><div class="lbl">FAIL</div></div>
+  <div class="stat"><div class="num skip-c">0</div><div class="lbl">SKIP</div></div>
+  <div class="stat"><div class="num notrun-c">136</div><div class="lbl">N/A</div></div>
+  <div class="stat"><div class="num">136</div><div class="lbl">TOTAL</div></div>
+</div>
+
+<div class="page-section">
+  <h3>📊 Results Summary Screen</h3>
+  <div class="ss-missing">[screenshot not available]</div>
+</div>
+
+<div class="suite">
+  <div class="suite-header">
+    <span>Page 1: CPU Behavior</span>
+    <span class="suite-stats"><span class="notrun-c">9?</span></span>
+  </div>
+  <div class="ss-missing">[screenshot not available]</div>
+  <table>
+    <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
+    <tr><td>1</td><td>ROM is not writable</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0405=00</td></tr>
+    <tr><td>2</td><td>RAM Mirroring</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0403=00</td></tr>
+    <tr><td>3</td><td>PC Wraparound</td><td><span class="badge notrun">N/A</span></td><td class="addr">$044D=00</td></tr>
+    <tr><td>4</td><td>The Decimal Flag</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0474=00</td></tr>
+    <tr><td>5</td><td>The B Flag</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0475=00</td></tr>
+    <tr><td>6</td><td>Dummy read cycles</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0406=00</td></tr>
+    <tr><td>7</td><td>Dummy write cycles</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0407=00</td></tr>
+    <tr><td>8</td><td>Open Bus</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0408=00</td></tr>
+    <tr><td>9</td><td>All NOP instructions</td><td><span class="badge notrun">N/A</span></td><td class="addr">$047D=00</td></tr>
+  </table>
+</div>
+
+<div class="suite">
+  <div class="suite-header">
+    <span>Page 2: Addressing mode wraparound</span>
+    <span class="suite-stats"><span class="notrun-c">6?</span></span>
+  </div>
+  <div class="ss-missing">[screenshot not available]</div>
+  <table>
+    <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
+    <tr><td>1</td><td>Absolute Indexed</td><td><span class="badge notrun">N/A</span></td><td class="addr">$046E=00</td></tr>
+    <tr><td>2</td><td>Zero Page Indexed</td><td><span class="badge notrun">N/A</span></td><td class="addr">$046F=00</td></tr>
+    <tr><td>3</td><td>Indirect</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0470=00</td></tr>
+    <tr><td>4</td><td>Indirect, X</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0471=00</td></tr>
+    <tr><td>5</td><td>Indirect, Y</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0472=00</td></tr>
+    <tr><td>6</td><td>Relative</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0473=00</td></tr>
+  </table>
+</div>
+
+<div class="suite">
+  <div class="suite-header">
+    <span>Page 3: Unofficial Instructions: SLO</span>
+    <span class="suite-stats"><span class="notrun-c">7?</span></span>
+  </div>
+  <div class="ss-missing">[screenshot not available]</div>
+  <table>
+    <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
+    <tr><td>1</td><td>$03  SLO (indirect,X)</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0409=00</td></tr>
+    <tr><td>2</td><td>$07  SLO zeropage</td><td><span class="badge notrun">N/A</span></td><td class="addr">$040A=00</td></tr>
+    <tr><td>3</td><td>$0F  SLO absolute</td><td><span class="badge notrun">N/A</span></td><td class="addr">$040B=00</td></tr>
+    <tr><td>4</td><td>$13  SLO (indirect),Y</td><td><span class="badge notrun">N/A</span></td><td class="addr">$040C=00</td></tr>
+    <tr><td>5</td><td>$17  SLO zeropage,X</td><td><span class="badge notrun">N/A</span></td><td class="addr">$040D=00</td></tr>
+    <tr><td>6</td><td>$1B  SLO absolute,Y</td><td><span class="badge notrun">N/A</span></td><td class="addr">$040E=00</td></tr>
+    <tr><td>7</td><td>$1F  SLO absolute,X</td><td><span class="badge notrun">N/A</span></td><td class="addr">$040F=00</td></tr>
+  </table>
+</div>
+
+<div class="suite">
+  <div class="suite-header">
+    <span>Page 4: Unofficial Instructions: RLA</span>
+    <span class="suite-stats"><span class="notrun-c">7?</span></span>
+  </div>
+  <div class="ss-missing">[screenshot not available]</div>
+  <table>
+    <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
+    <tr><td>1</td><td>$23  RLA (indirect,X)</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0419=00</td></tr>
+    <tr><td>2</td><td>$27  RLA zeropage</td><td><span class="badge notrun">N/A</span></td><td class="addr">$041A=00</td></tr>
+    <tr><td>3</td><td>$2F  RLA absolute</td><td><span class="badge notrun">N/A</span></td><td class="addr">$041B=00</td></tr>
+    <tr><td>4</td><td>$33  RLA (indirect),Y</td><td><span class="badge notrun">N/A</span></td><td class="addr">$041C=00</td></tr>
+    <tr><td>5</td><td>$37  RLA zeropage,X</td><td><span class="badge notrun">N/A</span></td><td class="addr">$041D=00</td></tr>
+    <tr><td>6</td><td>$3B  RLA absolute,Y</td><td><span class="badge notrun">N/A</span></td><td class="addr">$041E=00</td></tr>
+    <tr><td>7</td><td>$3F  RLA absolute,X</td><td><span class="badge notrun">N/A</span></td><td class="addr">$041F=00</td></tr>
+  </table>
+</div>
+
+<div class="suite">
+  <div class="suite-header">
+    <span>Page 5: Unofficial Instructions: SRE</span>
+    <span class="suite-stats"><span class="notrun-c">7?</span></span>
+  </div>
+  <div class="ss-missing">[screenshot not available]</div>
+  <table>
+    <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
+    <tr><td>1</td><td>$43  SRE (indirect,X)</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0420=00</td></tr>
+    <tr><td>2</td><td>$47  SRE zeropage</td><td><span class="badge notrun">N/A</span></td><td class="addr">$047F=00</td></tr>
+    <tr><td>3</td><td>$4F  SRE absolute</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0422=00</td></tr>
+    <tr><td>4</td><td>$53  SRE (indirect),Y</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0423=00</td></tr>
+    <tr><td>5</td><td>$57  SRE zeropage,X</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0424=00</td></tr>
+    <tr><td>6</td><td>$5B  SRE absolute,Y</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0425=00</td></tr>
+    <tr><td>7</td><td>$5F  SRE absolute,X</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0426=00</td></tr>
+  </table>
+</div>
+
+<div class="suite">
+  <div class="suite-header">
+    <span>Page 6: Unofficial Instructions: RRA</span>
+    <span class="suite-stats"><span class="notrun-c">7?</span></span>
+  </div>
+  <div class="ss-missing">[screenshot not available]</div>
+  <table>
+    <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
+    <tr><td>1</td><td>$63  RRA (indirect,X)</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0427=00</td></tr>
+    <tr><td>2</td><td>$67  RRA zeropage</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0428=00</td></tr>
+    <tr><td>3</td><td>$6F  RRA absolute</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0429=00</td></tr>
+    <tr><td>4</td><td>$73  RRA (indirect),Y</td><td><span class="badge notrun">N/A</span></td><td class="addr">$042A=00</td></tr>
+    <tr><td>5</td><td>$77  RRA zeropage,X</td><td><span class="badge notrun">N/A</span></td><td class="addr">$042B=00</td></tr>
+    <tr><td>6</td><td>$7B  RRA absolute,Y</td><td><span class="badge notrun">N/A</span></td><td class="addr">$042C=00</td></tr>
+    <tr><td>7</td><td>$7F  RRA absolute,X</td><td><span class="badge notrun">N/A</span></td><td class="addr">$042D=00</td></tr>
+  </table>
+</div>
+
+<div class="suite">
+  <div class="suite-header">
+    <span>Page 7: Unofficial Instructions: *AX</span>
+    <span class="suite-stats"><span class="notrun-c">10?</span></span>
+  </div>
+  <div class="ss-missing">[screenshot not available]</div>
+  <table>
+    <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
+    <tr><td>1</td><td>$83  SAX (indirect,X)</td><td><span class="badge notrun">N/A</span></td><td class="addr">$042E=00</td></tr>
+    <tr><td>2</td><td>$87  SAX zeropage</td><td><span class="badge notrun">N/A</span></td><td class="addr">$042F=00</td></tr>
+    <tr><td>3</td><td>$8F  SAX absolute</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0430=00</td></tr>
+    <tr><td>4</td><td>$97  SAX zeropage,Y</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0431=00</td></tr>
+    <tr><td>5</td><td>$A3  LAX (indirect,X)</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0432=00</td></tr>
+    <tr><td>6</td><td>$A7  LAX zeropage</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0433=00</td></tr>
+    <tr><td>7</td><td>$AF  LAX absolute</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0434=00</td></tr>
+    <tr><td>8</td><td>$B3  LAX (indirect),Y</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0435=00</td></tr>
+    <tr><td>9</td><td>$B7  LAX zeropage,Y</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0436=00</td></tr>
+    <tr><td>10</td><td>$BF  LAX absolute,X</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0437=00</td></tr>
+  </table>
+</div>
+
+<div class="suite">
+  <div class="suite-header">
+    <span>Page 8: Unofficial Instructions: DCP</span>
+    <span class="suite-stats"><span class="notrun-c">7?</span></span>
+  </div>
+  <div class="ss-missing">[screenshot not available]</div>
+  <table>
+    <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
+    <tr><td>1</td><td>$C3  DCP (indirect,X)</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0438=00</td></tr>
+    <tr><td>2</td><td>$C7  DCP zeropage</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0439=00</td></tr>
+    <tr><td>3</td><td>$CF  DCP absolute</td><td><span class="badge notrun">N/A</span></td><td class="addr">$043A=00</td></tr>
+    <tr><td>4</td><td>$D3  DCP (indirect),Y</td><td><span class="badge notrun">N/A</span></td><td class="addr">$043B=00</td></tr>
+    <tr><td>5</td><td>$D7  DCP zeropage,X</td><td><span class="badge notrun">N/A</span></td><td class="addr">$043C=00</td></tr>
+    <tr><td>6</td><td>$DB  DCP absolute,Y</td><td><span class="badge notrun">N/A</span></td><td class="addr">$043D=00</td></tr>
+    <tr><td>7</td><td>$DF  DCP absolute,X</td><td><span class="badge notrun">N/A</span></td><td class="addr">$043E=00</td></tr>
+  </table>
+</div>
+
+<div class="suite">
+  <div class="suite-header">
+    <span>Page 9: Unofficial Instructions: ISC</span>
+    <span class="suite-stats"><span class="notrun-c">7?</span></span>
+  </div>
+  <div class="ss-missing">[screenshot not available]</div>
+  <table>
+    <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
+    <tr><td>1</td><td>$E3  ISC (indirect,X)</td><td><span class="badge notrun">N/A</span></td><td class="addr">$043F=00</td></tr>
+    <tr><td>2</td><td>$E7  ISC zeropage</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0440=00</td></tr>
+    <tr><td>3</td><td>$EF  ISC absolute</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0441=00</td></tr>
+    <tr><td>4</td><td>$F3  ISC (indirect),Y</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0442=00</td></tr>
+    <tr><td>5</td><td>$F7  ISC zeropage,X</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0443=00</td></tr>
+    <tr><td>6</td><td>$FB  ISC absolute,Y</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0444=00</td></tr>
+    <tr><td>7</td><td>$FF  ISC absolute,X</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0445=00</td></tr>
+  </table>
+</div>
+
+<div class="suite">
+  <div class="suite-header">
+    <span>Page 10: Unofficial Instructions: SH*</span>
+    <span class="suite-stats"><span class="notrun-c">6?</span></span>
+  </div>
+  <div class="ss-missing">[screenshot not available]</div>
+  <table>
+    <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
+    <tr><td>1</td><td>$93  SHA (indirect),Y</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0446=00</td></tr>
+    <tr><td>2</td><td>$9F  SHA absolute,Y</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0447=00</td></tr>
+    <tr><td>3</td><td>$9B  SHS absolute,Y</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0448=00</td></tr>
+    <tr><td>4</td><td>$9C  SHY absolute,X</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0449=00</td></tr>
+    <tr><td>5</td><td>$9E  SHX absolute,Y</td><td><span class="badge notrun">N/A</span></td><td class="addr">$044A=00</td></tr>
+    <tr><td>6</td><td>$BB  LAE absolute,Y</td><td><span class="badge notrun">N/A</span></td><td class="addr">$044B=00</td></tr>
+  </table>
+</div>
+
+<div class="suite">
+  <div class="suite-header">
+    <span>Page 11: Unofficial Immediates</span>
+    <span class="suite-stats"><span class="notrun-c">8?</span></span>
+  </div>
+  <div class="ss-missing">[screenshot not available]</div>
+  <table>
+    <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
+    <tr><td>1</td><td>$0B  ANC Immediate</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0410=00</td></tr>
+    <tr><td>2</td><td>$2B  ANC Immediate</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0411=00</td></tr>
+    <tr><td>3</td><td>$4B  ASR Immediate</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0412=00</td></tr>
+    <tr><td>4</td><td>$6B  ARR Immediate</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0413=00</td></tr>
+    <tr><td>5</td><td>$8B  ANE Immediate</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0414=00</td></tr>
+    <tr><td>6</td><td>$AB  LXA Immediate</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0415=00</td></tr>
+    <tr><td>7</td><td>$CB  AXS Immediate</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0416=00</td></tr>
+    <tr><td>8</td><td>$EB  SBC Immediate</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0417=00</td></tr>
+  </table>
+</div>
+
+<div class="suite">
+  <div class="suite-header">
+    <span>Page 12: CPU Interrupts</span>
+    <span class="suite-stats"><span class="notrun-c">3?</span></span>
+  </div>
+  <div class="ss-missing">[screenshot not available]</div>
+  <table>
+    <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
+    <tr><td>1</td><td>Interrupt flag latency</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0461=00</td></tr>
+    <tr><td>2</td><td>NMI Overlap BRK</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0462=00</td></tr>
+    <tr><td>3</td><td>NMI Overlap IRQ</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0463=00</td></tr>
+  </table>
+</div>
+
+<div class="suite">
+  <div class="suite-header">
+    <span>Page 13: APU Registers and DMA tests</span>
+    <span class="suite-stats"><span class="notrun-c">10?</span></span>
+  </div>
+  <div class="ss-missing">[screenshot not available]</div>
+  <table>
+    <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
+    <tr><td>1</td><td>DMA + Open Bus</td><td><span class="badge notrun">N/A</span></td><td class="addr">$046C=00</td></tr>
+    <tr><td>2</td><td>DMA + $2002 Read</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0488=00</td></tr>
+    <tr><td>3</td><td>DMA + $2007 Read</td><td><span class="badge notrun">N/A</span></td><td class="addr">$044C=00</td></tr>
+    <tr><td>4</td><td>DMA + $2007 Write</td><td><span class="badge notrun">N/A</span></td><td class="addr">$044F=00</td></tr>
+    <tr><td>5</td><td>DMA + $4015 Read</td><td><span class="badge notrun">N/A</span></td><td class="addr">$045D=00</td></tr>
+    <tr><td>6</td><td>DMA + $4016 Read</td><td><span class="badge notrun">N/A</span></td><td class="addr">$045E=00</td></tr>
+    <tr><td>7</td><td>DMC DMA Bus Conflicts</td><td><span class="badge notrun">N/A</span></td><td class="addr">$046B=00</td></tr>
+    <tr><td>8</td><td>DMC DMA + OAM DMA</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0477=00</td></tr>
+    <tr><td>9</td><td>Explicit DMA Abort</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0479=00</td></tr>
+    <tr><td>10</td><td>Implicit DMA Abort</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0478=00</td></tr>
+  </table>
+</div>
+
+<div class="suite">
+  <div class="suite-header">
+    <span>Page 14: APU Tests</span>
+    <span class="suite-stats"><span class="notrun-c">9?</span></span>
+  </div>
+  <div class="ss-missing">[screenshot not available]</div>
+  <table>
+    <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
+    <tr><td>1</td><td>Length Counter</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0465=00</td></tr>
+    <tr><td>2</td><td>Length Table</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0466=00</td></tr>
+    <tr><td>3</td><td>Frame Counter IRQ</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0467=00</td></tr>
+    <tr><td>4</td><td>Frame Counter 4-step</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0468=00</td></tr>
+    <tr><td>5</td><td>Frame Counter 5-step</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0469=00</td></tr>
+    <tr><td>6</td><td>Delta Modulation Channel</td><td><span class="badge notrun">N/A</span></td><td class="addr">$046A=00</td></tr>
+    <tr><td>7</td><td>APU Register Activation</td><td><span class="badge notrun">N/A</span></td><td class="addr">$045C=00</td></tr>
+    <tr><td>8</td><td>Controller Strobing</td><td><span class="badge notrun">N/A</span></td><td class="addr">$045F=00</td></tr>
+    <tr><td>9</td><td>Controller Clocking</td><td><span class="badge notrun">N/A</span></td><td class="addr">$047A=00</td></tr>
+  </table>
+</div>
+
+<div class="draw-section">
+  <h3>🎨 Page 15: Power On State (DRAW Tests)</h3>
+  <p style="color:#aaa;font-size:.85em">These tests display memory values rather than simple pass/fail.
+  Run individually with sub-item navigation (A button) to see results.</p>
+  <div class="draw-grid">
+    <div class="draw-card"><h4>Page overview</h4><div class="ss-missing">[screenshot not available]</div></div>
+    <div class="draw-card"><h4>PPU Reset Flag</h4><div class="ss-missing">[screenshot not available]</div></div>
+    <div class="draw-card"><h4>CPU RAM</h4><div class="ss-missing">[screenshot not available]</div></div>
+    <div class="draw-card"><h4>CPU Registers</h4><div class="ss-missing">[screenshot not available]</div></div>
+    <div class="draw-card"><h4>PPU RAM</h4><div class="ss-missing">[screenshot not available]</div></div>
+    <div class="draw-card"><h4>Palette RAM</h4><div class="ss-missing">[screenshot not available]</div></div>
+  </div>
+</div>
+
+<div class="suite">
+  <div class="suite-header">
+    <span>Page 16: PPU Behavior</span>
+    <span class="suite-stats"><span class="notrun-c">7?</span></span>
+  </div>
+  <div class="ss-missing">[screenshot not available]</div>
+  <table>
+    <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
+    <tr><td>1</td><td>CHR ROM is not writable</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0485=00</td></tr>
+    <tr><td>2</td><td>PPU Register Mirroring</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0404=00</td></tr>
+    <tr><td>3</td><td>PPU Register Open Bus</td><td><span class="badge notrun">N/A</span></td><td class="addr">$044E=00</td></tr>
+    <tr><td>4</td><td>PPU Read Buffer</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0476=00</td></tr>
+    <tr><td>5</td><td>Palette RAM Quirks</td><td><span class="badge notrun">N/A</span></td><td class="addr">$047E=00</td></tr>
+    <tr><td>6</td><td>Rendering Flag Behavior</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0486=00</td></tr>
+    <tr><td>7</td><td>$2007 read w/ rendering</td><td><span class="badge notrun">N/A</span></td><td class="addr">$048A=00</td></tr>
+  </table>
+</div>
+
+<div class="suite">
+  <div class="suite-header">
+    <span>Page 17: PPU VBlank Timing</span>
+    <span class="suite-stats"><span class="notrun-c">7?</span></span>
+  </div>
+  <div class="ss-missing">[screenshot not available]</div>
+  <table>
+    <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
+    <tr><td>1</td><td>VBlank beginning</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0450=00</td></tr>
+    <tr><td>2</td><td>VBlank end</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0451=00</td></tr>
+    <tr><td>3</td><td>NMI Control</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0452=00</td></tr>
+    <tr><td>4</td><td>NMI Timing</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0453=00</td></tr>
+    <tr><td>5</td><td>NMI Suppression</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0454=00</td></tr>
+    <tr><td>6</td><td>NMI at VBlank end</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0455=00</td></tr>
+    <tr><td>7</td><td>NMI disabled at VBlank</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0456=00</td></tr>
+  </table>
+</div>
+
+<div class="suite">
+  <div class="suite-header">
+    <span>Page 18: Sprite Evaluation</span>
+    <span class="suite-stats"><span class="notrun-c">9?</span></span>
+  </div>
+  <div class="ss-missing">[screenshot not available]</div>
+  <table>
+    <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
+    <tr><td>1</td><td>Sprite overflow behavior</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0459=00</td></tr>
+    <tr><td>2</td><td>Sprite 0 Hit behavior</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0457=00</td></tr>
+    <tr><td>3</td><td>$2002 flag clear timing</td><td><span class="badge notrun">N/A</span></td><td class="addr">$048D=00</td></tr>
+    <tr><td>4</td><td>Suddenly Resize Sprite</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0489=00</td></tr>
+    <tr><td>5</td><td>Arbitrary Sprite zero</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0458=00</td></tr>
+    <tr><td>6</td><td>Misaligned OAM behavior</td><td><span class="badge notrun">N/A</span></td><td class="addr">$045A=00</td></tr>
+    <tr><td>7</td><td>Address $2004 behavior</td><td><span class="badge notrun">N/A</span></td><td class="addr">$045B=00</td></tr>
+    <tr><td>8</td><td>OAM Corruption</td><td><span class="badge notrun">N/A</span></td><td class="addr">$047B=00</td></tr>
+    <tr><td>9</td><td>INC $4014</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0480=00</td></tr>
+  </table>
+</div>
+
+<div class="suite">
+  <div class="suite-header">
+    <span>Page 19: PPU Misc.</span>
+    <span class="suite-stats"><span class="notrun-c">6?</span></span>
+  </div>
+  <div class="ss-missing">[screenshot not available]</div>
+  <table>
+    <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
+    <tr><td>1</td><td>Attributes As Tiles</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0481=00</td></tr>
+    <tr><td>2</td><td>t Register Quirks</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0482=00</td></tr>
+    <tr><td>3</td><td>Stale BG Shift Registers</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0483=00</td></tr>
+    <tr><td>4</td><td>BG Serial In</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0487=00</td></tr>
+    <tr><td>5</td><td>Sprites On Scanline 0</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0484=00</td></tr>
+    <tr><td>6</td><td>$2004 Stress Test</td><td><span class="badge notrun">N/A</span></td><td class="addr">$048C=00</td></tr>
+  </table>
+</div>
+
+<div class="suite">
+  <div class="suite-header">
+    <span>Page 20: CPU Behavior 2</span>
+    <span class="suite-stats"><span class="notrun-c">4?</span></span>
+  </div>
+  <div class="ss-missing">[screenshot not available]</div>
+  <table>
+    <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
+    <tr><td>1</td><td>Instruction Timing</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0460=00</td></tr>
+    <tr><td>2</td><td>Implied Dummy Reads</td><td><span class="badge notrun">N/A</span></td><td class="addr">$046D=00</td></tr>
+    <tr><td>3</td><td>Branch Dummy Reads</td><td><span class="badge notrun">N/A</span></td><td class="addr">$048B=00</td></tr>
+    <tr><td>4</td><td>JSR Edge Cases</td><td><span class="badge notrun">N/A</span></td><td class="addr">$047C=00</td></tr>
+  </table>
+</div>
+
+<hr style="border-color:#2d3561;margin:30px 0">
+<p style="color:#555;font-size:.8em;text-align:center">
+  AccuracyCoin by &lt;author&gt; | Result encoding: 0x01=PASS, (N&lt;&lt;2)|0x02=FAIL(N), 0xFF=SKIP, 0x00=not run
+</p>
+</body>
+</html>

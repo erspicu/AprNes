@@ -717,6 +717,7 @@ namespace AprNes
             if (dmcsamplesleft > 0) status |= 0x10;
             if (statusframeint)     status |= 0x40;
             if (statusdmcint)       status |= 0x80;
+            status |= (byte)(cpubus & 0x20); // bit 5 is open bus (CPU data bus)
             statusframeint = false;
             return status;
         }

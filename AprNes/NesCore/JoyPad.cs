@@ -30,7 +30,7 @@ namespace AprNes
             else P1_r = 1; // After 8 buttons, shift register returns D0=1 (NES hardware)
             P1_StrobeState++;
             if (P1_StrobeState == 24) P1_StrobeState = 0;
-            return P1_r;
+            return (byte)((P1_r & 0x1F) | (cpubus & 0xE0)); // upper 3 bits are CPU open bus
         }
 
         static byte P1_LastWrite = 0;

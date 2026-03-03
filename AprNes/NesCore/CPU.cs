@@ -1,4 +1,4 @@
-﻿#define illegal
+#define illegal
 using System;
 using System.Runtime.CompilerServices;
 
@@ -385,10 +385,10 @@ namespace AprNes
                     if (flagC == 0)
                     {
                         bool brSaved = irqLinePrev; // save before branch extra tick
-                        tick(); // taken
+                        Mem_r(r_PC); // cycle 3: dummy read from byte following operand
                         ushort1 = r_PC;
                         r_PC = (ushort)(r_PC + (sbyte)byte1);
-                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) tick(); // page cross
+                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) Mem_r((ushort)((ushort1 & 0xFF00) | (r_PC & 0x00FF))); // cycle 4: dummy read at wrong-page address
                         else irqLinePrev = brSaved; // no cross: IRQ penultimate = pre-branch state
                     }
                     break;
@@ -398,10 +398,10 @@ namespace AprNes
                     if (flagC == 1)
                     {
                         bool brSaved = irqLinePrev; // save before branch extra tick
-                        tick(); // taken
+                        Mem_r(r_PC); // cycle 3: dummy read from byte following operand
                         ushort1 = r_PC;
                         r_PC = (ushort)(r_PC + (sbyte)byte1);
-                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) tick(); // page cross
+                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) Mem_r((ushort)((ushort1 & 0xFF00) | (r_PC & 0x00FF))); // cycle 4: dummy read at wrong-page address
                         else irqLinePrev = brSaved; // no cross: IRQ penultimate = pre-branch state
                     }
                     break;
@@ -411,10 +411,10 @@ namespace AprNes
                     if (flagZ == 1)
                     {
                         bool brSaved = irqLinePrev; // save before branch extra tick
-                        tick(); // taken
+                        Mem_r(r_PC); // cycle 3: dummy read from byte following operand
                         ushort1 = r_PC;
                         r_PC = (ushort)(r_PC + (sbyte)byte1);
-                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) tick(); // page cross
+                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) Mem_r((ushort)((ushort1 & 0xFF00) | (r_PC & 0x00FF))); // cycle 4: dummy read at wrong-page address
                         else irqLinePrev = brSaved; // no cross: IRQ penultimate = pre-branch state
                     }
                     break;
@@ -439,10 +439,10 @@ namespace AprNes
                     if (flagN == 1)
                     {
                         bool brSaved = irqLinePrev; // save before branch extra tick
-                        tick(); // taken
+                        Mem_r(r_PC); // cycle 3: dummy read from byte following operand
                         ushort1 = r_PC;
                         r_PC = (ushort)(r_PC + (sbyte)byte1);
-                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) tick(); // page cross
+                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) Mem_r((ushort)((ushort1 & 0xFF00) | (r_PC & 0x00FF))); // cycle 4: dummy read at wrong-page address
                         else irqLinePrev = brSaved; // no cross: IRQ penultimate = pre-branch state
                     }
                     break;
@@ -452,10 +452,10 @@ namespace AprNes
                     if (flagZ == 0)
                     {
                         bool brSaved = irqLinePrev; // save before branch extra tick
-                        tick(); // taken
+                        Mem_r(r_PC); // cycle 3: dummy read from byte following operand
                         ushort1 = r_PC;
                         r_PC = (ushort)(r_PC + (sbyte)byte1);
-                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) tick(); // page cross
+                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) Mem_r((ushort)((ushort1 & 0xFF00) | (r_PC & 0x00FF))); // cycle 4: dummy read at wrong-page address
                         else irqLinePrev = brSaved; // no cross: IRQ penultimate = pre-branch state
                     }
                     break;
@@ -465,10 +465,10 @@ namespace AprNes
                     if (flagN == 0)
                     {
                         bool brSaved = irqLinePrev; // save before branch extra tick
-                        tick(); // taken
+                        Mem_r(r_PC); // cycle 3: dummy read from byte following operand
                         ushort1 = r_PC;
                         r_PC = (ushort)(r_PC + (sbyte)byte1);
-                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) tick(); // page cross
+                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) Mem_r((ushort)((ushort1 & 0xFF00) | (r_PC & 0x00FF))); // cycle 4: dummy read at wrong-page address
                         else irqLinePrev = brSaved; // no cross: IRQ penultimate = pre-branch state
                     }
                     break;
@@ -491,10 +491,10 @@ namespace AprNes
                     if (flagV == 0)
                     {
                         bool brSaved = irqLinePrev; // save before branch extra tick
-                        tick(); // taken
+                        Mem_r(r_PC); // cycle 3: dummy read from byte following operand
                         ushort1 = r_PC;
                         r_PC = (ushort)(r_PC + (sbyte)byte1);
-                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) tick(); // page cross
+                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) Mem_r((ushort)((ushort1 & 0xFF00) | (r_PC & 0x00FF))); // cycle 4: dummy read at wrong-page address
                         else irqLinePrev = brSaved; // no cross: IRQ penultimate = pre-branch state
                     }
                     break;
@@ -504,10 +504,10 @@ namespace AprNes
                     if (flagV == 1)
                     {
                         bool brSaved = irqLinePrev; // save before branch extra tick
-                        tick(); // taken
+                        Mem_r(r_PC); // cycle 3: dummy read from byte following operand
                         ushort1 = r_PC;
                         r_PC = (ushort)(r_PC + (sbyte)byte1);
-                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) tick(); // page cross
+                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) Mem_r((ushort)((ushort1 & 0xFF00) | (r_PC & 0x00FF))); // cycle 4: dummy read at wrong-page address
                         else irqLinePrev = brSaved; // no cross: IRQ penultimate = pre-branch state
                     }
                     break;

@@ -63,7 +63,7 @@ namespace AprNes
             cpuBusIsWrite = false;
             tick();
             byte val = mem_read_fun[address](address);
-            cpubus = val;
+            if (address != 0x4015) cpubus = val; // $4015 reads don't propagate to data bus
             return val;
         }
 
@@ -78,10 +78,10 @@ namespace AprNes
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static byte ZP_r(byte addr) { cpuBusAddr = addr; cpuBusIsWrite = false; tick(); return NES_MEM[addr]; }
+        static byte ZP_r(byte addr) { cpuBusAddr = addr; cpuBusIsWrite = false; tick(); byte val = NES_MEM[addr]; cpubus = val; return val; }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void ZP_w(byte addr, byte value) { cpuBusAddr = addr; cpuBusIsWrite = true; tick(); NES_MEM[addr] = value; }
+        static void ZP_w(byte addr, byte value) { cpuBusAddr = addr; cpuBusIsWrite = true; tick(); NES_MEM[addr] = value; cpubus = value; }
 
         static Action<ushort, byte>[] mem_write_fun = null;
         static Func<ushort, byte>[] mem_read_fun = null;
@@ -110,8 +110,7 @@ namespace AprNes
             {
                 if (address < 0x2000) mem_read_fun[address] = new Func<ushort, byte>((addr) => { return NES_MEM[addr & 0x7ff]; });
                 else if (address < 0x4020) mem_read_fun[address] = new Func<ushort, byte>(IO_read);
-                else if (address < 0x4100) mem_read_fun[address] = new Func<ushort, byte>((addr) => { return cpubus; }); // $4020-$40FF: CPU open bus
-                else if (address < 0x6000) mem_read_fun[address] = new Func<ushort, byte>(MapperObj.MapperR_ExpansionROM);
+                else if (address < 0x6000) mem_read_fun[address] = new Func<ushort, byte>((addr) => { return cpubus; }); // $4020-$5FFF: CPU open bus
                 else if (address < 0x8000) mem_read_fun[address] = new Func<ushort, byte>(MapperObj.MapperR_RAM);
                 else mem_read_fun[address] = new Func<ushort, byte>(MapperObj.MapperR_RPG);
             }

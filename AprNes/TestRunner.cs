@@ -52,8 +52,25 @@ namespace AprNes
             return events;
         }
 
-        static int ButtonNameToIndex(string name)
+        // Parse --timed-screenshots "path1:t1,path2:t2,...", returns list sorted by frame
+        static List<KeyValuePair<int, string>> ParseTimedScreenshots(string spec)
         {
+            var list = new List<KeyValuePair<int, string>>();
+            if (string.IsNullOrEmpty(spec)) return list;
+            foreach (string entry in spec.Split(','))
+            {
+                int sep = entry.LastIndexOf(':');
+                if (sep <= 0) continue;
+                string path = entry.Substring(0, sep).Trim();
+                double sec;
+                if (!double.TryParse(entry.Substring(sep + 1).Trim(), out sec)) continue;
+                list.Add(new KeyValuePair<int, string>((int)(sec * NES_FPS), path));
+            }
+            list.Sort((a, b) => a.Key.CompareTo(b.Key));
+            return list;
+        }
+
+        static int ButtonNameToIndex(string name)        {
             switch (name.ToLower())
             {
                 case "a":      return 0;
@@ -93,6 +110,8 @@ namespace AprNes
             string inputSpec = null;
             HashSet<string> expectedCrcs = null; // --expected-crc "CRC1,CRC2,..."
             bool passOnStable = false; // --pass-on-stable: screen stable + no "Failed" = PASS
+            string timedScreenshotsSpec = null; // --timed-screenshots "path1:t1,path2:t2,..."
+            bool dumpAcResults = false; // --dump-ac-results: print AC_RESULTS_HEX after run
 
             // Parse arguments
             for (int i = 0; i < args.Length; i++)
@@ -132,6 +151,12 @@ namespace AprNes
                     case "--pass-on-stable":
                         passOnStable = true;
                         break;
+                    case "--timed-screenshots":
+                        if (i + 1 < args.Length) timedScreenshotsSpec = args[++i];
+                        break;
+                    case "--dump-ac-results":
+                        dumpAcResults = true;
+                        break;
                     case "--expected-crc":
                         if (i + 1 < args.Length)
                         {
@@ -148,7 +173,7 @@ namespace AprNes
 
             if (romPath == null)
             {
-                Console.Error.WriteLine("Usage: AprNes.exe --rom <file.nes> [--time <seconds>] [--wait-result] [--max-wait <seconds>] [--soft-reset <seconds>] [--input \"A:1.0,B:2.0,...\"] [--screenshot <out.png>] [--log <results.log>] [--debug-log <path>] [--debug-max <n>]");
+                Console.Error.WriteLine("Usage: AprNes.exe --rom <file.nes> [--time <seconds>] [--wait-result] [--max-wait <seconds>] [--soft-reset <seconds>] [--input \"A:1.0,B:2.0,...\"] [--screenshot <out.png>] [--timed-screenshots \"path1:t1,path2:t2,...\"] [--dump-ac-results] [--log <results.log>] [--debug-log <path>] [--debug-max <n>]");
                 return 2;
             }
 
@@ -172,7 +197,12 @@ namespace AprNes
             // NES runs ~60.0988 fps; if --time given, compute frame limit
             int maxFrames = 0;
             if (timeSec > 0)
+            {
                 maxFrames = (int)(timeSec * 60.0988);
+                // If --time is explicitly set, let it be the hard limit; ensure maxWait doesn't fire first
+                if (timeSec > maxWait)
+                    maxWait = timeSec + 5;
+            }
 
             // State for video output handler
             bool done = false;
@@ -190,6 +220,9 @@ namespace AprNes
 
             // Input events
             List<InputEvent> inputEvents = ParseInput(inputSpec);
+
+            // Timed screenshots: sorted list of (frame, path)
+            var timedShots = ParseTimedScreenshots(timedScreenshotsSpec);
 
             // Screen stability tracking (for non-$6000-protocol test detection)
             uint prevHash = 0;
@@ -209,6 +242,16 @@ namespace AprNes
                         NesCore.P1_ButtonPress((byte)ev.buttonIndex);
                     else if (frameCount == ev.releaseFrame)
                         NesCore.P1_ButtonUnPress((byte)ev.buttonIndex);
+                }
+
+                // --- Timed screenshots ---
+                for (int ts = 0; ts < timedShots.Count; ts++)
+                {
+                    if (frameCount == timedShots[ts].Key)
+                    {
+                        try { SaveScreenshot(timedShots[ts].Value); }
+                        catch (Exception ex) { Console.Error.WriteLine("[TestRunner] Timed screenshot failed: " + ex.Message); }
+                    }
                 }
 
                 // --- Soft reset: explicit --soft-reset time ---
@@ -445,6 +488,15 @@ namespace AprNes
                 {
                     Console.Error.WriteLine("Screenshot failed: " + ex.Message);
                 }
+            }
+
+            // Dump AccuracyCoin results ($0300-$04FF)
+            if (dumpAcResults)
+            {
+                var sb = new StringBuilder("AC_RESULTS_HEX:");
+                for (int addr = 0x0300; addr < 0x0500; addr++)
+                    sb.Append(NesCore.NES_MEM[addr].ToString("X2"));
+                Console.WriteLine(sb.ToString());
             }
 
             // Determine pass/fail
