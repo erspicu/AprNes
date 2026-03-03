@@ -54,6 +54,14 @@
         {
             <span style="color:#f80; font-size:11px;">⚡ 無限制</span>
         }
+        @if (_gamepadConnected)
+        {
+            <span style="color:#4a4;">🎮 手把已連接</span>
+        }
+        else
+        {
+            <span style="color:#888; font-size:11px;">🎮 無手把（按手把任意鍵偵測）</span>
+        }
     </div>
     @if (_errorMsg != null)
     {
@@ -68,6 +76,8 @@
     string _fps       = "0";
     bool   _audioEnabled = true;
     bool   _fpsLimit     = true;
+    int    _prevGamepadMask   = 0;
+    bool   _gamepadConnected  = false;
 
     // frame 計數（FPS 顯示用）
     int    _framesSinceLastUpdate = 0;
@@ -118,31 +128,55 @@
 
     void CollectAudio(short s) => _audioSamples.Add(s);
 
-    // ── 每幀由 JS requestAnimationFrame 呼叫 ──────────────────────────────
+    // ── 每幀由 JS invokeMethod（同步）呼叫 ───────────────────────────────────
     [JSInvokable]
-    public async System.Threading.Tasks.Task OnFrame()
+    public void OnFrame()
     {
         if (!_romLoaded || NesCore.exit) return;
-
         try
         {
             // 執行一幀
             _audioSamples.Clear();
+
+            // 手把輸入（每幀輪詢，差分更新）
+            int gpMask = NesJsInterop.GetGamepadState();
+            bool nowConnected = gpMask >= 0;
+            if (nowConnected != _gamepadConnected)
+            {
+                _gamepadConnected = nowConnected;
+                _ = InvokeAsync(StateHasChanged);
+            }
+            if (nowConnected)
+            {
+                for (int i = 0; i < 8; i++)
+                {
+                    int bit = 1 << i;
+                    bool prev = (_prevGamepadMask & bit) != 0;
+                    bool curr = (gpMask & bit) != 0;
+                    if (prev != curr)
+                    {
+                        if (curr) NesCore.P1_ButtonPress((byte)i);
+                        else      NesCore.P1_ButtonUnPress((byte)i);
+                    }
+                }
+                _prevGamepadMask = gpMask;
+            }
+
             NesCore.StepOneFrame();
             _totalFrames++;
 
-            // 取畫面並繪製
+            // 零拷貝畫面輸出（[JSImport] + JSType.MemoryView，直接傳 WASM heap view）
             byte[] rgba = NesCore.GetScreenRgba();
-            await JS.InvokeVoidAsync("nesInterop.drawFrame", rgba);
+            NesJsInterop.DrawFrame(rgba);
 
-            // 送出音效
+            // 音效（fire-and-forget）
             if (_audioEnabled && _audioSamples.Count > 0)
             {
-                short[] samples = _audioSamples.ToArray();
-                await JS.InvokeVoidAsync("nesInterop.playAudio", samples);
+                var samples = _audioSamples.ToArray();
+                _ = JS.InvokeVoidAsync("nesInterop.playAudio", samples).AsTask();
             }
 
-            // 更新 FPS（每秒一次）
+            // FPS 顯示（每秒一次，fire-and-forget）
             _framesSinceLastUpdate++;
             long now = System.Environment.TickCount64;
             if (now - _lastFpsTickMs >= 1000)
@@ -150,13 +184,13 @@
                 _fps = _framesSinceLastUpdate.ToString();
                 _framesSinceLastUpdate = 0;
                 _lastFpsTickMs = now;
-                await InvokeAsync(StateHasChanged);
+                _ = InvokeAsync(StateHasChanged);
             }
         }
         catch (Exception ex)
         {
             _errorMsg = $"Frame #{_totalFrames} error: {ex.Message}";
-            await InvokeAsync(StateHasChanged);
+            _ = InvokeAsync(StateHasChanged);
         }
     }
 
@@ -196,6 +230,33 @@
     {
         int btn = KeyToButton(e.Key);
         if (btn >= 0) NesCore.P1_ButtonUnPress((byte)btn);
+    }
+
+    // ── 初始化（頁面渲染後執行一次，注冊手把連接事件回呼）────────────────────
+    bool _initialized = false;
+    protected override async System.Threading.Tasks.Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_initialized)
+        {
+            _initialized = true;
+            var dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("nesInterop.setGamepadCallback", dotNetRef);
+        }
+    }
+
+    [JSInvokable]
+    public void OnGamepadConnected(string id)
+    {
+        _gamepadConnected = true;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public void OnGamepadDisconnected()
+    {
+        _gamepadConnected = false;
+        _prevGamepadMask  = 0;
+        _ = InvokeAsync(StateHasChanged);
     }
 
     // ── 停止 ─────────────────────────────────────────────────────────────────

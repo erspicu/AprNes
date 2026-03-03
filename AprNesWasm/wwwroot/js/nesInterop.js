@@ -24,6 +24,16 @@ window.nesInterop = (() => {
         console.log('[AprNes] init canvas:', canvasId);
     }
 
+    // pixels: Uint8Array (RGBA, 256×240×4 bytes) — unmarshalled 零拷貝版
+    function drawFrameUnmarshalled(pixels) {
+        if (!ctx) return true;
+        const imageData = new ImageData(
+            new Uint8ClampedArray(pixels.buffer, pixels.byteOffset, pixels.byteLength),
+            256, 240);
+        ctx.putImageData(imageData, 0, 0);
+        return true;
+    }
+
     // pixels: Uint8Array (RGBA, 256×240×4 bytes)
     function drawFrame(pixels) {
         if (!ctx) return;
@@ -66,30 +76,68 @@ window.nesInterop = (() => {
 
     function startLoop(dotNetRef) {
         let running = true;
-        let frameCount = 0;
-        console.log('[AprNes] startLoop');
+        console.log('[AprNes] startLoop (sync invokeMethod)');
         function loop() {
             if (!running) return;
-            dotNetRef.invokeMethodAsync('OnFrame')
-                .then(() => {
-                    frameCount++;
-                    if (loopFpsLimit) requestAnimationFrame(loop);
-                    else setTimeout(loop, 0);
-                })
-                .catch(err => {
-                    console.warn('[AprNes] OnFrame error (frame ' + frameCount + '):', err);
-                    if (loopFpsLimit) requestAnimationFrame(loop);
-                    else setTimeout(loop, 0);
-                });
+            try {
+                dotNetRef.invokeMethod('OnFrame'); // 同步呼叫，無 Promise overhead
+            } catch(err) {
+                console.warn('[AprNes] OnFrame error:', err);
+            }
+            if (loopFpsLimit) requestAnimationFrame(loop);
+            else setTimeout(loop, 0);
         }
         if (loopFpsLimit) requestAnimationFrame(loop);
         else setTimeout(loop, 0);
-        return { stop: () => { running = false; console.log('[AprNes] loop stopped at frame', frameCount); } };
+        return { stop: () => { running = false; } };
     }
 
     function focusCanvas() {
         if (canvas) canvas.focus();
     }
 
-    return { init, drawFrame, playAudio, startLoop, focusCanvas, setFpsLimit };
+    // ── Gamepad ───────────────────────────────────────────────────────────────
+    let gamepadDotNetRef = null;
+
+    window.addEventListener('gamepadconnected', (e) => {
+        console.log('[AprNes] gamepad connected:', e.gamepad.id);
+        if (gamepadDotNetRef) gamepadDotNetRef.invokeMethodAsync('OnGamepadConnected', e.gamepad.id);
+    });
+    window.addEventListener('gamepaddisconnected', (e) => {
+        console.log('[AprNes] gamepad disconnected');
+        if (gamepadDotNetRef) gamepadDotNetRef.invokeMethodAsync('OnGamepadDisconnected');
+    });
+
+    function setGamepadCallback(dotNetRef) {
+        gamepadDotNetRef = dotNetRef;
+    }
+
+    // 回傳 8-bit mask（bit0=A, 1=B, 2=Select, 3=Start, 4=Up, 5=Down, 6=Left, 7=Right）
+    // 若無手把連接回傳 -1
+    function getGamepadState() {
+        const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+        if (!gamepads) return -1;
+        // 找第一個已連接的手把
+        let gp = null;
+        for (let i = 0; i < gamepads.length; i++) {
+            if (gamepads[i] && gamepads[i].connected) { gp = gamepads[i]; break; }
+        }
+        if (!gp) return -1;
+
+        let mask = 0;
+        const btn = (idx) => gp.buttons[idx]?.pressed ?? false;
+        const ax  = gp.axes;
+
+        if (btn(0))                        mask |= (1 << 0); // A
+        if (btn(1) || btn(2))              mask |= (1 << 1); // B (B 或 X 鍵)
+        if (btn(8))                        mask |= (1 << 2); // Select
+        if (btn(9))                        mask |= (1 << 3); // Start
+        if (btn(12) || (ax[1] ?? 0) < -0.5) mask |= (1 << 4); // Up
+        if (btn(13) || (ax[1] ?? 0) >  0.5) mask |= (1 << 5); // Down
+        if (btn(14) || (ax[0] ?? 0) < -0.5) mask |= (1 << 6); // Left
+        if (btn(15) || (ax[0] ?? 0) >  0.5) mask |= (1 << 7); // Right
+        return mask;
+    }
+
+    return { init, drawFrame, drawFrameUnmarshalled, playAudio, startLoop, focusCanvas, setFpsLimit, getGamepadState, setGamepadCallback };
 })();

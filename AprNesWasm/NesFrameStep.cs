@@ -102,10 +102,12 @@ namespace AprNes
 
         /// <summary>
         /// 複製 ScreenBuf1x（ARGB uint*）為 RGBA byte[]，供 Canvas ImageData 使用。
+        /// 重用靜態 buffer，避免每幀 245KB GC 壓力。
         /// </summary>
+        static readonly byte[] _rgbaBuffer = new byte[256 * 240 * 4];
         public static byte[] GetScreenRgba()
         {
-            byte[] rgba = new byte[256 * 240 * 4];
+            byte[] rgba = _rgbaBuffer;
             for (int i = 0; i < 256 * 240; i++)
             {
                 uint argb = ScreenBuf1x[i];
