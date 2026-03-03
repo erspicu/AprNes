@@ -45,13 +45,13 @@ Set-Content -Path $output -Value $header -Encoding UTF8
 
 # ── 1. .NET Framework 4.6.1 JIT ──────────────────────────────────────────────
 Write-Host "[1/3] .NET Framework 4.6.1 JIT ..." -ForegroundColor Yellow
-& $fxExe --benchmark $rom $seconds $output
-if ($LASTEXITCODE -ne 0) { Write-Host "[WARN] AprNes.exe exited with $LASTEXITCODE" -ForegroundColor Red }
+$p1 = Start-Process -FilePath $fxExe -ArgumentList @("--benchmark", "`"$rom`"", $seconds, "`"$output`"") -Wait -PassThru -NoNewWindow
+if ($p1.ExitCode -ne 0) { Write-Host "[WARN] AprNes.exe exited with $($p1.ExitCode)" -ForegroundColor Red }
 
 # ── 2+3. .NET 8 RyuJIT + AOT DLL ─────────────────────────────────────────────
 Write-Host "[2/3] .NET 8 RyuJIT  +  [3/3] AOT DLL ..." -ForegroundColor Yellow
-& $dotnetExe --benchmark $rom $seconds $output
-if ($LASTEXITCODE -ne 0) { Write-Host "[WARN] AprNesAOT.exe exited with $LASTEXITCODE" -ForegroundColor Red }
+$p2 = Start-Process -FilePath $dotnetExe -ArgumentList @("--benchmark", "`"$rom`"", $seconds, "`"$output`"") -Wait -PassThru -NoNewWindow
+if ($p2.ExitCode -ne 0) { Write-Host "[WARN] AprNesAOT.exe exited with $($p2.ExitCode)" -ForegroundColor Red }
 
 # ── 顯示結果 ──────────────────────────────────────────────────────────────────
 Write-Host ""
