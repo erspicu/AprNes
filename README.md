@@ -19,8 +19,9 @@
     *   `AprNes_RomInfoUI.cs` / `AprNes_Info.cs`: ROM 資訊顯示。
 *   **`AprNes/tool/`**: 系統層輔助工具與渲染函式庫。
     *   `WaveOutPlayer.cs`: WinMM WaveOut 音訊輸出，訂閱 `NesCore.AudioSampleReady`。
-    *   `joystick.cs`: 手把輸入輪詢，**雙 API 並行**：WinMM（一般 USB 手把）+ XInput（Xbox / Xbox One / Xbox Series 手把）。
-    *   `NativeAPIShare.cs`: WinMM / GDI / XInput 的 P/Invoke 宣告與 struct 定義。
+    *   `joystick.cs`: 手把輸入輪詢，**雙 API 並行**：DirectInput8（一般 USB 手把）+ XInput（Xbox / Xbox One / Xbox Series 手把）。含 `AXIS_NOISE=256` 中心雜訊過濾與 `SnapAxisDigital()` 軸值離散化。
+    *   `DirectInputHelper.cs`: DirectInput8 raw vtable 實作，包含 `DIJOYSTATE` 結構、vtable slot 常數、enumerate/open/poll/release 等操作，以及 SetupDi 排除 XInput 裝置邏輯。
+    *   `NativeAPIShare.cs`: GDI / XInput 的 P/Invoke 宣告與 struct 定義。
     *   `NativeRendering.cs` / `InterfaceGraphic.cs`: GDI 直接繪圖介面。
     *   `libXBRz.cs` / `LibScanline.cs` / `Scalex.cs`: 畫面放大濾鏡（xBRZ、Scanline）。
     *   `LangINI.cs`: 多語系 INI 設定讀取。
@@ -39,6 +40,7 @@
 ### 輔助工具 (tools/)
 *   **`tools/page_getter/`**: 抓取技術文件（如 NESdev Wiki）的 Python 腳本。
 *   **`tools/KeyTest/`**: 鍵盤/手把輸入測試工具。
+*   **`tools/JoyTest.cs`** / **`tools/build_joytest.bat`**: 獨立搖桿診斷工具，即時顯示 DI/XI 裝置清單、軸值、按鍵及 POV 事件 log。
 *   **`tools/knowledgebase/`**: 開發知識庫筆記。
 
 ### 建置與設定
@@ -55,7 +57,7 @@
 ## 手把支援
 | 裝置類型 | API | 說明 |
 |---------|-----|------|
-| 一般 USB 手把 / 老式搖桿 | WinMM（joyGetPos） | 自動偵測，最多 256 個裝置 |
+| 一般 USB 手把 / 老式搖桿 | DirectInput8（raw vtable） | 自動列舉，排除 XInput 裝置，支援軸、按鍵、POV hat |
 | Xbox 360 / Xbox One / Xbox Series | XInput（xinput1_4.dll） | 自動偵測 player 0–3，支援 D-Pad、類比搖桿、全部按鍵 |
 
 ## 支援的 Mapper
