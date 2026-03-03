@@ -12,7 +12,7 @@ namespace AprNes
         static void Main(string[] args)
         {
             // ── CLI benchmark mode ────────────────────────────────────────────
-            if (args.Length >= 2 && (args[0] == "--benchmark" || args[0] == "--benchmark-simd"))
+            if (args.Length >= 2 && (args[0] == "--benchmark" || args[0] == "--benchmark-simd" || args[0] == "--benchmark-nosimd"))
             {
                 string rom     = args[1];
                 int    seconds = args.Length >= 3 && int.TryParse(args[2], out int s) ? s : 10;
@@ -22,6 +22,12 @@ namespace AprNes
                 {
                     // SIMD 對比模式：同 ROM 分別跑 SIMD ON / OFF
                     RunSimdCompare(rom, seconds, outFile);
+                }
+                else if (args[0] == "--benchmark-nosimd")
+                {
+                    // 獨立 process 模式：強制 SIMD OFF
+                    NesCore.SIMDEnabled = false;
+                    BenchmarkRunner.Run(rom, seconds, outFile, ".NET 10 RyuJIT [SIMD OFF]");
                 }
                 else
                 {

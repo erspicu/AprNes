@@ -143,16 +143,19 @@ result       = BlendVariable(screen, sprColor, writeMask)  ← SSE4.1 核心
 
 測試 ROM：**spritecans.nes**（64 個 sprite 同時滿版彈跳，最大化 Sprite Pass 3 負荷）
 
-| 條件 | FPS | 差距 |
-|------|-----|------|
-| .NET 10 RyuJIT + SIMD ON  | **501.2** | 基準 |
-| .NET 10 RyuJIT + SIMD OFF | **498.7** | -2.5 FPS（-0.5%） |
+測試方法：兩組獨立 process，對調順序各跑一次（消除「第一跑 JIT 尚未暖機」和「第二跑 CPU 已降頻」的偏差），取平均值：
 
-**SIMD gain：+2.5 FPS（+0.5%）**
+| 輪次 | SIMD ON | SIMD OFF |
+|------|---------|----------|
+| Round 1（ON 先跑） | 558.2 FPS | 603.8 FPS |
+| Round 2（OFF 先跑） | 540.1 FPS | 534.5 FPS |
+| **平均** | **549.1 FPS** | **569.1 FPS** |
+
+**SIMD gain：-20.0 FPS（-3.5%）** ← 在誤差範圍內；Round 間差距達 18～45 FPS，遠大於任何 SIMD 效益。
 
 ---
 
-### 為何 SIMD 效益有限？
+### 為何 SIMD 效益不顯著？（5 個根本原因）
 
 1. **Sprite Pass 3 不是真正瓶頸**：每 scanline 跑一次（240次/frame），但整個 PPU 的瓶頸是每 PPU cycle 執行一次的 `ppu_step_new`（~89,000次/frame），SIMD 無法觸及。
 
@@ -162,17 +165,84 @@ result       = BlendVariable(screen, sprColor, writeMask)  ← SSE4.1 核心
 
 4. **記憶體頻寬不是瓶頸**：256 uint = 1KB，完全在 L1 cache 內，scalar 存取已經夠快。
 
+5. **熱節流雜訊主導結果**：筆電 i7-1370P Turbo Boost 在高負載下波動幅度約 ±10%，遠超 Sprite Pass 3 本身佔整體工作量的比例，導致任何小幅 SIMD 增益都被遮蓋。
+
 ### 結論
 
-> Sprite Pass 3 SIMD 在 NES 模擬器的實際場景中效益約 **+0.5%**，屬於微最佳化。
+> Sprite Pass 3 SIMD 在 NES 模擬器的實際場景中效益**無法量測**（< 誤差範圍）。
 > 對整體效能提升有限，但作為條件編譯的實踐範例，展示了如何在同一份程式碼中
 > 讓 .NET 8/10 走 SSE4.1 路徑、.NET Framework 走 scalar 路徑，完全無需維護兩套程式碼。
+> 若要量測到可信的 SIMD 效益，需要在 CPU 固定頻率（禁用 Turbo Boost）的環境下進行。
+
+---
+
+## 學習總結
+
+### 本次研究的核心發現
+
+#### 1. 執行環境選擇
+- **.NET 10 RyuJIT** 是目前吞吐量最強的選擇（764 FPS），比 .NET Framework 4.6.1 快 **+81%**，比 .NET 8 快 +9%
+- **Native AOT** 的定位不是「更快的 JIT」，而是「啟動速度 + 部署便利性」；在 CPU-bound 長時間運算上，AOT（550）輸給 JIT（764）約 28%
+- **.NET Framework 4.6.1** 對 NES 60 FPS 目標有 7× headroom，使用者感知無差異，但效能天花板已固定
+
+#### 2. JIT 為何長期優於 AOT（運算吞吐量）
+- **PGO（Profile-Guided Optimization）**：JIT 能在執行期觀察真實 hot path 並重新最佳化，AOT 只能依靠靜態分析
+- **Tiered Compilation**：.NET JIT 先快速編譯啟動，之後對熱路徑再做深度最佳化，兼顧啟動速度與穩態效能
+- **Devirtualization**：JIT 執行時確認型別，AOT 必須保守假設
+
+#### 3. SIMD 的適用條件
+手動 SIMD（`System.Runtime.Intrinsics`）只在以下條件**同時成立**時才有量測到的效益：
+- 操作本身佔整體執行時間的顯著比例（> 5%）
+- 資料夠密集、記憶體存取是瓶頸
+- JIT auto-vectorization 無法自動覆蓋（通常因為有條件分支）
+- 在固定頻率 CPU 環境下測試（排除熱節流雜訊）
+
+本專案的 Sprite Pass 3（240 次/frame，1KB L1 cache 內）不符合前兩個條件，SIMD 效益無法量測。
+
+#### 4. 條件編譯的正確用法
+```csharp
+#if NET8_0_OR_GREATER
+    // 僅 .NET 8/10 才有 System.Runtime.Intrinsics
+    using System.Runtime.Intrinsics;
+    using System.Runtime.Intrinsics.X86;
+#endif
+
+// 程式碼內：
+#if NET8_0_OR_GREATER
+    if (SIMDEnabled && Sse41.IsSupported)
+        CompositeSpritesSimd(...);
+    else
+#endif
+        CompositeSpritesScalar(...);
+```
+- `NETFRAMEWORK`：.NET Framework 4.6.1
+- `NET8_0_OR_GREATER`：涵蓋 .NET 8 和 .NET 10
+- `NET10_0_OR_GREATER`：僅 .NET 10+
+- 條件編譯符號由 SDK 自動定義，無需 csproj 額外設定
+
+#### 5. 效能量測的可靠性
+| 問題 | 原因 | 解決方式 |
+|------|------|---------|
+| JIT warm-up 偏差 | Tiered Compilation 前幾秒為 Tier 0（未最佳化） | 使用 10s 以上測試，前幾秒為 JIT 爬坡期 |
+| GUI exe 不等待 | PowerShell `&` 不 block WinExe | 改用 `Start-Process -Wait -NoNewWindow` |
+| 熱節流雜訊 ±10% | 筆電 Turbo Boost 動態調頻 | 對調測試順序取平均，或在固定頻率環境測試 |
+| 同 process 比較失真 | 第一段測試的 JIT 狀態影響第二段 | 每次比較使用獨立 process |
+
+#### 6. 各目標的定位確認
+| 專案 | Runtime | 主要用途 |
+|------|---------|---------|
+| `AprNes` (.NET Fx 4.6.1) | JIT | 原始開發版本，最大相容性 |
+| `NesCoreNative` (Native AOT) | AOT | NES 核心 DLL，供其他語言呼叫 |
+| `AprNesAOT` (.NET 8) | JIT | 高效能版，廣泛部署環境 |
+| `AprNesAOT10` (.NET 10) | JIT | 最高效能，需安裝 .NET 10 Runtime |
 
 ---
 
 ## 備註
 
-> 本測試使用 `Controller Test (USA).nes`（Mapper 0，NROM），為純 CPU-bound 測試場景，
-> 關閉 LimitFPS 以測試最大吞吐量。實際遊戲效能因 ROM 複雜度而異，但相對排名應維持一致。
+> 主測試 ROM：`Controller Test (USA).nes`（Mapper 0，NROM），純 CPU-bound 場景，關閉幀率限制（LimitFPS = false）。  
+> SIMD 測試 ROM：`spritecans.nes`（64 sprites 全螢幕彈跳，最大化 Sprite Pass 3 負荷）。  
+> 實際遊戲效能因 ROM 複雜度而異，但相對排名應維持一致。
 
-*測試工具：`benchmark.bat` / `benchmark.ps1`，結果儲存於 `benchmark.txt`*
+*測試工具：`benchmark.bat` / `benchmark.ps1`，結果儲存於 `benchmark.txt`*  
+*最後更新：2026-03-03*
