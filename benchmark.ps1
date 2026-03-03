@@ -60,3 +60,7 @@ Write-Host " Results:" -ForegroundColor Green
 Get-Content $output | Write-Host
 Write-Host "============================================================" -ForegroundColor Green
 Write-Host " Saved to: $output" -ForegroundColor Green
+
+Write-Host ""
+Write-Host "請按任意鍵繼續 . . ." -NoNewline
+$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
