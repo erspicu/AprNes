@@ -42,6 +42,11 @@ namespace AprNes
         // FPS limiting flag (set by UI, checked in VideoOutput handler)
         static public bool LimitFPS = false;
 
+#if NET8_0_OR_GREATER
+        // SIMD toggle：false 時強制走 scalar fallback（用於 benchmark 對比）
+        static public bool SIMDEnabled = true;
+#endif
+
         static int* Vertical; //  Vertical = false,
 
         static public ManualResetEvent _event = new ManualResetEvent(true);

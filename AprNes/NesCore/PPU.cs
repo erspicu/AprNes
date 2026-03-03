@@ -597,7 +597,7 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void CompositeSpritesSimd(int scanOff, byte* sprSet, byte* sprPriority, uint* sprColor)
         {
-            if (Sse41.IsSupported)
+            if (Sse41.IsSupported && SIMDEnabled)
             {
                 var zero    = Vector128<int>.Zero;
                 var allOnes = Vector128.Create(-1);
