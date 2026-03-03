@@ -98,25 +98,8 @@ namespace AprNes
 
         // ── .NET 8 UI 客製調整 ──────────────────────────────────────────────────
 
-        /// <summary>
-        /// initUIsize() 執行後微調：
-        /// - fps label 緊接 UIConfig 右側（原始碼用 Width-82 計算有誤）
-        /// - UIAbout 用 ClientSize.Width 正確靠右
-        /// 字體與按鈕尺寸已由 Program.cs SetDefaultFont 保持與 .NET Framework 一致
-        /// </summary>
-        partial void AotUIAdjust()
-        {
-            // fps label 緊接 UIConfig 右側，填滿剩餘寬度
-            int fpsX = UIConfig.Right + 3;
-            label3.Size = new System.Drawing.Size(ClientSize.Width - fpsX - 3, UIConfig.Height);
-            label3.Location = new System.Drawing.Point(fpsX, UIConfig.Top);
-
-            // UIAbout 靠右對齊 client 區域（原始碼用 Width-82，Width 含邊框所以偏差）
-            UIAbout.Location = new System.Drawing.Point(
-                ClientSize.Width - UIAbout.Width - 5,
-                UIAbout.Location.Y);
-            UIAbout.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
-        }
+        /// <summary>目前 SetDefaultFont 已確保 scale=1.0，無需額外調整</summary>
+        partial void AotUIAdjust() { }
 
         /// <summary>ShowDialog 前暫停 TopMost，避免 .NET 8 子視窗被遮蔽</summary>
         partial void AotPreShowDialog()  => this.TopMost = false;
