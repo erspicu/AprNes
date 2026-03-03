@@ -2,14 +2,12 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
-    <PublishAot>true</PublishAot>
-    <InvariantGlobalization>true</InvariantGlobalization>
-    <TrimmerRootDescriptor>AprNesAOT.xml</TrimmerRootDescriptor>
     <AssemblyName>AprNesAOT</AssemblyName>
     <RootNamespace>AprNes</RootNamespace>
     <Optimize>true</Optimize>
@@ -47,10 +45,54 @@
     <Compile Include="..\AprNes\NesCore\Mapper\Mapper011.cs" />
     <Compile Include="..\AprNes\NesCore\Mapper\Mapper066.cs" />
     <Compile Include="..\AprNes\NesCore\Mapper\Mapper071.cs" />
-    <!-- tool: P/Invoke 工具，AOT 相容 -->
-    <Compile Include="..\AprNes\tool\WaveOutPlayer.cs" />
-    <Compile Include="..\AprNes\tool\NativeAPIShare.cs" />
+  </ItemGroup>
+
+  <!-- 共享工具層 -->
+  <ItemGroup>
+    <Compile Include="..\AprNes\tool\DirectInputHelper.cs" />
+    <Compile Include="..\AprNes\tool\InterfaceGraphic.cs" />
     <Compile Include="..\AprNes\tool\joystick.cs" />
     <Compile Include="..\AprNes\tool\LangINI.cs" />
+    <Compile Include="..\AprNes\tool\libXBRz.cs" />
+    <Compile Include="..\AprNes\tool\LibScanline.cs" />
+    <Compile Include="..\AprNes\tool\NativeAPIShare.cs" />
+    <Compile Include="..\AprNes\tool\NativeRendering.cs" />
+    <Compile Include="..\AprNes\tool\Scalex.cs" />
+    <Compile Include="..\AprNes\tool\WaveOutPlayer.cs" />
+  </ItemGroup>
+
+  <!-- 共享 WinForms UI -->
+  <ItemGroup>
+    <Compile Include="..\AprNes\UI\AprNesUI.cs" Link="UI\AprNesUI.cs" />
+    <Compile Include="..\AprNes\UI\AprNesUI.Designer.cs" Link="UI\AprNesUI.Designer.cs">
+      <DependentUpon>AprNesUI.cs</DependentUpon>
+    </Compile>
+    <EmbeddedResource Include="..\AprNes\UI\AprNesUI.resx" Link="UI\AprNesUI.resx">
+      <DependentUpon>AprNesUI.cs</DependentUpon>
+    </EmbeddedResource>
+
+    <Compile Include="..\AprNes\UI\AprNes_ConfigureUI.cs" Link="UI\AprNes_ConfigureUI.cs" />
+    <Compile Include="..\AprNes\UI\AprNes_ConfigureUI.designer.cs" Link="UI\AprNes_ConfigureUI.designer.cs">
+      <DependentUpon>AprNes_ConfigureUI.cs</DependentUpon>
+    </Compile>
+    <EmbeddedResource Include="..\AprNes\UI\AprNes_ConfigureUI.resx" Link="UI\AprNes_ConfigureUI.resx">
+      <DependentUpon>AprNes_ConfigureUI.cs</DependentUpon>
+    </EmbeddedResource>
+
+    <Compile Include="..\AprNes\UI\AprNes_RomInfoUI.cs" Link="UI\AprNes_RomInfoUI.cs" />
+    <Compile Include="..\AprNes\UI\AprNes_RomInfoUI.Designer.cs" Link="UI\AprNes_RomInfoUI.Designer.cs">
+      <DependentUpon>AprNes_RomInfoUI.cs</DependentUpon>
+    </Compile>
+    <EmbeddedResource Include="..\AprNes\UI\AprNes_RomInfoUI.resx" Link="UI\AprNes_RomInfoUI.resx">
+      <DependentUpon>AprNes_RomInfoUI.cs</DependentUpon>
+    </EmbeddedResource>
+
+    <Compile Include="..\AprNes\UI\AprNes_Info.cs" Link="UI\AprNes_Info.cs" />
+    <Compile Include="..\AprNes\UI\AprNes_Info.Designer.cs" Link="UI\AprNes_Info.Designer.cs">
+      <DependentUpon>AprNes_Info.cs</DependentUpon>
+    </Compile>
+    <EmbeddedResource Include="..\AprNes\UI\AprNes_Info.resx" Link="UI\AprNes_Info.resx">
+      <DependentUpon>AprNes_Info.cs</DependentUpon>
+    </EmbeddedResource>
   </ItemGroup>
 </Project>

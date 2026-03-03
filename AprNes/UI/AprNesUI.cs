@@ -655,8 +655,8 @@ namespace AprNes
                 {
                     EndHighResPeriod();
                     NesCore.exit = true;
-                    Thread.Sleep(50);
-                    nes_t.Abort();
+                    NesCore._event.Set();
+                    nes_t.Join(500);
                 }
                 catch (Exception ex)
                 {
@@ -860,7 +860,7 @@ namespace AprNes
             if (nes_t != null)
             {
                 nes_t.Join(500);
-                if (nes_t.IsAlive) nes_t.Abort();
+                if (nes_t.IsAlive) nes_t.Join(500);
             }
 
             SaveSRam();
@@ -920,6 +920,12 @@ namespace AprNes
         {
             initUIsize();
             UpdateSoundMenuText();
+
+            // Add JIT benchmark menu item
+            contextMenuStrip1.Items.Add(new ToolStripSeparator());
+            var benchItem = new ToolStripMenuItem("Benchmark (JIT)");
+            benchItem.Click += BenchmarkJit_Click;
+            contextMenuStrip1.Items.Add(benchItem);
 
             _joystick.Init(this.Handle);
             new Thread(polling_listener).Start();
@@ -1014,6 +1020,46 @@ namespace AprNes
             ScreenCenterFull = false;
             Configure_Write();
             initUIsize();
+        }
+
+        void BenchmarkJit_Click(object sender, EventArgs e)
+        {
+            if (current_rom_bytes == null)
+            {
+                MessageBox.Show("請先載入 ROM", "Benchmark");
+                return;
+            }
+            if (MessageBox.Show(
+                "Benchmark 將以最大速度執行 5 秒，\n期間模擬器將停止，完成後需重新載入 ROM。\n\n繼續嗎？",
+                "Benchmark (JIT)", MessageBoxButtons.YesNo) != DialogResult.Yes)
+                return;
+
+            const int seconds = 5;
+            fps_count_timer.Enabled = false;
+            NesCore.exit = true;
+            NesCore._event.Set();
+            nes_t?.Join(1000);
+            WaveOutPlayer.CloseAudio();
+            running = false;
+
+            NesCore.exit = false;
+            NesCore.init(current_rom_bytes);
+            NesCore.LimitFPS = false;
+            int frames = 0;
+            EventHandler counter = (s2, e2) => Interlocked.Increment(ref frames);
+            NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
+            NesCore.VideoOutput += counter;
+            var t = new Thread(NesCore.run) { IsBackground = true };
+            t.Start();
+            Thread.Sleep(seconds * 1000);
+            NesCore.exit = true;
+            NesCore._event.Set();
+            t.Join(2000);
+            NesCore.VideoOutput -= counter;
+
+            MessageBox.Show(
+                $"Benchmark 結果（{seconds} 秒）\n\nJIT : {frames} 幀  ({frames / (float)seconds:F1} FPS)",
+                "Benchmark 結果");
         }
     }
 }

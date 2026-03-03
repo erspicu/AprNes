@@ -1,0 +1,16 @@
+<linker>
+  <assembly fullname="AprNesAOT">
+    <type fullname="AprNes.Mapper000" preserve="all" />
+    <type fullname="AprNes.Mapper001" preserve="all" />
+    <type fullname="AprNes.Mapper002" preserve="all" />
+    <type fullname="AprNes.Mapper003" preserve="all" />
+    <type fullname="AprNes.Mapper004" preserve="all" />
+    <type fullname="AprNes.Mapper004RevA" preserve="all" />
+    <type fullname="AprNes.Mapper004MMC6" preserve="all" />
+    <type fullname="AprNes.Mapper005" preserve="all" />
+    <type fullname="AprNes.Mapper007" preserve="all" />
+    <type fullname="AprNes.Mapper011" preserve="all" />
+    <type fullname="AprNes.Mapper066" preserve="all" />
+    <type fullname="AprNes.Mapper071" preserve="all" />
+  </assembly>
+</linker>
