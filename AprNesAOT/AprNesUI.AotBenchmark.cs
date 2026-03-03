@@ -107,7 +107,7 @@ namespace AprNes
         {
             int maxRight = 0;
             foreach (Control c in this.Controls)
-                if (c.Visible && c.Top < 50)
+                if (c.Visible && c.Top < 50 && !(c is Panel))
                     maxRight = Math.Max(maxRight, c.Right);
 
             int clientW = this.ClientSize.Width;
@@ -117,7 +117,7 @@ namespace AprNes
             double scale = (clientW - 8.0) / (double)(maxRight + 4);
             foreach (Control c in this.Controls)
             {
-                if (c.Visible && c.Top < 50)
+                if (c.Visible && c.Top < 50 && !(c is Panel))
                     c.SetBounds(
                         (int)Math.Round(c.Left   * scale),
                         (int)Math.Round(c.Top    * scale),
