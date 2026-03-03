@@ -98,8 +98,33 @@ namespace AprNes
 
         // ── .NET 8 UI 客製調整 ──────────────────────────────────────────────────
 
-        /// <summary>目前 SetDefaultFont 已確保 scale=1.0，無需額外調整</summary>
-        partial void AotUIAdjust() { }
+        /// <summary>
+        /// AutoScaleMode.Font 縮放後，若 toolbar 控制項大幅超出 ClientWidth，
+        /// 以等比縮放（X+Y）讓所有按鈕完整顯示。
+        /// 小幅溢出（≤20px）不介入，讓 WinForms 自然裁剪（與 .NET Framework 行為一致）。
+        /// </summary>
+        partial void AotUIAdjust()
+        {
+            int maxRight = 0;
+            foreach (Control c in this.Controls)
+                if (c.Visible && c.Top < 50)
+                    maxRight = Math.Max(maxRight, c.Right);
+
+            int clientW = this.ClientSize.Width;
+            // 只在大幅溢出（>20px）時介入；小溢出與 FW 行為一致
+            if (maxRight <= clientW + 20) return;
+
+            double scale = (clientW - 8.0) / (double)(maxRight + 4);
+            foreach (Control c in this.Controls)
+            {
+                if (c.Visible && c.Top < 50)
+                    c.SetBounds(
+                        (int)Math.Round(c.Left   * scale),
+                        (int)Math.Round(c.Top    * scale),
+                        (int)Math.Round(c.Width  * scale),
+                        (int)Math.Round(c.Height * scale));
+            }
+        }
 
         /// <summary>ShowDialog 前暫停 TopMost，避免 .NET 8 子視窗被遮蔽</summary>
         partial void AotPreShowDialog()  => this.TopMost = false;

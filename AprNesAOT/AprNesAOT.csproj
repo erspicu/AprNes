@@ -12,10 +12,11 @@
     <RootNamespace>AprNes</RootNamespace>
     <Optimize>true</Optimize>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <!-- PerMonitorV2：4K/多螢幕環境各視窗依所在螢幕 DPI 獨立縮放 -->
-    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <!-- WFO0003：manifest 與 csproj 同時有 DPI 設定，為預期行為（manifest 共用），壓制此警告 -->
-    <NoWarn>WFO0003</NoWarn>
+    <!-- 強制使用 .NET Framework 相同的預設字型，確保 AutoScaleMode.Font 計算出與 FW 一致的縮放比例 -->
+    <ApplicationDefaultFont>Microsoft Sans Serif, 8.25pt</ApplicationDefaultFont>
+    <!-- DpiUnawareGdiScaled：app 在虛擬 96 DPI 空間運行（initUIsize 硬編碼像素值正確），
+         OS 負責 4K bitmap stretch（等同 .NET Framework 行為），GDI 字型保持清晰 -->
+    <ApplicationHighDpiMode>DpiUnawareGdiScaled</ApplicationHighDpiMode>
   </PropertyGroup>
 
   <!-- INI 設定與語系檔：複製到輸出目錄 -->
