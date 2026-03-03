@@ -46,7 +46,7 @@
   <!-- 每次 build 自動產生 BuildTimestamp.g.cs，方便確認非快取版本 -->
   <Target Name="GenerateBuildTimestamp" BeforeTargets="CoreCompile">
     <PropertyGroup>
-      <_BuildTs>$([System.DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm UTC"))</_BuildTs>
+      <_BuildTs>$([System.DateTime]::UtcNow.AddHours(8).ToString("yyyy-MM-dd HH:mm")) (台北)</_BuildTs>
     </PropertyGroup>
     <WriteLinesToFile
       File="$(IntermediateOutputPath)BuildTimestamp.g.cs"

@@ -7,7 +7,11 @@
 @implements IAsyncDisposable
 
 <div style="font-family:monospace; padding:10px;">
-    <h4 style="margin:0 0 8px">🎮 AprNes WASM</h4>
+    <h4 style="margin:0 0 8px">🎮 AprNes WASM
+        <span style="font-size:10px; color:#666; font-weight:normal; margin-left:8px;">
+            build: @AprNes.BuildInfo.Timestamp
+        </span>
+    </h4>
 
     @if (!_romLoaded)
     {
@@ -41,10 +45,17 @@
             鍵盤：Z=A　X=B　Enter=Start　Shift=Select　方向鍵
         </p>
     }
-    <div style="margin-top:6px; font-size:12px; color:#aaa; display:flex; gap:16px; align-items:center;">
+    <div style="margin-top:6px; font-size:12px; color:#aaa; display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
         <label style="cursor:pointer;">
             <input type="checkbox" checked="@_audioEnabled"
                    @onchange="OnAudioToggle" /> 音效
+        </label>
+        <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            🔊
+            <input type="range" min="0" max="100" value="@_volume"
+                   style="width:80px; cursor:pointer;"
+                   @onchange="OnVolumeChange" />
+            <span style="min-width:26px;">@_volume%</span>
         </label>
         <label style="cursor:pointer;">
             <input type="checkbox" checked="@_fpsLimit"
@@ -76,6 +87,7 @@
     string _fps       = "0";
     bool   _audioEnabled = true;
     bool   _fpsLimit     = true;
+    int    _volume       = 80;   // 0~100
     int    _prevGamepadMask   = 0;
     bool   _gamepadConnected  = false;
 
@@ -200,6 +212,12 @@
         _audioEnabled = (bool)e.Value;
     }
 
+    async System.Threading.Tasks.Task OnVolumeChange(ChangeEventArgs e)
+    {
+        _volume = int.Parse(e.Value.ToString());
+        await JS.InvokeVoidAsync("nesInterop.setVolume", _volume / 100.0);
+    }
+
     async System.Threading.Tasks.Task OnFpsLimitToggle(ChangeEventArgs e)
     {
         _fpsLimit = (bool)e.Value;
@@ -260,13 +278,15 @@
     }
 
     // ── 停止 ─────────────────────────────────────────────────────────────────
-    void StopGame()
+    async System.Threading.Tasks.Task StopGame()
     {
         NesCore.exit = true;
         NesCore.AudioSampleReady -= CollectAudio;
-        _romLoaded = false;
-        _fps       = "0";
-        _romName   = "";
+        await JS.InvokeVoidAsync("nesInterop.stopLoop");
+        _romLoaded       = false;
+        _fps             = "0";
+        _romName         = "";
+        _prevGamepadMask = 0;
         StateHasChanged();
     }
 

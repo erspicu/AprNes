@@ -6,12 +6,17 @@ window.nesInterop = (() => {
 
     // ── Audio ─────────────────────────────────────────────────────────────────
     let audioCtx  = null;
+    let gainNode  = null;
     let nextTime  = 0;
+    let currentVolume = 0.8;
     const SAMPLE_RATE = 44100;
 
     function ensureAudio() {
         if (audioCtx) return;
         audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SAMPLE_RATE });
+        gainNode = audioCtx.createGain();
+        gainNode.gain.value = currentVolume;
+        gainNode.connect(audioCtx.destination);
         nextTime = audioCtx.currentTime + 0.1;
     }
 
@@ -56,7 +61,7 @@ window.nesInterop = (() => {
 
             const src = audioCtx.createBufferSource();
             src.buffer = buf;
-            src.connect(audioCtx.destination);
+            src.connect(gainNode ?? audioCtx.destination);
 
             const now = audioCtx.currentTime;
             if (nextTime < now + 0.02) nextTime = now + 0.05; // re-sync if behind
@@ -74,13 +79,23 @@ window.nesInterop = (() => {
 
     function setFpsLimit(val) { loopFpsLimit = val; }
 
+    function setVolume(val) {
+        currentVolume = val;
+        if (gainNode) gainNode.gain.value = val;
+    }
+
+    // 用 generation counter 確保同時只有一個 loop 在執行
+    let loopGeneration = 0;
+
     function startLoop(dotNetRef) {
-        let running = true;
-        console.log('[AprNes] startLoop (sync invokeMethod)');
+        loopGeneration++;           // 令所有舊 loop 失效
+        const myGen = loopGeneration;
+        nextTime = 0;               // 重置音效時間軸，避免新遊戲音效延遲累積
+        console.log('[AprNes] startLoop gen=' + myGen);
         function loop() {
-            if (!running) return;
+            if (loopGeneration !== myGen) return; // 舊 loop，直接結束
             try {
-                dotNetRef.invokeMethod('OnFrame'); // 同步呼叫，無 Promise overhead
+                dotNetRef.invokeMethod('OnFrame');
             } catch(err) {
                 console.warn('[AprNes] OnFrame error:', err);
             }
@@ -89,7 +104,11 @@ window.nesInterop = (() => {
         }
         if (loopFpsLimit) requestAnimationFrame(loop);
         else setTimeout(loop, 0);
-        return { stop: () => { running = false; } };
+    }
+
+    function stopLoop() {
+        loopGeneration++; // 令當前 loop 失效
+        console.log('[AprNes] stopLoop gen=' + loopGeneration);
     }
 
     function focusCanvas() {
@@ -139,5 +158,5 @@ window.nesInterop = (() => {
         return mask;
     }
 
-    return { init, drawFrame, drawFrameUnmarshalled, playAudio, startLoop, focusCanvas, setFpsLimit, getGamepadState, setGamepadCallback };
+    return { init, drawFrame, drawFrameUnmarshalled, playAudio, startLoop, stopLoop, focusCanvas, setFpsLimit, setVolume, getGamepadState, setGamepadCallback };
 })();
