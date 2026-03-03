@@ -1,0 +1,11 @@
+﻿=== AprNes Benchmark ===
+ROM  : Controller Test (USA).nes
+Time : 10 sec each
+Date : 2026-03-03 14:33:16
+OS   : Microsoft Windows NT 10.0.19045.0
+CPU  : 13th Gen Intel(R) Core(TM) i7-1370P
+
+JIT [.NET Framework 4.6.1 JIT] :    4220 frames      422.0 FPS
+JIT [.NET 8 RyuJIT] :    7018 frames      701.8 FPS
+AOT [NesCoreNative]     :    5500 frames      550.0 FPS
+JIT [.NET 10 RyuJIT] :    7640 frames      764.0 FPS

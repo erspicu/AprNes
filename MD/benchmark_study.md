@@ -14,97 +14,105 @@
 
 ## 測試結果
 
-| # | 執行環境 | 總 Frame 數 | FPS |
-|---|----------|------------|-----|
-| 1 | .NET Framework 4.6.1 JIT | 5,320 | **532.0** |
-| 2 | .NET 8 RyuJIT | 7,575 | **757.5** |
-| 3 | Native AOT（NesCoreNative.dll） | 5,664 | **566.4** |
+| # | 執行環境 | 總 Frame 數 | FPS | 相對基準 |
+|---|----------|------------|-----|---------|
+| 1 | .NET Framework 4.6.1 JIT | 4,220 | **422.0** | 100% |
+| 2 | Native AOT（NesCoreNative.dll） | 5,500 | **550.0** | +30.3% |
+| 3 | .NET 8 RyuJIT | 7,018 | **701.8** | +66.3% |
+| 4 | .NET 10 RyuJIT | 7,640 | **764.0** | +81.0% |
 
-> 以 .NET Framework 4.6.1 JIT 為基準（100%）
-
-| 執行環境 | 相對效能 |
-|----------|---------|
-| .NET Framework 4.6.1 JIT | 100% |
-| .NET 8 RyuJIT | **+42.4%** ↑ |
-| Native AOT | **+6.5%** ↑ |
+```
+.NET Framework 4.6.1 JIT  ████████████████████  422 FPS  (基準 100%)
+Native AOT                 ██████████████████████████  550 FPS  (+30%)
+.NET 8 RyuJIT              █████████████████████████████████  702 FPS  (+66%)
+.NET 10 RyuJIT             ████████████████████████████████████  764 FPS  (+81%)
+```
 
 ---
 
-## .NET 8：JIT 與 AOT 的比較
-
-### JIT（Just-In-Time Compilation）— RyuJIT
-
-**運作原理：**  
-程式啟動時以 IL（Intermediate Language）形式載入，執行過程中由 JIT 編譯器將 hot path 編譯為原生機械碼。.NET 8 的 RyuJIT 加入了 **Profile-Guided Optimization（PGO）**，能根據實際執行行為動態調整編譯策略。
-
-**優點：**
-- ✅ 執行時掌握真實 hot path，針對最常走的分支做深度最佳化
-- ✅ PGO / Tiered Compilation：第一層快速編譯，第二層根據 profiling 結果重新最佳化
-- ✅ 可利用執行時已知資訊（如虛擬方法的實際型別）做 devirtualization
-- ✅ 受益於 .NET 8 對 RyuJIT 的持續改進（SIMD、loop unrolling、向量化等）
-
-**缺點：**
-- ❌ 啟動時有 warm-up 時間（冷啟動較慢）
-- ❌ 需要完整 .NET 8 Runtime 環境
-- ❌ 部署包含 runtime，體積較大
-
-### AOT（Ahead-Of-Time Compilation）— Native AOT
-
-**運作原理：**  
-在 **編譯期** 將 C# 直接編譯為平台原生機械碼（.dll / .exe），執行時不需要 JIT 編譯器，也不依賴 CLR Runtime。
-
-**優點：**
-- ✅ 啟動速度極快，無 JIT warm-up
-- ✅ 記憶體佔用較少（無 JIT 基礎設施）
-- ✅ 適合部署到嵌入式、容器或啟動時間敏感的場景
-- ✅ 不依賴目標機器安裝 .NET Runtime（自帶 minimal runtime）
-
-**缺點：**
-- ❌ **缺乏執行時 PGO**：編譯時無法預知哪條路徑最熱，最佳化深度不如 JIT
-- ❌ 部分反射、動態型別功能受限（需 trim-friendly 寫法）
-- ❌ 對於 tight loop 密集計算，JIT 的動態重最佳化往往比靜態 AOT 更具優勢
-- ❌ 產出二進位較大（包含 minimal runtime）
-
-### 本測試的 JIT vs AOT 結論
+## .NET 8 vs .NET 10：JIT 的比較
 
 ```
-.NET 8 RyuJIT : 757.5 FPS
-Native AOT     : 566.4 FPS
-差距            : -191.1 FPS（AOT 慢約 25%）
+.NET 8  RyuJIT : 701.8 FPS
+.NET 10 RyuJIT : 764.0 FPS
+差距            : +62.2 FPS（.NET 10 快約 +8.9%）
 ```
 
-NES 模擬器的主迴圈是典型的 **CPU-bound tight loop**（每 frame 需執行數千個 CPU 指令週期），正是 JIT PGO 最能發揮效益的場景。AOT 在沒有 profiling 資訊的情況下，靜態編譯的結果無法達到 RyuJIT 動態最佳化的水準。
+### .NET 10 JIT 主要改進（官方宣稱）
+
+| 改進項目 | 對模擬器的影響 |
+|---------|--------------|
+| **Loop Optimization**（迴圈外提邊界檢查） | CPU/PPU 主迴圈每次迭代減少冗餘運算 |
+| **Struct Physical Promotion**（欄位直接提升至暫存器） | NES CPU 暫存器 struct 存取速度提升 |
+| **Stack Allocation of Value Arrays**（小陣列 stack 配置） | 減少 GC 壓力，hot path 更流暢 |
+| **Escape Analysis 擴大** | delegate/callback overhead 降低 |
+| **SIMD / Vectorization 擴展**（AVX10.2, ARM64 SVE） | 數值密集運算自動向量化 |
 
 ---
 
-## 三種執行環境總比較
+## JIT 與 AOT 的優劣分析
 
-```
-.NET Framework 4.6.1 JIT  ████████████████████████  532 FPS  (基準)
-Native AOT                 ██████████████████████████  566 FPS  (+6.5%)
-.NET 8 RyuJIT              ██████████████████████████████████  758 FPS  (+42.4%)
-```
+### JIT（Just-In-Time）— RyuJIT
 
-### 各場景適用時機
+**優點：**
+- ✅ **PGO（Profile-Guided Optimization）**：執行時掌握真實 hot path，針對最常走的分支做深度最佳化
+- ✅ **Tiered Compilation**：第一層快速啟動，第二層根據 profiling 重新最佳化
+- ✅ 可利用執行時資訊做 devirtualization（虛擬方法消除）
+- ✅ 受益於每個 .NET 版本的持續改進
 
-| 執行環境 | 最適場景 | 不適場景 |
-|----------|---------|---------|
-| .NET Framework 4.6.1 JIT | 現有 Windows 專案維護、WinForms 傳統應用 | 高效能需求、跨平台 |
-| .NET 8 RyuJIT | **持續執行的高效能應用**（遊戲、模擬器、伺服器） | 啟動時間極度敏感、無 Runtime 環境 |
-| Native AOT | CLI 工具、容器微服務、快速啟動場景 | CPU-bound 長時間運算 |
+**缺點：**
+- ❌ 啟動時需要 warm-up（冷啟動較慢）
+- ❌ 需要目標機器安裝對應 .NET Runtime
+
+### AOT（Ahead-Of-Time）— Native AOT
+
+**優點：**
+- ✅ 啟動速度極快（無 JIT warm-up，450ms → 50ms）
+- ✅ 記憶體佔用少（無 JIT 基礎設施常駐）
+- ✅ 適合容器/微服務/CLI 工具部署（映像縮小 60~87%）
+- ✅ 不依賴目標機器安裝 .NET Runtime
+- ✅ **穩定低延遲**：無 JIT 重新編譯造成的偶發性停頓
+
+**缺點：**
+- ❌ **缺乏執行時 PGO**：編譯期無 profiling 資訊，最佳化深度不如 JIT
+- ❌ 對 CPU-bound 長時間運算，靜態編譯無法追上 JIT 動態最佳化
+- ❌ 反射、動態型別功能受限
+
+### 關鍵結論
+
+> **AOT 的進步方向是「部署靈活性」，JIT 的進步方向是「運算吞吐量」。**
+>
+> 兩者的差距在 .NET 10 依然存在：AOT 550 FPS vs JIT 764 FPS（差距 -28%）。
+> 這個差距來自 PGO 的本質優勢，不會因 AOT 版本升級而消失。
+
+---
+
+## 四種執行環境總比較
+
+| 執行環境 | FPS | 適用場景 | 不適場景 |
+|----------|-----|---------|---------|
+| .NET Framework 4.6.1 JIT | 422 | 現有 Windows 專案維護 | 高效能需求、跨平台 |
+| Native AOT | 550 | CLI 工具、容器、快速啟動 | CPU-bound 長時間運算 |
+| .NET 8 RyuJIT | 702 | 高效能應用，廣泛部署環境 | 啟動時間極敏感場景 |
+| **.NET 10 RyuJIT** | **764** | **高效能 + 最新版本優化** | 需舊版相容性的環境 |
 
 ### 心得總結
 
-1. **.NET 8 RyuJIT 是三者中效能最強的**：對 AprNes 這類 CPU-bound 模擬器，PGO + Tiered Compilation 帶來 +42% 的效能提升，遠超預期。
+1. **.NET 10 RyuJIT 是四者中效能最強（764 FPS）**：比 .NET 8 再快 +8.9%，驗證了官方宣稱的 Loop Optimization 和 Struct Promotion 對模擬器 tight loop 有實質效益。
 
-2. **Native AOT 並非萬能的效能銀彈**：AOT 的優勢在「啟動速度」和「部署便利性」，而非「運算吞吐量」。對於需要長時間執行的密集計算，JIT 的動態最佳化能力更強。
+2. **.NET 8 → .NET 10 JIT 的提升比較溫和（+8.9%）**：相比 .NET Framework → .NET 8 的跳躍（+66%），版本間的邊際效益遞減，表示 RyuJIT 已相當成熟。
 
-3. **.NET Framework 雖舊，仍具競爭力**：4.6.1 的 JIT 雖無現代 PGO，但 532 FPS 仍然流暢，對 NES（60 FPS 目標）有 8× 以上的 headroom。
+3. **Native AOT 並非運算吞吐量的最佳選擇**：AOT 的定位是「啟動速度」和「部署便利性」。在本專案中，NesCoreNative.dll 的存在意義是讓其他語言可呼叫 NES 核心，而非追求最高 FPS。
 
-4. **遷移 .NET 8 有實質效益**：若只是為了效能，從 .NET Framework 遷移到 .NET 8（保持 JIT）可獲得近乎免費的 42% 效能紅利，代價是需要目標機器安裝 .NET 8 Runtime。
+4. **.NET Framework 4.6.1 JIT 仍堪用**：422 FPS 對 NES 60 FPS 目標有 7× headroom，對使用者感受上沒有差異，但效能天花板比現代 .NET 低很多。
 
-5. **AOT 的定位是部署靈活性，而非效能極致**：在本專案中，NesCoreNative.dll（AOT）的存在意義是「讓不同語言/環境能直接呼叫 NES 核心」，而非取代 JIT 執行效能。
+5. **遷移 .NET 8 或 .NET 10 有實質效益**：若只是為了效能，遷移到 .NET 8 可獲得免費的 +66% 效能紅利；若再升 .NET 10 可多拿 +8.9%，代價是需要目標機器安裝對應 Runtime。
 
 ---
+
+## 備註
+
+> 本測試使用 `Controller Test (USA).nes`（Mapper 0，NROM），為純 CPU-bound 測試場景，
+> 關閉 LimitFPS 以測試最大吞吐量。實際遊戲效能因 ROM 複雜度而異，但相對排名應維持一致。
 
 *測試工具：`benchmark.bat` / `benchmark.ps1`，結果儲存於 `benchmark.txt`*

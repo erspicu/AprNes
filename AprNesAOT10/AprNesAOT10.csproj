@@ -1,0 +1,110 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <AssemblyName>AprNesAOT10</AssemblyName>
+    <RootNamespace>AprNes</RootNamespace>
+    <Optimize>true</Optimize>
+    <ApplicationManifest>..\AprNesAOT\app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <!-- INI 設定與語系檔：複製到輸出目錄 -->
+  <ItemGroup>
+    <Content Include="..\AprNesAOT\AprNesLang.ini" Link="AprNesLang.ini">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\AprNesAOT\AprNes.ini" Link="AprNes.ini">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Benchmark CLI (shared) -->
+  <ItemGroup>
+    <Compile Include="..\AprNes\BenchmarkRunner.cs" Link="BenchmarkRunner.cs" />
+  </ItemGroup>
+
+  <!-- NES Core -->
+  <ItemGroup>
+    <Compile Include="..\AprNes\NesCore\APU.cs" />
+    <Compile Include="..\AprNes\NesCore\CPU.cs" />
+    <Compile Include="..\AprNes\NesCore\PPU.cs" />
+    <Compile Include="..\AprNes\NesCore\MEM.cs" />
+    <Compile Include="..\AprNes\NesCore\IO.cs" />
+    <Compile Include="..\AprNes\NesCore\JoyPad.cs" />
+    <Compile Include="..\AprNes\NesCore\Main.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\IMapper.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\Mapper000.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\Mapper001.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\Mapper002.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\Mapper003.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\Mapper004.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\Mapper004RevA.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\Mapper004MMC6.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\Mapper005.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\Mapper007.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\Mapper011.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\Mapper066.cs" />
+    <Compile Include="..\AprNes\NesCore\Mapper\Mapper071.cs" />
+  </ItemGroup>
+
+  <!-- 共享工具層 -->
+  <ItemGroup>
+    <Compile Include="..\AprNes\tool\DirectInputHelper.cs" />
+    <Compile Include="..\AprNes\tool\InterfaceGraphic.cs" />
+    <Compile Include="..\AprNes\tool\joystick.cs" />
+    <Compile Include="..\AprNes\tool\LangINI.cs" />
+    <Compile Include="..\AprNes\tool\libXBRz.cs" />
+    <Compile Include="..\AprNes\tool\LibScanline.cs" />
+    <Compile Include="..\AprNes\tool\NativeAPIShare.cs" />
+    <Compile Include="..\AprNes\tool\NativeRendering.cs" />
+    <Compile Include="..\AprNes\tool\Scalex.cs" />
+    <Compile Include="..\AprNes\tool\WaveOutPlayer.cs" />
+  </ItemGroup>
+
+  <!-- 共享 WinForms UI -->
+  <ItemGroup>
+    <Compile Include="..\AprNes\UI\AprNesUI.cs" Link="UI\AprNesUI.cs" />
+    <Compile Include="..\AprNes\UI\AprNesUI.Designer.cs" Link="UI\AprNesUI.Designer.cs">
+      <DependentUpon>AprNesUI.cs</DependentUpon>
+    </Compile>
+    <EmbeddedResource Include="..\AprNes\UI\AprNesUI.resx" Link="UI\AprNesUI.resx">
+      <DependentUpon>AprNesUI.cs</DependentUpon>
+    </EmbeddedResource>
+
+    <Compile Include="..\AprNes\UI\AprNes_ConfigureUI.cs" Link="UI\AprNes_ConfigureUI.cs" />
+    <Compile Include="..\AprNes\UI\AprNes_ConfigureUI.designer.cs" Link="UI\AprNes_ConfigureUI.designer.cs">
+      <DependentUpon>AprNes_ConfigureUI.cs</DependentUpon>
+    </Compile>
+    <EmbeddedResource Include="..\AprNes\UI\AprNes_ConfigureUI.resx" Link="UI\AprNes_ConfigureUI.resx">
+      <DependentUpon>AprNes_ConfigureUI.cs</DependentUpon>
+    </EmbeddedResource>
+
+    <Compile Include="..\AprNes\UI\AprNes_RomInfoUI.cs" Link="UI\AprNes_RomInfoUI.cs" />
+    <Compile Include="..\AprNes\UI\AprNes_RomInfoUI.Designer.cs" Link="UI\AprNes_RomInfoUI.Designer.cs">
+      <DependentUpon>AprNes_RomInfoUI.cs</DependentUpon>
+    </Compile>
+    <EmbeddedResource Include="..\AprNes\UI\AprNes_RomInfoUI.resx" Link="UI\AprNes_RomInfoUI.resx">
+      <DependentUpon>AprNes_RomInfoUI.cs</DependentUpon>
+    </EmbeddedResource>
+
+    <Compile Include="..\AprNes\UI\AprNes_Info.cs" Link="UI\AprNes_Info.cs" />
+    <Compile Include="..\AprNes\UI\AprNes_Info.Designer.cs" Link="UI\AprNes_Info.Designer.cs">
+      <DependentUpon>AprNes_Info.cs</DependentUpon>
+    </Compile>
+    <EmbeddedResource Include="..\AprNes\UI\AprNes_Info.resx" Link="UI\AprNes_Info.resx">
+      <DependentUpon>AprNes_Info.cs</DependentUpon>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <!-- AOT 相關（從 AprNesAOT 共用） -->
+  <ItemGroup>
+    <Compile Include="..\AprNesAOT\AprNesUI.AotBenchmark.cs" Link="AprNesUI.AotBenchmark.cs" />
+    <Compile Include="..\AprNesAOT\NesCoreBenchmark.cs" Link="NesCoreBenchmark.cs" />
+  </ItemGroup>
+</Project>
