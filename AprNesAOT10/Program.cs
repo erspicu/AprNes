@@ -40,8 +40,7 @@ namespace AprNes
             }
 
             // ── Normal WinForms mode ──────────────────────────────────────────
-            // PerMonitorV2：讓 .NET 10 WinForms 接管 DPI 縮放，不與 manifest 衝突
-            Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+            // DPI 模式由 csproj <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode> 管理
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             var ui = AprNesUI.GetInstance();
