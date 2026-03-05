@@ -302,12 +302,6 @@ namespace AprNes
                     nmi_just_deferred = true;
 
                 // === IRQ polling (end of instruction, for next instruction) ===
-                // irqLinePrev holds penultimate tick's IRQ state — naturally handles:
-                //   - 2-cycle instructions (penultimate = tick 1)
-                //   - 3+ cycle instructions (penultimate = tick N-1)
-                //   - Taken branch without page cross (last-cycle suppression is inherent)
-                //   - OAM DMA (irqLinePrev saved/restored around DMA in ppu_w_4014)
-                // Suppress poll on: BRK (opcode 0x00) — handled by interrupt sequence
                 if (opcode != 0x00)
                 {
                     byte irqPollI = (opcode == 0x40) ? flagI : prevFlagI_run;

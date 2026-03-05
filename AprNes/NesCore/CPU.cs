@@ -2343,7 +2343,20 @@ namespace AprNes
                     break;
                 #endregion
 #endif
-                default: ShowError("unkonw opcode ! - 0x" + opcode.ToString("X2")); break;
+                // KIL/STP/JAM — halt the CPU; only RESET can recover on real hardware.
+                // We busy-loop tick() until NMI fires (allows test ROMs to recover).
+                case 0x02: case 0x12: case 0x22: case 0x32:
+                case 0x42: case 0x52: case 0x62: case 0x72:
+                case 0x92: case 0xB2: case 0xD2: case 0xF2:
+                    r_PC = trace_pc; // stay on the KIL opcode (CPU jammed)
+                    for (int _kilGuard = 0; _kilGuard < 0x200000; _kilGuard++)
+                    {
+                        tick();
+                        if (nmi_pending || nmi_delay || exit) break;
+                    }
+                    break;
+
+                default: ShowError("unkonw opcode ! - 0x" + opcode.ToString("X2") + " at PC=$" + trace_pc.ToString("X4")); break;
             }
 
             // Post-instruction trace for NMI handler debugging
