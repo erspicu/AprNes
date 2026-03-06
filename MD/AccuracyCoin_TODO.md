@@ -1,6 +1,6 @@
 # AccuracyCoin FAIL 修復 TODO
 
-**基線**: 110/136 PASS, 25 FAIL, 1 SKIP (BUGFIX35 後)
+**基線**: 111/136 PASS, 23 FAIL, 1 SKIP (BUGFIX36 後)
 **目標**: 逐步提升至 Master Clock 驅動模型
 
 ---
@@ -39,9 +39,9 @@
 - [x] **Misaligned OAM behavior** (P18, $045A, PASS - BUGFIX35)
   - 修復: PrecomputeSprite0Line 支援未對齊 OAMADDR，正確模擬 addrH/addrL 遞增
 
-- [ ] **OAM Corruption** (P18, $047B, err=2, MEDIUM)
-  - rendering enable/disable 轉換時，OAM row 0 應被複製到其他 row
-  - OAMADDR corruption bug 未實作
+- [x] **OAM Corruption** (P18, $047B, PASS - BUGFIX36)
+  - 修復: SetOamCorruptionFlags() + ProcessOamCorruption() in ppu_w_2001() transition detection
+  - rendering disable 時標記 row，re-enable 或 frame start 時 copy OAM[0:7]
 
 - [ ] **APU Register Activation** (P14, $045C, err=4, MEDIUM)
   - OAM DMA 頁面非 $40 時，DMA 不應與 APU 暫存器產生 bus conflict
@@ -134,7 +134,7 @@
 ## 建議修改路徑
 
 ```
-Phase 1 (INDEPENDENT)     → 快速提升 PASS 數（+7，達 113/136）
+Phase 1 (INDEPENDENT)     → 快速提升 PASS 數（+6，達 113/136）
   ↓
 Phase 2.1 (TIMING-CORE easy) → 修復核心 timing 基礎（+2，達 115/136）
   ↓

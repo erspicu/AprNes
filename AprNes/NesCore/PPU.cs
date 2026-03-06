@@ -64,6 +64,13 @@ namespace AprNes
         static int ppu2007ReadCooldown = 0; // 6 PPU dots cooldown after $2007 read (Mesen2: _ignoreVramRead)
         static byte* spr_ram;
         static public byte* ppu_ram;
+
+        // OAM corruption: when rendering is disabled mid-scanline, the PPU's internal
+        // secondary OAM addressing glitches and marks rows for corruption.
+        // When rendering re-enables (or at next frame start), first 8 bytes of OAM
+        // are copied over each marked row.
+        static bool[] corruptOamRow = new bool[32];
+        static bool prevRenderingEnabled = false;
         static public uint* ScreenBuf1x;
         static uint* NesColors; //, targetSize;
         static int* Buffer_BG_array;
@@ -374,7 +381,13 @@ namespace AprNes
             // Advance scanline
             if (ppu_cycles_x == 341)
             {
-                if (++scanline == 262) scanline = 0;
+                if (++scanline == 262)
+                {
+                    scanline = 0;
+                    // Process OAM corruption at frame start if rendering is enabled
+                    if (ShowBackGround || ShowSprites)
+                        ProcessOamCorruption();
+                }
                 ppu_cycles_x = 0;
             }
         }
@@ -392,6 +405,42 @@ namespace AprNes
 
         // Pre-computed sprite overflow cycle for cycle-accurate overflow flag timing
         static int spriteOverflowCycle;
+
+        // OAM corruption: mark which row gets corrupted when rendering is disabled mid-scanline
+        static void SetOamCorruptionFlags()
+        {
+            if (ppu_cycles_x >= 0 && ppu_cycles_x < 64)
+            {
+                // Secondary OAM clear phase: every 2 dots shifts corruption down 1 row
+                corruptOamRow[ppu_cycles_x >> 1] = true;
+            }
+            else if (ppu_cycles_x >= 256 && ppu_cycles_x < 320)
+            {
+                // Sprite tile fetch phase: 8-dot segments
+                int rel = ppu_cycles_x - 256;
+                int baseIdx = rel >> 3;
+                int offset = rel & 0x07;
+                if (offset > 3) offset = 3;
+                corruptOamRow[baseIdx * 4 + offset] = true;
+            }
+        }
+
+        // OAM corruption: copy first 8 bytes of OAM over each marked row
+        static void ProcessOamCorruption()
+        {
+            for (int i = 0; i < 32; i++)
+            {
+                if (corruptOamRow[i])
+                {
+                    if (i > 0)
+                    {
+                        for (int j = 0; j < 8; j++)
+                            spr_ram[i * 8 + j] = spr_ram[j];
+                    }
+                    corruptOamRow[i] = false;
+                }
+            }
+        }
 
         // Pre-compute sprite 0 tile data for the current scanline so hit detection
         // can happen per-pixel inside RenderBGTile() at the correct PPU cycle.
@@ -765,6 +814,16 @@ namespace AprNes
             ShowSprLeft8 = (value & 0x04) != 0; // bit2: show sprites in leftmost 8 pixels
             ShowBackGround = (value & 0x08) != 0;
             ShowSprites    = (value & 0x10) != 0;
+
+            bool newRenderingEnabled = ShowBackGround || ShowSprites;
+            if (prevRenderingEnabled != newRenderingEnabled && scanline >= 0 && scanline < 240)
+            {
+                if (newRenderingEnabled)
+                    ProcessOamCorruption();
+                else
+                    SetOamCorruptionFlags();
+            }
+            prevRenderingEnabled = newRenderingEnabled;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
