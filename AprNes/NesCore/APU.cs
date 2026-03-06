@@ -141,7 +141,7 @@ namespace AprNes
             masterClock = 7 * MASTER_PER_CPU; // calibrated: 7 boot CPU cycles
             cpuCycleCount = 7;
             ppuClock = 7 * MASTER_PER_CPU;
-            apuClock = 7 * MASTER_PER_CPU;
+            apuClock = 7 * MASTER_PER_CPU - 4;
 
             // Re-apply last $4017 value (nesdev: "at reset, $4017 rewritten with last value")
             ctrmode    = ((last4017Val & 0x80) != 0) ? 5 : 4;
@@ -256,7 +256,7 @@ namespace AprNes
             masterClock = 7 * MASTER_PER_CPU; // calibrated: 7 boot CPU cycles
             cpuCycleCount = 7;
             ppuClock = 7 * MASTER_PER_CPU;
-            apuClock = 7 * MASTER_PER_CPU;
+            apuClock = 7 * MASTER_PER_CPU - 4;
             framectr = 0; ctrmode = 4;
 
             // 聲道計時器重置

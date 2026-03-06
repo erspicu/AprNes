@@ -18,7 +18,7 @@ namespace AprNes
         static long masterClock = 7 * MASTER_PER_CPU; // calibrated: 7 boot CPU cycles worth
         static long cpuCycleCount = 7;   // derived: masterClock / MASTER_PER_CPU
         static long ppuClock = 7 * MASTER_PER_CPU;    // PPU catch-up position (master clock units)
-        static long apuClock = 7 * MASTER_PER_CPU;    // APU catch-up position (master clock units)
+        static long apuClock = 7 * MASTER_PER_CPU - 4; // APU catch-up position (4 MCU behind → fires in tick_pre)
 
         // Catch up PPU to current master clock position
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -46,6 +46,7 @@ namespace AprNes
             }
         }
 
+        // Full tick: all 3 PPU dots + APU in one shot (used by DMA stolen cycles)
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void tick()
         {
@@ -64,14 +65,37 @@ namespace AprNes
             irqLineCurrent = statusframeint || statusdmcint || statusmapperint;
         }
 
+        // φ1 phase: all 3 PPU dots + APU before CPU bus access (currently 3+0 split).
+        // Future 2+1 split: move last dot + IRQ to tick_post when PPU register timing is adjusted.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void tick_pre()
+        {
+            masterClock += MASTER_PER_CPU;
+            cpuCycleCount++;
+
+            if (nmi_delay) { nmi_pending = true; nmi_delay = false; }
+            catchUpPPU();
+            catchUpAPU();
+
+            irqLinePrev = irqLineCurrent;
+            irqLineCurrent = statusframeint || statusdmcint || statusmapperint;
+        }
+
+        // φ2 phase: placeholder for post-access PPU dot (currently empty — all dots in tick_pre).
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void tick_post()
+        {
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte Mem_r(ushort address)
         {
             cpuBusAddr = address;
             cpuBusIsWrite = false;
-            tick();
+            tick_pre();                          // 3 PPU dots + APU before read
             byte val = mem_read_fun[address](address);
-            if (address != 0x4015) cpubus = val; // $4015 reads don't propagate to data bus
+            if (address != 0x4015) cpubus = val;
+            tick_post();                         // (placeholder for future sub-cycle split)
             return val;
         }
 
@@ -80,16 +104,30 @@ namespace AprNes
         {
             cpuBusAddr = address;
             cpuBusIsWrite = true;
-            tick();
+            tick_pre();                          // 3 PPU dots + APU before write
             cpubus = value;
             mem_write_fun[address](address, value);
+            tick_post();                         // (placeholder for future sub-cycle split)
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static byte ZP_r(byte addr) { cpuBusAddr = addr; cpuBusIsWrite = false; tick(); byte val = NES_MEM[addr]; cpubus = val; return val; }
+        static byte ZP_r(byte addr)
+        {
+            cpuBusAddr = addr; cpuBusIsWrite = false;
+            tick_pre();
+            byte val = NES_MEM[addr]; cpubus = val;
+            tick_post();
+            return val;
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void ZP_w(byte addr, byte value) { cpuBusAddr = addr; cpuBusIsWrite = true; tick(); NES_MEM[addr] = value; cpubus = value; }
+        static void ZP_w(byte addr, byte value)
+        {
+            cpuBusAddr = addr; cpuBusIsWrite = true;
+            tick_pre();
+            NES_MEM[addr] = value; cpubus = value;
+            tick_post();
+        }
 
         static Action<ushort, byte>[] mem_write_fun = null;
         static Func<ushort, byte>[] mem_read_fun = null;
