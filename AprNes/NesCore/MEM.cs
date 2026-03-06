@@ -62,7 +62,7 @@ namespace AprNes
 
             // Track IRQ line per-tick for penultimate-cycle polling
             irqLinePrev = irqLineCurrent;
-            irqLineCurrent = statusframeint || statusdmcint || statusmapperint;
+            irqLineCurrent = (statusframeint && !apuintflag) || statusdmcint || statusmapperint;
         }
 
         // φ1 phase: all 3 PPU dots + APU before CPU bus access (currently 3+0 split).
@@ -78,7 +78,7 @@ namespace AprNes
             catchUpAPU();
 
             irqLinePrev = irqLineCurrent;
-            irqLineCurrent = statusframeint || statusdmcint || statusmapperint;
+            irqLineCurrent = (statusframeint && !apuintflag) || statusdmcint || statusmapperint;
         }
 
         // φ2 phase: placeholder for post-access PPU dot (currently empty — all dots in tick_pre).

@@ -76,6 +76,7 @@ namespace AprNes
         static int framectrdiv = 7458;
         static bool apuintflag = true, statusdmcint = false, statusframeint = false;
         static int irqAssertCycles = 0; // post-fire: assert IRQ flag for extra cycles after step 3
+        static bool frameIrqClearPending = false; // deferred $4015 read IRQ clear (fires on next APU "get" cycle)
         static int framectr = 0, ctrmode = 4;
         static byte last4017Val = 0;  // track last value written to $4017 for reset
         static byte* lenCtrEnable;
@@ -158,6 +159,7 @@ namespace AprNes
             }
             framectrdiv = 7449; // match power-on advance (with tick-before-write compensation)
             irqAssertCycles = 0;
+            frameIrqClearPending = false;
 
             // 清除 IRQ flags
             statusframeint = false;
@@ -315,6 +317,7 @@ namespace AprNes
         static void apu_step()
         {
             apucycle++;
+
             lengthClockThisCycle[0] = lengthClockThisCycle[1] =
             lengthClockThisCycle[2] = lengthClockThisCycle[3] = 0;
 
@@ -324,11 +327,24 @@ namespace AprNes
             lengthctr_snapshot[2] = lengthctr[2];
             lengthctr_snapshot[3] = lengthctr[3];
 
-            // Mode 0: IRQ post-fire (1 cycle after step 3)
-            if (irqAssertCycles > 0 && !apuintflag)
+            // Deferred $4015 IRQ flag clear: fires on APU "get" cycle
+            // Must fire BEFORE frame counter assertion so re-assertion can override
+            if (frameIrqClearPending && (cpuCycleCount & 1) == 0)
+            {
+                statusframeint = false;
+                frameIrqClearPending = false;
+            }
+
+            // Mode 0: IRQ post-fire (continues for 2 cycles after initial set)
+            // Flag is set unconditionally for first 2 cycles, then gated by apuintflag
+            if (irqAssertCycles > 0)
             {
                 statusframeint = true;
+                frameIrqClearPending = false; // cancel deferred clear — flag was just re-asserted
                 --irqAssertCycles;
+                // On the last assertion cycle, check if suppress flag clears it
+                if (irqAssertCycles == 0 && apuintflag)
+                    statusframeint = false;
             }
 
             // Frame Counter：non-uniform step intervals matching real NES (~240Hz)
@@ -439,10 +455,13 @@ namespace AprNes
                 setlength();
                 setsweep();
             }
-            if (!apuintflag && framectr == 3 && ctrmode == 4)
+            if (framectr == 3 && ctrmode == 4)
             {
+                // Frame IRQ flag is set unconditionally for 3 cycles (even when apuintflag=true)
+                // On the 3rd cycle, it's cleared if apuintflag is true
                 statusframeint = true;
-                irqAssertCycles = 2; // post-fire: assert flag 2 more cycles after step 3 (fire + 2 post = 3 total)
+                frameIrqClearPending = false; // cancel deferred clear — flag was just asserted
+                irqAssertCycles = 2; // 2 more cycles after this one (3 total)
             }
 
             ++framectr;
@@ -727,7 +746,7 @@ namespace AprNes
             if (statusframeint)     status |= 0x40;
             if (statusdmcint)       status |= 0x80;
             status |= (byte)(cpubus & 0x20); // bit 5 is open bus (CPU data bus)
-            statusframeint = false;
+            frameIrqClearPending = true;
             return status;
         }
 

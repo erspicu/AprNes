@@ -1,6 +1,6 @@
 # AccuracyCoin FAIL 修復 TODO
 
-**基線**: 111/136 PASS, 24 FAIL, 1 SKIP (BUGFIX36 後)
+**基線**: 112/136 PASS, 23 FAIL, 1 SKIP (BUGFIX37 後)
 **目標**: 逐步提升至 Master Clock 驅動模型
 
 ---
@@ -10,11 +10,11 @@
 | 分類 | 總數 | 已修 | 剩餘 | 說明 |
 |------|------|------|------|------|
 | INDEPENDENT | 7 | 6 | 1(partial) | 不依賴 timing 改動，可獨立修復 |
-| TIMING-CORE | 11 | 0 | 11 | 需要 DMA/IRQ/PPU cycle-level 改動 |
+| TIMING-CORE | 11 | 1 | 10 | 需要 DMA/IRQ/PPU cycle-level 改動 |
 | TIMING-DEPENDENT | 7 | 1 | 6 | 依賴正確 timing 基礎設施 |
 | HARDWARE-EDGE | 5 | 0 | 5 | SH* RDY line，極端硬體行為 |
 
-已修 7 項 (6 INDEPENDENT + 1 TIMING-DEPENDENT)，剩餘 24 FAIL + 1 SKIP
+已修 8 項 (6 INDEPENDENT + 1 TIMING-CORE + 1 TIMING-DEPENDENT)，剩餘 23 FAIL + 1 SKIP
 
 ---
 
@@ -59,9 +59,10 @@
 
 ### 2.2 Frame Counter（中等難度）
 
-- [ ] **Frame Counter IRQ** (P14, $0467, err=7, MEDIUM)
-  - $4017 在 odd/even CPU cycle 寫入時，IRQ flag 未正確清除
-  - 涉及 frame counter 與 CPU bus cycle parity 的交互
+- [x] **Frame Counter IRQ** (P14, $0467, PASS - BUGFIX37)
+  - 修復: $4015 read 的 IRQ flag clear 改為 deferred（下個 APU "get" cycle 才生效）
+  - 修復: frame counter IRQ flag 在 apuintflag=true 時也會暫時 set 2 cycles
+  - 修復: irqLineCurrent 加上 !apuintflag 判斷，避免 suppress 模式下誤觸 IRQ
 
 ### 2.3 DMA cluster（高難度，互相關聯）
 
@@ -162,4 +163,4 @@ Page 12 item 1 (SKIP→PASS)→ 需要完整 Master Clock（136/136）
 
 ---
 
-*最後更新：2026-03-08*
+*最後更新：2026-03-07*
