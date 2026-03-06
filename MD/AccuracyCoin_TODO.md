@@ -1,22 +1,24 @@
 # AccuracyCoin FAIL 修復 TODO
 
-**基線**: 111/136 PASS, 23 FAIL, 1 SKIP (BUGFIX36 後)
+**基線**: 111/136 PASS, 24 FAIL, 1 SKIP (BUGFIX36 後)
 **目標**: 逐步提升至 Master Clock 驅動模型
 
 ---
 
 ## 分類統計
 
-| 分類 | 數量 | 說明 |
-|------|------|------|
-| INDEPENDENT | 7 | 不依賴 timing 改動，可獨立修復 |
-| TIMING-CORE | 10 | 需要 DMA/IRQ/PPU cycle-level 改動 |
-| TIMING-DEPENDENT | 7 | 依賴正確 timing 基礎設施 |
-| HARDWARE-EDGE | 5 | SH* RDY line，極端硬體行為 |
+| 分類 | 總數 | 已修 | 剩餘 | 說明 |
+|------|------|------|------|------|
+| INDEPENDENT | 7 | 6 | 1(partial) | 不依賴 timing 改動，可獨立修復 |
+| TIMING-CORE | 11 | 0 | 11 | 需要 DMA/IRQ/PPU cycle-level 改動 |
+| TIMING-DEPENDENT | 7 | 1 | 6 | 依賴正確 timing 基礎設施 |
+| HARDWARE-EDGE | 5 | 0 | 5 | SH* RDY line，極端硬體行為 |
+
+已修 7 項 (6 INDEPENDENT + 1 TIMING-DEPENDENT)，剩餘 24 FAIL + 1 SKIP
 
 ---
 
-## Phase 1: INDEPENDENT（獨立修復，優先處理）
+## Phase 1: INDEPENDENT（已完成，無更多可獨立修復的項目）
 
 ### 1.1 EASY（快速修復）
 
@@ -43,26 +45,30 @@
   - 修復: SetOamCorruptionFlags() + ProcessOamCorruption() in ppu_w_2001() transition detection
   - rendering disable 時標記 row，re-enable 或 frame start 時 copy OAM[0:7]
 
-- [ ] **APU Register Activation** (P14, $045C, err=4, HARD → 移至 Phase 2)
-  - 需要 DMA bus activation 邏輯：6502 address bus 是否在 $4000-$401F 決定 APU register 是否可讀
-  - Tests 5-7 需要 JSR $3FFE + DMC DMA timing + PPU bus state 配合，與 DMA cluster 高度相關
-
 ---
 
 ## Phase 2: TIMING-CORE（核心時序，最重要的基礎設施）
 
-### 2.1 中等難度（先處理）
+### 2.1 Sub-cycle 精度（需 M2 duty cycle 模型）
+
+- [ ] **$2002 flag clear timing** (P18, $048D, err=1, BLOCKED)
+  - VBL/S0H/overflow flags 未在正確的 PPU dot 清除
+  - 改 dot 2→1 會破壞 blargg vbl_clear_timing + nmi_on_timing（3 個回歸）
+  - 需要 sub-cycle M2 duty 精度（VBL 在 M2 high，sprite flags 在 M2 low）
+  - **已嘗試修復，確認無法在不破壞 blargg 測試的前提下修正**
+
+### 2.2 Frame Counter（中等難度）
 
 - [ ] **Frame Counter IRQ** (P14, $0467, err=7, MEDIUM)
   - $4017 在 odd/even CPU cycle 寫入時，IRQ flag 未正確清除
   - 涉及 frame counter 與 CPU bus cycle parity 的交互
 
-- [ ] **$2002 flag clear timing** (P18, $048D, err=1, MEDIUM → BLOCKED)
-  - VBL/S0H/overflow flags 未在正確的 PPU dot 清除
-  - 改 dot 2→1 會破壞 blargg vbl_clear_timing + nmi_on_timing（3 個回歸）
-  - 需要 sub-cycle M2 duty 精度（VBL 在 M2 high，sprite flags 在 M2 low）
+### 2.3 DMA cluster（高難度，互相關聯）
 
-### 2.2 高難度（DMA cluster，互相關聯）
+- [ ] **APU Register Activation** (P14, $045C, err=4, HARD)
+  - 需要 DMA bus activation 邏輯：6502 address bus 是否在 $4000-$401F 決定 APU register 是否可讀
+  - Tests 5-7 需要 JSR $3FFE + DMC DMA timing + PPU bus state 配合，與 DMA cluster 高度相關
+  - **已嘗試修復 (cpuLastReadAddr tracking)，反而惡化 err=4→6，已 revert**
 
 - [ ] **DMA + $4015 Read** (P13, $045D, err=2, HARD)
   - DMC DMA halt/alignment 的 phantom reads 碰到 $4015 時應清除 frame counter IRQ flag
@@ -99,9 +105,13 @@
 
 - [ ] **Stale BG Shift Registers** (P19, $0483, err=1, MEDIUM)
   - rendering 關閉後再開啟，BG shift registers 應保留 stale data
+  - 需要 mid-scanline rendering toggle 時 shift register 狀態正確保留
 
 - [ ] **$2004 Stress Test** (P19, $048C, err=1, MEDIUM)
-  - dot 0 讀取 $2004 應返回 Secondary OAM Index 0
+  - dot 0 讀取 $2004 應返回 Secondary OAM Index 0 (oamCopyBuffer)
+  - **已嘗試修復 (oamCopyBuffer + secondaryOam)，未改善 err=1，已 revert**
+  - 根因: AprNes 在 dot 257 為當前 scanline 評估 sprite，而非 dots 65-256 為下一 scanline
+  - 需要重構 sprite evaluation 為 per-dot pipeline 才能正確實作
 
 ### 3.2 高難度
 
@@ -136,13 +146,14 @@
 ## 建議修改路徑
 
 ```
-Phase 1 已完成（+5，達 111/136）
+Phase 1 已完成（+6 PASS，達 111/136）
   ↓
-Phase 2.1 (TIMING-CORE easy) → 兩項都被 blargg 測試阻擋，需 sub-cycle 精度
+Phase 2.1 ($2002 flag clear) → BLOCKED，需 sub-cycle M2 duty 精度
+Phase 2.2 (Frame Counter IRQ) → 可獨立嘗試，但涉及 cycle parity
   ↓
-Phase 2.2 (DMA cluster)   → Master Clock 重構，一次解決 DMA 相關問題（+9，含 APU Reg Activation）
+Phase 2.3 (DMA cluster)   → Master Clock 重構，一次解決 DMA 相關問題（+10，含 APU Reg Activation）
   ↓
-Phase 3 (TIMING-DEPENDENT)→ 在正確 timing 基礎上修復剩餘（+7）
+Phase 3 (TIMING-DEPENDENT)→ 在正確 timing 基礎上修復剩餘（+6）
   ↓
 Phase 4 (HARDWARE-EDGE)   → 追求極致精確度（+5）
   ↓
