@@ -219,13 +219,11 @@ namespace AprNes
                 //init function array
                 init_function();
 
-                //init cpu pc (suppress ticking during init — APU not ready yet)
-                in_tick = true;
-                r_PC = (ushort)(Mem_r(0xfffc) | Mem_r(0xfffd) << 8);
-                in_tick = false;
-
-                //init APU & audio output
+                //init APU & audio output (must be before reset vector read so tick() can run)
                 initAPU();
+
+                //init cpu pc (read reset vector — no tick needed, boot cycles already counted)
+                r_PC = (ushort)(mem_read_fun[0xfffc](0xfffc) | (mem_read_fun[0xfffd](0xfffd) << 8));
 
                 //init debug log
                 dbgInit();

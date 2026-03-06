@@ -140,6 +140,8 @@ namespace AprNes
             apucycle = 0;
             masterClock = 7 * MASTER_PER_CPU; // calibrated: 7 boot CPU cycles
             cpuCycleCount = 7;
+            ppuClock = 7 * MASTER_PER_CPU;
+            apuClock = 7 * MASTER_PER_CPU;
 
             // Re-apply last $4017 value (nesdev: "at reset, $4017 rewritten with last value")
             ctrmode    = ((last4017Val & 0x80) != 0) ? 5 : 4;
@@ -253,6 +255,8 @@ namespace AprNes
             apucycle    = 0;
             masterClock = 7 * MASTER_PER_CPU; // calibrated: 7 boot CPU cycles
             cpuCycleCount = 7;
+            ppuClock = 7 * MASTER_PER_CPU;
+            apuClock = 7 * MASTER_PER_CPU;
             framectr = 0; ctrmode = 4;
 
             // 聲道計時器重置
@@ -623,13 +627,13 @@ namespace AprNes
                         if (sc == stolenCycles - 1)
                         {
                             // Last stolen cycle is the actual DMA read
-                            dmc_stolen_tick();
+                            tick();
                             dmcbuffer = mem_read_fun[(ushort)dmcaddr]((ushort)dmcaddr);
                             cpubus = (byte)dmcbuffer;
                         }
                         else
                         {
-                            dmc_stolen_tick(); // dummy or alignment cycle
+                            tick(); // dummy or alignment cycle
                         }
                     }
                 }
@@ -652,7 +656,7 @@ namespace AprNes
 
                     for (int i = 0; i < haltCycles; i++)
                     {
-                        dmc_stolen_tick();
+                        tick();
 
                         // Phantom reads: CPU repeats last read on all no-op DMA cycles
                         if (!cpuBusIsWrite)
@@ -678,7 +682,7 @@ namespace AprNes
                     }
 
                     // DMA read cycle — fetch actual sample from PRG ROM
-                    dmc_stolen_tick();
+                    tick();
                     dmcbuffer = mem_read_fun[(ushort)dmcaddr]((ushort)dmcaddr);
                     cpubus = (byte)dmcbuffer;
                 }

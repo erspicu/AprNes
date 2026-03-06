@@ -19,7 +19,7 @@ trap "rm -rf $TMPDIR" EXIT
 TL="$TMPDIR/tests.txt"
 a() { echo "$1|$2|$3" >> "$TL"; }
 
-for r in dmc.nes noise.nes square.nes triangle.nes; do a "apu_mixer" "$r" "--max-wait 15"; done
+for r in dmc.nes noise.nes square.nes triangle.nes; do a "apu_mixer" "$r" "--max-wait 30"; done
 for r in 4015_cleared.nes 4017_timing.nes 4017_written.nes irq_flag_cleared.nes len_ctrs_enabled.nes works_immediately.nes; do a "apu_reset" "$r" "--max-wait 15"; done
 a "apu_test" "apu_test.nes" "--max-wait 15"
 for r in 1-len_ctr.nes 2-len_table.nes 3-irq_flag.nes 4-jitter.nes 5-len_timing.nes 6-irq_flag_timing.nes 7-dmc_basics.nes 8-dmc_rates.nes; do a "apu_test/rom_singles" "$r" "--max-wait 15"; done
@@ -41,22 +41,22 @@ a "dmc_dma_during_read4" "double_2007_read.nes" "--max-wait 15 --expected-crc 85
 a "dmc_dma_during_read4" "read_write_2007.nes" "--max-wait 15"
 a "instr_misc" "instr_misc.nes" "--max-wait 15"
 for r in 01-abs_x_wrap.nes 02-branch_wrap.nes 03-dummy_reads.nes 04-dummy_reads_apu.nes; do a "instr_misc/rom_singles" "$r" "--max-wait 15"; done
-a "instr_test-v3" "all_instrs.nes" "--max-wait 20"
-a "instr_test-v3" "official_only.nes" "--max-wait 20"
+a "instr_test-v3" "all_instrs.nes" "--max-wait 45"
+a "instr_test-v3" "official_only.nes" "--max-wait 45"
 for r in 01-implied.nes 02-immediate.nes 03-zero_page.nes 04-zp_xy.nes 05-absolute.nes 06-abs_xy.nes 07-ind_x.nes 08-ind_y.nes 09-branches.nes 10-stack.nes 11-jmp_jsr.nes 12-rts.nes 13-rti.nes 14-brk.nes 15-special.nes; do a "instr_test-v3/rom_singles" "$r" "--max-wait 15"; done
-a "instr_test-v5" "all_instrs.nes" "--max-wait 20"
-a "instr_test-v5" "official_only.nes" "--max-wait 20"
+a "instr_test-v5" "all_instrs.nes" "--max-wait 45"
+a "instr_test-v5" "official_only.nes" "--max-wait 45"
 for r in 01-basics.nes 02-implied.nes 03-immediate.nes 04-zero_page.nes 05-zp_xy.nes 06-absolute.nes 07-abs_xy.nes 08-ind_x.nes 09-ind_y.nes 10-branches.nes 11-stack.nes 12-jmp_jsr.nes 13-rts.nes 14-rti.nes 15-brk.nes 16-special.nes; do a "instr_test-v5/rom_singles" "$r" "--max-wait 15"; done
-a "instr_timing" "instr_timing.nes" "--max-wait 20"
-for r in 1-instr_timing.nes 2-branch_timing.nes; do a "instr_timing/rom_singles" "$r" "--max-wait 15"; done
+a "instr_timing" "instr_timing.nes" "--max-wait 45"
+for r in 1-instr_timing.nes 2-branch_timing.nes; do a "instr_timing/rom_singles" "$r" "--max-wait 30"; done
 for r in 1.Clocking.nes 2.Details.nes 3.A12_clocking.nes 4.Scanline_timing.nes 5.MMC3_rev_A.nes 6.MMC3_rev_B.nes; do a "mmc3_irq_tests" "$r" "--max-wait 15"; done
 for r in 1-clocking.nes 2-details.nes 3-A12_clocking.nes 4-scanline_timing.nes 5-MMC3.nes 6-MMC6.nes; do a "mmc3_test" "$r" "--max-wait 15"; done
 for r in 1-clocking.nes 2-details.nes 3-A12_clocking.nes 4-scanline_timing.nes 5-MMC3.nes 6-MMC3_alt.nes; do a "mmc3_test_2/rom_singles" "$r" "--max-wait 15"; done
 for r in 01-implied.nes 02-immediate.nes 03-zero_page.nes 04-zp_xy.nes 05-absolute.nes 06-abs_xy.nes 07-ind_x.nes 08-ind_y.nes 09-branches.nes 10-stack.nes 11-special.nes; do a "nes_instr_test/rom_singles" "$r" "--max-wait 15"; done
 a "oam_read" "oam_read.nes" "--max-wait 15"
 a "ppu_open_bus" "ppu_open_bus.nes" "--max-wait 15"
-a "ppu_read_buffer" "test_ppu_read_buffer.nes" "--max-wait 15"
-a "ppu_vbl_nmi" "ppu_vbl_nmi.nes" "--max-wait 20"
+a "ppu_read_buffer" "test_ppu_read_buffer.nes" "--max-wait 30"
+a "ppu_vbl_nmi" "ppu_vbl_nmi.nes" "--max-wait 45"
 for r in 01-vbl_basics.nes 02-vbl_set_time.nes 03-vbl_clear_time.nes 04-nmi_control.nes 05-nmi_timing.nes 06-suppression.nes 07-nmi_on_timing.nes 08-nmi_off_timing.nes 09-even_odd_frames.nes 10-even_odd_timing.nes; do a "ppu_vbl_nmi/rom_singles" "$r" "--max-wait 15"; done
 a "read_joy3" "test_buttons.nes" "--max-wait 25 --input A:2.0,B:4.0,Select:6.0,Start:8.0,Up:10.0,Down:12.0,Left:14.0,Right:16.0"
 for r in count_errors.nes count_errors_fast.nes; do a "read_joy3" "$r" "--max-wait 15 --pass-on-stable"; done

@@ -7,7 +7,6 @@ namespace AprNes
     {
         public static byte* NES_MEM;
 
-        static bool in_tick = false;  // prevent recursive tick from DMC fetch
         static ushort cpuBusAddr = 0;    // CPU current bus address (for DMC phantom reads)
         static bool cpuBusIsWrite = false; // true = write cycle, false = read cycle
 
@@ -18,52 +17,49 @@ namespace AprNes
         const int MASTER_PER_PPU = 4;
         static long masterClock = 7 * MASTER_PER_CPU; // calibrated: 7 boot CPU cycles worth
         static long cpuCycleCount = 7;   // derived: masterClock / MASTER_PER_CPU
+        static long ppuClock = 7 * MASTER_PER_CPU;    // PPU catch-up position (master clock units)
+        static long apuClock = 7 * MASTER_PER_CPU;    // APU catch-up position (master clock units)
 
+        // Catch up PPU to current master clock position
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void tick()
+        static void catchUpPPU()
         {
-            if (in_tick) return;
-            in_tick = true;
-            masterClock += MASTER_PER_CPU;
-            cpuCycleCount++;
-
-            // Promote nmi_delay from previous cycle → nmi_pending (1-cycle hardware delay)
-            if (nmi_delay) { nmi_pending = true; nmi_delay = false; }
-
-            // Per-dot NMI edge detection: rising edge → nmi_delay (not nmi_pending)
-            for (int i = 0; i < 3; i++)
+            while (ppuClock + MASTER_PER_PPU <= masterClock)
             {
-                ppu_step_new();
-                bool nmi_output = isVblank && NMIable;
-                if (nmi_output && !nmi_output_prev)
-                    nmi_delay = true;       // Rising edge → 1-cycle delay before pending
-                nmi_output_prev = nmi_output;
-            }
-
-            apu_step();
-
-            // Track IRQ line per-tick for penultimate-cycle polling
-            irqLinePrev = irqLineCurrent;
-            irqLineCurrent = statusframeint || statusdmcint || statusmapperint;
-
-            in_tick = false;
-        }
-
-        // Tick for DMC stolen cycles — full PPU + APU (timer must advance during DMA)
-        static void dmc_stolen_tick()
-        {
-            masterClock += MASTER_PER_CPU;
-            cpuCycleCount++;
-            if (nmi_delay) { nmi_pending = true; nmi_delay = false; }
-            for (int i = 0; i < 3; i++)
-            {
+                ppuClock += MASTER_PER_PPU;
                 ppu_step_new();
                 bool nmi_output = isVblank && NMIable;
                 if (nmi_output && !nmi_output_prev)
                     nmi_delay = true;
                 nmi_output_prev = nmi_output;
             }
-            apu_step(); // DMC timer must advance during DMA (dmcDmaInProgress prevents recursion)
+        }
+
+        // Catch up APU to current master clock position
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void catchUpAPU()
+        {
+            while (apuClock + MASTER_PER_CPU <= masterClock)
+            {
+                apuClock += MASTER_PER_CPU;
+                apu_step();
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void tick()
+        {
+            masterClock += MASTER_PER_CPU;
+            cpuCycleCount++;
+
+            // Promote nmi_delay from previous cycle → nmi_pending (1-cycle hardware delay)
+            if (nmi_delay) { nmi_pending = true; nmi_delay = false; }
+
+            // Catch up PPU and APU to current master clock
+            catchUpPPU();
+            catchUpAPU();
+
+            // Track IRQ line per-tick for penultimate-cycle polling
             irqLinePrev = irqLineCurrent;
             irqLineCurrent = statusframeint || statusdmcint || statusmapperint;
         }
