@@ -806,8 +806,7 @@ namespace AprNes
             tick(); // halt cycle
 
             // OAM DMA alignment: OAM reads must occur on GET cycles.
-            // After halt tick, check GET/PUT phase. If next cycle would be PUT,
-            // insert alignment cycle so OAM read starts on GET.
+            // After halt tick, check GET/PUT phase using apucycle (proven working).
             // GET = apucycle odd, PUT = apucycle even (after increment in apu_step)
             // After halt: apucycle odd → halt was GET → next is PUT → need alignment
             //             apucycle even → halt was PUT → next is GET → no alignment

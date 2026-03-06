@@ -11,11 +11,21 @@ namespace AprNes
         static ushort cpuBusAddr = 0;    // CPU current bus address (for DMC phantom reads)
         static bool cpuBusIsWrite = false; // true = write cycle, false = read cycle
 
+        // Master Clock timing (NTSC: 21,477,272.73 Hz)
+        // CPU = master ÷ 12, PPU = master ÷ 4, APU = CPU rate
+        // 1 CPU cycle = 12 master clocks = 3 PPU dots
+        const int MASTER_PER_CPU = 12;
+        const int MASTER_PER_PPU = 4;
+        static long masterClock = 7 * MASTER_PER_CPU; // calibrated: 7 boot CPU cycles worth
+        static long cpuCycleCount = 7;   // derived: masterClock / MASTER_PER_CPU
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void tick()
         {
             if (in_tick) return;
             in_tick = true;
+            masterClock += MASTER_PER_CPU;
+            cpuCycleCount++;
 
             // Promote nmi_delay from previous cycle → nmi_pending (1-cycle hardware delay)
             if (nmi_delay) { nmi_pending = true; nmi_delay = false; }
@@ -42,6 +52,8 @@ namespace AprNes
         // Tick for DMC stolen cycles — full PPU + APU (timer must advance during DMA)
         static void dmc_stolen_tick()
         {
+            masterClock += MASTER_PER_CPU;
+            cpuCycleCount++;
             if (nmi_delay) { nmi_pending = true; nmi_delay = false; }
             for (int i = 0; i < 3; i++)
             {

@@ -91,6 +91,7 @@ namespace AprNes
         static bool dmcDmaInProgress = false; // prevent re-entrant DMC fill during stolen ticks
         static bool dmcIsLoadDma = false;      // true = Load DMA (after $4015), false = Reload DMA
         static int dmcLoadDmaCountdown = 0;    // Load DMA scheduling delay (3-4 CPU cycles)
+        static bool dmcDmaPending = false;     // DMA trigger deferred to next read cycle (Mesen2: ProcessPendingDma only on MemoryRead)
 
         static bool oamDmaInProgress = false;  // true during OAM DMA (DMC overlaps with OAM cycles)
         static int oamDmaByteIndex = -1;       // current OAM byte being transferred (0-255, -1 = halt/align)
@@ -137,6 +138,8 @@ namespace AprNes
         static void apuSoftReset()
         {
             apucycle = 0;
+            masterClock = 7 * MASTER_PER_CPU; // calibrated: 7 boot CPU cycles
+            cpuCycleCount = 7;
 
             // Re-apply last $4017 value (nesdev: "at reset, $4017 rewritten with last value")
             ctrmode    = ((last4017Val & 0x80) != 0) ? 5 : 4;
@@ -167,6 +170,7 @@ namespace AprNes
             dmcsamplesleft = 0;
             dmcLoadDmaCountdown = 0;
             dmcIsLoadDma = false;
+            dmcDmaPending = false;
 
             // 重置音色產生器
             _pulseTimer[0] = _pulseTimer[1] = 0;
@@ -247,6 +251,8 @@ namespace AprNes
             framectrdiv = 7449; // 7458 + 1(even jitter) - 9(power-on advance) - 1(tick-before-write compensation)
             irqAssertCycles = 0;
             apucycle    = 0;
+            masterClock = 7 * MASTER_PER_CPU; // calibrated: 7 boot CPU cycles
+            cpuCycleCount = 7;
             framectr = 0; ctrmode = 4;
 
             // 聲道計時器重置
@@ -295,7 +301,7 @@ namespace AprNes
             dmcvalue = 0; dmcsamplelength = 1; dmcsamplesleft = 0;
             dmcstartaddr = 0xC000; dmcaddr = 0xC000; dmcbitsleft = 8;
             dmcsilence = true; dmcirq = false; dmcloop = false; dmcBufferEmpty = true;
-            dmcDmaInProgress = false; dmcIsLoadDma = false; dmcLoadDmaCountdown = 0;
+            dmcDmaInProgress = false; dmcIsLoadDma = false; dmcLoadDmaCountdown = 0; dmcDmaPending = false;
             oamDmaInProgress = false; oamDmaByteIndex = -1;
         }
 
@@ -892,8 +898,8 @@ namespace AprNes
                     {
                         dmcIsLoadDma = true;
                         // Mesen2: _transferStartDelay = CycleCount & 1 ? 3 : 2
-                        // Our apucycle odd = Mesen2 CycleCount even → delay 2
-                        // Our apucycle even = Mesen2 CycleCount odd → delay 3
+                        // apucycle odd = Mesen2 CycleCount even → delay 2
+                        // apucycle even = Mesen2 CycleCount odd → delay 3
                         dmcLoadDmaCountdown = (apucycle & 1) != 0 ? 2 : 3;
                     }
                 }
@@ -903,6 +909,7 @@ namespace AprNes
                 dmcsamplesleft = 0;
                 dmcLoadDmaCountdown = 0;
                 dmcIsLoadDma = false;
+                dmcDmaPending = false;
             }
             statusdmcint = false;
         }
