@@ -1,6 +1,6 @@
 # AccuracyCoin FAIL 修復 TODO
 
-**基線**: 108/136 PASS, 27 FAIL, 1 SKIP (BUGFIX34 後)
+**基線**: 110/136 PASS, 25 FAIL, 1 SKIP (BUGFIX35 後)
 **目標**: 逐步提升至 Master Clock 驅動模型
 
 ---
@@ -32,11 +32,12 @@
 - [x] **Rendering Flag Behavior** (P16, $0486, PASS - BUGFIX33)
   - 修復: OAMADDR dot 257 reset + PrecomputeSprite0Line 條件 + per-pixel S0H 兩旗標檢查
 
-- [ ] **Arbitrary Sprite zero** (P18, $0458, err=2, MEDIUM)
-  - OAM 地址未對齊時，第一個處理的 sprite 仍應視為 sprite zero
+- [x] **Arbitrary Sprite zero** (P18, $0458, PASS - BUGFIX35)
+  - 修復: sprite0_eval_addr 在 dot 65 儲存 OAMADDR，PrecomputeSprite0Line 改用此值
+  - 支援 OAMADDR 非零時的 sprite 0 判定
 
-- [ ] **Misaligned OAM behavior** (P18, $045A, err=1, MEDIUM)
-  - 未對齊的 OAM 起始地址仍應能觸發 sprite zero hit
+- [x] **Misaligned OAM behavior** (P18, $045A, PASS - BUGFIX35)
+  - 修復: PrecomputeSprite0Line 支援未對齊 OAMADDR，正確模擬 addrH/addrL 遞增
 
 - [ ] **OAM Corruption** (P18, $047B, err=2, MEDIUM)
   - rendering enable/disable 轉換時，OAM row 0 應被複製到其他 row
@@ -148,4 +149,4 @@ Page 12 item 1 (SKIP→PASS)→ 需要完整 Master Clock（136/136）
 
 ---
 
-*最後更新：2026-03-07*
+*最後更新：2026-03-08*

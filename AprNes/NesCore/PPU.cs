@@ -303,6 +303,12 @@ namespace AprNes
                 if (renderingEnabled)
                     ppu_rendering_tick();
 
+                // Sprite evaluation begins at cycle 65: save OAMADDR for next scanline's sprite 0
+                // (applies to visible scanlines AND pre-render scanline 261)
+                // Keep exact address (not aligned) — misaligned OAM reads Y from exact position
+                if (ppu_cycles_x == 65 && renderingEnabled)
+                    sprite0_eval_addr = spr_ram_add;
+
                 if (scanline >= 0 && scanline < 240)
                 {
                     // At start of each visible scanline: always zero Buffer_BG_array to prevent
@@ -382,6 +388,7 @@ namespace AprNes
         static int sprite0_line_x;
         static byte sprite0_tile_low, sprite0_tile_high;
         static bool sprite0_flip_x;
+        static int sprite0_eval_addr;  // OAMADDR at start of sprite evaluation (dot 65), for next scanline's sprite 0
 
         // Pre-computed sprite overflow cycle for cycle-accurate overflow flag timing
         static int spriteOverflowCycle;
@@ -394,27 +401,37 @@ namespace AprNes
             if (isSprite0hit) return;
             if (!ShowBackGround && !ShowSprites) return;
 
-            int y_loc = spr_ram[0] + 1; // NES hardware: sprites display at OAM_Y + 1
+            // Sprite 0 is the first sprite processed during evaluation on the PREVIOUS
+            // scanline. Use the saved OAMADDR from that evaluation (dot 65).
+            // For misaligned OAM, bytes wrap: addrH increments when addrL wraps past 3.
+            int addrH = (sprite0_eval_addr >> 2) & 0x3F;
+            int addrL = sprite0_eval_addr & 0x03;
+
+            // Read 4 bytes as hardware does: Y, tile, attr, X — with addrL wrapping
+            byte sprY    = spr_ram[(byte)(addrH * 4 + addrL)]; addrL++; if (addrL >= 4) { addrH = (addrH + 1) & 0x3F; addrL = 0; }
+            byte sprTile = spr_ram[(byte)(addrH * 4 + addrL)]; addrL++; if (addrL >= 4) { addrH = (addrH + 1) & 0x3F; addrL = 0; }
+            byte sprAttr = spr_ram[(byte)(addrH * 4 + addrL)]; addrL++; if (addrL >= 4) { addrH = (addrH + 1) & 0x3F; addrL = 0; }
+            byte sprX    = spr_ram[(byte)(addrH * 4 + addrL)];
+
+            int y_loc = sprY + 1; // NES hardware: sprites display at OAM_Y + 1
             int height = Spritesize8x16 ? 15 : 7;
             if (scanline < y_loc || scanline - y_loc > height) return;
 
             sprite0_on_line = true;
-            sprite0_line_x = spr_ram[3];
+            sprite0_line_x = sprX;
 
-            byte sprite_attr = spr_ram[2];
-            sprite0_flip_x = (sprite_attr & 0x40) != 0;
+            sprite0_flip_x = (sprAttr & 0x40) != 0;
             int offset, tile_th_t, line, line_t;
             byte tile_th;
 
             if (Spritesize8x16)
             {
-                byte byte0 = spr_ram[1];
-                tile_th = (byte)(byte0 & 0xfe);
-                offset = (byte0 & 1) != 0 ? 256 : 0;
+                tile_th = (byte)(sprTile & 0xfe);
+                offset = (sprTile & 1) != 0 ? 256 : 0;
             }
             else
             {
-                tile_th = spr_ram[1];
+                tile_th = sprTile;
                 offset = SpPatternTableAddr >> 4;
             }
 
@@ -429,7 +446,7 @@ namespace AprNes
                 line = scanline - y_loc - 8;
             }
 
-            if ((sprite_attr & 0x80) != 0)
+            if ((sprAttr & 0x80) != 0)
             {
                 line_t = 7 - line;
                 if (Spritesize8x16) tile_th_t ^= 1;

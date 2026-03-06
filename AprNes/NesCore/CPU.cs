@@ -29,9 +29,20 @@ namespace AprNes
         static public void dbgInit()
         {
             if (!HeadlessMode) { dbgLog = null; return; }
-            if (System.IO.File.Exists(DebugLogPath))
-                System.IO.File.Delete(DebugLogPath);
-            dbgLog = System.IO.File.AppendText(DebugLogPath);
+            // Use temp file with PID to allow parallel execution
+            string pidLog = System.IO.Path.Combine(System.IO.Path.GetTempPath(),
+                "aprnes_debug_" + System.Diagnostics.Process.GetCurrentProcess().Id + ".log");
+            // Override with explicit path if set via TestRunner
+            if (DebugLogPath != null && DebugLogPath.Length > 0)
+                pidLog = DebugLogPath;
+            try {
+                if (System.IO.File.Exists(pidLog))
+                    System.IO.File.Delete(pidLog);
+                dbgLog = System.IO.File.AppendText(pidLog);
+            } catch {
+                dbgLog = null;
+                return;
+            }
             dbgCount = 0;
         }
         static public void dbgWrite(string s)
