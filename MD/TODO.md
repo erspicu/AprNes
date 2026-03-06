@@ -72,7 +72,29 @@
 
 ---
 
-## 無未修復問題 — 174/174 全數通過
+## 進行中 / 已知問題
+
+### AccuracyCoin 測試套件（進階精確度測試）
+
+**現況**: 76 PASS / 5 FAIL / 81 tested — Test 82 掛住，83+ 未達
+
+| 問題 | 說明 | 狀態 |
+|------|------|------|
+| Tests #70-74 (5 FAIL) | 不穩定非法指令 SHY/SHX/LAE/ANC — 需精確 DMA 時序影響 bus contention | 待修 |
+| Test #82 (IFlagLatency) | Tests 1-D PASS，Test E 掛住 — 使用 DMASyncWith90 + JSR $4013（在 APU 暫存器位址執行程式碼）| 待修 |
+| Tests #83+ | 因 Test 82 掛住未能到達 | blocked |
+
+**根因分析**:
+- Test E 的 DMA 時序偏移約 12 cycles（累積的 stolen cycle 微誤差）
+- 需要完整 Master Clock scheduler 實現 sub-cycle 精確度
+- 目前的 tick-per-memory-access 模型無法達到所需精度
+
+### 長期目標
+
+- **Master Clock scheduler**: 將時序模型從 tick-per-memory-access 改為 Master Clock (21,477,272.73 Hz) 驅動
+  - 已加入 masterClock / cpuCycleCount 計數器（基礎設施）
+  - Load DMA 已改用 cpuCycleCount parity（BUGFIX32）
+  - 完整遷移需大量工作，暫不進行
 
 ---
 
@@ -127,8 +149,14 @@
 已完成: Bug H 剩餘 (TestRunner --pass-on-stable) → 174 PASS / 0 FAIL ★★★★★★
   → count_errors/count_errors_fast 靜默退出偵測
   → 全數通過！
+
+進行中: AccuracyCoin 進階精確度測試 (BUGFIX30-32)
+  → BUGFIX30: branch dummy reads, CPU open bus, controller open bus
+  → BUGFIX32: Load DMA stolen cycles 使用 cpuCycleCount parity
+  → Master Clock 基礎設施 (masterClock/cpuCycleCount 計數器)
+  → AccuracyCoin 76/81 PASS, Test 82 掛住 (需 sub-cycle DMA 精度)
 ```
 
 ---
 
-*最後更新: 2026-02-22 (BUGFIX21 — 174 PASS / 0 FAIL / 174 TOTAL, 全數通過！)*
+*最後更新: 2026-03-06 (BUGFIX32 — blargg 174/174 全 PASS, AccuracyCoin 76/81 PASS)*

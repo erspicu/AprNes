@@ -353,7 +353,63 @@ static public void run()
 
 ---
 
-## 5. 建置說明
+## 5. 時序精確度修正歷程（BUGFIX8-32）
+
+### 5.1 概要
+
+從 BUGFIX8 到 BUGFIX21，共完成 14 次修正，將 blargg 測試套件從 113 PASS 提升至 **174/174 全數通過**。後續 BUGFIX30-32 針對 AccuracyCoin 進階精確度測試進行優化。
+
+### 5.2 關鍵修正
+
+| BUGFIX | 修正項目 | 影響 |
+|--------|----------|------|
+| 8 | MMC3 IRQ A12 clocking | +12 PASS |
+| 9 | APU frame counter timing | +6 PASS |
+| 10 | DMC timer down-counter | +2 PASS |
+| 11 | APU $4017 reset/power-on | +3 PASS |
+| 12 | PPU VBL/NMI 1-cycle delay model | +15 PASS |
+| 13-16 | MMC3 scanline + A12 phase alignment | +4 PASS |
+| 17 | Sprite 0 hit per-pixel + overflow hardware bug | +4 PASS |
+| 18 | CPU interrupt timing (irqLinePrev penultimate-cycle) | +4 PASS |
+| 19 | DMC DMA cycle stealing (Load/Reload stolen cycles) | +2 PASS |
+| 20 | PPU $2007 read cooldown (6 PPU dots) | +1 PASS |
+| 21 | TestRunner --pass-on-stable | +2 PASS |
+| 30 | Branch dummy reads, CPU/controller open bus | AccuracyCoin |
+| 32 | Load DMA cpuCycleCount parity | AccuracyCoin |
+
+### 5.3 Tick 模型
+
+每次 `Mem_r` / `Mem_w` 呼叫 `tick()`，推進 3 PPU dots + 1 APU cycle。這是核心時序機制。
+
+```
+Mem_r(addr) → tick() → 3× ppu_step_new() + apu_step() → 讀取記憶體
+```
+
+DMC DMA 使用 `dmc_stolen_tick()`（僅 PPU，不推 APU 避免遞迴）。
+
+### 5.4 Master Clock 基礎設施（BUGFIX32）
+
+新增 `masterClock` 和 `cpuCycleCount` 計數器，每次 tick 遞增。Load DMA stolen cycle 計算改用 `cpuCycleCount & 1` 判斷 GET/PUT phase，取代原本的 `cpuBusIsWrite` proxy。
+
+```csharp
+// Load DMA: cpuCycleCount parity 決定 stolen cycles
+bool isPutCycle = (cpuCycleCount & 1) != 0;
+haltCycles = isPutCycle ? 3 : 2;
+```
+
+### 5.5 AccuracyCoin 測試結果
+
+| 範圍 | 結果 | 說明 |
+|------|------|------|
+| Tests 1-69 | 69 PASS | 基本功能全通過 |
+| Tests 70-74 | 5 FAIL | 不穩定非法指令（SHY/SHX/LAE/ANC），需精確 DMA bus contention |
+| Tests 75-81 | 7 PASS | |
+| Test 82 | 掛住 | IFlagLatency Test E — DMA 時序偏移 ~12 cycles |
+| Tests 83+ | 未達 | blocked by Test 82 |
+
+---
+
+## 6. 建置說明
 
 執行 `build.bat`（需已安裝 Visual Studio 2022）：
 
