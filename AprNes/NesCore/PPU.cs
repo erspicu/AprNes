@@ -278,10 +278,17 @@ namespace AprNes
 
             bool renderingEnabled = ShowBackGround || ShowSprites;
 
+            // At dot 0 of visible scanlines: precompute sprite 0 data for hit detection.
+            // Must run BEFORE the hit check so sprite0_on_line is valid at dot 0.
+            // On real hardware, sprite evaluation happens during the previous scanline.
+            if (scanline >= 0 && scanline < 240 && ppu_cycles_x == 0)
+                PrecomputeSprite0Line();
+
             // Per-pixel sprite 0 hit detection — BEFORE ppu_rendering_tick() modifies shift registers.
             // Shift registers hold the data loaded at the previous phase 7, so we can safely compute
             // the current dot's BG pixel from them before the next tile fetch cycle runs.
-            if (scanline >= 0 && scanline < 240 && ppu_cycles_x >= 2 && ppu_cycles_x < 256
+            // Mesen2: hit check from cycle 1+ (our dot 0+) when left-column sprites enabled.
+            if (scanline >= 0 && scanline < 240 && ppu_cycles_x < 256
                 && sprite0_on_line && !isSprite0hit && ShowBackGround && ShowSprites)
             {
                 int screenX = ppu_cycles_x;
@@ -331,7 +338,6 @@ namespace AprNes
                             for (int i = 0; i < 256; i++)
                                 ScreenBuf1x[scanOff + i] = bgColor;
                         }
-                        PrecomputeSprite0Line();
                         PrecomputeOverflow();
                     }
 
