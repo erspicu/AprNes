@@ -1,6 +1,6 @@
 # AccuracyCoin FAIL 修復 TODO
 
-**基線**: 107/136 PASS, 28 FAIL, 1 SKIP (BUGFIX33 後)
+**基線**: 108/136 PASS, 27 FAIL, 1 SKIP (BUGFIX34 後)
 **目標**: 逐步提升至 Master Clock 驅動模型
 
 ---
@@ -23,8 +23,9 @@
 - [x] **Controller Strobing** (P14, $045F, err=2→4 partial, BUGFIX33)
   - 修復 bit 0 check。Tests 1-3 pass, test 4 (put/get cycle parity) 需 TIMING-CORE
 
-- [ ] **Address $2004 behavior** (P18, $045B, err=1→4, MEDIUM)
-  - OAMADDR reset 修復後 err=1→4。Tests 1-3 pass, test 4+ 需 PPU rendering 中 $2004 返回 $FF
+- [x] **Address $2004 behavior** (P18, $045B, err=4→8, BUGFIX34)
+  - 修復: $2004 reads during dots 1-64/257-320 return $FF; writes during rendering increment by 4 & align
+  - Tests 1-7 pass, test 8 需 OAM evaluation latch (TIMING-DEPENDENT)
 
 ### 1.2 MEDIUM（中等難度）
 
@@ -90,8 +91,8 @@
 
 ### 3.1 中等難度
 
-- [ ] **$2007 read w/ rendering** (P16, $048A, err=1, MEDIUM)
-  - rendering 中讀取 $2007 應觸發 vertical increment（非 horizontal）
+- [x] **$2007 read w/ rendering** (P16, $048A, PASS - BUGFIX34)
+  - 修復: Increment2007() — rendering 期間 CXinc+Yinc 取代 +1/+32
 
 - [ ] **Stale BG Shift Registers** (P19, $0483, err=1, MEDIUM)
   - rendering 關閉後再開啟，BG shift registers 應保留 stale data
@@ -147,4 +148,4 @@ Page 12 item 1 (SKIP→PASS)→ 需要完整 Master Clock（136/136）
 
 ---
 
-*最後更新：2026-03-06*
+*最後更新：2026-03-07*

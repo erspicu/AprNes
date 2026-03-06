@@ -111,6 +111,22 @@ namespace AprNes
             }
         }
 
+        // $2007 access increment: during rendering → CXinc + Yinc; otherwise → +1/+32
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Increment2007()
+        {
+            if ((ShowBackGround || ShowSprites) && (scanline < 240 || scanline == 261))
+            {
+                CXinc();
+                Yinc();
+            }
+            else
+            {
+                vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x7FFF);
+            }
+            if (mapper == 4) NotifyMapperA12(vram_addr);
+        }
+
         // hori(v) = hori(t)
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void CopyHoriV()
@@ -745,14 +761,36 @@ namespace AprNes
         static void ppu_w_2004(byte value) //ok
         {
             openbus = value;
-            spr_ram[spr_ram_add++] = value;
+            // During rendering (visible + pre-render), writes don't modify OAM; OAMADDR increments by 4 and aligns to 4-byte boundary
+            if ((scanline < 240 || scanline == 261) && scanline >= 0 && (ShowBackGround || ShowSprites))
+            {
+                spr_ram_add = (byte)((spr_ram_add + 4) & 0xFC);
+            }
+            else
+            {
+                spr_ram[spr_ram_add++] = value;
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ppu_r_2004()
         {
-            byte val = spr_ram[spr_ram_add];
-            if ((spr_ram_add & 3) == 2) val &= 0xE3; // mask unimplemented bits of attribute byte only
+            byte val;
+            // During secondary OAM clear (dots 1-64) on visible scanlines with rendering enabled,
+            // $2004 reads return $FF
+            if (scanline >= 0 && scanline < 240 && ppu_cycles_x >= 1 && ppu_cycles_x <= 64
+                && (ShowBackGround || ShowSprites))
+                val = 0xFF;
+            // During sprite tile loading (dots 257-320) on visible scanlines with rendering enabled,
+            // $2004 reads return $FF
+            else if (scanline >= 0 && scanline < 240 && ppu_cycles_x >= 257 && ppu_cycles_x <= 320
+                && (ShowBackGround || ShowSprites))
+                val = 0xFF;
+            else
+            {
+                val = spr_ram[spr_ram_add];
+                if ((spr_ram_add & 3) == 2) val &= 0xE3; // mask unimplemented bits of attribute byte only
+            }
             open_bus_decay_timer = 77777;
             return openbus = val;
         }

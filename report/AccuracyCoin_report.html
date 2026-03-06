@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AccuracyCoin Report — AprNes</title>
+<title>AccuracyCoin Report - AprNes</title>
 <style>
 body { font-family: 'Segoe UI', Arial, sans-serif; background:#1a1a2e; color:#e0e0e0; margin:0; padding:20px; }
 h1 { color:#a3c4f3; margin-bottom:4px; }
@@ -32,41 +32,38 @@ tr:hover td { background:#1e2a5e; }
 .addr { font-family:monospace; color:#78909c; font-size:.82em; }
 .ss { max-width:512px; width:100%; border:2px solid #2d3561; border-radius:4px; display:block; margin:8px auto; image-rendering:pixelated; }
 .ss-missing { background:#111; color:#555; text-align:center; padding:16px; font-style:italic; }
-.page-section { background:#16213e; border:1px solid #2d3561; border-radius:8px; margin-bottom:24px; padding:16px; }
-.page-section h3 { margin:0 0 10px; color:#a3c4f3; }
-.page-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:12px; }
-.page-card { background:#1a1a2e; border:1px solid #2d3561; border-radius:6px; padding:10px; text-align:center; }
-.page-card h4 { margin:0 0 8px; color:#ccc; font-size:.9em; }
 .draw-section { background:#1a0a2e; border:1px solid #4a148c; border-radius:8px; padding:16px; margin-bottom:24px; }
 .draw-section h3 { color:#ce93d8; margin:0 0 10px; }
 .draw-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:12px; }
 .draw-card { background:#12001e; border:1px solid #4a148c; border-radius:6px; padding:10px; text-align:center; }
 .draw-card h4 { margin:0 0 8px; color:#ce93d8; font-size:.9em; }
+.note { background:#1e3a1e; border:1px solid #4caf50; border-radius:8px; padding:12px 16px; margin-bottom:24px; font-size:.9em; }
+.note.warn { background:#3a2a1e; border-color:#ff9800; }
 </style>
 </head>
 <body>
-<h1>🪙 AccuracyCoin Report — AprNes</h1>
-<div class="meta">Generated: 2026-03-05 22:37 | ROM: AccuracyCoin.nes (Mapper 0/NROM)</div>
+<h1>AccuracyCoin Report - AprNes</h1>
+<div class="meta">Generated: 2026-03-07 00:36 | ROM: AccuracyCoin.nes (Mapper 0/NROM) | Method: page-by-page</div>
 
-<div class="summary">
-  <div class="stat"><div class="num pass-c">76</div><div class="lbl">PASS</div></div>
-  <div class="stat"><div class="num fail-c">5</div><div class="lbl">FAIL</div></div>
-  <div class="stat"><div class="num skip-c">0</div><div class="lbl">SKIP</div></div>
-  <div class="stat"><div class="num notrun-c">55</div><div class="lbl">N/A</div></div>
-  <div class="stat"><div class="num">136</div><div class="lbl">TOTAL</div></div>
+<div class="note warn">
+  Page 12 item 1 (Interrupt Flag Latency) is marked SKIP - test hangs due to DMC DMA timing drift (~12 cycles).
+  Requires Master Clock scheduler for sub-cycle accuracy. All other 135 tests are executed.
 </div>
 
-<div class="page-section">
-  <h3>📊 Results Summary Screen</h3>
-  <img src="screenshots/ac/ac_summary.png" alt="Summary screen" class="ss" loading="lazy">
+<div class="summary">
+  <div class="stat"><div class="num pass-c">108</div><div class="lbl">PASS</div></div>
+  <div class="stat"><div class="num fail-c">27</div><div class="lbl">FAIL</div></div>
+  <div class="stat"><div class="num skip-c">1</div><div class="lbl">SKIP</div></div>
+  <div class="stat"><div class="num notrun-c">0</div><div class="lbl">N/A</div></div>
+  <div class="stat"><div class="num">136</div><div class="lbl">TOTAL</div></div>
 </div>
 
 <div class="suite">
   <div class="suite-header">
     <span>Page 1: CPU Behavior</span>
-    <span class="suite-stats"><span class="pass-c">9✓</span></span>
+    <span class="suite-stats"><span class="pass-c">9 PASS</span></span>
   </div>
-  <img src="screenshots/ac/ac_page_01.png" alt="CPU Behavior" class="ss" loading="lazy">
+  <img src="screenshots-ac/ac_page_01.png" alt="CPU Behavior" class="ss" loading="lazy">
   <table>
     <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
     <tr><td>1</td><td>ROM is not writable</td><td><span class="badge pass">PASS</span></td><td class="addr">$0405=01</td></tr>
@@ -84,9 +81,9 @@ tr:hover td { background:#1e2a5e; }
 <div class="suite">
   <div class="suite-header">
     <span>Page 2: Addressing mode wraparound</span>
-    <span class="suite-stats"><span class="pass-c">6✓</span></span>
+    <span class="suite-stats"><span class="pass-c">6 PASS</span></span>
   </div>
-  <img src="screenshots/ac/ac_page_02.png" alt="Addressing mode wraparound" class="ss" loading="lazy">
+  <img src="screenshots-ac/ac_page_02.png" alt="Addressing mode wraparound" class="ss" loading="lazy">
   <table>
     <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
     <tr><td>1</td><td>Absolute Indexed</td><td><span class="badge pass">PASS</span></td><td class="addr">$046E=01</td></tr>
@@ -101,9 +98,9 @@ tr:hover td { background:#1e2a5e; }
 <div class="suite">
   <div class="suite-header">
     <span>Page 3: Unofficial Instructions: SLO</span>
-    <span class="suite-stats"><span class="pass-c">7✓</span></span>
+    <span class="suite-stats"><span class="pass-c">7 PASS</span></span>
   </div>
-  <img src="screenshots/ac/ac_page_03.png" alt="Unofficial Instructions: SLO" class="ss" loading="lazy">
+  <img src="screenshots-ac/ac_page_03.png" alt="Unofficial Instructions: SLO" class="ss" loading="lazy">
   <table>
     <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
     <tr><td>1</td><td>$03  SLO (indirect,X)</td><td><span class="badge pass">PASS</span></td><td class="addr">$0409=01</td></tr>
@@ -119,9 +116,9 @@ tr:hover td { background:#1e2a5e; }
 <div class="suite">
   <div class="suite-header">
     <span>Page 4: Unofficial Instructions: RLA</span>
-    <span class="suite-stats"><span class="pass-c">7✓</span></span>
+    <span class="suite-stats"><span class="pass-c">7 PASS</span></span>
   </div>
-  <img src="screenshots/ac/ac_page_04.png" alt="Unofficial Instructions: RLA" class="ss" loading="lazy">
+  <img src="screenshots-ac/ac_page_04.png" alt="Unofficial Instructions: RLA" class="ss" loading="lazy">
   <table>
     <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
     <tr><td>1</td><td>$23  RLA (indirect,X)</td><td><span class="badge pass">PASS</span></td><td class="addr">$0419=01</td></tr>
@@ -137,9 +134,9 @@ tr:hover td { background:#1e2a5e; }
 <div class="suite">
   <div class="suite-header">
     <span>Page 5: Unofficial Instructions: SRE</span>
-    <span class="suite-stats"><span class="pass-c">7✓</span></span>
+    <span class="suite-stats"><span class="pass-c">7 PASS</span></span>
   </div>
-  <img src="screenshots/ac/ac_page_05.png" alt="Unofficial Instructions: SRE" class="ss" loading="lazy">
+  <img src="screenshots-ac/ac_page_05.png" alt="Unofficial Instructions: SRE" class="ss" loading="lazy">
   <table>
     <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
     <tr><td>1</td><td>$43  SRE (indirect,X)</td><td><span class="badge pass">PASS</span></td><td class="addr">$0420=01</td></tr>
@@ -155,9 +152,9 @@ tr:hover td { background:#1e2a5e; }
 <div class="suite">
   <div class="suite-header">
     <span>Page 6: Unofficial Instructions: RRA</span>
-    <span class="suite-stats"><span class="pass-c">7✓</span></span>
+    <span class="suite-stats"><span class="pass-c">7 PASS</span></span>
   </div>
-  <img src="screenshots/ac/ac_page_06.png" alt="Unofficial Instructions: RRA" class="ss" loading="lazy">
+  <img src="screenshots-ac/ac_page_06.png" alt="Unofficial Instructions: RRA" class="ss" loading="lazy">
   <table>
     <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
     <tr><td>1</td><td>$63  RRA (indirect,X)</td><td><span class="badge pass">PASS</span></td><td class="addr">$0427=01</td></tr>
@@ -173,9 +170,9 @@ tr:hover td { background:#1e2a5e; }
 <div class="suite">
   <div class="suite-header">
     <span>Page 7: Unofficial Instructions: *AX</span>
-    <span class="suite-stats"><span class="pass-c">10✓</span></span>
+    <span class="suite-stats"><span class="pass-c">10 PASS</span></span>
   </div>
-  <img src="screenshots/ac/ac_page_07.png" alt="Unofficial Instructions: *AX" class="ss" loading="lazy">
+  <img src="screenshots-ac/ac_page_07.png" alt="Unofficial Instructions: *AX" class="ss" loading="lazy">
   <table>
     <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
     <tr><td>1</td><td>$83  SAX (indirect,X)</td><td><span class="badge pass">PASS</span></td><td class="addr">$042E=01</td></tr>
@@ -194,9 +191,9 @@ tr:hover td { background:#1e2a5e; }
 <div class="suite">
   <div class="suite-header">
     <span>Page 8: Unofficial Instructions: DCP</span>
-    <span class="suite-stats"><span class="pass-c">7✓</span></span>
+    <span class="suite-stats"><span class="pass-c">7 PASS</span></span>
   </div>
-  <img src="screenshots/ac/ac_page_08.png" alt="Unofficial Instructions: DCP" class="ss" loading="lazy">
+  <img src="screenshots-ac/ac_page_08.png" alt="Unofficial Instructions: DCP" class="ss" loading="lazy">
   <table>
     <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
     <tr><td>1</td><td>$C3  DCP (indirect,X)</td><td><span class="badge pass">PASS</span></td><td class="addr">$0438=01</td></tr>
@@ -212,9 +209,9 @@ tr:hover td { background:#1e2a5e; }
 <div class="suite">
   <div class="suite-header">
     <span>Page 9: Unofficial Instructions: ISC</span>
-    <span class="suite-stats"><span class="pass-c">7✓</span></span>
+    <span class="suite-stats"><span class="pass-c">7 PASS</span></span>
   </div>
-  <img src="screenshots/ac/ac_page_09.png" alt="Unofficial Instructions: ISC" class="ss" loading="lazy">
+  <img src="screenshots-ac/ac_page_09.png" alt="Unofficial Instructions: ISC" class="ss" loading="lazy">
   <table>
     <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
     <tr><td>1</td><td>$E3  ISC (indirect,X)</td><td><span class="badge pass">PASS</span></td><td class="addr">$043F=01</td></tr>
@@ -230,9 +227,9 @@ tr:hover td { background:#1e2a5e; }
 <div class="suite">
   <div class="suite-header">
     <span>Page 10: Unofficial Instructions: SH*</span>
-    <span class="suite-stats"><span class="pass-c">1✓</span> <span class="fail-c">5✗</span></span>
+    <span class="suite-stats"><span class="pass-c">1 PASS</span> | <span class="fail-c">5 FAIL</span></span>
   </div>
-  <img src="screenshots/ac/ac_page_10.png" alt="Unofficial Instructions: SH*" class="ss" loading="lazy">
+  <img src="screenshots-ac/ac_page_10.png" alt="Unofficial Instructions: SH*" class="ss" loading="lazy">
   <table>
     <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
     <tr><td>1</td><td>$93  SHA (indirect),Y</td><td><span class="badge fail">FAIL (err 7)</span></td><td class="addr">$0446=1E</td></tr>
@@ -247,9 +244,9 @@ tr:hover td { background:#1e2a5e; }
 <div class="suite">
   <div class="suite-header">
     <span>Page 11: Unofficial Immediates</span>
-    <span class="suite-stats"><span class="pass-c">8✓</span></span>
+    <span class="suite-stats"><span class="pass-c">8 PASS</span></span>
   </div>
-  <img src="screenshots/ac/ac_page_11.png" alt="Unofficial Immediates" class="ss" loading="lazy">
+  <img src="screenshots-ac/ac_page_11.png" alt="Unofficial Immediates" class="ss" loading="lazy">
   <table>
     <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
     <tr><td>1</td><td>$0B  ANC Immediate</td><td><span class="badge pass">PASS</span></td><td class="addr">$0410=01</td></tr>
@@ -266,163 +263,162 @@ tr:hover td { background:#1e2a5e; }
 <div class="suite">
   <div class="suite-header">
     <span>Page 12: CPU Interrupts</span>
-    <span class="suite-stats"><span class="notrun-c">3?</span></span>
+    <span class="suite-stats"><span class="pass-c">2 PASS</span> | <span class="skip-c">1 SKIP</span></span>
   </div>
-  <img src="screenshots/ac/ac_page_12.png" alt="CPU Interrupts" class="ss" loading="lazy">
+  <img src="screenshots-ac/ac_page_12.png" alt="CPU Interrupts" class="ss" loading="lazy">
   <table>
     <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
-    <tr><td>1</td><td>Interrupt flag latency</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0461=00</td></tr>
-    <tr><td>2</td><td>NMI Overlap BRK</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0462=00</td></tr>
-    <tr><td>3</td><td>NMI Overlap IRQ</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0463=00</td></tr>
+    <tr><td>1</td><td>Interrupt flag latency</td><td><span class="badge skip">SKIP</span></td><td class="addr">$0461=FF</td></tr>
+    <tr><td>2</td><td>NMI Overlap BRK</td><td><span class="badge pass">PASS</span></td><td class="addr">$0462=01</td></tr>
+    <tr><td>3</td><td>NMI Overlap IRQ</td><td><span class="badge pass">PASS</span></td><td class="addr">$0463=01</td></tr>
   </table>
 </div>
 
 <div class="suite">
   <div class="suite-header">
     <span>Page 13: APU Registers and DMA tests</span>
-    <span class="suite-stats"><span class="notrun-c">10?</span></span>
+    <span class="suite-stats"><span class="pass-c">4 PASS</span> | <span class="fail-c">6 FAIL</span></span>
   </div>
-  <img src="screenshots/ac/ac_page_13.png" alt="APU Registers and DMA tests" class="ss" loading="lazy">
+  <img src="screenshots-ac/ac_page_13.png" alt="APU Registers and DMA tests" class="ss" loading="lazy">
   <table>
     <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
-    <tr><td>1</td><td>DMA + Open Bus</td><td><span class="badge notrun">N/A</span></td><td class="addr">$046C=00</td></tr>
-    <tr><td>2</td><td>DMA + $2002 Read</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0488=00</td></tr>
-    <tr><td>3</td><td>DMA + $2007 Read</td><td><span class="badge notrun">N/A</span></td><td class="addr">$044C=00</td></tr>
-    <tr><td>4</td><td>DMA + $2007 Write</td><td><span class="badge notrun">N/A</span></td><td class="addr">$044F=00</td></tr>
-    <tr><td>5</td><td>DMA + $4015 Read</td><td><span class="badge notrun">N/A</span></td><td class="addr">$045D=00</td></tr>
-    <tr><td>6</td><td>DMA + $4016 Read</td><td><span class="badge notrun">N/A</span></td><td class="addr">$045E=00</td></tr>
-    <tr><td>7</td><td>DMC DMA Bus Conflicts</td><td><span class="badge notrun">N/A</span></td><td class="addr">$046B=00</td></tr>
-    <tr><td>8</td><td>DMC DMA + OAM DMA</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0477=00</td></tr>
-    <tr><td>9</td><td>Explicit DMA Abort</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0479=00</td></tr>
-    <tr><td>10</td><td>Implicit DMA Abort</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0478=00</td></tr>
+    <tr><td>1</td><td>DMA + Open Bus</td><td><span class="badge pass">PASS</span></td><td class="addr">$046C=01</td></tr>
+    <tr><td>2</td><td>DMA + $2002 Read</td><td><span class="badge fail">FAIL (err 2)</span></td><td class="addr">$0488=0A</td></tr>
+    <tr><td>3</td><td>DMA + $2007 Read</td><td><span class="badge pass">PASS</span></td><td class="addr">$044C=01</td></tr>
+    <tr><td>4</td><td>DMA + $2007 Write</td><td><span class="badge pass">PASS</span></td><td class="addr">$044F=01</td></tr>
+    <tr><td>5</td><td>DMA + $4015 Read</td><td><span class="badge fail">FAIL (err 2)</span></td><td class="addr">$045D=0A</td></tr>
+    <tr><td>6</td><td>DMA + $4016 Read</td><td><span class="badge pass">PASS</span></td><td class="addr">$045E=05</td></tr>
+    <tr><td>7</td><td>DMC DMA Bus Conflicts</td><td><span class="badge fail">FAIL (err 2)</span></td><td class="addr">$046B=0A</td></tr>
+    <tr><td>8</td><td>DMC DMA + OAM DMA</td><td><span class="badge fail">FAIL (err 2)</span></td><td class="addr">$0477=0A</td></tr>
+    <tr><td>9</td><td>Explicit DMA Abort</td><td><span class="badge fail">FAIL (err 2)</span></td><td class="addr">$0479=0A</td></tr>
+    <tr><td>10</td><td>Implicit DMA Abort</td><td><span class="badge fail">FAIL (err 2)</span></td><td class="addr">$0478=0A</td></tr>
   </table>
 </div>
 
 <div class="suite">
   <div class="suite-header">
     <span>Page 14: APU Tests</span>
-    <span class="suite-stats"><span class="notrun-c">9?</span></span>
+    <span class="suite-stats"><span class="pass-c">5 PASS</span> | <span class="fail-c">4 FAIL</span></span>
   </div>
-  <img src="screenshots/ac/ac_page_14.png" alt="APU Tests" class="ss" loading="lazy">
+  <img src="screenshots-ac/ac_page_14.png" alt="APU Tests" class="ss" loading="lazy">
   <table>
     <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
-    <tr><td>1</td><td>Length Counter</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0465=00</td></tr>
-    <tr><td>2</td><td>Length Table</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0466=00</td></tr>
-    <tr><td>3</td><td>Frame Counter IRQ</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0467=00</td></tr>
-    <tr><td>4</td><td>Frame Counter 4-step</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0468=00</td></tr>
-    <tr><td>5</td><td>Frame Counter 5-step</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0469=00</td></tr>
-    <tr><td>6</td><td>Delta Modulation Channel</td><td><span class="badge notrun">N/A</span></td><td class="addr">$046A=00</td></tr>
-    <tr><td>7</td><td>APU Register Activation</td><td><span class="badge notrun">N/A</span></td><td class="addr">$045C=00</td></tr>
-    <tr><td>8</td><td>Controller Strobing</td><td><span class="badge notrun">N/A</span></td><td class="addr">$045F=00</td></tr>
-    <tr><td>9</td><td>Controller Clocking</td><td><span class="badge notrun">N/A</span></td><td class="addr">$047A=00</td></tr>
+    <tr><td>1</td><td>Length Counter</td><td><span class="badge pass">PASS</span></td><td class="addr">$0465=01</td></tr>
+    <tr><td>2</td><td>Length Table</td><td><span class="badge pass">PASS</span></td><td class="addr">$0466=01</td></tr>
+    <tr><td>3</td><td>Frame Counter IRQ</td><td><span class="badge fail">FAIL (err 7)</span></td><td class="addr">$0467=1E</td></tr>
+    <tr><td>4</td><td>Frame Counter 4-step</td><td><span class="badge pass">PASS</span></td><td class="addr">$0468=01</td></tr>
+    <tr><td>5</td><td>Frame Counter 5-step</td><td><span class="badge pass">PASS</span></td><td class="addr">$0469=01</td></tr>
+    <tr><td>6</td><td>Delta Modulation Channel</td><td><span class="badge fail">FAIL (err 21)</span></td><td class="addr">$046A=56</td></tr>
+    <tr><td>7</td><td>APU Register Activation</td><td><span class="badge fail">FAIL (err 4)</span></td><td class="addr">$045C=12</td></tr>
+    <tr><td>8</td><td>Controller Strobing</td><td><span class="badge fail">FAIL (err 4)</span></td><td class="addr">$045F=12</td></tr>
+    <tr><td>9</td><td>Controller Clocking</td><td><span class="badge pass">PASS</span></td><td class="addr">$047A=09</td></tr>
   </table>
 </div>
 
 <div class="draw-section">
-  <h3>🎨 Page 15: Power On State (DRAW Tests)</h3>
-  <p style="color:#aaa;font-size:.85em">These tests display memory values rather than simple pass/fail.
-  Run individually with sub-item navigation (A button) to see results.</p>
+  <h3>Page 15: Power On State (DRAW Tests)</h3>
+  <p style="color:#aaa;font-size:.85em">These tests display memory values rather than simple pass/fail.</p>
   <div class="draw-grid">
-    <div class="draw-card"><h4>Page overview</h4><img src="screenshots/ac/ac_page_15.png" alt="Power On State" class="ss" loading="lazy"></div>
-    <div class="draw-card"><h4>PPU Reset Flag</h4><img src="screenshots/ac/ac_page_15_item00.png" alt="PPU Reset Flag" class="ss" loading="lazy"></div>
-    <div class="draw-card"><h4>CPU RAM</h4><img src="screenshots/ac/ac_page_15_item01.png" alt="CPU RAM" class="ss" loading="lazy"></div>
-    <div class="draw-card"><h4>CPU Registers</h4><img src="screenshots/ac/ac_page_15_item02.png" alt="CPU Registers" class="ss" loading="lazy"></div>
-    <div class="draw-card"><h4>PPU RAM</h4><img src="screenshots/ac/ac_page_15_item03.png" alt="PPU RAM" class="ss" loading="lazy"></div>
-    <div class="draw-card"><h4>Palette RAM</h4><img src="screenshots/ac/ac_page_15_item04.png" alt="Palette RAM" class="ss" loading="lazy"></div>
+    <div class="draw-card"><h4>Page overview</h4><img src="screenshots-ac/ac_page_15.png" alt="Power On State" class="ss" loading="lazy"></div>
+    <div class="draw-card"><h4>PPU Reset Flag</h4><img src="screenshots-ac/ac_page_15_item00.png" alt="PPU Reset Flag" class="ss" loading="lazy"></div>
+    <div class="draw-card"><h4>CPU RAM</h4><img src="screenshots-ac/ac_page_15_item01.png" alt="CPU RAM" class="ss" loading="lazy"></div>
+    <div class="draw-card"><h4>CPU Registers</h4><img src="screenshots-ac/ac_page_15_item02.png" alt="CPU Registers" class="ss" loading="lazy"></div>
+    <div class="draw-card"><h4>PPU RAM</h4><img src="screenshots-ac/ac_page_15_item03.png" alt="PPU RAM" class="ss" loading="lazy"></div>
+    <div class="draw-card"><h4>Palette RAM</h4><img src="screenshots-ac/ac_page_15_item04.png" alt="Palette RAM" class="ss" loading="lazy"></div>
   </div>
 </div>
 
 <div class="suite">
   <div class="suite-header">
     <span>Page 16: PPU Behavior</span>
-    <span class="suite-stats"><span class="notrun-c">7?</span></span>
+    <span class="suite-stats"><span class="pass-c">7 PASS</span></span>
   </div>
-  <img src="screenshots/ac/ac_page_16.png" alt="PPU Behavior" class="ss" loading="lazy">
+  <img src="screenshots-ac/ac_page_16.png" alt="PPU Behavior" class="ss" loading="lazy">
   <table>
     <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
-    <tr><td>1</td><td>CHR ROM is not writable</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0485=00</td></tr>
-    <tr><td>2</td><td>PPU Register Mirroring</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0404=00</td></tr>
-    <tr><td>3</td><td>PPU Register Open Bus</td><td><span class="badge notrun">N/A</span></td><td class="addr">$044E=00</td></tr>
-    <tr><td>4</td><td>PPU Read Buffer</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0476=00</td></tr>
-    <tr><td>5</td><td>Palette RAM Quirks</td><td><span class="badge notrun">N/A</span></td><td class="addr">$047E=00</td></tr>
-    <tr><td>6</td><td>Rendering Flag Behavior</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0486=00</td></tr>
-    <tr><td>7</td><td>$2007 read w/ rendering</td><td><span class="badge notrun">N/A</span></td><td class="addr">$048A=00</td></tr>
+    <tr><td>1</td><td>CHR ROM is not writable</td><td><span class="badge pass">PASS</span></td><td class="addr">$0485=01</td></tr>
+    <tr><td>2</td><td>PPU Register Mirroring</td><td><span class="badge pass">PASS</span></td><td class="addr">$0404=01</td></tr>
+    <tr><td>3</td><td>PPU Register Open Bus</td><td><span class="badge pass">PASS</span></td><td class="addr">$044E=01</td></tr>
+    <tr><td>4</td><td>PPU Read Buffer</td><td><span class="badge pass">PASS</span></td><td class="addr">$0476=01</td></tr>
+    <tr><td>5</td><td>Palette RAM Quirks</td><td><span class="badge pass">PASS</span></td><td class="addr">$047E=01</td></tr>
+    <tr><td>6</td><td>Rendering Flag Behavior</td><td><span class="badge pass">PASS</span></td><td class="addr">$0486=01</td></tr>
+    <tr><td>7</td><td>$2007 read w/ rendering</td><td><span class="badge pass">PASS</span></td><td class="addr">$048A=01</td></tr>
   </table>
 </div>
 
 <div class="suite">
   <div class="suite-header">
     <span>Page 17: PPU VBlank Timing</span>
-    <span class="suite-stats"><span class="notrun-c">7?</span></span>
+    <span class="suite-stats"><span class="pass-c">7 PASS</span></span>
   </div>
-  <img src="screenshots/ac/ac_page_17.png" alt="PPU VBlank Timing" class="ss" loading="lazy">
+  <img src="screenshots-ac/ac_page_17.png" alt="PPU VBlank Timing" class="ss" loading="lazy">
   <table>
     <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
-    <tr><td>1</td><td>VBlank beginning</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0450=00</td></tr>
-    <tr><td>2</td><td>VBlank end</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0451=00</td></tr>
-    <tr><td>3</td><td>NMI Control</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0452=00</td></tr>
-    <tr><td>4</td><td>NMI Timing</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0453=00</td></tr>
-    <tr><td>5</td><td>NMI Suppression</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0454=00</td></tr>
-    <tr><td>6</td><td>NMI at VBlank end</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0455=00</td></tr>
-    <tr><td>7</td><td>NMI disabled at VBlank</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0456=00</td></tr>
+    <tr><td>1</td><td>VBlank beginning</td><td><span class="badge pass">PASS</span></td><td class="addr">$0450=01</td></tr>
+    <tr><td>2</td><td>VBlank end</td><td><span class="badge pass">PASS</span></td><td class="addr">$0451=01</td></tr>
+    <tr><td>3</td><td>NMI Control</td><td><span class="badge pass">PASS</span></td><td class="addr">$0452=01</td></tr>
+    <tr><td>4</td><td>NMI Timing</td><td><span class="badge pass">PASS</span></td><td class="addr">$0453=01</td></tr>
+    <tr><td>5</td><td>NMI Suppression</td><td><span class="badge pass">PASS</span></td><td class="addr">$0454=01</td></tr>
+    <tr><td>6</td><td>NMI at VBlank end</td><td><span class="badge pass">PASS</span></td><td class="addr">$0455=01</td></tr>
+    <tr><td>7</td><td>NMI disabled at VBlank</td><td><span class="badge pass">PASS</span></td><td class="addr">$0456=01</td></tr>
   </table>
 </div>
 
 <div class="suite">
   <div class="suite-header">
     <span>Page 18: Sprite Evaluation</span>
-    <span class="suite-stats"><span class="notrun-c">9?</span></span>
+    <span class="suite-stats"><span class="pass-c">2 PASS</span> | <span class="fail-c">7 FAIL</span></span>
   </div>
-  <img src="screenshots/ac/ac_page_18.png" alt="Sprite Evaluation" class="ss" loading="lazy">
+  <img src="screenshots-ac/ac_page_18.png" alt="Sprite Evaluation" class="ss" loading="lazy">
   <table>
     <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
-    <tr><td>1</td><td>Sprite overflow behavior</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0459=00</td></tr>
-    <tr><td>2</td><td>Sprite 0 Hit behavior</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0457=00</td></tr>
-    <tr><td>3</td><td>$2002 flag clear timing</td><td><span class="badge notrun">N/A</span></td><td class="addr">$048D=00</td></tr>
-    <tr><td>4</td><td>Suddenly Resize Sprite</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0489=00</td></tr>
-    <tr><td>5</td><td>Arbitrary Sprite zero</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0458=00</td></tr>
-    <tr><td>6</td><td>Misaligned OAM behavior</td><td><span class="badge notrun">N/A</span></td><td class="addr">$045A=00</td></tr>
-    <tr><td>7</td><td>Address $2004 behavior</td><td><span class="badge notrun">N/A</span></td><td class="addr">$045B=00</td></tr>
-    <tr><td>8</td><td>OAM Corruption</td><td><span class="badge notrun">N/A</span></td><td class="addr">$047B=00</td></tr>
-    <tr><td>9</td><td>INC $4014</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0480=00</td></tr>
+    <tr><td>1</td><td>Sprite overflow behavior</td><td><span class="badge pass">PASS</span></td><td class="addr">$0459=01</td></tr>
+    <tr><td>2</td><td>Sprite 0 Hit behavior</td><td><span class="badge pass">PASS</span></td><td class="addr">$0457=01</td></tr>
+    <tr><td>3</td><td>$2002 flag clear timing</td><td><span class="badge fail">FAIL (err 1)</span></td><td class="addr">$048D=06</td></tr>
+    <tr><td>4</td><td>Suddenly Resize Sprite</td><td><span class="badge fail">FAIL (err 4)</span></td><td class="addr">$0489=12</td></tr>
+    <tr><td>5</td><td>Arbitrary Sprite zero</td><td><span class="badge fail">FAIL (err 2)</span></td><td class="addr">$0458=0A</td></tr>
+    <tr><td>6</td><td>Misaligned OAM behavior</td><td><span class="badge fail">FAIL (err 1)</span></td><td class="addr">$045A=06</td></tr>
+    <tr><td>7</td><td>Address $2004 behavior</td><td><span class="badge fail">FAIL (err 8)</span></td><td class="addr">$045B=22</td></tr>
+    <tr><td>8</td><td>OAM Corruption</td><td><span class="badge fail">FAIL (err 2)</span></td><td class="addr">$047B=0A</td></tr>
+    <tr><td>9</td><td>INC $4014</td><td><span class="badge fail">FAIL (err 3)</span></td><td class="addr">$0480=0E</td></tr>
   </table>
 </div>
 
 <div class="suite">
   <div class="suite-header">
     <span>Page 19: PPU Misc.</span>
-    <span class="suite-stats"><span class="notrun-c">6?</span></span>
+    <span class="suite-stats"><span class="pass-c">2 PASS</span> | <span class="fail-c">4 FAIL</span></span>
   </div>
-  <img src="screenshots/ac/ac_page_19.png" alt="PPU Misc." class="ss" loading="lazy">
+  <img src="screenshots-ac/ac_page_19.png" alt="PPU Misc." class="ss" loading="lazy">
   <table>
     <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
-    <tr><td>1</td><td>Attributes As Tiles</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0481=00</td></tr>
-    <tr><td>2</td><td>t Register Quirks</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0482=00</td></tr>
-    <tr><td>3</td><td>Stale BG Shift Registers</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0483=00</td></tr>
-    <tr><td>4</td><td>BG Serial In</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0487=00</td></tr>
-    <tr><td>5</td><td>Sprites On Scanline 0</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0484=00</td></tr>
-    <tr><td>6</td><td>$2004 Stress Test</td><td><span class="badge notrun">N/A</span></td><td class="addr">$048C=00</td></tr>
+    <tr><td>1</td><td>Attributes As Tiles</td><td><span class="badge pass">PASS</span></td><td class="addr">$0481=01</td></tr>
+    <tr><td>2</td><td>t Register Quirks</td><td><span class="badge pass">PASS</span></td><td class="addr">$0482=01</td></tr>
+    <tr><td>3</td><td>Stale BG Shift Registers</td><td><span class="badge fail">FAIL (err 1)</span></td><td class="addr">$0483=06</td></tr>
+    <tr><td>4</td><td>BG Serial In</td><td><span class="badge fail">FAIL (err 2)</span></td><td class="addr">$0487=0A</td></tr>
+    <tr><td>5</td><td>Sprites On Scanline 0</td><td><span class="badge fail">FAIL (err 2)</span></td><td class="addr">$0484=0A</td></tr>
+    <tr><td>6</td><td>$2004 Stress Test</td><td><span class="badge fail">FAIL (err 1)</span></td><td class="addr">$048C=06</td></tr>
   </table>
 </div>
 
 <div class="suite">
   <div class="suite-header">
     <span>Page 20: CPU Behavior 2</span>
-    <span class="suite-stats"><span class="notrun-c">4?</span></span>
+    <span class="suite-stats"><span class="pass-c">3 PASS</span> | <span class="fail-c">1 FAIL</span></span>
   </div>
-  <img src="screenshots/ac/ac_page_20.png" alt="CPU Behavior 2" class="ss" loading="lazy">
+  <img src="screenshots-ac/ac_page_20.png" alt="CPU Behavior 2" class="ss" loading="lazy">
   <table>
     <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
-    <tr><td>1</td><td>Instruction Timing</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0460=00</td></tr>
-    <tr><td>2</td><td>Implied Dummy Reads</td><td><span class="badge notrun">N/A</span></td><td class="addr">$046D=00</td></tr>
-    <tr><td>3</td><td>Branch Dummy Reads</td><td><span class="badge notrun">N/A</span></td><td class="addr">$048B=00</td></tr>
-    <tr><td>4</td><td>JSR Edge Cases</td><td><span class="badge notrun">N/A</span></td><td class="addr">$047C=00</td></tr>
+    <tr><td>1</td><td>Instruction Timing</td><td><span class="badge pass">PASS</span></td><td class="addr">$0460=01</td></tr>
+    <tr><td>2</td><td>Implied Dummy Reads</td><td><span class="badge fail">FAIL (err 3)</span></td><td class="addr">$046D=0E</td></tr>
+    <tr><td>3</td><td>Branch Dummy Reads</td><td><span class="badge pass">PASS</span></td><td class="addr">$048B=01</td></tr>
+    <tr><td>4</td><td>JSR Edge Cases</td><td><span class="badge pass">PASS</span></td><td class="addr">$047C=01</td></tr>
   </table>
 </div>
 
 <hr style="border-color:#2d3561;margin:30px 0">
 <p style="color:#555;font-size:.8em;text-align:center">
-  AccuracyCoin by &lt;author&gt; | Result encoding: 0x01=PASS, (N&lt;&lt;2)|0x02=FAIL(N), 0xFF=SKIP, 0x00=not run
+  AccuracyCoin | Result encoding: 0x01=PASS, (N&lt;&lt;2)|0x02=FAIL(N), 0xFF=SKIP, 0x00=not run
 </p>
 </body>
 </html>
