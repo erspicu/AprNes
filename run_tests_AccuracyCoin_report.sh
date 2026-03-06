@@ -187,13 +187,13 @@ echo "=== Generating HTML report ==="
 python3 - "$AC_HEX" "$OUTPUT_HTML" "$SS_DIR" <<'PYEOF'
 import sys, os, json, datetime
 
-ac_hex    = sys.argv[1]  # hex string of $0300-$04FF (512 hex chars = 256 bytes)
+ac_hex    = sys.argv[1]  # hex string of $0300-$04FF (1024 hex chars = 512 bytes)
 out_html  = sys.argv[2]
 ss_dir    = sys.argv[3]
 
 # Decode results bytes ($0300-$04FF)
 # Our dump is $0300-$04FF → index 0 = $0300
-mem = bytes.fromhex(ac_hex) if len(ac_hex) == 512 else bytes(256)
+mem = bytes.fromhex(ac_hex) if len(ac_hex) == 1024 else bytes(512)
 def mem_byte(addr):
     idx = addr - 0x0300
     return mem[idx] if 0 <= idx < len(mem) else 0

@@ -891,7 +891,10 @@ namespace AprNes
                     if (dmcBufferEmpty)
                     {
                         dmcIsLoadDma = true;
-                        dmcLoadDmaCountdown = 3;
+                        // Mesen2: _transferStartDelay = CycleCount & 1 ? 3 : 2
+                        // Our apucycle odd = Mesen2 CycleCount even → delay 2
+                        // Our apucycle even = Mesen2 CycleCount odd → delay 3
+                        dmcLoadDmaCountdown = (apucycle & 1) != 0 ? 2 : 3;
                     }
                 }
             }
