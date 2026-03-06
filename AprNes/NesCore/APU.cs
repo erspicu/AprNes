@@ -635,21 +635,20 @@ namespace AprNes
                 }
                 else
                 {
-                    // Standalone DMC DMA cycle stealing (NESdev Wiki "DMA" reference):
+                    // Standalone DMC DMA cycle stealing:
                     //
-                    // Load DMA (from $4015 write): scheduled to halt on GET cycle
-                    //   Normal (CPU reading): halt(GET) + dummy(PUT) + get(GET) = 3 cycles
-                    //   Delayed (CPU writing): halt(PUT) + dummy(GET) + align(PUT) + get(GET) = 4 cycles
-                    //
-                    // Reload DMA (buffer emptied by output unit): scheduled to halt on PUT cycle
-                    //   Normal (CPU reading): halt(PUT) + dummy(GET) + align(PUT) + get(GET) = 4 cycles
-                    //   Delayed (CPU writing): halt(GET) + dummy(PUT) + get(GET) = 3 cycles
+                    // Load DMA: uses cpuCycleCount parity (Master Clock derived GET/PUT phase)
+                    //   to correctly handle reads on PUT cycles (AccuracyCoin clockslide fix).
+                    // Reload DMA: uses cpuBusIsWrite proxy (empirically correct for blargg).
                     //
                     int haltCycles;
                     if (isLoad)
-                        haltCycles = cpuBusIsWrite ? 3 : 2; // Load: 4 when write-delayed, 3 normally
+                    {
+                        bool isPutCycle = (cpuCycleCount & 1) != 0;
+                        haltCycles = isPutCycle ? 3 : 2;
+                    }
                     else
-                        haltCycles = cpuBusIsWrite ? 2 : 3; // Reload: 3 when write-delayed, 4 normally
+                        haltCycles = cpuBusIsWrite ? 2 : 3;
 
                     for (int i = 0; i < haltCycles; i++)
                     {
