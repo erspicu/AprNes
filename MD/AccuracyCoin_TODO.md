@@ -136,15 +136,15 @@
 ## 建議修改路徑
 
 ```
-Phase 1 (INDEPENDENT)     → 快速提升 PASS 數（+6，達 113/136）
+Phase 1 已完成（+5，達 111/136）
   ↓
-Phase 2.1 (TIMING-CORE easy) → 修復核心 timing 基礎（+2，達 115/136）
+Phase 2.1 (TIMING-CORE easy) → 兩項都被 blargg 測試阻擋，需 sub-cycle 精度
   ↓
-Phase 2.2 (DMA cluster)   → Master Clock 重構，一次解決 DMA 相關問題（+8，達 123/136）
+Phase 2.2 (DMA cluster)   → Master Clock 重構，一次解決 DMA 相關問題（+9，含 APU Reg Activation）
   ↓
-Phase 3 (TIMING-DEPENDENT)→ 在正確 timing 基礎上修復剩餘（+7，達 130/136）
+Phase 3 (TIMING-DEPENDENT)→ 在正確 timing 基礎上修復剩餘（+7）
   ↓
-Phase 4 (HARDWARE-EDGE)   → 追求極致精確度（+5，達 135/136）
+Phase 4 (HARDWARE-EDGE)   → 追求極致精確度（+5）
   ↓
 Page 12 item 1 (SKIP→PASS)→ 需要完整 Master Clock（136/136）
 ```
