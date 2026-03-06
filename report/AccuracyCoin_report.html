@@ -43,7 +43,7 @@ tr:hover td { background:#1e2a5e; }
 </head>
 <body>
 <h1>AccuracyCoin Report - AprNes</h1>
-<div class="meta">Generated: 2026-03-07 01:45 | ROM: AccuracyCoin.nes (Mapper 0/NROM) | Method: page-by-page</div>
+<div class="meta">Generated: 2026-03-07 01:58 | ROM: AccuracyCoin.nes (Mapper 0/NROM) | Method: page-by-page</div>
 
 <div class="note warn">
   Page 12 item 1 (Interrupt Flag Latency) is marked SKIP - test hangs due to DMC DMA timing drift (~12 cycles).
@@ -52,9 +52,9 @@ tr:hover td { background:#1e2a5e; }
 
 <div class="summary">
   <div class="stat"><div class="num pass-c">111</div><div class="lbl">PASS</div></div>
-  <div class="stat"><div class="num fail-c">23</div><div class="lbl">FAIL</div></div>
+  <div class="stat"><div class="num fail-c">24</div><div class="lbl">FAIL</div></div>
   <div class="stat"><div class="num skip-c">1</div><div class="lbl">SKIP</div></div>
-  <div class="stat"><div class="num notrun-c">1</div><div class="lbl">N/A</div></div>
+  <div class="stat"><div class="num notrun-c">0</div><div class="lbl">N/A</div></div>
   <div class="stat"><div class="num">136</div><div class="lbl">TOTAL</div></div>
 </div>
 
@@ -309,7 +309,7 @@ tr:hover td { background:#1e2a5e; }
     <tr><td>4</td><td>Frame Counter 4-step</td><td><span class="badge pass">PASS</span></td><td class="addr">$0468=01</td></tr>
     <tr><td>5</td><td>Frame Counter 5-step</td><td><span class="badge pass">PASS</span></td><td class="addr">$0469=01</td></tr>
     <tr><td>6</td><td>Delta Modulation Channel</td><td><span class="badge fail">FAIL (err 21)</span></td><td class="addr">$046A=56</td></tr>
-    <tr><td>7</td><td>APU Register Activation</td><td><span class="badge fail">FAIL (err 4)</span></td><td class="addr">$045C=12</td></tr>
+    <tr><td>7</td><td>APU Register Activation</td><td><span class="badge fail">FAIL (err 6)</span></td><td class="addr">$045C=1A</td></tr>
     <tr><td>8</td><td>Controller Strobing</td><td><span class="badge fail">FAIL (err 4)</span></td><td class="addr">$045F=12</td></tr>
     <tr><td>9</td><td>Controller Clocking</td><td><span class="badge pass">PASS</span></td><td class="addr">$047A=09</td></tr>
   </table>
@@ -367,7 +367,7 @@ tr:hover td { background:#1e2a5e; }
 <div class="suite">
   <div class="suite-header">
     <span>Page 18: Sprite Evaluation</span>
-    <span class="suite-stats"><span class="pass-c">5 PASS</span> | <span class="fail-c">3 FAIL</span> | <span class="notrun-c">1 N/A</span></span>
+    <span class="suite-stats"><span class="pass-c">5 PASS</span> | <span class="fail-c">4 FAIL</span></span>
   </div>
   <img src="screenshots-ac/ac_page_18.png" alt="Sprite Evaluation" class="ss" loading="lazy">
   <table>
@@ -379,8 +379,8 @@ tr:hover td { background:#1e2a5e; }
     <tr><td>5</td><td>Arbitrary Sprite zero</td><td><span class="badge pass">PASS</span></td><td class="addr">$0458=01</td></tr>
     <tr><td>6</td><td>Misaligned OAM behavior</td><td><span class="badge pass">PASS</span></td><td class="addr">$045A=01</td></tr>
     <tr><td>7</td><td>Address $2004 behavior</td><td><span class="badge fail">FAIL (err 8)</span></td><td class="addr">$045B=22</td></tr>
-    <tr><td>8</td><td>OAM Corruption</td><td><span class="badge pass">PASS</span></td><td class="addr">$047B=03</td></tr>
-    <tr><td>9</td><td>INC $4014</td><td><span class="badge notrun">N/A</span></td><td class="addr">$0480=00</td></tr>
+    <tr><td>8</td><td>OAM Corruption</td><td><span class="badge pass">PASS</span></td><td class="addr">$047B=01</td></tr>
+    <tr><td>9</td><td>INC $4014</td><td><span class="badge fail">FAIL (err 3)</span></td><td class="addr">$0480=0E</td></tr>
   </table>
 </div>
 

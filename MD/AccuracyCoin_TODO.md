@@ -43,8 +43,9 @@
   - 修復: SetOamCorruptionFlags() + ProcessOamCorruption() in ppu_w_2001() transition detection
   - rendering disable 時標記 row，re-enable 或 frame start 時 copy OAM[0:7]
 
-- [ ] **APU Register Activation** (P14, $045C, err=4, MEDIUM)
-  - OAM DMA 頁面非 $40 時，DMA 不應與 APU 暫存器產生 bus conflict
+- [ ] **APU Register Activation** (P14, $045C, err=4, HARD → 移至 Phase 2)
+  - 需要 DMA bus activation 邏輯：6502 address bus 是否在 $4000-$401F 決定 APU register 是否可讀
+  - Tests 5-7 需要 JSR $3FFE + DMC DMA timing + PPU bus state 配合，與 DMA cluster 高度相關
 
 ---
 
@@ -56,9 +57,10 @@
   - $4017 在 odd/even CPU cycle 寫入時，IRQ flag 未正確清除
   - 涉及 frame counter 與 CPU bus cycle parity 的交互
 
-- [ ] **$2002 flag clear timing** (P18, $048D, err=1, MEDIUM)
+- [ ] **$2002 flag clear timing** (P18, $048D, err=1, MEDIUM → BLOCKED)
   - VBL/S0H/overflow flags 未在正確的 PPU dot 清除
-  - 清除發生在 pre-render scanline dot 1，但 sub-cycle 精度不足
+  - 改 dot 2→1 會破壞 blargg vbl_clear_timing + nmi_on_timing（3 個回歸）
+  - 需要 sub-cycle M2 duty 精度（VBL 在 M2 high，sprite flags 在 M2 low）
 
 ### 2.2 高難度（DMA cluster，互相關聯）
 

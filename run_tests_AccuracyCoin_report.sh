@@ -56,7 +56,8 @@ get_test_wait() {
         14)     echo 9  ;;  # APU Tests: ~7s
         17)     echo 16 ;;  # PPU VBlank Timing: ~14s
         13)     echo 8  ;;  # APU Registers/DMA: ~6s
-        16|18|19|20) echo 8 ;;  # PPU tests: ~6s
+        18)     echo 12 ;;  # PPU OAM tests: ~10s
+        16|19|20) echo 8 ;;  # PPU tests: ~6s
         *)      echo 6  ;;  # CPU/unofficial opcodes: ~3-4s
     esac
 }
