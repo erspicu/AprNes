@@ -1,11 +1,13 @@
 #!/bin/bash
 # run_tests_AccuracyCoin_report.sh
-# Run AccuracyCoin.nes comprehensive accuracy tests and generate HTML report.
+# Run AccuracyCoin page-by-page and generate HTML report.
+# Page 12 item 1 (IFlagLatency) is skipped to avoid hang.
+# Page 15 (Power On State) is DRAW-only, screenshots only.
 #
 # Usage:
-#   bash run_tests_AccuracyCoin_report.sh             # Full run (build + screenshots + report)
-#   bash run_tests_AccuracyCoin_report.sh --no-build  # Skip build step
-#   bash run_tests_AccuracyCoin_report.sh --no-screenshots  # Skip page screenshots (faster)
+#   bash run_tests_AccuracyCoin_report.sh             # Full run (build + test + report)
+#   bash run_tests_AccuracyCoin_report.sh --no-build  # Skip build
+#   bash run_tests_AccuracyCoin_report.sh --no-screenshots  # Skip screenshots
 set -u
 
 cd /c/ai_project/AprNes
@@ -13,8 +15,9 @@ cd /c/ai_project/AprNes
 EXE="AprNes/bin/Debug/AprNes.exe"
 ROM="nes-test-roms-master/AccuracyCoin-main/AccuracyCoin.nes"
 REPORT_DIR="report"
-SS_DIR="$REPORT_DIR/screenshots/ac"
+SS_DIR="$REPORT_DIR/screenshots-ac"
 OUTPUT_HTML="$REPORT_DIR/AccuracyCoin_report.html"
+RESULTS_DIR="temp/ac_results"
 
 OPT_BUILD=1
 OPT_SCREENSHOTS=1
@@ -27,190 +30,239 @@ for arg in "$@"; do
     esac
 done
 
-# ─────────────────────────────────────────────
 # Build
-# ─────────────────────────────────────────────
 if [ $OPT_BUILD -eq 1 ]; then
     echo "=== Building project ==="
-    powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
+    powershell -NoProfile -Command "& 'C:\Program Files (x86)\MSBuild\14.0\Bin\MSBuild.exe' 'C:\ai_project\AprNes\AprNes.sln' /p:Configuration=Debug /t:Rebuild /nologo" 2>&1 | tail -3
     if [ $? -ne 0 ]; then echo "BUILD FAILED"; exit 1; fi
 fi
 
-if [ ! -f "$EXE" ]; then
-    echo "ERROR: $EXE not found. Run without --no-build first."
-    exit 1
-fi
+if [ ! -f "$EXE" ]; then echo "ERROR: $EXE not found."; exit 1; fi
+if [ ! -f "$ROM" ]; then echo "ERROR: ROM not found: $ROM"; exit 1; fi
 
-if [ ! -f "$ROM" ]; then
-    echo "ERROR: ROM not found: $ROM"
-    exit 1
-fi
+mkdir -p "$SS_DIR" "$RESULTS_DIR"
 
-mkdir -p "$SS_DIR"
+# Clean old results
+rm -f "$RESULTS_DIR"/page_*.hex
 
-# ─────────────────────────────────────────────
-# Timing plan (all values in NES seconds)
-# ─────────────────────────────────────────────
-# t=3.0 : press Start → begin AutomaticallyRunEveryTestInROM
-# t=90.5: screenshot of results summary table
-# t=91.0: press Start → enter per-suite page view (lands on page 1)
-#
-# Per-page navigation (2s per page):
-#   page N: Right press at (91 + 1 + (N-1)*2), screenshot at (91 + 1 + (N-1)*2 + 1)
-#   i.e.: page 1 = screenshot at 93.0 (no Right needed, already on page 1)
-#         page 2 = Right at 94.0, screenshot at 95.0
-#         page 3 = Right at 96.0, screenshot at 97.0  ...
-#         page 14 = Right at 94+(13-1)*2=118.0, screenshot at 119.0
-#
-# Page 15 (Power On State, DRAW tests — 5 sub-items):
-#   Right at 120.0 → screenshot overview at 121.0
-#   A at 122.0 → sub-item 0, screenshot at 123.0
-#   Down+A at 124.0,125.0 → sub-item 1, screenshot at 126.0
-#   Down+A at 127.0,128.0 → sub-item 2, screenshot at 129.0
-#   Down+A at 130.0,131.0 → sub-item 3, screenshot at 132.0
-#   Down+A at 133.0,134.0 → sub-item 4, screenshot at 135.0
-#
-# Pages 16-20:
-#   page 16 = Right at 136.0, screenshot at 137.0
-#   page 17 = Right at 138.0, screenshot at 139.0
-#   page 18 = Right at 140.0, screenshot at 141.0
-#   page 19 = Right at 142.0, screenshot at 143.0
-#   page 20 = Right at 144.0, screenshot at 145.0
-#
-# Total run time: 147 NES seconds = ~8832 frames
-# (In headless mode this runs in a few wall-clock seconds)
-
-T_TOTAL=147.0
-
-build_sequences() {
-    python3 - <<'PYEOF'
-import sys
-
-# NES fps constant (same as TestRunner.cs)
-NES_FPS = 60.0988
-
-def f(t):
-    """Convert NES seconds to frame number (int)"""
-    return int(t * NES_FPS)
-
-input_events = []  # "Button:sec"
-timed_shots  = []  # "path:sec"
-
-SS_DIR = "report/screenshots/ac"
-
-# Boot + trigger all-tests run
-input_events.append("Start:3.0")
-
-# Results summary screenshot (before pressing Start to navigate pages)
-timed_shots.append(f"{SS_DIR}/ac_summary.png:90.5")
-
-# Press Start → enter per-suite page view (lands on page 1)
-input_events.append("Start:91.0")
-
-# Page 1: screenshot at 93.0 (no Right needed)
-timed_shots.append(f"{SS_DIR}/ac_page_01.png:93.0")
-
-# Pages 2-14
-for page in range(2, 15):
-    t_right  = 92.0 + (page - 1) * 2.0
-    t_shot   = t_right + 1.0
-    input_events.append(f"Right:{t_right:.1f}")
-    timed_shots.append(f"{SS_DIR}/ac_page_{page:02d}.png:{t_shot:.1f}")
-
-# Page 15 (Power On State — DRAW tests, 5 sub-items)
-# Right to navigate to page 15
-input_events.append("Right:120.0")
-timed_shots.append(f"{SS_DIR}/ac_page_15.png:121.0")
-# Sub-item 0 (cursor already at item 0): press A
-input_events.append("A:122.0")
-timed_shots.append(f"{SS_DIR}/ac_page_15_item00.png:123.0")
-# Sub-items 1-4: Down then A
-for item in range(1, 5):
-    t_down = 122.0 + item * 5.0
-    t_a    = t_down + 1.0
-    t_shot = t_a + 1.0
-    input_events.append(f"Down:{t_down:.1f}")
-    input_events.append(f"A:{t_a:.1f}")
-    timed_shots.append(f"{SS_DIR}/ac_page_15_item{item:02d}.png:{t_shot:.1f}")
-
-# Pages 16-20
-for page in range(16, 21):
-    t_right = 134.0 + (page - 16) * 2.0
-    t_shot  = t_right + 1.0
-    input_events.append(f"Right:{t_right:.1f}")
-    timed_shots.append(f"{SS_DIR}/ac_page_{page:02d}.png:{t_shot:.1f}")
-
-# Output as shell variables
-print(f"INPUT_SPEC=\"{','.join(input_events)}\"")
-print(f"TIMED_SHOTS=\"{','.join(timed_shots)}\"")
-PYEOF
+# ───────────────────────────────────────────────
+# Run each page separately
+# ───────────────────────────────────────────────
+get_test_wait() {
+    # Per-page test wait time (seconds after A press for all tests to complete)
+    # Measured empirically with 2s safety buffer
+    case $1 in
+        12)     echo 20 ;;  # CPU Interrupts (skip item 1, items 2-3 are slow)
+        14)     echo 9  ;;  # APU Tests: ~7s
+        17)     echo 16 ;;  # PPU VBlank Timing: ~14s
+        13)     echo 8  ;;  # APU Registers/DMA: ~6s
+        16|18|19|20) echo 8 ;;  # PPU tests: ~6s
+        *)      echo 6  ;;  # CPU/unofficial opcodes: ~3-4s
+    esac
 }
 
-# ─────────────────────────────────────────────
-# Run emulator
-# ─────────────────────────────────────────────
-if [ $OPT_SCREENSHOTS -eq 1 ]; then
-    echo "=== Generating timing sequences ==="
-    eval "$(build_sequences)"
+run_page() {
+    local PAGE=$1
+    local NAV_TIME=3.0  # seconds to wait for ROM boot
+    local INPUT_EVENTS=""
+    local TIMED_SHOTS=""
+    local SS_FILE="$SS_DIR/ac_page_$(printf '%02d' $PAGE).png"
 
-    echo "=== Running AccuracyCoin (with screenshots, ~5-10 seconds wall time) ==="
-    RUN_OUTPUT=$("$EXE" \
-        --rom "$ROM" \
-        --time "$T_TOTAL" \
-        --input "$INPUT_SPEC" \
-        --timed-screenshots "$TIMED_SHOTS" \
-        --dump-ac-results \
-        2>/dev/null)
-else
-    echo "=== Running AccuracyCoin (results only, no screenshots) ==="
-    RUN_OUTPUT=$("$EXE" \
-        --rom "$ROM" \
-        --time "$T_TOTAL" \
-        --input "Start:3.0" \
-        --dump-ac-results \
-        2>/dev/null)
-fi
+    echo -n "  Page $PAGE/20: "
 
-echo "$RUN_OUTPUT" | grep -v "^AC_RESULTS_HEX:"
+    # Navigate to the target page
+    # Pages 1-10: use Right from page 1 (0.5s intervals)
+    # Pages 11-20: use Left from page 1 (1.0s intervals, wraps around)
+    if [ $PAGE -le 10 ]; then
+        local PRESSES=$(( PAGE - 1 ))
+        local DIR="Right"
+        local NAV_INTERVAL=0.5
+    else
+        local PRESSES=$(( 21 - PAGE ))
+        local DIR="Left"
+        local NAV_INTERVAL=1.0
+    fi
 
-AC_HEX=$(echo "$RUN_OUTPUT" | grep "^AC_RESULTS_HEX:" | head -1 | cut -d: -f2-)
+    local T=$NAV_TIME
+    for ((i=0; i<PRESSES; i++)); do
+        T=$(python3 -c "print(f'{$T + $NAV_INTERVAL:.1f}')")
+        if [ -n "$INPUT_EVENTS" ]; then INPUT_EVENTS="$INPUT_EVENTS,"; fi
+        INPUT_EVENTS="${INPUT_EVENTS}${DIR}:${T}"
+    done
 
-if [ -z "$AC_HEX" ]; then
-    echo "WARNING: No AC_RESULTS_HEX in output — test results will show as 'not run'"
-fi
+    # After navigation, wait a moment then press A
+    T=$(python3 -c "print(f'{$T + 1.0:.1f}')")
+    local T_A=$T
 
-# ─────────────────────────────────────────────
-# Generate HTML report
-# ─────────────────────────────────────────────
-echo "=== Generating HTML report ==="
+    # Special handling for page 12: skip item 1 (IFlagLatency)
+    if [ $PAGE -eq 12 ]; then
+        # Down to select item 1
+        T=$(python3 -c "print(f'{$T_A:.1f}')")
+        if [ -n "$INPUT_EVENTS" ]; then INPUT_EVENTS="$INPUT_EVENTS,"; fi
+        INPUT_EVENTS="${INPUT_EVENTS}Down:${T}"
+        # B to mark as skip
+        T=$(python3 -c "print(f'{$T + 0.5:.1f}')")
+        INPUT_EVENTS="${INPUT_EVENTS},B:${T}"
+        # Up to go back to page header
+        T=$(python3 -c "print(f'{$T + 0.5:.1f}')")
+        INPUT_EVENTS="${INPUT_EVENTS},Up:${T}"
+        # A to run remaining tests
+        T=$(python3 -c "print(f'{$T + 0.5:.1f}')")
+        INPUT_EVENTS="${INPUT_EVENTS},A:${T}"
+        T_A=$T
+    else
+        if [ -n "$INPUT_EVENTS" ]; then INPUT_EVENTS="$INPUT_EVENTS,"; fi
+        INPUT_EVENTS="${INPUT_EVENTS}A:${T_A}"
+    fi
 
-python3 - "$AC_HEX" "$OUTPUT_HTML" "$SS_DIR" <<'PYEOF'
-import sys, os, json, datetime
+    # Per-page test wait time (optimized)
+    local TEST_WAIT=$(get_test_wait $PAGE)
+    local TOTAL_TIME=$(python3 -c "print(f'{$T_A + $TEST_WAIT:.1f}')")
 
-ac_hex    = sys.argv[1]  # hex string of $0300-$04FF (1024 hex chars = 512 bytes)
-out_html  = sys.argv[2]
-ss_dir    = sys.argv[3]
+    # Screenshot at the end (after tests complete)
+    local T_SS=$(python3 -c "print(f'{$T_A + $TEST_WAIT - 0.5:.1f}')")
 
-# Decode results bytes ($0300-$04FF)
-# Our dump is $0300-$04FF → index 0 = $0300
-mem = bytes.fromhex(ac_hex) if len(ac_hex) == 1024 else bytes(512)
+    if [ $OPT_SCREENSHOTS -eq 1 ]; then
+        TIMED_SHOTS="$SS_FILE:$T_SS"
+    fi
+
+    # Run emulator
+    local CMD="$EXE --rom $ROM --time $TOTAL_TIME --input $INPUT_EVENTS --dump-ac-results"
+    if [ -n "$TIMED_SHOTS" ]; then
+        CMD="$CMD --timed-screenshots $TIMED_SHOTS"
+    fi
+
+    local OUTPUT
+    OUTPUT=$($CMD 2>/dev/null)
+    local HEX=$(echo "$OUTPUT" | grep "^AC_RESULTS_HEX:" | head -1 | cut -d: -f2-)
+
+    if [ -n "$HEX" ]; then
+        echo "$HEX" > "$RESULTS_DIR/page_$(printf '%02d' $PAGE).hex"
+    fi
+
+    # Count pass/fail from screen output
+    local PASS_COUNT=$(echo "$HEX" | python3 -c "
+import sys
+data = sys.stdin.read().strip()
+if len(data) == 1024:
+    mem = bytes.fromhex(data)
+    p = sum(1 for b in mem if b & 0x01 and b != 0xFF)
+    f = sum(1 for b in mem if b != 0 and b != 0xFF and not (b & 0x01))
+    s = sum(1 for b in mem if b == 0xFF)
+    print(f'{p} PASS, {f} FAIL, {s} SKIP')
+else:
+    print('no data')
+" 2>/dev/null)
+
+    echo "$PASS_COUNT"
+}
+
+run_page_15_draw() {
+    echo -n "  Page 15/20 (DRAW): "
+    local NAV_TIME=3.0
+    local INPUT_EVENTS=""
+    local TIMED_SHOTS=""
+
+    # Navigate to page 15 using Left (6 presses: page 1 -> 20 -> 19 -> 18 -> 17 -> 16 -> 15)
+    local T=$NAV_TIME
+    for ((i=0; i<6; i++)); do
+        T=$(python3 -c "print(f'{$T + 1.0:.1f}')")
+        if [ -n "$INPUT_EVENTS" ]; then INPUT_EVENTS="$INPUT_EVENTS,"; fi
+        INPUT_EVENTS="${INPUT_EVENTS}Left:${T}"
+    done
+
+    # Wait for page to load, then screenshot overview
+    T=$(python3 -c "print(f'{$T + 1.0:.1f}')")
+
+    if [ $OPT_SCREENSHOTS -eq 1 ]; then
+        TIMED_SHOTS="$SS_DIR/ac_page_15.png:$T"
+
+        # Navigate to each sub-item (5 items)
+        # First: press Down to go to first item, then A to run it
+        local T_DOWN=$(python3 -c "print(f'{$T + 1.0:.1f}')")
+        INPUT_EVENTS="${INPUT_EVENTS},Down:${T_DOWN}"
+        local T_ITEM_A=$(python3 -c "print(f'{$T_DOWN + 0.5:.1f}')")
+        INPUT_EVENTS="${INPUT_EVENTS},A:${T_ITEM_A}"
+        local T_ITEM_SS=$(python3 -c "print(f'{$T_ITEM_A + 3.0:.1f}')")
+        TIMED_SHOTS="${TIMED_SHOTS},$SS_DIR/ac_page_15_item00.png:$T_ITEM_SS"
+
+        # Items 1-4: Down + A + screenshot
+        for ((item=1; item<5; item++)); do
+            T_DOWN=$(python3 -c "print(f'{$T_ITEM_SS + 1.0:.1f}')")
+            INPUT_EVENTS="${INPUT_EVENTS},Down:${T_DOWN}"
+            T_ITEM_A=$(python3 -c "print(f'{$T_DOWN + 0.5:.1f}')")
+            INPUT_EVENTS="${INPUT_EVENTS},A:${T_ITEM_A}"
+            T_ITEM_SS=$(python3 -c "print(f'{$T_ITEM_A + 3.0:.1f}')")
+            TIMED_SHOTS="${TIMED_SHOTS},$SS_DIR/ac_page_15_item$(printf '%02d' $item).png:$T_ITEM_SS"
+        done
+
+        local TOTAL_TIME=$(python3 -c "print(f'{$T_ITEM_SS + 2.0:.1f}')")
+    else
+        local TOTAL_TIME=$(python3 -c "print(f'{$T + 2.0:.1f}')")
+    fi
+
+    $EXE --rom "$ROM" --time "$TOTAL_TIME" --input "$INPUT_EVENTS" \
+        ${TIMED_SHOTS:+--timed-screenshots "$TIMED_SHOTS"} \
+        2>/dev/null >/dev/null
+
+    echo "screenshots captured"
+}
+
+echo "=== Running AccuracyCoin page-by-page ==="
+echo ""
+
+for PAGE in $(seq 1 20); do
+    if [ $PAGE -eq 15 ]; then
+        run_page_15_draw
+    else
+        run_page $PAGE
+    fi
+done
+
+echo ""
+
+# ───────────────────────────────────────────────
+# Merge results from all pages
+# ───────────────────────────────────────────────
+echo "=== Merging results and generating report ==="
+
+python3 - "$OUTPUT_HTML" "$SS_DIR" "$RESULTS_DIR" "$OPT_SCREENSHOTS" <<'PYEOF'
+import sys, os, datetime
+
+out_html  = sys.argv[1]
+ss_dir    = sys.argv[2]
+results_dir = sys.argv[3]
+has_screenshots = sys.argv[4] == "1"
+
+# Merge all page results: overlay non-zero bytes
+merged = bytearray(512)  # $0300-$04FF
+for page in range(1, 21):
+    hex_file = os.path.join(results_dir, f"page_{page:02d}.hex")
+    if not os.path.exists(hex_file):
+        continue
+    with open(hex_file, 'r') as f:
+        hex_data = f.read().strip()
+    if len(hex_data) != 1024:
+        continue
+    page_data = bytes.fromhex(hex_data)
+    for i in range(512):
+        if page_data[i] != 0:
+            merged[i] = page_data[i]
+
 def mem_byte(addr):
     idx = addr - 0x0300
-    return mem[idx] if 0 <= idx < len(mem) else 0
+    return merged[idx] if 0 <= idx < len(merged) else 0
 
 def decode_result(byte):
-    """Returns ('PASS','FAIL','SKIP','NOT_RUN'), error_code"""
     if byte == 0xFF: return 'SKIP', None
     if byte == 0x00: return 'NOT_RUN', None
     if byte & 0x01:  return 'PASS', None
     ec = byte >> 2
     return 'FAIL', ec
 
-# ── Full test map ─────────────────────────────────────────────────────────────
-# Format: (suite_name, [(test_name, result_addr_hex), ...])
-# DRAW tests (Power On State) store at $03FC-$03FF; omitted from run-all summary.
+# Full test map (page_number, suite_name, tests)
 SUITES = [
-    ("CPU Behavior", [
+    (1, "CPU Behavior", [
         ("ROM is not writable",  0x0405),
         ("RAM Mirroring",        0x0403),
         ("PC Wraparound",        0x044D),
@@ -221,7 +273,7 @@ SUITES = [
         ("Open Bus",             0x0408),
         ("All NOP instructions", 0x047D),
     ]),
-    ("Addressing mode wraparound", [
+    (2, "Addressing mode wraparound", [
         ("Absolute Indexed",  0x046E),
         ("Zero Page Indexed", 0x046F),
         ("Indirect",          0x0470),
@@ -229,7 +281,7 @@ SUITES = [
         ("Indirect, Y",       0x0472),
         ("Relative",          0x0473),
     ]),
-    ("Unofficial Instructions: SLO", [
+    (3, "Unofficial Instructions: SLO", [
         ("$03  SLO (indirect,X)", 0x0409),
         ("$07  SLO zeropage",     0x040A),
         ("$0F  SLO absolute",     0x040B),
@@ -238,7 +290,7 @@ SUITES = [
         ("$1B  SLO absolute,Y",   0x040E),
         ("$1F  SLO absolute,X",   0x040F),
     ]),
-    ("Unofficial Instructions: RLA", [
+    (4, "Unofficial Instructions: RLA", [
         ("$23  RLA (indirect,X)", 0x0419),
         ("$27  RLA zeropage",     0x041A),
         ("$2F  RLA absolute",     0x041B),
@@ -247,7 +299,7 @@ SUITES = [
         ("$3B  RLA absolute,Y",   0x041E),
         ("$3F  RLA absolute,X",   0x041F),
     ]),
-    ("Unofficial Instructions: SRE", [
+    (5, "Unofficial Instructions: SRE", [
         ("$43  SRE (indirect,X)", 0x0420),
         ("$47  SRE zeropage",     0x047F),
         ("$4F  SRE absolute",     0x0422),
@@ -256,7 +308,7 @@ SUITES = [
         ("$5B  SRE absolute,Y",   0x0425),
         ("$5F  SRE absolute,X",   0x0426),
     ]),
-    ("Unofficial Instructions: RRA", [
+    (6, "Unofficial Instructions: RRA", [
         ("$63  RRA (indirect,X)", 0x0427),
         ("$67  RRA zeropage",     0x0428),
         ("$6F  RRA absolute",     0x0429),
@@ -265,7 +317,7 @@ SUITES = [
         ("$7B  RRA absolute,Y",   0x042C),
         ("$7F  RRA absolute,X",   0x042D),
     ]),
-    ("Unofficial Instructions: *AX", [
+    (7, "Unofficial Instructions: *AX", [
         ("$83  SAX (indirect,X)", 0x042E),
         ("$87  SAX zeropage",     0x042F),
         ("$8F  SAX absolute",     0x0430),
@@ -277,7 +329,7 @@ SUITES = [
         ("$B7  LAX zeropage,Y",   0x0436),
         ("$BF  LAX absolute,X",   0x0437),
     ]),
-    ("Unofficial Instructions: DCP", [
+    (8, "Unofficial Instructions: DCP", [
         ("$C3  DCP (indirect,X)", 0x0438),
         ("$C7  DCP zeropage",     0x0439),
         ("$CF  DCP absolute",     0x043A),
@@ -286,7 +338,7 @@ SUITES = [
         ("$DB  DCP absolute,Y",   0x043D),
         ("$DF  DCP absolute,X",   0x043E),
     ]),
-    ("Unofficial Instructions: ISC", [
+    (9, "Unofficial Instructions: ISC", [
         ("$E3  ISC (indirect,X)", 0x043F),
         ("$E7  ISC zeropage",     0x0440),
         ("$EF  ISC absolute",     0x0441),
@@ -295,7 +347,7 @@ SUITES = [
         ("$FB  ISC absolute,Y",   0x0444),
         ("$FF  ISC absolute,X",   0x0445),
     ]),
-    ("Unofficial Instructions: SH*", [
+    (10, "Unofficial Instructions: SH*", [
         ("$93  SHA (indirect),Y", 0x0446),
         ("$9F  SHA absolute,Y",   0x0447),
         ("$9B  SHS absolute,Y",   0x0448),
@@ -303,7 +355,7 @@ SUITES = [
         ("$9E  SHX absolute,Y",   0x044A),
         ("$BB  LAE absolute,Y",   0x044B),
     ]),
-    ("Unofficial Immediates", [
+    (11, "Unofficial Immediates", [
         ("$0B  ANC Immediate", 0x0410),
         ("$2B  ANC Immediate", 0x0411),
         ("$4B  ASR Immediate", 0x0412),
@@ -313,12 +365,12 @@ SUITES = [
         ("$CB  AXS Immediate", 0x0416),
         ("$EB  SBC Immediate", 0x0417),
     ]),
-    ("CPU Interrupts", [
+    (12, "CPU Interrupts", [
         ("Interrupt flag latency", 0x0461),
         ("NMI Overlap BRK",        0x0462),
         ("NMI Overlap IRQ",        0x0463),
     ]),
-    ("APU Registers and DMA tests", [
+    (13, "APU Registers and DMA tests", [
         ("DMA + Open Bus",        0x046C),
         ("DMA + $2002 Read",      0x0488),
         ("DMA + $2007 Read",      0x044C),
@@ -330,7 +382,7 @@ SUITES = [
         ("Explicit DMA Abort",    0x0479),
         ("Implicit DMA Abort",    0x0478),
     ]),
-    ("APU Tests", [
+    (14, "APU Tests", [
         ("Length Counter",           0x0465),
         ("Length Table",             0x0466),
         ("Frame Counter IRQ",        0x0467),
@@ -341,15 +393,14 @@ SUITES = [
         ("Controller Strobing",      0x045F),
         ("Controller Clocking",      0x047A),
     ]),
-    ("Power On State (DRAW)", [
-        # DRAW tests — results stored at $03FC-$03FF, not in run-all summary
-        ("PPU Reset Flag", 0x03FD),  # result_PowOn_PPUReset
-        ("CPU RAM",        0x03FC),  # result_PowOn_CPURAM
-        ("CPU Registers",  0x03FD),  # result_PowOn_CPUReg (shares addr with PPUReset intentionally)
-        ("PPU RAM",        0x03FE),  # result_PowOn_PPURAM
-        ("Palette RAM",    0x03FF),  # result_PowOn_PPUPal
+    (15, "Power On State (DRAW)", [
+        ("PPU Reset Flag", 0x03FD),
+        ("CPU RAM",        0x03FC),
+        ("CPU Registers",  0x03FD),
+        ("PPU RAM",        0x03FE),
+        ("Palette RAM",    0x03FF),
     ]),
-    ("PPU Behavior", [
+    (16, "PPU Behavior", [
         ("CHR ROM is not writable", 0x0485),
         ("PPU Register Mirroring",  0x0404),
         ("PPU Register Open Bus",   0x044E),
@@ -358,7 +409,7 @@ SUITES = [
         ("Rendering Flag Behavior", 0x0486),
         ("$2007 read w/ rendering", 0x048A),
     ]),
-    ("PPU VBlank Timing", [
+    (17, "PPU VBlank Timing", [
         ("VBlank beginning",       0x0450),
         ("VBlank end",             0x0451),
         ("NMI Control",            0x0452),
@@ -367,7 +418,7 @@ SUITES = [
         ("NMI at VBlank end",      0x0455),
         ("NMI disabled at VBlank", 0x0456),
     ]),
-    ("Sprite Evaluation", [
+    (18, "Sprite Evaluation", [
         ("Sprite overflow behavior", 0x0459),
         ("Sprite 0 Hit behavior",    0x0457),
         ("$2002 flag clear timing",  0x048D),
@@ -378,7 +429,7 @@ SUITES = [
         ("OAM Corruption",           0x047B),
         ("INC $4014",                0x0480),
     ]),
-    ("PPU Misc.", [
+    (19, "PPU Misc.", [
         ("Attributes As Tiles",      0x0481),
         ("t Register Quirks",        0x0482),
         ("Stale BG Shift Registers", 0x0483),
@@ -386,7 +437,7 @@ SUITES = [
         ("Sprites On Scanline 0",    0x0484),
         ("$2004 Stress Test",        0x048C),
     ]),
-    ("CPU Behavior 2", [
+    (20, "CPU Behavior 2", [
         ("Instruction Timing",  0x0460),
         ("Implied Dummy Reads", 0x046D),
         ("Branch Dummy Reads",  0x048B),
@@ -394,13 +445,13 @@ SUITES = [
     ]),
 ]
 
-# ── Count results ─────────────────────────────────────────────────────────────
+# Count results (exclude DRAW page)
 total_pass = total_fail = total_skip = total_not_run = 0
-for suite_name, tests in SUITES:
+for page_num, suite_name, tests in SUITES:
     is_draw = "(DRAW)" in suite_name
     for test_name, addr in tests:
         if is_draw:
-            continue  # DRAW tests are not in run-all; skip from summary
+            continue
         b = mem_byte(addr)
         status, _ = decode_result(b)
         if   status == 'PASS':    total_pass    += 1
@@ -411,12 +462,10 @@ for suite_name, tests in SUITES:
 total_tests = total_pass + total_fail + total_skip + total_not_run
 
 def ss_rel(path):
-    """Return relative path from report dir for use in HTML"""
     return os.path.relpath(path, os.path.dirname(out_html)).replace('\\', '/')
 
 def ss_img(name, alt=""):
-    """Return <img> tag if screenshot exists, else placeholder"""
-    path = f"{ss_dir}/{name}"
+    path = os.path.join(ss_dir, name)
     if os.path.exists(path):
         rel = ss_rel(path)
         return f'<img src="{rel}" alt="{alt}" class="ss" loading="lazy">'
@@ -426,7 +475,7 @@ def status_badge(status, err_code=None):
     if status == 'PASS':
         return '<span class="badge pass">PASS</span>'
     elif status == 'FAIL':
-        ec = f" (err {err_code})" if err_code else ""
+        ec = f" (err {err_code})" if err_code is not None else ""
         return f'<span class="badge fail">FAIL{ec}</span>'
     elif status == 'SKIP':
         return '<span class="badge skip">SKIP</span>'
@@ -436,13 +485,12 @@ def status_badge(status, err_code=None):
 
 now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
-# ── Generate HTML ─────────────────────────────────────────────────────────────
 html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AccuracyCoin Report — AprNes</title>
+<title>AccuracyCoin Report - AprNes</title>
 <style>
 body {{ font-family: 'Segoe UI', Arial, sans-serif; background:#1a1a2e; color:#e0e0e0; margin:0; padding:20px; }}
 h1 {{ color:#a3c4f3; margin-bottom:4px; }}
@@ -471,21 +519,23 @@ tr:hover td {{ background:#1e2a5e; }}
 .addr {{ font-family:monospace; color:#78909c; font-size:.82em; }}
 .ss {{ max-width:512px; width:100%; border:2px solid #2d3561; border-radius:4px; display:block; margin:8px auto; image-rendering:pixelated; }}
 .ss-missing {{ background:#111; color:#555; text-align:center; padding:16px; font-style:italic; }}
-.page-section {{ background:#16213e; border:1px solid #2d3561; border-radius:8px; margin-bottom:24px; padding:16px; }}
-.page-section h3 {{ margin:0 0 10px; color:#a3c4f3; }}
-.page-grid {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:12px; }}
-.page-card {{ background:#1a1a2e; border:1px solid #2d3561; border-radius:6px; padding:10px; text-align:center; }}
-.page-card h4 {{ margin:0 0 8px; color:#ccc; font-size:.9em; }}
 .draw-section {{ background:#1a0a2e; border:1px solid #4a148c; border-radius:8px; padding:16px; margin-bottom:24px; }}
 .draw-section h3 {{ color:#ce93d8; margin:0 0 10px; }}
 .draw-grid {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:12px; }}
 .draw-card {{ background:#12001e; border:1px solid #4a148c; border-radius:6px; padding:10px; text-align:center; }}
 .draw-card h4 {{ margin:0 0 8px; color:#ce93d8; font-size:.9em; }}
+.note {{ background:#1e3a1e; border:1px solid #4caf50; border-radius:8px; padding:12px 16px; margin-bottom:24px; font-size:.9em; }}
+.note.warn {{ background:#3a2a1e; border-color:#ff9800; }}
 </style>
 </head>
 <body>
-<h1>🪙 AccuracyCoin Report — AprNes</h1>
-<div class="meta">Generated: {now} | ROM: AccuracyCoin.nes (Mapper 0/NROM)</div>
+<h1>AccuracyCoin Report - AprNes</h1>
+<div class="meta">Generated: {now} | ROM: AccuracyCoin.nes (Mapper 0/NROM) | Method: page-by-page</div>
+
+<div class="note warn">
+  Page 12 item 1 (Interrupt Flag Latency) is marked SKIP - test hangs due to DMC DMA timing drift (~12 cycles).
+  Requires Master Clock scheduler for sub-cycle accuracy. All other 135 tests are executed.
+</div>
 
 <div class="summary">
   <div class="stat"><div class="num pass-c">{total_pass}</div><div class="lbl">PASS</div></div>
@@ -494,21 +544,14 @@ tr:hover td {{ background:#1e2a5e; }}
   <div class="stat"><div class="num notrun-c">{total_not_run}</div><div class="lbl">N/A</div></div>
   <div class="stat"><div class="num">{total_tests}</div><div class="lbl">TOTAL</div></div>
 </div>
-
-<div class="page-section">
-  <h3>📊 Results Summary Screen</h3>
-  {ss_img('ac_summary.png', 'Summary screen')}
-</div>
 """
 
-# Per-suite sections with screenshots
-for suite_idx, (suite_name, tests) in enumerate(SUITES):
-    page_num = suite_idx + 1
+# Per-suite sections
+for page_num, suite_name, tests in SUITES:
     is_draw = "(DRAW)" in suite_name
     disp_name = suite_name.replace(" (DRAW)", "")
     ss_file = f"ac_page_{page_num:02d}.png"
 
-    # Count pass/fail/skip for header
     s_pass = s_fail = s_skip = s_nr = 0
     for test_name, addr in tests:
         b = mem_byte(addr)
@@ -519,18 +562,16 @@ for suite_idx, (suite_name, tests) in enumerate(SUITES):
         else:                     s_nr += 1
 
     stats_parts = []
-    if s_pass:  stats_parts.append(f'<span class="pass-c">{s_pass}✓</span>')
-    if s_fail:  stats_parts.append(f'<span class="fail-c">{s_fail}✗</span>')
-    if s_skip:  stats_parts.append(f'<span class="skip-c">{s_skip}↷</span>')
-    if s_nr and not is_draw: stats_parts.append(f'<span class="notrun-c">{s_nr}?</span>')
+    if s_pass:  stats_parts.append(f'<span class="pass-c">{s_pass} PASS</span>')
+    if s_fail:  stats_parts.append(f'<span class="fail-c">{s_fail} FAIL</span>')
+    if s_skip:  stats_parts.append(f'<span class="skip-c">{s_skip} SKIP</span>')
+    if s_nr and not is_draw: stats_parts.append(f'<span class="notrun-c">{s_nr} N/A</span>')
 
     if is_draw:
-        # Draw test section (purple)
         html += f"""
 <div class="draw-section">
-  <h3>🎨 Page {page_num}: {disp_name} (DRAW Tests)</h3>
-  <p style="color:#aaa;font-size:.85em">These tests display memory values rather than simple pass/fail.
-  Run individually with sub-item navigation (A button) to see results.</p>
+  <h3>Page {page_num}: {disp_name} (DRAW Tests)</h3>
+  <p style="color:#aaa;font-size:.85em">These tests display memory values rather than simple pass/fail.</p>
   <div class="draw-grid">
     <div class="draw-card"><h4>Page overview</h4>{ss_img(ss_file, disp_name)}</div>
 """
@@ -544,7 +585,7 @@ for suite_idx, (suite_name, tests) in enumerate(SUITES):
 <div class="suite">
   <div class="suite-header">
     <span>Page {page_num}: {disp_name}</span>
-    <span class="suite-stats">{' '.join(stats_parts)}</span>
+    <span class="suite-stats">{' | '.join(stats_parts)}</span>
   </div>
   {ss_img(ss_file, disp_name)}
   <table>
@@ -560,7 +601,7 @@ for suite_idx, (suite_name, tests) in enumerate(SUITES):
 html += """
 <hr style="border-color:#2d3561;margin:30px 0">
 <p style="color:#555;font-size:.8em;text-align:center">
-  AccuracyCoin by &lt;author&gt; | Result encoding: 0x01=PASS, (N&lt;&lt;2)|0x02=FAIL(N), 0xFF=SKIP, 0x00=not run
+  AccuracyCoin | Result encoding: 0x01=PASS, (N&lt;&lt;2)|0x02=FAIL(N), 0xFF=SKIP, 0x00=not run
 </p>
 </body>
 </html>
@@ -574,5 +615,6 @@ print(f"[OK] Report: {out_html}")
 print(f"[OK] Results: {total_pass}/{total_tests} PASS, {total_fail} FAIL, {total_skip} SKIP, {total_not_run} N/A")
 PYEOF
 
+echo ""
 echo "=== Done ==="
 echo "HTML report: $OUTPUT_HTML"

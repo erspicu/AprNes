@@ -38,7 +38,7 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static public void gamepad_w_4016(byte val)
         {
-            if (P1_LastWrite == 1 && val == 0) P1_StrobeState = 0;
+            if ((P1_LastWrite & 1) == 1 && (val & 1) == 0) P1_StrobeState = 0;
             P1_LastWrite = val;
         }
     }

@@ -213,7 +213,7 @@ namespace AprNes
             }
             else if (ppu_cycles_x >= 257 && ppu_cycles_x < 320)
             {
-                if (ppu_cycles_x == 257) CopyHoriV();
+                if (ppu_cycles_x == 257) { CopyHoriV(); spr_ram_add = 0; }
 
                 if (mapper == 4)
                 {
@@ -259,7 +259,7 @@ namespace AprNes
             // Shift registers hold the data loaded at the previous phase 7, so we can safely compute
             // the current dot's BG pixel from them before the next tile fetch cycle runs.
             if (scanline >= 0 && scanline < 240 && ppu_cycles_x >= 2 && ppu_cycles_x < 256
-                && sprite0_on_line && !isSprite0hit && renderingEnabled)
+                && sprite0_on_line && !isSprite0hit && ShowBackGround && ShowSprites)
             {
                 int screenX = ppu_cycles_x;
                 bool inLeft8 = screenX < 8;
@@ -376,7 +376,7 @@ namespace AprNes
         {
             sprite0_on_line = false;
             if (isSprite0hit) return;
-            if (!ShowBackGround || !ShowSprites) return;
+            if (!ShowBackGround && !ShowSprites) return;
 
             int y_loc = spr_ram[0] + 1; // NES hardware: sprites display at OAM_Y + 1
             int height = Spritesize8x16 ? 15 : 7;
