@@ -1,6 +1,6 @@
 # AccuracyCoin FAIL 修復 TODO
 
-**基線**: 113/136 PASS, 22 FAIL, 1 SKIP (BUGFIX38 後)
+**基線**: 114/136 PASS, 21 FAIL, 1 SKIP (BUGFIX39 後)
 **目標**: 逐步提升至 Master Clock 驅動模型
 
 ---
@@ -9,12 +9,12 @@
 
 | 分類 | 總數 | 已修 | 剩餘 | 說明 |
 |------|------|------|------|------|
-| INDEPENDENT | 7 | 6 | 1(partial) | 不依賴 timing 改動，可獨立修復 |
-| TIMING-CORE | 11 | 2 | 9 | 需要 DMA/IRQ/PPU cycle-level 改動 |
+| INDEPENDENT | 7 | 7 | 0 | 不依賴 timing 改動，可獨立修復 |
+| TIMING-CORE | 11 | 3 | 8 | 需要 DMA/IRQ/PPU cycle-level 改動 |
 | TIMING-DEPENDENT | 7 | 1 | 6 | 依賴正確 timing 基礎設施 |
 | HARDWARE-EDGE | 5 | 0 | 5 | SH* RDY line，極端硬體行為 |
 
-已修 9 項 (6 INDEPENDENT + 2 TIMING-CORE + 1 TIMING-DEPENDENT)，剩餘 22 FAIL + 1 SKIP
+已修 11 項 (7 INDEPENDENT + 3 TIMING-CORE + 1 TIMING-DEPENDENT)，剩餘 21 FAIL + 1 SKIP
 
 ---
 
@@ -22,8 +22,9 @@
 
 ### 1.1 EASY（快速修復）
 
-- [x] **Controller Strobing** (P14, $045F, err=2→4 partial, BUGFIX33)
-  - 修復 bit 0 check。Tests 1-3 pass, test 4 (put/get cycle parity) 需 TIMING-CORE
+- [x] **Controller Strobing** (P14, $045F, PASS - BUGFIX33+BUGFIX39)
+  - BUGFIX33: 修復 bit 0 check (Tests 1-3)
+  - BUGFIX39: deferred $4016 write model (Test 4 put/get cycle parity)
 
 - [x] **Address $2004 behavior** (P18, $045B, err=4→8, BUGFIX34)
   - 修復: $2004 reads during dots 1-64/257-320 return $FF; writes during rendering increment by 4 & align
@@ -149,7 +150,7 @@
 ## 建議修改路徑
 
 ```
-Phase 1 已完成（+6 PASS，達 111/136）
+Phase 1 已完成（+7 PASS，達 114/136 with BUGFIX39）
   ↓
 Phase 2.1 ($2002 flag clear) → BLOCKED，需 sub-cycle M2 duty 精度
 Phase 2.2 (Frame Counter IRQ) → 可獨立嘗試，但涉及 cycle parity

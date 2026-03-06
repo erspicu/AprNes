@@ -59,6 +59,7 @@ namespace AprNes
             // Catch up PPU and APU to current master clock
             catchUpPPU();
             catchUpAPU();
+            if (strobeWritePending > 0) processStrobeWrite();
 
             // Track IRQ line per-tick for penultimate-cycle polling
             irqLinePrev = irqLineCurrent;
@@ -76,6 +77,7 @@ namespace AprNes
             if (nmi_delay) { nmi_pending = true; nmi_delay = false; }
             catchUpPPU();
             catchUpAPU();
+            if (strobeWritePending > 0) processStrobeWrite();
 
             irqLinePrev = irqLineCurrent;
             irqLineCurrent = (statusframeint && !apuintflag) || statusdmcint || statusmapperint;

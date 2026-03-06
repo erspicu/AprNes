@@ -111,6 +111,8 @@ namespace AprNes
             irq_pending = false;
             statusmapperint = false;
             apuSoftReset();
+            strobeWritePending = 0;
+            P1_LastWrite = 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

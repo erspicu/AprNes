@@ -34,12 +34,25 @@ namespace AprNes
         }
 
         static byte P1_LastWrite = 0;
+        static int strobeWritePending = 0;
+        static byte strobeWriteValue = 0;
+
+        // Deferred $4016 write processing: OUT pins update at start of PUT cycles (Mesen2 model)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void processStrobeWrite()
+        {
+            if (strobeWritePending > 0 && --strobeWritePending == 0)
+            {
+                if ((P1_LastWrite & 1) == 1 && (strobeWriteValue & 1) == 0) P1_StrobeState = 0;
+                P1_LastWrite = strobeWriteValue;
+            }
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static public void gamepad_w_4016(byte val)
         {
-            if ((P1_LastWrite & 1) == 1 && (val & 1) == 0) P1_StrobeState = 0;
-            P1_LastWrite = val;
+            strobeWriteValue = val;
+            strobeWritePending = (cpuCycleCount & 1) == 0 ? 1 : 2;
         }
     }
 }
