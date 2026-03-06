@@ -96,6 +96,8 @@ namespace AprNes
 
         static bool oamDmaInProgress = false;  // true during OAM DMA (DMC overlaps with OAM cycles)
         static int oamDmaByteIndex = -1;       // current OAM byte being transferred (0-255, -1 = halt/align)
+        static bool oamDmaPending = false;     // OAM DMA deferred to next read cycle (RMW second write overwrites page)
+        static byte oamDmaPendingPage = 0;     // page number for pending OAM DMA
 
         // Length counter 欄位
         static int* lengthctr;
@@ -308,7 +310,7 @@ namespace AprNes
             dmcstartaddr = 0xC000; dmcaddr = 0xC000; dmcbitsleft = 8;
             dmcsilence = true; dmcirq = false; dmcloop = false; dmcBufferEmpty = true;
             dmcDmaInProgress = false; dmcIsLoadDma = false; dmcLoadDmaCountdown = 0; dmcDmaPending = false;
-            oamDmaInProgress = false; oamDmaByteIndex = -1;
+            oamDmaInProgress = false; oamDmaByteIndex = -1; oamDmaPending = false;
         }
 
         // =====================================================================

@@ -1,6 +1,6 @@
 # AccuracyCoin FAIL 修復 TODO
 
-**基線**: 112/136 PASS, 23 FAIL, 1 SKIP (BUGFIX37 後)
+**基線**: 113/136 PASS, 22 FAIL, 1 SKIP (BUGFIX38 後)
 **目標**: 逐步提升至 Master Clock 驅動模型
 
 ---
@@ -10,11 +10,11 @@
 | 分類 | 總數 | 已修 | 剩餘 | 說明 |
 |------|------|------|------|------|
 | INDEPENDENT | 7 | 6 | 1(partial) | 不依賴 timing 改動，可獨立修復 |
-| TIMING-CORE | 11 | 1 | 10 | 需要 DMA/IRQ/PPU cycle-level 改動 |
+| TIMING-CORE | 11 | 2 | 9 | 需要 DMA/IRQ/PPU cycle-level 改動 |
 | TIMING-DEPENDENT | 7 | 1 | 6 | 依賴正確 timing 基礎設施 |
 | HARDWARE-EDGE | 5 | 0 | 5 | SH* RDY line，極端硬體行為 |
 
-已修 8 項 (6 INDEPENDENT + 1 TIMING-CORE + 1 TIMING-DEPENDENT)，剩餘 23 FAIL + 1 SKIP
+已修 9 項 (6 INDEPENDENT + 2 TIMING-CORE + 1 TIMING-DEPENDENT)，剩餘 22 FAIL + 1 SKIP
 
 ---
 
@@ -92,8 +92,10 @@
 - [ ] **Delta Modulation Channel** (P14, $046A, err=21/L, HARD)
   - $4015 寫入時 DMC timer 即將到期，新 DMA 應延遲 3-4 cycle 才觸發
 
-- [ ] **INC $4014** (P18, $0480, err=3, HARD)
-  - RMW 指令對 $4014 的兩次寫入應只觸發一次 OAM DMA
+- [x] **INC $4014** (P18, $0480, PASS - BUGFIX38)
+  - 修復: OAM DMA 改為 deferred 模型，寫入 $4014 設定 pending flag
+  - 實際 DMA 在下一個 read cycle (Mem_r/ZP_r) 才執行
+  - RMW 指令的第二次寫入覆蓋 page number，只觸發一次 DMA
 
 ---
 
