@@ -77,6 +77,7 @@ namespace AprNes
         static byte spr_ram_add = 0;
 
         static bool oddSwap = false;
+        static bool ppuRenderingEnabled = false; // Delayed rendering enable (Mesen2 model: updated at end of PPU dot)
         static bool nmi_output_prev = false;  // NMI edge detection: previous NMI output level
         static long nmi_delay_cycle = -1;     // CPU cycle that detected NMI edge (-1 = inactive)
                                               // Promotes to nmi_pending when cpuCycleCount > nmi_delay_cycle
@@ -291,6 +292,8 @@ namespace AprNes
             }
 
             bool renderingEnabled = ShowBackGround || ShowSprites;
+            // ppuRenderingEnabled is the delayed version (Mesen2 model: updated at end of previous dot).
+            // Used for tile fetch gating — the mask write takes effect 1 PPU dot later for rendering.
 
             // At dot 0 of visible scanlines: precompute sprite 0 data for hit detection.
             // Must run BEFORE the hit check so sprite0_on_line is valid at dot 0.
@@ -328,7 +331,8 @@ namespace AprNes
             // When rendering is enabled, shift with serial input: low plane = 0, high plane = 1.
             // AccuracyCoin "Stale BG Shift Registers" confirms: regs not clocked when off → stale data preserved.
             // AccuracyCoin "Rendering Flag" confirms: regs empty if never loaded → no false hit.
-            if (renderingEnabled)
+            // Use delayed ppuRenderingEnabled: shift registers are clocked by the same signal as tile fetches.
+            if (ppuRenderingEnabled)
             {
                 if ((scanline >= 0 && scanline < 240 && ppu_cycles_x < 256)
                     || ((scanline < 240 || scanline == 261)
@@ -341,13 +345,13 @@ namespace AprNes
 
             if (scanline < 240 || scanline == 261)
             {
-                if (renderingEnabled)
+                if (ppuRenderingEnabled)
                     ppu_rendering_tick();
 
                 // Sprite evaluation begins at cycle 65: save OAMADDR for next scanline's sprite 0
                 // (applies to visible scanlines AND pre-render scanline 261)
                 // Keep exact address (not aligned) — misaligned OAM reads Y from exact position
-                if (ppu_cycles_x == 65 && renderingEnabled)
+                if (ppu_cycles_x == 65 && ppuRenderingEnabled)
                     sprite0_eval_addr = spr_ram_add;
 
                 if (scanline >= 0 && scanline < 240)
@@ -386,6 +390,9 @@ namespace AprNes
                 frame_count++;
                 // StopWatch 持續計時，不在此 Restart（供 deadline 絕對計時使用）
             }
+
+            // Update delayed rendering flag (Mesen2: _renderingEnabled updated at end of dot)
+            ppuRenderingEnabled = renderingEnabled;
 
             // Advance cycle counter
             ppu_cycles_x++;
