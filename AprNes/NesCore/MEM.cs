@@ -93,7 +93,7 @@ namespace AprNes
         static byte Mem_r(ushort address)
         {
             // Execute deferred OAM DMA on first read cycle (real NES: DMA can't start on write cycle)
-            if (oamDmaPending) oamDmaExecute();
+            if (oamDmaPending) oamDmaExecute(address);
 
             cpuBusAddr = address;
             cpuBusIsWrite = false;
@@ -120,7 +120,7 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ZP_r(byte addr)
         {
-            if (oamDmaPending) oamDmaExecute();
+            if (oamDmaPending) oamDmaExecute(addr);
             cpuBusAddr = addr; cpuBusIsWrite = false;
             if (dmcDmaPending) { dmcDmaPending = false; dmcfillbuffer(); }
             tick_pre();

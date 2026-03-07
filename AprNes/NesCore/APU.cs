@@ -93,10 +93,13 @@ namespace AprNes
         static bool dmcIsLoadDma = false;      // true = Load DMA (after $4015), false = Reload DMA
         static int dmcLoadDmaCountdown = 0;    // Load DMA scheduling delay (3-4 CPU cycles)
         static bool dmcDmaPending = false;     // DMA trigger deferred to next read cycle (Mesen2: ProcessPendingDma only on MemoryRead)
+        static int dmcDisableDelay = 0;        // Deferred $4015 disable (Mesen2: _disableDelay, 2-3 CPU cycles)
+        static bool dmcAbortDma = false;       // Abort flag for in-progress DMA (Mesen2: _abortDmcDma)
 
         static bool oamDmaInProgress = false;  // true during OAM DMA (DMC overlaps with OAM cycles)
         static int oamDmaByteIndex = -1;       // current OAM byte being transferred (0-255, -1 = halt/align)
         static bool oamDmaPending = false;     // OAM DMA deferred to next read cycle (RMW second write overwrites page)
+        static bool oamDmaApuActive = false;   // APU regs accessible during OAM DMA (6502 bus in $4000-$401F)
         static byte oamDmaPendingPage = 0;     // page number for pending OAM DMA
 
         // Length counter 欄位
@@ -310,6 +313,7 @@ namespace AprNes
             dmcstartaddr = 0xC000; dmcaddr = 0xC000; dmcbitsleft = 8;
             dmcsilence = true; dmcirq = false; dmcloop = false; dmcBufferEmpty = true;
             dmcDmaInProgress = false; dmcIsLoadDma = false; dmcLoadDmaCountdown = 0; dmcDmaPending = false;
+            dmcDisableDelay = 0; dmcAbortDma = false;
             oamDmaInProgress = false; oamDmaByteIndex = -1; oamDmaPending = false;
         }
 
@@ -593,6 +597,27 @@ namespace AprNes
             // Don't trigger new DMA during active DMA stolen ticks
             if (dmcDmaInProgress) return;
 
+            // Handle deferred DMC disable ($4015 clear, Mesen2: _disableDelay)
+            if (dmcDisableDelay > 0)
+            {
+                --dmcDisableDelay;
+                if (dmcDisableDelay == 0)
+                {
+                    dmcsamplesleft = 0;
+                    // Abort pending/running DMA (Mesen2: StopDmcTransfer)
+                    if (dmcDmaPending)
+                    {
+                        // DMA was pending but hasn't started → cancel completely
+                        dmcDmaPending = false;
+                    }
+                    else
+                    {
+                        // If DMA will be triggered this same cycle, abort it
+                        dmcAbortDma = true;
+                    }
+                }
+            }
+
             // Handle Load DMA countdown (scheduled DMA from $4015 write)
             if (dmcLoadDmaCountdown > 0)
             {
@@ -622,6 +647,7 @@ namespace AprNes
                 dmcDmaInProgress = true;
                 bool isLoad = dmcIsLoadDma;
                 dmcIsLoadDma = false;
+                bool aborted = false;
 
                 if (oamDmaInProgress)
                 {
@@ -684,6 +710,14 @@ namespace AprNes
 
                     for (int i = 0; i < haltCycles; i++)
                     {
+                        // Check abort flag (set by deferred DMC disable)
+                        if (dmcAbortDma)
+                        {
+                            dmcAbortDma = false;
+                            aborted = true;
+                            break;
+                        }
+
                         tick();
 
                         // Phantom reads: CPU repeats last read on all no-op DMA cycles
@@ -709,22 +743,43 @@ namespace AprNes
                         }
                     }
 
-                    // DMA read cycle — fetch actual sample from PRG ROM
-                    tick();
-                    dmcbuffer = mem_read_fun[(ushort)dmcaddr]((ushort)dmcaddr);
-                    cpubus = (byte)dmcbuffer;
+                    if (!aborted)
+                    {
+                        // Check abort before final DMA read
+                        if (dmcAbortDma)
+                        {
+                            dmcAbortDma = false;
+                            aborted = true;
+                        }
+                    }
+
+                    if (!aborted)
+                    {
+                        // DMA read cycle — fetch actual sample from PRG ROM
+                        tick();
+                        dmcbuffer = mem_read_fun[(ushort)dmcaddr]((ushort)dmcaddr);
+                        cpubus = (byte)dmcbuffer;
+                    }
                 }
 
-                dmcBufferEmpty = false;
-                dmcaddr++;
-                if (dmcaddr > 0xffff) dmcaddr = 0x8000;
-                --dmcsamplesleft;
-                if (dmcsamplesleft == 0)
+                if (aborted)
                 {
-                    if (dmcloop)
-                        restartdmc();
-                    else if (dmcirq && !statusdmcint)
-                        statusdmcint = true;
+                    // DMA was aborted — don't update buffer or advance address
+                    dmcAbortDma = false;
+                }
+                else
+                {
+                    dmcBufferEmpty = false;
+                    dmcaddr++;
+                    if (dmcaddr > 0xffff) dmcaddr = 0x8000;
+                    --dmcsamplesleft;
+                    if (dmcsamplesleft == 0)
+                    {
+                        if (dmcloop)
+                            restartdmc();
+                        else if (dmcirq && !statusdmcint)
+                            statusdmcint = true;
+                    }
                 }
                 dmcDmaInProgress = false;
             }
@@ -928,9 +983,7 @@ namespace AprNes
                     if (dmcBufferEmpty)
                     {
                         dmcIsLoadDma = true;
-                        // Mesen2: _transferStartDelay = CycleCount & 1 ? 3 : 2
-                        // apucycle odd = Mesen2 CycleCount even → delay 2
-                        // apucycle even = Mesen2 CycleCount odd → delay 3
+                        // Mesen2: CycleCount even → 2, CycleCount odd → 3
                         dmcLoadDmaCountdown = (apucycle & 1) != 0 ? 2 : 3;
                     }
                 }
@@ -941,6 +994,7 @@ namespace AprNes
                 dmcLoadDmaCountdown = 0;
                 dmcIsLoadDma = false;
                 dmcDmaPending = false;
+                dmcDisableDelay = 0;
             }
             statusdmcint = false;
         }

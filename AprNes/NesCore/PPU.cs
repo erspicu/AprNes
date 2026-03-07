@@ -148,6 +148,9 @@ namespace AprNes
         // ---- BG shift registers (16-bit, two tiles: high=current, low=next) ----
         static ushort lowshift = 0, highshift = 0;
 
+        // ---- Per-dot shifted BG registers for sprite 0 hit (serial in: 0=low, 1=high) ----
+        static ushort lowshift_s0 = 0, highshift_s0 = 0;
+
         // ---- Attribute 3-stage pipeline ----
         // Phase-3 shifts ATVal into p1; phase-7 render reads p3 (2 groups later).
         // This correctly delays attribute by 2 fetch groups with no index drift.
@@ -226,6 +229,10 @@ namespace AprNes
                         // Load shift registers (high = old-low = previous tile, low = new tile)
                         lowshift  = (ushort)((lowshift  << 8) | lowTile);
                         highshift = (ushort)((highshift << 8) | highTile);
+                        // Sync per-dot shadow registers: load new tile into low byte
+                        // (the per-dot shifting already shifted the old data up by 8 bits)
+                        lowshift_s0  = (ushort)((lowshift_s0  & 0xFF00) | lowTile);
+                        highshift_s0 = (ushort)((highshift_s0 & 0xFF00) | highTile);
                         CXinc();
                         break;
                 }
@@ -290,10 +297,7 @@ namespace AprNes
             if (scanline >= 0 && scanline < 240 && ppu_cycles_x == 0)
                 PrecomputeSprite0Line();
 
-            // Per-pixel sprite 0 hit detection — BEFORE ppu_rendering_tick() modifies shift registers.
-            // Shift registers hold the data loaded at the previous phase 7, so we can safely compute
-            // the current dot's BG pixel from them before the next tile fetch cycle runs.
-            // Mesen2: hit check from cycle 1+ (our dot 0+) when left-column sprites enabled.
+            // Per-pixel sprite 0 hit detection using per-dot shifted shadow registers.
             if (scanline >= 0 && scanline < 240 && ppu_cycles_x < 256
                 && sprite0_on_line && !isSprite0hit && ShowBackGround && ShowSprites)
             {
@@ -304,8 +308,8 @@ namespace AprNes
                     int sprCol = screenX - sprite0_line_x;
                     if (sprCol >= 0 && sprCol < 8)
                     {
-                        int bit = 15 - (ppu_cycles_x & 7) - FineX;
-                        int bgPixel = ((lowshift >> bit) & 1) | (((highshift >> bit) & 1) << 1);
+                        int bit = 15 - FineX;
+                        int bgPixel = ((lowshift_s0 >> bit) & 1) | (((highshift_s0 >> bit) & 1) << 1);
                         if (bgPixel != 0)
                         {
                             int loc_t = sprite0_flip_x ? (7 - sprCol) : sprCol;
@@ -315,6 +319,22 @@ namespace AprNes
                                 isSprite0hit = true;
                         }
                     }
+                }
+            }
+            // Per-dot BG shift register shifting (shadow registers for sprite 0 hit).
+            // "Output then shift" model: hit check reads BEFORE shift, shift happens after.
+            // Hardware: shift registers are FROZEN when rendering is disabled (both BG+sprites off).
+            // When rendering is enabled, shift with serial input: low plane = 0, high plane = 1.
+            // AccuracyCoin "Stale BG Shift Registers" confirms: regs not clocked when off → stale data preserved.
+            // AccuracyCoin "Rendering Flag" confirms: regs empty if never loaded → no false hit.
+            if (renderingEnabled)
+            {
+                if ((scanline >= 0 && scanline < 240 && ppu_cycles_x < 256)
+                    || ((scanline < 240 || scanline == 261)
+                        && ppu_cycles_x >= 320 && ppu_cycles_x < 336))
+                {
+                    lowshift_s0 <<= 1;
+                    highshift_s0 = (ushort)((highshift_s0 << 1) | 1);
                 }
             }
 
@@ -959,7 +979,8 @@ namespace AprNes
         }
 
         // Execute deferred OAM DMA (called from Mem_r before the read)
-        static void oamDmaExecute()
+        // cpu6502Addr: the CPU's next read address (6502 address bus at DMA start)
+        static void oamDmaExecute(ushort cpu6502Addr)
         {
             oamDmaPending = false;
             byte value = oamDmaPendingPage;
@@ -968,6 +989,9 @@ namespace AprNes
             bool saved_irqLinePrev = irqLinePrev;
 
             oamDmaInProgress = true;
+            // APU registers ($4000-$401F) are only accessible during OAM DMA when
+            // the 6502 address bus is in $4000-$401F. Otherwise reads return open bus.
+            oamDmaApuActive = (cpu6502Addr >= 0x4000 && cpu6502Addr <= 0x401F);
             oamDmaByteIndex = -1; // pre-loop phase
 
             cpuBusAddr = 0x4014;

@@ -1,162 +1,87 @@
 # AprNes 待修復問題清單
 
-**基線**: 174 PASS / 0 FAIL / 174 TOTAL (2026-02-22, run_tests.sh) — 全數通過！
+**基線**: blargg 174/174 PASS | AccuracyCoin 117/136 PASS, 18 FAIL, 1 SKIP
+**最後更新**: 2026-03-07 (BUGFIX44)
 
 優先權排序原則：**影響大 + 好修** 排最前面
 
 ---
 
-## 已完成
+## AccuracyCoin 剩餘 18 FAIL + 1 SKIP
 
-- ~~Bug A: MMC3 IRQ A12 clocking~~ → **+12 PASS** (BUGFIX8)
-- ~~Bug C: APU frame counter timing~~ → **+6 PASS** (BUGFIX9)
-  - frameReload 修正、$4017 offset +7→+2、even/odd jitter
-  - IRQ 三連 assert (pre-fire / step 3 / post-fire)
-- ~~Bug L: DMC timer 計時器行為~~ → **+2 PASS** (BUGFIX10)
-  - DMC timer 從 up-counter 改為 down-counter
-  - $4010 更改速率時不重置倒數，僅在 reload 時生效
-- ~~Bug D: APU $4017 reset/power-on~~ → **+3 PASS** (BUGFIX11)
-  - Power-on/reset advance: framectrdiv = 7450 (模擬 9-cycle 提前寫入)
-  - Length counter reload suppression: 在 length clock 同 cycle 寫入時抑制 reload
-- ~~Bug B: PPU VBL/NMI timing~~ → **+15 PASS** (BUGFIX12)
-  - 1-cycle NMI delay model: nmi_delay → promote → nmi_pending
-  - Per-dot edge detection in tick()
-  - VBL clear cx=1→2, VBL flag 抑制 at (sl=241,cx=1)
-  - $2002 read 不清 nmi_pending, $2000 falling edge 不清 nmi_pending
-- ~~Bug M: MMC3 scanline timing~~ → **+2 PASS** (BUGFIX13)
-  - BG A12 notification 移至 phase 3,7（模擬真實 NES bus timing）
-  - Sprite A12 notification 移至 phase 2,6，sprite fetch 從 cx=257 開始
-  - 新增 garbage NT A12 通知 at cx=337
-  - VBL gap detection: 跨 VBL 時不重置 a12LowSince
-- ~~Bug D 剩餘: APU IRQ timing~~ → **+3 PASS** (BUGFIX14)
-  - framectrdiv tick-before-write compensation (-1)
-  - 移除 pre-fire，irqAssertCycles = 2（step 3 + 2 post-fire = 3 total）
-  - lengthctr_snapshot for $4015 reads（pre-step values）
-  - **IRQ line sampling at opcode fetch**: irqLineAtFetch 模擬 penultimate-cycle polling
-- ~~Bug E 部分: CPU interrupt timing~~ → **+1 PASS** (BUGFIX14 bonus)
-  - Branch IRQ suppression: taken branch 無 page cross 抑制 IRQ polling
-  - OAM DMA IRQ deferral: DMA 期間抑制 IRQ polling
-  - irqLineAtFetch 修正 NMI+IRQ 交互 → 3-nmi_and_irq PASS
-- ~~Bug H: 手把讀取~~ → **+1 PASS** (BUGFIX15)
-  - 測試腳本修正：移除錯誤的 --input A:2.0，增加 --max-wait 30→45
-- ~~MMC3 scanline timing (新版)~~ → **+2 PASS** (BUGFIX16)
-  - PPU A12 notification phase alignment: sprite CHR 從 phase 4→3
-  - BG: phase 0 (NT, A12=0) + phase 4 (CHR, A12=BG table bit)
-  - Sprite: phase 0 (garbage NT, A12=0) + phase 3 (sprite CHR, A12=sprite table bit)
-  - run_tests_report.sh 重構：`--json`, `--screenshots`, `--no-build` 參數
-- ~~Bug G: Sprite timing 精確度~~ → **+4 PASS** (BUGFIX17)
-  - Per-pixel sprite 0 hit detection: 從 RenderBGTile phase 7 批次改為 ppu_step_new 逐 dot 偵測
-  - Cycle-accurate sprite overflow: PrecomputeOverflow() 模擬 dots 65-256 evaluation timing
-  - Sprite overflow hardware bug: byte offset m 在找到 8 sprites 後 cycles 0→1→2→3
-- ~~Bug E 剩餘: CPU interrupt timing~~ → **+4 PASS** (BUGFIX18)
-  - irqLinePrev/irqLineCurrent 取代 irqLineAtFetch（per-tick penultimate-cycle tracking）
-  - NMI deferral after interrupt sequences（nmi_just_deferred flag）
-  - Branch taken-no-cross: irqLinePrev save/restore around extra tick
-  - OAM DMA: irqLinePrev save/restore + alignment cycle（513→514 ticks）
-- ~~Bug F: DMC DMA cycle stealing~~ → **+2 PASS** (BUGFIX19)
-  - MEM.cs: cpuBusAddr/cpuBusIsWrite tracking + dmc_stolen_tick()
-  - APU.cs: dmcfillbuffer() Load/Reload type-based stolen cycle model
-  - PPU.cs: ppu_w_4014() bus state tracking for OAM DMA
-  - TestRunner.cs: --expected-crc 支援 CRC-only 測試
-  - 4/5 DMC 測試修復，1/5 (double_2007_read) 為不同問題
-- ~~Bug I: PPU $2007 read cooldown~~ → **+1 PASS** (BUGFIX20)
-  - ppu2007ReadCooldown: 6 PPU dot cooldown after $2007 read（Mesen2: _ignoreVramRead）
-  - ppu_r_2007() cooldown 檢查：cooldown > 0 時返回 openbus
-  - ppu_step_new() 每 dot 遞減 cooldown
-  - DMC phantom reads 前清除 cooldown（APU.cs）
-  - dmc_dma_during_read4 套件 5/5 全數通過
-- ~~Bug H 剩餘: 手把讀取精確度~~ → **+2 PASS** (BUGFIX21)
-  - TestRunner.cs: --pass-on-stable 模式（畫面穩定 + 無 "Failed" = PASS）
-  - count_errors/count_errors_fast 成功時靜默退出（exit code 0），不印 "Passed"
-  - 測試腳本加入 --pass-on-stable
+### 優先級 A: 可修（預期可行，不需架構改動）
+
+| # | 頁面 | 測試 | 地址 | err | 修復方向 | 預估影響 |
+|---|------|------|------|-----|---------|---------|
+| 1 | P10 | SH* 5 項 (SHA/SHS/SHY/SHX) | $0446-$044A | 7 | DMA 發生在 dummy read cycle 時，SHX→STX、SHY→STY 等（去掉 `& (H+1)` masking）。需偵測 dummy read 是否觸發 DMA | +5 |
+
+### 優先級 B: 中等難度（需要理解但可能可行）
+
+| # | 頁面 | 測試 | 地址 | err | 修復方向 | 預估影響 |
+|---|------|------|------|-----|---------|---------|
+| 2 | P19 | Sprites On Scanline 0 | $0484 | 2 | Pre-render line (261) sprite tile fetch 需用 `261 & 255 = 5` 做 Y range check，需 secondary OAM 持久化 | +1 |
+| 3 | P18 | $2002 flag clear timing | $048D | 1 | Pre-render line flag 清除時序需精確到 sub-dot（M2 duty cycle: VBL 與 sprite flags 分開清除）。**注意**: 嘗試過 dot 1→3 stagger 會回歸 P17 VBL timing (+2 FAIL) | +1 |
+| 4 | P19 | $2004 Stress Test | $048C | 1 | 需 OAM Latch + Secondary OAM buffer，$2004 在 rendering 期間返回 evaluation latch 值而非直接 OAM | +1 |
+| 5 | P19 | BG Serial In | $0487 | 2 | 需 per-dot BG shift register model（目前 shadow-only），shift register reload 時序 | +1 |
+| 6 | P14 | APU Register Activation | $045C | 6 | Test 4 已修（BUGFIX44）。Test 5-7 需從 $3FFE 執行 STA $4014 + DMC DMA 配合，極度複雜的 bus 行為 | +0→+1 |
+| 7 | P14 | Controller Strobing | $045F | 1 | DEC $4016 的 PUT/GET cycle 對齊。目前 strobe deferred 機制與 Mesen2 一致，可能是 OAM DMA 後 parity 不準 | +1 |
+
+### 優先級 C: 困難（需架構改動或精確子周期時序）
+
+| # | 頁面 | 測試 | 地址 | err | 說明 |
+|---|------|------|------|-----|------|
+| 8 | P13 | DMA 6 項 | $0488,$045D,$046B,$0477,$0479,$0478 | 2 | 共用前置條件 DMADMASync_PreTest 失敗。DMC DMA open bus 更新 1-cycle drift，需 sub-cycle M2 duty cycle | +6 |
+| 9 | P14 | DMC | $046A | 21 | DMC 通道測試，高錯誤碼表示多個子測試失敗 | +1 |
+| 10 | P20 | Implied Dummy Reads | $046D | 3 | 前置條件失敗（DMA timing），本身的 implied dummy reads 已正確實作 | +1 |
+| 11 | P12 | IRQ Flag Latency | $0461 | SKIP | Test E 掛住（DMC DMA 累積時序偏移 ~12 cycles），需 Master Clock scheduler | +1 |
 
 ---
 
-## 進行中 / 已知問題
+## 建議修復順序
 
-### AccuracyCoin 測試套件（進階精確度測試）
+### Step 1: P10 SH* 5 項 (+5)
+**影響最大**。DMA 發生在 SH* 指令的 dummy read cycle 時，指令退化為簡單 store。
+- 在 `Mem_r()` 或 `dmcfillbuffer()` 中設定 `dmcOccurredDuringRead = true` flag
+- SH* opcodes (0x93, 0x9B, 0x9C, 0x9E, 0x9F) 的 dummy read 後檢查此 flag
+- 若 flag 為 true，寫入值改為不含 `& (H+1)` masking（SHX→X, SHY→Y, SHA→A, SHS→SP）
 
-**現況**: 76 PASS / 5 FAIL / 81 tested — Test 82 掛住，83+ 未達
-
-| 問題 | 說明 | 狀態 |
-|------|------|------|
-| Tests #70-74 (5 FAIL) | 不穩定非法指令 SHY/SHX/LAE/ANC — 需精確 DMA 時序影響 bus contention | 待修 |
-| Test #82 (IFlagLatency) | Tests 1-D PASS，Test E 掛住 — 使用 DMASyncWith90 + JSR $4013（在 APU 暫存器位址執行程式碼）| 待修 |
-| Tests #83+ | 因 Test 82 掛住未能到達 | blocked |
-
-**根因分析**:
-- Test E 的 DMA 時序偏移約 12 cycles（累積的 stolen cycle 微誤差）
-- 需要完整 Master Clock scheduler 實現 sub-cycle 精確度
-- 目前的 tick-per-memory-access 模型無法達到所需精度
-
-### 長期目標
-
-- **Master Clock scheduler**: 將時序模型從 tick-per-memory-access 改為 Master Clock (21,477,272.73 Hz) 驅動
-  - 已加入 masterClock / cpuCycleCount 計數器（基礎設施）
-  - Load DMA 已改用 cpuCycleCount parity（BUGFIX32）
-  - 完整遷移需大量工作，暫不進行
+### Step 2: P13 DMA 6 項 (+6)
+最大潛在收益但最難。需修正 DMADMASync_PreTest 前置條件。
+- DMC DMA open bus 更新需精確到 M2 duty cycle 內的時序點
+- 可能需要 sub-cycle PPU dot splitting
 
 ---
 
-## 修復路線圖
+## 已嘗試但未成功的修復
 
-```
-已完成: Bug A (MMC3 A12) + Bug C (APU frame counter)
-  113 → 125 → 128 → 134 PASS
-
-已完成: Bug L (DMC timer) → 136 PASS
-
-已完成: Bug D (APU reset/power-on) → 139 PASS
-
-已完成: Bug B (PPU VBL/NMI timing) → 154 PASS ★
-
-已完成: Bug M (MMC3 scanline timing) → 156 PASS ★
-
-已完成: Bug D 剩餘 + Bug E 部分 → 158 PASS ★★
-  → APU IRQ timing 修正 (+3: 08.irq_timing, 10.len_halt, 11.len_reload)
-  → IRQ line sampling at opcode fetch (+1: 3-nmi_and_irq)
-  → Branch IRQ suppression + OAM DMA IRQ deferral
-
-已完成: Bug H (手把讀取) → 159 PASS / 15 FAIL
-  → 測試腳本修正：移除 --input，增加 --max-wait
-
-已完成: MMC3 scanline timing (新版) → 161 PASS / 13 FAIL ★
-  → PPU A12 notification phase alignment
-  → run_tests_report.sh 重構 + run_tests.sh 同步 mmc3 測試
-
-已完成: Bug G (sprite timing) → 165 PASS / 9 FAIL ★★
-  → Per-pixel sprite 0 hit detection (dot 2-255)
-  → Cycle-accurate sprite overflow (PrecomputeOverflow)
-  → Sprite overflow hardware bug (byte offset cycling)
-
-已完成: Bug E 剩餘 (CPU interrupt timing) → 169 PASS / 5 FAIL ★★★
-  → irqLinePrev/irqLineCurrent per-tick tracking (penultimate-cycle IRQ)
-  → NMI deferral after BRK/IRQ/NMI sequences
-  → Branch taken-no-cross irqLinePrev save/restore
-  → OAM DMA irqLinePrev isolation + alignment cycle
-
-已完成: Bug F (DMC DMA cycle stealing) → 171 PASS / 3 FAIL ★★★★
-  → Load/Reload type-based stolen cycle model
-  → Phantom reads: $4016 halt-only, other regs every no-op cycle
-  → cpuBusAddr/cpuBusIsWrite tracking + dmc_stolen_tick()
-  → TestRunner --expected-crc for CRC-only tests
-
-已完成: Bug I (PPU $2007 read cooldown) → 172 PASS / 2 FAIL ★★★★★
-  → ppu2007ReadCooldown 6-dot cooldown (Mesen2 _ignoreVramRead)
-  → DMC phantom reads bypass cooldown
-  → dmc_dma_during_read4 套件 5/5 全數通過
-
-已完成: Bug H 剩餘 (TestRunner --pass-on-stable) → 174 PASS / 0 FAIL ★★★★★★
-  → count_errors/count_errors_fast 靜默退出偵測
-  → 全數通過！
-
-進行中: AccuracyCoin 進階精確度測試 (BUGFIX30-32)
-  → BUGFIX30: branch dummy reads, CPU open bus, controller open bus
-  → BUGFIX32: Load DMA stolen cycles 使用 cpuCycleCount parity
-  → Master Clock 基礎設施 (masterClock/cpuCycleCount 計數器)
-  → AccuracyCoin 76/81 PASS, Test 82 掛住 (需 sub-cycle DMA 精度)
-```
+| 目標 | 嘗試 | 結果 | 原因 |
+|------|------|------|------|
+| P18 $2002 flag clear | Dot 2→3 VBL stagger | P17 -2 回歸 | VBL end timing 被延後 1 dot |
+| P14 APU Reg Test 6 | $4020-$40FF mirror to $4000-$401F | P14 -1 回歸 | Controller Strobing 受影響 |
+| P14 Controller Strobing | 翻轉 strobe parity | -1 回歸 | 其他測試依賴當前 parity |
 
 ---
 
-*最後更新: 2026-03-06 (BUGFIX32 — blargg 174/174 全 PASS, AccuracyCoin 76/81 PASS)*
+## 已完成的 AccuracyCoin 修復（BUGFIX30-44）
+
+| BUGFIX | 日期 | 修復內容 | AC 分數 |
+|--------|------|---------|---------|
+| 30 | 03-04 | Branch dummy reads, CPU open bus, controller open bus | 76/81→? |
+| 31 | 03-06 | Load DMA parity fix | blargg 174/174 |
+| 32 | 03-06 | Load DMA cpuCycleCount parity | blargg 174/174 |
+| 33 | 03-07 | AccuracyCoin page-by-page test runner | 測試框架 |
+| 34 | 03-07 | Unofficial opcodes batch fix | 103→108 |
+| 35 | 03-07 | Arbitrary sprite zero + misaligned OAM + parallel runner | 108→110 |
+| 36 | 03-07 | OAM corruption | 110→111 |
+| 37 | 03-07 | PPU register open bus + $2004 during rendering | 111→112 |
+| 38 | 03-07 | INC $4014 + palette RAM quirks | 112→113 |
+| 39 | 03-07 | Attributes as tiles + t register quirks | 113→114 |
+| 40 | 03-07 | Stale BG shift registers + deferred Load DMA | 114→115 |
+| 41 | 03-07 | $2007 read during rendering | 115→116 |
+| 42 | 03-07 | Suddenly resize sprite (sprite size latch at dot 261) | 116→117 |
+| 43 | 03-07 | Rendering flag behavior (freeze BG shift regs when off) | 116→117 |
+| 44 | 03-07 | OAM DMA APU activation bypass + debug cleanup | 117→117 |
+
+---
+
+*blargg 174/174 全 PASS 自 BUGFIX31 起維持至今*

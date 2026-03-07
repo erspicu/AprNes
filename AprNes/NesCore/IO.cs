@@ -6,6 +6,12 @@ namespace AprNes
         static byte IO_read(ushort addr)
         {
             if (addr < 0x4000) addr = (ushort)(0x2000 | (addr & 7));
+
+            // During OAM DMA, APU registers ($4000-$401F) are only accessible when
+            // the 6502 address bus is in $4000-$401F. Otherwise return open bus.
+            if (oamDmaInProgress && !oamDmaApuActive && addr >= 0x4000)
+                return cpubus;
+
             switch (addr)
             {
                 case 0x2000: return openbus;
