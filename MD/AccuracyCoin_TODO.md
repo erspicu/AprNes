@@ -1,7 +1,7 @@
 # AccuracyCoin 修復追蹤
 
-**基線**: 118/136 PASS, 17 FAIL, 1 SKIP (BUGFIX45)
-**最後更新**: 2026-03-07
+**基線**: 119/136 PASS, 16 FAIL, 1 SKIP (BUGFIX46)
+**最後更新**: 2026-03-08
 
 ---
 
@@ -14,7 +14,7 @@
 | P11 | Unofficial: Misc | 全 PASS | |
 | P12 | CPU Interrupts | 1 SKIP / 3 | IFlagLatency Test E hang |
 | P13 | DMA Tests | 6 FAIL / 6 | 共用前置條件失敗 |
-| P14 | APU Tests | 3 FAIL / 7 | DMC/APU Reg/Controller Strobe |
+| P14 | APU Tests | 2 FAIL / 7 | DMC/Controller Strobe |
 | P15 | Power On State | DRAW only | 無自動判定 |
 | P16 | PPU Rendering | 全 PASS | |
 | P17 | PPU VBlank Timing | 全 PASS | |
@@ -41,6 +41,10 @@
 - [x] Frame Counter IRQ (P14) — BUGFIX37
 - [x] $2002 flag clear timing (P18) — **BUGFIX45**: sprite flags dot 1, VBL dot 2
 
+### Phase 2.5: DMA BUS（部分完成）
+
+- [x] APU Register Activation (P14) — BUGFIX46: $4017 read handler + ProcessDmaRead open bus
+
 ### Phase 3: TIMING-DEPENDENT（部分完成）
 
 - [x] $2007 read w/ rendering (P16) — BUGFIX34
@@ -49,7 +53,7 @@
 
 ---
 
-## 剩餘 17 FAIL + 1 SKIP
+## 剩餘 16 FAIL + 1 SKIP
 
 ### 根因 A: DMA Sub-cycle 精度（12 項，共用根因）
 
@@ -84,14 +88,14 @@
 |------|------|------|
 | Implied Dummy Reads | $046D | 指令本身已正確，被 DMA 前置條件擋住 |
 
-### 根因 B: DMC/APU 複雜互動（3 項）
+### 根因 B: DMC/APU 複雜互動（2 項）
 
-**P14: APU Tests (3 FAIL)**
+**P14: APU Tests (2 FAIL)**
 
 | 測試 | 地址 | err | 分析 |
 |------|------|-----|------|
 | Delta Modulation Channel | $046A | 21 | 多項 DMC 子測試失敗，需全面修正 |
-| APU Register Activation | $045C | 6 | Test 4 已修(BUGFIX44)，Test 5-7 需 $3FFE + DMC DMA bus |
+| APU Register Activation | $045C | — | **PASS** (BUGFIX46: $4017 read handler + ProcessDmaRead open bus fix) |
 | Controller Strobing | $045F | 1 | Test 4 PUT/GET parity，OAM DMA 後 parity 不準 |
 
 ### 根因 C: PPU Per-dot 精度（3 項）

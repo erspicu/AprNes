@@ -16,6 +16,13 @@ namespace AprNes
         // DMA halt/alignment decisions depend on this phase.
         static bool m2PhaseIsWrite = false;
 
+        // Unified DMA state machine (Mesen2 model: ProcessPendingDma)
+        static bool dmaNeedHalt = false;        // DMA needs halt cycle (shared OAM/DMC)
+        static bool dmcNeedDummyRead = false;   // DMC needs dummy read before data read
+        static bool dmcDmaRunning = false;      // DMC DMA fetch pending
+        static bool spriteDmaTransfer = false;  // OAM DMA in progress
+        static byte spriteDmaOffset = 0;        // OAM source page ($4014 value)
+
         // Master Clock timing (NTSC: 21,477,272.73 Hz)
         // CPU = master ÷ 12, PPU = master ÷ 4, APU = CPU rate
         // 1 CPU cycle = 12 master clocks = 3 PPU dots
@@ -52,69 +59,253 @@ namespace AprNes
             }
         }
 
-        // Full tick: all 3 PPU dots + APU in one shot (used by DMA stolen cycles)
+        // --- M2 Phase Split (Mesen2 model) ---
+        // StartCpuCycle: full cycle advance (CC++, NMI promote, PPU, APU, IRQ)
+        // Same content as old tick_pre, kept as single unit to preserve timing.
+        // The key change is ProcessPendingDma moving BEFORE StartCpuCycle in Mem_r/ZP_r.
+        // EndCpuCycle: placeholder for future sub-cycle split.
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void StartCpuCycle()
+        {
+            masterClock += MASTER_PER_CPU;
+            cpuCycleCount++;
+            m2PhaseIsWrite = (cpuCycleCount & 1) != 0;
+
+            if (nmi_delay_cycle >= 0 && cpuCycleCount > nmi_delay_cycle)
+            { nmi_pending = true; nmi_delay_cycle = -1; }
+            catchUpPPU();
+            catchUpAPU();
+            if (strobeWritePending > 0) processStrobeWrite();
+
+            irqLinePrev = irqLineCurrent;
+            irqLineCurrent = (statusframeint && !apuintflag) || statusdmcint || statusmapperint;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void EndCpuCycle()
+        {
+        }
+
+        // Full tick: StartCpuCycle + EndCpuCycle (used by DMA stolen cycles)
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void tick()
         {
-            masterClock += MASTER_PER_CPU;
-            cpuCycleCount++;
-            m2PhaseIsWrite = (cpuCycleCount & 1) != 0;
-
-            // Promote NMI: fires on next CPU cycle after edge detection (1-cycle hardware delay)
-            if (nmi_delay_cycle >= 0 && cpuCycleCount > nmi_delay_cycle)
-            { nmi_pending = true; nmi_delay_cycle = -1; }
-
-            // Catch up PPU and APU to current master clock
-            catchUpPPU();
-            catchUpAPU();
-            if (strobeWritePending > 0) processStrobeWrite();
-
-            // Track IRQ line per-tick for penultimate-cycle polling
-            irqLinePrev = irqLineCurrent;
-            irqLineCurrent = (statusframeint && !apuintflag) || statusdmcint || statusmapperint;
+            StartCpuCycle();
+            EndCpuCycle();
         }
 
-        // φ1 phase: all 3 PPU dots + APU before CPU bus access.
-        // 2+1 split tested but causes 10 regressions: VBL set happens on 3rd dot of
-        // certain cycles, running it in tick_post means CPU misses it. Would need
-        // full PPU event recalibration or master clock architecture (Phase 5).
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void tick_pre()
+        // Unified DMA engine (Mesen2: ProcessPendingDma)
+        // Called from Mem_r/ZP_r BEFORE StartCpuCycle (matches Mesen2 ordering).
+        // Handles both OAM DMA and DMC DMA with correct interleaving.
+        static void ProcessPendingDma(ushort readAddress)
         {
-            masterClock += MASTER_PER_CPU;
-            cpuCycleCount++;
-            m2PhaseIsWrite = (cpuCycleCount & 1) != 0;
+            if (!dmaNeedHalt) return;
 
-            if (nmi_delay_cycle >= 0 && cpuCycleCount > nmi_delay_cycle)
-            { nmi_pending = true; nmi_delay_cycle = -1; }
-            catchUpPPU();
-            catchUpAPU();
-            if (strobeWritePending > 0) processStrobeWrite();
+            bool skipDummyReads = (readAddress == 0x4016 || readAddress == 0x4017);
+            // Mesen2: APU internal registers ($4000-$401F) only respond during DMA
+            // if the CPU's address bus was in that range when halted.
+            bool enableInternalRegReads = (readAddress & 0xFFE0) == 0x4000;
+            dmaPrevReadAddress = readAddress;
 
-            irqLinePrev = irqLineCurrent;
-            irqLineCurrent = (statusframeint && !apuintflag) || statusdmcint || statusmapperint;
+            // --- Halt cycle ---
+            dmaNeedHalt = false;
+            cpuBusAddr = readAddress;
+            cpuBusIsWrite = true; // old code: halt marked as write cycle
+            tick();
+            cpuBusIsWrite = false;
+            // Halt cycle phantom read (Mesen2: skipped for abort+controller)
+            if (!(dmcAbortDma && skipDummyReads))
+            {
+                ppu2007ReadCooldown = 0; // DMA reads bypass $2007 cooldown
+                mem_read_fun[readAddress](readAddress);
+            }
+
+            // Check DMC abort after halt
+            if (dmcAbortDma)
+            {
+                dmcDmaRunning = false;
+                dmcAbortDma = false;
+                if (!spriteDmaTransfer)
+                {
+                    dmcNeedDummyRead = false;
+                    return;
+                }
+            }
+
+            // --- Main DMA loop ---
+            // ProcessPendingDma is called BEFORE StartCpuCycle (matching Mesen2 ordering).
+            // getCycle uses (CC & 1) != 0 to compensate: DMA sees pre-increment CC,
+            // which is 1 less than Mesen2's post-StartCpuCycle CC, flipping parity.
+            int spriteDmaCounter = 0;
+            byte spriteReadAddr = 0;
+            byte readValue = 0;
+
+            while (dmcDmaRunning || spriteDmaTransfer)
+            {
+                bool getCycle = (cpuCycleCount & 1) == 0;
+
+                if (getCycle)
+                {
+                    if (dmcDmaRunning && !dmaNeedHalt && !dmcNeedDummyRead)
+                    {
+                        // DMC read cycle — fetch sample from PRG ROM
+                        absorbDmaFlags();
+                        tick();
+                        ushort dmcReadAddr = (ushort)dmcaddr;
+                        byte val = ProcessDmaRead(dmcReadAddr, enableInternalRegReads);
+                        cpubus = val;
+                        dmcDmaRunning = false;
+                        dmcAbortDma = false;
+                        dmcSetReadBuffer(val);
+                    }
+                    else if (spriteDmaTransfer)
+                    {
+                        // OAM DMA read cycle
+                        absorbDmaFlags();
+                        tick();
+                        ushort srcAddr = (ushort)(spriteDmaOffset * 0x100 + spriteReadAddr);
+                        cpuBusAddr = srcAddr;
+                        cpuBusIsWrite = false;
+                        readValue = ProcessDmaRead(srcAddr, enableInternalRegReads);
+                        cpubus = readValue;
+                        spriteReadAddr++;
+                        spriteDmaCounter++;
+                    }
+                    else
+                    {
+                        // Dummy read (DMC waiting for halt/dummy, no sprite)
+                        absorbDmaFlags();
+                        tick();
+                        cpuBusAddr = readAddress;
+                        cpuBusIsWrite = false;
+                        if (!skipDummyReads)
+                        {
+                            ppu2007ReadCooldown = 0;
+                            mem_read_fun[readAddress](readAddress);
+                        }
+                    }
+                }
+                else
+                {
+                    if (spriteDmaTransfer && (spriteDmaCounter & 1) != 0)
+                    {
+                        // OAM DMA write cycle
+                        absorbDmaFlags();
+                        tick();
+                        cpuBusAddr = 0x2004;
+                        cpuBusIsWrite = true;
+                        spr_ram[spr_ram_add++] = readValue;
+                        spriteDmaCounter++;
+                        if (spriteDmaCounter == 0x200)
+                            spriteDmaTransfer = false;
+                    }
+                    else
+                    {
+                        // Alignment / dummy read (odd cycle, waiting for even)
+                        absorbDmaFlags();
+                        tick();
+                        cpuBusAddr = readAddress;
+                        cpuBusIsWrite = false;
+                        if (!skipDummyReads)
+                        {
+                            ppu2007ReadCooldown = 0;
+                            mem_read_fun[readAddress](readAddress);
+                        }
+                    }
+                }
+            }
+
         }
 
-        // φ2 phase: placeholder (all dots in tick_pre).
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void tick_post()
+        // Mesen2: ProcessDmaRead — handles internal register bus conflict during DMA
+        // When CPU was halted while reading $4000-$401F, DMA reads activate internal
+        // registers at $4000 | (addr & 0x1F) regardless of actual DMA read address.
+        static ushort dmaPrevReadAddress = 0;
+
+        static byte ProcessDmaRead(ushort addr, bool enableInternalRegReads)
         {
+            if (!enableInternalRegReads)
+            {
+                if (addr >= 0x4000 && addr <= 0x401F)
+                    return cpubus; // open bus — nothing responds on external bus
+                return mem_read_fun[addr](addr);
+            }
+
+            // Internal register mapping: $4000 | (addr & 0x1F)
+            ushort internalAddr = (ushort)(0x4000 | (addr & 0x1F));
+            byte val;
+
+            switch (internalAddr)
+            {
+                case 0x4015:
+                    val = IO_read(0x4015); // reads APU status, clears frame IRQ flag
+                    if (internalAddr != addr)
+                    {
+                        cpubus = val; // Update open bus before external read
+                        mem_read_fun[addr](addr); // also read external bus
+                    }
+                    break;
+
+                case 0x4016:
+                case 0x4017:
+                    if (dmaPrevReadAddress == internalAddr)
+                        val = cpubus; // consecutive same-register read: skip to avoid extra bit deletion
+                    else
+                        val = IO_read(internalAddr); // read controller
+
+                    if (internalAddr != addr)
+                    {
+                        // Update open bus before external read (Mesen2: Read() updates open bus)
+                        cpubus = val;
+                        // Bus conflict: merge internal and external values
+                        byte externalVal = mem_read_fun[addr](addr);
+                        byte obMask = 0xE0; // upper 3 bits are open bus on controller ports
+                        val = (byte)((externalVal & obMask) | ((val & ~obMask) & (externalVal & ~obMask)));
+                    }
+                    break;
+
+                default:
+                    // Write-only registers: just read from external bus
+                    val = mem_read_fun[addr](addr);
+                    break;
+            }
+
+            dmaPrevReadAddress = internalAddr;
+            return val;
+        }
+
+        // Absorb pending DMA halt/dummy/abort flags (Mesen2: processCycle lambda)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void absorbDmaFlags()
+        {
+            if (dmcAbortDma)
+            {
+                dmcDmaRunning = false;
+                dmcAbortDma = false;
+                dmcNeedDummyRead = false;
+                dmaNeedHalt = false;
+            }
+            else if (dmaNeedHalt)
+            {
+                dmaNeedHalt = false;
+            }
+            else if (dmcNeedDummyRead)
+            {
+                dmcNeedDummyRead = false;
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte Mem_r(ushort address)
         {
-            // Execute deferred OAM DMA on first read cycle (real NES: DMA can't start on write cycle)
-            if (oamDmaPending) oamDmaExecute(address);
-
             cpuBusAddr = address;
             cpuBusIsWrite = false;
-            // Deferred DMC DMA: fires at next read cycle with correct bus address (Mesen2 model)
-            if (dmcDmaPending) { dmcDmaPending = false; dmcfillbuffer(); }
-            tick_pre();                          // 3 PPU dots + APU before read
+            StartCpuCycle();
+            if (dmaNeedHalt) ProcessPendingDma(address);
             byte val = mem_read_fun[address](address);
             if (address != 0x4015) cpubus = val;
-            tick_post();                         // (placeholder for future sub-cycle split)
+            EndCpuCycle();
             return val;
         }
 
@@ -123,21 +314,20 @@ namespace AprNes
         {
             cpuBusAddr = address;
             cpuBusIsWrite = true;
-            tick_pre();                          // 3 PPU dots + APU before write
+            StartCpuCycle();
             cpubus = value;
             mem_write_fun[address](address, value);
-            tick_post();                         // (placeholder for future sub-cycle split)
+            EndCpuCycle();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ZP_r(byte addr)
         {
-            if (oamDmaPending) oamDmaExecute(addr);
             cpuBusAddr = addr; cpuBusIsWrite = false;
-            if (dmcDmaPending) { dmcDmaPending = false; dmcfillbuffer(); }
-            tick_pre();
+            StartCpuCycle();
+            if (dmaNeedHalt) ProcessPendingDma(addr);
             byte val = NES_MEM[addr]; cpubus = val;
-            tick_post();
+            EndCpuCycle();
             return val;
         }
 
@@ -145,9 +335,9 @@ namespace AprNes
         static void ZP_w(byte addr, byte value)
         {
             cpuBusAddr = addr; cpuBusIsWrite = true;
-            tick_pre();
+            StartCpuCycle();
             NES_MEM[addr] = value; cpubus = value;
-            tick_post();
+            EndCpuCycle();
         }
 
         static Action<ushort, byte>[] mem_write_fun = null;

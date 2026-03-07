@@ -7,11 +7,6 @@ namespace AprNes
         {
             if (addr < 0x4000) addr = (ushort)(0x2000 | (addr & 7));
 
-            // During OAM DMA, APU registers ($4000-$401F) are only accessible when
-            // the 6502 address bus is in $4000-$401F. Otherwise return open bus.
-            if (oamDmaInProgress && !oamDmaApuActive && addr >= 0x4000)
-                return cpubus;
-
             switch (addr)
             {
                 case 0x2000: return openbus;
@@ -24,6 +19,7 @@ namespace AprNes
                 case 0x2007: return ppu_r_2007();
                 case 0x4015: return apu_r_4015();
                 case 0x4016: return gamepad_r_4016();
+                case 0x4017: return (byte)(cpubus & 0xE0); // Controller 2: no controller → D0-D4=0, D5-D7=open bus
                 default:
                     return cpubus; // APU write-only registers return CPU data bus value
             }

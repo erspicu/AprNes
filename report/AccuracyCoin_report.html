@@ -43,7 +43,7 @@ tr:hover td { background:#1e2a5e; }
 </head>
 <body>
 <h1>AccuracyCoin Report - AprNes</h1>
-<div class="meta">Generated: 2026-03-07 16:42 | ROM: AccuracyCoin.nes (Mapper 0/NROM) | Method: page-by-page</div>
+<div class="meta">Generated: 2026-03-08 00:38 | ROM: AccuracyCoin.nes (Mapper 0/NROM) | Method: page-by-page</div>
 
 <div class="note warn">
   Page 12 item 1 (Interrupt Flag Latency) is marked SKIP - test hangs due to DMC DMA timing drift (~12 cycles).
@@ -51,8 +51,8 @@ tr:hover td { background:#1e2a5e; }
 </div>
 
 <div class="summary">
-  <div class="stat"><div class="num pass-c">118</div><div class="lbl">PASS</div></div>
-  <div class="stat"><div class="num fail-c">17</div><div class="lbl">FAIL</div></div>
+  <div class="stat"><div class="num pass-c">119</div><div class="lbl">PASS</div></div>
+  <div class="stat"><div class="num fail-c">16</div><div class="lbl">FAIL</div></div>
   <div class="stat"><div class="num skip-c">1</div><div class="lbl">SKIP</div></div>
   <div class="stat"><div class="num notrun-c">0</div><div class="lbl">N/A</div></div>
   <div class="stat"><div class="num">136</div><div class="lbl">TOTAL</div></div>
@@ -289,16 +289,16 @@ tr:hover td { background:#1e2a5e; }
     <tr><td>5</td><td>DMA + $4015 Read</td><td><span class="badge fail">FAIL (err 2)</span></td><td class="addr">$045D=0A</td></tr>
     <tr><td>6</td><td>DMA + $4016 Read</td><td><span class="badge pass">PASS</span></td><td class="addr">$045E=05</td></tr>
     <tr><td>7</td><td>DMC DMA Bus Conflicts</td><td><span class="badge fail">FAIL (err 2)</span></td><td class="addr">$046B=0A</td></tr>
-    <tr><td>8</td><td>DMC DMA + OAM DMA</td><td><span class="badge fail">FAIL (err 2)</span></td><td class="addr">$0477=0A</td></tr>
-    <tr><td>9</td><td>Explicit DMA Abort</td><td><span class="badge fail">FAIL (err 2)</span></td><td class="addr">$0479=0A</td></tr>
-    <tr><td>10</td><td>Implicit DMA Abort</td><td><span class="badge fail">FAIL (err 2)</span></td><td class="addr">$0478=0A</td></tr>
+    <tr><td>8</td><td>DMC DMA + OAM DMA</td><td><span class="badge fail">FAIL (err 1)</span></td><td class="addr">$0477=06</td></tr>
+    <tr><td>9</td><td>Explicit DMA Abort</td><td><span class="badge fail">FAIL (err 1)</span></td><td class="addr">$0479=06</td></tr>
+    <tr><td>10</td><td>Implicit DMA Abort</td><td><span class="badge fail">FAIL (err 1)</span></td><td class="addr">$0478=06</td></tr>
   </table>
 </div>
 
 <div class="suite">
   <div class="suite-header">
     <span>Page 14: APU Tests</span>
-    <span class="suite-stats"><span class="pass-c">7 PASS</span> | <span class="fail-c">2 FAIL</span></span>
+    <span class="suite-stats"><span class="pass-c">8 PASS</span> | <span class="fail-c">1 FAIL</span></span>
   </div>
   <img src="screenshots-ac/ac_page_14.png" alt="APU Tests" class="ss" loading="lazy">
   <table>
@@ -309,7 +309,7 @@ tr:hover td { background:#1e2a5e; }
     <tr><td>4</td><td>Frame Counter 4-step</td><td><span class="badge pass">PASS</span></td><td class="addr">$0468=01</td></tr>
     <tr><td>5</td><td>Frame Counter 5-step</td><td><span class="badge pass">PASS</span></td><td class="addr">$0469=01</td></tr>
     <tr><td>6</td><td>Delta Modulation Channel</td><td><span class="badge fail">FAIL (err 21)</span></td><td class="addr">$046A=56</td></tr>
-    <tr><td>7</td><td>APU Register Activation</td><td><span class="badge fail">FAIL (err 6)</span></td><td class="addr">$045C=1A</td></tr>
+    <tr><td>7</td><td>APU Register Activation</td><td><span class="badge pass">PASS</span></td><td class="addr">$045C=09</td></tr>
     <tr><td>8</td><td>Controller Strobing</td><td><span class="badge pass">PASS</span></td><td class="addr">$045F=01</td></tr>
     <tr><td>9</td><td>Controller Clocking</td><td><span class="badge pass">PASS</span></td><td class="addr">$047A=09</td></tr>
   </table>
@@ -387,7 +387,7 @@ tr:hover td { background:#1e2a5e; }
 <div class="suite">
   <div class="suite-header">
     <span>Page 19: PPU Misc.</span>
-    <span class="suite-stats"><span class="pass-c">3 PASS</span> | <span class="fail-c">3 FAIL</span></span>
+    <span class="suite-stats"><span class="pass-c">4 PASS</span> | <span class="fail-c">2 FAIL</span></span>
   </div>
   <img src="screenshots-ac/ac_page_19.png" alt="PPU Misc." class="ss" loading="lazy">
   <table>
@@ -395,7 +395,7 @@ tr:hover td { background:#1e2a5e; }
     <tr><td>1</td><td>Attributes As Tiles</td><td><span class="badge pass">PASS</span></td><td class="addr">$0481=01</td></tr>
     <tr><td>2</td><td>t Register Quirks</td><td><span class="badge pass">PASS</span></td><td class="addr">$0482=01</td></tr>
     <tr><td>3</td><td>Stale BG Shift Registers</td><td><span class="badge pass">PASS</span></td><td class="addr">$0483=01</td></tr>
-    <tr><td>4</td><td>BG Serial In</td><td><span class="badge fail">FAIL (err 2)</span></td><td class="addr">$0487=0A</td></tr>
+    <tr><td>4</td><td>BG Serial In</td><td><span class="badge pass">PASS</span></td><td class="addr">$0487=01</td></tr>
     <tr><td>5</td><td>Sprites On Scanline 0</td><td><span class="badge fail">FAIL (err 2)</span></td><td class="addr">$0484=0A</td></tr>
     <tr><td>6</td><td>$2004 Stress Test</td><td><span class="badge fail">FAIL (err 1)</span></td><td class="addr">$048C=06</td></tr>
   </table>
@@ -404,12 +404,12 @@ tr:hover td { background:#1e2a5e; }
 <div class="suite">
   <div class="suite-header">
     <span>Page 20: CPU Behavior 2</span>
-    <span class="suite-stats"><span class="pass-c">3 PASS</span> | <span class="fail-c">1 FAIL</span></span>
+    <span class="suite-stats"><span class="pass-c">2 PASS</span> | <span class="fail-c">2 FAIL</span></span>
   </div>
   <img src="screenshots-ac/ac_page_20.png" alt="CPU Behavior 2" class="ss" loading="lazy">
   <table>
     <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
-    <tr><td>1</td><td>Instruction Timing</td><td><span class="badge pass">PASS</span></td><td class="addr">$0460=01</td></tr>
+    <tr><td>1</td><td>Instruction Timing</td><td><span class="badge fail">FAIL (err 2)</span></td><td class="addr">$0460=0A</td></tr>
     <tr><td>2</td><td>Implied Dummy Reads</td><td><span class="badge fail">FAIL (err 3)</span></td><td class="addr">$046D=0E</td></tr>
     <tr><td>3</td><td>Branch Dummy Reads</td><td><span class="badge pass">PASS</span></td><td class="addr">$048B=01</td></tr>
     <tr><td>4</td><td>JSR Edge Cases</td><td><span class="badge pass">PASS</span></td><td class="addr">$047C=01</td></tr>

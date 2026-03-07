@@ -984,57 +984,11 @@ namespace AprNes
 
         static void ppu_w_4014(byte value)//DMA , fixex 2017.01.16 pass sprite_ram test
         {
-            // Defer OAM DMA to next read cycle (real NES: DMA can't start on write cycle)
+            // Set OAM DMA flags — deferred to next read cycle via ProcessPendingDma()
             // For RMW instructions (e.g., INC $4014), second write overwrites page → only 1 DMA runs
-            oamDmaPending = true;
-            oamDmaPendingPage = value;
-        }
-
-        // Execute deferred OAM DMA (called from Mem_r before the read)
-        // cpu6502Addr: the CPU's next read address (6502 address bus at DMA start)
-        static void oamDmaExecute(ushort cpu6502Addr)
-        {
-            oamDmaPending = false;
-            byte value = oamDmaPendingPage;
-
-            // Save IRQ tracking — CPU is halted during DMA, IRQ not polled
-            bool saved_irqLinePrev = irqLinePrev;
-
-            oamDmaInProgress = true;
-            // APU registers ($4000-$401F) are only accessible during OAM DMA when
-            // the 6502 address bus is in $4000-$401F. Otherwise reads return open bus.
-            oamDmaApuActive = (cpu6502Addr >= 0x4000 && cpu6502Addr <= 0x401F);
-            oamDmaByteIndex = -1; // pre-loop phase
-
-            cpuBusAddr = 0x4014;
-            cpuBusIsWrite = true;
-            tick(); // halt cycle
-
-            // OAM DMA alignment: OAM reads must occur on GET cycles.
-            bool oamNeedAlignment = (apucycle & 1) == 1;
-            if (oamNeedAlignment)
-            {
-                cpuBusIsWrite = true;
-                tick(); // alignment cycle (PUT → align to GET)
-            }
-
-            int oam_address = value << 8;
-            for (int i = 0; i < 256; i++)
-            {
-                oamDmaByteIndex = i;
-                byte data = Mem_r((ushort)(oam_address + i)); // read cycle (tick via Mem_r)
-
-                cpuBusAddr = (ushort)(oam_address + i);
-                cpuBusIsWrite = true;
-                tick(); // write cycle
-                spr_ram[spr_ram_add++] = data;
-            }
-
-            oamDmaByteIndex = -1;
-            oamDmaInProgress = false;
-
-            // Restore penultimate IRQ state to pre-DMA value
-            irqLinePrev = saved_irqLinePrev;
+            spriteDmaTransfer = true;
+            spriteDmaOffset = value;
+            dmaNeedHalt = true;
         }
     }
 }
