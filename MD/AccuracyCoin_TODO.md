@@ -1,6 +1,6 @@
 # AccuracyCoin 修復追蹤
 
-**基線**: 119/136 PASS, 16 FAIL, 1 SKIP (BUGFIX46)
+**基線**: 120/136 PASS, 15 FAIL, 1 SKIP (BUGFIX47)
 **最後更新**: 2026-03-08
 
 ---
@@ -19,8 +19,8 @@
 | P16 | PPU Rendering | 全 PASS | |
 | P17 | PPU VBlank Timing | 全 PASS | |
 | P18 | Sprite Evaluation | 全 PASS | BUGFIX45 修復最後一項 |
-| P19 | PPU Misc | 3 FAIL / 6 | BG Serial In / Sprites SL0 / $2004 Stress |
-| P20 | CPU Behavior 2 | 1 FAIL / 2 | Implied Dummy Reads |
+| P19 | PPU Misc | 1 FAIL / 6 | $2004 Stress Test |
+| P20 | CPU Behavior 2 | 2 FAIL / 4 | Instruction Timing / Implied Dummy Reads |
 
 ---
 
@@ -50,10 +50,11 @@
 - [x] $2007 read w/ rendering (P16) — BUGFIX34
 - [x] Stale BG Shift Registers (P19) — BUGFIX40
 - [x] Suddenly Resize Sprite (P18) — BUGFIX42
+- [x] Sprites On Scanline 0 (P19) — **BUGFIX47**: secondary OAM + per-dot eval FSM + pre-render sprite data
 
 ---
 
-## 剩餘 16 FAIL + 1 SKIP
+## 剩餘 15 FAIL + 1 SKIP
 
 ### 根因 A: DMA Sub-cycle 精度（12 項，共用根因）
 
@@ -82,11 +83,12 @@
 
 測試期望 DMA 發生在 SH* write cycle 前會消除 H 的 AND masking（value = A & X，不再 & H）。
 
-**P20: Implied Dummy Reads (1 FAIL)** — err=3，前置條件依賴 DMA timing
+**P20: CPU Behavior 2 (2 FAIL)** — 前置條件依賴 DMA timing
 
-| 測試 | 地址 | 分析 |
-|------|------|------|
-| Implied Dummy Reads | $046D | 指令本身已正確，被 DMA 前置條件擋住 |
+| 測試 | 地址 | err | 分析 |
+|------|------|-----|------|
+| Instruction Timing | $0460 | 2 | DMA timing 前置條件失敗 |
+| Implied Dummy Reads | $046D | 3 | 指令本身已正確，被 DMA 前置條件擋住 |
 
 ### 根因 B: DMC/APU 複雜互動（2 項）
 
@@ -98,15 +100,15 @@
 | APU Register Activation | $045C | — | **PASS** (BUGFIX46: $4017 read handler + ProcessDmaRead open bus fix) |
 | Controller Strobing | $045F | 1 | Test 4 PUT/GET parity，OAM DMA 後 parity 不準 |
 
-### 根因 C: PPU Per-dot 精度（3 項）
+### 根因 C: PPU Per-dot 精度（1 項）
 
-**P19: PPU Misc (3 FAIL)**
+**P19: PPU Misc (1 FAIL)**
 
 | 測試 | 地址 | err | 分析 |
 |------|------|-----|------|
-| BG Serial In | $0487 | 2 | 需 per-dot BG shift register reload 時序 |
-| Sprites On Scanline 0 | $0484 | 2 | 需 secondary OAM 跨 scanline 持久化 |
-| $2004 Stress Test | $048C | 1 | 需 per-dot OAM evaluation state machine |
+| BG Serial In | $0487 | — | **PASS** (BUGFIX BGSerialIn) |
+| Sprites On Scanline 0 | $0484 | — | **PASS** (BUGFIX47: secondary OAM + per-dot eval FSM) |
+| $2004 Stress Test | $048C | 1 | 需 per-dot OAM evaluation state machine（仍有差異） |
 
 ### 根因 D: DMC DMA 累積偏移（1 項）
 
@@ -124,10 +126,10 @@
 
 | 方向 | 潛在收益 | 難度 | 說明 |
 |------|----------|------|------|
-| P13 DMA 前置條件 | +6~+12 | 極高 | 修好 DMADMASync_PreTest 可解鎖 P13(6) + P20(1) + P10(5) |
+| P13 DMA 前置條件 | +6~+13 | 極高 | 修好 DMADMASync_PreTest 可解鎖 P13(6) + P20(2) + P10(5) |
 | P14 Controller Strobe | +1 | 高 | PUT/GET parity 問題，嘗試過翻轉但回歸 |
-| P19 $2004 Stress | +1 | 高 | 需 per-dot OAM evaluation，架構改動大 |
-| Master Clock 重構 | +18 | 極高 | 理論上解決所有問題，但工程量巨大 |
+| P19 $2004 Stress | +1 | 高 | 已有 per-dot eval FSM，但 $2004 讀取仍有差異 |
+| Master Clock 重構 | +16 | 極高 | 理論上解決所有問題，但工程量巨大 |
 
 ---
 

@@ -348,11 +348,35 @@ namespace AprNes
                 if (ppuRenderingEnabled)
                     ppu_rendering_tick();
 
-                // Sprite evaluation begins at cycle 65: save OAMADDR for next scanline's sprite 0
-                // (applies to visible scanlines AND pre-render scanline 261)
-                // Keep exact address (not aligned) — misaligned OAM reads Y from exact position
-                if (ppu_cycles_x == 65 && ppuRenderingEnabled)
+                // Per-dot sprite evaluation (visible scanlines only)
+                if (scanline >= 0 && scanline < 240 && ppuRenderingEnabled)
+                {
+                    // Dots 1-64: clear secondary OAM (write $FF, 2 dots per byte)
+                    if (ppu_cycles_x >= 1 && ppu_cycles_x <= 64)
+                    {
+                        oamCopyBuffer = 0xFF;
+                        if ((ppu_cycles_x & 1) == 0)
+                            secondaryOAM[(ppu_cycles_x >> 1) - 1] = 0xFF;
+                    }
+                    // Dot 65: initialize evaluation FSM
+                    else if (ppu_cycles_x == 65)
+                    {
+                        sprite0_eval_addr = spr_ram_add;
+                        SpriteEvalInit();
+                        SpriteEvalTick();
+                    }
+                    // Dots 66-256: per-dot evaluation
+                    else if (ppu_cycles_x >= 66 && ppu_cycles_x <= 256)
+                    {
+                        SpriteEvalTick();
+                        if (ppu_cycles_x == 256) SpriteEvalEnd();
+                    }
+                }
+                // Pre-render line: save sprite0_eval_addr at dot 65
+                else if (scanline == 261 && ppu_cycles_x == 65 && ppuRenderingEnabled)
+                {
                     sprite0_eval_addr = spr_ram_add;
+                }
 
                 if (scanline >= 0 && scanline < 240)
                 {
@@ -381,6 +405,11 @@ namespace AprNes
                         RenderSpritesLine();
 
                 }
+
+                // Pre-render line: compute pre-render sprite data at dot 257
+                if (scanline == 261 && ppu_cycles_x == 257 && ppuRenderingEnabled)
+                    PrecomputePreRenderSprites();
+
             }
 
             // Screen output at scanline 240 cycle 1 (matches ppu_step timing)
@@ -448,6 +477,25 @@ namespace AprNes
         static int sprite0_eval_addr;  // OAMADDR at start of sprite evaluation (dot 65), for next scanline's sprite 0
         static bool spriteSizeLatchedForFetch; // Spritesize8x16 latched at dot 261 (sprite 0 CHR fetch timing)
 
+        // ========== Secondary OAM and Per-dot Sprite Evaluation FSM ==========
+        static byte[] secondaryOAM = new byte[32]; // 8 sprites × 4 bytes
+        static byte oamCopyBuffer;                  // Last byte read during evaluation ($2004 returns this)
+        static byte spriteEvalAddrH;                // Primary OAM sprite index (0-63)
+        static byte spriteEvalAddrL;                // Byte offset within sprite (0-3)
+        static byte secOAMAddr;                     // Write position in secondary OAM (0-31)
+        static bool spriteInRange;                  // Current sprite Y is in range
+        static bool sprite0Added;                   // First evaluated sprite was in range
+        static bool oamCopyDone;                    // Evaluation wrapped around all 64 sprites
+        static byte overflowBugCounter;             // For sprite overflow hardware bug
+        static int evalSpriteCount;                 // Number of sprites found (0-8)
+        static bool evalSprite0Visible;             // Sprite 0 found in secondary OAM
+
+        // Pre-render line sprite data (loaded at pre-render dot 257 for scanline 0)
+        static bool prerender_sprite0_valid;
+        static int prerender_sprite0_x;
+        static byte prerender_sprite0_tile_low, prerender_sprite0_tile_high;
+        static bool prerender_sprite0_flip_x;
+
         // Pre-computed sprite overflow cycle for cycle-accurate overflow flag timing
         static int spriteOverflowCycle;
 
@@ -513,7 +561,19 @@ namespace AprNes
             // at fetch time, not the value at dot 0 of the next scanline.
             bool sprSize16 = spriteSizeLatchedForFetch;
             int height = sprSize16 ? 15 : 7;
-            if (scanline < y_loc || scanline - y_loc > height) return;
+            if (scanline < y_loc || scanline - y_loc > height)
+            {
+                // Scanline 0: use pre-render line sprite 0 data if available.
+                if (scanline == 0 && prerender_sprite0_valid)
+                {
+                    sprite0_on_line = true;
+                    sprite0_line_x = prerender_sprite0_x;
+                    sprite0_tile_low = prerender_sprite0_tile_low;
+                    sprite0_tile_high = prerender_sprite0_tile_high;
+                    sprite0_flip_x = prerender_sprite0_flip_x;
+                }
+                return;
+            }
 
             sprite0_on_line = true;
             sprite0_line_x = sprX;
@@ -597,6 +657,192 @@ namespace AprNes
                     m = (m + 1) & 3; // bug: increment byte offset on miss
                     evalCycle += 2;
                 }
+            }
+        }
+
+        // Initialize sprite evaluation state at dot 65 of visible scanlines
+        static void SpriteEvalInit()
+        {
+            sprite0Added = false;
+            spriteInRange = false;
+            secOAMAddr = 0;
+            overflowBugCounter = 0;
+            oamCopyDone = false;
+            spriteEvalAddrH = (byte)((spr_ram_add >> 2) & 0x3F);
+            spriteEvalAddrL = (byte)(spr_ram_add & 0x03);
+        }
+
+        // Per-dot sprite evaluation: odd dots read, even dots write/check
+        static void SpriteEvalTick()
+        {
+            bool isOdd = (ppu_cycles_x & 1) != 0;
+
+            if (isOdd)
+            {
+                // Odd cycle: read from primary OAM
+                oamCopyBuffer = spr_ram[(byte)(spriteEvalAddrH * 4 + spriteEvalAddrL)];
+            }
+            else
+            {
+                // Even cycle: write/check
+                SpriteEvalWrite();
+            }
+        }
+
+        static void SpriteEvalWrite()
+        {
+            int height = Spritesize8x16 ? 16 : 8;
+
+            if (secOAMAddr >= 0x20)
+            {
+                // Secondary OAM full
+                oamCopyBuffer = secondaryOAM[secOAMAddr & 0x1F]; // read instead of write
+
+                if (oamCopyDone)
+                {
+                    // Already found 8+ sprites, just advance
+                    spriteEvalAddrH = (byte)((spriteEvalAddrH + 1) & 0x3F);
+                    spriteEvalAddrL = 0;
+                }
+                else if (spriteInRange)
+                {
+                    // Found 9th+ sprite: overflow flag set by PrecomputeOverflow() at exact cycle
+                    spriteEvalAddrL++;
+                    if (spriteEvalAddrL >= 4)
+                    {
+                        spriteEvalAddrH = (byte)((spriteEvalAddrH + 1) & 0x3F);
+                        spriteEvalAddrL = 0;
+                    }
+                    if (overflowBugCounter == 0)
+                        overflowBugCounter = 3;
+                    else if (--overflowBugCounter == 0)
+                    {
+                        oamCopyDone = true;
+                        spriteEvalAddrL = 0;
+                    }
+                    spriteInRange = false; // reset for next check
+                }
+                else
+                {
+                    // Check in-range for overflow bug (reads wrong byte offset)
+                    if (scanline >= oamCopyBuffer && scanline < oamCopyBuffer + height)
+                        spriteInRange = true;
+                    // Advance both H and L (hardware bug: L increments on miss)
+                    spriteEvalAddrH = (byte)((spriteEvalAddrH + 1) & 0x3F);
+                    spriteEvalAddrL = (byte)((spriteEvalAddrL + 1) & 0x03);
+                    if (spriteEvalAddrH == 0) oamCopyDone = true;
+                }
+            }
+            else
+            {
+                // Check in-range if not already tracking
+                if (!spriteInRange)
+                {
+                    if (scanline >= oamCopyBuffer && scanline < oamCopyBuffer + height)
+                        spriteInRange = !oamCopyDone;
+                }
+
+                // Write to secondary OAM
+                secondaryOAM[secOAMAddr] = oamCopyBuffer;
+
+                if (spriteInRange)
+                {
+                    // First in-range sprite at the very first evaluation is sprite 0
+                    if (ppu_cycles_x == 66) sprite0Added = true;
+
+                    spriteEvalAddrL++;
+                    secOAMAddr++;
+
+                    if (spriteEvalAddrL >= 4)
+                    {
+                        spriteEvalAddrH = (byte)((spriteEvalAddrH + 1) & 0x3F);
+                        spriteEvalAddrL = 0;
+                        if (spriteEvalAddrH == 0) oamCopyDone = true;
+                    }
+
+                    if ((secOAMAddr & 0x03) == 0)
+                    {
+                        // Done copying 4 bytes of this sprite
+                        spriteInRange = false;
+                    }
+                }
+                else
+                {
+                    // Not in range: skip to next sprite
+                    spriteEvalAddrH = (byte)((spriteEvalAddrH + 1) & 0x3F);
+                    spriteEvalAddrL = 0;
+                    if (spriteEvalAddrH == 0) oamCopyDone = true;
+                }
+            }
+
+            // Update primary OAM read address (for $2003 visibility)
+            spr_ram_add = (byte)((spriteEvalAddrL & 0x03) | (spriteEvalAddrH << 2));
+        }
+
+        // Finalize evaluation at dot 256
+        static void SpriteEvalEnd()
+        {
+            evalSprite0Visible = sprite0Added;
+            evalSpriteCount = (secOAMAddr + 3) >> 2;
+            if (evalSpriteCount > 8) evalSpriteCount = 8;
+        }
+
+        // Pre-render line: check secondary OAM entries against (261 & 255) = 5
+        // and store sprite 0 data for scanline 0 rendering
+        static void PrecomputePreRenderSprites()
+        {
+            prerender_sprite0_valid = false;
+            int effectiveScanline = 261 & 255; // = 5
+            int height = Spritesize8x16 ? 16 : 8;
+
+            // Check first entry in secondary OAM (potential sprite 0)
+            byte sprY = secondaryOAM[0];
+            if (sprY >= 240) return; // $FF or invalid
+
+            if (effectiveScanline >= sprY && effectiveScanline < sprY + height)
+            {
+                byte sprTile = secondaryOAM[1];
+                byte sprAttr = secondaryOAM[2];
+                byte sprX = secondaryOAM[3];
+
+                prerender_sprite0_valid = true;
+                prerender_sprite0_x = sprX;
+                prerender_sprite0_flip_x = (sprAttr & 0x40) != 0;
+
+                int line = effectiveScanline - sprY;
+                int offset, tile_th_t, line_t;
+                byte tile_th;
+
+                if (Spritesize8x16)
+                {
+                    tile_th = (byte)(sprTile & 0xfe);
+                    offset = (sprTile & 1) != 0 ? 256 : 0;
+                }
+                else
+                {
+                    tile_th = sprTile;
+                    offset = SpPatternTableAddr >> 4;
+                }
+
+                if (line <= 7)
+                {
+                    tile_th_t = tile_th + offset;
+                }
+                else
+                {
+                    tile_th_t = tile_th + offset + 1;
+                    line -= 8;
+                }
+
+                if ((sprAttr & 0x80) != 0)
+                {
+                    line_t = 7 - line;
+                    if (Spritesize8x16) tile_th_t ^= 1;
+                }
+                else line_t = line;
+
+                prerender_sprite0_tile_high = MapperObj.MapperR_CHR((tile_th_t << 4) | (line_t + 8));
+                prerender_sprite0_tile_low = MapperObj.MapperR_CHR((tile_th_t << 4) | line_t);
             }
         }
 
@@ -913,34 +1159,35 @@ namespace AprNes
         {
             byte val;
             bool renderingOn = ShowBackGround || ShowSprites;
-            // During secondary OAM clear (dots 1-64) on visible scanlines with rendering enabled,
-            // $2004 reads return $FF
-            if (scanline >= 0 && scanline < 240 && ppu_cycles_x >= 1 && ppu_cycles_x <= 64
-                && renderingOn)
-                val = 0xFF;
-            // During sprite evaluation (dots 65-256) on visible scanlines with rendering enabled,
-            // $2004 reads return the byte at the PPU's current internal evaluation address.
-            // The PPU scans OAM entries: 2 dots per out-of-range entry, 8 dots per in-range entry.
-            // Approximate: assume all out-of-range (most common case).
-            else if (scanline >= 0 && scanline < 240 && ppu_cycles_x >= 65 && ppu_cycles_x <= 256
-                && renderingOn)
+            if (scanline >= 0 && scanline < 240 && renderingOn)
             {
-                int evalDot = ppu_cycles_x - 65;
-                int n = evalDot >> 1; // entry index (2 dots per out-of-range entry)
-                if (n > 63) n = 63;
-                int addr = (n << 2) & 0xFF;
-                val = spr_ram[addr];
-                if ((addr & 3) == 2) val &= 0xE3;
+                if (ppu_cycles_x >= 1 && ppu_cycles_x <= 64)
+                {
+                    // Secondary OAM clear: returns oamCopyBuffer ($FF)
+                    val = oamCopyBuffer;
+                }
+                else if (ppu_cycles_x >= 65 && ppu_cycles_x <= 256)
+                {
+                    // Sprite evaluation: returns the last byte read from primary OAM
+                    val = oamCopyBuffer;
+                }
+                else if (ppu_cycles_x >= 257 && ppu_cycles_x <= 320)
+                {
+                    // Sprite tile fetch: reads from secondary OAM
+                    int offset = ppu_cycles_x - 257;
+                    int spriteIdx = offset >> 3;
+                    int byteIdx = offset & 0x03;
+                    val = secondaryOAM[spriteIdx * 4 + byteIdx];
+                }
+                else
+                {
+                    val = spr_ram[spr_ram_add];
+                }
             }
-            // During sprite tile loading (dots 257-320) on visible scanlines with rendering enabled,
-            // $2004 reads return $FF
-            else if (scanline >= 0 && scanline < 240 && ppu_cycles_x >= 257 && ppu_cycles_x <= 320
-                && renderingOn)
-                val = 0xFF;
             else
             {
                 val = spr_ram[spr_ram_add];
-                if ((spr_ram_add & 3) == 2) val &= 0xE3; // mask unimplemented bits of attribute byte only
+                if ((spr_ram_add & 3) == 2) val &= 0xE3; // mask unimplemented bits of attribute byte
             }
             open_bus_decay_timer = 77777;
             return openbus = val;
