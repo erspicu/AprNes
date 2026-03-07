@@ -77,14 +77,13 @@ namespace AprNes
             catchUpPPU();
             catchUpAPU();
             if (strobeWritePending > 0) processStrobeWrite();
-
-            irqLinePrev = irqLineCurrent;
-            irqLineCurrent = (statusframeint && !apuintflag) || statusdmcint || statusmapperint;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void EndCpuCycle()
         {
+            irqLinePrev = irqLineCurrent;
+            irqLineCurrent = (statusframeint && !apuintflag) || statusdmcint || statusmapperint;
         }
 
         // Full tick: StartCpuCycle + EndCpuCycle (used by DMA stolen cycles)
@@ -96,8 +95,9 @@ namespace AprNes
         }
 
         // Unified DMA engine (Mesen2: ProcessPendingDma)
-        // Called from Mem_r/ZP_r BEFORE StartCpuCycle (matches Mesen2 ordering).
+        // Called from Mem_r/ZP_r AFTER StartCpuCycle.
         // Handles both OAM DMA and DMC DMA with correct interleaving.
+        // Each DMA cycle: StartCpuCycle → bus operation → EndCpuCycle.
         static void ProcessPendingDma(ushort readAddress)
         {
             if (!dmaNeedHalt) return;
@@ -109,17 +109,19 @@ namespace AprNes
             dmaPrevReadAddress = readAddress;
 
             // --- Halt cycle ---
+            // Mesen2: StartCpuCycle → phantom read → EndCpuCycle
             dmaNeedHalt = false;
             cpuBusAddr = readAddress;
-            cpuBusIsWrite = true; // old code: halt marked as write cycle
-            tick();
+            cpuBusIsWrite = true;
+            StartCpuCycle();
             cpuBusIsWrite = false;
             // Halt cycle phantom read (Mesen2: skipped for abort+controller)
             if (!(dmcAbortDma && skipDummyReads))
             {
-                ppu2007ReadCooldown = 0; // DMA reads bypass $2007 cooldown
+                ppu2007ReadCooldown = 0;
                 mem_read_fun[readAddress](readAddress);
             }
+            EndCpuCycle();
 
             // Check DMC abort after halt
             if (dmcAbortDma)
@@ -134,9 +136,7 @@ namespace AprNes
             }
 
             // --- Main DMA loop ---
-            // ProcessPendingDma is called BEFORE StartCpuCycle (matching Mesen2 ordering).
-            // getCycle uses (CC & 1) != 0 to compensate: DMA sees pre-increment CC,
-            // which is 1 less than Mesen2's post-StartCpuCycle CC, flipping parity.
+            // getCycle = (CC & 1) == 0 matches Mesen2's (CycleCount & 1) == 0.
             int spriteDmaCounter = 0;
             byte spriteReadAddr = 0;
             byte readValue = 0;
@@ -149,34 +149,36 @@ namespace AprNes
                 {
                     if (dmcDmaRunning && !dmaNeedHalt && !dmcNeedDummyRead)
                     {
-                        // DMC read cycle — fetch sample from PRG ROM
+                        // DMC read cycle — StartCpuCycle → read → EndCpuCycle
                         absorbDmaFlags();
-                        tick();
+                        StartCpuCycle();
                         ushort dmcReadAddr = (ushort)dmcaddr;
                         byte val = ProcessDmaRead(dmcReadAddr, enableInternalRegReads);
                         cpubus = val;
+                        EndCpuCycle();
                         dmcDmaRunning = false;
                         dmcAbortDma = false;
                         dmcSetReadBuffer(val);
                     }
                     else if (spriteDmaTransfer)
                     {
-                        // OAM DMA read cycle
+                        // OAM DMA read cycle — StartCpuCycle → read → EndCpuCycle
                         absorbDmaFlags();
-                        tick();
+                        StartCpuCycle();
                         ushort srcAddr = (ushort)(spriteDmaOffset * 0x100 + spriteReadAddr);
                         cpuBusAddr = srcAddr;
                         cpuBusIsWrite = false;
                         readValue = ProcessDmaRead(srcAddr, enableInternalRegReads);
                         cpubus = readValue;
+                        EndCpuCycle();
                         spriteReadAddr++;
                         spriteDmaCounter++;
                     }
                     else
                     {
-                        // Dummy read (DMC waiting for halt/dummy, no sprite)
+                        // Dummy read — StartCpuCycle → phantom read → EndCpuCycle
                         absorbDmaFlags();
-                        tick();
+                        StartCpuCycle();
                         cpuBusAddr = readAddress;
                         cpuBusIsWrite = false;
                         if (!skipDummyReads)
@@ -184,27 +186,29 @@ namespace AprNes
                             ppu2007ReadCooldown = 0;
                             mem_read_fun[readAddress](readAddress);
                         }
+                        EndCpuCycle();
                     }
                 }
                 else
                 {
                     if (spriteDmaTransfer && (spriteDmaCounter & 1) != 0)
                     {
-                        // OAM DMA write cycle
+                        // OAM DMA write cycle — StartCpuCycle → write → EndCpuCycle
                         absorbDmaFlags();
-                        tick();
+                        StartCpuCycle();
                         cpuBusAddr = 0x2004;
                         cpuBusIsWrite = true;
                         spr_ram[spr_ram_add++] = readValue;
+                        EndCpuCycle();
                         spriteDmaCounter++;
                         if (spriteDmaCounter == 0x200)
                             spriteDmaTransfer = false;
                     }
                     else
                     {
-                        // Alignment / dummy read (odd cycle, waiting for even)
+                        // Alignment / dummy read — StartCpuCycle → phantom read → EndCpuCycle
                         absorbDmaFlags();
-                        tick();
+                        StartCpuCycle();
                         cpuBusAddr = readAddress;
                         cpuBusIsWrite = false;
                         if (!skipDummyReads)
@@ -212,6 +216,7 @@ namespace AprNes
                             ppu2007ReadCooldown = 0;
                             mem_read_fun[readAddress](readAddress);
                         }
+                        EndCpuCycle();
                     }
                 }
             }
