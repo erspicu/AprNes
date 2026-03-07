@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AprNes - AccuracyCoin Testing Methodology</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f172a;--surface:#1e293b;--surface2:#283548;--border:#334155;
+  --text:#e2e8f0;--text-dim:#94a3b8;
+  --pass:#22c55e;--pass-bg:rgba(34,197,94,.15);
+  --fail:#ef4444;--fail-bg:rgba(239,68,68,.15);
+  --skip:#f59e0b;--skip-bg:rgba(245,158,11,.15);
+  --draw:#a78bfa;--draw-bg:rgba(167,139,250,.15);
+  --accent:#3b82f6;--accent2:#8b5cf6;
+}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;line-height:1.6;padding:2rem;min-height:100vh;max-width:960px;margin:0 auto}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+h1{font-size:1.8rem;margin-bottom:.25rem;letter-spacing:-.02em;text-align:center}
+h2{font-size:1.2rem;margin:2rem 0 .75rem;padding-bottom:.4rem;border-bottom:1px solid var(--border);color:var(--accent)}
+h3{font-size:.95rem;margin:1.2rem 0 .5rem;color:var(--text)}
+p{margin-bottom:.75rem;font-size:.88rem;color:var(--text-dim)}
+.back{display:inline-block;margin-bottom:1.5rem;font-size:.85rem}
+.lang-switch{float:right;font-size:.85rem}
+.subtitle{text-align:center;color:var(--text-dim);font-size:.88rem;margin-bottom:2rem}
+
+.overview{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.85rem;margin:1.2rem 0 2rem}
+.ov-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1rem;text-align:center}
+.ov-card .num{font-size:1.8rem;font-weight:700}
+.ov-card .num.c-pass{color:var(--pass)}.ov-card .num.c-fail{color:var(--fail)}.ov-card .num.c-skip{color:var(--skip)}.ov-card .num.c-blue{color:var(--accent)}
+.ov-card .lbl{font-size:.78rem;color:var(--text-dim);margin-top:.2rem}
+
+.section{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.2rem 1.5rem;margin-bottom:1rem}
+.section h3{margin-top:0;color:var(--accent);font-size:.95rem}
+.section p{font-size:.82rem}
+.section ul,.section ol{margin:.5rem 0 .75rem 1.2rem;font-size:.82rem;color:var(--text-dim)}
+.section li{margin-bottom:.3rem}
+
+code{background:var(--bg);padding:.15rem .4rem;border-radius:3px;font-size:.78rem;font-family:Consolas,Monaco,'Courier New',monospace}
+pre{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:1rem;margin:.75rem 0;overflow-x:auto;font-size:.78rem;font-family:Consolas,Monaco,'Courier New',monospace;color:var(--text-dim);line-height:1.5}
+
+.flow{display:flex;align-items:center;justify-content:center;gap:.5rem;flex-wrap:wrap;margin:1rem 0;font-size:.82rem}
+.flow .step{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:.5rem .8rem;text-align:center;min-width:100px}
+.flow .step .title{font-weight:600;font-size:.78rem;color:var(--accent)}
+.flow .step .desc{font-size:.7rem;color:var(--text-dim);margin-top:.2rem}
+.flow .arrow{color:var(--text-dim);font-size:1.2rem}
+
+table{width:100%;border-collapse:collapse;margin:.75rem 0;font-size:.82rem}
+th{background:var(--surface2);text-align:left;padding:.5rem .75rem;font-weight:600;font-size:.78rem;border:1px solid var(--border)}
+td{padding:.45rem .75rem;border:1px solid var(--border);color:var(--text-dim)}
+tr:hover td{background:var(--surface2)}
+.badge{display:inline-block;padding:.1rem .4rem;border-radius:4px;font-size:.72rem;font-weight:600}
+.badge.pass{background:var(--pass-bg);color:var(--pass)}
+.badge.fail{background:var(--fail-bg);color:var(--fail)}
+.badge.skip{background:var(--skip-bg);color:var(--skip)}
+.badge.draw{background:var(--draw-bg);color:var(--draw)}
+
+.footer{text-align:center;color:var(--text-dim);font-size:.75rem;margin-top:2rem;padding-top:1rem;border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+
+<a href="AccuracyCoin_report.html" class="back">&larr; Back to AccuracyCoin Report</a>
+<a href="AccuracyCoin_methodology_zh.html" class="lang-switch">&#x4E2D;&#x6587;&#x7248;</a>
+<h1>AccuracyCoin Testing Methodology</h1>
+<p class="subtitle">Advanced NES accuracy testing &mdash; 136 tests across 20 pages</p>
+
+<div class="overview">
+  <div class="ov-card"><div class="num c-blue">136</div><div class="lbl">Tests</div></div>
+  <div class="ov-card"><div class="num c-blue">20</div><div class="lbl">Pages</div></div>
+  <div class="ov-card"><div class="num c-pass">118</div><div class="lbl">PASS</div></div>
+  <div class="ov-card"><div class="num c-fail">17</div><div class="lbl">FAIL</div></div>
+  <div class="ov-card"><div class="num c-skip">1</div><div class="lbl">SKIP</div></div>
+</div>
+
+<!-- ───────── Section 1 ───────── -->
+<h2>1. About AccuracyCoin</h2>
+
+<div class="section">
+<p><strong>AccuracyCoin</strong> is a comprehensive NES accuracy test ROM that goes beyond the standard blargg test suites. It contains <strong>136 individual tests</strong> plus <strong>5 DRAW-only information pages</strong>, covering CPU instructions, unofficial opcodes, interrupt timing, DMA behavior, APU registers, PPU rendering, and edge-case hardware behaviors.</p>
+<ul>
+  <li><strong>ROM path:</strong> <code>nes-test-roms-master/AccuracyCoin-main/AccuracyCoin.nes</code></li>
+  <li><strong>Mapper:</strong> 0 (NROM)</li>
+  <li><strong>Author:</strong> Community project with assembly source available at <code>AccuracyCoin.asm</code></li>
+  <li><strong>Scope:</strong> Tests behaviors that most emulators get wrong &mdash; sub-cycle DMA timing, M2 duty cycle effects, OAM evaluation internals, unstable unofficial opcodes, etc.</li>
+</ul>
+</div>
+
+<!-- ───────── Section 2 ───────── -->
+<h2>2. ROM Navigation</h2>
+
+<div class="section">
+<h3>Startup</h3>
+<p>The ROM boots to Page 1/20 within ~3 seconds, showing a list of test items.</p>
+
+<h3>Page Navigation (focus on page title)</h3>
+<table>
+<tr><th>Button</th><th>Action</th></tr>
+<tr><td><code>Right</code></td><td>Next page (wraps: P20 &rarr; P1)</td></tr>
+<tr><td><code>Left</code></td><td>Previous page (wraps: P1 &rarr; P20)</td></tr>
+<tr><td><code>A</code></td><td>Run all tests on this page</td></tr>
+<tr><td><code>B</code></td><td>Mark all tests as SKIP</td></tr>
+<tr><td><code>Start</code></td><td>Run all 136 tests sequentially</td></tr>
+<tr><td><code>Down</code></td><td>Move focus to first test item</td></tr>
+</table>
+
+<h3>Item Navigation (focus on individual test)</h3>
+<table>
+<tr><th>Button</th><th>Action</th></tr>
+<tr><td><code>Down</code> / <code>Up</code></td><td>Move between test items</td></tr>
+<tr><td><code>A</code></td><td>Run this single test</td></tr>
+<tr><td><code>B</code></td><td>Toggle SKIP mark</td></tr>
+<tr><td><code>Select</code></td><td>Debug menu (memory inspection)</td></tr>
+</table>
+</div>
+
+<!-- ───────── Section 3 ───────── -->
+<h2>3. Testing Tools</h2>
+
+<div class="section">
+<h3>Tool Overview</h3>
+<table>
+<tr><th>Tool</th><th>Purpose</th><th>Usage</th></tr>
+<tr>
+  <td><code>run_ac_test.sh</code></td>
+  <td>Run a specific page or single test item</td>
+  <td><code>bash run_ac_test.sh &lt;page&gt; [item] [options]</code></td>
+</tr>
+<tr>
+  <td><code>run_tests_AccuracyCoin_report.sh</code></td>
+  <td>Full report: run all 20 pages + generate HTML</td>
+  <td><code>bash run_tests_AccuracyCoin_report.sh</code></td>
+</tr>
+<tr>
+  <td><code>run_tests.sh</code></td>
+  <td>Blargg regression check (174 standard ROMs)</td>
+  <td><code>bash run_tests.sh</code></td>
+</tr>
+</table>
+
+<h3>run_ac_test.sh &mdash; Single Page/Item Testing</h3>
+<p>The primary development tool for debugging individual tests:</p>
+<pre># Run all tests on a page
+bash run_ac_test.sh 18
+
+# Run a single test item (1-based index)
+bash run_ac_test.sh 14 7          # P14, item 7 (APU Register Activation)
+
+# Skip an item that hangs, run the rest
+bash run_ac_test.sh 12 --skip 1   # P12, skip IFlagLatency
+
+# Skip build, increase timeout
+bash run_ac_test.sh 13 --no-build --extra-time 10</pre>
+
+<p>The script automatically:</p>
+<ul>
+  <li>Builds the emulator (unless <code>--no-build</code>)</li>
+  <li>Calculates input timing for page navigation (Right key presses)</li>
+  <li>Sends <code>A</code> to start the test, waits for completion</li>
+  <li>Takes a screenshot and dumps the result hex data</li>
+</ul>
+
+<h3>run_tests_AccuracyCoin_report.sh &mdash; Full Report</h3>
+<pre># Full run (build + all 20 pages + screenshots + HTML report)
+bash run_tests_AccuracyCoin_report.sh
+
+# Skip build step
+bash run_tests_AccuracyCoin_report.sh --no-build
+
+# Skip screenshots (faster, data only)
+bash run_tests_AccuracyCoin_report.sh --no-screenshots</pre>
+
+<p>Output:</p>
+<ul>
+  <li>HTML report: <code>report/AccuracyCoin_report.html</code></li>
+  <li>Page screenshots: <code>report/screenshots-ac/ac_page_XX.png</code></li>
+  <li>Intermediate hex data: <code>temp/ac_results/page_XX.hex</code></li>
+</ul>
+</div>
+
+<!-- ───────── Section 4 ───────── -->
+<h2>4. Emulator CLI Parameters</h2>
+
+<div class="section">
+<p>The emulator supports headless execution with joypad input simulation:</p>
+<table>
+<tr><th>Parameter</th><th>Description</th></tr>
+<tr><td><code>--rom &lt;path&gt;</code></td><td>ROM file path</td></tr>
+<tr><td><code>--time &lt;seconds&gt;</code></td><td>Total emulation time in NES seconds</td></tr>
+<tr><td><code>--input &lt;spec&gt;</code></td><td>Simulated joypad input, format: <code>Button:time,Button:time,...</code></td></tr>
+<tr><td><code>--screenshot &lt;path&gt;</code></td><td>Capture final frame as PNG</td></tr>
+<tr><td><code>--timed-screenshots &lt;spec&gt;</code></td><td>Capture at specific times: <code>path1:t1,path2:t2,...</code></td></tr>
+<tr><td><code>--dump-ac-results</code></td><td>Print <code>AC_RESULTS_HEX:</code> memory dump ($0400-$05FF)</td></tr>
+<tr><td><code>--wait-result</code></td><td>Wait for test ROM to signal pass/fail (blargg mode)</td></tr>
+<tr><td><code>--max-wait &lt;sec&gt;</code></td><td>Maximum wait time for <code>--wait-result</code></td></tr>
+</table>
+<p>Button names: <code>A</code>, <code>B</code>, <code>Select</code>, <code>Start</code>, <code>Up</code>, <code>Down</code>, <code>Left</code>, <code>Right</code></p>
+</div>
+
+<!-- ───────── Section 5 ───────── -->
+<h2>5. Test Architecture</h2>
+
+<div class="flow">
+  <div class="step"><div class="title">Boot Emulator</div><div class="desc">Load ROM, wait 3s</div></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step"><div class="title">Navigate</div><div class="desc">Right &times; N</div></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step"><div class="title">Press A</div><div class="desc">Run page tests</div></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step"><div class="title">Wait</div><div class="desc">8&ndash;30 sec</div></div>
+  <span class="arrow">&rarr;</span>
+  <div class="step"><div class="title">Dump</div><div class="desc">Hex + Screenshot</div></div>
+</div>
+
+<div class="section">
+<h3>Why Per-Page Testing?</h3>
+<p>AccuracyCoin's <code>Start</code> button runs all 136 tests sequentially, but <strong>Page 12 item 1 (IRQ Flag Latency Test E) hangs indefinitely</strong> due to DMC DMA timing drift. This blocks all subsequent tests. The per-page architecture solves this by running each page in an independent emulator instance.</p>
+
+<h3>Per-Page Flow</h3>
+<ol>
+  <li><strong>Independent boot:</strong> Each page launches a fresh emulator instance (20 launches total)</li>
+  <li><strong>Navigation:</strong> Right key pressed (N-1) times to reach Page N from Page 1</li>
+  <li><strong>P12 special handling:</strong> Navigate to item 1 &rarr; press B (mark SKIP) &rarr; return to title &rarr; press A</li>
+  <li><strong>P15 special handling:</strong> DRAW-only page, screenshots captured but no PASS/FAIL data</li>
+  <li><strong>Result collection:</strong> <code>--dump-ac-results</code> outputs hex data for memory range $0400-$05FF</li>
+  <li><strong>Merge:</strong> All 20 pages' hex data are merged (non-zero values overwrite zeroes)</li>
+</ol>
+
+<h3>Timing Calculation</h3>
+<pre>ROM boot wait:     3.0 seconds
+Nav key interval:  0.5 seconds per press
+Post-nav settle:   1.0 seconds
+Test wait time:    8-30 seconds (varies by page)
+
+Page N total time &asymp; 3.0 + (N-1) &times; 0.5 + 1.0 + test_wait</pre>
+</div>
+
+<!-- ───────── Section 6 ───────── -->
+<h2>6. Result Encoding</h2>
+
+<div class="section">
+<h3>Memory Layout</h3>
+<p>AccuracyCoin stores each test result as 1 byte at a fixed address in the $0400&ndash;$05FF range:</p>
+<table>
+<tr><th>Value</th><th>Meaning</th><th>Decoding</th></tr>
+<tr><td><code>0x01</code></td><td><span class="badge pass">PASS</span></td><td>bit 0 = 1</td></tr>
+<tr><td><code>0x02</code></td><td><span class="badge fail">FAIL</span> error 0</td><td>(0 &lt;&lt; 2) | 0x02</td></tr>
+<tr><td><code>0x06</code></td><td><span class="badge fail">FAIL</span> error 1</td><td>(1 &lt;&lt; 2) | 0x02</td></tr>
+<tr><td><code>0x0A</code></td><td><span class="badge fail">FAIL</span> error 2</td><td>(2 &lt;&lt; 2) | 0x02</td></tr>
+<tr><td><code>0x1E</code></td><td><span class="badge fail">FAIL</span> error 7</td><td>(7 &lt;&lt; 2) | 0x02</td></tr>
+<tr><td><code>0xFF</code></td><td><span class="badge skip">SKIP</span></td><td>Marked by B button</td></tr>
+<tr><td><code>0x00</code></td><td>Not executed</td><td>&mdash;</td></tr>
+</table>
+<p>General formula: <code>error_code = result_byte &gt;&gt; 2</code> (when bit 1 is set)</p>
+
+<h3>Error Code Meanings</h3>
+<p>Each test defines its own error codes. Common patterns for unofficial opcode tests:</p>
+<ul>
+  <li>1: Target address incorrect</li>
+  <li>2: A register value incorrect</li>
+  <li>3: X register value incorrect</li>
+  <li>4: Y register value incorrect</li>
+  <li>5: CPU flags incorrect</li>
+  <li>6: Stack pointer incorrect</li>
+  <li>7+: DMA bus conflict / timing-dependent behavior</li>
+</ul>
+</div>
+
+<!-- ───────── Section 7 ───────── -->
+<h2>7. Page Contents</h2>
+
+<div class="section">
+<table>
+<tr><th>Page</th><th>Title</th><th>Tests</th><th>Status</th><th>Notes</th></tr>
+<tr><td>1</td><td>CPU Behavior</td><td>9</td><td><span class="badge pass">ALL PASS</span></td><td>Basic CPU: ROM, RAM, flags, dummy R/W, open bus, NOPs</td></tr>
+<tr><td>2</td><td>Addressing Wraparound</td><td>6</td><td><span class="badge pass">ALL PASS</span></td><td>Zero-page, indirect, absolute wrap behavior</td></tr>
+<tr><td>3</td><td>Unofficial: SLO</td><td>7</td><td><span class="badge pass">ALL PASS</span></td><td></td></tr>
+<tr><td>4</td><td>Unofficial: RLA</td><td>7</td><td><span class="badge pass">ALL PASS</span></td><td></td></tr>
+<tr><td>5</td><td>Unofficial: SRE</td><td>7</td><td><span class="badge pass">ALL PASS</span></td><td></td></tr>
+<tr><td>6</td><td>Unofficial: RRA</td><td>7</td><td><span class="badge pass">ALL PASS</span></td><td></td></tr>
+<tr><td>7</td><td>Unofficial: *AX</td><td>10</td><td><span class="badge pass">ALL PASS</span></td><td>SAX + LAX family</td></tr>
+<tr><td>8</td><td>Unofficial: DCP</td><td>7</td><td><span class="badge pass">ALL PASS</span></td><td></td></tr>
+<tr><td>9</td><td>Unofficial: ISC</td><td>7</td><td><span class="badge pass">ALL PASS</span></td><td></td></tr>
+<tr><td>10</td><td>Unofficial: SH*</td><td>6</td><td><span class="badge fail">5 FAIL</span></td><td>SHA/SHS/SHY/SHX need DMA bus conflict</td></tr>
+<tr><td>11</td><td>Unofficial Immediates</td><td>8</td><td><span class="badge pass">ALL PASS</span></td><td>ANC, ASR, ARR, ANE, LXA, AXS, SBC</td></tr>
+<tr><td>12</td><td>CPU Interrupts</td><td>3</td><td><span class="badge skip">1 SKIP</span></td><td>IFlagLatency Test E hangs</td></tr>
+<tr><td>13</td><td>DMA Tests</td><td>10</td><td><span class="badge fail">6 FAIL</span></td><td>Shared DMA precondition failure</td></tr>
+<tr><td>14</td><td>APU Tests</td><td>9</td><td><span class="badge fail">3 FAIL</span></td><td>DMC, APU Reg Activation, Controller</td></tr>
+<tr><td>15</td><td>Power On State</td><td>5</td><td><span class="badge draw">DRAW</span></td><td>Information display only, no PASS/FAIL</td></tr>
+<tr><td>16</td><td>PPU Rendering</td><td>7</td><td><span class="badge pass">ALL PASS</span></td><td>CHR, registers, palette, $2007</td></tr>
+<tr><td>17</td><td>PPU VBlank Timing</td><td>7</td><td><span class="badge pass">ALL PASS</span></td><td>VBL begin/end, NMI control/timing/suppression</td></tr>
+<tr><td>18</td><td>Sprite Evaluation</td><td>9</td><td><span class="badge pass">ALL PASS</span></td><td>Overflow, hit, OAM, $2002 flag timing</td></tr>
+<tr><td>19</td><td>PPU Misc</td><td>6</td><td><span class="badge fail">3 FAIL</span></td><td>BG serial, sprites SL0, $2004 stress</td></tr>
+<tr><td>20</td><td>CPU Behavior 2</td><td>4</td><td><span class="badge fail">1 FAIL</span></td><td>Implied dummy reads (DMA prereq)</td></tr>
+</table>
+</div>
+
+<!-- ───────── Section 8 ───────── -->
+<h2>8. Known Limitations</h2>
+
+<div class="section">
+<h3>Hanging Test</h3>
+<table>
+<tr><th>Test</th><th>Page</th><th>Issue</th><th>Root Cause</th></tr>
+<tr><td>IRQ Flag Latency (Test E)</td><td>P12, item 1</td><td>Infinite loop</td><td>DMC DMA cumulative timing drift (~12 cycles). Requires Master Clock scheduler.</td></tr>
+</table>
+
+<h3>Remaining FAIL Categories</h3>
+<table>
+<tr><th>Root Cause</th><th>Count</th><th>Description</th></tr>
+<tr><td>DMA sub-cycle precision</td><td>12</td><td>P10 SH* (5) + P13 DMA (6) + P20 dummy reads (1). All share the same DMADMASync precondition failure.</td></tr>
+<tr><td>DMC/APU bus interaction</td><td>3</td><td>P14: DMC channel, APU register activation during DMA, controller strobe PUT/GET parity.</td></tr>
+<tr><td>PPU per-dot precision</td><td>3</td><td>P19: BG shift register reload timing, secondary OAM persistence, OAM evaluation state machine.</td></tr>
+</table>
+
+<h3>Highest ROI Fix Target</h3>
+<p>Fixing the <code>DMADMASync_PreTest</code> precondition (sub-cycle accurate DMC DMA open bus timing) could unlock <strong>+6 to +12 tests</strong> at once, covering P13, P10, and P20.</p>
+</div>
+
+<div class="footer">
+  AprNes &mdash; AccuracyCoin Testing Methodology &mdash; Last updated: 2026-03-07
+</div>
+
+</body>
+</html>

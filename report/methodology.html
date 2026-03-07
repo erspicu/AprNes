@@ -126,10 +126,11 @@ The same ROMs are used by every major NES emulator project to measure accuracy.<
 <h3>Headless Mode</h3>
 <p>The emulator has a built-in <code>TestRunner.cs</code> that runs in headless mode &mdash; no window, no audio, no frame rate limiter. The CPU/PPU/APU all tick at maximum speed. A single test ROM typically completes in under 1 second.</p>
 
-<h3>Two Scripts, Two Purposes</h3>
-<p>The testing workflow uses two complementary scripts with identical test lists (174 ROMs):</p>
+<h3>Three Scripts, Three Purposes</h3>
+<p>The testing workflow uses three scripts with identical test lists (174 ROMs):</p>
 <ul>
-  <li><strong><code>run_tests.sh</code></strong> &mdash; Lightweight validation script. Runs all tests and prints PASS/FAIL to stdout with a failure summary. Used for quick regression checks during development.</li>
+  <li><strong><code>run_tests.sh</code></strong> &mdash; Bash validation script. Runs all tests (4 parallel jobs by default) and prints PASS/FAIL to stdout with a failure summary. Used for quick regression checks.</li>
+  <li><strong><code>run_tests.py</code></strong> &mdash; Python fast version. Same 174 tests but with 8 parallel threads by default, typically 30-50% faster than the Bash version. Usage: <code>python run_tests.py</code> or <code>python run_tests.py -j 4</code>.</li>
   <li><strong><code>run_tests_report.sh</code></strong> &mdash; Full-featured report generator with modular output controlled by command-line flags.</li>
 </ul>
 

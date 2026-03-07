@@ -126,10 +126,11 @@ tr:hover td{background:var(--surface2)}
 <h3>無頭模式</h3>
 <p>模擬器內建 <code>TestRunner.cs</code>，以無頭模式運行 &mdash; 沒有視窗、沒有音效、沒有幀率限制。CPU/PPU/APU 全部以最高速度運行。單個測試 ROM 通常在 1 秒內完成。</p>
 
-<h3>兩個腳本、兩種用途</h3>
-<p>測試工作流使用兩個互補的腳本，測試清單完全一致（174 個 ROM）：</p>
+<h3>三個腳本、三種用途</h3>
+<p>測試工作流使用三個腳本，測試清單完全一致（174 個 ROM）：</p>
 <ul>
-  <li><strong><code>run_tests.sh</code></strong> &mdash; 輕量驗證腳本。執行所有測試並將 PASS/FAIL 輸出到 stdout，附帶失敗摘要。用於開發過程中快速回歸檢查。</li>
+  <li><strong><code>run_tests.sh</code></strong> &mdash; Bash 驗證腳本。預設 4 個平行工作，執行所有測試並將 PASS/FAIL 輸出到 stdout，附帶失敗摘要。用於快速回歸檢查。</li>
+  <li><strong><code>run_tests.py</code></strong> &mdash; Python 快速版本。同樣 174 個測試，預設 8 個平行執行緒，通常比 Bash 版快 30-50%。用法：<code>python run_tests.py</code> 或 <code>python run_tests.py -j 4</code>。</li>
   <li><strong><code>run_tests_report.sh</code></strong> &mdash; 全功能報告產生器，透過命令列參數控制模組化輸出。</li>
 </ul>
 
