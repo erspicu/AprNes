@@ -43,7 +43,7 @@ tr:hover td { background:#1e2a5e; }
 </head>
 <body>
 <h1>AccuracyCoin Report - AprNes</h1>
-<div class="meta">Generated: 2026-03-07 04:42 | ROM: AccuracyCoin.nes (Mapper 0/NROM) | Method: page-by-page</div>
+<div class="meta">Generated: 2026-03-07 11:37 | ROM: AccuracyCoin.nes (Mapper 0/NROM) | Method: page-by-page</div>
 
 <div class="note warn">
   Page 12 item 1 (Interrupt Flag Latency) is marked SKIP - test hangs due to DMC DMA timing drift (~12 cycles).
@@ -51,8 +51,8 @@ tr:hover td { background:#1e2a5e; }
 </div>
 
 <div class="summary">
-  <div class="stat"><div class="num pass-c">114</div><div class="lbl">PASS</div></div>
-  <div class="stat"><div class="num fail-c">21</div><div class="lbl">FAIL</div></div>
+  <div class="stat"><div class="num pass-c">117</div><div class="lbl">PASS</div></div>
+  <div class="stat"><div class="num fail-c">18</div><div class="lbl">FAIL</div></div>
   <div class="stat"><div class="num skip-c">1</div><div class="lbl">SKIP</div></div>
   <div class="stat"><div class="num notrun-c">0</div><div class="lbl">N/A</div></div>
   <div class="stat"><div class="num">136</div><div class="lbl">TOTAL</div></div>
@@ -367,7 +367,7 @@ tr:hover td { background:#1e2a5e; }
 <div class="suite">
   <div class="suite-header">
     <span>Page 18: Sprite Evaluation</span>
-    <span class="suite-stats"><span class="pass-c">6 PASS</span> | <span class="fail-c">3 FAIL</span></span>
+    <span class="suite-stats"><span class="pass-c">8 PASS</span> | <span class="fail-c">1 FAIL</span></span>
   </div>
   <img src="screenshots-ac/ac_page_18.png" alt="Sprite Evaluation" class="ss" loading="lazy">
   <table>
@@ -375,10 +375,10 @@ tr:hover td { background:#1e2a5e; }
     <tr><td>1</td><td>Sprite overflow behavior</td><td><span class="badge pass">PASS</span></td><td class="addr">$0459=01</td></tr>
     <tr><td>2</td><td>Sprite 0 Hit behavior</td><td><span class="badge pass">PASS</span></td><td class="addr">$0457=01</td></tr>
     <tr><td>3</td><td>$2002 flag clear timing</td><td><span class="badge fail">FAIL (err 1)</span></td><td class="addr">$048D=06</td></tr>
-    <tr><td>4</td><td>Suddenly Resize Sprite</td><td><span class="badge fail">FAIL (err 4)</span></td><td class="addr">$0489=12</td></tr>
+    <tr><td>4</td><td>Suddenly Resize Sprite</td><td><span class="badge pass">PASS</span></td><td class="addr">$0489=01</td></tr>
     <tr><td>5</td><td>Arbitrary Sprite zero</td><td><span class="badge pass">PASS</span></td><td class="addr">$0458=01</td></tr>
     <tr><td>6</td><td>Misaligned OAM behavior</td><td><span class="badge pass">PASS</span></td><td class="addr">$045A=01</td></tr>
-    <tr><td>7</td><td>Address $2004 behavior</td><td><span class="badge fail">FAIL (err 8)</span></td><td class="addr">$045B=22</td></tr>
+    <tr><td>7</td><td>Address $2004 behavior</td><td><span class="badge pass">PASS</span></td><td class="addr">$045B=01</td></tr>
     <tr><td>8</td><td>OAM Corruption</td><td><span class="badge pass">PASS</span></td><td class="addr">$047B=01</td></tr>
     <tr><td>9</td><td>INC $4014</td><td><span class="badge pass">PASS</span></td><td class="addr">$0480=01</td></tr>
   </table>
@@ -387,14 +387,14 @@ tr:hover td { background:#1e2a5e; }
 <div class="suite">
   <div class="suite-header">
     <span>Page 19: PPU Misc.</span>
-    <span class="suite-stats"><span class="pass-c">2 PASS</span> | <span class="fail-c">4 FAIL</span></span>
+    <span class="suite-stats"><span class="pass-c">3 PASS</span> | <span class="fail-c">3 FAIL</span></span>
   </div>
   <img src="screenshots-ac/ac_page_19.png" alt="PPU Misc." class="ss" loading="lazy">
   <table>
     <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
     <tr><td>1</td><td>Attributes As Tiles</td><td><span class="badge pass">PASS</span></td><td class="addr">$0481=01</td></tr>
     <tr><td>2</td><td>t Register Quirks</td><td><span class="badge pass">PASS</span></td><td class="addr">$0482=01</td></tr>
-    <tr><td>3</td><td>Stale BG Shift Registers</td><td><span class="badge fail">FAIL (err 1)</span></td><td class="addr">$0483=06</td></tr>
+    <tr><td>3</td><td>Stale BG Shift Registers</td><td><span class="badge pass">PASS</span></td><td class="addr">$0483=01</td></tr>
     <tr><td>4</td><td>BG Serial In</td><td><span class="badge fail">FAIL (err 2)</span></td><td class="addr">$0487=0A</td></tr>
     <tr><td>5</td><td>Sprites On Scanline 0</td><td><span class="badge fail">FAIL (err 2)</span></td><td class="addr">$0484=0A</td></tr>
     <tr><td>6</td><td>$2004 Stress Test</td><td><span class="badge fail">FAIL (err 1)</span></td><td class="addr">$048C=06</td></tr>

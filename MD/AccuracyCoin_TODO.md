@@ -1,6 +1,6 @@
 # AccuracyCoin FAIL 修復 TODO
 
-**基線**: 116/136 PASS, 19 FAIL, 1 SKIP (BUGFIX41 後)
+**基線**: 117/136 PASS, 18 FAIL, 1 SKIP (BUGFIX42 後)
 **目標**: 逐步提升至 Master Clock 驅動模型
 
 ---
@@ -11,10 +11,10 @@
 |------|------|------|------|------|
 | INDEPENDENT | 7 | 7 | 0 | 不依賴 timing 改動，可獨立修復 |
 | TIMING-CORE | 11 | 3 | 8 | 需要 DMA/IRQ/PPU cycle-level 改動 |
-| TIMING-DEPENDENT | 7 | 3 | 4 | 依賴正確 timing 基礎設施 |
+| TIMING-DEPENDENT | 7 | 4 | 3 | 依賴正確 timing 基礎設施 |
 | HARDWARE-EDGE | 5 | 0 | 5 | SH* RDY line，極端硬體行為 |
 
-已修 13 項 (7 INDEPENDENT + 3 TIMING-CORE + 3 TIMING-DEPENDENT)，剩餘 19 FAIL + 1 SKIP
+已修 14 項 (7 INDEPENDENT + 3 TIMING-CORE + 4 TIMING-DEPENDENT)，剩餘 18 FAIL + 1 SKIP
 
 ---
 
@@ -123,8 +123,9 @@
 - [ ] **Implied Dummy Reads** (P20, $046D, err=3, HARD)
   - 前置條件：DMC DMA 必須正確更新 data bus（被 DMA timing 擋住）
 
-- [ ] **Suddenly Resize Sprite** (P18, $0489, err=4, HARD)
-  - HBlank 寫入 $2000 改變 sprite size 應影響當前 scanline 的 sprite 範圍判定
+- [x] **Suddenly Resize Sprite** (P18, $0489, PASS - BUGFIX42)
+  - 修復: 在 dot 261 (sprite 0 CHR fetch) latch Spritesize8x16
+  - PrecomputeSprite0Line 改用 latched 值，匹配硬體 fetch 時序
 
 - [ ] **Sprites On Scanline 0** (P19, $0484, err=2, HARD)
   - pre-render scanline 的 sprite evaluation 使用 stale secondary OAM 資料
@@ -167,4 +168,4 @@ Page 12 item 1 (SKIP→PASS)→ 需要完整 Master Clock（136/136）
 
 ---
 
-*最後更新：2026-03-09*
+*最後更新：2026-03-07*

@@ -238,6 +238,12 @@ namespace AprNes
             {
                 if (ppu_cycles_x == 257) { CopyHoriV(); spr_ram_add = 0; }
 
+                // Latch sprite size at dot 261 (sprite 0 CHR low fetch address).
+                // On real hardware, the Spritesize8x16 value at CHR fetch time determines
+                // tile addressing. Mid-HBlank $2000 writes after this dot won't affect
+                // the current scanline's sprite 0 tile data.
+                if (ppu_cycles_x == 261) spriteSizeLatchedForFetch = Spritesize8x16;
+
                 if (mapper == 4)
                 {
                     int phase = (ppu_cycles_x - 257) & 7;
@@ -408,6 +414,7 @@ namespace AprNes
         static byte sprite0_tile_low, sprite0_tile_high;
         static bool sprite0_flip_x;
         static int sprite0_eval_addr;  // OAMADDR at start of sprite evaluation (dot 65), for next scanline's sprite 0
+        static bool spriteSizeLatchedForFetch; // Spritesize8x16 latched at dot 261 (sprite 0 CHR fetch timing)
 
         // Pre-computed sprite overflow cycle for cycle-accurate overflow flag timing
         static int spriteOverflowCycle;
@@ -469,7 +476,11 @@ namespace AprNes
             byte sprX    = spr_ram[(byte)(addrH * 4 + addrL)];
 
             int y_loc = sprY + 1; // NES hardware: sprites display at OAM_Y + 1
-            int height = Spritesize8x16 ? 15 : 7;
+            // Use latched sprite size from dot 261 of previous scanline's HBlank.
+            // This matches real hardware where sprite 0's CHR fetch uses the size
+            // at fetch time, not the value at dot 0 of the next scanline.
+            bool sprSize16 = spriteSizeLatchedForFetch;
+            int height = sprSize16 ? 15 : 7;
             if (scanline < y_loc || scanline - y_loc > height) return;
 
             sprite0_on_line = true;
@@ -479,7 +490,7 @@ namespace AprNes
             int offset, tile_th_t, line, line_t;
             byte tile_th;
 
-            if (Spritesize8x16)
+            if (sprSize16)
             {
                 tile_th = (byte)(sprTile & 0xfe);
                 offset = (sprTile & 1) != 0 ? 256 : 0;
@@ -504,7 +515,7 @@ namespace AprNes
             if ((sprAttr & 0x80) != 0)
             {
                 line_t = 7 - line;
-                if (Spritesize8x16) tile_th_t ^= 1;
+                if (sprSize16) tile_th_t ^= 1;
             }
             else line_t = line;
 
