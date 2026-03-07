@@ -10,6 +10,12 @@ namespace AprNes
         static ushort cpuBusAddr = 0;    // CPU current bus address (for DMC phantom reads)
         static bool cpuBusIsWrite = false; // true = write cycle, false = read cycle
 
+        // M2 phase tracking: true = PUT (M2 low, write phase), false = GET (M2 high, read phase)
+        // Derived from cpuCycleCount parity — represents the absolute M2 clock phase,
+        // independent of whether the current bus access is a read or write.
+        // DMA halt/alignment decisions depend on this phase.
+        static bool m2PhaseIsWrite = false;
+
         // Master Clock timing (NTSC: 21,477,272.73 Hz)
         // CPU = master ÷ 12, PPU = master ÷ 4, APU = CPU rate
         // 1 CPU cycle = 12 master clocks = 3 PPU dots
@@ -52,6 +58,7 @@ namespace AprNes
         {
             masterClock += MASTER_PER_CPU;
             cpuCycleCount++;
+            m2PhaseIsWrite = (cpuCycleCount & 1) != 0;
 
             // Promote nmi_delay from previous cycle → nmi_pending (1-cycle hardware delay)
             if (nmi_delay) { nmi_pending = true; nmi_delay = false; }
@@ -66,13 +73,15 @@ namespace AprNes
             irqLineCurrent = (statusframeint && !apuintflag) || statusdmcint || statusmapperint;
         }
 
-        // φ1 phase: all 3 PPU dots + APU before CPU bus access (currently 3+0 split).
-        // Future 2+1 split: move last dot + IRQ to tick_post when PPU register timing is adjusted.
+        // φ1 phase: all 3 PPU dots + APU before CPU bus access.
+        // NOTE: 2+1 split was tested but causes 10 NMI/VBL timing regressions.
+        // Requires PPU event recalibration before it can work. Keep 3+0 for now.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void tick_pre()
         {
             masterClock += MASTER_PER_CPU;
             cpuCycleCount++;
+            m2PhaseIsWrite = (cpuCycleCount & 1) != 0;
 
             if (nmi_delay) { nmi_pending = true; nmi_delay = false; }
             catchUpPPU();
@@ -83,7 +92,8 @@ namespace AprNes
             irqLineCurrent = (statusframeint && !apuintflag) || statusdmcint || statusmapperint;
         }
 
-        // φ2 phase: placeholder for post-access PPU dot (currently empty — all dots in tick_pre).
+        // φ2 phase: placeholder (all dots currently in tick_pre).
+        // Future: move 1 PPU dot here once VBL/NMI timing is recalibrated.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void tick_post()
         {

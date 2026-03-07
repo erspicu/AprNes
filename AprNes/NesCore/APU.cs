@@ -699,12 +699,12 @@ namespace AprNes
                     //   to correctly handle reads on PUT cycles (AccuracyCoin clockslide fix).
                     // Reload DMA: uses cpuBusIsWrite proxy (empirically correct for blargg).
                     //
+                    // DMA halt/alignment cycles depend on M2 phase at the moment DMA fires.
+                    // Load DMA: uses m2PhaseIsWrite (cpuCycleCount parity = absolute M2 phase)
+                    // Reload DMA: uses cpuBusIsWrite (bus direction at trigger point)
                     int haltCycles;
                     if (isLoad)
-                    {
-                        bool isPutCycle = (cpuCycleCount & 1) != 0;
-                        haltCycles = isPutCycle ? 3 : 2;
-                    }
+                        haltCycles = m2PhaseIsWrite ? 3 : 2;
                     else
                         haltCycles = cpuBusIsWrite ? 2 : 3;
 
