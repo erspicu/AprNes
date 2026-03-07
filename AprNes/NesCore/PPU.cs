@@ -261,6 +261,10 @@ namespace AprNes
                 }
             }
 
+            // Dot 321: latch secondary OAM[0] into oamCopyBuffer for dots 321-340
+            if (ppu_cycles_x == 321 && scanline < 240 && (ShowBackGround || ShowSprites))
+                oamCopyBuffer = secondaryOAM[0];
+
             // Pre-render scanline: continuous vert(v) = vert(t) copy at cycles 280-304
             if (scanline == 261 && ppu_cycles_x >= 280 && ppu_cycles_x <= 304)
             {
@@ -681,6 +685,8 @@ namespace AprNes
             {
                 // Odd cycle: read from primary OAM
                 oamCopyBuffer = spr_ram[(byte)(spriteEvalAddrH * 4 + spriteEvalAddrL)];
+                // Attribute byte bits 2-4 don't exist in hardware; masked on internal bus
+                if (spriteEvalAddrL == 2) oamCopyBuffer &= 0xE3;
             }
             else
             {
@@ -742,36 +748,48 @@ namespace AprNes
                         spriteInRange = !oamCopyDone;
                 }
 
-                // Write to secondary OAM
-                secondaryOAM[secOAMAddr] = oamCopyBuffer;
-
-                if (spriteInRange)
+                if (oamCopyDone)
                 {
-                    // First in-range sprite at the very first evaluation is sprite 0
-                    if (ppu_cycles_x == 66) sprite0Added = true;
+                    // All 64 sprites checked, fewer than 8 in range:
+                    // even dots read from secondary OAM into oamCopyBuffer (no write)
+                    oamCopyBuffer = secondaryOAM[secOAMAddr];
+                    // Still advance through primary OAM (hardware continues cycling)
+                    spriteEvalAddrH = (byte)((spriteEvalAddrH + 1) & 0x3F);
+                    spriteEvalAddrL = 0;
+                }
+                else
+                {
+                    // Write to secondary OAM (attribute already masked at read time)
+                    secondaryOAM[secOAMAddr] = oamCopyBuffer;
 
-                    spriteEvalAddrL++;
-                    secOAMAddr++;
-
-                    if (spriteEvalAddrL >= 4)
+                    if (spriteInRange)
                     {
+                        // First in-range sprite at the very first evaluation is sprite 0
+                        if (ppu_cycles_x == 66) sprite0Added = true;
+
+                        spriteEvalAddrL++;
+                        secOAMAddr++;
+
+                        if (spriteEvalAddrL >= 4)
+                        {
+                            spriteEvalAddrH = (byte)((spriteEvalAddrH + 1) & 0x3F);
+                            spriteEvalAddrL = 0;
+                            if (spriteEvalAddrH == 0) oamCopyDone = true;
+                        }
+
+                        if ((secOAMAddr & 0x03) == 0)
+                        {
+                            // Done copying 4 bytes of this sprite
+                            spriteInRange = false;
+                        }
+                    }
+                    else
+                    {
+                        // Not in range: skip to next sprite
                         spriteEvalAddrH = (byte)((spriteEvalAddrH + 1) & 0x3F);
                         spriteEvalAddrL = 0;
                         if (spriteEvalAddrH == 0) oamCopyDone = true;
                     }
-
-                    if ((secOAMAddr & 0x03) == 0)
-                    {
-                        // Done copying 4 bytes of this sprite
-                        spriteInRange = false;
-                    }
-                }
-                else
-                {
-                    // Not in range: skip to next sprite
-                    spriteEvalAddrH = (byte)((spriteEvalAddrH + 1) & 0x3F);
-                    spriteEvalAddrL = 0;
-                    if (spriteEvalAddrH == 0) oamCopyDone = true;
                 }
             }
 
@@ -1161,27 +1179,32 @@ namespace AprNes
             bool renderingOn = ShowBackGround || ShowSprites;
             if (scanline >= 0 && scanline < 240 && renderingOn)
             {
-                if (ppu_cycles_x >= 1 && ppu_cycles_x <= 64)
+                // Timing offset: tick() processes 3 PPU dots BEFORE the bus read,
+                // so at cx=N the last processed dot was N-1. Shift ranges by +1.
+                if (ppu_cycles_x >= 2 && ppu_cycles_x <= 65)
                 {
-                    // Secondary OAM clear: returns oamCopyBuffer ($FF)
+                    // Secondary OAM clear phase (hardware dots 1-64): always $FF
+                    val = 0xFF;
+                }
+                else if (ppu_cycles_x >= 66 && ppu_cycles_x <= 257)
+                {
+                    // Sprite evaluation phase (hardware dots 65-256): last byte read from primary OAM
                     val = oamCopyBuffer;
                 }
-                else if (ppu_cycles_x >= 65 && ppu_cycles_x <= 256)
+                else if (ppu_cycles_x >= 258 && ppu_cycles_x <= 321)
                 {
-                    // Sprite evaluation: returns the last byte read from primary OAM
-                    val = oamCopyBuffer;
-                }
-                else if (ppu_cycles_x >= 257 && ppu_cycles_x <= 320)
-                {
-                    // Sprite tile fetch: reads from secondary OAM
-                    int offset = ppu_cycles_x - 257;
+                    // Sprite tile fetch (hardware dots 257-320): reads from secondary OAM
+                    // Pattern per 8-dot group: Y, tile, attr, X, X, X, X, X
+                    int offset = ppu_cycles_x - 258;
                     int spriteIdx = offset >> 3;
-                    int byteIdx = offset & 0x03;
+                    int step = offset & 0x07;
+                    int byteIdx = step > 3 ? 3 : step;
                     val = secondaryOAM[spriteIdx * 4 + byteIdx];
                 }
                 else
                 {
-                    val = spr_ram[spr_ram_add];
+                    // Dots 0-1 and 322-340: return oamCopyBuffer
+                    val = oamCopyBuffer;
                 }
             }
             else

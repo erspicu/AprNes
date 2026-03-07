@@ -1,6 +1,6 @@
 # AccuracyCoin 修復追蹤
 
-**基線**: 120/136 PASS, 15 FAIL, 1 SKIP (BUGFIX47)
+**基線**: 121/136 PASS, 14 FAIL, 1 SKIP (BUGFIX48)
 **最後更新**: 2026-03-08
 
 ---
@@ -19,7 +19,7 @@
 | P16 | PPU Rendering | 全 PASS | |
 | P17 | PPU VBlank Timing | 全 PASS | |
 | P18 | Sprite Evaluation | 全 PASS | BUGFIX45 修復最後一項 |
-| P19 | PPU Misc | 1 FAIL / 6 | $2004 Stress Test |
+| P19 | PPU Misc | 全 PASS | BUGFIX48 修復 $2004 Stress Test |
 | P20 | CPU Behavior 2 | 2 FAIL / 4 | Instruction Timing / Implied Dummy Reads |
 
 ---
@@ -51,10 +51,11 @@
 - [x] Stale BG Shift Registers (P19) — BUGFIX40
 - [x] Suddenly Resize Sprite (P18) — BUGFIX42
 - [x] Sprites On Scanline 0 (P19) — **BUGFIX47**: secondary OAM + per-dot eval FSM + pre-render sprite data
+- [x] $2004 Stress Test (P19) — **BUGFIX48**: per-dot $2004 read accuracy, attribute masking at read level, post-eval OAM2 read
 
 ---
 
-## 剩餘 15 FAIL + 1 SKIP
+## 剩餘 14 FAIL + 1 SKIP
 
 ### 根因 A: DMA Sub-cycle 精度（12 項，共用根因）
 
@@ -100,15 +101,15 @@
 | APU Register Activation | $045C | — | **PASS** (BUGFIX46: $4017 read handler + ProcessDmaRead open bus fix) |
 | Controller Strobing | $045F | 1 | Test 4 PUT/GET parity，OAM DMA 後 parity 不準 |
 
-### 根因 C: PPU Per-dot 精度（1 項）
+### 根因 C: PPU Per-dot 精度（已全部完成）
 
-**P19: PPU Misc (1 FAIL)**
+**P19: PPU Misc (全 PASS)**
 
 | 測試 | 地址 | err | 分析 |
 |------|------|-----|------|
 | BG Serial In | $0487 | — | **PASS** (BUGFIX BGSerialIn) |
 | Sprites On Scanline 0 | $0484 | — | **PASS** (BUGFIX47: secondary OAM + per-dot eval FSM) |
-| $2004 Stress Test | $048C | 1 | 需 per-dot OAM evaluation state machine（仍有差異） |
+| $2004 Stress Test | $048C | — | **PASS** (BUGFIX48: per-dot $2004 read, attr masking, post-eval OAM2 read) |
 
 ### 根因 D: DMC DMA 累積偏移（1 項）
 
@@ -128,7 +129,7 @@
 |------|----------|------|------|
 | P13 DMA 前置條件 | +6~+13 | 極高 | 修好 DMADMASync_PreTest 可解鎖 P13(6) + P20(2) + P10(5) |
 | P14 Controller Strobe | +1 | 高 | PUT/GET parity 問題，嘗試過翻轉但回歸 |
-| P19 $2004 Stress | +1 | 高 | 已有 per-dot eval FSM，但 $2004 讀取仍有差異 |
+| P19 $2004 Stress | ~~+1~~ | ~~高~~ | **已完成 BUGFIX48** |
 | Master Clock 重構 | +16 | 極高 | 理論上解決所有問題，但工程量巨大 |
 
 ---
@@ -143,4 +144,4 @@
 | P14 APU Reg Test 6 | $4020-$40FF mirror | P14 -1 回歸 | Controller Strobing 受影響 |
 | P14 Controller Strobing | 翻轉 strobe parity | -1 回歸 | 其他測試依賴當前 parity |
 | P14 APU Reg Activation | cpuLastReadAddr tracking | err 4→6 惡化 | 已 revert |
-| P19 $2004 Stress | oamCopyBuffer + secondaryOam | 無改善 | 需 per-dot pipeline |
+| P19 $2004 Stress | oamCopyBuffer + secondaryOam | **已修復 BUGFIX48** | 需 attr mask at read + post-eval OAM2 read |
