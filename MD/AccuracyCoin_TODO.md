@@ -1,6 +1,6 @@
 # AccuracyCoin FAIL 修復 TODO
 
-**基線**: 114/136 PASS, 21 FAIL, 1 SKIP (BUGFIX39 後)
+**基線**: 115/136 PASS, 20 FAIL, 1 SKIP (BUGFIX40 後)
 **目標**: 逐步提升至 Master Clock 驅動模型
 
 ---
@@ -11,10 +11,10 @@
 |------|------|------|------|------|
 | INDEPENDENT | 7 | 7 | 0 | 不依賴 timing 改動，可獨立修復 |
 | TIMING-CORE | 11 | 3 | 8 | 需要 DMA/IRQ/PPU cycle-level 改動 |
-| TIMING-DEPENDENT | 7 | 1 | 6 | 依賴正確 timing 基礎設施 |
+| TIMING-DEPENDENT | 7 | 2 | 5 | 依賴正確 timing 基礎設施 |
 | HARDWARE-EDGE | 5 | 0 | 5 | SH* RDY line，極端硬體行為 |
 
-已修 11 項 (7 INDEPENDENT + 3 TIMING-CORE + 1 TIMING-DEPENDENT)，剩餘 21 FAIL + 1 SKIP
+已修 12 項 (7 INDEPENDENT + 3 TIMING-CORE + 2 TIMING-DEPENDENT)，剩餘 20 FAIL + 1 SKIP
 
 ---
 
@@ -107,9 +107,10 @@
 - [x] **$2007 read w/ rendering** (P16, $048A, PASS - BUGFIX34)
   - 修復: Increment2007() — rendering 期間 CXinc+Yinc 取代 +1/+32
 
-- [ ] **Stale BG Shift Registers** (P19, $0483, err=1, MEDIUM)
-  - rendering 關閉後再開啟，BG shift registers 應保留 stale data
-  - 需要 mid-scanline rendering toggle 時 shift register 狀態正確保留
+- [x] **Stale BG Shift Registers** (P19, $0483, PASS - BUGFIX40)
+  - 修復: ppu_w_2001 在 rendering disabled→enabled 轉換時重新執行 PrecomputeSprite0Line()
+  - sprite0_line_x 設為 ppu_cycles_x（凍結的 sprite counter 從當前 dot 開始）
+  - BG shift registers 本身已正確保留 stale data（static 變數不會被清除）
 
 - [ ] **$2004 Stress Test** (P19, $048C, err=1, MEDIUM)
   - dot 0 讀取 $2004 應返回 Secondary OAM Index 0 (oamCopyBuffer)
@@ -166,4 +167,4 @@ Page 12 item 1 (SKIP→PASS)→ 需要完整 Master Clock（136/136）
 
 ---
 
-*最後更新：2026-03-07*
+*最後更新：2026-03-08*

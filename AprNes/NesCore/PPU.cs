@@ -825,7 +825,18 @@ namespace AprNes
             if (prevRenderingEnabled != newRenderingEnabled && scanline >= 0 && scanline < 240)
             {
                 if (newRenderingEnabled)
+                {
                     ProcessOamCorruption();
+                    // Mid-scanline rendering re-enable: sprite 0 wasn't precomputed at dot 0
+                    // (rendering was off then). Re-run now so hit detection can work.
+                    // Sprite counters were frozen, so sprite appears at the current dot.
+                    if (!sprite0_on_line && !isSprite0hit && ppu_cycles_x > 0)
+                    {
+                        PrecomputeSprite0Line();
+                        if (sprite0_on_line)
+                            sprite0_line_x = ppu_cycles_x;
+                    }
+                }
                 else
                     SetOamCorruptionFlags();
             }

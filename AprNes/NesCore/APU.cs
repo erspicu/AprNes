@@ -598,7 +598,14 @@ namespace AprNes
             {
                 --dmcLoadDmaCountdown;
                 if (dmcLoadDmaCountdown == 0 && dmcBufferEmpty && dmcsamplesleft > 0)
-                    dmcfillbuffer();
+                {
+                    if (oamDmaInProgress)
+                        dmcfillbuffer(); // OAM overlap: fire immediately
+                    else
+                    {
+                        dmcDmaPending = true; // Defer to next CPU read cycle (Mesen2: ProcessPendingDma)
+                    }
+                }
                 return;
             }
 

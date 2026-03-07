@@ -97,6 +97,8 @@ namespace AprNes
 
             cpuBusAddr = address;
             cpuBusIsWrite = false;
+            // Deferred DMC DMA: fires at next read cycle with correct bus address (Mesen2 model)
+            if (dmcDmaPending) { dmcDmaPending = false; dmcfillbuffer(); }
             tick_pre();                          // 3 PPU dots + APU before read
             byte val = mem_read_fun[address](address);
             if (address != 0x4015) cpubus = val;
@@ -120,6 +122,7 @@ namespace AprNes
         {
             if (oamDmaPending) oamDmaExecute();
             cpuBusAddr = addr; cpuBusIsWrite = false;
+            if (dmcDmaPending) { dmcDmaPending = false; dmcfillbuffer(); }
             tick_pre();
             byte val = NES_MEM[addr]; cpubus = val;
             tick_post();
