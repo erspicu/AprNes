@@ -1,6 +1,6 @@
 # AccuracyCoin FAIL 修復 TODO
 
-**基線**: 115/136 PASS, 20 FAIL, 1 SKIP (BUGFIX40 後)
+**基線**: 116/136 PASS, 19 FAIL, 1 SKIP (BUGFIX41 後)
 **目標**: 逐步提升至 Master Clock 驅動模型
 
 ---
@@ -11,10 +11,10 @@
 |------|------|------|------|------|
 | INDEPENDENT | 7 | 7 | 0 | 不依賴 timing 改動，可獨立修復 |
 | TIMING-CORE | 11 | 3 | 8 | 需要 DMA/IRQ/PPU cycle-level 改動 |
-| TIMING-DEPENDENT | 7 | 2 | 5 | 依賴正確 timing 基礎設施 |
+| TIMING-DEPENDENT | 7 | 3 | 4 | 依賴正確 timing 基礎設施 |
 | HARDWARE-EDGE | 5 | 0 | 5 | SH* RDY line，極端硬體行為 |
 
-已修 12 項 (7 INDEPENDENT + 3 TIMING-CORE + 2 TIMING-DEPENDENT)，剩餘 20 FAIL + 1 SKIP
+已修 13 項 (7 INDEPENDENT + 3 TIMING-CORE + 3 TIMING-DEPENDENT)，剩餘 19 FAIL + 1 SKIP
 
 ---
 
@@ -26,9 +26,9 @@
   - BUGFIX33: 修復 bit 0 check (Tests 1-3)
   - BUGFIX39: deferred $4016 write model (Test 4 put/get cycle parity)
 
-- [x] **Address $2004 behavior** (P18, $045B, err=4→8, BUGFIX34)
-  - 修復: $2004 reads during dots 1-64/257-320 return $FF; writes during rendering increment by 4 & align
-  - Tests 1-7 pass, test 8 需 OAM evaluation latch (TIMING-DEPENDENT)
+- [x] **Address $2004 behavior** (P18, $045B, PASS - BUGFIX34+BUGFIX41)
+  - BUGFIX34: $2004 reads during dots 1-64/257-320 return $FF; writes during rendering increment by 4 & align (Tests 1-7)
+  - BUGFIX41: dots 65-256 reads return OAM byte at approximate evaluation position (Test 8)
 
 ### 1.2 MEDIUM（中等難度）
 
@@ -167,4 +167,4 @@ Page 12 item 1 (SKIP→PASS)→ 需要完整 Master Clock（136/136）
 
 ---
 
-*最後更新：2026-03-08*
+*最後更新：2026-03-09*

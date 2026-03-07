@@ -869,15 +869,30 @@ namespace AprNes
         static byte ppu_r_2004()
         {
             byte val;
+            bool renderingOn = ShowBackGround || ShowSprites;
             // During secondary OAM clear (dots 1-64) on visible scanlines with rendering enabled,
             // $2004 reads return $FF
             if (scanline >= 0 && scanline < 240 && ppu_cycles_x >= 1 && ppu_cycles_x <= 64
-                && (ShowBackGround || ShowSprites))
+                && renderingOn)
                 val = 0xFF;
+            // During sprite evaluation (dots 65-256) on visible scanlines with rendering enabled,
+            // $2004 reads return the byte at the PPU's current internal evaluation address.
+            // The PPU scans OAM entries: 2 dots per out-of-range entry, 8 dots per in-range entry.
+            // Approximate: assume all out-of-range (most common case).
+            else if (scanline >= 0 && scanline < 240 && ppu_cycles_x >= 65 && ppu_cycles_x <= 256
+                && renderingOn)
+            {
+                int evalDot = ppu_cycles_x - 65;
+                int n = evalDot >> 1; // entry index (2 dots per out-of-range entry)
+                if (n > 63) n = 63;
+                int addr = (n << 2) & 0xFF;
+                val = spr_ram[addr];
+                if ((addr & 3) == 2) val &= 0xE3;
+            }
             // During sprite tile loading (dots 257-320) on visible scanlines with rendering enabled,
             // $2004 reads return $FF
             else if (scanline >= 0 && scanline < 240 && ppu_cycles_x >= 257 && ppu_cycles_x <= 320
-                && (ShowBackGround || ShowSprites))
+                && renderingOn)
                 val = 0xFF;
             else
             {
