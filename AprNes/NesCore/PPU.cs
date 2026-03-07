@@ -399,9 +399,13 @@ namespace AprNes
                 SuppressVbl = false;
             }
 
-            // Pre-render: clear PPU status flags at cycle 2 (post-increment)
+            // Pre-render: clear PPU status flags
+            // M2 duty cycle effect: sprite flags are read at M2 fall (~1.875 PPU dots after M2 rise)
+            // So sprite flags appear to clear ~2 dots earlier than VBL flag
+            if (scanline == 261 && ppu_cycles_x == 1)
+                isSprite0hit = isSpriteOverflow = false;
             if (scanline == 261 && ppu_cycles_x == 2)
-                isVblank = isSprite0hit = isSpriteOverflow = false;
+                isVblank = false;
 
             // Odd frame skip: on odd frames with rendering enabled, skip last idle cycle of pre-render
             if (scanline == 261 && ppu_cycles_x == 339)
