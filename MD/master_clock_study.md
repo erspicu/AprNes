@@ -235,12 +235,6 @@ static void tick() {
 - `NesPpu.cpp`: 獨立的 dot-by-dot execution
 - `NesApu.cpp`: `ClockDmc()` 在精確的 master clock 時機呼叫
 
-### BeesNES (C++)
-
-- `ref/BeesNES-main/` 已下載完整原始碼
-- 使用真正的 master clock scheduler
-- CPU 使用微碼表（microcode table）驅動 state machine
-
 ---
 
 ## 結論

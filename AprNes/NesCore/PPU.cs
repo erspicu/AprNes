@@ -78,7 +78,8 @@ namespace AprNes
 
         static bool oddSwap = false;
         static bool nmi_output_prev = false;  // NMI edge detection: previous NMI output level
-        static bool nmi_delay = false;        // 1-cycle NMI delay: edge detected → delay → pending
+        static long nmi_delay_cycle = -1;     // CPU cycle that detected NMI edge (-1 = inactive)
+                                              // Promotes to nmi_pending when cpuCycleCount > nmi_delay_cycle
         //https://wiki.nesdev.com/w/index.php/PPU_scrolling
 
         #region cycle-accurate PPU
@@ -800,7 +801,7 @@ namespace AprNes
             openbus = (byte)((vblFlag ? 0x80 : 0) | ((isSprite0hit) ? 0x40 : 0) | ((isSpriteOverflow) ? 0x20 : 0) | (openbus & 0x1f));
 
             isVblank = false;
-            nmi_delay = false;         // Cancel not-yet-promoted NMI (same-cycle $2002 read)
+            nmi_delay_cycle = -1;      // Cancel not-yet-promoted NMI (same-cycle $2002 read)
             nmi_output_prev = false;   // Reset edge state to prevent false rising edge on next tick
             // Note: nmi_pending is NOT cleared — once promoted, $2002 can't cancel it
             vram_latch = false;
@@ -841,7 +842,7 @@ namespace AprNes
             bool nmi_output = isVblank && NMIable;
             if (!nmi_output && nmi_output_prev)
             {
-                nmi_delay = false;
+                nmi_delay_cycle = -1;
                 nmi_output_prev = false;
             }
         }

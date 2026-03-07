@@ -36,7 +36,7 @@ namespace AprNes
                 ppu_step_new();
                 bool nmi_output = isVblank && NMIable;
                 if (nmi_output && !nmi_output_prev)
-                    nmi_delay = true;
+                    nmi_delay_cycle = cpuCycleCount;
                 nmi_output_prev = nmi_output;
             }
         }
@@ -60,8 +60,9 @@ namespace AprNes
             cpuCycleCount++;
             m2PhaseIsWrite = (cpuCycleCount & 1) != 0;
 
-            // Promote nmi_delay from previous cycle → nmi_pending (1-cycle hardware delay)
-            if (nmi_delay) { nmi_pending = true; nmi_delay = false; }
+            // Promote NMI: fires on next CPU cycle after edge detection (1-cycle hardware delay)
+            if (nmi_delay_cycle >= 0 && cpuCycleCount > nmi_delay_cycle)
+            { nmi_pending = true; nmi_delay_cycle = -1; }
 
             // Catch up PPU and APU to current master clock
             catchUpPPU();
@@ -74,8 +75,9 @@ namespace AprNes
         }
 
         // φ1 phase: all 3 PPU dots + APU before CPU bus access.
-        // NOTE: 2+1 split was tested but causes 10 NMI/VBL timing regressions.
-        // Requires PPU event recalibration before it can work. Keep 3+0 for now.
+        // 2+1 split tested but causes 10 regressions: VBL set happens on 3rd dot of
+        // certain cycles, running it in tick_post means CPU misses it. Would need
+        // full PPU event recalibration or master clock architecture (Phase 5).
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void tick_pre()
         {
@@ -83,7 +85,8 @@ namespace AprNes
             cpuCycleCount++;
             m2PhaseIsWrite = (cpuCycleCount & 1) != 0;
 
-            if (nmi_delay) { nmi_pending = true; nmi_delay = false; }
+            if (nmi_delay_cycle >= 0 && cpuCycleCount > nmi_delay_cycle)
+            { nmi_pending = true; nmi_delay_cycle = -1; }
             catchUpPPU();
             catchUpAPU();
             if (strobeWritePending > 0) processStrobeWrite();
@@ -92,8 +95,7 @@ namespace AprNes
             irqLineCurrent = (statusframeint && !apuintflag) || statusdmcint || statusmapperint;
         }
 
-        // φ2 phase: placeholder (all dots currently in tick_pre).
-        // Future: move 1 PPU dot here once VBL/NMI timing is recalibrated.
+        // φ2 phase: placeholder (all dots in tick_pre).
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void tick_post()
         {

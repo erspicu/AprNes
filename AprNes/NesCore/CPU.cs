@@ -106,7 +106,7 @@ namespace AprNes
             r_PC = (ushort)(lo | (hi << 8));
             flagI = 1;
             nmi_pending = false;
-            nmi_delay = false;
+            nmi_delay_cycle = -1;
             nmi_output_prev = false;
             irq_pending = false;
             statusmapperint = false;
@@ -2365,7 +2365,7 @@ namespace AprNes
                     for (int _kilGuard = 0; _kilGuard < 0x200000; _kilGuard++)
                     {
                         tick();
-                        if (nmi_pending || nmi_delay || exit) break;
+                        if (nmi_pending || nmi_delay_cycle >= 0 || exit) break;
                     }
                     break;
 
