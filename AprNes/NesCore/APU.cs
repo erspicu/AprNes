@@ -851,11 +851,10 @@ namespace AprNes
                 if (dmcsamplesleft == 0)
                 {
                     restartdmc();
-                    if (dmcBufferEmpty)
-                    {
-                        // Mesen2: CycleCount even → 2, CycleCount odd → 3
-                        dmcLoadDmaCountdown = (apucycle & 1) != 0 ? 2 : 3;
-                    }
+                    // Mesen2: always set _transferStartDelay regardless of buffer state
+                    // Buffer may not be empty yet if timer hasn't fired; the countdown
+                    // prevents premature DMA when buffer empties before delay expires
+                    dmcLoadDmaCountdown = (apucycle & 1) != 0 ? 2 : 3;
                 }
             }
             else
