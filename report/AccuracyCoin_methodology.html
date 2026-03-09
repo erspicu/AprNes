@@ -70,9 +70,9 @@ tr:hover td{background:var(--surface2)}
 <div class="overview">
   <div class="ov-card"><div class="num c-blue">136</div><div class="lbl">Tests</div></div>
   <div class="ov-card"><div class="num c-blue">20</div><div class="lbl">Pages</div></div>
-  <div class="ov-card"><div class="num c-pass">118</div><div class="lbl">PASS</div></div>
-  <div class="ov-card"><div class="num c-fail">17</div><div class="lbl">FAIL</div></div>
-  <div class="ov-card"><div class="num c-skip">1</div><div class="lbl">SKIP</div></div>
+  <div class="ov-card"><div class="num c-pass">132</div><div class="lbl">PASS</div></div>
+  <div class="ov-card"><div class="num c-fail">4</div><div class="lbl">FAIL</div></div>
+  <div class="ov-card"><div class="num c-skip">0</div><div class="lbl">SKIP</div></div>
 </div>
 
 <!-- ───────── Section 1 ───────── -->
@@ -148,8 +148,8 @@ bash run_ac_test.sh 18
 # Run a single test item (1-based index)
 bash run_ac_test.sh 14 7          # P14, item 7 (APU Register Activation)
 
-# Skip an item that hangs, run the rest
-bash run_ac_test.sh 12 --skip 1   # P12, skip IFlagLatency
+# Skip an item, run the rest
+bash run_ac_test.sh 13 --skip 2   # P13, skip item 2
 
 # Skip build, increase timeout
 bash run_ac_test.sh 13 --no-build --extra-time 10</pre>
@@ -216,13 +216,12 @@ bash run_tests_AccuracyCoin_report.sh --no-screenshots</pre>
 
 <div class="section">
 <h3>Why Per-Page Testing?</h3>
-<p>AccuracyCoin's <code>Start</code> button runs all 136 tests sequentially, but <strong>Page 12 item 1 (IRQ Flag Latency Test E) hangs indefinitely</strong> due to DMC DMA timing drift. This blocks all subsequent tests. The per-page architecture solves this by running each page in an independent emulator instance.</p>
+<p>AccuracyCoin's <code>Start</code> button runs all 136 tests sequentially (~90 seconds), but per-page testing allows isolating failures and capturing per-page screenshots. Each page runs in an independent emulator instance for maximum reliability.</p>
 
 <h3>Per-Page Flow</h3>
 <ol>
   <li><strong>Independent boot:</strong> Each page launches a fresh emulator instance (20 launches total)</li>
   <li><strong>Navigation:</strong> Right key pressed (N-1) times to reach Page N from Page 1</li>
-  <li><strong>P12 special handling:</strong> Navigate to item 1 &rarr; press B (mark SKIP) &rarr; return to title &rarr; press A</li>
   <li><strong>P15 special handling:</strong> DRAW-only page, screenshots captured but no PASS/FAIL data</li>
   <li><strong>Result collection:</strong> <code>--dump-ac-results</code> outputs hex data for memory range $0400-$05FF</li>
   <li><strong>Merge:</strong> All 20 pages' hex data are merged (non-zero values overwrite zeroes)</li>
@@ -283,17 +282,17 @@ Page N total time &asymp; 3.0 + (N-1) &times; 0.5 + 1.0 + test_wait</pre>
 <tr><td>7</td><td>Unofficial: *AX</td><td>10</td><td><span class="badge pass">ALL PASS</span></td><td>SAX + LAX family</td></tr>
 <tr><td>8</td><td>Unofficial: DCP</td><td>7</td><td><span class="badge pass">ALL PASS</span></td><td></td></tr>
 <tr><td>9</td><td>Unofficial: ISC</td><td>7</td><td><span class="badge pass">ALL PASS</span></td><td></td></tr>
-<tr><td>10</td><td>Unofficial: SH*</td><td>6</td><td><span class="badge fail">5 FAIL</span></td><td>SHA/SHS/SHY/SHX need DMA bus conflict</td></tr>
+<tr><td>10</td><td>Unofficial: SH*</td><td>6</td><td><span class="badge pass">ALL PASS</span></td><td>SHA/SHS/SHY/SHX per-cycle CPU rewrite</td></tr>
 <tr><td>11</td><td>Unofficial Immediates</td><td>8</td><td><span class="badge pass">ALL PASS</span></td><td>ANC, ASR, ARR, ANE, LXA, AXS, SBC</td></tr>
-<tr><td>12</td><td>CPU Interrupts</td><td>3</td><td><span class="badge skip">1 SKIP</span></td><td>IFlagLatency Test E hangs</td></tr>
-<tr><td>13</td><td>DMA Tests</td><td>10</td><td><span class="badge fail">6 FAIL</span></td><td>Shared DMA precondition failure</td></tr>
-<tr><td>14</td><td>APU Tests</td><td>9</td><td><span class="badge fail">3 FAIL</span></td><td>DMC, APU Reg Activation, Controller</td></tr>
+<tr><td>12</td><td>CPU Interrupts</td><td>3</td><td><span class="badge pass">ALL PASS</span></td><td>IFlagLatency now passes with DMC DMA cooldown</td></tr>
+<tr><td>13</td><td>DMA Tests</td><td>10</td><td><span class="badge fail">4 FAIL</span></td><td>DMA+$2002, Bus Conflicts, Explicit/Implicit Abort</td></tr>
+<tr><td>14</td><td>APU Tests</td><td>9</td><td><span class="badge pass">ALL PASS</span></td><td>DMC channel fixed with DMA cooldown</td></tr>
 <tr><td>15</td><td>Power On State</td><td>5</td><td><span class="badge draw">DRAW</span></td><td>Information display only, no PASS/FAIL</td></tr>
 <tr><td>16</td><td>PPU Rendering</td><td>7</td><td><span class="badge pass">ALL PASS</span></td><td>CHR, registers, palette, $2007</td></tr>
 <tr><td>17</td><td>PPU VBlank Timing</td><td>7</td><td><span class="badge pass">ALL PASS</span></td><td>VBL begin/end, NMI control/timing/suppression</td></tr>
 <tr><td>18</td><td>Sprite Evaluation</td><td>9</td><td><span class="badge pass">ALL PASS</span></td><td>Overflow, hit, OAM, $2002 flag timing</td></tr>
-<tr><td>19</td><td>PPU Misc</td><td>6</td><td><span class="badge fail">3 FAIL</span></td><td>BG serial, sprites SL0, $2004 stress</td></tr>
-<tr><td>20</td><td>CPU Behavior 2</td><td>4</td><td><span class="badge fail">1 FAIL</span></td><td>Implied dummy reads (DMA prereq)</td></tr>
+<tr><td>19</td><td>PPU Misc</td><td>6</td><td><span class="badge pass">ALL PASS</span></td><td>BG serial, sprites SL0, $2004 stress</td></tr>
+<tr><td>20</td><td>CPU Behavior 2</td><td>4</td><td><span class="badge pass">ALL PASS</span></td><td>Instruction timing, dummy reads, JSR edge</td></tr>
 </table>
 </div>
 
@@ -301,26 +300,24 @@ Page N total time &asymp; 3.0 + (N-1) &times; 0.5 + 1.0 + test_wait</pre>
 <h2>8. Known Limitations</h2>
 
 <div class="section">
-<h3>Hanging Test</h3>
+<h3>No Hanging Tests</h3>
+<p>All 136 tests now complete without hanging. The DMC DMA cooldown mechanism (<code>dmcDmaCooldown</code>) resolved the P12 IFlagLatency timing drift issue.</p>
+
+<h3>Remaining 4 FAIL (all on Page 13)</h3>
 <table>
-<tr><th>Test</th><th>Page</th><th>Issue</th><th>Root Cause</th></tr>
-<tr><td>IRQ Flag Latency (Test E)</td><td>P12, item 1</td><td>Infinite loop</td><td>DMC DMA cumulative timing drift (~12 cycles). Requires Master Clock scheduler.</td></tr>
+<tr><th>Test</th><th>Root Cause</th><th>Description</th></tr>
+<tr><td>DMA + $2002 Read</td><td>DMC DMA phantom read timing</td><td>Phantom read during DMC DMA hits $2002, clearing VBL flag at wrong cycle</td></tr>
+<tr><td>DMC DMA Bus Conflicts</td><td>Dynamic bus conflict detection</td><td>Bus conflict check needs per-cycle <code>addressBus</code> during DMA, not static</td></tr>
+<tr><td>Explicit DMA Abort</td><td>$4015 disable timing</td><td>Delayed DMC disable when timer about to fire (2-3 extra APU cycle delay)</td></tr>
+<tr><td>Implicit DMA Abort</td><td>$4015 enable timing</td><td>Phantom 1-cycle DMA when enabling DMC near timer firing</td></tr>
 </table>
 
-<h3>Remaining FAIL Categories</h3>
-<table>
-<tr><th>Root Cause</th><th>Count</th><th>Description</th></tr>
-<tr><td>DMA sub-cycle precision</td><td>12</td><td>P10 SH* (5) + P13 DMA (6) + P20 dummy reads (1). All share the same DMADMASync precondition failure.</td></tr>
-<tr><td>DMC/APU bus interaction</td><td>3</td><td>P14: DMC channel, APU register activation during DMA, controller strobe PUT/GET parity.</td></tr>
-<tr><td>PPU per-dot precision</td><td>3</td><td>P19: BG shift register reload timing, secondary OAM persistence, OAM evaluation state machine.</td></tr>
-</table>
-
-<h3>Highest ROI Fix Target</h3>
-<p>Fixing the <code>DMADMASync_PreTest</code> precondition (sub-cycle accurate DMC DMA open bus timing) could unlock <strong>+6 to +12 tests</strong> at once, covering P13, P10, and P20.</p>
+<h3>Fix Direction</h3>
+<p>All 4 remaining failures are DMA timing edge cases on Page 13. Fixing requires reworking <code>ProcessPendingDma</code> in MEM.cs (dynamic bus conflict + implicit abort handling) without regressing the existing 132 passing tests.</p>
 </div>
 
 <div class="footer">
-  AprNes &mdash; AccuracyCoin Testing Methodology &mdash; Last updated: 2026-03-07
+  AprNes &mdash; AccuracyCoin Testing Methodology &mdash; Last updated: 2026-03-09
 </div>
 
 </body>

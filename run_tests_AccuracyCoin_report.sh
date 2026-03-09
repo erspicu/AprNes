@@ -1,13 +1,15 @@
 #!/bin/bash
 # run_tests_AccuracyCoin_report.sh
 # Run AccuracyCoin page-by-page and generate HTML report.
-# Page 12 item 1 (IFlagLatency) is skipped to avoid hang.
+# All 136 tests are executed (no skips).
 # Page 15 (Power On State) is DRAW-only, screenshots only.
 #
 # Usage:
-#   bash run_tests_AccuracyCoin_report.sh             # Full run (build + test + report)
-#   bash run_tests_AccuracyCoin_report.sh --no-build  # Skip build
-#   bash run_tests_AccuracyCoin_report.sh --no-screenshots  # Skip screenshots
+#   bash run_tests_AccuracyCoin_report.sh                    # Full run (build + test + summary + report)
+#   bash run_tests_AccuracyCoin_report.sh --no-build         # Skip build
+#   bash run_tests_AccuracyCoin_report.sh --no-screenshots   # Skip screenshots
+#   bash run_tests_AccuracyCoin_report.sh --skip 12:1        # Skip P12 item 1 (disables summary run)
+#   bash run_tests_AccuracyCoin_report.sh --skip 12:1 --skip 13:7  # Multiple skips
 set -u
 
 cd /c/ai_project/AprNes
@@ -21,14 +23,19 @@ RESULTS_DIR="temp/ac_results"
 
 OPT_BUILD=1
 OPT_SCREENSHOTS=1
+SKIP_SPECS=()  # Array of "page:item" skip specs
 
-for arg in "$@"; do
-    case "$arg" in
-        --no-build)       OPT_BUILD=0 ;;
-        --no-screenshots) OPT_SCREENSHOTS=0 ;;
-        *) echo "Unknown option: $arg"; exit 1 ;;
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --no-build)       OPT_BUILD=0; shift ;;
+        --no-screenshots) OPT_SCREENSHOTS=0; shift ;;
+        --skip)           SKIP_SPECS+=("$2"); shift 2 ;;
+        *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
+
+HAS_SKIPS=0
+if [ ${#SKIP_SPECS[@]} -gt 0 ]; then HAS_SKIPS=1; fi
 
 # Build
 if [ $OPT_BUILD -eq 1 ]; then
@@ -52,7 +59,7 @@ get_test_wait() {
     # Per-page test wait time (seconds after A press for all tests to complete)
     # Measured empirically with 2s safety buffer
     case $1 in
-        12)     echo 20 ;;  # CPU Interrupts (skip item 1, items 2-3 are slow)
+        12)     echo 30 ;;  # CPU Interrupts (IFlagLatency takes ~20s)
         14)     echo 9  ;;  # APU Tests: ~7s
         17)     echo 16 ;;  # PPU VBlank Timing: ~14s
         13)     echo 8  ;;  # APU Registers/DMA: ~6s
@@ -62,6 +69,21 @@ get_test_wait() {
     esac
 }
 
+# Get skip items for a given page from SKIP_SPECS array
+get_page_skips() {
+    local PAGE=$1
+    local ITEMS=""
+    for spec in "${SKIP_SPECS[@]}"; do
+        local SP=$(echo "$spec" | cut -d: -f1)
+        local SI=$(echo "$spec" | cut -d: -f2)
+        if [ "$SP" -eq "$PAGE" ] 2>/dev/null; then
+            if [ -n "$ITEMS" ]; then ITEMS="$ITEMS "; fi
+            ITEMS="${ITEMS}${SI}"
+        fi
+    done
+    echo "$ITEMS"
+}
+
 run_page() {
     local PAGE=$1
     local NAV_TIME=3.0  # seconds to wait for ROM boot
@@ -69,7 +91,14 @@ run_page() {
     local TIMED_SHOTS=""
     local SS_FILE="$SS_DIR/ac_page_$(printf '%02d' $PAGE).png"
 
-    echo -n "  Page $PAGE/20: "
+    # Check for skips on this page
+    local PAGE_SKIPS=$(get_page_skips $PAGE)
+
+    if [ -n "$PAGE_SKIPS" ]; then
+        echo -n "  Page $PAGE/20 (skip item $PAGE_SKIPS): "
+    else
+        echo -n "  Page $PAGE/20: "
+    fi
 
     # Navigate to the target page
     # Pages 1-10: use Right from page 1 (0.5s intervals)
@@ -91,30 +120,36 @@ run_page() {
         INPUT_EVENTS="${INPUT_EVENTS}${DIR}:${T}"
     done
 
-    # After navigation, wait a moment then press A
+    # After navigation, wait a moment
     T=$(python3 -c "print(f'{$T + 1.0:.1f}')")
     local T_A=$T
 
-    # Special handling for page 12: skip item 1 (IFlagLatency)
-    if [ $PAGE -eq 12 ]; then
-        # Down to select item 1
-        T=$(python3 -c "print(f'{$T_A:.1f}')")
-        if [ -n "$INPUT_EVENTS" ]; then INPUT_EVENTS="$INPUT_EVENTS,"; fi
-        INPUT_EVENTS="${INPUT_EVENTS}Down:${T}"
-        # B to mark as skip
-        T=$(python3 -c "print(f'{$T + 0.5:.1f}')")
-        INPUT_EVENTS="${INPUT_EVENTS},B:${T}"
-        # Up to go back to page header
-        T=$(python3 -c "print(f'{$T + 0.5:.1f}')")
-        INPUT_EVENTS="${INPUT_EVENTS},Up:${T}"
-        # A to run remaining tests
-        T=$(python3 -c "print(f'{$T + 0.5:.1f}')")
-        INPUT_EVENTS="${INPUT_EVENTS},A:${T}"
-        T_A=$T
-    else
-        if [ -n "$INPUT_EVENTS" ]; then INPUT_EVENTS="$INPUT_EVENTS,"; fi
-        INPUT_EVENTS="${INPUT_EVENTS}A:${T_A}"
+    # Handle per-item skips: navigate to item, press B, return
+    if [ -n "$PAGE_SKIPS" ]; then
+        for SKIP_ITEM in $PAGE_SKIPS; do
+            # Navigate down to the item
+            for ((si=0; si<SKIP_ITEM; si++)); do
+                T=$(python3 -c "print(f'{$T + 0.4:.1f}')")
+                if [ -n "$INPUT_EVENTS" ]; then INPUT_EVENTS="$INPUT_EVENTS,"; fi
+                INPUT_EVENTS="${INPUT_EVENTS}Down:${T}"
+            done
+            # B to toggle skip
+            T=$(python3 -c "print(f'{$T + 0.4:.1f}')")
+            if [ -n "$INPUT_EVENTS" ]; then INPUT_EVENTS="$INPUT_EVENTS,"; fi
+            INPUT_EVENTS="${INPUT_EVENTS}B:${T}"
+            # Navigate back up
+            for ((si=0; si<SKIP_ITEM; si++)); do
+                T=$(python3 -c "print(f'{$T + 0.3:.1f}')")
+                INPUT_EVENTS="${INPUT_EVENTS},Up:${T}"
+            done
+            T=$(python3 -c "print(f'{$T + 0.5:.1f}')")
+            T_A=$T
+        done
     fi
+
+    # Press A to run all (non-skipped) tests
+    if [ -n "$INPUT_EVENTS" ]; then INPUT_EVENTS="$INPUT_EVENTS,"; fi
+    INPUT_EVENTS="${INPUT_EVENTS}A:${T_A}"
 
     # Per-page test wait time (optimized)
     local TEST_WAIT=$(get_test_wait $PAGE)
@@ -141,18 +176,49 @@ run_page() {
         echo "$HEX" > "$RESULTS_DIR/page_$(printf '%02d' $PAGE).hex"
     fi
 
-    # Count pass/fail from screen output
+    # Count pass/fail using known test addresses for this page
     local PASS_COUNT=$(echo "$HEX" | python3 -c "
 import sys
+PAGE = $PAGE
 data = sys.stdin.read().strip()
-if len(data) == 1024:
-    mem = bytes.fromhex(data)
-    p = sum(1 for b in mem if b & 0x01 and b != 0xFF)
-    f = sum(1 for b in mem if b != 0 and b != 0xFF and not (b & 0x01))
-    s = sum(1 for b in mem if b == 0xFF)
-    print(f'{p} PASS, {f} FAIL, {s} SKIP')
-else:
-    print('no data')
+if len(data) != 1024:
+    print('no data'); exit()
+mem = bytes.fromhex(data)
+def mb(addr):
+    i = addr - 0x0300
+    return mem[i] if 0 <= i < len(mem) else 0
+# Known test addresses per page
+ADDRS = {
+    1: [0x0405,0x0403,0x044D,0x0474,0x0475,0x0406,0x0407,0x0408,0x047D],
+    2: [0x046E,0x046F,0x0470,0x0471,0x0472,0x0473],
+    3: [0x0409,0x040A,0x040B,0x040C,0x040D,0x040E,0x040F],
+    4: [0x0419,0x041A,0x041B,0x041C,0x041D,0x041E,0x041F],
+    5: [0x0420,0x047F,0x0422,0x0423,0x0424,0x0425,0x0426],
+    6: [0x0427,0x0428,0x0429,0x042A,0x042B,0x042C,0x042D],
+    7: [0x042E,0x042F,0x0430,0x0431,0x0432,0x0433,0x0434,0x0435,0x0436,0x0437],
+    8: [0x0438,0x0439,0x043A,0x043B,0x043C,0x043D,0x043E],
+    9: [0x043F,0x0440,0x0441,0x0442,0x0443,0x0444,0x0445],
+    10: [0x0446,0x0447,0x0448,0x0449,0x044A,0x044B],
+    11: [0x0410,0x0411,0x0412,0x0413,0x0414,0x0415,0x0416,0x0417],
+    12: [0x0461,0x0462,0x0463],
+    13: [0x046C,0x0488,0x044C,0x044F,0x045D,0x045E,0x046B,0x0477,0x0479,0x0478],
+    14: [0x0465,0x0466,0x0467,0x0468,0x0469,0x046A,0x045C,0x045F,0x047A],
+    15: [],
+    16: [0x0485,0x0404,0x044E,0x0476,0x047E,0x0486,0x048A],
+    17: [0x0450,0x0451,0x0452,0x0453,0x0454,0x0455,0x0456],
+    18: [0x0459,0x0457,0x048D,0x0489,0x0458,0x045A,0x045B,0x047B,0x0480],
+    19: [0x0481,0x0482,0x0483,0x0487,0x0484,0x048C],
+    20: [0x0460,0x046D,0x048B,0x047C],
+}
+addrs = ADDRS.get(PAGE, [])
+p = f = s = 0
+for a in addrs:
+    b = mb(a)
+    if b == 0xFF: s += 1
+    elif b == 0: pass
+    elif b & 0x01: p += 1
+    else: f += 1
+print(f'{p} PASS, {f} FAIL, {s} SKIP')
 " 2>/dev/null)
 
     echo "$PASS_COUNT"
@@ -223,17 +289,67 @@ done
 echo ""
 
 # ───────────────────────────────────────────────
+# Run full summary (Start button → wait for all tests → screenshot)
+# Only when no --skip specified (Start can't skip individual items)
+# ───────────────────────────────────────────────
+SUMMARY_SS="$SS_DIR/ac_summary.png"
+if [ $HAS_SKIPS -eq 0 ]; then
+    echo "=== Running full summary (Start → ~95s) ==="
+    SUMMARY_INPUT="Start:3.0"
+    SUMMARY_TOTAL=98.0
+    SUMMARY_SS_TIME=97.0
+
+    SUMMARY_CMD="$EXE --rom $ROM --time $SUMMARY_TOTAL --input $SUMMARY_INPUT --dump-ac-results"
+    # Summary screenshot is always captured (even with --no-screenshots)
+    SUMMARY_CMD="$SUMMARY_CMD --timed-screenshots $SUMMARY_SS:$SUMMARY_SS_TIME"
+
+    SUMMARY_OUTPUT=$($SUMMARY_CMD 2>/dev/null)
+    SUMMARY_HEX=$(echo "$SUMMARY_OUTPUT" | grep "^AC_RESULTS_HEX:" | head -1 | cut -d: -f2-)
+    if [ -n "$SUMMARY_HEX" ]; then
+        echo "$SUMMARY_HEX" > "$RESULTS_DIR/summary.hex"
+    fi
+    echo "  Summary screenshot: $SUMMARY_SS"
+else
+    echo "=== Skipping summary run (--skip specified) ==="
+    rm -f "$SUMMARY_SS"
+fi
+echo ""
+
+# ───────────────────────────────────────────────
+# Convert PNG screenshots to WebP
+# ───────────────────────────────────────────────
+echo "=== Converting screenshots to WebP ==="
+python3 -c "
+from PIL import Image
+import glob, os
+ss_dir = '$SS_DIR'
+count = 0
+for png in glob.glob(os.path.join(ss_dir, '*.png')):
+    webp = png.rsplit('.', 1)[0] + '.webp'
+    try:
+        img = Image.open(png)
+        img.save(webp, 'WEBP', lossless=True)
+        os.remove(png)
+        count += 1
+    except Exception as e:
+        print(f'  WARN: {png}: {e}')
+print(f'  Converted {count} screenshots to WebP')
+"
+echo ""
+
+# ───────────────────────────────────────────────
 # Merge results from all pages
 # ───────────────────────────────────────────────
 echo "=== Merging results and generating report ==="
 
-python3 - "$OUTPUT_HTML" "$SS_DIR" "$RESULTS_DIR" "$OPT_SCREENSHOTS" <<'PYEOF'
+python3 - "$OUTPUT_HTML" "$SS_DIR" "$RESULTS_DIR" "$OPT_SCREENSHOTS" "$SUMMARY_SS" <<'PYEOF'
 import sys, os, datetime
 
 out_html  = sys.argv[1]
 ss_dir    = sys.argv[2]
 results_dir = sys.argv[3]
 has_screenshots = sys.argv[4] == "1"
+summary_ss = sys.argv[5].rsplit('.', 1)[0] + '.webp'  # use webp version
 
 # Merge all page results: overlay non-zero bytes
 merged = bytearray(512)  # $0300-$04FF
@@ -519,6 +635,7 @@ tr:hover td {{ background:#1e2a5e; }}
 .badge.draw   {{ background:#4a148c; color:#ce93d8; }}
 .addr {{ font-family:monospace; color:#78909c; font-size:.82em; }}
 .ss {{ max-width:512px; width:100%; border:2px solid #2d3561; border-radius:4px; display:block; margin:8px auto; image-rendering:pixelated; }}
+.ss-summary {{ max-width:512px; width:100%; border:2px solid #4caf50; border-radius:4px; display:block; margin:12px auto; image-rendering:pixelated; }}
 .ss-missing {{ background:#111; color:#555; text-align:center; padding:16px; font-style:italic; }}
 .draw-section {{ background:#1a0a2e; border:1px solid #4a148c; border-radius:8px; padding:16px; margin-bottom:24px; }}
 .draw-section h3 {{ color:#ce93d8; margin:0 0 10px; }}
@@ -533,11 +650,6 @@ tr:hover td {{ background:#1e2a5e; }}
 <h1>AccuracyCoin Report - AprNes</h1>
 <div class="meta">Generated: {now} | ROM: AccuracyCoin.nes (Mapper 0/NROM) | Method: page-by-page</div>
 
-<div class="note warn">
-  Page 12 item 1 (Interrupt Flag Latency) is marked SKIP - test hangs due to DMC DMA timing drift (~12 cycles).
-  Requires Master Clock scheduler for sub-cycle accuracy. All other 135 tests are executed.
-</div>
-
 <div class="summary">
   <div class="stat"><div class="num pass-c">{total_pass}</div><div class="lbl">PASS</div></div>
   <div class="stat"><div class="num fail-c">{total_fail}</div><div class="lbl">FAIL</div></div>
@@ -547,11 +659,33 @@ tr:hover td {{ background:#1e2a5e; }}
 </div>
 """
 
+# Summary screenshot (from Start button full run — always captured)
+if os.path.exists(summary_ss):
+    summary_rel = os.path.relpath(summary_ss, os.path.dirname(out_html)).replace('\\', '/')
+    html += f'<img src="{summary_rel}" alt="AccuracyCoin Summary" class="ss-summary" loading="lazy">\n'
+
+# List remaining failures after summary
+if total_fail > 0:
+    html += f'<div style="background:#2a1e1e;border:1px solid #f44336;border-radius:8px;padding:12px 16px;margin-bottom:24px;font-size:.9em">\n'
+    html += f'<h3 style="color:#ef9a9a;margin:0 0 8px">Remaining {total_fail} Failure{"s" if total_fail != 1 else ""}</h3>\n'
+    html += '<table style="margin:0"><tr><th>Page</th><th>Test</th><th>Error</th></tr>\n'
+    for page_num, suite_name, tests in SUITES:
+        if "(DRAW)" in suite_name:
+            continue
+        disp = suite_name.replace(" (DRAW)", "")
+        for test_name, addr in tests:
+            b = mem_byte(addr)
+            status, ec = decode_result(b)
+            if status == 'FAIL':
+                ec_str = f'err {ec}' if ec is not None else '?'
+                html += f'<tr><td>P{page_num}</td><td>{test_name}</td><td><span class="badge fail">FAIL ({ec_str})</span></td></tr>\n'
+    html += '</table>\n</div>\n'
+
 # Per-suite sections
 for page_num, suite_name, tests in SUITES:
     is_draw = "(DRAW)" in suite_name
     disp_name = suite_name.replace(" (DRAW)", "")
-    ss_file = f"ac_page_{page_num:02d}.png"
+    ss_file = f"ac_page_{page_num:02d}.webp"
 
     s_pass = s_fail = s_skip = s_nr = 0
     for test_name, addr in tests:
@@ -577,7 +711,7 @@ for page_num, suite_name, tests in SUITES:
     <div class="draw-card"><h4>Page overview</h4>{ss_img(ss_file, disp_name)}</div>
 """
         for item_idx in range(len(tests)):
-            item_ss = f"ac_page_15_item{item_idx:02d}.png"
+            item_ss = f"ac_page_15_item{item_idx:02d}.webp"
             test_name = tests[item_idx][0]
             html += f'    <div class="draw-card"><h4>{test_name}</h4>{ss_img(item_ss, test_name)}</div>\n'
         html += "  </div>\n</div>\n"

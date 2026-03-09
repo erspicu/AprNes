@@ -70,9 +70,9 @@ tr:hover td{background:var(--surface2)}
 <div class="overview">
   <div class="ov-card"><div class="num c-blue">136</div><div class="lbl">測試項目</div></div>
   <div class="ov-card"><div class="num c-blue">20</div><div class="lbl">測試分頁</div></div>
-  <div class="ov-card"><div class="num c-pass">118</div><div class="lbl">通過</div></div>
-  <div class="ov-card"><div class="num c-fail">17</div><div class="lbl">失敗</div></div>
-  <div class="ov-card"><div class="num c-skip">1</div><div class="lbl">跳過</div></div>
+  <div class="ov-card"><div class="num c-pass">132</div><div class="lbl">通過</div></div>
+  <div class="ov-card"><div class="num c-fail">4</div><div class="lbl">失敗</div></div>
+  <div class="ov-card"><div class="num c-skip">0</div><div class="lbl">跳過</div></div>
 </div>
 
 <!-- ───────── Section 1 ───────── -->
@@ -148,8 +148,8 @@ bash run_ac_test.sh 18
 # 執行單項測試（1-based 索引）
 bash run_ac_test.sh 14 7          # P14 第 7 項（APU Register Activation）
 
-# 跳過會卡住的項目，執行其餘
-bash run_ac_test.sh 12 --skip 1   # P12 跳過 IFlagLatency
+# 跳過某項目，執行其餘
+bash run_ac_test.sh 13 --skip 2   # P13 跳過第 2 項
 
 # 跳過編譯、增加超時時間
 bash run_ac_test.sh 13 --no-build --extra-time 10</pre>
@@ -216,13 +216,12 @@ bash run_tests_AccuracyCoin_report.sh --no-screenshots</pre>
 
 <div class="section">
 <h3>為何採用分頁測試？</h3>
-<p>AccuracyCoin 的 <code>Start</code> 鍵可連續執行全部 136 項測試，但 <strong>Page 12 第 1 項（IRQ Flag Latency Test E）會無限掛住</strong>，原因是 DMC DMA 時序漂移。這會導致後續所有測試無法執行。分頁架構透過每頁獨立啟動模擬器來解決此問題。</p>
+<p>AccuracyCoin 的 <code>Start</code> 鍵可連續執行全部 136 項測試（約 90 秒），但分頁測試可以隔離失敗項目並擷取每頁截圖。每頁在獨立模擬器實例中執行，確保最大可靠性。</p>
 
 <h3>逐頁流程</h3>
 <ol>
   <li><strong>獨立啟動：</strong>每頁各啟動一次模擬器（共 20 次），互不干擾</li>
   <li><strong>導覽：</strong>從 Page 1 按右鍵 (N-1) 次到達 Page N</li>
-  <li><strong>P12 特殊處理：</strong>導覽至第 1 項 &rarr; 按 B（標記 SKIP）&rarr; 返回標題 &rarr; 按 A</li>
   <li><strong>P15 特殊處理：</strong>DRAW 頁面，僅擷取截圖，無 PASS/FAIL 資料</li>
   <li><strong>結果收集：</strong><code>--dump-ac-results</code> 輸出 $0400-$05FF 記憶體區域的 hex 資料</li>
   <li><strong>合併：</strong>20 頁的 hex 資料合併（非零值覆蓋零值），產生完整結果</li>
@@ -283,17 +282,17 @@ Page N 總時間 &asymp; 3.0 + (N-1) &times; 0.5 + 1.0 + 測試等待</pre>
 <tr><td>7</td><td>Unofficial: *AX</td><td>10</td><td><span class="badge pass">全 PASS</span></td><td>SAX + LAX 系列</td></tr>
 <tr><td>8</td><td>Unofficial: DCP</td><td>7</td><td><span class="badge pass">全 PASS</span></td><td></td></tr>
 <tr><td>9</td><td>Unofficial: ISC</td><td>7</td><td><span class="badge pass">全 PASS</span></td><td></td></tr>
-<tr><td>10</td><td>Unofficial: SH*</td><td>6</td><td><span class="badge fail">5 FAIL</span></td><td>SHA/SHS/SHY/SHX 需要 DMA bus conflict</td></tr>
+<tr><td>10</td><td>Unofficial: SH*</td><td>6</td><td><span class="badge pass">全 PASS</span></td><td>SHA/SHS/SHY/SHX per-cycle CPU 重寫修復</td></tr>
 <tr><td>11</td><td>Unofficial Immediates</td><td>8</td><td><span class="badge pass">全 PASS</span></td><td>ANC、ASR、ARR、ANE、LXA、AXS、SBC</td></tr>
-<tr><td>12</td><td>CPU Interrupts</td><td>3</td><td><span class="badge skip">1 SKIP</span></td><td>IFlagLatency Test E 掛住</td></tr>
-<tr><td>13</td><td>DMA Tests</td><td>10</td><td><span class="badge fail">6 FAIL</span></td><td>共用 DMA 前置條件失敗</td></tr>
-<tr><td>14</td><td>APU Tests</td><td>9</td><td><span class="badge fail">3 FAIL</span></td><td>DMC、APU Reg Activation、Controller</td></tr>
+<tr><td>12</td><td>CPU Interrupts</td><td>3</td><td><span class="badge pass">全 PASS</span></td><td>IFlagLatency 已通過（DMC DMA cooldown）</td></tr>
+<tr><td>13</td><td>DMA Tests</td><td>10</td><td><span class="badge fail">4 FAIL</span></td><td>DMA+$2002、Bus Conflicts、Explicit/Implicit Abort</td></tr>
+<tr><td>14</td><td>APU Tests</td><td>9</td><td><span class="badge pass">全 PASS</span></td><td>DMC 通道已用 DMA cooldown 修復</td></tr>
 <tr><td>15</td><td>Power On State</td><td>5</td><td><span class="badge draw">DRAW</span></td><td>僅顯示資訊，無 PASS/FAIL</td></tr>
 <tr><td>16</td><td>PPU Rendering</td><td>7</td><td><span class="badge pass">全 PASS</span></td><td>CHR、暫存器、調色盤、$2007</td></tr>
 <tr><td>17</td><td>PPU VBlank Timing</td><td>7</td><td><span class="badge pass">全 PASS</span></td><td>VBL begin/end、NMI control/timing/suppression</td></tr>
 <tr><td>18</td><td>Sprite Evaluation</td><td>9</td><td><span class="badge pass">全 PASS</span></td><td>Overflow、hit、OAM、$2002 flag timing</td></tr>
-<tr><td>19</td><td>PPU Misc</td><td>6</td><td><span class="badge fail">3 FAIL</span></td><td>BG serial、sprites SL0、$2004 stress</td></tr>
-<tr><td>20</td><td>CPU Behavior 2</td><td>4</td><td><span class="badge fail">1 FAIL</span></td><td>Implied dummy reads（DMA 前置條件）</td></tr>
+<tr><td>19</td><td>PPU Misc</td><td>6</td><td><span class="badge pass">全 PASS</span></td><td>BG serial、sprites SL0、$2004 stress</td></tr>
+<tr><td>20</td><td>CPU Behavior 2</td><td>4</td><td><span class="badge pass">全 PASS</span></td><td>指令時序、dummy reads、JSR 邊界</td></tr>
 </table>
 </div>
 
@@ -301,26 +300,24 @@ Page N 總時間 &asymp; 3.0 + (N-1) &times; 0.5 + 1.0 + 測試等待</pre>
 <h2>8. 已知限制</h2>
 
 <div class="section">
-<h3>卡住的測試</h3>
+<h3>無卡住的測試</h3>
+<p>全部 136 項測試均可正常完成。DMC DMA cooldown 機制（<code>dmcDmaCooldown</code>）已解決 P12 IFlagLatency 時序漂移問題。</p>
+
+<h3>剩餘 4 個 FAIL（全部在 Page 13）</h3>
 <table>
-<tr><th>測試</th><th>分頁</th><th>問題</th><th>根因</th></tr>
-<tr><td>IRQ Flag Latency (Test E)</td><td>P12 第 1 項</td><td>無限迴圈</td><td>DMC DMA 累積時序漂移（約 12 cycles），需要 Master Clock scheduler</td></tr>
+<tr><th>測試</th><th>根因</th><th>說明</th></tr>
+<tr><td>DMA + $2002 Read</td><td>DMC DMA phantom read 時序</td><td>DMC DMA 期間的 phantom read 碰到 $2002，在錯誤 cycle 清除 VBL flag</td></tr>
+<tr><td>DMC DMA Bus Conflicts</td><td>動態 bus conflict 偵測</td><td>Bus conflict 檢查需要 DMA 期間逐 cycle 檢查 <code>addressBus</code>，非靜態</td></tr>
+<tr><td>Explicit DMA Abort</td><td>$4015 disable 時序</td><td>Timer 即將觸發時延遲 DMC 停用（額外 2-3 APU cycle 延遲）</td></tr>
+<tr><td>Implicit DMA Abort</td><td>$4015 enable 時序</td><td>在 timer 即將觸發時啟用 DMC，觸發 phantom 1-cycle DMA</td></tr>
 </table>
 
-<h3>剩餘 FAIL 分類</h3>
-<table>
-<tr><th>根因</th><th>數量</th><th>說明</th></tr>
-<tr><td>DMA sub-cycle 精度</td><td>12</td><td>P10 SH*(5) + P13 DMA(6) + P20 dummy reads(1)。共用 DMADMASync 前置條件失敗。</td></tr>
-<tr><td>DMC/APU bus 互動</td><td>3</td><td>P14：DMC 通道、DMA 期間 APU 暫存器啟用、controller strobe PUT/GET parity</td></tr>
-<tr><td>PPU per-dot 精度</td><td>3</td><td>P19：BG shift register reload 時序、secondary OAM 持久化、OAM evaluation state machine</td></tr>
-</table>
-
-<h3>最高投資報酬率修復方向</h3>
-<p>修好 <code>DMADMASync_PreTest</code> 前置條件（sub-cycle 精確的 DMC DMA open bus timing）可能一次解鎖 <strong>+6 至 +12 項測試</strong>，涵蓋 P13、P10 和 P20。這需要 Master Clock 驅動架構重構。</p>
+<h3>修復方向</h3>
+<p>剩餘 4 個失敗均為 Page 13 的 DMA 時序邊界情況。修復需重構 MEM.cs 的 <code>ProcessPendingDma</code>（動態 bus conflict + implicit abort 處理），且不能影響已通過的 132 項測試。</p>
 </div>
 
 <div class="footer">
-  AprNes &mdash; AccuracyCoin 測試方法論 &mdash; 最後更新：2026-03-07
+  AprNes &mdash; AccuracyCoin 測試方法論 &mdash; 最後更新：2026-03-09
 </div>
 
 </body>
