@@ -1,9 +1,0 @@
-﻿=== SIMD Compare (.NET 10 RyuJIT) ===
-ROM  : spritecans.nes
-Time : 10 sec each
-Date : 2026-03-03 15:03:56
-
-SIMD  ON  :    5012 frames      501.2 FPS
-SIMD  OFF :    4987 frames      498.7 FPS
-SIMD gain : +2.5 FPS  (+0.5%)
-
