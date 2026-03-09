@@ -2,7 +2,7 @@
 
 **基線**: 132/136 PASS, 4 FAIL, 0 SKIP
 **最後更新**: 2026-03-10
-**分支**: asymmetric-mcu-split
+**分支**: master
 
 ---
 
@@ -124,7 +124,28 @@
 | DMA timing | DMC defer + pre-increment CC | 168/174 | APU 在 DMA 中位置偏移 |
 | DMA timing | DMC defer + OAM-aware | 172/174, AC 121/136 | DMC-only DMA 仍差 ±1 |
 
-### 根本結論
+### 2026-03-10 P13 深入調查結論
 
-Per-cycle CPU rewrite 解決了大部分 DMA timing 問題（P10/P12/P20 全通過），
-DMC DMA cooldown 再修復 1 項。剩餘 4 項 P13 失敗仍需更精確的 DMA stolen cycle 時序。
+| 嘗試 | 結果 | 原因 |
+|------|------|------|
+| 延遲 $4015 disable (TriCNES APU_DelayedDMC4015) | 174/174, AC 132/136 (無改善) | 延遲正確但不是根因 |
+| 簡單 DMA reorder (ProcessPendingDma→StartCpuCycle) | 172/174, AC P13 不變 | irq_and_dma 回歸 |
+| DMA reorder + getCycle parity flip | 168/174, P13 10/10 全 FAIL | 補償不正確 |
+
+**P13 err=2 的具體含義** (從 AccuracyCoin ROM 錯誤碼確認):
+- DMA + $2002 Read err=2: halt/alignment cycles 沒正確讀取 $2002
+- DMC DMA Bus Conflicts err=2: 與 APU 暫存器的 bus conflict 不正確
+- Explicit DMA Abort err=2: 被中止的 DMA stolen cycle 數量錯
+- Implicit DMA Abort err=2: 被中止的 DMA stolen cycle 數量錯
+
+**根本結論: 需要三個修復同時到位**
+
+1. **Asymmetric DMA split** — Read cycle: DMA before StartCpuCycle; Write cycle: 不變
+   - 修正 halt cycle phantom read 晚 1 CC 的問題
+   - 最大結構改動，影響全部 174+136 測試
+2. **Abort mechanism** — 延遲 $4015 disable + explicit/implicit abort stolen cycle 計數
+   - TriCNES parity 映射已確認: post-toggle `APU_PutCycle` = 我們的 `!putCycle`
+3. **Bus conflict 邏輯** — DMC DMA 讀 APU 暫存器時的 bus-OR 行為
+   - 最獨立、最低風險
+
+詳細修復計畫見 Claude memory: `p13_fix_plan.md`
