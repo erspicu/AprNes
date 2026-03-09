@@ -92,6 +92,9 @@ namespace AprNes
         static int dmcLoadDmaCountdown = 0;    // Load DMA scheduling delay (2-3 APU cycles)
         static int dmcDisableDelay = 0;        // Deferred $4015 disable (Mesen2: _disableDelay)
         static bool dmcAbortDma = false;       // Abort flag for in-progress DMA (Mesen2: _abortDmcDma)
+        static int dmcDmaCooldown = 0;         // TriCNES: CannotRunDMCDMARightNow (blocks new DMA for 2 cycles after completion)
+        static bool dmcImplicitAbortPending = false;  // TriCNES: APU_SetImplicitAbortDMC4015
+        static bool dmcImplicitAbortActive = false;   // TriCNES: APU_ImplicitAbortDMC4015
 
         // Length counter 欄位
         static int* lengthctr;
@@ -303,6 +306,7 @@ namespace AprNes
             dmcsilence = true; dmcirq = false; dmcloop = false; dmcBufferEmpty = true;
             dmcLoadDmaCountdown = 0; dmcDisableDelay = 0; dmcAbortDma = false;
             dmcDmaRunning = false; dmcNeedDummyRead = false; dmaNeedHalt = false;
+            dmcDmaCooldown = 0; dmcImplicitAbortPending = false; dmcImplicitAbortActive = false;
             spriteDmaTransfer = false; spriteDmaOffset = 0;
         }
 
@@ -586,6 +590,9 @@ namespace AprNes
             // Don't trigger new DMA during active DMA
             if (dmcDmaRunning) return;
 
+            // TriCNES: CannotRunDMCDMARightNow cooldown (blocks back-to-back DMA)
+            if (dmcDmaCooldown > 0) dmcDmaCooldown--;
+
             // Handle deferred DMC disable ($4015 clear, Mesen2: _disableDelay)
             if (dmcDisableDelay > 0)
             {
@@ -607,8 +614,19 @@ namespace AprNes
             }
 
             // Reload DMA: buffer emptied by output unit → request DMA
-            if (dmcBufferEmpty && dmcsamplesleft > 0)
-                dmcStartTransfer();
+            // TriCNES: also trigger DMA for implicit abort (phantom DMA)
+            if (dmcBufferEmpty && (dmcsamplesleft > 0 || dmcImplicitAbortPending))
+            {
+                if (dmcDmaCooldown != 2) // block if just finished DMA
+                {
+                    if (dmcImplicitAbortPending)
+                    {
+                        dmcImplicitAbortActive = true;
+                        dmcImplicitAbortPending = false;
+                    }
+                    dmcStartTransfer();
+                }
+            }
         }
 
         // Request DMC DMA — sets flags for ProcessPendingDma() (Mesen2: StartDmcTransfer)

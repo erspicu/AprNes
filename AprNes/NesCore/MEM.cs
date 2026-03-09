@@ -161,6 +161,7 @@ namespace AprNes
                         dmcDmaRunning = false;
                         dmcAbortDma = false;
                         dmcSetReadBuffer(val);
+                        dmcDmaCooldown = 2; // TriCNES: CannotRunDMCDMARightNow
                     }
                     else if (spriteDmaTransfer)
                     {
