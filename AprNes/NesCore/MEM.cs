@@ -100,6 +100,16 @@ namespace AprNes
         {
             if (!dmaNeedHalt) return;
 
+            // SH* opcodes: DMA during critical cycle makes H invisible (TriCNES IgnoreH)
+            if ((opcode == 0x93 && operationCycle == 4) ||
+                (opcode == 0x9B && operationCycle == 3) ||
+                (opcode == 0x9C && operationCycle == 3) ||
+                (opcode == 0x9E && operationCycle == 3) ||
+                (opcode == 0x9F && operationCycle == 3))
+            {
+                ignoreH = true;
+            }
+
             bool skipDummyReads = (readAddress == 0x4016 || readAddress == 0x4017);
             bool enableInternalRegReads = (readAddress & 0xFFE0) == 0x4000;
             dmaPrevReadAddress = readAddress;

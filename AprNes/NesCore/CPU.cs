@@ -25,6 +25,7 @@ namespace AprNes
         static ushort temporaryAddress;   // used for branch/page-cross calculations
         static byte specialBus;           // used by JSR/JMP ind
         static byte H;                    // high byte for SH*/SHA illegals
+        static bool ignoreH;             // DMA during SH* critical cycle → H=0xFF
         static bool fixHighByte;          // for abs,X/Y page cross tracking
 
         // Interrupt flags for per-cycle model
@@ -685,6 +686,7 @@ namespace AprNes
             if (operationCycle == 0)
             {
                 // --- Cycle 0: Opcode Fetch ---
+                ignoreH = false;
                 addressBus = r_PC;
                 opcode = CpuRead(addressBus);
 
@@ -1906,22 +1908,24 @@ namespace AprNes
                         break;
 
                     // ===== SHA (Ind),Y *** =====
-                    case 0x93:
+                    case 0x93: // SHA (Ind),Y — alternate behavior: A & (X|magic) & H
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(false); if (operationCycle == 4) CPU_Read = false; break;
                             case 5: PollInterrupts();
                                 if ((temporaryAddress & 0xFF00) != (addressBus & 0xFF00))
                                     addressBus = (ushort)((byte)addressBus | (((addressBus >> 8) & r_X) << 8));
-                                CpuWrite(addressBus, (byte)(r_A & r_X & (byte)((addressBus >> 8) + 1)));
+                                if (ignoreH) H = 0xFF;
+                                CpuWrite(addressBus, (byte)(r_A & (r_X | 0xF5) & H));
                                 CompleteOperation(); break; }
                         break;
 
                     // ===== SHA Abs,Y *** =====
-                    case 0x9F:
+                    case 0x9F: // SHA Abs,Y — alternate behavior: A & (X|magic) & H
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(false); if (operationCycle == 3) CPU_Read = false; break;
                             case 4: PollInterrupts();
                                 if ((temporaryAddress & 0xFF00) != (addressBus & 0xFF00))
                                     addressBus = (ushort)((byte)addressBus | (((addressBus >> 8) & r_X) << 8));
-                                CpuWrite(addressBus, (byte)(r_A & r_X & H));
+                                if (ignoreH) H = 0xFF;
+                                CpuWrite(addressBus, (byte)(r_A & (r_X | 0xF5) & H));
                                 CompleteOperation(); break; }
                         break;
 
@@ -1931,6 +1935,7 @@ namespace AprNes
                             case 4: PollInterrupts();
                                 if ((temporaryAddress & 0xFF00) != (addressBus & 0xFF00))
                                     addressBus = (ushort)((byte)addressBus | (((addressBus >> 8) & r_Y) << 8));
+                                if (ignoreH) H = 0xFF;
                                 CpuWrite(addressBus, (byte)(r_Y & H));
                                 CompleteOperation(); break; }
                         break;
@@ -1941,18 +1946,20 @@ namespace AprNes
                             case 4: PollInterrupts();
                                 if ((temporaryAddress & 0xFF00) != (addressBus & 0xFF00))
                                     addressBus = (ushort)((byte)addressBus | (((addressBus >> 8) & r_X) << 8));
+                                if (ignoreH) H = 0xFF;
                                 CpuWrite(addressBus, (byte)(r_X & H));
                                 CompleteOperation(); break; }
                         break;
 
                     // ===== SHS (TAS) Abs,Y *** =====
-                    case 0x9B:
+                    case 0x9B: // SHS — alternate behavior: A & (X|magic) & H
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(false); if (operationCycle == 3) CPU_Read = false; break;
                             case 4: PollInterrupts();
                                 if ((temporaryAddress & 0xFF00) != (addressBus & 0xFF00))
                                     addressBus = (ushort)((byte)addressBus | (((addressBus >> 8) & r_X) << 8));
                                 r_SP = (byte)(r_A & r_X);
-                                CpuWrite(addressBus, (byte)(r_A & r_X & H));
+                                if (ignoreH) H = 0xFF;
+                                CpuWrite(addressBus, (byte)(r_A & (r_X | 0xF5) & H));
                                 CompleteOperation(); break; }
                         break;
 
