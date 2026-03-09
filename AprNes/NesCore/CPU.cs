@@ -1,4 +1,3 @@
-#define illegal
 using System;
 using System.Runtime.CompilerServices;
 
@@ -12,11 +11,27 @@ namespace AprNes
 
         static public bool exit = false;
         static bool nmi_pending = false;
-        static bool irq_pending = false; // IRQ should fire before next instruction
-        static bool irqLinePrev = false; // IRQ line at penultimate tick (N-1)
-        static bool irqLineCurrent = false; // IRQ line at last tick (N)
-        static public bool statusmapperint = false; // mapper IRQ line asserted (MMC3 etc.)
-        static int nmi_trace_count = 0; // trace instructions after NMI
+        static bool irq_pending = false;
+        static bool irqLinePrev = false;
+        static bool irqLineCurrent = false;
+        static public bool statusmapperint = false;
+        static int nmi_trace_count = 0;
+
+        // Per-cycle state machine state
+        static byte operationCycle = 0;   // 0 = opcode fetch, 1..N = subsequent cycles
+        static bool CPU_Read = true;      // true = read cycle, false = write cycle (for DMA halt logic)
+        static ushort addressBus = 0;     // current address on bus
+        static byte dl = 0;              // data latch (intermediate value between cycles)
+        static ushort temporaryAddress;   // used for branch/page-cross calculations
+        static byte specialBus;           // used by JSR/JMP ind
+        static byte H;                    // high byte for SH*/SHA illegals
+        static bool fixHighByte;          // for abs,X/Y page cross tracking
+
+        // Interrupt flags for per-cycle model
+        static bool doNMI = false;
+        static bool doIRQ = false;
+        static bool doReset = false;
+        static bool doBRK = false;
 
         // Headless mode (console test runner)
         static public bool HeadlessMode = false;
@@ -29,10 +44,8 @@ namespace AprNes
         static public void dbgInit()
         {
             if (!HeadlessMode) { dbgLog = null; return; }
-            // Use temp file with PID to allow parallel execution
             string pidLog = System.IO.Path.Combine(System.IO.Path.GetTempPath(),
                 "aprnes_debug_" + System.Diagnostics.Process.GetCurrentProcess().Id + ".log");
-            // Override with explicit path if set via TestRunner
             if (DebugLogPath != null && DebugLogPath.Length > 0)
                 pidLog = DebugLogPath;
             try {
@@ -72,2324 +85,1897 @@ namespace AprNes
             flagC = (byte)(flag & 0x1);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void NMIInterrupt()
-        {
-            byte pushed_flags = (byte)(GetFlag() | 0x20);
-            dbgWrite("NMI_PUSH: PC=$" + r_PC.ToString("X4") + " flags=$" + pushed_flags.ToString("X2") + " SP=$" + r_SP.ToString("X2"));
-            Mem_r(r_PC); Mem_r(r_PC); // cycles 1-2: dummy reads
-            Mem_w((ushort)(0x100 | r_SP--), (byte)(r_PC >> 8)); // cycle 3: push PCH
-            Mem_w((ushort)(0x100 | r_SP--), (byte)r_PC); // cycle 4: push PCL
-            Mem_w((ushort)(0x100 | r_SP--), pushed_flags); // cycle 5: push P
-            byte lo = Mem_r(0xfffa); // cycle 6: vector low
-            byte hi = Mem_r(0xfffb); // cycle 7: vector high
-            r_PC = (ushort)(lo | (hi << 8));
-            flagI = 1;
-        }
-
         static bool softreset = false;
         public static void SoftReset()
         {
             softreset = true;
+            doReset = true;
+        }
+
+        // --- Per-cycle bus access functions ---
+        // Each call advances the clock (StartCpuCycle/EndCpuCycle), matching Mem_r/Mem_w behavior.
+        // CpuRead also triggers DMA via ProcessPendingDma when dmaNeedHalt is set.
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static byte CpuRead(ushort addr)
+        {
+            CPU_Read = true;
+            cpuBusAddr = addr;
+            cpuBusIsWrite = false;
+            StartCpuCycle();
+            if (dmaNeedHalt) ProcessPendingDma(addr);
+            byte val = mem_read_fun[addr](addr);
+            if (addr != 0x4015) cpubus = val;
+            EndCpuCycle();
+            return val;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void ResetInterrupt()
+        static void CpuWrite(ushort addr, byte val)
         {
-            Console.WriteLine("soft reset !");
-            Mem_r(r_PC); Mem_r(r_PC); // cycles 1-2: dummy reads
-            Mem_r((ushort)(0x100 | r_SP--)); // cycle 3: dummy stack access
-            Mem_r((ushort)(0x100 | r_SP--)); // cycle 4: dummy stack access
-            Mem_r((ushort)(0x100 | r_SP--)); // cycle 5: dummy stack access
-            byte lo = Mem_r(0xfffc); // cycle 6: reset vector low
-            byte hi = Mem_r(0xfffd); // cycle 7: reset vector high
-            r_PC = (ushort)(lo | (hi << 8));
-            flagI = 1;
-            nmi_pending = false;
-            nmi_delay_cycle = -1;
-            nmi_output_prev = false;
-            irq_pending = false;
-            statusmapperint = false;
-            apuSoftReset();
-            strobeWritePending = 0;
-            P1_LastWrite = 0;
+            CPU_Read = false;
+            cpuBusAddr = addr;
+            cpuBusIsWrite = true;
+            StartCpuCycle();
+            cpubus = val;
+            mem_write_fun[addr](addr, val);
+            EndCpuCycle();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void IRQInterrupt()
+        static byte CpuReadZP(byte addr)
         {
-            Mem_r(r_PC); Mem_r(r_PC); // cycles 1-2: dummy reads
-            Mem_w((ushort)(0x100 | r_SP--), (byte)(r_PC >> 8)); // cycle 3: push PCH
-            Mem_w((ushort)(0x100 | r_SP--), (byte)r_PC); // cycle 4: push PCL
-            Mem_w((ushort)(0x100 | r_SP--), (byte)(GetFlag() | 0x20)); // cycle 5: push P
-            // Check if NMI asserted during IRQ vectoring — hijack to NMI vector
-            ushort vector = (nmi_pending) ? (ushort)0xfffa : (ushort)0xfffe;
-            if (nmi_pending) nmi_pending = false;
-            byte lo = Mem_r(vector); // cycle 6: vector low
-            byte hi = Mem_r((ushort)(vector + 1)); // cycle 7: vector high
-            r_PC = (ushort)(lo | (hi << 8));
-            flagI = 1;
+            CPU_Read = true;
+            cpuBusAddr = addr;
+            cpuBusIsWrite = false;
+            StartCpuCycle();
+            if (dmaNeedHalt) ProcessPendingDma(addr);
+            byte val = NES_MEM[addr];
+            cpubus = val;
+            EndCpuCycle();
+            return val;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void CpuWriteZP(byte addr, byte val)
+        {
+            CPU_Read = false;
+            cpuBusAddr = addr;
+            cpuBusIsWrite = true;
+            StartCpuCycle();
+            NES_MEM[addr] = val;
+            cpubus = val;
+            EndCpuCycle();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void StackPush(byte val)
+        {
+            CpuWrite((ushort)(0x100 | r_SP), val);
+            r_SP--;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static byte StackPull()
+        {
+            r_SP++;
+            return CpuRead((ushort)(0x100 | r_SP));
+        }
+
+        // PollInterrupts: no-op — interrupt detection moved to run() loop in Main.cs
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void PollInterrupts() { }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void PollInterrupts_CantDisableIRQ() { }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void CompleteOperation()
+        {
+            operationCycle = 0xFF; // will be incremented to 0 at end of cpu_step_one_cycle
+            addressBus = r_PC;
+            CPU_Read = true;
+        }
+
+        // --- Operation helpers ---
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void SetNZ(byte val)
+        {
+            flagN = (byte)((val & 0x80) >> 7);
+            flagZ = (val == 0) ? (byte)1 : (byte)0;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Op_ADC(byte val)
+        {
+            int result = r_A + val + flagC;
+            flagV = (byte)((((r_A ^ val) & 0x80) == 0 && ((r_A ^ result) & 0x80) != 0) ? 1 : 0);
+            flagC = (result > 0xFF) ? (byte)1 : (byte)0;
+            r_A = (byte)result;
+            SetNZ(r_A);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Op_SBC(byte val)
+        {
+            int result = r_A - val - (1 - flagC);
+            flagV = (byte)((((r_A ^ val) & 0x80) != 0 && ((r_A ^ result) & 0x80) != 0) ? 1 : 0);
+            flagC = (result >= 0) ? (byte)1 : (byte)0;
+            r_A = (byte)result;
+            SetNZ(r_A);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Op_AND(byte val)
+        {
+            r_A &= val;
+            SetNZ(r_A);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Op_ORA(byte val)
+        {
+            r_A |= val;
+            SetNZ(r_A);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Op_EOR(byte val)
+        {
+            r_A ^= val;
+            SetNZ(r_A);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Op_CMP(byte val, byte reg)
+        {
+            flagC = (reg >= val) ? (byte)1 : (byte)0;
+            flagZ = (reg == val) ? (byte)1 : (byte)0;
+            flagN = (byte)((((byte)(reg - val)) & 0x80) >> 7);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Op_ASL_mem(ushort addr)
+        {
+            flagC = (byte)((dl & 0x80) >> 7);
+            dl <<= 1;
+            SetNZ(dl);
+            CpuWrite(addr, dl);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Op_LSR_mem(ushort addr)
+        {
+            flagC = (byte)(dl & 1);
+            dl >>= 1;
+            SetNZ(dl);
+            CpuWrite(addr, dl);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Op_ROL_mem(ushort addr)
+        {
+            byte oldC = flagC;
+            flagC = (byte)((dl & 0x80) >> 7);
+            dl = (byte)((dl << 1) | oldC);
+            SetNZ(dl);
+            CpuWrite(addr, dl);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Op_ROR_mem(ushort addr)
+        {
+            byte oldC = flagC;
+            flagC = (byte)(dl & 1);
+            dl = (byte)((dl >> 1) | (oldC << 7));
+            SetNZ(dl);
+            CpuWrite(addr, dl);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Op_INC_mem(ushort addr)
+        {
+            dl++;
+            SetNZ(dl);
+            CpuWrite(addr, dl);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Op_DEC_mem(ushort addr)
+        {
+            dl--;
+            SetNZ(dl);
+            CpuWrite(addr, dl);
+        }
+
+        // Illegal op helpers
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Op_SLO(ushort addr)
+        {
+            Op_ASL_mem(addr);
+            Op_ORA(dl);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Op_RLA(ushort addr)
+        {
+            Op_ROL_mem(addr);
+            Op_AND(dl);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Op_SRE(ushort addr)
+        {
+            Op_LSR_mem(addr);
+            Op_EOR(dl);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Op_RRA(ushort addr)
+        {
+            Op_ROR_mem(addr);
+            Op_ADC(dl);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Op_ISC(ushort addr)
+        {
+            Op_INC_mem(addr);
+            Op_SBC(dl);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Op_DCP(ushort addr)
+        {
+            Op_DEC_mem(addr);
+            Op_CMP(dl, r_A);
+        }
+
+        // --- Addressing mode helpers ---
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void GetImmediate()
+        {
+            dl = CpuRead(r_PC);
+            r_PC++;
+            addressBus = r_PC;
+        }
+
+        static void GetAddressAbsolute()
+        {
+            if (operationCycle == 1)
+            {
+                dl = CpuRead(r_PC);
+            }
+            else
+            {
+                addressBus = (ushort)(dl | (CpuRead(r_PC) << 8));
+            }
+            r_PC++;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void GetAddressZeroPage()
+        {
+            addressBus = CpuRead(r_PC);
+            r_PC++;
+        }
+
+        static void GetAddressIndOffX()
+        {
+            switch (operationCycle)
+            {
+                case 1:
+                    addressBus = CpuRead(r_PC);
+                    r_PC++;
+                    break;
+                case 2:
+                    CpuReadZP((byte)addressBus); // dummy read
+                    addressBus = (byte)(addressBus + r_X);
+                    break;
+                case 3:
+                    dl = CpuReadZP((byte)addressBus);
+                    break;
+                case 4:
+                    addressBus = (ushort)(dl | (CpuReadZP((byte)(addressBus + 1)) << 8));
+                    break;
+            }
+        }
+
+        static void GetAddressIndOffY(bool optionalExtraCycle)
+        {
+            if (optionalExtraCycle)
+            {
+                switch (operationCycle)
+                {
+                    case 1:
+                        addressBus = CpuRead(r_PC);
+                        r_PC++;
+                        break;
+                    case 2:
+                        dl = CpuReadZP((byte)addressBus);
+                        break;
+                    case 3:
+                        addressBus = (ushort)(dl | (CpuReadZP((byte)(addressBus + 1)) << 8));
+                        temporaryAddress = addressBus;
+                        H = (byte)(addressBus >> 8);
+                        if (((temporaryAddress + r_Y) & 0xFF00) == (temporaryAddress & 0xFF00))
+                        {
+                            operationCycle++; // skip next cycle
+                        }
+                        addressBus = (ushort)((addressBus & 0xFF00) | ((addressBus + r_Y) & 0xFF));
+                        break;
+                    case 4:
+                        dl = CpuRead(addressBus); // dummy read
+                        H = (byte)(addressBus >> 8);
+                        H++;
+                        addressBus += 0x100;
+                        break;
+                }
+            }
+            else
+            {
+                switch (operationCycle)
+                {
+                    case 1:
+                        addressBus = CpuRead(r_PC);
+                        r_PC++;
+                        break;
+                    case 2:
+                        dl = CpuReadZP((byte)addressBus);
+                        break;
+                    case 3:
+                        addressBus = (ushort)(dl | (CpuReadZP((byte)(addressBus + 1)) << 8));
+                        temporaryAddress = addressBus;
+                        addressBus = (ushort)((addressBus & 0xFF00) | ((addressBus + r_Y) & 0xFF));
+                        break;
+                    case 4:
+                        dl = CpuRead(addressBus); // dummy read
+                        H = (byte)(addressBus >> 8);
+                        H++;
+                        if (((temporaryAddress + r_Y) & 0xFF00) != (temporaryAddress & 0xFF00))
+                        {
+                            addressBus += 0x100;
+                        }
+                        break;
+                }
+            }
+        }
+
+        static void GetAddressZPOffX()
+        {
+            if (operationCycle == 1)
+            {
+                addressBus = CpuRead(r_PC);
+                r_PC++;
+            }
+            else
+            {
+                dl = CpuReadZP((byte)addressBus); // dummy read
+                addressBus = (byte)(addressBus + r_X);
+            }
+        }
+
+        static void GetAddressZPOffY()
+        {
+            if (operationCycle == 1)
+            {
+                addressBus = CpuRead(r_PC);
+                r_PC++;
+            }
+            else
+            {
+                dl = CpuReadZP((byte)addressBus); // dummy read
+                addressBus = (byte)(addressBus + r_Y);
+            }
+        }
+
+        static void GetAddressAbsOffX(bool optionalExtraCycle)
+        {
+            if (optionalExtraCycle)
+            {
+                switch (operationCycle)
+                {
+                    case 1:
+                        dl = CpuRead(r_PC);
+                        r_PC++;
+                        break;
+                    case 2:
+                        addressBus = (ushort)(dl | (CpuRead(r_PC) << 8));
+                        temporaryAddress = addressBus;
+                        H = (byte)(addressBus >> 8);
+                        if (((temporaryAddress + r_X) & 0xFF00) == (temporaryAddress & 0xFF00))
+                        {
+                            operationCycle++; // skip next cycle
+                            fixHighByte = false;
+                        }
+                        else
+                        {
+                            fixHighByte = true;
+                        }
+                        addressBus = (ushort)((addressBus & 0xFF00) | ((addressBus + r_X) & 0xFF));
+                        r_PC++;
+                        break;
+                    case 3:
+                        dl = CpuRead(addressBus); // dummy read with wrong high byte
+                        H = (byte)(addressBus >> 8);
+                        H++;
+                        if (fixHighByte)
+                        {
+                            addressBus += 0x100;
+                        }
+                        break;
+                    case 4:
+                        dl = CpuRead(addressBus); // read from final address
+                        break;
+                }
+            }
+            else
+            {
+                switch (operationCycle)
+                {
+                    case 1:
+                        dl = CpuRead(r_PC);
+                        r_PC++;
+                        break;
+                    case 2:
+                        addressBus = (ushort)(dl | (CpuRead(r_PC) << 8));
+                        temporaryAddress = addressBus;
+                        addressBus = (ushort)((addressBus & 0xFF00) | ((addressBus + r_X) & 0xFF));
+                        r_PC++;
+                        break;
+                    case 3:
+                        dl = CpuRead(addressBus); // dummy read with possibly wrong high byte
+                        H = (byte)(addressBus >> 8);
+                        H++;
+                        if (((temporaryAddress + r_X) & 0xFF00) != (temporaryAddress & 0xFF00))
+                        {
+                            addressBus += 0x100;
+                        }
+                        break;
+                    case 4:
+                        dl = CpuRead(addressBus); // read from final address
+                        break;
+                }
+            }
+        }
+
+        static void GetAddressAbsOffY(bool optionalExtraCycle)
+        {
+            if (optionalExtraCycle)
+            {
+                switch (operationCycle)
+                {
+                    case 1:
+                        dl = CpuRead(r_PC);
+                        r_PC++;
+                        break;
+                    case 2:
+                        addressBus = (ushort)(dl | (CpuRead(r_PC) << 8));
+                        temporaryAddress = addressBus;
+                        H = (byte)(addressBus >> 8);
+                        if (((temporaryAddress + r_Y) & 0xFF00) == (temporaryAddress & 0xFF00))
+                        {
+                            operationCycle++; // skip next cycle
+                            fixHighByte = false;
+                        }
+                        else
+                        {
+                            fixHighByte = true;
+                        }
+                        addressBus = (ushort)((addressBus & 0xFF00) | ((addressBus + r_Y) & 0xFF));
+                        r_PC++;
+                        break;
+                    case 3:
+                        dl = CpuRead(addressBus); // dummy read with wrong high byte
+                        H = (byte)(addressBus >> 8);
+                        H++;
+                        if (fixHighByte)
+                        {
+                            addressBus += 0x100;
+                        }
+                        break;
+                    case 4:
+                        dl = CpuRead(addressBus); // read from final address
+                        break;
+                }
+            }
+            else
+            {
+                switch (operationCycle)
+                {
+                    case 1:
+                        dl = CpuRead(r_PC);
+                        r_PC++;
+                        break;
+                    case 2:
+                        addressBus = (ushort)(dl | (CpuRead(r_PC) << 8));
+                        temporaryAddress = addressBus;
+                        addressBus = (ushort)((addressBus & 0xFF00) | ((addressBus + r_Y) & 0xFF));
+                        r_PC++;
+                        break;
+                    case 3:
+                        dl = CpuRead(addressBus); // dummy read with possibly wrong high byte
+                        H = (byte)(addressBus >> 8);
+                        H++;
+                        if (((temporaryAddress + r_Y) & 0xFF00) != (temporaryAddress & 0xFF00))
+                        {
+                            addressBus += 0x100;
+                        }
+                        break;
+                    case 4:
+                        dl = CpuRead(addressBus); // read from final address
+                        break;
+                }
+            }
+        }
+
+        // --- Branch helper ---
+        static bool branchIrqSaved; // saved irqLinePrev for branch-taken-no-cross
+
+        static void DoBranch(bool condition)
+        {
+            switch (operationCycle)
+            {
+                case 1:
+                    GetImmediate();
+                    if (!condition)
+                    {
+                        CompleteOperation();
+                    }
+                    else
+                    {
+                        branchIrqSaved = irqLinePrev; // save before taken-dummy tick
+                    }
+                    break;
+                case 2:
+                    CpuRead(addressBus); // dummy read
+                    temporaryAddress = (ushort)(r_PC + ((dl >= 0x80) ? -(256 - dl) : dl));
+                    r_PC = (ushort)((r_PC & 0xFF00) | (byte)((r_PC & 0xFF) + dl));
+                    addressBus = r_PC;
+                    if ((temporaryAddress & 0xFF00) == (r_PC & 0xFF00))
+                    {
+                        irqLinePrev = branchIrqSaved; // restore: IRQ penultimate = pre-branch state
+                        CompleteOperation();
+                    }
+                    break;
+                case 3:
+                    CpuRead(addressBus); // dummy read (page fix)
+                    r_PC = (ushort)((r_PC & 0xFF) | (temporaryAddress & 0xFF00));
+                    CompleteOperation();
+                    break;
+            }
+        }
+
+        // --- HLT (JAM) helper ---
+        static void DoHLT()
+        {
+            switch (operationCycle)
+            {
+                case 1:
+                    dl = CpuRead(addressBus);
+                    break;
+                case 2:
+                    addressBus = 0xFFFF;
+                    CpuRead(addressBus);
+                    break;
+                case 3:
+                case 4:
+                    addressBus = 0xFFFE;
+                    CpuRead(addressBus);
+                    break;
+                case 5:
+                    addressBus = 0xFFFF;
+                    CpuRead(addressBus);
+                    break;
+                case 6:
+                    addressBus = 0xFFFF;
+                    CpuRead(addressBus);
+                    operationCycle = 5; // loop infinitely
+                    break;
+            }
+        }
+
+        // ============================================================
+        // Main per-cycle CPU step function
+        // Called once per CPU cycle from the master clock loop.
+        // ============================================================
+        static void cpu_step_one_cycle()
+        {
+            if (operationCycle == 0)
+            {
+                // --- Cycle 0: Opcode Fetch ---
+                addressBus = r_PC;
+                opcode = CpuRead(addressBus);
+
+                if (softreset || doReset)
+                {
+                    opcode = 0x00;
+                    doReset = true;
+                    softreset = false;
+                }
+                else if (doNMI)
+                {
+                    opcode = 0x00; // BRK with NMI behavior
+                }
+                else if (doIRQ)
+                {
+                    opcode = 0x00; // BRK with IRQ behavior
+                }
+                else if (opcode == 0x00)
+                {
+                    doBRK = true;
+                }
+
+                // Pre-instruction trace
+                if (nmi_trace_count > 0)
+                    dbgWrite("TRACE: PC=$" + r_PC.ToString("X4") + " op=$" + opcode.ToString("X2")
+                        + " A=$" + r_A.ToString("X2") + " X=$" + r_X.ToString("X2")
+                        + " Y=$" + r_Y.ToString("X2") + " SP=$" + r_SP.ToString("X2")
+                        + " P=$" + (GetFlag() | 0x20).ToString("X2"));
+
+                if (!doNMI && !doIRQ && !doReset)
+                {
+                    r_PC++;
+                    addressBus = r_PC;
+                }
+
+                operationCycle++;
+            }
+            else
+            {
+                // --- Cycles 1..N: Execute based on opcode ---
+                switch (opcode)
+                {
+                    case 0x00: // BRK / NMI / IRQ / RESET
+                        switch (operationCycle)
+                        {
+                            case 1:
+                                if (!doBRK)
+                                {
+                                    CpuRead(addressBus); // dummy fetch without incrementing PC
+                                }
+                                else
+                                {
+                                    GetImmediate(); // dummy fetch and PC increment
+                                }
+                                break;
+                            case 2:
+                                if (!doReset)
+                                    StackPush((byte)(r_PC >> 8));
+                                else
+                                    { CpuRead((ushort)(0x100 | r_SP)); r_SP--; } // reset: read instead of write
+                                break;
+                            case 3:
+                                if (!doReset)
+                                    StackPush((byte)r_PC);
+                                else
+                                    { CpuRead((ushort)(0x100 | r_SP)); r_SP--; }
+                                break;
+                            case 4:
+                                if (!doReset)
+                                {
+                                    byte pushed = (byte)(GetFlag() | 0x20 | (doBRK ? 0x10 : 0x00));
+                                    StackPush(pushed);
+                                }
+                                else
+                                    { CpuRead((ushort)(0x100 | r_SP)); r_SP--; }
+                                // NMI hijack check during interrupt vectoring
+                                if (nmi_pending) { doNMI = true; nmi_pending = false; }
+                                break;
+                            case 5:
+                                if (doNMI)
+                                    r_PC = (ushort)((r_PC & 0xFF00) | CpuRead(0xFFFA));
+                                else if (doReset)
+                                    r_PC = (ushort)((r_PC & 0xFF00) | CpuRead(0xFFFC));
+                                else
+                                    r_PC = (ushort)((r_PC & 0xFF00) | CpuRead(0xFFFE));
+                                break;
+                            case 6:
+                                if (doNMI)
+                                    r_PC = (ushort)((r_PC & 0xFF) | (CpuRead(0xFFFB) << 8));
+                                else if (doReset)
+                                    r_PC = (ushort)((r_PC & 0xFF) | (CpuRead(0xFFFD) << 8));
+                                else
+                                    r_PC = (ushort)((r_PC & 0xFF) | (CpuRead(0xFFFF) << 8));
+
+                                if (doNMI)
+                                {
+                                    dbgWrite("NMI_PUSH: PC=$" + r_PC.ToString("X4") + " SP=$" + r_SP.ToString("X2"));
+                                }
+                                if (doReset)
+                                {
+                                    Console.WriteLine("soft reset !");
+                                    nmi_pending = false;
+                                    nmi_delay_cycle = -1;
+                                    nmi_output_prev = false;
+                                    irq_pending = false;
+                                    statusmapperint = false;
+                                    apuSoftReset();
+                                    strobeWritePending = 0;
+                                    P1_LastWrite = 0;
+                                }
+
+                                CompleteOperation();
+                                doReset = false;
+                                doNMI = false;
+                                doIRQ = false;
+                                doBRK = false;
+                                flagI = 1;
+                                break;
+                        }
+                        break;
+
+                    // ===== ORA =====
+                    case 0x09: // ORA Imm
+                        PollInterrupts(); GetImmediate(); Op_ORA(dl); CompleteOperation(); break;
+                    case 0x05: // ORA ZP
+                        if (operationCycle == 1) GetAddressZeroPage();
+                        else { PollInterrupts(); Op_ORA(CpuRead(addressBus)); CompleteOperation(); }
+                        break;
+                    case 0x15: // ORA ZP,X
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
+                            case 3: PollInterrupts(); Op_ORA(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+                    case 0x0D: // ORA Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: PollInterrupts(); Op_ORA(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+                    case 0x1D: // ORA Abs,X
+                        switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffX(true); break;
+                            case 4: PollInterrupts(); Op_ORA(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+                    case 0x19: // ORA Abs,Y
+                        switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(true); break;
+                            case 4: PollInterrupts(); Op_ORA(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+                    case 0x01: // ORA (Ind,X)
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
+                            case 5: PollInterrupts(); Op_ORA(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+                    case 0x11: // ORA (Ind),Y
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(true); break;
+                            case 5: PollInterrupts(); Op_ORA(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+
+                    // ===== AND =====
+                    case 0x29: // AND Imm
+                        PollInterrupts(); GetImmediate(); Op_AND(dl); CompleteOperation(); break;
+                    case 0x25: // AND ZP
+                        if (operationCycle == 1) GetAddressZeroPage();
+                        else { PollInterrupts(); Op_AND(CpuRead(addressBus)); CompleteOperation(); }
+                        break;
+                    case 0x35: // AND ZP,X
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
+                            case 3: PollInterrupts(); Op_AND(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+                    case 0x2D: // AND Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: PollInterrupts(); Op_AND(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+                    case 0x3D: // AND Abs,X
+                        switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffX(true); break;
+                            case 4: PollInterrupts(); Op_AND(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+                    case 0x39: // AND Abs,Y
+                        switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(true); break;
+                            case 4: PollInterrupts(); Op_AND(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+                    case 0x21: // AND (Ind,X)
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
+                            case 5: PollInterrupts(); Op_AND(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+                    case 0x31: // AND (Ind),Y
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(true); break;
+                            case 5: PollInterrupts(); Op_AND(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+
+                    // ===== EOR =====
+                    case 0x49: // EOR Imm
+                        PollInterrupts(); GetImmediate(); Op_EOR(dl); CompleteOperation(); break;
+                    case 0x45: // EOR ZP
+                        if (operationCycle == 1) GetAddressZeroPage();
+                        else { PollInterrupts(); Op_EOR(CpuRead(addressBus)); CompleteOperation(); }
+                        break;
+                    case 0x55: // EOR ZP,X
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
+                            case 3: PollInterrupts(); Op_EOR(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+                    case 0x4D: // EOR Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: PollInterrupts(); Op_EOR(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+                    case 0x5D: // EOR Abs,X
+                        switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffX(true); break;
+                            case 4: PollInterrupts(); Op_EOR(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+                    case 0x59: // EOR Abs,Y
+                        switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(true); break;
+                            case 4: PollInterrupts(); Op_EOR(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+                    case 0x41: // EOR (Ind,X)
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
+                            case 5: PollInterrupts(); Op_EOR(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+                    case 0x51: // EOR (Ind),Y
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(true); break;
+                            case 5: PollInterrupts(); Op_EOR(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+
+                    // ===== ADC =====
+                    case 0x69: // ADC Imm
+                        PollInterrupts(); GetImmediate(); Op_ADC(dl); CompleteOperation(); break;
+                    case 0x65: // ADC ZP
+                        if (operationCycle == 1) GetAddressZeroPage();
+                        else { PollInterrupts(); Op_ADC(CpuRead(addressBus)); CompleteOperation(); }
+                        break;
+                    case 0x75: // ADC ZP,X
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
+                            case 3: PollInterrupts(); Op_ADC(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+                    case 0x6D: // ADC Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: PollInterrupts(); Op_ADC(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+                    case 0x7D: // ADC Abs,X
+                        switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffX(true); break;
+                            case 4: PollInterrupts(); Op_ADC(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+                    case 0x79: // ADC Abs,Y
+                        switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(true); break;
+                            case 4: PollInterrupts(); Op_ADC(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+                    case 0x61: // ADC (Ind,X)
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
+                            case 5: PollInterrupts(); Op_ADC(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+                    case 0x71: // ADC (Ind),Y
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(true); break;
+                            case 5: PollInterrupts(); Op_ADC(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+
+                    // ===== SBC =====
+                    case 0xE9: // SBC Imm
+                    case 0xEB: // SBC Imm *** (unofficial)
+                        PollInterrupts(); GetImmediate(); Op_SBC(dl); CompleteOperation(); break;
+                    case 0xE5: // SBC ZP
+                        if (operationCycle == 1) GetAddressZeroPage();
+                        else { PollInterrupts(); Op_SBC(CpuRead(addressBus)); CompleteOperation(); }
+                        break;
+                    case 0xF5: // SBC ZP,X
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
+                            case 3: PollInterrupts(); Op_SBC(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+                    case 0xED: // SBC Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: PollInterrupts(); Op_SBC(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+                    case 0xFD: // SBC Abs,X
+                        switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffX(true); break;
+                            case 4: PollInterrupts(); Op_SBC(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+                    case 0xF9: // SBC Abs,Y
+                        switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(true); break;
+                            case 4: PollInterrupts(); Op_SBC(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+                    case 0xE1: // SBC (Ind,X)
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
+                            case 5: PollInterrupts(); Op_SBC(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+                    case 0xF1: // SBC (Ind),Y
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(true); break;
+                            case 5: PollInterrupts(); Op_SBC(CpuRead(addressBus)); CompleteOperation(); break; }
+                        break;
+
+                    // ===== CMP =====
+                    case 0xC9: // CMP Imm
+                        PollInterrupts(); GetImmediate(); Op_CMP(dl, r_A); CompleteOperation(); break;
+                    case 0xC5: // CMP ZP
+                        if (operationCycle == 1) GetAddressZeroPage();
+                        else { PollInterrupts(); Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); }
+                        break;
+                    case 0xD5: // CMP ZP,X
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
+                            case 3: PollInterrupts(); Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); break; }
+                        break;
+                    case 0xCD: // CMP Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: PollInterrupts(); Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); break; }
+                        break;
+                    case 0xDD: // CMP Abs,X
+                        switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffX(true); break;
+                            case 4: PollInterrupts(); Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); break; }
+                        break;
+                    case 0xD9: // CMP Abs,Y
+                        switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(true); break;
+                            case 4: PollInterrupts(); Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); break; }
+                        break;
+                    case 0xC1: // CMP (Ind,X)
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
+                            case 5: PollInterrupts(); Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); break; }
+                        break;
+                    case 0xD1: // CMP (Ind),Y
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(true); break;
+                            case 5: PollInterrupts(); Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); break; }
+                        break;
+
+                    // ===== CPX =====
+                    case 0xE0: // CPX Imm
+                        PollInterrupts(); GetImmediate(); Op_CMP(dl, r_X); CompleteOperation(); break;
+                    case 0xE4: // CPX ZP
+                        if (operationCycle == 1) GetAddressZeroPage();
+                        else { PollInterrupts(); Op_CMP(CpuRead(addressBus), r_X); CompleteOperation(); }
+                        break;
+                    case 0xEC: // CPX Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: PollInterrupts(); Op_CMP(CpuRead(addressBus), r_X); CompleteOperation(); break; }
+                        break;
+
+                    // ===== CPY =====
+                    case 0xC0: // CPY Imm
+                        PollInterrupts(); GetImmediate(); Op_CMP(dl, r_Y); CompleteOperation(); break;
+                    case 0xC4: // CPY ZP
+                        if (operationCycle == 1) GetAddressZeroPage();
+                        else { PollInterrupts(); Op_CMP(CpuRead(addressBus), r_Y); CompleteOperation(); }
+                        break;
+                    case 0xCC: // CPY Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: PollInterrupts(); Op_CMP(CpuRead(addressBus), r_Y); CompleteOperation(); break; }
+                        break;
+
+                    // ===== LDA =====
+                    case 0xA9: // LDA Imm
+                        PollInterrupts(); GetImmediate(); r_A = dl; SetNZ(r_A); CompleteOperation(); break;
+                    case 0xA5: // LDA ZP
+                        if (operationCycle == 1) GetAddressZeroPage();
+                        else { PollInterrupts(); r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); }
+                        break;
+                    case 0xB5: // LDA ZP,X
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
+                            case 3: PollInterrupts(); r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); break; }
+                        break;
+                    case 0xAD: // LDA Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: PollInterrupts(); r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); break; }
+                        break;
+                    case 0xBD: // LDA Abs,X
+                        switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffX(true); break;
+                            case 4: PollInterrupts(); r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); break; }
+                        break;
+                    case 0xB9: // LDA Abs,Y
+                        switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(true); break;
+                            case 4: PollInterrupts(); r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); break; }
+                        break;
+                    case 0xA1: // LDA (Ind,X)
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
+                            case 5: PollInterrupts(); r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); break; }
+                        break;
+                    case 0xB1: // LDA (Ind),Y
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(true); break;
+                            case 5: PollInterrupts(); r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); break; }
+                        break;
+
+                    // ===== LDX =====
+                    case 0xA2: // LDX Imm
+                        PollInterrupts(); GetImmediate(); r_X = dl; SetNZ(r_X); CompleteOperation(); break;
+                    case 0xA6: // LDX ZP
+                        if (operationCycle == 1) GetAddressZeroPage();
+                        else { PollInterrupts(); r_X = CpuRead(addressBus); SetNZ(r_X); CompleteOperation(); }
+                        break;
+                    case 0xB6: // LDX ZP,Y
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffY(); break;
+                            case 3: PollInterrupts(); r_X = CpuRead(addressBus); SetNZ(r_X); CompleteOperation(); break; }
+                        break;
+                    case 0xAE: // LDX Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: PollInterrupts(); r_X = CpuRead(addressBus); SetNZ(r_X); CompleteOperation(); break; }
+                        break;
+                    case 0xBE: // LDX Abs,Y
+                        switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(true); break;
+                            case 4: PollInterrupts(); r_X = CpuRead(addressBus); SetNZ(r_X); CompleteOperation(); break; }
+                        break;
+
+                    // ===== LDY =====
+                    case 0xA0: // LDY Imm
+                        PollInterrupts(); GetImmediate(); r_Y = dl; SetNZ(r_Y); CompleteOperation(); break;
+                    case 0xA4: // LDY ZP
+                        if (operationCycle == 1) GetAddressZeroPage();
+                        else { PollInterrupts(); r_Y = CpuRead(addressBus); SetNZ(r_Y); CompleteOperation(); }
+                        break;
+                    case 0xB4: // LDY ZP,X
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
+                            case 3: PollInterrupts(); r_Y = CpuRead(addressBus); SetNZ(r_Y); CompleteOperation(); break; }
+                        break;
+                    case 0xAC: // LDY Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: PollInterrupts(); r_Y = CpuRead(addressBus); SetNZ(r_Y); CompleteOperation(); break; }
+                        break;
+                    case 0xBC: // LDY Abs,X
+                        switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffX(true); break;
+                            case 4: PollInterrupts(); r_Y = CpuRead(addressBus); SetNZ(r_Y); CompleteOperation(); break; }
+                        break;
+
+                    // ===== STA =====
+                    case 0x85: // STA ZP
+                        if (operationCycle == 1) { GetAddressZeroPage(); CPU_Read = false; }
+                        else { PollInterrupts(); CpuWrite(addressBus, r_A); CompleteOperation(); }
+                        break;
+                    case 0x95: // STA ZP,X
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); if (operationCycle == 2) CPU_Read = false; break;
+                            case 3: PollInterrupts(); CpuWrite(addressBus, r_A); CompleteOperation(); break; }
+                        break;
+                    case 0x8D: // STA Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); if (operationCycle == 2) CPU_Read = false; break;
+                            case 3: PollInterrupts(); CpuWrite(addressBus, r_A); CompleteOperation(); break; }
+                        break;
+                    case 0x9D: // STA Abs,X
+                        switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffX(false); if (operationCycle == 3) CPU_Read = false; break;
+                            case 4: PollInterrupts(); CpuWrite(addressBus, r_A); CompleteOperation(); break; }
+                        break;
+                    case 0x99: // STA Abs,Y
+                        switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(false); if (operationCycle == 3) CPU_Read = false; break;
+                            case 4: PollInterrupts(); CpuWrite(addressBus, r_A); CompleteOperation(); break; }
+                        break;
+                    case 0x81: // STA (Ind,X)
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); if (operationCycle == 4) CPU_Read = false; break;
+                            case 5: PollInterrupts(); CpuWrite(addressBus, r_A); CompleteOperation(); break; }
+                        break;
+                    case 0x91: // STA (Ind),Y
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(false); if (operationCycle == 4) CPU_Read = false; break;
+                            case 5: PollInterrupts(); CpuWrite(addressBus, r_A); CompleteOperation(); break; }
+                        break;
+
+                    // ===== STX =====
+                    case 0x86: // STX ZP
+                        if (operationCycle == 1) { GetAddressZeroPage(); CPU_Read = false; }
+                        else { PollInterrupts(); CpuWrite(addressBus, r_X); CompleteOperation(); }
+                        break;
+                    case 0x96: // STX ZP,Y
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffY(); if (operationCycle == 2) CPU_Read = false; break;
+                            case 3: PollInterrupts(); CpuWrite(addressBus, r_X); CompleteOperation(); break; }
+                        break;
+                    case 0x8E: // STX Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); if (operationCycle == 2) CPU_Read = false; break;
+                            case 3: PollInterrupts(); CpuWrite(addressBus, r_X); CompleteOperation(); break; }
+                        break;
+
+                    // ===== STY =====
+                    case 0x84: // STY ZP
+                        if (operationCycle == 1) { GetAddressZeroPage(); CPU_Read = false; }
+                        else { PollInterrupts(); CpuWrite(addressBus, r_Y); CompleteOperation(); }
+                        break;
+                    case 0x94: // STY ZP,X
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); if (operationCycle == 2) CPU_Read = false; break;
+                            case 3: PollInterrupts(); CpuWrite(addressBus, r_Y); CompleteOperation(); break; }
+                        break;
+                    case 0x8C: // STY Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); if (operationCycle == 2) CPU_Read = false; break;
+                            case 3: PollInterrupts(); CpuWrite(addressBus, r_Y); CompleteOperation(); break; }
+                        break;
+
+                    // ===== BIT =====
+                    case 0x24: // BIT ZP
+                        switch (operationCycle) { case 1: GetAddressZeroPage(); break;
+                            case 2: PollInterrupts(); dl = CpuRead(addressBus);
+                                flagZ = (byte)(((r_A & dl) == 0) ? 1 : 0);
+                                flagN = (byte)((dl & 0x80) >> 7);
+                                flagV = (byte)((dl & 0x40) >> 6);
+                                CompleteOperation(); break; }
+                        break;
+                    case 0x2C: // BIT Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: PollInterrupts(); dl = CpuRead(addressBus);
+                                flagZ = (byte)(((r_A & dl) == 0) ? 1 : 0);
+                                flagN = (byte)((dl & 0x80) >> 7);
+                                flagV = (byte)((dl & 0x40) >> 6);
+                                CompleteOperation(); break; }
+                        break;
+
+                    // ===== ASL =====
+                    case 0x0A: // ASL A
+                        PollInterrupts(); CpuRead(addressBus); // dummy read
+                        flagC = (byte)((r_A & 0x80) >> 7); r_A <<= 1; SetNZ(r_A);
+                        CompleteOperation(); break;
+                    case 0x06: // ASL ZP
+                        switch (operationCycle) { case 1: GetAddressZeroPage(); break;
+                            case 2: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 3: CpuWrite(addressBus, dl); break; // dummy write
+                            case 4: PollInterrupts(); Op_ASL_mem(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x16: // ASL ZP,X
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
+                            case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 4: CpuWrite(addressBus, dl); break;
+                            case 5: PollInterrupts(); Op_ASL_mem(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x0E: // ASL Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 4: CpuWrite(addressBus, dl); break;
+                            case 5: PollInterrupts(); Op_ASL_mem(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x1E: // ASL Abs,X
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffX(false); if (operationCycle == 4) CPU_Read = false; break;
+                            case 5: CpuWrite(addressBus, dl); break;
+                            case 6: PollInterrupts(); Op_ASL_mem(addressBus); CompleteOperation(); break; }
+                        break;
+
+                    // ===== LSR =====
+                    case 0x4A: // LSR A
+                        PollInterrupts(); CpuRead(addressBus);
+                        flagC = (byte)(r_A & 1); r_A >>= 1; SetNZ(r_A);
+                        CompleteOperation(); break;
+                    case 0x46: // LSR ZP
+                        switch (operationCycle) { case 1: GetAddressZeroPage(); break;
+                            case 2: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 3: CpuWrite(addressBus, dl); break;
+                            case 4: PollInterrupts(); Op_LSR_mem(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x56: // LSR ZP,X
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
+                            case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 4: CpuWrite(addressBus, dl); break;
+                            case 5: PollInterrupts(); Op_LSR_mem(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x4E: // LSR Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 4: CpuWrite(addressBus, dl); break;
+                            case 5: PollInterrupts(); Op_LSR_mem(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x5E: // LSR Abs,X
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffX(false); if (operationCycle == 4) CPU_Read = false; break;
+                            case 5: CpuWrite(addressBus, dl); break;
+                            case 6: PollInterrupts(); Op_LSR_mem(addressBus); CompleteOperation(); break; }
+                        break;
+
+                    // ===== ROL =====
+                    case 0x2A: // ROL A
+                        PollInterrupts(); CpuRead(addressBus);
+                        { byte oc = flagC; flagC = (byte)((r_A & 0x80) >> 7); r_A = (byte)((r_A << 1) | oc); SetNZ(r_A); }
+                        CompleteOperation(); break;
+                    case 0x26: // ROL ZP
+                        switch (operationCycle) { case 1: GetAddressZeroPage(); break;
+                            case 2: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 3: CpuWrite(addressBus, dl); break;
+                            case 4: PollInterrupts(); Op_ROL_mem(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x36: // ROL ZP,X
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
+                            case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 4: CpuWrite(addressBus, dl); break;
+                            case 5: PollInterrupts(); Op_ROL_mem(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x2E: // ROL Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 4: CpuWrite(addressBus, dl); break;
+                            case 5: PollInterrupts(); Op_ROL_mem(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x3E: // ROL Abs,X
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffX(false); if (operationCycle == 4) CPU_Read = false; break;
+                            case 5: CpuWrite(addressBus, dl); break;
+                            case 6: PollInterrupts(); Op_ROL_mem(addressBus); CompleteOperation(); break; }
+                        break;
+
+                    // ===== ROR =====
+                    case 0x6A: // ROR A
+                        PollInterrupts(); CpuRead(addressBus);
+                        { byte oc = flagC; flagC = (byte)(r_A & 1); r_A = (byte)((r_A >> 1) | (oc << 7)); SetNZ(r_A); }
+                        CompleteOperation(); break;
+                    case 0x66: // ROR ZP
+                        switch (operationCycle) { case 1: GetAddressZeroPage(); break;
+                            case 2: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 3: CpuWrite(addressBus, dl); break;
+                            case 4: PollInterrupts(); Op_ROR_mem(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x76: // ROR ZP,X
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
+                            case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 4: CpuWrite(addressBus, dl); break;
+                            case 5: PollInterrupts(); Op_ROR_mem(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x6E: // ROR Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 4: CpuWrite(addressBus, dl); break;
+                            case 5: PollInterrupts(); Op_ROR_mem(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x7E: // ROR Abs,X
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffX(false); if (operationCycle == 4) CPU_Read = false; break;
+                            case 5: CpuWrite(addressBus, dl); break;
+                            case 6: PollInterrupts(); Op_ROR_mem(addressBus); CompleteOperation(); break; }
+                        break;
+
+                    // ===== INC =====
+                    case 0xE6: // INC ZP
+                        switch (operationCycle) { case 1: GetAddressZeroPage(); break;
+                            case 2: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 3: CpuWrite(addressBus, dl); break;
+                            case 4: PollInterrupts(); Op_INC_mem(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0xF6: // INC ZP,X
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
+                            case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 4: CpuWrite(addressBus, dl); break;
+                            case 5: PollInterrupts(); Op_INC_mem(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0xEE: // INC Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 4: CpuWrite(addressBus, dl); break;
+                            case 5: PollInterrupts(); Op_INC_mem(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0xFE: // INC Abs,X
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffX(false); if (operationCycle == 4) CPU_Read = false; break;
+                            case 5: CpuWrite(addressBus, dl); break;
+                            case 6: PollInterrupts(); Op_INC_mem(addressBus); CompleteOperation(); break; }
+                        break;
+
+                    // ===== DEC =====
+                    case 0xC6: // DEC ZP
+                        switch (operationCycle) { case 1: GetAddressZeroPage(); break;
+                            case 2: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 3: CpuWrite(addressBus, dl); break;
+                            case 4: PollInterrupts(); Op_DEC_mem(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0xD6: // DEC ZP,X
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
+                            case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 4: CpuWrite(addressBus, dl); break;
+                            case 5: PollInterrupts(); Op_DEC_mem(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0xCE: // DEC Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 4: CpuWrite(addressBus, dl); break;
+                            case 5: PollInterrupts(); Op_DEC_mem(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0xDE: // DEC Abs,X
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffX(false); if (operationCycle == 4) CPU_Read = false; break;
+                            case 5: CpuWrite(addressBus, dl); break;
+                            case 6: PollInterrupts(); Op_DEC_mem(addressBus); CompleteOperation(); break; }
+                        break;
+
+                    // ===== INX/INY/DEX/DEY =====
+                    case 0xE8: // INX
+                        PollInterrupts(); CpuRead(addressBus); r_X++; SetNZ(r_X); CompleteOperation(); break;
+                    case 0xC8: // INY
+                        PollInterrupts(); CpuRead(addressBus); r_Y++; SetNZ(r_Y); CompleteOperation(); break;
+                    case 0xCA: // DEX
+                        PollInterrupts(); CpuRead(addressBus); r_X--; SetNZ(r_X); CompleteOperation(); break;
+                    case 0x88: // DEY
+                        PollInterrupts(); CpuRead(addressBus); r_Y--; SetNZ(r_Y); CompleteOperation(); break;
+
+                    // ===== Transfer =====
+                    case 0xAA: // TAX
+                        PollInterrupts(); r_X = r_A; CpuRead(addressBus); SetNZ(r_X); CompleteOperation(); break;
+                    case 0x8A: // TXA
+                        PollInterrupts(); r_A = r_X; CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); break;
+                    case 0xA8: // TAY
+                        PollInterrupts(); r_Y = r_A; CpuRead(addressBus); SetNZ(r_Y); CompleteOperation(); break;
+                    case 0x98: // TYA
+                        PollInterrupts(); r_A = r_Y; CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); break;
+                    case 0xBA: // TSX
+                        PollInterrupts(); r_X = r_SP; CpuRead(addressBus); SetNZ(r_X); CompleteOperation(); break;
+                    case 0x9A: // TXS
+                        PollInterrupts(); r_SP = r_X; CpuRead(addressBus); CompleteOperation(); break;
+
+                    // ===== Flag instructions =====
+                    case 0x18: // CLC
+                        PollInterrupts(); CpuRead(addressBus); flagC = 0; CompleteOperation(); break;
+                    case 0x38: // SEC
+                        PollInterrupts(); CpuRead(addressBus); flagC = 1; CompleteOperation(); break;
+                    case 0x58: // CLI
+                        PollInterrupts(); CpuRead(addressBus); flagI = 0; CompleteOperation(); break;
+                    case 0x78: // SEI
+                        PollInterrupts(); CpuRead(addressBus); flagI = 1; CompleteOperation(); break;
+                    case 0xD8: // CLD
+                        PollInterrupts(); CpuRead(addressBus); flagD = 0; CompleteOperation(); break;
+                    case 0xF8: // SED
+                        PollInterrupts(); CpuRead(addressBus); flagD = 1; CompleteOperation(); break;
+                    case 0xB8: // CLV
+                        PollInterrupts(); CpuRead(addressBus); flagV = 0; CompleteOperation(); break;
+
+                    // ===== Stack instructions =====
+                    case 0x48: // PHA
+                        switch (operationCycle) { case 1: CpuRead(addressBus); break; // dummy fetch
+                            case 2: PollInterrupts(); StackPush(r_A); CompleteOperation(); break; }
+                        break;
+                    case 0x08: // PHP
+                        switch (operationCycle) { case 1: CpuRead(addressBus); break;
+                            case 2: PollInterrupts(); StackPush((byte)(GetFlag() | 0x30)); CompleteOperation(); break; }
+                        break;
+                    case 0x68: // PLA
+                        switch (operationCycle) { case 1: CpuRead(addressBus); break; // dummy fetch
+                            case 2: CpuRead((ushort)(0x100 | r_SP)); r_SP++; break; // dummy stack read
+                            case 3: PollInterrupts(); r_A = CpuRead((ushort)(0x100 | r_SP)); SetNZ(r_A); CompleteOperation(); break; }
+                        break;
+                    case 0x28: // PLP
+                        switch (operationCycle) { case 1: CpuRead(addressBus); break;
+                            case 2: CpuRead((ushort)(0x100 | r_SP)); r_SP++; break;
+                            case 3: PollInterrupts(); SetFlag(CpuRead((ushort)(0x100 | r_SP))); CompleteOperation(); break; }
+                        break;
+
+                    // ===== Branches =====
+                    case 0x10: DoBranch(flagN == 0); break; // BPL
+                    case 0x30: DoBranch(flagN != 0); break; // BMI
+                    case 0x50: DoBranch(flagV == 0); break; // BVC
+                    case 0x70: DoBranch(flagV != 0); break; // BVS
+                    case 0x90: DoBranch(flagC == 0); break; // BCC
+                    case 0xB0: DoBranch(flagC != 0); break; // BCS
+                    case 0xD0: DoBranch(flagZ == 0); break; // BNE
+                    case 0xF0: DoBranch(flagZ != 0); break; // BEQ
+
+                    // ===== JMP =====
+                    case 0x4C: // JMP abs
+                        if (operationCycle == 1) GetAddressAbsolute();
+                        else { PollInterrupts(); GetAddressAbsolute(); r_PC = addressBus; CompleteOperation(); }
+                        break;
+                    case 0x6C: // JMP (ind)
+                        switch (operationCycle) {
+                            case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: specialBus = CpuRead(addressBus); break;
+                            case 4: PollInterrupts();
+                                dl = CpuRead((ushort)((addressBus & 0xFF00) | (byte)(addressBus + 1)));
+                                r_PC = (ushort)((dl << 8) | specialBus);
+                                CompleteOperation(); break;
+                        }
+                        break;
+
+                    // ===== JSR =====
+                    case 0x20: // JSR
+                        switch (operationCycle) {
+                            case 1:
+                                addressBus = r_PC;
+                                dl = CpuRead(addressBus);
+                                r_PC++;
+                                break;
+                            case 2:
+                                addressBus = (ushort)(0x100 | r_SP);
+                                specialBus = dl;
+                                CPU_Read = false;
+                                CpuRead(addressBus); // dummy read (internal op)
+                                break;
+                            case 3:
+                                CpuWrite(addressBus, (byte)(r_PC >> 8));
+                                addressBus = (ushort)((byte)(addressBus - 1) | 0x100);
+                                break;
+                            case 4:
+                                CpuWrite(addressBus, (byte)r_PC);
+                                addressBus = (ushort)((byte)(addressBus - 1) | 0x100);
+                                r_SP = (byte)addressBus;
+                                CPU_Read = true;
+                                break;
+                            case 5:
+                                PollInterrupts();
+                                r_PC = (ushort)((CpuRead(r_PC) << 8) | specialBus);
+                                CompleteOperation();
+                                break;
+                        }
+                        break;
+
+                    // ===== RTS =====
+                    case 0x60: // RTS
+                        switch (operationCycle) {
+                            case 1: GetImmediate(); break;
+                            case 2:
+                                addressBus = (ushort)(0x100 | r_SP);
+                                CpuRead(addressBus); // dummy read
+                                addressBus = (ushort)((byte)(addressBus + 1) | 0x100);
+                                break;
+                            case 3:
+                                dl = CpuRead(addressBus);
+                                r_PC = (ushort)((r_PC & 0xFF00) | dl);
+                                addressBus = (ushort)((byte)(addressBus + 1) | 0x100);
+                                break;
+                            case 4:
+                                dl = CpuRead(addressBus);
+                                r_PC = (ushort)((r_PC & 0xFF) | (dl << 8));
+                                break;
+                            case 5:
+                                PollInterrupts();
+                                r_SP = (byte)addressBus;
+                                GetImmediate(); // PC++ (skip return address)
+                                CompleteOperation();
+                                break;
+                        }
+                        break;
+
+                    // ===== RTI =====
+                    case 0x40: // RTI
+                        switch (operationCycle) {
+                            case 1: GetImmediate(); break;
+                            case 2:
+                                addressBus = (ushort)(0x100 | r_SP);
+                                CpuRead(addressBus); // dummy read
+                                addressBus = (ushort)((byte)(addressBus + 1) | 0x100);
+                                break;
+                            case 3:
+                                {
+                                    byte status = CpuRead(addressBus);
+                                    SetFlag(status);
+                                    addressBus = (ushort)((byte)(addressBus + 1) | 0x100);
+                                }
+                                break;
+                            case 4:
+                                dl = CpuRead(addressBus);
+                                r_PC = (ushort)((r_PC & 0xFF00) | dl);
+                                addressBus = (ushort)((byte)(addressBus + 1) | 0x100);
+                                break;
+                            case 5:
+                                PollInterrupts();
+                                dl = CpuRead(addressBus);
+                                r_PC = (ushort)((r_PC & 0xFF) | (dl << 8));
+                                r_SP = (byte)addressBus;
+                                CompleteOperation();
+                                break;
+                        }
+                        break;
+
+                    // ===== NOP =====
+                    case 0xEA: // NOP
+                    case 0x1A: case 0x3A: case 0x5A: case 0x7A: case 0xDA: case 0xFA: // NOP *** (implied)
+                        PollInterrupts(); CpuRead(addressBus); CompleteOperation(); break;
+
+                    // ===== DOP (Double NOP) *** - Immediate =====
+                    case 0x80: case 0x82: case 0x89: case 0xC2: case 0xE2:
+                        PollInterrupts(); GetImmediate(); CompleteOperation(); break;
+
+                    // ===== DOP *** - ZeroPage =====
+                    case 0x04: case 0x44: case 0x64:
+                        if (operationCycle == 1) GetAddressZeroPage();
+                        else { PollInterrupts(); CpuRead(addressBus); CompleteOperation(); }
+                        break;
+
+                    // ===== DOP *** - ZeroPage,X =====
+                    case 0x14: case 0x34: case 0x54: case 0x74: case 0xD4: case 0xF4:
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
+                            case 3: PollInterrupts(); CpuRead(addressBus); CompleteOperation(); break; }
+                        break;
+
+                    // ===== TOP (Triple NOP) *** - Absolute =====
+                    case 0x0C:
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: PollInterrupts(); CpuRead(addressBus); CompleteOperation(); break; }
+                        break;
+
+                    // ===== TOP *** - Absolute,X =====
+                    case 0x1C: case 0x3C: case 0x5C: case 0x7C: case 0xDC: case 0xFC:
+                        switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffX(true); break;
+                            case 4: PollInterrupts(); CpuRead(addressBus); CompleteOperation(); break; }
+                        break;
+
+                    // ===== SLO *** =====
+                    case 0x07: // SLO ZP
+                        switch (operationCycle) { case 1: GetAddressZeroPage(); break;
+                            case 2: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 3: CpuWrite(addressBus, dl); break;
+                            case 4: PollInterrupts(); Op_SLO(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x17: // SLO ZP,X
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
+                            case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 4: CpuWrite(addressBus, dl); break;
+                            case 5: PollInterrupts(); Op_SLO(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x0F: // SLO Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 4: CpuWrite(addressBus, dl); break;
+                            case 5: PollInterrupts(); Op_SLO(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x1F: // SLO Abs,X
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffX(false); if (operationCycle == 4) CPU_Read = false; break;
+                            case 5: CpuWrite(addressBus, dl); break;
+                            case 6: PollInterrupts(); Op_SLO(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x1B: // SLO Abs,Y
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffY(false); if (operationCycle == 4) CPU_Read = false; break;
+                            case 5: CpuWrite(addressBus, dl); break;
+                            case 6: PollInterrupts(); Op_SLO(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x03: // SLO (Ind,X)
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
+                            case 5: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 6: CpuWrite(addressBus, dl); break;
+                            case 7: PollInterrupts(); Op_SLO(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x13: // SLO (Ind),Y
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(false); break;
+                            case 5: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 6: CpuWrite(addressBus, dl); break;
+                            case 7: PollInterrupts(); Op_SLO(addressBus); CompleteOperation(); break; }
+                        break;
+
+                    // ===== RLA *** =====
+                    case 0x27: // RLA ZP
+                        switch (operationCycle) { case 1: GetAddressZeroPage(); break;
+                            case 2: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 3: CpuWrite(addressBus, dl); break;
+                            case 4: PollInterrupts(); Op_RLA(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x37: // RLA ZP,X
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
+                            case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 4: CpuWrite(addressBus, dl); break;
+                            case 5: PollInterrupts(); Op_RLA(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x2F: // RLA Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 4: CpuWrite(addressBus, dl); break;
+                            case 5: PollInterrupts(); Op_RLA(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x3F: // RLA Abs,X
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffX(false); if (operationCycle == 4) CPU_Read = false; break;
+                            case 5: CpuWrite(addressBus, dl); break;
+                            case 6: PollInterrupts(); Op_RLA(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x3B: // RLA Abs,Y
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffY(false); if (operationCycle == 4) CPU_Read = false; break;
+                            case 5: CpuWrite(addressBus, dl); break;
+                            case 6: PollInterrupts(); Op_RLA(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x23: // RLA (Ind,X)
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
+                            case 5: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 6: CpuWrite(addressBus, dl); break;
+                            case 7: PollInterrupts(); Op_RLA(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x33: // RLA (Ind),Y
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(false); break;
+                            case 5: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 6: CpuWrite(addressBus, dl); break;
+                            case 7: PollInterrupts(); Op_RLA(addressBus); CompleteOperation(); break; }
+                        break;
+
+                    // ===== SRE *** =====
+                    case 0x47: // SRE ZP
+                        switch (operationCycle) { case 1: GetAddressZeroPage(); break;
+                            case 2: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 3: CpuWrite(addressBus, dl); break;
+                            case 4: PollInterrupts(); Op_SRE(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x57: // SRE ZP,X
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
+                            case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 4: CpuWrite(addressBus, dl); break;
+                            case 5: PollInterrupts(); Op_SRE(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x4F: // SRE Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 4: CpuWrite(addressBus, dl); break;
+                            case 5: PollInterrupts(); Op_SRE(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x5F: // SRE Abs,X
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffX(false); if (operationCycle == 4) CPU_Read = false; break;
+                            case 5: CpuWrite(addressBus, dl); break;
+                            case 6: PollInterrupts(); Op_SRE(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x5B: // SRE Abs,Y
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffY(false); if (operationCycle == 4) CPU_Read = false; break;
+                            case 5: CpuWrite(addressBus, dl); break;
+                            case 6: PollInterrupts(); Op_SRE(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x43: // SRE (Ind,X)
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
+                            case 5: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 6: CpuWrite(addressBus, dl); break;
+                            case 7: PollInterrupts(); Op_SRE(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x53: // SRE (Ind),Y
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(false); break;
+                            case 5: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 6: CpuWrite(addressBus, dl); break;
+                            case 7: PollInterrupts(); Op_SRE(addressBus); CompleteOperation(); break; }
+                        break;
+
+                    // ===== RRA *** =====
+                    case 0x67: // RRA ZP
+                        switch (operationCycle) { case 1: GetAddressZeroPage(); break;
+                            case 2: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 3: CpuWrite(addressBus, dl); break;
+                            case 4: PollInterrupts(); Op_RRA(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x77: // RRA ZP,X
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
+                            case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 4: CpuWrite(addressBus, dl); break;
+                            case 5: PollInterrupts(); Op_RRA(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x6F: // RRA Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 4: CpuWrite(addressBus, dl); break;
+                            case 5: PollInterrupts(); Op_RRA(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x7F: // RRA Abs,X
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffX(false); if (operationCycle == 4) CPU_Read = false; break;
+                            case 5: CpuWrite(addressBus, dl); break;
+                            case 6: PollInterrupts(); Op_RRA(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x7B: // RRA Abs,Y
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffY(false); if (operationCycle == 4) CPU_Read = false; break;
+                            case 5: CpuWrite(addressBus, dl); break;
+                            case 6: PollInterrupts(); Op_RRA(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x63: // RRA (Ind,X)
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
+                            case 5: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 6: CpuWrite(addressBus, dl); break;
+                            case 7: PollInterrupts(); Op_RRA(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0x73: // RRA (Ind),Y
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(false); break;
+                            case 5: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 6: CpuWrite(addressBus, dl); break;
+                            case 7: PollInterrupts(); Op_RRA(addressBus); CompleteOperation(); break; }
+                        break;
+
+                    // ===== SAX *** =====
+                    case 0x87: // SAX ZP
+                        if (operationCycle == 1) { GetAddressZeroPage(); CPU_Read = false; }
+                        else { PollInterrupts(); CpuWrite(addressBus, (byte)(r_A & r_X)); CompleteOperation(); }
+                        break;
+                    case 0x97: // SAX ZP,Y
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffY(); if (operationCycle == 2) CPU_Read = false; break;
+                            case 3: PollInterrupts(); CpuWrite(addressBus, (byte)(r_A & r_X)); CompleteOperation(); break; }
+                        break;
+                    case 0x8F: // SAX Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); if (operationCycle == 2) CPU_Read = false; break;
+                            case 3: PollInterrupts(); CpuWrite(addressBus, (byte)(r_A & r_X)); CompleteOperation(); break; }
+                        break;
+                    case 0x83: // SAX (Ind,X)
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); if (operationCycle == 4) CPU_Read = false; break;
+                            case 5: PollInterrupts(); CpuWrite(addressBus, (byte)(r_A & r_X)); CompleteOperation(); break; }
+                        break;
+
+                    // ===== LAX *** =====
+                    case 0xA7: // LAX ZP
+                        if (operationCycle == 1) GetAddressZeroPage();
+                        else { PollInterrupts(); r_A = CpuRead(addressBus); r_X = r_A; SetNZ(r_X); CompleteOperation(); }
+                        break;
+                    case 0xB7: // LAX ZP,Y
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffY(); break;
+                            case 3: PollInterrupts(); r_A = CpuRead(addressBus); r_X = r_A; SetNZ(r_X); CompleteOperation(); break; }
+                        break;
+                    case 0xAF: // LAX Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: PollInterrupts(); r_A = CpuRead(addressBus); r_X = r_A; SetNZ(r_X); CompleteOperation(); break; }
+                        break;
+                    case 0xBF: // LAX Abs,Y
+                        switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(true); break;
+                            case 4: PollInterrupts(); r_A = CpuRead(addressBus); r_X = r_A; SetNZ(r_X); CompleteOperation(); break; }
+                        break;
+                    case 0xA3: // LAX (Ind,X)
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
+                            case 5: PollInterrupts(); r_A = CpuRead(addressBus); r_X = r_A; SetNZ(r_X); CompleteOperation(); break; }
+                        break;
+                    case 0xB3: // LAX (Ind),Y
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(true); break;
+                            case 5: PollInterrupts(); r_A = CpuRead(addressBus); r_X = r_A; SetNZ(r_X); CompleteOperation(); break; }
+                        break;
+
+                    // ===== DCP *** =====
+                    case 0xC7: // DCP ZP
+                        switch (operationCycle) { case 1: GetAddressZeroPage(); break;
+                            case 2: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 3: CpuWrite(addressBus, dl); break;
+                            case 4: PollInterrupts(); Op_DCP(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0xD7: // DCP ZP,X
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
+                            case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 4: CpuWrite(addressBus, dl); break;
+                            case 5: PollInterrupts(); Op_DCP(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0xCF: // DCP Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 4: CpuWrite(addressBus, dl); break;
+                            case 5: PollInterrupts(); Op_DCP(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0xDF: // DCP Abs,X
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffX(false); if (operationCycle == 4) CPU_Read = false; break;
+                            case 5: CpuWrite(addressBus, dl); break;
+                            case 6: PollInterrupts(); Op_DCP(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0xDB: // DCP Abs,Y
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffY(false); if (operationCycle == 4) CPU_Read = false; break;
+                            case 5: CpuWrite(addressBus, dl); break;
+                            case 6: PollInterrupts(); Op_DCP(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0xC3: // DCP (Ind,X)
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
+                            case 5: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 6: CpuWrite(addressBus, dl); break;
+                            case 7: PollInterrupts(); Op_DCP(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0xD3: // DCP (Ind),Y
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(false); break;
+                            case 5: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 6: CpuWrite(addressBus, dl); break;
+                            case 7: PollInterrupts(); Op_DCP(addressBus); CompleteOperation(); break; }
+                        break;
+
+                    // ===== ISC (ISB) *** =====
+                    case 0xE7: // ISC ZP
+                        switch (operationCycle) { case 1: GetAddressZeroPage(); break;
+                            case 2: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 3: CpuWrite(addressBus, dl); break;
+                            case 4: PollInterrupts(); Op_ISC(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0xF7: // ISC ZP,X
+                        switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
+                            case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 4: CpuWrite(addressBus, dl); break;
+                            case 5: PollInterrupts(); Op_ISC(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0xEF: // ISC Abs
+                        switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
+                            case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 4: CpuWrite(addressBus, dl); break;
+                            case 5: PollInterrupts(); Op_ISC(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0xFF: // ISC Abs,X
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffX(false); if (operationCycle == 4) CPU_Read = false; break;
+                            case 5: CpuWrite(addressBus, dl); break;
+                            case 6: PollInterrupts(); Op_ISC(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0xFB: // ISC Abs,Y
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffY(false); if (operationCycle == 4) CPU_Read = false; break;
+                            case 5: CpuWrite(addressBus, dl); break;
+                            case 6: PollInterrupts(); Op_ISC(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0xE3: // ISC (Ind,X)
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
+                            case 5: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 6: CpuWrite(addressBus, dl); break;
+                            case 7: PollInterrupts(); Op_ISC(addressBus); CompleteOperation(); break; }
+                        break;
+                    case 0xF3: // ISC (Ind),Y
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(false); break;
+                            case 5: dl = CpuRead(addressBus); CPU_Read = false; break;
+                            case 6: CpuWrite(addressBus, dl); break;
+                            case 7: PollInterrupts(); Op_ISC(addressBus); CompleteOperation(); break; }
+                        break;
+
+                    // ===== ANC *** =====
+                    case 0x0B: case 0x2B:
+                        PollInterrupts(); GetImmediate();
+                        r_A = (byte)(r_A & dl);
+                        flagC = (byte)((r_A & 0x80) >> 7);
+                        SetNZ(r_A);
+                        CompleteOperation(); break;
+
+                    // ===== ALR (ASR) *** =====
+                    case 0x4B:
+                        PollInterrupts(); GetImmediate();
+                        r_A = (byte)(r_A & dl);
+                        flagC = (byte)(r_A & 1); r_A >>= 1; SetNZ(r_A);
+                        CompleteOperation(); break;
+
+                    // ===== ARR *** =====
+                    case 0x6B:
+                        PollInterrupts(); GetImmediate();
+                        r_A = (byte)(r_A & dl);
+                        { byte oc = flagC; flagC = (byte)(r_A & 1); r_A = (byte)((r_A >> 1) | (oc << 7)); }
+                        SetNZ(r_A);
+                        flagC = (byte)((r_A & 0x40) >> 6);
+                        flagV = (byte)((((r_A >> 5) ^ (r_A >> 6)) & 1));
+                        CompleteOperation(); break;
+
+                    // ===== SBX (AXS) *** =====
+                    case 0xCB:
+                        PollInterrupts(); GetImmediate();
+                        {
+                            int tmp = (r_A & r_X) - dl;
+                            flagC = (tmp >= 0) ? (byte)1 : (byte)0;
+                            r_X = (byte)tmp;
+                            SetNZ(r_X);
+                        }
+                        CompleteOperation(); break;
+
+                    // ===== ANE (XAA) *** =====
+                    case 0x8B:
+                        PollInterrupts(); GetImmediate();
+                        r_A = (byte)((r_A | 0xFF) & r_X & dl); // MAGIC = 0xFF
+                        SetNZ(r_A);
+                        CompleteOperation(); break;
+
+                    // ===== LXA (LAX imm) *** =====
+                    case 0xAB:
+                        PollInterrupts(); GetImmediate();
+                        r_A = (byte)((r_A | 0xFF) & dl); // MAGIC = 0xFF
+                        r_X = r_A;
+                        SetNZ(r_X);
+                        CompleteOperation(); break;
+
+                    // ===== LAE (LAS) *** Abs,Y =====
+                    case 0xBB:
+                        switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(true); break;
+                            case 4: PollInterrupts();
+                                dl = CpuRead(addressBus);
+                                r_A = (byte)(dl & r_SP);
+                                r_X = r_A;
+                                r_SP = r_A;
+                                SetNZ(r_A);
+                                CompleteOperation(); break; }
+                        break;
+
+                    // ===== SHA (Ind),Y *** =====
+                    case 0x93:
+                        switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(false); if (operationCycle == 4) CPU_Read = false; break;
+                            case 5: PollInterrupts();
+                                if ((temporaryAddress & 0xFF00) != (addressBus & 0xFF00))
+                                    addressBus = (ushort)((byte)addressBus | (((addressBus >> 8) & r_X) << 8));
+                                CpuWrite(addressBus, (byte)(r_A & r_X & (byte)((addressBus >> 8) + 1)));
+                                CompleteOperation(); break; }
+                        break;
+
+                    // ===== SHA Abs,Y *** =====
+                    case 0x9F:
+                        switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(false); if (operationCycle == 3) CPU_Read = false; break;
+                            case 4: PollInterrupts();
+                                if ((temporaryAddress & 0xFF00) != (addressBus & 0xFF00))
+                                    addressBus = (ushort)((byte)addressBus | (((addressBus >> 8) & r_X) << 8));
+                                CpuWrite(addressBus, (byte)(r_A & r_X & H));
+                                CompleteOperation(); break; }
+                        break;
+
+                    // ===== SHY Abs,X *** =====
+                    case 0x9C:
+                        switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffX(false); if (operationCycle == 3) CPU_Read = false; break;
+                            case 4: PollInterrupts();
+                                if ((temporaryAddress & 0xFF00) != (addressBus & 0xFF00))
+                                    addressBus = (ushort)((byte)addressBus | (((addressBus >> 8) & r_Y) << 8));
+                                CpuWrite(addressBus, (byte)(r_Y & H));
+                                CompleteOperation(); break; }
+                        break;
+
+                    // ===== SHX Abs,Y *** =====
+                    case 0x9E:
+                        switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(false); if (operationCycle == 3) CPU_Read = false; break;
+                            case 4: PollInterrupts();
+                                if ((temporaryAddress & 0xFF00) != (addressBus & 0xFF00))
+                                    addressBus = (ushort)((byte)addressBus | (((addressBus >> 8) & r_X) << 8));
+                                CpuWrite(addressBus, (byte)(r_X & H));
+                                CompleteOperation(); break; }
+                        break;
+
+                    // ===== SHS (TAS) Abs,Y *** =====
+                    case 0x9B:
+                        switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(false); if (operationCycle == 3) CPU_Read = false; break;
+                            case 4: PollInterrupts();
+                                if ((temporaryAddress & 0xFF00) != (addressBus & 0xFF00))
+                                    addressBus = (ushort)((byte)addressBus | (((addressBus >> 8) & r_X) << 8));
+                                r_SP = (byte)(r_A & r_X);
+                                CpuWrite(addressBus, (byte)(r_A & r_X & H));
+                                CompleteOperation(); break; }
+                        break;
+
+                    // ===== HLT (JAM) *** =====
+                    case 0x02: case 0x12: case 0x22: case 0x32: case 0x42: case 0x52:
+                    case 0x62: case 0x72: case 0x92: case 0xB2: case 0xD2: case 0xF2:
+                        DoHLT(); break;
+
+                    default: // should never happen
+                        break;
+                }
+                operationCycle++;
+            }
+        }
+
+        // Legacy cpu_step() wrapper - runs one full instruction using the per-cycle model
         static void cpu_step()
         {
-            ushort ushort1, ushort2, ushort3;
-            byte byte1, byte2, byte3;
-            int int1;
-
-            if (softreset)
+            // Execute one full instruction — each CpuRead/CpuWrite advances the clock
+            do
             {
-                ResetInterrupt();
-                softreset = false;
-            }
-
-            ushort trace_pc = r_PC; // save PC before opcode fetch for tracing
-            opcode = Mem_r(r_PC++);
-
-            //debug();
-
-            // Interrupt_cycle removed — NMI/IRQ/Reset now tick via their own Mem_r/Mem_w
-
-            // Pre-instruction trace when tracking NMI handler
-            if (nmi_trace_count > 0)
-                dbgWrite("TRACE: PC=$" + trace_pc.ToString("X4") + " op=$" + opcode.ToString("X2")
-                    + " A=$" + r_A.ToString("X2") + " X=$" + r_X.ToString("X2")
-                    + " Y=$" + r_Y.ToString("X2") + " SP=$" + r_SP.ToString("X2")
-                    + " P=$" + (GetFlag() | 0x20).ToString("X2"));
-
-            //參考了 mynes 去修正與debug許多錯誤 http://sourceforge.net/projects/mynes 
-            switch (opcode)
-            {
-                case 0x69: //ADC  Immediate  fix
-                    byte1 = Mem_r(r_PC++);
-                    int1 = byte1 + r_A + flagC;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if (int1 > 0xff) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (((int1 ^ r_A) & (int1 ^ byte1) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x65: //ADC  Zero Page  
-                    byte1 = ZP_r(Mem_r(r_PC++));
-                    int1 = byte1 + r_A + flagC;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if (int1 > 0xff) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (((int1 ^ r_A) & (int1 ^ byte1) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x75://ADC Zero Page,X
-                    byte2 = Mem_r(r_PC++); ZP_r(byte2); byte1 = ZP_r((byte)(byte2 + r_X));
-                    int1 = byte1 + r_A + flagC;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if (int1 > 0xff) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (((int1 ^ r_A) & (int1 ^ byte1) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x6D: //ADC Absolute //fix
-                    byte1 = Mem_r((ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)));
-                    int1 = byte1 + r_A + flagC;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if (int1 > 0xff) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (((int1 ^ r_A) & (int1 ^ byte1) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x7D: //ADC  Absolute,X
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort2 = (ushort)(ushort1 + r_X);
-                    if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
-                    {
-                        Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                    }
-                    byte1 = Mem_r(ushort2);
-                    int1 = byte1 + r_A + flagC;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if (int1 > 0xff) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (((int1 ^ r_A) & (int1 ^ byte1) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x79: //ADC  Absolute,Y
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort2 = (ushort)(ushort1 + r_Y);
-                    if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
-                    {
-                        Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                    }
-                    byte1 = Mem_r(ushort2);
-                    int1 = byte1 + r_A + flagC;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if (int1 > 0xff) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (((int1 ^ r_A) & (int1 ^ byte1) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x61: //ADC (Indirect,X)
-                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
-                    byte1 = Mem_r((ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8)));
-                    int1 = byte1 + r_A + flagC;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if (int1 > 0xff) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (((int1 ^ r_A) & (int1 ^ byte1) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x71: //ADC (Indirect),Y
-                    byte2 = Mem_r(r_PC++);
-                    ushort1 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
-                    ushort2 = (ushort)(ushort1 + r_Y);
-                    if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
-                    {
-                        Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                    }
-                    byte1 = Mem_r(ushort2);
-                    int1 = byte1 + r_A + flagC;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if (int1 > 0xff) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (((int1 ^ r_A) & (int1 ^ byte1) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                //--- AND BEGIN
-                case 0x29: //AND  Immediate  
-                    int1 = Mem_r(r_PC++) & r_A;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x25: //AND  Zero Page  
-                    int1 = ZP_r(Mem_r(r_PC++)) & r_A;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x35://AND Zero Page,X
-                    byte2 = Mem_r(r_PC++); ZP_r(byte2); int1 = ZP_r((byte)(byte2 + r_X)) & r_A;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x2D: //AND Absolute 
-                    int1 = Mem_r((ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8))) & r_A;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x3D: //AND  Absolute,X
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort2 = (ushort)(ushort1 + r_X);
-                    if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
-                    {
-                        Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                    }
-                    int1 = Mem_r(ushort2) & r_A;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x39: //AND  Absolute,Y
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort2 = (ushort)(ushort1 + r_Y);
-                    if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
-                    {
-                        Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                    }
-                    int1 = Mem_r(ushort2) & r_A;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x21: //AND (Indirect,X)
-                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte1 = (byte)(byte3 + r_X);
-                    ushort1 = (ushort)(ZP_r(byte1) | (ZP_r((byte)(byte1 + 1)) << 8));
-                    int1 = Mem_r(ushort1) & r_A;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x31: //AND (Indirect),Y
-                    byte1 = Mem_r(r_PC++);
-                    ushort1 = (ushort)(ZP_r(byte1) | (ZP_r((byte)(byte1 + 1)) << 8));
-                    ushort2 = (ushort)(ushort1 + r_Y);
-                    if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
-                    {
-                        Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                    }
-                    int1 = Mem_r(ushort2) & r_A;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-                //--- AND END 
-
-                case 0x0A://ASL acc
-                    Mem_r(r_PC); // dummy read
-                    if ((r_A & 0x80) > 0) flagC = 1; else flagC = 0;
-                    r_A <<= 1;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0x06://ASL zp
-                    byte2 = Mem_r(r_PC++);
-                    byte1 = ZP_r(byte2);
-                    ZP_w(byte2, byte1); // dummy write
-                    if ((byte1 & 0x80) > 0) flagC = 1; else flagC = 0;
-                    byte1 <<= 1;
-                    if (byte1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((byte1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    ZP_w(byte2, byte1);
-                    break;
-
-                case 0x16://ASL zp,x
-                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
-                    byte1 = ZP_r(byte2);
-                    ZP_w(byte2, byte1); // dummy write
-                    if ((byte1 & 0x80) > 0) flagC = 1; else flagC = 0;
-                    byte1 <<= 1;
-                    if (byte1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((byte1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    ZP_w(byte2, byte1);
-                    break;
-
-                case 0x0E://ASL abs
-                    ushort2 = (ushort)((Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)));
-                    byte1 = Mem_r(ushort2);
-                    Mem_w(ushort2, byte1);//dummy write fixed
-                    if ((byte1 & 0x80) > 0) flagC = 1; else flagC = 0;
-                    byte1 <<= 1;
-                    if (byte1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((byte1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    Mem_w(ushort2, byte1);
-                    break;
-
-                case 0x1E://ASL abs,x
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort2 = (ushort)(ushort1 + r_X);
-                    Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF))); // dummy read wrong page
-                    byte1 = Mem_r(ushort2);
-                    Mem_w(ushort2, byte1);//dummy write fixed
-                    if ((byte1 & 0x80) > 0) flagC = 1; else flagC = 0;
-                    byte1 <<= 1;
-                    if (byte1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((byte1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    Mem_w(ushort2, byte1);
-                    break;
-
-                case 0x90://BCC
-                    byte1 = Mem_r(r_PC++);
-                    if (flagC == 0)
-                    {
-                        bool brSaved = irqLinePrev; // save before branch extra tick
-                        Mem_r(r_PC); // cycle 3: dummy read from byte following operand
-                        ushort1 = r_PC;
-                        r_PC = (ushort)(r_PC + (sbyte)byte1);
-                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) Mem_r((ushort)((ushort1 & 0xFF00) | (r_PC & 0x00FF))); // cycle 4: dummy read at wrong-page address
-                        else irqLinePrev = brSaved; // no cross: IRQ penultimate = pre-branch state
-                    }
-                    break;
-
-                case 0xB0://BCS
-                    byte1 = Mem_r(r_PC++);
-                    if (flagC == 1)
-                    {
-                        bool brSaved = irqLinePrev; // save before branch extra tick
-                        Mem_r(r_PC); // cycle 3: dummy read from byte following operand
-                        ushort1 = r_PC;
-                        r_PC = (ushort)(r_PC + (sbyte)byte1);
-                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) Mem_r((ushort)((ushort1 & 0xFF00) | (r_PC & 0x00FF))); // cycle 4: dummy read at wrong-page address
-                        else irqLinePrev = brSaved; // no cross: IRQ penultimate = pre-branch state
-                    }
-                    break;
-
-                case 0xF0://BEQ
-                    byte1 = Mem_r(r_PC++);
-                    if (flagZ == 1)
-                    {
-                        bool brSaved = irqLinePrev; // save before branch extra tick
-                        Mem_r(r_PC); // cycle 3: dummy read from byte following operand
-                        ushort1 = r_PC;
-                        r_PC = (ushort)(r_PC + (sbyte)byte1);
-                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) Mem_r((ushort)((ushort1 & 0xFF00) | (r_PC & 0x00FF))); // cycle 4: dummy read at wrong-page address
-                        else irqLinePrev = brSaved; // no cross: IRQ penultimate = pre-branch state
-                    }
-                    break;
-
-                case 0x24://BIT zp fix
-                    byte1 = ZP_r(Mem_r(r_PC++));
-                    if ((byte1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if ((byte1 & 0x40) > 0) flagV = 1; else flagV = 0;
-                    if ((byte1 & r_A) == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0x2C://BIT abs //FIX
-                    ushort t1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    byte1 = Mem_r(t1);
-                    if ((byte1 & 0x80) != 0) flagN = 1; else flagN = 0;
-                    if ((byte1 & 0x40) > 0) flagV = 1; else flagV = 0;
-                    if ((byte1 & r_A) == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0x30://BMI
-                    byte1 = Mem_r(r_PC++);
-                    if (flagN == 1)
-                    {
-                        bool brSaved = irqLinePrev; // save before branch extra tick
-                        Mem_r(r_PC); // cycle 3: dummy read from byte following operand
-                        ushort1 = r_PC;
-                        r_PC = (ushort)(r_PC + (sbyte)byte1);
-                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) Mem_r((ushort)((ushort1 & 0xFF00) | (r_PC & 0x00FF))); // cycle 4: dummy read at wrong-page address
-                        else irqLinePrev = brSaved; // no cross: IRQ penultimate = pre-branch state
-                    }
-                    break;
-
-                case 0xD0://BNE
-                    byte1 = Mem_r(r_PC++);
-                    if (flagZ == 0)
-                    {
-                        bool brSaved = irqLinePrev; // save before branch extra tick
-                        Mem_r(r_PC); // cycle 3: dummy read from byte following operand
-                        ushort1 = r_PC;
-                        r_PC = (ushort)(r_PC + (sbyte)byte1);
-                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) Mem_r((ushort)((ushort1 & 0xFF00) | (r_PC & 0x00FF))); // cycle 4: dummy read at wrong-page address
-                        else irqLinePrev = brSaved; // no cross: IRQ penultimate = pre-branch state
-                    }
-                    break;
-
-                case 0x10://BPL
-                    byte1 = Mem_r(r_PC++);
-                    if (flagN == 0)
-                    {
-                        bool brSaved = irqLinePrev; // save before branch extra tick
-                        Mem_r(r_PC); // cycle 3: dummy read from byte following operand
-                        ushort1 = r_PC;
-                        r_PC = (ushort)(r_PC + (sbyte)byte1);
-                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) Mem_r((ushort)((ushort1 & 0xFF00) | (r_PC & 0x00FF))); // cycle 4: dummy read at wrong-page address
-                        else irqLinePrev = brSaved; // no cross: IRQ penultimate = pre-branch state
-                    }
-                    break;
-
-                case 00://BRK — 7 cycles with NMI hijacking support
-                    Mem_r(r_PC);//dummy read (padding byte)
-                    r_PC++;
-                    Mem_w((ushort)(r_SP-- | 0x100), (byte)(r_PC >> 8)); // push PCH
-                    Mem_w((ushort)(r_SP-- | 0x100), (byte)r_PC); // push PCL
-                    Mem_w((ushort)(r_SP-- | 0x100), (byte)(GetFlag() | 0x30)); // push P with B
-                    flagI = 1;
-                    // NMI hijacking: if NMI asserted during BRK, use NMI vector
-                    ushort brk_vector = (nmi_pending) ? (ushort)0xfffa : (ushort)0xfffe;
-                    if (nmi_pending) nmi_pending = false;
-                    r_PC = (ushort)(Mem_r(brk_vector) | (Mem_r((ushort)(brk_vector + 1)) << 8));
-                    break;
-
-                case 0x50://BVC
-                    byte1 = Mem_r(r_PC++);
-                    if (flagV == 0)
-                    {
-                        bool brSaved = irqLinePrev; // save before branch extra tick
-                        Mem_r(r_PC); // cycle 3: dummy read from byte following operand
-                        ushort1 = r_PC;
-                        r_PC = (ushort)(r_PC + (sbyte)byte1);
-                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) Mem_r((ushort)((ushort1 & 0xFF00) | (r_PC & 0x00FF))); // cycle 4: dummy read at wrong-page address
-                        else irqLinePrev = brSaved; // no cross: IRQ penultimate = pre-branch state
-                    }
-                    break;
-
-                case 0x70://BVS
-                    byte1 = Mem_r(r_PC++);
-                    if (flagV == 1)
-                    {
-                        bool brSaved = irqLinePrev; // save before branch extra tick
-                        Mem_r(r_PC); // cycle 3: dummy read from byte following operand
-                        ushort1 = r_PC;
-                        r_PC = (ushort)(r_PC + (sbyte)byte1);
-                        if ((ushort1 & 0xFF00) != (r_PC & 0xFF00)) Mem_r((ushort)((ushort1 & 0xFF00) | (r_PC & 0x00FF))); // cycle 4: dummy read at wrong-page address
-                        else irqLinePrev = brSaved; // no cross: IRQ penultimate = pre-branch state
-                    }
-                    break;
-
-                case 0x18: Mem_r(r_PC); flagC = 0; break;//CLC
-                case 0xD8: Mem_r(r_PC); flagD = 0; break;//CLD
-
-                case 0x58: Mem_r(r_PC); flagI = 0; break;//CLI
-
-                case 0xB8: Mem_r(r_PC); flagV = 0; break;//CLV
-
-                //--- CMP BEGIN
-                case 0xC9: //CMP  Immediate  
-                    byte1 = Mem_r(r_PC++);
-                    int1 = r_A - byte1;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if (r_A >= byte1) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xC5: //CMP  Zero Page  
-                    byte1 = ZP_r(Mem_r(r_PC++));
-                    int1 = r_A - byte1;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if (r_A >= byte1) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xD5://CMP Zero Page,X
-                    byte2 = Mem_r(r_PC++); ZP_r(byte2); byte1 = ZP_r((byte)(byte2 + r_X));
-                    int1 = r_A - byte1;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if (r_A >= byte1) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xCD: //CMP Absolute 
-                    byte1 = Mem_r((ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)));
-                    int1 = r_A - byte1;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if (r_A >= byte1) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xDD: //CMP  Absolute,X
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort2 = (ushort)(ushort1 + r_X);
-                    if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
-                    {
-                        Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                    }
-                    byte1 = Mem_r(ushort2);
-                    int1 = r_A - byte1;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if (r_A >= byte1) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xD9: //CMP  Absolute,Y
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort2 = (ushort)(ushort1 + r_Y);
-                    if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
-                    {
-                        Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                    }
-                    byte1 = Mem_r(ushort2);
-                    int1 = r_A - byte1;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if (r_A >= byte1) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xC1: //CMP (Indirect,X)  fix
-                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
-                    ushort1 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
-                    byte1 = Mem_r(ushort1);
-                    int1 = r_A - byte1;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if (r_A >= byte1) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xD1: //CMP (Indirect),Y
-                    byte2 = Mem_r(r_PC++);
-                    ushort1 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
-                    ushort2 = (ushort)(ushort1 + r_Y);
-                    if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
-                    {
-                        Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                    }
-                    byte1 = Mem_r(ushort2);
-                    int1 = r_A - byte1;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if (r_A >= byte1) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-                //--- CMP END
-
-                case 0xE0: //CPX  Immediate  
-                    byte1 = Mem_r(r_PC++);
-                    int1 = r_X - byte1;// +(byte)flagC;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if (r_X >= byte1) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xE4: //CPX  Zero Page  
-                    byte1 = ZP_r(Mem_r(r_PC++));
-                    int1 = r_X - byte1;// +(byte)flagC;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if (r_X >= byte1) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xEC: //CPX Absolute 
-                    byte1 = Mem_r((ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)));
-                    int1 = r_X - byte1;// +(byte)flagC;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if (r_X >= byte1) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                //-- CPY BEGIN
-                case 0xC0: //CPY  Immediate  
-                    byte1 = Mem_r(r_PC++);
-                    int1 = r_Y - byte1;// +(byte)flagC;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if (r_Y >= byte1) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xC4: //CPY  Zero Page  
-                    byte1 = ZP_r(Mem_r(r_PC++));
-                    int1 = r_Y - byte1;// +(byte)flagC;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if (r_Y >= byte1) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xCC: //CPY Absolute 
-                    byte1 = Mem_r((ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)));
-                    int1 = r_Y - byte1;// +(byte)flagC;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if (r_Y >= byte1) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-                //-- CPY END
-
-                case 0xC6://DEC zp
-                    byte1 = Mem_r(r_PC++);
-                    byte2 = ZP_r(byte1);
-                    ZP_w(byte1, byte2); // dummy write
-                    ZP_w(byte1, --byte2);
-                    if ((byte2 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (byte2 == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xD6://DEC zp,x
-                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte1 = (byte)(byte3 + r_X);
-                    byte2 = ZP_r(byte1);
-                    ZP_w(byte1, byte2); // dummy write
-                    ZP_w(byte1, --byte2);
-                    if ((byte2 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (byte2 == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xCE://DEC abs
-                    ushort1 = (ushort)(Mem_r(r_PC++) | Mem_r(r_PC++) << 8);
-                    byte1 = Mem_r(ushort1);
-                    Mem_w(ushort1, byte1);//dummy write fixed
-                    Mem_w(ushort1, --byte1);
-                    if ((byte1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (byte1 == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xDE://DEC abs,x
-                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort1 = (ushort)(ushort2 + r_X);
-                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read wrong page
-                    byte1 = Mem_r(ushort1);
-                    Mem_w(ushort1, byte1);//dummy write fixed
-                    Mem_w(ushort1, --byte1);
-                    if ((byte1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (byte1 == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xCA://DEX
-                    Mem_r(r_PC); // dummy read
-                    if ((--r_X & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_X == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0x88://DEY //fix
-                    Mem_r(r_PC); // dummy read
-                    if ((--r_Y & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_Y == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                //--- EOR BEGIN
-                case 0x49: //EOR  Immediate  
-                    int1 = Mem_r(r_PC++) ^ r_A;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x45: //EOR  Zero Page  
-                    int1 = ZP_r(Mem_r(r_PC++)) ^ r_A;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x55://EOR Zero Page,X
-                    byte2 = Mem_r(r_PC++); ZP_r(byte2); int1 = ZP_r((byte)(byte2 + r_X)) ^ r_A;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x4D: //EOR Absolute 
-                    int1 = Mem_r((ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8))) ^ r_A;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x5D: //EOR  Absolute,X
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort2 = (ushort)(ushort1 + r_X);
-                    if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
-                    {
-                        Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                    }
-                    int1 = Mem_r(ushort2) ^ r_A;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x59: //EOR  Absolute,Y
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort2 = (ushort)(ushort1 + r_Y);
-                    if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
-                    {
-                        Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                    }
-                    int1 = Mem_r(ushort2) ^ r_A;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x41: //EOR (Indirect,X)
-                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte1 = (byte)(byte3 + r_X);
-                    int1 = Mem_r((ushort)(ZP_r(byte1) | (ZP_r((byte)(byte1 + 1)) << 8))) ^ r_A;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x51: //EOR (Indirect),Y
-                    byte1 = Mem_r(r_PC++);
-                    ushort1 = (ushort)(ZP_r(byte1) | (ZP_r((byte)(byte1 + 1)) << 8));
-                    ushort2 = (ushort)(ushort1 + r_Y);
-                    if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
-                    {
-                        Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                    }
-                    int1 = Mem_r(ushort2) ^ r_A;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-                //--- EOR END  
-
-                case 0xE6://INC zp
-                    byte1 = Mem_r(r_PC++);
-                    byte2 = ZP_r(byte1);
-                    ZP_w(byte1, byte2); // dummy write
-                    ZP_w(byte1, ++byte2);
-                    if ((byte2 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (byte2 == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xF6://INC zp,x
-                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte1 = (byte)(byte3 + r_X);
-                    byte2 = ZP_r(byte1);
-                    ZP_w(byte1, byte2); // dummy write
-                    ZP_w(byte1, ++byte2);
-                    if ((byte2 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (byte2 == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xEE://INC abs
-                    ushort1 = (ushort)(Mem_r(r_PC++) | Mem_r(r_PC++) << 8);
-                    byte2 = Mem_r(ushort1);
-                    Mem_w(ushort1, byte2);//dummy write fixed 2017.0119
-                    Mem_w(ushort1, ++byte2);
-                    if ((byte2 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (byte2 == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xFE://INC abs,x
-                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort1 = (ushort)(ushort2 + r_X);
-                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read wrong page
-                    byte2 = Mem_r(ushort1);
-                    Mem_w(ushort1, byte2);//dummy write fixed 2017.0119
-                    Mem_w(ushort1, ++byte2);
-                    if ((byte2 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (byte2 == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xE8://INX
-                    Mem_r(r_PC); // dummy read
-                    if ((++r_X & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_X == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xC8://INY
-                    Mem_r(r_PC); // dummy read
-                    if ((++r_Y & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_Y == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0x4C://JMP abs                    
-                    r_PC = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    break;
-
-                case 0x6C://JMP indirect
-                    byte1 = Mem_r(r_PC++);
-                    byte2 = Mem_r(r_PC++);
-                    r_PC = (ushort)(Mem_r((ushort)((byte1++) | (byte2 << 8))) | (Mem_r((ushort)(byte1 | (byte2 << 8))) << 8));
-                    break;
-
-                case 0x20://JSR abs — 6 cycles: fetch low, read(S), push PCH, push PCL, fetch high
-                    byte1 = Mem_r(r_PC++); // cycle 2: fetch addr low
-                    Mem_r((ushort)(r_SP | 0x100)); // cycle 3: dummy read stack
-                    Mem_w((ushort)(r_SP-- | 0x100), (byte)(r_PC >> 8)); // cycle 4: push PCH
-                    Mem_w((ushort)(r_SP-- | 0x100), (byte)r_PC); // cycle 5: push PCL
-                    r_PC = (ushort)(byte1 | (Mem_r(r_PC) << 8)); // cycle 6: fetch addr high
-                    break;
-
-                case 0xA9://LDA imm
-                    r_A = Mem_r(r_PC++);
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xA5://LDA zp
-                    r_A = ZP_r(Mem_r(r_PC++));
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xB5://LDA zp,x
-                    byte2 = Mem_r(r_PC++); ZP_r(byte2); r_A = ZP_r((byte)(byte2 + r_X));
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    break
-                        ;
-                case 0xAD://LDA abs
-                    r_A = Mem_r((ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)));
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xBD://LDA abs,x
-                    byte1 = Mem_r(r_PC++); //low
-                    byte2 = Mem_r(r_PC++); //heigh
-                    ushort1 = (ushort)(byte1 | (byte2 << 8));
-                    byte1 += r_X;
-                    //
-                    r_A = Mem_r((ushort)(byte1 | (byte2 << 8)));
-                    //
-                    if (byte1 < r_X) r_A = Mem_r((ushort)(byte1 | ((++byte2) << 8)));//dummy read fiexed 2017.01.17
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xB9://LDA abs,y
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort2 = (ushort)(ushort1 + r_Y);
-                    if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
-                    {
-                        Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                    }
-                    r_A = Mem_r(ushort2);
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xA1://LDA (indirect,x)
-                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte1 = (byte)(byte3 + r_X);
-                    r_A = Mem_r((ushort)(ZP_r(byte1) | (ZP_r((byte)(byte1 + 1)) << 8)));
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xB1://LDA (indirect),y
-                    byte3 = Mem_r(r_PC++);
-                    byte1 = ZP_r(byte3);
-                    byte2 = ZP_r((byte)(byte3 + 1));
-                    ushort1 = (ushort)(byte1 | (byte2 << 8));
-                    byte1 += r_Y;
-                    r_A = Mem_r((ushort)(byte1 | (byte2 << 8)));
-                    //
-                    if (byte1 < r_Y) r_A = Mem_r((ushort)(byte1 | ((++byte2) << 8)));//dummy read fiexed 2017.01.17
-                                                                                     //
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xA2://LDX imm
-                    r_X = Mem_r(r_PC++);
-                    if ((r_X & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_X == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xA6://LDX zp
-                    r_X = ZP_r(Mem_r(r_PC++));
-                    if ((r_X & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_X == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xB6://LDX zp,y
-                    byte2 = Mem_r(r_PC++); ZP_r(byte2); r_X = ZP_r((byte)(byte2 + r_Y));
-                    if ((r_X & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_X == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xAE://LDX abs
-                    r_X = Mem_r((ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)));
-                    if ((r_X & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_X == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xBE://LDX abs,y
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort2 = (ushort)(ushort1 + r_Y);
-                    if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
-                    {
-                        Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                    }
-                    r_X = Mem_r(ushort2);
-                    if ((r_X & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_X == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xA0://LDY imm
-                    r_Y = Mem_r(r_PC++);
-                    if ((r_Y & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_Y == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xA4://LDY zp
-                    r_Y = ZP_r(Mem_r(r_PC++));
-                    if ((r_Y & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_Y == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xB4://LDY zp,x
-                    byte2 = Mem_r(r_PC++); ZP_r(byte2); r_Y = ZP_r((byte)(byte2 + r_X));
-                    if ((r_Y & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_Y == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xAC://LDY abs
-                    r_Y = Mem_r((ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)));
-                    if ((r_Y & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_Y == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xBC://LDY abs,x
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort2 = (ushort)(ushort1 + r_X);
-                    if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
-                    {
-                        Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                    }
-                    r_Y = Mem_r(ushort2);
-                    if ((r_Y & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_Y == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                //----- LSR begin
-                case 0x4A://LSR acc
-                    Mem_r(r_PC); // dummy read
-                    if ((r_A & 0x01) > 0) flagC = 1; else flagC = 0;
-                    r_A >>= 1;
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0x46://LSR zp fix
-                    byte2 = Mem_r(r_PC++);
-                    byte1 = ZP_r(byte2);
-                    ZP_w(byte2, byte1); // dummy write
-                    if ((byte1 & 1) > 0) flagC = 1; else flagC = 0;
-                    byte1 >>= 1;
-                    if ((byte1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if ((byte1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    ZP_w(byte2, byte1);
-                    break;
-
-                case 0x56://LSR zp,x
-                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
-                    byte1 = ZP_r(byte2);
-                    ZP_w(byte2, byte1); // dummy write
-                    if ((byte1 & 1) > 0) flagC = 1; else flagC = 0;
-                    byte1 >>= 1;
-                    if ((byte1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if ((byte1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    ZP_w(byte2, byte1);
-                    break;
-
-                case 0x4E://LSR abs fix
-                    ushort2 = (ushort)(((Mem_r(r_PC++) << 0) | (Mem_r(r_PC++) << 8)));
-                    byte1 = Mem_r(ushort2);
-                    Mem_w(ushort2, byte1);//dummy write fixed
-                    if ((byte1 & 1) > 0) flagC = 1; else flagC = 0;
-                    byte1 >>= 1;
-                    if ((byte1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if ((byte1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    Mem_w(ushort2, byte1);
-                    break;
-
-                case 0x5E://LSR abs,x
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort2 = (ushort)(ushort1 + r_X);
-                    Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF))); // dummy read wrong page
-                    byte1 = Mem_r(ushort2);
-                    Mem_w(ushort2, byte1);//dummy write fixed
-                    if ((byte1 & 1) > 0) flagC = 1; else flagC = 0;
-                    byte1 >>= 1;
-                    if ((byte1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if ((byte1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    Mem_w(ushort2, byte1);
-                    break;
-                //---- LSR END
-
-                case 0xEA: Mem_r(r_PC); break;//NOP
-
-                //--- ORA BEGIN
-                case 0x09: //ORA  Immediate  
-                    int1 = Mem_r(r_PC++) | r_A;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x05: //ORA  Zero Page  
-                    int1 = ZP_r(Mem_r(r_PC++)) | r_A;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x15://ORA Zero Page,X
-                    byte2 = Mem_r(r_PC++); ZP_r(byte2); int1 = ZP_r((byte)(byte2 + r_X)) | r_A;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x0D: //ORA Absolute 
-                    int1 = Mem_r((ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8))) | r_A;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x1D: //ORA  Absolute,X  fix
-                    byte1 = Mem_r(r_PC++);
-                    byte2 = Mem_r(r_PC++);
-                    byte1 += r_X;
-                    ushort2 = Mem_r((ushort)(byte1 | (byte2 << 8)));
-                    if (byte1 < r_X)
-                    {
-                        byte2++;
-                        ushort2 = Mem_r((ushort)(byte1 | ((byte2) << 8)));
-                    }
-                    int1 = ushort2 | r_A;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x19: //ORA  Absolute,Y
-                    byte1 = Mem_r(r_PC++);
-                    byte2 = Mem_r(r_PC++);
-                    byte1 += r_Y;
-                    ushort2 = Mem_r((ushort)(byte1 | (byte2 << 8)));
-                    if (byte1 < r_Y)
-                    {
-                        byte2++;
-                        ushort2 = Mem_r((ushort)(byte1 | ((byte2) << 8)));
-                    }
-                    int1 = ushort2 | r_A;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x01: //ORA (Indirect,X)
-                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte1 = (byte)(byte3 + r_X);
-                    int1 = Mem_r((ushort)(ZP_r(byte1) | (ZP_r((byte)(byte1 + 1)) << 8))) | r_A;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x11: //ORA (Indirect),Y
-                    byte1 = Mem_r(r_PC++);
-                    ushort1 = (ushort)(ZP_r(byte1) | (ZP_r((byte)(byte1 + 1)) << 8));
-                    ushort2 = (ushort)(ushort1 + r_Y);
-                    if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
-                    {
-                        Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                    }
-                    int1 = Mem_r(ushort2) | r_A;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-                //--- ORA END    
-
-                case 0x48: Mem_r(r_PC); Mem_w((ushort)(r_SP-- | 0x100), r_A); break;//PHA
-                case 0x08: Mem_r(r_PC); Mem_w((ushort)(r_SP-- | 0x100), (byte)(GetFlag() | 0x30)); break;//PHP
-
-                case 0x68://PLA
-                    Mem_r(r_PC); // dummy read
-                    Mem_r((ushort)(r_SP | 0x100)); // dummy read stack
-                    r_A = Mem_r((ushort)(++r_SP | 0x100));
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0x28: Mem_r(r_PC); Mem_r((ushort)(r_SP | 0x100)); SetFlag(Mem_r((ushort)(++r_SP | 0x100))); break;//PLP
-
-                //----ROL begin
-                case 0x2A://ROL acc //fix
-                    Mem_r(r_PC); // dummy read
-                    ushort1 = (ushort)(r_A << 1);
-                    if (flagC == 1) ushort1 |= 0x1;
-                    if ((r_A & 0x80) != 0) flagC = 1; else flagC = 0;
-                    if ((ushort1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if ((ushort1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    r_A = (byte)ushort1;
-                    break;
-
-                case 0x26://ROL zp //fix
-                    byte2 = Mem_r(r_PC++);
-                    byte1 = ZP_r(byte2);
-                    ZP_w(byte2, byte1); // dummy write
-                    ushort1 = (ushort)(byte1 << 1);
-                    if (flagC == 1) ushort1 |= 0x1;
-                    if ((byte1 & 0x80) != 0) flagC = 1; else flagC = 0;
-                    if ((ushort1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if ((ushort1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    ZP_w(byte2, (byte)ushort1);
-                    break;
-
-                case 0x36://ROL zp,x
-                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
-                    byte1 = ZP_r(byte2);
-                    ZP_w(byte2, byte1); // dummy write
-                    ushort1 = (ushort)(byte1 << 1);
-                    if (flagC == 1) ushort1 |= 0x1;
-                    if ((byte1 & 0x80) != 0) flagC = 1; else flagC = 0;
-                    if ((ushort1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if ((ushort1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    ZP_w(byte2, (byte)ushort1);
-                    break;
-
-                case 0x2E://ROL abs fix
-                    ushort2 = (ushort)((Mem_r(r_PC++) | Mem_r(r_PC++) << 8));
-                    byte1 = Mem_r(ushort2);
-                    Mem_w(ushort2, byte1);//dummy write fixed
-                    ushort1 = (ushort)(byte1 << 1);
-                    if (flagC == 1) ushort1 |= 0x1;
-                    if ((byte1 & 0x80) != 0) flagC = 1; else flagC = 0;
-                    if ((ushort1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if ((ushort1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    Mem_w(ushort2, (byte)ushort1); //!!!!!
-                    break;
-
-                case 0x3E://ROL abs,x fix
-                    byte1 = Mem_r(r_PC++); //low
-                    byte2 = Mem_r(r_PC++); //heigh
-                    byte1 += r_X;
-                    Mem_r((ushort)(byte1 | ((byte2) << 8)));
-                    if (byte1 < r_X) byte2++;
-                    byte3 = Mem_r((ushort)(byte1 | ((byte2) << 8))); //dummy read fixed 2017.01.17
-                    Mem_w((ushort)(byte1 | (byte2 << 8)), byte3);
-                    ushort1 = (ushort)(byte3 << 1);
-                    if (flagC == 1) ushort1 |= 0x1;
-                    if ((byte3 & 0x80) != 0) flagC = 1; else flagC = 0;
-                    if ((ushort1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if ((ushort1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    Mem_w((ushort)(byte1 | (byte2 << 8)), (byte)ushort1);
-                    break;
-                //----ROL end
-
-                //---- ROR begin
-                case 0x6A://ROR acc
-                    Mem_r(r_PC); // dummy read
-                    ushort1 = r_A;
-                    if (flagC == 1) ushort1 |= 0x100;
-                    if ((ushort1 & 0x01) > 0) flagC = 1; else flagC = 0;
-                    ushort1 >>= 1;
-                    if ((ushort1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (ushort1 == 0) flagZ = 1; else flagZ = 0;
-                    r_A = (byte)ushort1;
-                    break;
-
-                case 0x66://ROR zp
-                    byte1 = Mem_r(r_PC++);
-                    ushort1 = ZP_r(byte1);
-                    ZP_w(byte1, (byte)ushort1); // dummy write
-                    if (flagC == 1) ushort1 |= 0x100;
-                    if ((ushort1 & 0x01) > 0) flagC = 1; else flagC = 0;
-                    ushort1 >>= 1;
-                    if ((ushort1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (ushort1 == 0) flagZ = 1; else flagZ = 0;
-                    ushort1 = (byte)ushort1;
-                    ZP_w(byte1, (byte)ushort1);
-                    break;
-
-                case 0x76://ROR zp,x
-                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte1 = (byte)(byte3 + r_X);
-                    ushort1 = ZP_r(byte1);
-                    ZP_w(byte1, (byte)ushort1); // dummy write
-                    if (flagC == 1) ushort1 |= 0x100;
-                    if ((ushort1 & 0x01) > 0) flagC = 1; else flagC = 0;
-                    ushort1 >>= 1;
-                    if ((ushort1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (ushort1 == 0) flagZ = 1; else flagZ = 0;
-                    ushort1 = (byte)ushort1;
-                    ZP_w(byte1, (byte)ushort1);
-                    break;
-
-                case 0x6E://ROR abs
-                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort1 = Mem_r(ushort2);
-                    Mem_w(ushort2, (byte)ushort1);//dummy write fixed
-                    if (flagC == 1) ushort1 |= 0x100;
-                    if ((ushort1 & 0x01) > 0) flagC = 1; else flagC = 0;
-                    ushort1 >>= 1;
-                    if ((ushort1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (ushort1 == 0) flagZ = 1; else flagZ = 0;
-                    ushort1 = (byte)ushort1;
-                    Mem_w(ushort2, (byte)ushort1);
-                    break;
-
-                case 0x7E://ROR abs,x
-                    ushort3 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort2 = (ushort)(ushort3 + r_X);
-                    Mem_r((ushort)((ushort3 & 0xFF00) | (ushort2 & 0x00FF))); // dummy read wrong page
-                    ushort1 = Mem_r(ushort2);
-                    Mem_w(ushort2, (byte)ushort1);//dummy write fixed
-                    if (flagC == 1) ushort1 |= 0x100;
-                    if ((ushort1 & 0x01) > 0) flagC = 1; else flagC = 0;
-                    ushort1 >>= 1;
-                    if ((ushort1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (ushort1 == 0) flagZ = 1; else flagZ = 0;
-                    ushort1 = (byte)ushort1;
-                    Mem_w(ushort2, (byte)ushort1);
-                    break;
-                // ----ROR end
-
-                case 0x40://RTI
-                    Mem_r(r_PC);//dummy read
-                    Mem_r((ushort)(r_SP | 0x100)); // dummy read stack (pre-increment S)
-                    SetFlag(Mem_r((ushort)(++r_SP | 0x100)));
-                    r_PC = (ushort)(Mem_r((ushort)(++r_SP | 0x100)) | (Mem_r((ushort)(++r_SP | 0x100)) << 8));
-                    break;
-
-                case 0x60://RTS
-                    Mem_r(r_PC);//dummy read
-                    Mem_r((ushort)(r_SP | 0x100)); // dummy read stack (pre-increment S)
-                    r_PC = (ushort)((Mem_r((ushort)(++r_SP | 0x100)) | (Mem_r((ushort)(++r_SP | 0x100)) << 8)) + 1);
-                    tick(); // cycle 6: increment PC
-                    break;
-
-                //--- SBC BEGIN
-                case 0xE9: //SBC  Immediate  
-                    byte1 = (byte)(Mem_r(r_PC++) ^ 0xFF);
-                    int1 = r_A + byte1 + flagC;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if (int1 > 0xff) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (((int1 ^ r_A) & (int1 ^ byte1) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0xE5: //SBC  Zero Page  
-                    byte1 = (byte)(ZP_r(Mem_r(r_PC++)) ^ 0xFF);
-                    int1 = r_A + byte1 + flagC;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if (int1 > 0xff) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (((int1 ^ r_A) & (int1 ^ byte1) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0xF5://SBC Zero Page,X
-                    byte2 = Mem_r(r_PC++); ZP_r(byte2); byte1 = (byte)(ZP_r((byte)(byte2 + r_X)) ^ 0xFF);
-                    int1 = r_A + byte1 + flagC;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if (int1 > 0xff) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (((int1 ^ r_A) & (int1 ^ byte1) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0xED: //SBC Absolute fix
-                    byte1 = (byte)(Mem_r((ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8))) ^ 0xFF);
-                    int1 = r_A + byte1 + flagC;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if (int1 > 0xff) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (((int1 ^ r_A) & (int1 ^ byte1) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0xFD: //SBC  Absolute,X
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort2 = (ushort)(ushort1 + r_X);
-                    if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
-                    {
-                        Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                    }
-                    byte1 = (byte)(Mem_r(ushort2) ^ 0xFF);
-                    int1 = r_A + byte1 + flagC;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if (int1 > 0xff) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (((int1 ^ r_A) & (int1 ^ byte1) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0xF9: //SBC  Absolute,Y
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort2 = (ushort)(ushort1 + r_Y);
-                    if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
-                    {
-                        Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                    }
-                    byte1 = (byte)(Mem_r(ushort2) ^ 0xFF);
-                    int1 = r_A + byte1 + flagC;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if (int1 > 0xff) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (((int1 ^ r_A) & (int1 ^ byte1) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0xE1: //SBC (Indirect,X)
-                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
-                    byte1 = (byte)(Mem_r((ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8))) ^ 0xFF);
-                    int1 = r_A + byte1 + flagC;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if (int1 > 0xff) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (((int1 ^ r_A) & (int1 ^ byte1) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0xF1: //SBC (Indirect),Y
-                    byte2 = Mem_r(r_PC++);
-                    ushort1 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
-                    ushort2 = (ushort)(ushort1 + r_Y);
-                    if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
-                    {
-                        Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF)));
-                    }
-                    byte1 = (byte)(Mem_r(ushort2) ^ 0xFF);
-                    int1 = r_A + byte1 + flagC;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if (int1 > 0xff) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (((int1 ^ r_A) & (int1 ^ byte1) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    r_A = (byte)int1;
-                    break;
-                //--- SBC END
-                case 0x38: Mem_r(r_PC); flagC = 1; break; //SEC
-                case 0xF8: Mem_r(r_PC); flagD = 1; break; // SED NES 6502 此 FLAG 無作用
-                case 0x78: Mem_r(r_PC); flagI = 1; break; //SEI
-                case 0x85: ZP_w(Mem_r(r_PC++), r_A); break;//STA zp
-                case 0x95: byte2 = Mem_r(r_PC++); ZP_r(byte2); ZP_w((byte)(byte2 + r_X), r_A); break;//STA zp,x
-                case 0x8D: Mem_w((ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)), r_A); break;//STA abs
-                case 0x9D:  //STA abs,x
-                    byte1 = Mem_r(r_PC++); //low
-                    byte2 = Mem_r(r_PC++); //heigh
-                    byte1 += r_X;
-
-                    Mem_r((ushort)(byte1 | ((byte2) << 8)));
-                    //
-                    if (byte1 < r_X) byte2++;
-                    Mem_w((ushort)(byte1 | ((byte2) << 8)), r_A);//dummy read fiexed 2017.01.17
-                                                                 //
-                    break;
-                case 0x99: //STA abs,Y
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort2 = (ushort)(ushort1 + r_Y);
-                    Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF))); // dummy read (always)
-                    Mem_w(ushort2, r_A);
-                    break;
-
-                case 0x81://STA (indirect,x)
-                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte1 = (byte)(byte3 + r_X);
-                    Mem_w((ushort)(ZP_r(byte1) | (ZP_r((byte)(byte1 + 1)) << 8)), r_A);
-                    break;
-
-                case 0x91://STA (indirect),y
-                    byte3 = Mem_r(r_PC++);
-                    byte1 = ZP_r(byte3); //low
-                    byte2 = ZP_r((byte)(byte3 + 1)); //heigh
-                    byte1 += r_Y;
-                    Mem_r((ushort)(byte1 | ((byte2) << 8)));
-
-                    //
-                    if (byte1 < r_Y) byte2++;
-                    Mem_w((ushort)(byte1 | ((byte2) << 8)), r_A);//dummy read fiexed 2017.01.17
-                                                                 //
-                    break;
-
-                case 0x86: ZP_w(Mem_r(r_PC++), r_X); break; //STX zp
-                case 0x96: byte2 = Mem_r(r_PC++); ZP_r(byte2); ZP_w((byte)(byte2 + r_Y), r_X); break; //STX zp,y
-                case 0x8E: Mem_w((ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)), r_X); break; //STX abs //fixed 1/3
-                case 0x84: ZP_w(Mem_r(r_PC++), r_Y); break;//STY  zp
-                case 0x94: byte2 = Mem_r(r_PC++); ZP_r(byte2); ZP_w((byte)(byte2 + r_X), r_Y); break;//STY zp,x
-                case 0x8C: Mem_w((ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)), r_Y); break;//STY abs 
-
-                case 0xAA: //TAX
-                    Mem_r(r_PC); // dummy read
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    r_X = r_A;
-                    break;
-
-                case 0xA8://TAY
-                    Mem_r(r_PC); // dummy read
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    r_Y = r_A;
-                    break;
-
-                case 0xBA://TSX
-                    Mem_r(r_PC); // dummy read
-                    if ((r_SP & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_SP == 0) flagZ = 1; else flagZ = 0;
-                    r_X = r_SP;
-                    break;
-
-                case 0x8A://TXA
-                    Mem_r(r_PC); // dummy read
-                    if ((r_X & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_X == 0) flagZ = 1; else flagZ = 0;
-                    r_A = r_X;
-                    break;
-
-                case 0x9A: Mem_r(r_PC); r_SP = r_X; break; //TXS
-
-                case 0x98: //TYA
-                    Mem_r(r_PC); // dummy read
-                    if ((r_Y & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (r_Y == 0) flagZ = 1; else flagZ = 0;
-                    r_A = r_Y;
-                    break;
-#if illegal
-                #region illagel code
-                // http://visual6502.org/wiki/index.php?title=6502_all_256_Opcodes
-                // http://macgui.com/kb/article/46
-
-                //do nothing
-                case 0x1A:
-                case 0x3A:
-                case 0x5A:
-                case 0x7A:
-                case 0xDA:
-                case 0xFA:
-                    Mem_r(r_PC); // dummy read
-                    break;
-
-                case 0x80: // NOP imm
-                case 0x82:
-                case 0x89:
-                case 0xC2:
-                case 0xE2:
-                    Mem_r(r_PC++); // read and discard operand
-                    break;
-                case 0x04: // NOP zp
-                case 0x44:
-                case 0x64:
-                    ZP_r(Mem_r(r_PC++)); // fetch addr + read zp
-                    break;
-                case 0x14: // NOP zp,x
-                case 0x34:
-                case 0x54:
-                case 0xD4:
-                case 0xF4:
-                case 0x74:
-                    byte2 = Mem_r(r_PC++); ZP_r(byte2); ZP_r((byte)(byte2 + r_X)); // fetch addr + dummy + read indexed
-                    break;
-
-                case 0x0C: // NOP abs (unofficial)
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    Mem_r(ushort1); // read and discard
-                    break;
-
-                case 0x1C: case 0x3C: case 0x5C: case 0x7C: case 0xDC: case 0xFC: // NOP abs,X (unofficial)
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort2 = (ushort)(ushort1 + r_X);
-                    if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
-                    {
-                        Mem_r((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF))); // dummy read wrong page
-                    }
-                    Mem_r(ushort2); // read and discard
-                    break;
-
-                case 0x6B:
-                    byte1 = Mem_r(r_PC++);
-                    r_A = (byte)(((byte1 & r_A) >> 1) | (((byte)flagC) << 7));
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if ((r_A & 0x40) > 0) flagC = 1; else flagC = 0;
-                    if (((r_A << 1 ^ r_A) & 0x40) > 0) flagV = 1; else flagV = 0;
-                    break;
-
-                case 0x0B: //ANC
-                case 0x2B: //ANC
-                    r_A &= Mem_r(r_PC++);
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) > 0) flagC = 1; else flagC = 0;
-                    flagN = flagC;
-                    break;
-
-                case 0x8B: //XAA/ANE #imm (unstable)
-                    r_A = (byte)((r_A | 0xFF) & r_X & Mem_r(r_PC++));
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) != 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0x4B: //ALR
-                    r_A &= Mem_r(r_PC++);
-                    if ((r_A & 0x1) != 0) flagC = 1; else flagC = 0;
-                    r_A >>= 1;
-                    if ((r_A & 0x80) != 0) flagN = 1; else flagN = 0;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0xEB: //illegal sbc imm
-                    byte1 = (byte)(Mem_r(r_PC++) ^ 0xFF);
-                    int1 = r_A + byte1 + flagC;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if (int1 > 0xff) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) > 0) flagN = 1; else flagN = 0;
-                    if (((int1 ^ r_A) & (int1 ^ byte1) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0x03: //SLO (  ASL M THEN (M "OR" A) -> A,M  )
-                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
-                    ushort1 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
-                    byte1 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte1);//dummy write fixed
-
-                    if ((byte1 & 0x80) > 0) flagC = 1; else flagC = 0;
-                    byte1 <<= 1;
-                    Mem_w(ushort1, byte1);
-                    r_A |= byte1;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0x07: //SLO (  ASL M THEN (M "OR" A) -> A,M  )
-                    byte2 = Mem_r(r_PC++);
-                    byte1 = ZP_r(byte2);
-                    ZP_w(byte2, byte1); // dummy write
-                    if ((byte1 & 0x80) > 0) flagC = 1; else flagC = 0;
-                    byte1 <<= 1;
-                    ZP_w(byte2, byte1);
-                    r_A |= byte1;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0x13: //SLO (ind),Y
-                    byte2 = Mem_r(r_PC++);
-                    ushort2 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
-                    ushort1 = (ushort)(ushort2 + r_Y);
-                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
-                    byte1 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte1);//dummy write fixed
-
-                    if ((byte1 & 0x80) > 0) flagC = 1; else flagC = 0;
-                    byte1 <<= 1;
-                    Mem_w((ushort)(ushort1), byte1);
-                    r_A |= byte1;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0x17: //SLO (  ASL M THEN (M "OR" A) -> A,M  )
-                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
-                    byte1 = ZP_r(byte2);
-                    ZP_w(byte2, byte1); // dummy write
-                    if ((byte1 & 0x80) > 0) flagC = 1; else flagC = 0;
-                    byte1 <<= 1;
-                    ZP_w(byte2, byte1);
-                    r_A |= byte1;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0x1B: //SLO (  ASL M THEN (M "OR" A) -> A,M  )
-                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort1 = (ushort)(ushort2 + r_Y);
-                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
-                    byte1 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte1);//dummy write fixed
-
-                    if ((byte1 & 0x80) > 0) flagC = 1; else flagC = 0;
-                    byte1 <<= 1;
-                    Mem_w(ushort1, byte1);
-                    r_A |= byte1;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0x0F: //SLO (  ASL M THEN (M "OR" A) -> A,M  )
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    byte1 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte1);//dummy write fixed
-
-                    if ((byte1 & 0x80) > 0) flagC = 1; else flagC = 0;
-                    byte1 <<= 1;
-                    Mem_w(ushort1, byte1);
-                    r_A |= byte1;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0x1F: //SLO (  ASL M THEN (M "OR" A) -> A,M  )
-                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort1 = (ushort)(ushort2 + r_X);
-                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
-                    byte1 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte1);//dummy write fixed
-
-                    if ((byte1 & 0x80) > 0) flagC = 1; else flagC = 0;
-                    byte1 <<= 1;
-                    Mem_w(ushort1, byte1);
-                    r_A |= byte1;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0x23: //RLA    ( ROL M  THEN (M "AND" A) -> A )
-                    byte1 = Mem_r(r_PC++); ZP_r(byte1); byte3 = (byte)(byte1 + r_X);
-                    ushort1 = (ushort)(ZP_r(byte3) | (ZP_r((byte)(byte3 + 1)) << 8));
-                    byte2 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte2);//dummy write fixed
-
-                    byte1 = (byte)((byte2 << 1) | flagC);
-                    Mem_w(ushort1, byte1);
-                    if ((byte2 & 0x80) > 0) flagC = 1; else flagC = 0;
-                    r_A &= byte1;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0x27: //RLA    ( ROL M  THEN (M "AND" A) -> A )
-                    byte3 = Mem_r(r_PC++);
-                    byte2 = ZP_r(byte3);
-                    ZP_w(byte3, byte2); // dummy write
-                    byte1 = (byte)((byte2 << 1) | flagC);
-                    ZP_w(byte3, byte1);
-                    if ((byte2 & 0x80) > 0) flagC = 1; else flagC = 0;
-                    r_A &= byte1;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0x2F:// RLA
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    byte2 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte2);//dummy write fixed
-
-                    byte1 = (byte)((byte2 << 1) | flagC);
-                    Mem_w(ushort1, byte1);
-                    if ((byte2 & 0x80) > 0) flagC = 1; else flagC = 0;
-                    r_A &= byte1;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0x3F://RLA
-                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort1 = (ushort)(ushort2 + r_X);
-                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
-                    byte2 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte2);//dummy write fixed
-
-                    byte1 = (byte)((byte2 << 1) | flagC);
-                    Mem_w(ushort1, byte1);
-                    if ((byte2 & 0x80) > 0) flagC = 1; else flagC = 0;
-                    r_A &= byte1;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0x3B://RLA
-                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort1 = (ushort)(ushort2 + r_Y);
-                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
-                    byte2 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte2);//dummy write fixed
-
-                    byte1 = (byte)((byte2 << 1) | flagC);
-                    Mem_w(ushort1, byte1);
-                    if ((byte2 & 0x80) > 0) flagC = 1; else flagC = 0;
-                    r_A &= byte1;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0x33: //RLA (ind),Y
-                    byte3 = Mem_r(r_PC++);
-                    ushort2 = (ushort)(ZP_r(byte3) | (ZP_r((byte)(byte3 + 1)) << 8));
-                    ushort1 = (ushort)(ushort2 + r_Y);
-                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
-                    byte2 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte2);//dummy write fixed
-
-                    byte1 = (byte)(byte2 << 1);
-                    byte1 |= (byte)(flagC);
-                    Mem_w(ushort1, byte1);
-                    if ((byte2 & 0x80) > 0) flagC = 1; else flagC = 0;
-                    r_A &= byte1;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0x37: //RLA    ( ROL M  THEN (M "AND" A) -> A )
-                    byte1 = Mem_r(r_PC++); ZP_r(byte1); byte3 = (byte)(byte1 + r_X);
-                    byte2 = ZP_r(byte3);
-                    ZP_w(byte3, byte2); // dummy write
-                    byte1 = (byte)(byte2 << 1);
-                    byte1 |= (byte)(flagC);
-                    ZP_w(byte3, byte1);
-                    if ((byte2 & 0x80) > 0) flagC = 1; else flagC = 0;
-                    r_A &= byte1;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0x43://SRE (LSR M  THEN (M "EOR" A) -> A )
-                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
-                    ushort1 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
-                    byte1 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte1);//dummy write fixed
-
-                    if ((byte1 & 1) > 0) flagC = 1; else flagC = 0;
-                    byte1 >>= 1;
-                    Mem_w(ushort1, byte1);
-                    r_A ^= byte1;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0x47://SRE (LSR M  THEN (M "EOR" A) -> A )
-                    byte2 = Mem_r(r_PC++);
-                    byte1 = ZP_r(byte2);
-                    ZP_w(byte2, byte1); // dummy write
-                    if ((byte1 & 1) > 0) flagC = 1; else flagC = 0;
-                    byte1 >>= 1;
-                    ZP_w(byte2, byte1);
-                    r_A ^= byte1;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0x4F://SRE (LSR M  THEN (M "EOR" A) -> A )
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    byte1 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte1);//dummy write fixed
-
-                    if ((byte1 & 1) > 0) flagC = 1; else flagC = 0;
-                    byte1 >>= 1;
-                    Mem_w(ushort1, byte1);
-                    r_A ^= byte1;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0x5F://SRE
-                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort1 = (ushort)(ushort2 + r_X);
-                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
-                    byte1 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte1);//dummy write fixed
-
-                    if ((byte1 & 1) != 0) flagC = 1; else flagC = 0;
-                    byte1 >>= 1;
-                    Mem_w(ushort1, byte1);
-                    r_A ^= byte1;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) != 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0x5B://SRE
-                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort1 = (ushort)(ushort2 + r_Y);
-                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
-                    byte1 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte1);//dummy write fixed
-
-                    if ((byte1 & 1) != 0) flagC = 1; else flagC = 0;
-                    byte1 >>= 1;
-                    Mem_w(ushort1, byte1);
-                    r_A ^= byte1;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) != 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0x53://SRE (ind),Y
-                    byte2 = Mem_r(r_PC++);
-                    ushort2 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
-                    ushort1 = (ushort)(ushort2 + r_Y);
-                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
-                    byte1 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte1);//dummy write fixed
-
-                    if ((byte1 & 1) > 0) flagC = 1; else flagC = 0;
-                    byte1 >>= 1;
-                    Mem_w(ushort1, byte1);
-                    r_A ^= byte1;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0x57://SRE (LSR M  THEN (M "EOR" A) -> A )
-                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
-                    byte1 = ZP_r(byte2);
-                    ZP_w(byte2, byte1); // dummy write
-                    if ((byte1 & 1) > 0) flagC = 1; else flagC = 0;
-                    byte1 >>= 1;
-                    ZP_w(byte2, byte1);
-                    r_A ^= byte1;
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) > 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0x63:// RRA (ROR M THEN (A + M + C) -> A  )  ok
-                    byte1 = Mem_r(r_PC++); ZP_r(byte1); byte3 = (byte)(byte1 + r_X);
-                    ushort1 = (ushort)(ZP_r(byte3) | (ZP_r((byte)(byte3 + 1)) << 8));
-                    byte2 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte2);//dummy write fixed
-
-                    byte1 = (byte)((byte2 >> 1) | ((flagC == 0) ? 0 : 0x80));
-                    Mem_w(ushort1, byte1);
-                    if ((byte2 & 1) > 0) flagC = 1; else flagC = 0;
-                    int1 = r_A + byte1 + flagC;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
-                    if (((int1 ^ r_A) & (int1 ^ byte1) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    r_A = (byte)int1;
-                    if ((int1 >> 8) > 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0x67:// RRA (ROR M THEN (A + M + C) -> A  ) ok
-                    byte3 = Mem_r(r_PC++);
-                    byte2 = ZP_r(byte3);
-                    ZP_w(byte3, byte2); // dummy write
-                    byte1 = (byte)((byte2 >> 1) | ((flagC == 0) ? 0 : 0x80));
-                    ZP_w(byte3, byte1);
-                    if ((byte2 & 1) > 0) flagC = 1; else flagC = 0;
-                    int1 = r_A + byte1 + flagC;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
-                    if (((int1 ^ r_A) & (int1 ^ byte1) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    r_A = (byte)int1;
-                    if ((int1 >> 8) > 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0x6F://RRA
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));//ok
-                    byte2 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte2);//dummy write fixed
-
-                    byte1 = (byte)((byte2 >> 1) | ((flagC == 0) ? 0 : 0x80));
-                    Mem_w(ushort1, byte1);
-                    if ((byte2 & 1) > 0) flagC = 1; else flagC = 0;
-                    int1 = r_A + byte1 + flagC;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
-                    if (((int1 ^ r_A) & (int1 ^ byte1) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    r_A = (byte)int1;
-                    if ((int1 >> 8) > 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0x73:// RRA (ind),Y
-                    byte3 = Mem_r(r_PC++);
-                    ushort2 = (ushort)(ZP_r(byte3) | (ZP_r((byte)(byte3 + 1)) << 8));
-                    ushort1 = (ushort)(ushort2 + r_Y);
-                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
-                    byte2 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte2);//dummy write fixed
-
-                    byte1 = (byte)((byte2 >> 1) | ((flagC == 0) ? 0 : 0x80));
-                    Mem_w(ushort1, byte1);
-                    if ((byte2 & 1) > 0) flagC = 1; else flagC = 0;
-                    int1 = r_A + byte1 + flagC;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
-                    if (((int1 ^ r_A) & (int1 ^ byte1) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    r_A = (byte)int1;
-                    if ((int1 >> 8) > 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0x77:// RRA (ROR M THEN (A + M + C) -> A  ) ok
-                    byte1 = Mem_r(r_PC++); ZP_r(byte1); byte3 = (byte)(byte1 + r_X);
-                    byte2 = ZP_r(byte3);
-                    ZP_w(byte3, byte2); // dummy write
-                    byte1 = (byte)((byte2 >> 1) | ((flagC == 0) ? 0 : 0x80));
-                    ZP_w(byte3, byte1);
-                    if ((byte2 & 1) > 0) flagC = 1; else flagC = 0;
-                    int1 = r_A + byte1 + flagC;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
-                    if (((int1 ^ r_A) & (int1 ^ byte1) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    r_A = (byte)int1;
-                    if ((int1 >> 8) > 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0x7B:// RRA (ROR M THEN (A + M + C) -> A  )
-                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort1 = (ushort)(ushort2 + r_Y);
-                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
-                    byte2 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte2);//dummy write fixed
-
-                    byte1 = (byte)((byte2 >> 1) | ((flagC == 0) ? 0 : 0x80));
-                    Mem_w(ushort1, byte1);
-                    if ((byte2 & 1) > 0) flagC = 1; else flagC = 0;
-                    int1 = r_A + byte1 + flagC;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
-                    if (((int1 ^ r_A) & (int1 ^ byte1) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    r_A = (byte)int1;
-                    if ((int1 >> 8) > 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0x7F: //RRA
-                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort1 = (ushort)(ushort2 + r_X);
-                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
-                    byte2 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte2);//dummy write fixed
-
-                    byte1 = (byte)((byte2 >> 1) | ((flagC == 0) ? 0 : 0x80));
-                    Mem_w(ushort1, byte1);
-                    if ((byte2 & 1) > 0) flagC = 1; else flagC = 0;
-                    int1 = r_A + byte1 + flagC;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
-                    if (((int1 ^ r_A) & (int1 ^ byte1) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    r_A = (byte)int1;
-                    if ((int1 >> 8) > 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    break;
-
-                case 0x83://SAX (ind,X)
-                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte1 = (byte)(byte3 + r_X);
-                    Mem_w((ushort)(ZP_r(byte1) | (ZP_r((byte)(byte1 + 1)) << 8)), (byte)(r_X & r_A));
-                    break;
-
-                case 0x87://SAX ( (A "AND" (MSB(adr)+1)  "AND" X) -> M 
-                    Mem_w(Mem_r(r_PC++), (byte)(r_X & r_A));
-                    break;
-
-                case 0x8F://SAX ( (A "AND" (MSB(adr)+1)  "AND" X) -> M 
-                    Mem_w((ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)), (byte)(r_X & r_A));
-                    break;
-
-                case 0x9C://SHY
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    byte1 = (byte)(r_Y & (((ushort1 & 0xff00) >> 8) + 1));
-                    ushort1 = (ushort)((ushort1 & 0xff00) | (byte)(ushort1 + r_X));
-                    Mem_r(ushort1); // dummy read at wrong-page address
-                    if ((ushort1 & 0xff) < r_X) ushort1 = (ushort)((ushort1 & 0xff) | (byte1 << 8));
-                    Mem_w(ushort1, byte1);
-                    break;
-
-                case 0x9E://SHX
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    byte1 = (byte)(r_X & (((ushort1 & 0xff00) >> 8) + 1));
-                    ushort1 = (ushort)((ushort1 & 0xff00) | (byte)(ushort1 + r_Y));
-                    Mem_r(ushort1); // dummy read at wrong-page address
-                    if ((ushort1 & 0xff) < r_Y) ushort1 = (ushort)((ushort1 & 0xff) | (byte1 << 8));
-                    Mem_w(ushort1, byte1);
-                    break;
-
-                case 0x9B://TAS/SHS abs,Y - SP = A & X, write SP & (H+1)
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    r_SP = (byte)(r_A & r_X);
-                    byte1 = (byte)(r_SP & (((ushort1 & 0xff00) >> 8) + 1));
-                    ushort1 = (ushort)((ushort1 & 0xff00) | (byte)(ushort1 + r_Y));
-                    Mem_r(ushort1); // dummy read at wrong-page address
-                    if ((ushort1 & 0xff) < r_Y) ushort1 = (ushort)((ushort1 & 0xff) | (byte1 << 8));
-                    Mem_w(ushort1, byte1);
-                    break;
-
-                case 0x9F://SHA/AXA abs,Y - write A & X & (H+1)
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    byte1 = (byte)(r_A & r_X & (((ushort1 & 0xff00) >> 8) + 1));
-                    ushort1 = (ushort)((ushort1 & 0xff00) | (byte)(ushort1 + r_Y));
-                    Mem_r(ushort1); // dummy read at wrong-page address
-                    if ((ushort1 & 0xff) < r_Y) ushort1 = (ushort)((ushort1 & 0xff) | (byte1 << 8));
-                    Mem_w(ushort1, byte1);
-                    break;
-
-                case 0x93://SHA/AXA (ind),Y - write A & X & (H+1)
-                    byte2 = Mem_r(r_PC++);
-                    ushort2 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
-                    ushort1 = (ushort)(ushort2 + r_Y);
-                    byte1 = (byte)(r_A & r_X & (((ushort2 >> 8) & 0xFF) + 1));
-                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
-                    if ((ushort1 & 0xFF00) != (ushort2 & 0xFF00))
-                        ushort1 = (ushort)((ushort1 & 0xFF) | (byte1 << 8));
-                    Mem_w(ushort1, byte1);
-                    break;
-
-                case 0x97://SAX zp,y
-                    byte2 = Mem_r(r_PC++); ZP_r(byte2); ZP_w((byte)(byte2 + r_Y), (byte)(r_X & r_A));
-                    break;
-
-                case 0xB7://LAX zp,y
-                    byte2 = Mem_r(r_PC++); ZP_r(byte2); r_X = r_A = ZP_r((byte)(byte2 + r_Y));
-                    if (r_X == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_X & 0x80) != 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xA3://LAX (ind,X)
-                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte1 = (byte)(byte3 + r_X);
-                    r_X = r_A = Mem_r((ushort)(ZP_r(byte1) | (ZP_r((byte)(byte1 + 1)) << 8)));
-                    if (r_X == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_X & 0x80) != 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xA7://LAX
-                    r_X = r_A = ZP_r(Mem_r(r_PC++));
-                    if (r_X == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_X & 0x80) != 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xAB://LAX
-                    r_X = r_A = Mem_r(r_PC++);
-                    if (r_X == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_X & 0x80) != 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xAF://LAX
-                    r_X = r_A = Mem_r((ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8)));
-                    if (r_X == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_X & 0x80) != 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xBF://LAX
-                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort1 = (ushort)(ushort2 + r_Y);
-                    if ((ushort1 & 0xFF00) != (ushort2 & 0xFF00)) // page cross
-                        Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
-                    r_X = r_A = Mem_r(ushort1);
-                    if (r_X == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_X & 0x80) != 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xB3://LAX (ind),Y
-                    byte1 = Mem_r(r_PC++);
-                    ushort2 = (ushort)(ZP_r(byte1) | (ZP_r((byte)(byte1 + 1)) << 8));
-                    ushort1 = (ushort)(ushort2 + r_Y);
-                    if ((ushort1 & 0xFF00) != (ushort2 & 0xFF00)) // page cross
-                        Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
-                    r_X = r_A = Mem_r(ushort1);
-                    if (r_X == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_X & 0x80) != 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xBB://LAS/LAR abs,Y - A = X = SP = M & SP
-                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort1 = (ushort)(ushort2 + r_Y);
-                    if ((ushort1 & 0xFF00) != (ushort2 & 0xFF00)) // page cross
-                        Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
-                    r_A = r_X = r_SP = (byte)(Mem_r(ushort1) & r_SP);
-                    if (r_A == 0) flagZ = 1; else flagZ = 0;
-                    if ((r_A & 0x80) != 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xCB:// AXS
-                    int1 = (r_A & r_X) - Mem_r(r_PC++);
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
-                    if ((byte)int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((~int1 >> 8) != 0) flagC = 1; else flagC = 0;
-                    r_X = (byte)int1;
-                    break;
-
-                case 0xC3: //DCP (ind,X)
-                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
-                    ushort1 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
-                    byte1 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte1);//dummy write fixed
-
-                    Mem_w(ushort1, --byte1);
-                    int1 = r_A - byte1;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((~int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xC7: //DCP
-                    byte2 = Mem_r(r_PC++);
-                    byte1 = ZP_r(byte2);
-                    ZP_w(byte2, byte1); // dummy write
-                    ZP_w(byte2, --byte1);
-                    int1 = r_A - byte1;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((~int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xCF: //DCP
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    byte1 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte1);//dummy write fixed
-
-                    Mem_w(ushort1, --byte1);
-                    int1 = r_A - byte1;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((~int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xDF: //DCP
-                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort1 = (ushort)(ushort2 + r_X);
-                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
-                    byte1 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte1);//dummy write fixed
-
-                    Mem_w(ushort1, --byte1);
-                    int1 = r_A - byte1;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((~int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xD3: //DCP (ind),Y
-                    byte2 = Mem_r(r_PC++);
-                    ushort2 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
-                    ushort3 = (ushort)(ushort2 + r_Y);
-                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort3 & 0x00FF))); // dummy read at wrong-page address
-                    byte1 = Mem_r(ushort3);
-
-                    Mem_w(ushort3, byte1);//dummy write fixed
-
-                    Mem_w(ushort3, --byte1);
-                    int1 = r_A - byte1;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((~int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xD7: //DCP
-                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
-                    byte1 = ZP_r(byte2);
-                    ZP_w(byte2, byte1); // dummy write
-                    ZP_w(byte2, --byte1);
-                    int1 = r_A - byte1;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((~int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xDB:// DCP
-                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort1 = (ushort)(ushort2 + r_Y);
-                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
-                    byte1 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte1);//dummy write fixed
-
-                    Mem_w(ushort1, --byte1);
-                    int1 = r_A - byte1;
-                    if (int1 == 0) flagZ = 1; else flagZ = 0;
-                    if ((~int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
-                    break;
-
-                case 0xE3://ISC (ind,X)
-                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
-                    ushort3 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
-                    byte1 = Mem_r(ushort3);
-
-                    Mem_w(ushort3, byte1);//dummy write fixed
-
-                    Mem_w(ushort3, ++byte1);
-                    int1 = r_A + (byte1 ^ 0xff) + flagC;
-                    if (((int1 ^ r_A) & (int1 ^ (byte1 ^ 0xff)) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0xE7://ISC
-                    byte2 = Mem_r(r_PC++);
-                    byte1 = ZP_r(byte2);
-                    ZP_w(byte2, byte1); // dummy write
-                    ZP_w(byte2, ++byte1);
-                    int1 = r_A + (byte1 ^ 0xff) + flagC;
-                    if (((int1 ^ r_A) & (int1 ^ (byte1 ^ 0xff)) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0xEF://ISC
-                    ushort1 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    byte1 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte1);//dummy write fixed
-
-                    Mem_w(ushort1, ++byte1);
-                    int1 = r_A + (byte1 ^ 0xff) + flagC;
-                    if (((int1 ^ r_A) & (int1 ^ (byte1 ^ 0xff)) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0xF3://ISC (ind),Y
-                    byte2 = Mem_r(r_PC++);
-                    ushort2 = (ushort)(ZP_r(byte2) | (ZP_r((byte)(byte2 + 1)) << 8));
-                    ushort3 = (ushort)(ushort2 + r_Y);
-                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort3 & 0x00FF))); // dummy read at wrong-page address
-                    byte1 = Mem_r(ushort3);
-
-                    Mem_w(ushort3, byte1);//dummy write fixed
-
-                    Mem_w(ushort3, ++byte1);
-                    int1 = r_A + (byte1 ^ 0xff) + flagC;
-                    if (((int1 ^ r_A) & (int1 ^ (byte1 ^ 0xff)) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0xF7://ISC
-                    byte3 = Mem_r(r_PC++); ZP_r(byte3); byte2 = (byte)(byte3 + r_X);
-                    byte1 = ZP_r(byte2);
-                    ZP_w(byte2, byte1); // dummy write
-                    ZP_w(byte2, ++byte1);
-                    int1 = r_A + (byte1 ^ 0xff) + flagC;
-                    if (((int1 ^ r_A) & (int1 ^ (byte1 ^ 0xff)) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0xFB://ISC
-                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort1 = (ushort)(ushort2 + r_Y);
-                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
-                    byte1 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte1);//dummy write fixed
-
-                    Mem_w(ushort1, ++byte1);
-                    int1 = r_A + (byte1 ^ 0xff) + flagC;
-                    if (((int1 ^ r_A) & (int1 ^ (byte1 ^ 0xff)) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-
-                case 0xFF://ISC
-                    ushort2 = (ushort)(Mem_r(r_PC++) | (Mem_r(r_PC++) << 8));
-                    ushort1 = (ushort)(ushort2 + r_X);
-                    Mem_r((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
-                    byte1 = Mem_r(ushort1);
-
-                    Mem_w(ushort1, byte1);//dummy write fixed
-
-                    Mem_w(ushort1, ++byte1);
-                    int1 = r_A + (byte1 ^ 0xff) + flagC;
-                    if (((int1 ^ r_A) & (int1 ^ (byte1 ^ 0xff)) & 0x80) != 0) flagV = 1; else flagV = 0;
-                    if ((int1 & 0xff) == 0) flagZ = 1; else flagZ = 0;
-                    if ((int1) >> 8 != 0) flagC = 1; else flagC = 0;
-                    if ((int1 & 0x80) != 0) flagN = 1; else flagN = 0;
-                    r_A = (byte)int1;
-                    break;
-                #endregion
-#endif
-                // KIL/STP/JAM — halt the CPU; only RESET can recover on real hardware.
-                // We busy-loop tick() until NMI fires (allows test ROMs to recover).
-                case 0x02: case 0x12: case 0x22: case 0x32:
-                case 0x42: case 0x52: case 0x62: case 0x72:
-                case 0x92: case 0xB2: case 0xD2: case 0xF2:
-                    r_PC = trace_pc; // stay on the KIL opcode (CPU jammed)
-                    for (int _kilGuard = 0; _kilGuard < 0x200000; _kilGuard++)
-                    {
-                        tick();
-                        if (nmi_pending || nmi_delay_cycle >= 0 || exit) break;
-                    }
-                    break;
-
-                default: ShowError("unkonw opcode ! - 0x" + opcode.ToString("X2") + " at PC=$" + trace_pc.ToString("X4")); break;
-            }
-
-            // Post-instruction trace for NMI handler debugging
-            if (nmi_trace_count > 0)
-            {
-                nmi_trace_count--;
-                if (opcode == 0x68) // PLA
-                    dbgWrite("  PLA -> A=$" + r_A.ToString("X2"));
-                else if (opcode == 0x85) // STA zp
-                    { byte trAddr = NES_MEM[(ushort)(trace_pc + 1)]; dbgWrite("  STA_ZP: addr=$" + trAddr.ToString("X2") + " val=$" + r_A.ToString("X2") + " verify=$" + NES_MEM[trAddr].ToString("X2")); }
-                else if (opcode == 0x86) // STX zp
-                    dbgWrite("  STX_ZP: addr=$" + NES_MEM[(ushort)(trace_pc + 1)].ToString("X2") + " val=$" + r_X.ToString("X2"));
-                else if (opcode == 0x40) // RTI
-                    dbgWrite("  RTI -> PC=$" + r_PC.ToString("X4") + " P=$" + (GetFlag() | 0x20).ToString("X2"));
-                else if (opcode == 0xa5) // LDA zp
-                    dbgWrite("  LDA_ZP: addr=$" + NES_MEM[(ushort)(trace_pc + 1)].ToString("X2") + " val=$" + r_A.ToString("X2"));
-            }
-
-            // IRQ polling moved to run loop (Main.cs) for correct NMI/IRQ priority
-
+                cpu_step_one_cycle();
+            } while (operationCycle != 0);
         }
     }
 }

@@ -1255,7 +1255,6 @@ namespace AprNes
         static void ppu_w_4014(byte value)//DMA , fixex 2017.01.16 pass sprite_ram test
         {
             // Set OAM DMA flags — deferred to next read cycle via ProcessPendingDma()
-            // For RMW instructions (e.g., INC $4014), second write overwrites page → only 1 DMA runs
             spriteDmaTransfer = true;
             spriteDmaOffset = value;
             dmaNeedHalt = true;

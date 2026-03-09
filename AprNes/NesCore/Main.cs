@@ -275,9 +275,8 @@ namespace AprNes
                 if (nmi_pending && !nmi_just_deferred)
                 {
                     nmi_pending = false;
-                    NMIInterrupt();
-                    // NMI arose during NMI sequence → defer 1 instruction
-                    if (nmi_pending) nmi_just_deferred = true;
+                    doNMI = true;
+                    irq_pending = false; // NMI handler sets I=1; IRQ re-polled after RTI
                 }
                 else if (nmi_just_deferred)
                 {
@@ -287,15 +286,13 @@ namespace AprNes
                 else if (irq_pending)
                 {
                     irq_pending = false;
-                    IRQInterrupt();
-                    // NMI arose during IRQ sequence → defer 1 instruction
-                    if (nmi_pending) nmi_just_deferred = true;
+                    doIRQ = true;
                 }
 
                 byte prevFlagI_run = flagI; // capture I flag before instruction for IRQ delay
                 cpu_step();
 
-                // BRK: NMI arising during BRK sequence → defer 1 instruction
+                // BRK/NMI/IRQ: NMI arising during sequence → defer 1 instruction
                 if (opcode == 0x00 && nmi_pending)
                     nmi_just_deferred = true;
 

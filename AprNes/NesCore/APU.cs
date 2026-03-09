@@ -629,14 +629,12 @@ namespace AprNes
             {
                 if (dmaNeedHalt)
                 {
-                    // Not started yet → cancel completely
                     dmcDmaRunning = false;
                     dmcNeedDummyRead = false;
                     dmaNeedHalt = false;
                 }
                 else
                 {
-                    // Already running → abort at next opportunity
                     dmcAbortDma = true;
                 }
             }
