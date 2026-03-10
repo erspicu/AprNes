@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TriCNES Test Report</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f172a;--surface:#1e293b;--surface2:#283548;--border:#334155;
+  --text:#e2e8f0;--text-dim:#94a3b8;
+  --pass:#22c55e;--pass-bg:rgba(34,197,94,.15);
+  --fail:#ef4444;--fail-bg:rgba(239,68,68,.15);
+  --accent:#3b82f6;
+}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;line-height:1.5;padding:1.5rem;min-height:100vh}
+a{color:var(--accent);text-decoration:none}
+
+.header{text-align:center;margin-bottom:2rem}
+.header h1{font-size:1.8rem;margin-bottom:.25rem;letter-spacing:-.02em}
+.header .date{color:var(--text-dim);font-size:.85rem}
+.stats{display:flex;justify-content:center;gap:2.5rem;margin:1.5rem 0;flex-wrap:wrap}
+.stat{text-align:center}
+.stat .num{font-size:2.2rem;font-weight:700}
+.stat .lbl{font-size:.75rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em}
+.stat.pass .num{color:var(--pass)}
+.stat.fail .num{color:var(--fail)}
+.progress-wrap{max-width:600px;margin:1rem auto}
+.progress-bar{width:100%;height:12px;background:var(--surface);border-radius:6px;overflow:hidden}
+.progress-bar .fill{height:100%;background:var(--pass);border-radius:6px;transition:width .3s}
+.progress-text{text-align:center;font-size:.85rem;color:var(--text-dim);margin-top:.4rem}
+
+.controls{display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap;margin:1.5rem 0;align-items:center}
+.btn-group{display:flex;border-radius:8px;overflow:hidden;border:1px solid var(--border)}
+.btn-group button{padding:.45rem .9rem;border:none;background:var(--surface);color:var(--text);cursor:pointer;font-size:.82rem;transition:background .15s}
+.btn-group button:hover{background:var(--surface2)}
+.btn-group button.active{background:var(--accent);color:#fff}
+select,input[type="text"]{padding:.45rem .9rem;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-size:.82rem;outline:none}
+select:focus,input[type="text"]:focus{border-color:var(--accent)}
+input[type="text"]{width:220px}
+input[type="text"]::placeholder{color:var(--text-dim)}
+
+.suite-section{margin-bottom:1.25rem}
+.suite-header{display:flex;align-items:center;gap:.75rem;padding:.65rem 1rem;background:var(--surface);border:1px solid var(--border);border-radius:8px;cursor:pointer;user-select:none;margin-bottom:.65rem;transition:background .15s}
+.suite-header:hover{background:var(--surface2)}
+.suite-header .arrow{transition:transform .2s;font-size:.75rem;color:var(--text-dim)}
+.suite-header .arrow.collapsed{transform:rotate(-90deg)}
+.suite-header .name{font-weight:600;flex:1}
+.suite-header .badge{font-size:.72rem;padding:.15rem .45rem;border-radius:4px;font-weight:600}
+.suite-header .badge.pass{background:var(--pass-bg);color:var(--pass)}
+.suite-header .badge.fail{background:var(--fail-bg);color:var(--fail)}
+.suite-header .count{color:var(--text-dim);font-size:.78rem}
+
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.85rem}
+.card-grid.hidden{display:none}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;transition:transform .12s,box-shadow .12s}
+.card:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,.35)}
+.card .thumb{width:100%;aspect-ratio:256/240;background:#000;cursor:pointer;display:block;position:relative;overflow:hidden}
+.card .thumb img{width:100%;height:100%;object-fit:contain;image-rendering:pixelated;display:block}
+.card .thumb .no-img{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-dim);font-size:.75rem}
+.card .info{padding:.65rem .75rem}
+.card .status-badge{display:inline-block;font-size:.7rem;font-weight:700;padding:.12rem .45rem;border-radius:4px;text-transform:uppercase;letter-spacing:.03em}
+.card .status-badge.pass{background:var(--pass-bg);color:var(--pass)}
+.card .status-badge.fail{background:var(--fail-bg);color:var(--fail)}
+.card .rom-name{font-weight:600;font-size:.85rem;margin-top:.35rem;word-break:break-word}
+.card .suite-name{font-size:.72rem;color:var(--text-dim);margin-top:.1rem}
+.card .expand-btn{font-size:.72rem;color:var(--accent);cursor:pointer;border:none;background:none;padding:.2rem 0;margin-top:.35rem}
+.card .expand-btn:hover{text-decoration:underline}
+.card .result-text{font-size:.68rem;font-family:Consolas,Monaco,'Courier New',monospace;color:var(--text-dim);white-space:pre-wrap;word-break:break-word;max-height:0;overflow:hidden;transition:max-height .25s ease}
+.card .result-text.expanded{max-height:300px;overflow-y:auto;margin-top:.35rem;padding:.4rem;background:var(--bg);border-radius:4px}
+
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:1000;justify-content:center;align-items:center;flex-direction:column;cursor:pointer}
+.modal-overlay.active{display:flex}
+.modal-overlay img{max-width:min(90vw,768px);max-height:85vh;image-rendering:pixelated;border:2px solid var(--border);border-radius:4px}
+.modal-overlay .modal-title{margin-top:1rem;background:var(--surface);padding:.4rem 1rem;border-radius:8px;font-size:.85rem;border:1px solid var(--border)}
+
+.empty-msg{text-align:center;color:var(--text-dim);padding:3rem;font-size:.95rem}
+.footer{text-align:center;color:var(--text-dim);font-size:.75rem;margin-top:2rem;padding-top:1rem;border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>TriCNES Test Report</h1>
+  <div class="date" id="build-date"></div>
+</div>
+<div class="stats">
+  <div class="stat pass"><div class="num" id="pass-num">0</div><div class="lbl">Passed</div></div>
+  <div class="stat fail"><div class="num" id="fail-num">0</div><div class="lbl">Failed</div></div>
+  <div class="stat"><div class="num" id="total-num">0</div><div class="lbl">Total</div></div>
+</div>
+<div class="progress-wrap">
+  <div class="progress-bar"><div class="fill" id="progress-fill"></div></div>
+  <div class="progress-text" id="progress-text"></div>
+</div>
+<div class="controls">
+  <div class="btn-group">
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="pass">Pass</button>
+    <button class="filter-btn" data-filter="fail">Fail</button>
+  </div>
+  <select id="suite-select"><option value="all">All Suites</option></select>
+  <input type="text" id="search" placeholder="Search ROM name...">
+</div>
+<div id="content"></div>
+<div class="modal-overlay" id="modal">
+  <img id="modal-img" src="" alt="">
+  <div class="modal-title" id="modal-title"></div>
+</div>
+<div class="footer">Generated by TriCNES Test Runner</div>
+<script>
+var BUILD_DATE='2026-03-10 22:24:11';
+var RESULTS=
+[
+  {"suite": "apu_mixer", "rom": "dmc.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | dmc.nes | dmc channel mixing test  1. Should play short tone.  2. Should be nearly silent.  3. Should play short tone.  Some clicking might occur between the two tones.Also, a faint tone might be audible through headphones.", "screenshot": "screenshots-TriCNES/apu_mixer/dmc.webp"},
+  {"suite": "apu_mixer", "rom": "noise.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | noise.nes | noise channel mixing test  1. Should play short tone.  2. Should fade noise in, and out, without any tone.  3. Should play short tone.  Some clicking might occur between the two tones.Also, a faint tone might be audible through headphones.", "screenshot": "screenshots-TriCNES/apu_mixer/noise.webp"},
+  {"suite": "apu_mixer", "rom": "square.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | square.nes | square channel mixing test  1. Should play short tone.  2. Should be nearly silent.  3. Should play short tone.  Some clicking might occur between the two tones.Also, a faint tone might be audible through headphones.", "screenshot": "screenshots-TriCNES/apu_mixer/square.webp"},
+  {"suite": "apu_mixer", "rom": "triangle.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | triangle.nes | triangle channel mixing test  1. Should play short tone.  2. Should be nearly silent.  3. Should play short tone.  Some clicking might occur between the two tones.Also, a faint tone might be audible through headphones.", "screenshot": "screenshots-TriCNES/apu_mixer/triangle.webp"},
+  {"suite": "apu_reset", "rom": "4015_cleared.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 4015_cleared.nes | 4015_cleared  Passed", "screenshot": "screenshots-TriCNES/apu_reset/4015_cleared.webp"},
+  {"suite": "apu_reset", "rom": "4017_timing.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 4017_timing.nes | Delay after effective $4017 write: 10  4017_timing  Passed", "screenshot": "screenshots-TriCNES/apu_reset/4017_timing.webp"},
+  {"suite": "apu_reset", "rom": "4017_written.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 4017_written.nes | 4017_written  Passed", "screenshot": "screenshots-TriCNES/apu_reset/4017_written.webp"},
+  {"suite": "apu_reset", "rom": "irq_flag_cleared.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | irq_flag_cleared.nes | irq_flag_cleared  Passed", "screenshot": "screenshots-TriCNES/apu_reset/irq_flag_cleared.webp"},
+  {"suite": "apu_reset", "rom": "len_ctrs_enabled.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | len_ctrs_enabled.nes | len_ctrs_enabled  Passed", "screenshot": "screenshots-TriCNES/apu_reset/len_ctrs_enabled.webp"},
+  {"suite": "apu_reset", "rom": "works_immediately.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | works_immediately.nes | works_immediately  Passed", "screenshot": "screenshots-TriCNES/apu_reset/works_immediately.webp"},
+  {"suite": "apu_test", "rom": "apu_test.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 8\r\nCHR-ROM count : 0\r\nPASS | apu_test.nes | 8-dmc_rates  Passed All 8 tests passed", "screenshot": "screenshots-TriCNES/apu_test/apu_test.webp"},
+  {"suite": "apu_test/rom_singles", "rom": "1-len_ctr.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 1-len_ctr.nes | 1-len_ctr  Passed", "screenshot": "screenshots-TriCNES/apu_test/rom_singles/1-len_ctr.webp"},
+  {"suite": "apu_test/rom_singles", "rom": "2-len_table.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 2-len_table.nes | 2-len_table  Passed", "screenshot": "screenshots-TriCNES/apu_test/rom_singles/2-len_table.webp"},
+  {"suite": "apu_test/rom_singles", "rom": "3-irq_flag.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 3-irq_flag.nes | 3-irq_flag  Passed", "screenshot": "screenshots-TriCNES/apu_test/rom_singles/3-irq_flag.webp"},
+  {"suite": "apu_test/rom_singles", "rom": "4-jitter.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 4-jitter.nes | 4-jitter  Passed", "screenshot": "screenshots-TriCNES/apu_test/rom_singles/4-jitter.webp"},
+  {"suite": "apu_test/rom_singles", "rom": "5-len_timing.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 5-len_timing.nes | 5-len_timing  Passed", "screenshot": "screenshots-TriCNES/apu_test/rom_singles/5-len_timing.webp"},
+  {"suite": "apu_test/rom_singles", "rom": "6-irq_flag_timing.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 6-irq_flag_timing.nes | 6-irq_flag_timing  Passed", "screenshot": "screenshots-TriCNES/apu_test/rom_singles/6-irq_flag_timing.webp"},
+  {"suite": "apu_test/rom_singles", "rom": "7-dmc_basics.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 7-dmc_basics.nes | 7-dmc_basics  Passed", "screenshot": "screenshots-TriCNES/apu_test/rom_singles/7-dmc_basics.webp"},
+  {"suite": "apu_test/rom_singles", "rom": "8-dmc_rates.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 8-dmc_rates.nes | 8-dmc_rates  Passed", "screenshot": "screenshots-TriCNES/apu_test/rom_singles/8-dmc_rates.webp"},
+  {"suite": "blargg_apu_2005.07.30", "rom": "01.len_ctr.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 01.len_ctr.nes | (screen: $01 = passed)", "screenshot": "screenshots-TriCNES/blargg_apu_2005.07.30/01.len_ctr.webp"},
+  {"suite": "blargg_apu_2005.07.30", "rom": "02.len_table.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 02.len_table.nes | (screen: $01 = passed)", "screenshot": "screenshots-TriCNES/blargg_apu_2005.07.30/02.len_table.webp"},
+  {"suite": "blargg_apu_2005.07.30", "rom": "03.irq_flag.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 03.irq_flag.nes | (screen: $01 = passed)", "screenshot": "screenshots-TriCNES/blargg_apu_2005.07.30/03.irq_flag.webp"},
+  {"suite": "blargg_apu_2005.07.30", "rom": "04.clock_jitter.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 04.clock_jitter.nes | (screen: $01 = passed)", "screenshot": "screenshots-TriCNES/blargg_apu_2005.07.30/04.clock_jitter.webp"},
+  {"suite": "blargg_apu_2005.07.30", "rom": "05.len_timing_mode0.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 05.len_timing_mode0.nes | (screen: $01 = passed)", "screenshot": "screenshots-TriCNES/blargg_apu_2005.07.30/05.len_timing_mode0.webp"},
+  {"suite": "blargg_apu_2005.07.30", "rom": "06.len_timing_mode1.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 06.len_timing_mode1.nes | (screen: $01 = passed)", "screenshot": "screenshots-TriCNES/blargg_apu_2005.07.30/06.len_timing_mode1.webp"},
+  {"suite": "blargg_apu_2005.07.30", "rom": "07.irq_flag_timing.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 07.irq_flag_timing.nes | (screen: $01 = passed)", "screenshot": "screenshots-TriCNES/blargg_apu_2005.07.30/07.irq_flag_timing.webp"},
+  {"suite": "blargg_apu_2005.07.30", "rom": "08.irq_timing.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 08.irq_timing.nes | (screen: $01 = passed)", "screenshot": "screenshots-TriCNES/blargg_apu_2005.07.30/08.irq_timing.webp"},
+  {"suite": "blargg_apu_2005.07.30", "rom": "09.reset_timing.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 09.reset_timing.nes | (screen: $01 = passed)", "screenshot": "screenshots-TriCNES/blargg_apu_2005.07.30/09.reset_timing.webp"},
+  {"suite": "blargg_apu_2005.07.30", "rom": "10.len_halt_timing.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 10.len_halt_timing.nes | (screen: $01 = passed)", "screenshot": "screenshots-TriCNES/blargg_apu_2005.07.30/10.len_halt_timing.webp"},
+  {"suite": "blargg_apu_2005.07.30", "rom": "11.len_reload_timing.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 11.len_reload_timing.nes | (screen: $01 = passed)", "screenshot": "screenshots-TriCNES/blargg_apu_2005.07.30/11.len_reload_timing.webp"},
+  {"suite": "blargg_nes_cpu_test5", "rom": "cpu.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 16\r\nCHR-ROM count : 1\r\nPASS | cpu.nes | (screen: All tests complete = passed)", "screenshot": "screenshots-TriCNES/blargg_nes_cpu_test5/cpu.webp"},
+  {"suite": "blargg_nes_cpu_test5", "rom": "official.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 16\r\nCHR-ROM count : 1\r\nPASS | official.nes | (screen: All tests complete = passed)", "screenshot": "screenshots-TriCNES/blargg_nes_cpu_test5/official.webp"},
+  {"suite": "blargg_ppu_tests_2005.09.15b", "rom": "palette_ram.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | palette_ram.nes | (screen: $01 = passed)", "screenshot": "screenshots-TriCNES/blargg_ppu_tests_2005.09.15b/palette_ram.webp"},
+  {"suite": "blargg_ppu_tests_2005.09.15b", "rom": "power_up_palette.nes", "status": "fail", "exit_code": 1, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nFAIL(1) | power_up_palette.nes | (screen: $02 = failed)", "screenshot": "screenshots-TriCNES/blargg_ppu_tests_2005.09.15b/power_up_palette.webp"},
+  {"suite": "blargg_ppu_tests_2005.09.15b", "rom": "sprite_ram.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | sprite_ram.nes | (screen: $01 = passed)", "screenshot": "screenshots-TriCNES/blargg_ppu_tests_2005.09.15b/sprite_ram.webp"},
+  {"suite": "blargg_ppu_tests_2005.09.15b", "rom": "vbl_clear_time.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | vbl_clear_time.nes | (screen: $01 = passed)", "screenshot": "screenshots-TriCNES/blargg_ppu_tests_2005.09.15b/vbl_clear_time.webp"},
+  {"suite": "blargg_ppu_tests_2005.09.15b", "rom": "vram_access.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | vram_access.nes | (screen: $01 = passed)", "screenshot": "screenshots-TriCNES/blargg_ppu_tests_2005.09.15b/vram_access.webp"},
+  {"suite": "branch_timing_tests", "rom": "1.Branch_Basics.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 1.Branch_Basics.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/branch_timing_tests/1.Branch_Basics.webp"},
+  {"suite": "branch_timing_tests", "rom": "2.Backward_Branch.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 2.Backward_Branch.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/branch_timing_tests/2.Backward_Branch.webp"},
+  {"suite": "branch_timing_tests", "rom": "3.Forward_Branch.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 3.Forward_Branch.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/branch_timing_tests/3.Forward_Branch.webp"},
+  {"suite": "cpu_dummy_reads", "rom": "cpu_dummy_reads.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | cpu_dummy_reads.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/cpu_dummy_reads/cpu_dummy_reads.webp"},
+  {"suite": "cpu_dummy_writes", "rom": "cpu_dummy_writes_oam.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | cpu_dummy_writes_oam.nes | \u001b[0;37mTEST: cpu_dummy_writes_oam \u001b[0;33mThis program verifies that the CPU does 2x writes properly. Any read-modify-write opcode should first write the origi- nal value; then the calculated value exactly 1 cycle later.  Requirement: OAM memory reads MUST be reliable. This is often the case on emulators, but NOT on the real NES. Nevertheless, this test can be used to see if the CPU in the emulator is built properly.  \u001b[0;37m\u001b[0;37mTesting OAM.  The screen will go blank for a moment now. \u001b[0;37mOK; \u001b[0;37mVerifying opcodes... \u001b[1;34m0E\u001b[1;34m2E\u001b[1;34m4E\u001b[1;34m6E\u001b[1;34mCE\u001b[1;34mEE \u001b[1;34m1E\u001b[1;34m3E\u001b[1;34m5E\u001b[1;34m7E\u001b[1;34mDE\u001b[1;34mFE  \u001b[1;34m0F\u001b[1;34m2F\u001b[1;34m4F\u001b[1;34m6F\u001b[1;34mCF\u001b[1;34mEF \u001b[1;34m1F\u001b[1;34m3F\u001b[1;34m5F\u001b[1;34m7F\u001b[1;34mDF\u001b[1;34mFF  \u001b[1;34m03\u001b[1;34m23\u001b[1;34m43\u001b[1;34m63\u001b[1;34mC3\u001b[1;34mE3 \u001b[1;34m13\u001b[1;34m33\u001b[1;34m53\u001b[1;34m73\u001b[1;34mD3\u001b[1;34mF3  \u001b[1;34m1B\u001b[1;34m3B\u001b[1;34m5B\u001b[1;34m7B\u001b[1;34mDB\u001b[1;34mFB               \u001b[0;37m Passed", "screenshot": "screenshots-TriCNES/cpu_dummy_writes/cpu_dummy_writes_oam.webp"},
+  {"suite": "cpu_dummy_writes", "rom": "cpu_dummy_writes_ppumem.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | cpu_dummy_writes_ppumem.nes | \u001b[0;37mTEST: cpu_dummy_writes_ppumem \u001b[0;33mThis program verifies that the CPU does 2x writes properly. Any read-modify-write opcode should first write the origi- nal value; then the calculated value exactly 1 cycle later.  \u001b[0;37mVerifying open bus behavior. \u001b[0;33m      W- W- WR W- W- W- W- WR 2000+ 0  1  2  3  4  5  6  7  \u001b[0;33m  R0:\u001b[1;34m 0\u001b[1;34m- 0\u001b[1;34m- 0\u001b[1;34m0\u001b[1;34m 0\u001b[1;34m- 0\u001b[1;34m- 0\u001b[1;34m- 0\u001b[1;34m- 0\u001b[1;34m0\u001b[1;34m \u001b[0;33m  R1:\u001b[1;34m 0\u001b[1;34m- 0\u001b[1;34m- 0\u001b[1;34m0\u001b[1;34m 0\u001b[1;34m- 0\u001b[1;34m- 0\u001b[1;34m- 0\u001b[1;34m- 0\u001b[1;34m0\u001b[1;34m \u001b[0;33m  R3:\u001b[1;34m 0\u001b[1;34m- 0\u001b[1;34m- 0\u001b[1;34m0\u001b[1;34m 0\u001b[1;34m- 0\u001b[1;34m- 0\u001b[1;34m- 0\u001b[1;34m- 0\u001b[1;34m0\u001b[1;34m \u001b[0;33m  R5:\u001b[1;34m 0\u001b[1;34m- 0\u001b[1;34m- 0\u001b[1;34m0\u001b[1;34m 0\u001b[1;34m- 0\u001b[1;34m- 0\u001b[1;34m- 0\u001b[1;34m- 0\u001b[1;34m0\u001b[1;34m \u001b[0;33m  R6:\u001b[1;34m 0\u001b[1;34m- 0\u001b[1;34m- 0\u001b[1;34m0\u001b[1;34m 0\u001b[1;34m- 0\u001b[1;34m- 0\u001b[1;34m- 0\u001b[1;34m- 0\u001b[1;34m0\u001b[1;34m \u001b[0;37mOK; \u001b[0;37mVerifying opcodes... \u001b[1;34m0E\u001b[1;34m2E\u001b[1;34m4E\u001b[1;34m6E\u001b[1;34mCE\u001b[1;34mEE \u001b[1;34m1E\u001b[1;34m3E\u001b[1;34m5E\u001b[1;34m7E\u001b[1;34mDE\u001b[1;34mFE  \u001b[1;34m0F\u001b[1;34m2F\u001b[1;34m4F\u001b[1;34m6F\u001b[1;34mCF\u001b[1;34mEF \u001b[1;34m1F\u001b[1;34m3F\u001b[1;34m5F\u001b[1;34m7F\u001b[1;34mDF\u001b[1;34mFF  \u001b[1;34m03\u001b[1;34m23\u001b[1;34m43\u001b[1;34m63\u001b[1;34mC3\u001b[1;34mE3 \u001b[1;34m13\u001b[1;34m33\u001b[1;34m53\u001b[1;34m73\u001b[1;34mD3\u001b[1;34mF3  \u001b[1;34m1B\u001b[1;34m3B\u001b[1;34m5B\u001b[1;34m7B\u001b[1;34mDB\u001b[1;34mFB               \u001b[0;37m Passed", "screenshot": "screenshots-TriCNES/cpu_dummy_writes/cpu_dummy_writes_ppumem.webp"},
+  {"suite": "cpu_exec_space", "rom": "test_cpu_exec_space_ppuio.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | test_cpu_exec_space_ppuio.nes | \u001b[0;37mTEST:test_cpu_exec_space_ppuio \u001b[0;33mThis program verifies that the CPU can execute code from any possible location that it can address, including I/O space.  In addition, it will be tested that an RTS instruction does a dummy read of the byte that immediately follows the instructions.  \u001b[0;37m\u001b[1;34mJSR+RTS TEST OK JMP+RTS TEST OK RTS+RTS TEST OK JMP+RTI TEST OK JMP+BRK TEST OK \u001b[0;37m Passed", "screenshot": "screenshots-TriCNES/cpu_exec_space/test_cpu_exec_space_ppuio.webp"},
+  {"suite": "cpu_exec_space", "rom": "test_cpu_exec_space_apu.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | test_cpu_exec_space_apu.nes | \u001b[0;37mTEST: test_cpu_exec_space_apu \u001b[0;33mThis program verifies that the CPU can execute code from any possible location that it can address, including I/O space.  In this test, it is also verified that not only all write-only APU I/O ports return the open bus, but also the unallocated I/O space in $4018..$40FF.  \u001b[0;37m\u001b[1;34m0022 \b\b\b\b\b4000 \b\b\b\b\b4001 \b\b\b\b\b4002 \b\b\b\b\b4003 \b\b\b\b\b4004 \b\b\b\b\b4005 \b\b\b\b\b4006 \b\b\b\b\b4007 \b\b\b\b\b4008 \b\b\b\b\b4009 \b\b\b\b\b400A \b\b\b\b\b400B \b\b\b\b\b400C \b\b\b\b\b400D \b\b\b\b\b400E \b\b\b\b\b400F \b\b\b\b\b4010 \b\b\b\b\b4011 \b\b\b\b\b4012 \b\b\b\b\b4013 \b\b\b\b\b4014 \b\b\b\b\b\b\b\b\b\b4016 \b\b\b\b\b4017 \b\b\b\b\b4018 \b\b\b\b\b4019 \b\b\b\b\b401A \b\b\b\b\b401B \b\b\b\b\b401C \b\b\b\b\b401D \b\b\b\b\b401E \b\b\b\b\b401F \b\b\b\b\b4020 \b\b\b\b\b4021 \b\b\b\b\b4022 \b\b\b\b\b4023 \b\b\b\b\b4024 \b\b\b\b\b4025 \b\b\b\b\b4026 \b\b\b\b\b4027 \b\b\b\b\b4028 \b\b\b\b\b4029 \b\b\b\b\b402A \b\b\b\b\b402B \b\b\b\b\b402C \b\b\b\b\b402D \b\b\b\b\b402E \b\b\b\b\b402F \b\b\b\b\b4030 \b\b\b\b\b4031 \b\b\b\b\b4032 \b\b\b\b\b4033 \b\b\b\b\b4034 \b\b\b\b\b4035 \b\b\b\b\b4036 \b\b\b\b\b4037 \b\b\b\b\b4038 \b\b\b\b\b4039 \b\b\b\b\b403A \b\b\b\b\b403B \b\b\b\b\b403C \b\b\b\b\b403D \b\b\b\b\b403E \b\b\b\b\b403F \b\b\b\b\b4040 \b\b\b\b\b4041 \b\b\b\b\b4042 \b\b\b\b\b4043 \b\b\b\b\b4044 \b\b\b\b\b4045 \b\b\b\b\b4046 \b\b\b\b\b4047 \b\b\b\b\b4048 \b\b\b\b\b4049 \b\b\b\b\b404A \b\b\b\b\b404B \b\b\b\b\b404C \b\b\b\b\b404D \b\b\b\b\b404E \b\b\b\b\b404F \b\b\b\b\b4050 \b\b\b\b\b4051 \b\b\b\b\b4052 \b\b\b\b\b4053 \b\b\b\b\b4054 \b\b\b\b\b4055 \b\b\b\b\b4056 \b\b\b\b\b4057 \b\b\b\b\b4058 \b\b\b\b\b4059 \b\b\b\b\b405A \b\b\b\b\b405B \b\b\b\b\b405C \b\b\b\b\b405D \b\b\b\b\b405E \b\b\b\b\b405F \b\b\b\b\b4060 \b\b\b\b\b4061 \b\b\b\b\b4062 \b\b\b\b\b4063 \b\b\b\b\b4064 \b\b\b\b\b4065 \b\b\b\b\b4066 \b\b\b\b\b4067 \b\b\b\b\b4068 \b\b\b\b\b4069 \b\b\b\b\b406A \b\b\b\b\b406B \b\b\b\b\b406C \b\b\b\b\b406D \b\b\b\b\b406E \b\b\b\b\b406F \b\b\b\b\b4070 \b\b\b\b\b4071 \b\b\b\b\b4072 \b\b\b\b\b4073 \b\b\b\b\b4074 \b\b\b\b\b4075 \b\b\b\b\b4076 \b\b\b\b\b4077 \b\b\b\b\b4078 \b\b\b\b\b4079 \b\b\b\b\b407A \b\b\b\b\b407B \b\b\b\b\b407C \b\b\b\b\b407D \b\b\b\b\b407E \b\b\b\b\b407F \b\b\b\b\b4080 \b\b\b\b\b4081 \b\b\b\b\b4082 \b\b\b\b\b4083 \b\b\b\b\b4084 \b\b\b\b\b4085 \b\b\b\b\b4086 \b\b\b\b\b4087 \b\b\b\b\b4088 \b\b\b\b\b4089 \b\b\b\b\b408A \b\b\b\b\b408B \b\b\b\b\b408C \b\b\b\b\b408D \b\b\b\b\b408E \b\b\b\b\b408F \b\b\b\b\b4090 \b\b\b\b\b4091 \b\b\b\b\b4092 \b\b\b\b\b4093 \b\b\b\b\b4094 \b\b\b\b\b4095 \b\b\b\b\b4096 \b\b\b\b\b4097 \b\b\b\b\b4098 \b\b\b\b\b4099 \b\b\b\b\b409A \b\b\b\b\b409B \b\b\b\b\b409C \b\b\b\b\b409D \b\b\b\b\b409E \b\b\b\b\b409F \b\b\b\b\b40A0 \b\b\b\b\b40A1 \b\b\b\b\b40A2 \b\b\b\b\b40A3 \b\b\b\b\b40A4 \b\b\b\b\b40A5 \b\b\b\b\b40A6 \b\b\b\b\b40A7 \b\b\b\b\b40A8 \b\b\b\b\b40A9 \b\b\b\b\b40AA \b\b\b", "screenshot": "screenshots-TriCNES/cpu_exec_space/test_cpu_exec_space_apu.webp"},
+  {"suite": "cpu_interrupts_v2", "rom": "cpu_interrupts.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 5\r\nCHR-ROM count : 0\r\nPASS | cpu_interrupts.nes | test_jmp T+ CK PC 00 02 04  01 01 04  02 03 07  03 02 07  04 01 07  05 02 08  06 01 08  07 03 08  08 02 08  09 01 08   test_branch_not_taken T+ CK PC 00 02 04  01 01 04  02 02 06  03 01 06  04 02 07  05 01 07  06 04 0A  07 03 0A  08 02 0A  09 01 0A   test_branch_taken_pagecross T+ CK PC 00 02 0D  01 01 0D  02 04 00  03 03 00  04 02 00  05 01 00  06 04 03  07 03 03  08 02 03  09 01 03   test_branch_taken T+ CK PC 00 02 04  01 01 04  02 03 07  03 02 07  04 05 0A  05 04 0A  06 03 0A  07 02 0A  08 01 0A  09 03 0A    5-branch_delays_irq  Passed All 5 tests passed", "screenshot": "screenshots-TriCNES/cpu_interrupts_v2/cpu_interrupts.webp"},
+  {"suite": "cpu_interrupts_v2/rom_singles", "rom": "1-cli_latency.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 1-cli_latency.nes | 1-cli_latency  Passed", "screenshot": "screenshots-TriCNES/cpu_interrupts_v2/rom_singles/1-cli_latency.webp"},
+  {"suite": "cpu_interrupts_v2/rom_singles", "rom": "2-nmi_and_brk.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 2-nmi_and_brk.nes | NMI BRK 00 27  36  00  26  36  00  26  36  00  36  00  00  36  00  00  36  00  00  36  00  00  36  00  00  27  36  00  27  36  00   2-nmi_and_brk  Passed", "screenshot": "screenshots-TriCNES/cpu_interrupts_v2/rom_singles/2-nmi_and_brk.webp"},
+  {"suite": "cpu_interrupts_v2/rom_singles", "rom": "3-nmi_and_irq.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 3-nmi_and_irq.nes | NMI BRK 23  00  21  00  21  00  20  00  20  00  20  00  20  00  20  00  20  00  20  00  25  20  25  20   3-nmi_and_irq  Passed", "screenshot": "screenshots-TriCNES/cpu_interrupts_v2/rom_singles/3-nmi_and_irq.webp"},
+  {"suite": "cpu_interrupts_v2/rom_singles", "rom": "4-irq_and_dma.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 4-irq_and_dma.nes | 0 +0 1 +1 1 +2 2 +3 2 +4 4 +5 4 +6 7 +7 7 +8 7 +9 7 +10 8 +11 8 +12 8 +13 ... 8 +524 8 +525 8 +526 9 +527  4-irq_and_dma  Passed", "screenshot": "screenshots-TriCNES/cpu_interrupts_v2/rom_singles/4-irq_and_dma.webp"},
+  {"suite": "cpu_interrupts_v2/rom_singles", "rom": "5-branch_delays_irq.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 5-branch_delays_irq.nes | test_jmp T+ CK PC 00 02 04  01 01 04  02 03 07  03 02 07  04 01 07  05 02 08  06 01 08  07 03 08  08 02 08  09 01 08   test_branch_not_taken T+ CK PC 00 02 04  01 01 04  02 02 06  03 01 06  04 02 07  05 01 07  06 04 0A  07 03 0A  08 02 0A  09 01 0A   test_branch_taken_pagecross T+ CK PC 00 02 0D  01 01 0D  02 04 00  03 03 00  04 02 00  05 01 00  06 04 03  07 03 03  08 02 03  09 01 03   test_branch_taken T+ CK PC 00 02 04  01 01 04  02 03 07  03 02 07  04 05 0A  05 04 0A  06 03 0A  07 02 0A  08 01 0A  09 03 0A    5-branch_delays_irq  Passed", "screenshot": "screenshots-TriCNES/cpu_interrupts_v2/rom_singles/5-branch_delays_irq.webp"},
+  {"suite": "cpu_reset", "rom": "registers.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | registers.nes | A  X  Y  P  S 34 56 78 FF 0F   registers  Passed", "screenshot": "screenshots-TriCNES/cpu_reset/registers.webp"},
+  {"suite": "cpu_reset", "rom": "ram_after_reset.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | ram_after_reset.nes | ram_after_reset  Passed", "screenshot": "screenshots-TriCNES/cpu_reset/ram_after_reset.webp"},
+  {"suite": "cpu_timing_test6", "rom": "cpu_timing_test.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | cpu_timing_test.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/cpu_timing_test6/cpu_timing_test.webp"},
+  {"suite": "dmc_dma_during_read4", "rom": "dma_2007_read.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 0\r\nPASS | dma_2007_read.nes | (screen CRC: 159A7A8F)", "screenshot": "screenshots-TriCNES/dmc_dma_during_read4/dma_2007_read.webp"},
+  {"suite": "dmc_dma_during_read4", "rom": "dma_2007_write.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 0\r\nPASS | dma_2007_write.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/dmc_dma_during_read4/dma_2007_write.webp"},
+  {"suite": "dmc_dma_during_read4", "rom": "dma_4016_read.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 0\r\nPASS | dma_4016_read.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/dmc_dma_during_read4/dma_4016_read.webp"},
+  {"suite": "dmc_dma_during_read4", "rom": "double_2007_read.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 0\r\nPASS | double_2007_read.nes | (screen CRC: F018C287)", "screenshot": "screenshots-TriCNES/dmc_dma_during_read4/double_2007_read.webp"},
+  {"suite": "dmc_dma_during_read4", "rom": "read_write_2007.nes", "status": "fail", "exit_code": 1, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 0\r\nFAIL(1) | read_write_2007.nes | (screen: Failed)", "screenshot": "screenshots-TriCNES/dmc_dma_during_read4/read_write_2007.webp"},
+  {"suite": "instr_misc", "rom": "instr_misc.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 4\r\nCHR-ROM count : 0\r\nPASS | instr_misc.nes | 04-dummy_reads_apu  Passed All 4 tests passed", "screenshot": "screenshots-TriCNES/instr_misc/instr_misc.webp"},
+  {"suite": "instr_misc/rom_singles", "rom": "01-abs_x_wrap.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 01-abs_x_wrap.nes | 01-abs_x_wrap  Passed", "screenshot": "screenshots-TriCNES/instr_misc/rom_singles/01-abs_x_wrap.webp"},
+  {"suite": "instr_misc/rom_singles", "rom": "02-branch_wrap.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 02-branch_wrap.nes | 02-branch_wrap  Passed", "screenshot": "screenshots-TriCNES/instr_misc/rom_singles/02-branch_wrap.webp"},
+  {"suite": "instr_misc/rom_singles", "rom": "03-dummy_reads.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 03-dummy_reads.nes | 03-dummy_reads  Passed", "screenshot": "screenshots-TriCNES/instr_misc/rom_singles/03-dummy_reads.webp"},
+  {"suite": "instr_misc/rom_singles", "rom": "04-dummy_reads_apu.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 04-dummy_reads_apu.nes | 04-dummy_reads_apu  Passed", "screenshot": "screenshots-TriCNES/instr_misc/rom_singles/04-dummy_reads_apu.webp"},
+  {"suite": "instr_test-v3", "rom": "all_instrs.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 16\r\nCHR-ROM count : 0\r\nPASS | all_instrs.nes | All 15 tests passed", "screenshot": "screenshots-TriCNES/instr_test-v3/all_instrs.webp"},
+  {"suite": "instr_test-v3", "rom": "official_only.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 16\r\nCHR-ROM count : 0\r\nPASS | official_only.nes | All 15 tests passed", "screenshot": "screenshots-TriCNES/instr_test-v3/official_only.webp"},
+  {"suite": "instr_test-v3/rom_singles", "rom": "01-implied.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 01-implied.nes | 01-implied  Passed", "screenshot": "screenshots-TriCNES/instr_test-v3/rom_singles/01-implied.webp"},
+  {"suite": "instr_test-v3/rom_singles", "rom": "02-immediate.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 02-immediate.nes | 02-immediate  Passed", "screenshot": "screenshots-TriCNES/instr_test-v3/rom_singles/02-immediate.webp"},
+  {"suite": "instr_test-v3/rom_singles", "rom": "03-zero_page.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 03-zero_page.nes | 03-zero_page  Passed", "screenshot": "screenshots-TriCNES/instr_test-v3/rom_singles/03-zero_page.webp"},
+  {"suite": "instr_test-v3/rom_singles", "rom": "04-zp_xy.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 04-zp_xy.nes | 04-zp_xy  Passed", "screenshot": "screenshots-TriCNES/instr_test-v3/rom_singles/04-zp_xy.webp"},
+  {"suite": "instr_test-v3/rom_singles", "rom": "05-absolute.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 05-absolute.nes | 05-absolute  Passed", "screenshot": "screenshots-TriCNES/instr_test-v3/rom_singles/05-absolute.webp"},
+  {"suite": "instr_test-v3/rom_singles", "rom": "06-abs_xy.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 06-abs_xy.nes | 06-abs_xy  Passed", "screenshot": "screenshots-TriCNES/instr_test-v3/rom_singles/06-abs_xy.webp"},
+  {"suite": "instr_test-v3/rom_singles", "rom": "07-ind_x.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 07-ind_x.nes | 07-ind_x  Passed", "screenshot": "screenshots-TriCNES/instr_test-v3/rom_singles/07-ind_x.webp"},
+  {"suite": "instr_test-v3/rom_singles", "rom": "08-ind_y.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 08-ind_y.nes | 08-ind_y  Passed", "screenshot": "screenshots-TriCNES/instr_test-v3/rom_singles/08-ind_y.webp"},
+  {"suite": "instr_test-v3/rom_singles", "rom": "09-branches.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 09-branches.nes | 09-branches  Passed", "screenshot": "screenshots-TriCNES/instr_test-v3/rom_singles/09-branches.webp"},
+  {"suite": "instr_test-v3/rom_singles", "rom": "10-stack.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 10-stack.nes | 10-stack  Passed", "screenshot": "screenshots-TriCNES/instr_test-v3/rom_singles/10-stack.webp"},
+  {"suite": "instr_test-v3/rom_singles", "rom": "11-jmp_jsr.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 11-jmp_jsr.nes | 11-jmp_jsr  Passed", "screenshot": "screenshots-TriCNES/instr_test-v3/rom_singles/11-jmp_jsr.webp"},
+  {"suite": "instr_test-v3/rom_singles", "rom": "12-rts.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 12-rts.nes | 12-rts  Passed", "screenshot": "screenshots-TriCNES/instr_test-v3/rom_singles/12-rts.webp"},
+  {"suite": "instr_test-v3/rom_singles", "rom": "13-rti.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 13-rti.nes | 13-rti  Passed", "screenshot": "screenshots-TriCNES/instr_test-v3/rom_singles/13-rti.webp"},
+  {"suite": "instr_test-v3/rom_singles", "rom": "14-brk.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 14-brk.nes | 14-brk  Passed", "screenshot": "screenshots-TriCNES/instr_test-v3/rom_singles/14-brk.webp"},
+  {"suite": "instr_test-v3/rom_singles", "rom": "15-special.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 15-special.nes | 15-special  Passed", "screenshot": "screenshots-TriCNES/instr_test-v3/rom_singles/15-special.webp"},
+  {"suite": "instr_test-v5", "rom": "all_instrs.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 16\r\nCHR-ROM count : 0\r\nPASS | all_instrs.nes | All 16 tests passed", "screenshot": "screenshots-TriCNES/instr_test-v5/all_instrs.webp"},
+  {"suite": "instr_test-v5", "rom": "official_only.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 16\r\nCHR-ROM count : 0\r\nPASS | official_only.nes | All 16 tests passed", "screenshot": "screenshots-TriCNES/instr_test-v5/official_only.webp"},
+  {"suite": "instr_test-v5/rom_singles", "rom": "01-basics.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 01-basics.nes | 01-basics  Passed", "screenshot": "screenshots-TriCNES/instr_test-v5/rom_singles/01-basics.webp"},
+  {"suite": "instr_test-v5/rom_singles", "rom": "02-implied.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 02-implied.nes | 02-implied  Passed", "screenshot": "screenshots-TriCNES/instr_test-v5/rom_singles/02-implied.webp"},
+  {"suite": "instr_test-v5/rom_singles", "rom": "03-immediate.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 03-immediate.nes | 03-immediate  Passed", "screenshot": "screenshots-TriCNES/instr_test-v5/rom_singles/03-immediate.webp"},
+  {"suite": "instr_test-v5/rom_singles", "rom": "04-zero_page.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 04-zero_page.nes | 04-zero_page  Passed", "screenshot": "screenshots-TriCNES/instr_test-v5/rom_singles/04-zero_page.webp"},
+  {"suite": "instr_test-v5/rom_singles", "rom": "05-zp_xy.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 05-zp_xy.nes | 05-zp_xy  Passed", "screenshot": "screenshots-TriCNES/instr_test-v5/rom_singles/05-zp_xy.webp"},
+  {"suite": "instr_test-v5/rom_singles", "rom": "06-absolute.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 06-absolute.nes | 06-absolute  Passed", "screenshot": "screenshots-TriCNES/instr_test-v5/rom_singles/06-absolute.webp"},
+  {"suite": "instr_test-v5/rom_singles", "rom": "07-abs_xy.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 07-abs_xy.nes | 07-abs_xy  Passed", "screenshot": "screenshots-TriCNES/instr_test-v5/rom_singles/07-abs_xy.webp"},
+  {"suite": "instr_test-v5/rom_singles", "rom": "08-ind_x.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 08-ind_x.nes | 08-ind_x  Passed", "screenshot": "screenshots-TriCNES/instr_test-v5/rom_singles/08-ind_x.webp"},
+  {"suite": "instr_test-v5/rom_singles", "rom": "09-ind_y.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 09-ind_y.nes | 09-ind_y  Passed", "screenshot": "screenshots-TriCNES/instr_test-v5/rom_singles/09-ind_y.webp"},
+  {"suite": "instr_test-v5/rom_singles", "rom": "10-branches.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 10-branches.nes | 10-branches  Passed", "screenshot": "screenshots-TriCNES/instr_test-v5/rom_singles/10-branches.webp"},
+  {"suite": "instr_test-v5/rom_singles", "rom": "11-stack.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 11-stack.nes | 11-stack  Passed", "screenshot": "screenshots-TriCNES/instr_test-v5/rom_singles/11-stack.webp"},
+  {"suite": "instr_test-v5/rom_singles", "rom": "12-jmp_jsr.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 12-jmp_jsr.nes | 12-jmp_jsr  Passed", "screenshot": "screenshots-TriCNES/instr_test-v5/rom_singles/12-jmp_jsr.webp"},
+  {"suite": "instr_test-v5/rom_singles", "rom": "13-rts.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 13-rts.nes | 13-rts  Passed", "screenshot": "screenshots-TriCNES/instr_test-v5/rom_singles/13-rts.webp"},
+  {"suite": "instr_test-v5/rom_singles", "rom": "14-rti.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 14-rti.nes | 14-rti  Passed", "screenshot": "screenshots-TriCNES/instr_test-v5/rom_singles/14-rti.webp"},
+  {"suite": "instr_test-v5/rom_singles", "rom": "15-brk.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 15-brk.nes | 15-brk  Passed", "screenshot": "screenshots-TriCNES/instr_test-v5/rom_singles/15-brk.webp"},
+  {"suite": "instr_test-v5/rom_singles", "rom": "16-special.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 16-special.nes | 16-special  Passed", "screenshot": "screenshots-TriCNES/instr_test-v5/rom_singles/16-special.webp"},
+  {"suite": "instr_timing", "rom": "instr_timing.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 0\r\nPASS | instr_timing.nes | Instruction timing test  Takes about 25 seconds. Doesn't time the 8 branches and 12 illegal instructions.  Official instructions...  NOPs and alternate SBC...  Unofficial instructions...  1-instr_timing  Passed", "screenshot": "screenshots-TriCNES/instr_timing/instr_timing.webp"},
+  {"suite": "instr_timing/rom_singles", "rom": "1-instr_timing.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 1-instr_timing.nes | Instruction timing test  Takes about 25 seconds. Doesn't time the 8 branches and 12 illegal instructions.  Official instructions...  NOPs and alternate SBC...  Unofficial instructions...  1-instr_timing  Passed", "screenshot": "screenshots-TriCNES/instr_timing/rom_singles/1-instr_timing.webp"},
+  {"suite": "instr_timing/rom_singles", "rom": "2-branch_timing.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 2-branch_timing.nes | 2-branch_timing  Passed", "screenshot": "screenshots-TriCNES/instr_timing/rom_singles/2-branch_timing.webp"},
+  {"suite": "mmc3_irq_tests", "rom": "1.Clocking.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 1.Clocking.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/mmc3_irq_tests/1.Clocking.webp"},
+  {"suite": "mmc3_irq_tests", "rom": "2.Details.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 2.Details.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/mmc3_irq_tests/2.Details.webp"},
+  {"suite": "mmc3_irq_tests", "rom": "3.A12_clocking.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 3.A12_clocking.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/mmc3_irq_tests/3.A12_clocking.webp"},
+  {"suite": "mmc3_irq_tests", "rom": "4.Scanline_timing.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 4.Scanline_timing.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/mmc3_irq_tests/4.Scanline_timing.webp"},
+  {"suite": "mmc3_irq_tests", "rom": "5.MMC3_rev_A.nes", "status": "fail", "exit_code": 1, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nFAIL(1) | 5.MMC3_rev_A.nes | (screen: Failed)", "screenshot": "screenshots-TriCNES/mmc3_irq_tests/5.MMC3_rev_A.webp"},
+  {"suite": "mmc3_irq_tests", "rom": "6.MMC3_rev_B.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 6.MMC3_rev_B.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/mmc3_irq_tests/6.MMC3_rev_B.webp"},
+  {"suite": "mmc3_test", "rom": "1-clocking.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 1-clocking.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/mmc3_test/1-clocking.webp"},
+  {"suite": "mmc3_test", "rom": "2-details.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 2-details.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/mmc3_test/2-details.webp"},
+  {"suite": "mmc3_test", "rom": "3-A12_clocking.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 3-A12_clocking.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/mmc3_test/3-A12_clocking.webp"},
+  {"suite": "mmc3_test", "rom": "4-scanline_timing.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 4-scanline_timing.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/mmc3_test/4-scanline_timing.webp"},
+  {"suite": "mmc3_test", "rom": "5-MMC3.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 5-MMC3.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/mmc3_test/5-MMC3.webp"},
+  {"suite": "mmc3_test", "rom": "6-MMC6.nes", "status": "fail", "exit_code": 1, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nFAIL(1) | 6-MMC6.nes | (screen: Failed)", "screenshot": "screenshots-TriCNES/mmc3_test/6-MMC6.webp"},
+  {"suite": "mmc3_test_2/rom_singles", "rom": "1-clocking.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 1-clocking.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/mmc3_test_2/rom_singles/1-clocking.webp"},
+  {"suite": "mmc3_test_2/rom_singles", "rom": "2-details.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 2-details.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/mmc3_test_2/rom_singles/2-details.webp"},
+  {"suite": "mmc3_test_2/rom_singles", "rom": "3-A12_clocking.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 3-A12_clocking.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/mmc3_test_2/rom_singles/3-A12_clocking.webp"},
+  {"suite": "mmc3_test_2/rom_singles", "rom": "4-scanline_timing.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 4-scanline_timing.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/mmc3_test_2/rom_singles/4-scanline_timing.webp"},
+  {"suite": "mmc3_test_2/rom_singles", "rom": "5-MMC3.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 5-MMC3.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/mmc3_test_2/rom_singles/5-MMC3.webp"},
+  {"suite": "mmc3_test_2/rom_singles", "rom": "6-MMC3_alt.nes", "status": "fail", "exit_code": 1, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nFAIL(1) | 6-MMC3_alt.nes | (screen: Failed)", "screenshot": "screenshots-TriCNES/mmc3_test_2/rom_singles/6-MMC3_alt.webp"},
+  {"suite": "nes_instr_test/rom_singles", "rom": "01-implied.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 01-implied.nes | 01-implied  Passed", "screenshot": "screenshots-TriCNES/nes_instr_test/rom_singles/01-implied.webp"},
+  {"suite": "nes_instr_test/rom_singles", "rom": "02-immediate.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 02-immediate.nes | 02-immediate  Passed", "screenshot": "screenshots-TriCNES/nes_instr_test/rom_singles/02-immediate.webp"},
+  {"suite": "nes_instr_test/rom_singles", "rom": "03-zero_page.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 03-zero_page.nes | 03-zero_page  Passed", "screenshot": "screenshots-TriCNES/nes_instr_test/rom_singles/03-zero_page.webp"},
+  {"suite": "nes_instr_test/rom_singles", "rom": "04-zp_xy.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 04-zp_xy.nes | 04-zp_xy  Passed", "screenshot": "screenshots-TriCNES/nes_instr_test/rom_singles/04-zp_xy.webp"},
+  {"suite": "nes_instr_test/rom_singles", "rom": "05-absolute.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 05-absolute.nes | 05-absolute  Passed", "screenshot": "screenshots-TriCNES/nes_instr_test/rom_singles/05-absolute.webp"},
+  {"suite": "nes_instr_test/rom_singles", "rom": "06-abs_xy.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 06-abs_xy.nes | 06-abs_xy  Passed", "screenshot": "screenshots-TriCNES/nes_instr_test/rom_singles/06-abs_xy.webp"},
+  {"suite": "nes_instr_test/rom_singles", "rom": "07-ind_x.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 07-ind_x.nes | 07-ind_x  Passed", "screenshot": "screenshots-TriCNES/nes_instr_test/rom_singles/07-ind_x.webp"},
+  {"suite": "nes_instr_test/rom_singles", "rom": "08-ind_y.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 08-ind_y.nes | 08-ind_y  Passed", "screenshot": "screenshots-TriCNES/nes_instr_test/rom_singles/08-ind_y.webp"},
+  {"suite": "nes_instr_test/rom_singles", "rom": "09-branches.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 09-branches.nes | 09-branches  Passed", "screenshot": "screenshots-TriCNES/nes_instr_test/rom_singles/09-branches.webp"},
+  {"suite": "nes_instr_test/rom_singles", "rom": "10-stack.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 10-stack.nes | 10-stack  Passed", "screenshot": "screenshots-TriCNES/nes_instr_test/rom_singles/10-stack.webp"},
+  {"suite": "nes_instr_test/rom_singles", "rom": "11-special.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 11-special.nes | 11-special  Passed", "screenshot": "screenshots-TriCNES/nes_instr_test/rom_singles/11-special.webp"},
+  {"suite": "oam_read", "rom": "oam_read.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | oam_read.nes | ---------------- ---------------- ---------------- ---------------- ---------------- ---------------- ---------------- ---------------- ---------------- ---------------- ---------------- ---------------- ---------------- ---------------- ---------------- ----------------  oam_read  Passed", "screenshot": "screenshots-TriCNES/oam_read/oam_read.webp"},
+  {"suite": "ppu_open_bus", "rom": "ppu_open_bus.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | ppu_open_bus.nes | ppu_open_bus  Passed", "screenshot": "screenshots-TriCNES/ppu_open_bus/ppu_open_bus.webp"},
+  {"suite": "ppu_read_buffer", "rom": "test_ppu_read_buffer.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 4\r\nPASS | test_ppu_read_buffer.nes | \u001b[0;37mTEST:test_ppu_read_buffer ----------------------------- Testing basic PPU memory I/O. \u001b[0;37mPerforming tests that combine sprite 0 hit flag, $4014 DMA and the RAM mirroring... \u001b[0;33mGraphical artifacts during this test are OK and expected.  \u001b[0;37m              Hi   No-Hi \u001b[0;37mDirect poke  \u001b[0;33m OK  \u001b[0;33m OK   \u001b[0;37mDMA with ROM  \u001b[0;33m OK  \u001b[0;33m OK   \u001b[0;37mDMA + PPU bus\u001b[0;33m OK  \u001b[0;33m OK   \u001b[0;37mDMA with RAM    \u001b[0;37m-----------------------------  This next test wil take a while.  In order to distract you with  entertainment, art is provided.  Contemplate on the art while  the test is in progress.    \u001b[0;37m Passed", "screenshot": "screenshots-TriCNES/ppu_read_buffer/test_ppu_read_buffer.webp"},
+  {"suite": "ppu_vbl_nmi", "rom": "ppu_vbl_nmi.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 16\r\nCHR-ROM count : 0\r\nPASS | ppu_vbl_nmi.nes | 08 08 09 07  10-even_odd_timing  Passed All 10 tests passed", "screenshot": "screenshots-TriCNES/ppu_vbl_nmi/ppu_vbl_nmi.webp"},
+  {"suite": "ppu_vbl_nmi/rom_singles", "rom": "01-vbl_basics.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 01-vbl_basics.nes | 01-vbl_basics  Passed", "screenshot": "screenshots-TriCNES/ppu_vbl_nmi/rom_singles/01-vbl_basics.webp"},
+  {"suite": "ppu_vbl_nmi/rom_singles", "rom": "02-vbl_set_time.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 02-vbl_set_time.nes | T+ 1 2 00 - V 01 - V 02 - V 03 - V 04 - - 05 V - 06 V - 07 V - 08 V -  02-vbl_set_time  Passed", "screenshot": "screenshots-TriCNES/ppu_vbl_nmi/rom_singles/02-vbl_set_time.webp"},
+  {"suite": "ppu_vbl_nmi/rom_singles", "rom": "03-vbl_clear_time.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 03-vbl_clear_time.nes | 00 V 01 V 02 V 03 V 04 V 05 V 06 - 07 - 08 -  03-vbl_clear_time  Passed", "screenshot": "screenshots-TriCNES/ppu_vbl_nmi/rom_singles/03-vbl_clear_time.webp"},
+  {"suite": "ppu_vbl_nmi/rom_singles", "rom": "04-nmi_control.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 04-nmi_control.nes | 04-nmi_control  Passed", "screenshot": "screenshots-TriCNES/ppu_vbl_nmi/rom_singles/04-nmi_control.webp"},
+  {"suite": "ppu_vbl_nmi/rom_singles", "rom": "05-nmi_timing.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 05-nmi_timing.nes | 00 4 01 4 02 4 03 3 04 3 05 3 06 3 07 3 08 3 09 2  05-nmi_timing  Passed", "screenshot": "screenshots-TriCNES/ppu_vbl_nmi/rom_singles/05-nmi_timing.webp"},
+  {"suite": "ppu_vbl_nmi/rom_singles", "rom": "06-suppression.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 06-suppression.nes | 00 - N 01 - N 02 - N 03 - N 04 - - 05 V - 06 V - 07 V N 08 V N 09 V N  06-suppression  Passed", "screenshot": "screenshots-TriCNES/ppu_vbl_nmi/rom_singles/06-suppression.webp"},
+  {"suite": "ppu_vbl_nmi/rom_singles", "rom": "07-nmi_on_timing.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 07-nmi_on_timing.nes | 00 N 01 N 02 N 03 N 04 N 05 - 06 - 07 - 08 -  07-nmi_on_timing  Passed", "screenshot": "screenshots-TriCNES/ppu_vbl_nmi/rom_singles/07-nmi_on_timing.webp"},
+  {"suite": "ppu_vbl_nmi/rom_singles", "rom": "08-nmi_off_timing.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 08-nmi_off_timing.nes | 03 - 04 - 05 - 06 - 07 N 08 N 09 N 0A N 0B N 0C N  08-nmi_off_timing  Passed", "screenshot": "screenshots-TriCNES/ppu_vbl_nmi/rom_singles/08-nmi_off_timing.webp"},
+  {"suite": "ppu_vbl_nmi/rom_singles", "rom": "09-even_odd_frames.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 09-even_odd_frames.nes | 00 01 01 02  09-even_odd_frames  Passed", "screenshot": "screenshots-TriCNES/ppu_vbl_nmi/rom_singles/09-even_odd_frames.webp"},
+  {"suite": "ppu_vbl_nmi/rom_singles", "rom": "10-even_odd_timing.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | 10-even_odd_timing.nes | 08 08 09 07  10-even_odd_timing  Passed", "screenshot": "screenshots-TriCNES/ppu_vbl_nmi/rom_singles/10-even_odd_timing.webp"},
+  {"suite": "read_joy3", "rom": "test_buttons.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | test_buttons.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/read_joy3/test_buttons.webp"},
+  {"suite": "read_joy3", "rom": "count_errors.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | count_errors.nes | ", "screenshot": "screenshots-TriCNES/read_joy3/count_errors.webp"},
+  {"suite": "read_joy3", "rom": "count_errors_fast.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | count_errors_fast.nes | ", "screenshot": "screenshots-TriCNES/read_joy3/count_errors_fast.webp"},
+  {"suite": "read_joy3", "rom": "thorough_test.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | thorough_test.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/read_joy3/thorough_test.webp"},
+  {"suite": "sprdma_and_dmc_dma", "rom": "sprdma_and_dmc_dma.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | sprdma_and_dmc_dma.nes | T+ Clocks (decimal) 00 527 01 528 02 527 03 528 04 527 05 526 06 525 07 526 08 525 09 526 0A 525 0B 526 0C 525 0D 526 0E 525 0F 526  SPRDMA and DMC DMA  Passed", "screenshot": "screenshots-TriCNES/sprdma_and_dmc_dma/sprdma_and_dmc_dma.webp"},
+  {"suite": "sprdma_and_dmc_dma", "rom": "sprdma_and_dmc_dma_512.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 2\r\nCHR-ROM count : 1\r\nPASS | sprdma_and_dmc_dma_512.nes | T+ Clocks (decimal) 00 525 01 526 02 525 03 526 04 524 05 525 06 526 07 527 08 527 09 528 0A 526 0B 527 0C 527 0D 528 0E 527 0F 528  SPRDMA and DMC DMA  Passed", "screenshot": "screenshots-TriCNES/sprdma_and_dmc_dma/sprdma_and_dmc_dma_512.webp"},
+  {"suite": "sprite_hit_tests_2005.10.05", "rom": "01.basics.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 01.basics.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/sprite_hit_tests_2005.10.05/01.basics.webp"},
+  {"suite": "sprite_hit_tests_2005.10.05", "rom": "02.alignment.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 02.alignment.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/sprite_hit_tests_2005.10.05/02.alignment.webp"},
+  {"suite": "sprite_hit_tests_2005.10.05", "rom": "03.corners.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 03.corners.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/sprite_hit_tests_2005.10.05/03.corners.webp"},
+  {"suite": "sprite_hit_tests_2005.10.05", "rom": "04.flip.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 04.flip.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/sprite_hit_tests_2005.10.05/04.flip.webp"},
+  {"suite": "sprite_hit_tests_2005.10.05", "rom": "05.left_clip.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 05.left_clip.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/sprite_hit_tests_2005.10.05/05.left_clip.webp"},
+  {"suite": "sprite_hit_tests_2005.10.05", "rom": "06.right_edge.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 06.right_edge.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/sprite_hit_tests_2005.10.05/06.right_edge.webp"},
+  {"suite": "sprite_hit_tests_2005.10.05", "rom": "07.screen_bottom.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 07.screen_bottom.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/sprite_hit_tests_2005.10.05/07.screen_bottom.webp"},
+  {"suite": "sprite_hit_tests_2005.10.05", "rom": "08.double_height.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 08.double_height.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/sprite_hit_tests_2005.10.05/08.double_height.webp"},
+  {"suite": "sprite_hit_tests_2005.10.05", "rom": "09.timing_basics.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 09.timing_basics.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/sprite_hit_tests_2005.10.05/09.timing_basics.webp"},
+  {"suite": "sprite_hit_tests_2005.10.05", "rom": "10.timing_order.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 10.timing_order.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/sprite_hit_tests_2005.10.05/10.timing_order.webp"},
+  {"suite": "sprite_hit_tests_2005.10.05", "rom": "11.edge_timing.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 11.edge_timing.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/sprite_hit_tests_2005.10.05/11.edge_timing.webp"},
+  {"suite": "sprite_overflow_tests", "rom": "1.Basics.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 1.Basics.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/sprite_overflow_tests/1.Basics.webp"},
+  {"suite": "sprite_overflow_tests", "rom": "2.Details.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 2.Details.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/sprite_overflow_tests/2.Details.webp"},
+  {"suite": "sprite_overflow_tests", "rom": "3.Timing.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 3.Timing.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/sprite_overflow_tests/3.Timing.webp"},
+  {"suite": "sprite_overflow_tests", "rom": "4.Obscure.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 4.Obscure.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/sprite_overflow_tests/4.Obscure.webp"},
+  {"suite": "sprite_overflow_tests", "rom": "5.Emulator.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 5.Emulator.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/sprite_overflow_tests/5.Emulator.webp"},
+  {"suite": "vbl_nmi_timing", "rom": "1.frame_basics.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 1.frame_basics.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/vbl_nmi_timing/1.frame_basics.webp"},
+  {"suite": "vbl_nmi_timing", "rom": "2.vbl_timing.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 2.vbl_timing.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/vbl_nmi_timing/2.vbl_timing.webp"},
+  {"suite": "vbl_nmi_timing", "rom": "3.even_odd_frames.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 3.even_odd_frames.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/vbl_nmi_timing/3.even_odd_frames.webp"},
+  {"suite": "vbl_nmi_timing", "rom": "4.vbl_clear_timing.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 4.vbl_clear_timing.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/vbl_nmi_timing/4.vbl_clear_timing.webp"},
+  {"suite": "vbl_nmi_timing", "rom": "5.nmi_suppression.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 5.nmi_suppression.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/vbl_nmi_timing/5.nmi_suppression.webp"},
+  {"suite": "vbl_nmi_timing", "rom": "6.nmi_disable.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 6.nmi_disable.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/vbl_nmi_timing/6.nmi_disable.webp"},
+  {"suite": "vbl_nmi_timing", "rom": "7.nmi_timing.nes", "status": "pass", "exit_code": 0, "result_text": "iNes header\r\nPRG-ROM count : 1\r\nCHR-ROM count : 0\r\nPASS | 7.nmi_timing.nes | (screen: Passed)", "screenshot": "screenshots-TriCNES/vbl_nmi_timing/7.nmi_timing.webp"}
+]
+;
+document.getElementById('build-date').textContent = BUILD_DATE;
+var totalCount = RESULTS.length;
+var passCount = RESULTS.filter(function(r){return r.status==='pass'}).length;
+var failCount = totalCount - passCount;
+var passRate = totalCount > 0 ? (passCount/totalCount*100).toFixed(1) : '0.0';
+document.getElementById('total-num').textContent = totalCount;
+document.getElementById('pass-num').textContent = passCount;
+document.getElementById('fail-num').textContent = failCount;
+document.getElementById('progress-fill').style.width = passRate + '%';
+document.getElementById('progress-text').textContent = passCount + ' / ' + totalCount + ' (' + passRate + '%)';
+
+var suiteSelect = document.getElementById('suite-select');
+var searchInput = document.getElementById('search');
+var content = document.getElementById('content');
+var modal = document.getElementById('modal');
+var modalImg = document.getElementById('modal-img');
+var modalTitle = document.getElementById('modal-title');
+
+var filter = 'all';
+var suiteFilter = 'all';
+var search = '';
+var collapsed = {};
+
+var suiteNames = [];
+var seen = {};
+RESULTS.forEach(function(r) {
+  if (!seen[r.suite]) { seen[r.suite] = true; suiteNames.push(r.suite); }
+});
+suiteNames.sort();
+suiteNames.forEach(function(s) {
+  var opt = document.createElement('option');
+  opt.value = s; opt.textContent = s;
+  suiteSelect.appendChild(opt);
+});
+
+document.querySelectorAll('.filter-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.filter-btn').forEach(function(b){b.classList.remove('active')});
+    btn.classList.add('active');
+    filter = btn.dataset.filter;
+    render();
+  });
+});
+suiteSelect.addEventListener('change', function() { suiteFilter = suiteSelect.value; render(); });
+searchInput.addEventListener('input', function() { search = searchInput.value.toLowerCase(); render(); });
+modal.addEventListener('click', function() { modal.classList.remove('active'); });
+
+function openModal(src, title) {
+  modalImg.src = src;
+  modalTitle.textContent = title;
+  modal.classList.add('active');
+}
+
+function toggleSuite(suite) {
+  collapsed[suite] = !collapsed[suite];
+  render();
+}
+
+function toggleResult(id) {
+  var el = document.getElementById(id);
+  if (el) el.classList.toggle('expanded');
+}
+
+function esc(s) {
+  var d = document.createElement('div');
+  d.appendChild(document.createTextNode(s));
+  return d.innerHTML;
+}
+
+function render() {
+  var filtered = RESULTS.filter(function(r) {
+    if (filter === 'pass' && r.status !== 'pass') return false;
+    if (filter === 'fail' && r.status !== 'fail') return false;
+    if (suiteFilter !== 'all' && r.suite !== suiteFilter) return false;
+    if (search && r.rom.toLowerCase().indexOf(search) === -1 && r.suite.toLowerCase().indexOf(search) === -1) return false;
+    return true;
+  });
+
+  var groups = {};
+  filtered.forEach(function(r) {
+    if (!groups[r.suite]) groups[r.suite] = [];
+    groups[r.suite].push(r);
+  });
+
+  var sortedSuites = Object.keys(groups).sort();
+  sortedSuites.forEach(function(s) {
+    groups[s].sort(function(a, b) {
+      if (a.status !== b.status) return a.status === 'fail' ? -1 : 1;
+      return a.rom.localeCompare(b.rom);
+    });
+  });
+
+  var html = '';
+  sortedSuites.forEach(function(suite) {
+    var tests = groups[suite];
+    var sp = tests.filter(function(t){return t.status==='pass'}).length;
+    var sf = tests.length - sp;
+    var isCollapsed = collapsed[suite];
+    var safeId = suite.replace(/[^a-zA-Z0-9]/g, '_');
+
+    html += '<div class="suite-section">';
+    html += '<div class="suite-header" onclick="toggleSuite(\'' + suite.replace(/'/g, "\\'") + '\')">';
+    html += '<span class="arrow' + (isCollapsed ? ' collapsed' : '') + '">&#9660;</span>';
+    html += '<span class="name">' + esc(suite) + '</span>';
+    if (sf > 0) html += '<span class="badge fail">' + sf + ' fail</span>';
+    html += '<span class="badge pass">' + sp + ' pass</span>';
+    html += '<span class="count">' + tests.length + ' tests</span>';
+    html += '</div>';
+    html += '<div class="card-grid' + (isCollapsed ? ' hidden' : '') + '">';
+
+    tests.forEach(function(t, i) {
+      var rid = 'r_' + safeId + '_' + i;
+      html += '<div class="card">';
+      html += '<div class="thumb" onclick="openModal(\'' + t.screenshot.replace(/'/g, "\\'") + '\',\'' + esc(t.rom).replace(/'/g, "\\'") + '\')">';
+      html += '<img src="' + esc(t.screenshot) + '" alt="' + esc(t.rom) + '" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">';
+      html += '<div class="no-img" style="display:none">No Screenshot</div>';
+      html += '</div>';
+      html += '<div class="info">';
+      html += '<span class="status-badge ' + t.status + '">' + t.status + '</span>';
+      html += '<div class="rom-name">' + esc(t.rom) + '</div>';
+      html += '<div class="suite-name">' + esc(t.suite) + '</div>';
+      if (t.result_text) {
+        html += '<button class="expand-btn" onclick="toggleResult(\'' + rid + '\')">Details &#9656;</button>';
+        html += '<div class="result-text" id="' + rid + '">' + esc(t.result_text) + '</div>';
+      }
+      html += '</div></div>';
+    });
+
+    html += '</div></div>';
+  });
+
+  if (!html) {
+    html = '<div class="empty-msg">No matching tests found.</div>';
+  }
+  content.innerHTML = html;
+}
+
+render();
+</script>
+</body>
+</html>
