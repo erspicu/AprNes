@@ -48,6 +48,16 @@ ref/Mesen2-master/
 knowledgebase/config.json
 knowledgebase/models_list.txt
 
+# WASM/AOT publish outputs (large build artifacts)
+publish_wasm/
+AprNesWasm/publish_out/
+AprNesWasm/wwwroot/lib/
+AprNesWasm/wwwroot/_framework/
+
+# Temp & result directories
+temp/
+result/
+
 # =========================
 # Visual Studio
 # =========================
