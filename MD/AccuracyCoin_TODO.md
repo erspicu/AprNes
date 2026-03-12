@@ -1,7 +1,7 @@
 # AccuracyCoin 修復追蹤
 
-**基線**: 132/136 PASS, 4 FAIL, 0 SKIP
-**最後更新**: 2026-03-10
+**基線**: 133/136 PASS, 3 FAIL, 0 SKIP
+**最後更新**: 2026-03-13
 **分支**: master
 
 ---
@@ -14,7 +14,7 @@
 | P10 | Unofficial: SH* | 全 PASS | Per-cycle CPU rewrite + SH* fix |
 | P11 | Unofficial: Misc | 全 PASS | |
 | P12 | CPU Interrupts | 全 PASS | Per-cycle CPU rewrite 修復 IFlagLatency |
-| P13 | DMA Tests | 4 FAIL / 10 | 6 PASS，剩餘 4 項需 DMA sub-cycle 精度 |
+| P13 | DMA Tests | 3 FAIL / 10 | 7 PASS，BUGFIX53 修復 DMA+$2002 Read |
 | P14 | APU Tests | 全 PASS | BUGFIX49: DMC enable delay always set |
 | P15 | Power On State | DRAW only | 無自動判定 |
 | P16 | PPU Rendering | 全 PASS | |
@@ -53,6 +53,10 @@
 - [x] SH* unofficial opcodes — SHA/SHX/SHY/SHS DMA bus conflict 正確實作 (+5)
 - [x] DMC DMA cooldown — TriCNES CannotRunDMCDMARightNow，防止連續 DMC DMA (+1)
 
+### Phase 2.7: DMA Load Countdown Timing
+
+- [x] DMA + $2002 Read (P13) — **BUGFIX53**: DMC Load DMA countdown uses TriCNES-style GET-only decrement
+
 ### Phase 3: TIMING-DEPENDENT（全部完成）
 
 - [x] $2007 read w/ rendering (P16) — BUGFIX34
@@ -63,18 +67,18 @@
 
 ---
 
-## 剩餘 4 FAIL
+## 剩餘 3 FAIL
 
-### 根因: DMA Sub-cycle 精度（4 項，共用根因）
+### 根因: DMA Sub-cycle 精度（3 項，共用根因）
 
 所有剩餘失敗都在 P13 DMA Tests，需要更精確的 DMA bus state / stolen cycle 時序。
 
-**P13: DMA Tests (4 FAIL / 10 total)**
+**P13: DMA Tests (3 FAIL / 10 total)**
 
 | 測試 | 狀態 | err | 分析 |
 |------|------|-----|------|
 | DMA + Open Bus | **PASS** | — | |
-| DMA + $2002 Read | FAIL | 2 | phantom read 碰 $2002 時序不對 |
+| DMA + $2002 Read | **PASS** | — | **BUGFIX53**: DMC Load DMA countdown timing |
 | DMA + $2007 Read | **PASS** | — | |
 | DMA + $2007 Write | **PASS** | — | |
 | DMA + $4015 Read | **PASS** | — | Per-cycle CPU 修復 |

@@ -605,11 +605,18 @@ namespace AprNes
             }
 
             // Handle Load DMA countdown (scheduled DMA from $4015 write)
+            // TriCNES: DMCDMADelay=2, decremented on PUT cycles (_EmulateAPU else branch)
+            // Since our APU runs BEFORE CPU (TriCNES: after), we invert the parity:
+            // decrement on GET cycles to produce the correct 3/4 cycle delay.
             if (dmcLoadDmaCountdown > 0)
             {
-                --dmcLoadDmaCountdown;
-                if (dmcLoadDmaCountdown == 0 && dmcBufferEmpty && dmcsamplesleft > 0)
-                    dmcStartTransfer();
+                bool getCycle = (cpuCycleCount & 1) == 0;
+                if (getCycle)
+                {
+                    --dmcLoadDmaCountdown;
+                    if (dmcLoadDmaCountdown == 0 && dmcBufferEmpty && dmcsamplesleft > 0)
+                        dmcStartTransfer();
+                }
                 return;
             }
 
@@ -867,10 +874,9 @@ namespace AprNes
                 if (dmcsamplesleft == 0)
                 {
                     restartdmc();
-                    // Mesen2: always set _transferStartDelay regardless of buffer state
-                    // Buffer may not be empty yet if timer hasn't fired; the countdown
-                    // prevents premature DMA when buffer empties before delay expires
-                    dmcLoadDmaCountdown = (apucycle & 1) != 0 ? 2 : 3;
+                    // TriCNES: DMCDMADelay = 2 (always, not parity-dependent)
+                    // Parity compensation is in the decrement logic (GET-only) in apu_step
+                    dmcLoadDmaCountdown = 2;
                 }
             }
             else
