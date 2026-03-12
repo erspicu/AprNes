@@ -156,7 +156,7 @@ namespace AprNes
                         StartCpuCycle();
                         ushort dmcReadAddr = (ushort)dmcaddr;
                         byte val = ProcessDmaRead(dmcReadAddr, enableInternalRegReads);
-                        cpubus = val;
+                        if (!dmaReadSkipBusUpdate) cpubus = val;
                         EndCpuCycle();
                         dmcDmaRunning = false;
                         dmcAbortDma = false;
@@ -223,8 +223,11 @@ namespace AprNes
 
         static ushort dmaPrevReadAddress = 0;
 
+        static bool dmaReadSkipBusUpdate; // $4015 bus conflict: don't update cpubus with return value
+
         static byte ProcessDmaRead(ushort addr, bool enableInternalRegReads)
         {
+            dmaReadSkipBusUpdate = false;
             if (!enableInternalRegReads)
             {
                 if (addr >= 0x4000 && addr <= 0x401F)
@@ -236,20 +239,31 @@ namespace AprNes
             switch (internalAddr)
             {
                 case 0x4015:
-                    val = IO_read(0x4015);
-                    if (internalAddr != addr) { cpubus = val; mem_read_fun[addr](addr); }
+                    if (internalAddr != addr)
+                    {
+                        // TriCNES bus conflict: read ROM first, then construct $4015 value
+                        byte romVal = mem_read_fun[addr](addr);
+                        cpubus = romVal;  // set bus to ROM value
+                        val = IO_read(0x4015);  // apu_r_4015 uses cpubus & 0x20 for bit 5
+                        // TriCNES: "reading from $4015 can not affect the databus"
+                        // dataBus stays as ROM value; return status for DMA buffer only
+                        dmaReadSkipBusUpdate = true;
+                    }
+                    else
+                    {
+                        val = IO_read(0x4015);
+                    }
                     break;
                 case 0x4016:
                 case 0x4017:
-                    if (dmaPrevReadAddress == internalAddr) val = cpubus;
-                    else val = IO_read(internalAddr);
                     if (internalAddr != addr)
                     {
-                        cpubus = val;
-                        byte externalVal = mem_read_fun[addr](addr);
-                        byte obMask = 0xE0;
-                        val = (byte)((externalVal & obMask) | ((val & ~obMask) & (externalVal & ~obMask)));
+                        // Bus conflict: read ROM first to set data bus,
+                        // then controller read uses cpubus for open bus bits
+                        cpubus = mem_read_fun[addr](addr);
                     }
+                    if (dmaPrevReadAddress == internalAddr) val = cpubus;
+                    else val = IO_read(internalAddr);
                     break;
                 default:
                     val = mem_read_fun[addr](addr);

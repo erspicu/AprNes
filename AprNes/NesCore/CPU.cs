@@ -118,6 +118,15 @@ namespace AprNes
             cpuBusAddr = addr;
             cpuBusIsWrite = true;
             StartCpuCycle();
+            // TriCNES line 8758: implicit abort DMA cancelled if delayed by write cycle
+            // "The 1-cycle DMA should not get delayed by a write cycle, rather it just shouldn't occur"
+            if (dmcImplicitAbortActive && dmaNeedHalt)
+            {
+                dmcImplicitAbortActive = false;
+                dmcDmaRunning = false;
+                dmcNeedDummyRead = false;
+                dmaNeedHalt = false;
+            }
             cpubus = val;
             mem_write_fun[addr](addr, val);
             EndCpuCycle();

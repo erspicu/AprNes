@@ -1,6 +1,6 @@
 # AccuracyCoin 修復追蹤
 
-**基線**: 133/136 PASS, 3 FAIL, 0 SKIP
+**基線**: 134/136 PASS, 2 FAIL, 0 SKIP
 **最後更新**: 2026-03-13
 **分支**: master
 
@@ -14,7 +14,7 @@
 | P10 | Unofficial: SH* | 全 PASS | Per-cycle CPU rewrite + SH* fix |
 | P11 | Unofficial: Misc | 全 PASS | |
 | P12 | CPU Interrupts | 全 PASS | Per-cycle CPU rewrite 修復 IFlagLatency |
-| P13 | DMA Tests | 3 FAIL / 10 | 7 PASS，BUGFIX53 修復 DMA+$2002 Read |
+| P13 | DMA Tests | 2 FAIL / 10 | 8 PASS，BUGFIX53+54 修復 DMA+$2002 Read + Bus Conflicts |
 | P14 | APU Tests | 全 PASS | BUGFIX49: DMC enable delay always set |
 | P15 | Power On State | DRAW only | 無自動判定 |
 | P16 | PPU Rendering | 全 PASS | |
@@ -57,6 +57,10 @@
 
 - [x] DMA + $2002 Read (P13) — **BUGFIX53**: DMC Load DMA countdown uses TriCNES-style GET-only decrement
 
+### Phase 2.8: DMC DMA Bus Conflicts + Deferred Status
+
+- [x] DMC DMA Bus Conflicts (P13) — **BUGFIX54**: bus conflict rewrite + deferred $4015 status update
+
 ### Phase 3: TIMING-DEPENDENT（全部完成）
 
 - [x] $2007 read w/ rendering (P16) — BUGFIX34
@@ -67,13 +71,13 @@
 
 ---
 
-## 剩餘 3 FAIL
+## 剩餘 2 FAIL
 
-### 根因: DMA Sub-cycle 精度（3 項，共用根因）
+### 根因: DMA Sub-cycle 精度（2 項，共用根因）
 
-所有剩餘失敗都在 P13 DMA Tests，需要更精確的 DMA bus state / stolen cycle 時序。
+所有剩餘失敗都在 P13 DMA Tests，需要更精確的 DMA abort stolen cycle 時序。
 
-**P13: DMA Tests (3 FAIL / 10 total)**
+**P13: DMA Tests (2 FAIL / 10 total)**
 
 | 測試 | 狀態 | err | 分析 |
 |------|------|-----|------|
@@ -83,7 +87,7 @@
 | DMA + $2007 Write | **PASS** | — | |
 | DMA + $4015 Read | **PASS** | — | Per-cycle CPU 修復 |
 | DMA + $4016 Read | **PASS** | — | |
-| DMC DMA Bus Conflicts | FAIL | 2 | bus conflict 合併時序 |
+| DMC DMA Bus Conflicts | **PASS** | — | **BUGFIX54**: bus conflict + deferred $4015 status |
 | DMC DMA + OAM DMA | **PASS** | — | Per-cycle CPU 修復 |
 | Explicit DMA Abort | FAIL | 2 | DMA 中止 stolen cycle 數 |
 | Implicit DMA Abort | FAIL | 2 | 隱式 DMA 中止 stolen cycle 數 |
@@ -102,8 +106,8 @@
 
 | 方向 | 潛在收益 | 難度 | 說明 |
 |------|----------|------|------|
-| P13 DMA timing | +4 | 極高 | 需要更精確的 DMA stolen cycle / phantom read 時序 |
-| 136/136 完美分數 | +4 | 極高 | 剩餘 4 項全在 P13，共用 DMA sub-cycle 根因 |
+| P13 DMA abort | +2 | 極高 | 需要更精確的 explicit/implicit abort stolen cycle 時序 |
+| 136/136 完美分數 | +2 | 極高 | 剩餘 2 項全在 P13，共用 DMA abort 根因 |
 
 ---
 

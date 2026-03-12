@@ -112,6 +112,8 @@ namespace AprNes
             bool passOnStable = false; // --pass-on-stable: screen stable + no "Failed" = PASS
             string timedScreenshotsSpec = null; // --timed-screenshots "path1:t1,path2:t2,..."
             bool dumpAcResults = false; // --dump-ac-results: print AC_RESULTS_HEX after run
+            bool dumpDebug = false; // --dump-debug: print debug memory ranges ($50-$6F, $500-$5FF)
+            bool dmaTrace = false; // --dma-trace: enable DMA timing trace
 
             // Parse arguments
             for (int i = 0; i < args.Length; i++)
@@ -157,6 +159,12 @@ namespace AprNes
                     case "--dump-ac-results":
                         dumpAcResults = true;
                         break;
+                    case "--dump-debug":
+                        dumpDebug = true;
+                        break;
+                    case "--dma-trace":
+                        dmaTrace = true;
+                        break;
                     case "--expected-crc":
                         if (i + 1 < args.Length)
                         {
@@ -187,6 +195,7 @@ namespace AprNes
 
             // Headless init
             NesCore.HeadlessMode = true;
+            NesCore.dmcTraceEnabled = dmaTrace;
             NesCore.OnError = msg => Console.Error.WriteLine("ERROR: " + msg);
             NesCore.AudioEnabled = false;
             if (debugLog != null)
@@ -497,6 +506,31 @@ namespace AprNes
                 for (int addr = 0x0300; addr < 0x0500; addr++)
                     sb.Append(NesCore.NES_MEM[addr].ToString("X2"));
                 Console.WriteLine(sb.ToString());
+            }
+
+            // Dump debug memory ranges (same as AccuracyCoin debug menu)
+            if (dumpDebug)
+            {
+                var sb = new StringBuilder();
+                sb.Append("DEBUG_ZP_00: ");
+                for (int addr = 0x00; addr < 0x20; addr++)
+                    sb.Append(NesCore.NES_MEM[addr].ToString("X2") + " ");
+                Console.Error.WriteLine(sb.ToString().TrimEnd());
+
+                sb.Clear();
+                sb.Append("DEBUG_ZP_50: ");
+                for (int addr = 0x50; addr < 0x70; addr++)
+                    sb.Append(NesCore.NES_MEM[addr].ToString("X2") + " ");
+                Console.Error.WriteLine(sb.ToString().TrimEnd());
+
+                for (int row = 0; row < 16; row++)
+                {
+                    sb.Clear();
+                    sb.Append("DEBUG_" + (0x500 + row * 16).ToString("X4") + ": ");
+                    for (int col = 0; col < 16; col++)
+                        sb.Append(NesCore.NES_MEM[0x500 + row * 16 + col].ToString("X2") + " ");
+                    Console.Error.WriteLine(sb.ToString().TrimEnd());
+                }
             }
 
             // Determine pass/fail
