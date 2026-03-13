@@ -98,6 +98,17 @@ namespace AprNes
                 return 0;
             }
 
+            // ── perf mode: AprNes.exe --perf <rom> [seconds] [note] ──
+            // Runs a headless benchmark, saves versioned MD report to Performance/
+            if (args.Length >= 2 && args[0] == "--perf")
+            {
+                string rom     = args[1];
+                int s; int seconds = args.Length >= 3 && int.TryParse(args[2], out s) ? s : 20;
+                string note    = args.Length >= 4 ? args[3] : null;
+                BenchmarkRunner.RunPerf(rom, seconds, note);
+                return 0;
+            }
+
             string romPath = null;
             double timeSec = 0;
             string screenshotPath = null;
