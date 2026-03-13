@@ -78,20 +78,18 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 ### PRIORITY 4 — Integer fixed-point sample accumulator in APU
 - **Target**: APU.cs — floating-point `_sampleAccum += 1.0` comparison done every CPU cycle
 - **Expected gain**: 1–2%
-- **Effort**: ~1 hour
-- **Method**: Replace double accumulator with integer Q20 fixed-point counter
+- **Method**: Replace `double _sampleAccum` with `int _sampleCounter += APU_SAMPLE_RATE`，觸發條件改為 `>= CPU_FREQ`；避免 double 浮點加法與比較
 - **Risk**: Low — only affects sample timing precision (negligible)
-- **Status**: 🔲 TODO
+- **Status**: ❌ FAILED — 實測 188.55 → 187.90 FPS（-0.3%），已 revert。Debug mode JIT 對 double 加法的 overhead 不如預期高。
 
 ---
 
 ### PRIORITY 5 — Cache palette lookups in RenderBGTile()
 - **Target**: PPU.cs `RenderBGTile()` — redundant ppu_ram[] + NesColors[] lookups per pixel
 - **Expected gain**: 1–2%
-- **Effort**: ~30 minutes
-- **Method**: Pre-compute `bgColor` and `paletteColor` before inner loop; use ternary assignment
+- **Method**: 在 loop 外用 `stackalloc uint[4]` 預計算 palR / palN，loop 內直接 `pal[bgPixel]` 存取
 - **Risk**: Low — pure refactor, no logic change
-- **Status**: 🔲 TODO
+- **Status**: ❌ FAILED — 實測 188.55 → 187.90 FPS（-0.3%），已 revert。`stackalloc` 初始化成本抵銷了 lookup 節省；Priority 8 已做 bgColor pre-compute，殘餘收益不足。
 
 ---
 
@@ -205,7 +203,8 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 |---|-------------|-----------|----------|-------|--------|--------|
 | 1 | Baseline | — | 181.70 | — | — | [v1](2026-03-14_perf_v1.md) |
 | 2 | Priority 11: managed array → unsafe pointer (TRI_SEQ, DUTYLOOKUP, secondaryOAM, corruptOamRow) | 181.70 | 187.70 | **+3.3%** | ✅ KEEP | [v2](2026-03-14_perf_v2.md) |
-| 3 | Priority 8: RenderBGTile pre-compute bgColor + eliminate duplicate condition | 187.70 | 188.55 | +0.4% | ✅ KEEP (cleaner code) | [v6](2026-03-14_perf_v6.md) |
+| 3 | Priority 8: RenderBGTile pre-compute bgColor + merge duplicate condition | 187.70 | 188.55 | +0.4% | ✅ KEEP (cleaner code) | [v6](2026-03-14_perf_v6.md) |
+| 4 | Priority 4+5: APU int counter + RenderBGTile stackalloc palette | 188.55 | 187.90 | -0.3% | ❌ REVERT | [v7](2026-03-14_perf_v7.md) |
 
 ---
 
