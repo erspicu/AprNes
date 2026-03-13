@@ -58,6 +58,9 @@ AprNesWasm/wwwroot/_framework/
 temp/
 result/
 
+# Performance test ROMs
+Performance/*.nes
+
 # =========================
 # Visual Studio
 # =========================
