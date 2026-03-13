@@ -139,6 +139,24 @@ namespace AprNes
                 }
             }
 
+            // TriCNES: clear implicit abort after halt cycle (line 8758-8761)
+            // In TriCNES, after each CPU cycle, if DoDMCDMA && APU_ImplicitAbortDMC4015,
+            // the flag is cleared. Next cycle's gate check fails because neither
+            // APU_Status_DMC nor APU_ImplicitAbortDMC4015 is true.
+            // This gives a 1-cycle phantom DMA (halt only).
+            // Only cancel when DMA was SOLELY for implicit abort (no samples left to play).
+            // If dmcsamplesleft > 0, this is a normal refill DMA that also had the flag set.
+            if (dmcImplicitAbortActive)
+            {
+                dmcImplicitAbortActive = false;
+                if (dmcDmaRunning && dmcsamplesleft == 0)
+                {
+                    dmcDmaRunning = false;
+                    dmcNeedDummyRead = false;
+                    if (!spriteDmaTransfer) return;
+                }
+            }
+
             // --- Main DMA loop ---
             int spriteDmaCounter = 0;
             byte spriteReadAddr = 0;

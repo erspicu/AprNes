@@ -651,7 +651,8 @@ namespace AprNes
                         dmcsamplesleft = 0;
                         dmcStopTransfer();
                     }
-                    // For enable: dmcStatusEnabled = true allows DMA entry gate
+                    // Note: dmcDelayedEnable intentionally NOT cleared here.
+                    // It serves as "intent" for the DMA gate until the next $4015 write.
                 }
             }
         }
@@ -925,13 +926,12 @@ namespace AprNes
                     dmcLoadDmaCountdown = 2;
                 }
 
-                // Implicit abort: TriCNES checks specific timer values
-                // TriCNES: (timer==10 && !APU_PutCycle) || (timer==8 && APU_PutCycle)
-                // AprNes: APU already ran, timer decremented by 1.
-                // Parity mapping: AprNes getCycle ↔ TriCNES PUT, AprNes !getCycle ↔ TriCNES GET
-                // Condition 1: TriCNES timer==10/GET → AprNes timer==9, !getCycle
-                // Condition 2: TriCNES timer==8/PUT → AprNes timer==7, getCycle
-                if ((dmctimer == 9 && !getCycle) || (dmctimer == 7 && getCycle))
+                // Implicit abort: TriCNES checks (timer==10 && !PutCycle) || (timer==8 && PutCycle)
+                // These are consecutive CPU cycles in TriCNES (timer decrements by 2 on GET cycles).
+                // In AprNes, clockdmc decrements by 1 every cycle, and timer values are
+                // offset by the 3-cycle pending→active conversion delay (bits counter run-out).
+                // Empirically verified: timer=8/9 with matching parity gives correct X=10/11 result.
+                if ((dmctimer == 8 && !getCycle) || (dmctimer == 9 && getCycle))
                 {
                     dmcImplicitAbortPending = true;
                     if (dmcTraceEnabled)

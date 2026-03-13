@@ -1,7 +1,7 @@
 # AccuracyCoin 修復追蹤
 
-**基線**: 135/136 PASS, 1 FAIL, 0 SKIP
-**最後更新**: 2026-03-13
+**基線**: 136/136 PASS, 0 FAIL, 0 SKIP ✓ PERFECT
+**最後更新**: 2026-03-14
 **分支**: master
 
 ---
@@ -14,7 +14,7 @@
 | P10 | Unofficial: SH* | 全 PASS | Per-cycle CPU rewrite + SH* fix |
 | P11 | Unofficial: Misc | 全 PASS | |
 | P12 | CPU Interrupts | 全 PASS | Per-cycle CPU rewrite 修復 IFlagLatency |
-| P13 | DMA Tests | 1 FAIL / 11 | 10 PASS，BUGFIX55 修復 Explicit DMA Abort |
+| P13 | DMA Tests | 全 PASS | BUGFIX53-56 修復全部 DMA 測試 |
 | P14 | APU Tests | 全 PASS | BUGFIX49: DMC enable delay always set |
 | P15 | Power On State | DRAW only | 無自動判定 |
 | P16 | PPU Rendering | 全 PASS | |
@@ -37,7 +37,7 @@
 - [x] OAM Corruption (P18) — BUGFIX36
 - [x] INC $4014 (P18) — BUGFIX38
 
-### Phase 2: TIMING-CORE（部分完成）
+### Phase 2: TIMING-CORE（全部完成）
 
 - [x] Frame Counter IRQ (P14) — BUGFIX37
 - [x] $2002 flag clear timing (P18) — **BUGFIX45**: sprite flags dot 1, VBL dot 2
@@ -65,36 +65,15 @@
 
 - [x] Explicit DMA Abort (P13) — **BUGFIX55**: 2-cycle fire window detection + parity-dependent normal delay
 
+### Phase 3.0: Implicit DMA Abort
+
+- [x] Implicit DMA Abort (P13) — **BUGFIX56**: 1-cycle phantom DMA + write cycle cancellation
+
 ---
 
-## 剩餘 1 FAIL
+## 全部完成
 
-### P13: Implicit DMA Abort
-
-| 測試 | 狀態 | err | 分析 |
-|------|------|-----|------|
-| DMA + Open Bus | **PASS** | — | |
-| DMA + $2002 Read | **PASS** | — | **BUGFIX53** |
-| DMA + $2007 Read | **PASS** | — | |
-| DMA + $2007 Write | **PASS** | — | |
-| DMA + $4015 Read | **PASS** | — | Per-cycle CPU 修復 |
-| DMA + $4016 Read | **PASS** | — | |
-| DMC DMA Bus Conflicts | **PASS** | — | **BUGFIX54** |
-| DMC DMA + OAM DMA | **PASS** | — | Per-cycle CPU 修復 |
-| Explicit DMA Abort | **PASS** | — | **BUGFIX55** |
-| Implicit DMA Abort | FAIL | 2 | 隱式 DMA 中止：1-cycle phantom DMA + write cycle cancellation |
-
-### Implicit DMA Abort 分析
-
-測試包含 3 個 sub-test（$500, $520, $540），有兩組 answer key（pre/post-1990 CPU）。
-核心行為：enable ($4015=$10) 在 1-byte non-looping sample 即將結束時寫入，
-觸發「幽靈」1-cycle DMA，此 DMA 若遇到 write cycle 會被完全取消（非延遲）。
-
-TriCNES 實作要點：
-- `APU_SetImplicitAbortDMC4015 = true` 設於 $4015 write（timer 接近 fire）
-- Timer fire 時轉為 `APU_ImplicitAbortDMC4015 = true`，觸發 1-cycle DMA
-- PUT cycle（write）遇到此 DMA 時直接取消：`APU_ImplicitAbortDMC4015 = false`
-- 與 explicit abort 不同：implicit abort DMA 不會被 write cycle delay，而是直接不執行
+所有 136 項 AccuracyCoin 測試全數通過。blargg 174/174 無回歸。
 
 ---
 
@@ -106,3 +85,4 @@ TriCNES 實作要點：
 - ~~P10 SH* unofficial opcodes~~ — **已修復** (P10 全 PASS)
 - ~~P20 CPU Behavior 2~~ — **已修復** Per-cycle CPU rewrite (P20 全 PASS)
 - ~~P13 Explicit DMA Abort~~ — **已修復 BUGFIX55** (2-cycle fire window + parity delay)
+- ~~P13 Implicit DMA Abort~~ — **已修復 BUGFIX56** (1-cycle phantom DMA + write cycle cancellation)
