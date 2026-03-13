@@ -221,6 +221,7 @@ namespace AprNes
 
                 //init function array
                 init_function();
+                InitOpHandlers();
 
                 //init APU & audio output (must be before reset vector read so tick() can run)
                 initAPU();

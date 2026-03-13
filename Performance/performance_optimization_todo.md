@@ -156,7 +156,7 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
   - 每個 handler 仍保有內層 operationCycle 邏輯
 - **Risk**: High — 256 個 opcode 全部重構，容易遺漏；需要完整跑過 AccuracyCoin 136/136 + blargg 174/174 驗證
 - **Note**: JIT 本身會將 switch 編譯為 jump table，實際增益需實測才能確認；可先實作 10-20 個高頻 opcode（LDA/STA/BNE/JMP/JSR/RTS）做對比測試再決定是否全面替換
-- **Status**: 🔲 TODO
+- **Status**: ✅ DONE — **+7.6%** (189.75 → 204.10 FPS)；Debug JIT 對 switch 未完全 jump table 最佳化，delegate array 明顯更快
 
 ---
 
@@ -164,8 +164,8 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 - **Target**: CPU.cs — 完整替換 256-case switch（PRIORITY 9 的延伸）
 - **Expected gain**: 2–4%（與 Priority 9 合併後確認）
 - **Risk**: High — large refactor
-- **Note**: 先完成 Priority 9 的局部實驗，確認有效後再全面替換
-- **Status**: 🔲 DEFERRED
+- **Note**: Priority 9 已全面替換，Priority 10 視為已完成
+- **Status**: ✅ DONE (合併到 Priority 9)
 
 ---
 
@@ -212,6 +212,7 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 | 4 | Priority 4+5 v1: APU int counter + stackalloc palette | 188.55 | 187.90 | -0.3% | ❌ REVERT | [v7](2026-03-14_perf_v7.md) |
 | 5 | Priority 5 v2: static palCacheR/N (Marshal.AllocHGlobal, reuse) | 188.55 | 189.75 | **+0.6%** | ✅ KEEP | [v8](2026-03-14_perf_v8.md) |
 | 6 | Priority 4 v2: APU int counter (單獨測試) | 189.75 | 186.50 | -1.7% | ❌ REVERT | [v10](2026-03-14_perf_v10.md) |
+| 7 | Priority 9: CPU opcode dispatch Action[256] table | 189.75 | 204.10 | **+7.6%** | ✅ KEEP | [v11](2026-03-14_perf_v11.md) |
 
 ---
 
