@@ -4,6 +4,7 @@
 **基線**: 174/174 blargg, 122/136 AccuracyCoin
 **目標**: 修復剩餘 13 FAIL + 1 SKIP（全部與 DMA timing 相關）
 **潛在收益**: +13~14 PASS
+**狀態**: **已完成** — 最終成果 174/174 blargg + 136/136 AC (BUGFIX33-56)
 
 ---
 

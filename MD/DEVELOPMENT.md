@@ -399,13 +399,10 @@ haltCycles = isPutCycle ? 3 : 2;
 
 ### 5.5 AccuracyCoin 測試結果
 
-| 範圍 | 結果 | 說明 |
-|------|------|------|
-| Tests 1-69 | 69 PASS | 基本功能全通過 |
-| Tests 70-74 | 5 FAIL | 不穩定非法指令（SHY/SHX/LAE/ANC），需精確 DMA bus contention |
-| Tests 75-81 | 7 PASS | |
-| Test 82 | 掛住 | IFlagLatency Test E — DMA 時序偏移 ~12 cycles |
-| Tests 83+ | 未達 | blocked by Test 82 |
+**最終成果 (2026-03-14)**: 136/136 全 PASS (PERFECT SCORE)
+
+歷程：初始 69/136 → Per-cycle CPU rewrite 132/136 → BUGFIX53-56 修復 P13 DMA → 136/136。
+詳見 [AccuracyCoin_TODO.md](AccuracyCoin_TODO.md) 及 `bugfix/` 目錄。
 
 ---
 

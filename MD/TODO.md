@@ -1,6 +1,6 @@
 # AprNes 測試總覽
 
-**最後更新**: 2026-03-07 (BUGFIX45)
+**最後更新**: 2026-03-14 (BUGFIX56 — ALL TESTS PASS)
 
 ---
 
@@ -9,25 +9,17 @@
 | 測試套件 | 通過 | 總數 | 達成率 |
 |----------|------|------|--------|
 | blargg | 174 | 174 | 100% |
-| AccuracyCoin | 118 | 136 | 87% |
+| AccuracyCoin | 136 | 136 | 100% |
 
 - blargg 174/174 全 PASS 自 BUGFIX31 起維持至今
+- AccuracyCoin 136/136 全 PASS 自 BUGFIX56 達成（PERFECT SCORE）
 - AccuracyCoin 詳細修復追蹤見 [AccuracyCoin_TODO.md](AccuracyCoin_TODO.md)
 
 ---
 
-## AccuracyCoin 剩餘問題摘要
+## AccuracyCoin — 全部完成
 
-17 FAIL + 1 SKIP，全部屬於高難度：
-
-| 分類 | 項目數 | 根因 |
-|------|--------|------|
-| DMA sub-cycle 精度 | 6+1+5 | P13 前置條件 + P20 + P10 SH*，共用同一根因 |
-| DMC/APU 複雜互動 | 3 | P14 DMC/APU Reg/Controller Strobe |
-| PPU per-dot 精度 | 3 | P19 BG Serial In / Sprites SL0 / $2004 Stress |
-| DMC DMA 累積偏移 | 1 | P12 IRQ Flag Latency (Test E hang) |
-
-**最高 ROI**: 修好 P13 `DMADMASync_PreTest` 可能一次解鎖 +6~+12 項。
+所有 136 項測試全數通過。歷程：118/136 (BUGFIX45) → 132/136 (Per-cycle CPU) → 136/136 (BUGFIX56)。
 
 ---
 

@@ -575,18 +575,18 @@ Cycle 5 (read):  │ tick() → 3 PPU dots → CheckDMA → real read    │
 2026-03-10   174/174   126/136        Per-Cycle CPU rewrite
 2026-03-10   174/174   131/136        SH* opcodes fix
 2026-03-10   174/174   132/136        DMC DMA cooldown
+2026-03-13   174/174   133/136        DMC Load DMA countdown timing (BUGFIX53)
+2026-03-13   174/174   134/136        DMC DMA bus conflicts + deferred status (BUGFIX54)
+2026-03-13   174/174   135/136        Explicit DMA abort (BUGFIX55)
+2026-03-14   174/174   136/136        Implicit DMA abort (BUGFIX56) — PERFECT!
 ```
 
-### 尚未解決：P13 DMA 測試 (4/136)
+### 全部完成
 
-剩餘 4 個 AC 失敗都是 DMA timing 精度問題。
-計畫以 **方案 B（DMA 狀態機重寫）** 解決：
-
-將 `dmcfillbuffer()` 從一次性批量處理改為逐 cycle 的 Get/Put 狀態機，
-類似 TriCNES 的做法。TriCNES 使用同樣的對稱 3+3 PPU 模型，
-搭配逐 cycle DMA 狀態機，達到了 AC 136/136 滿分。
-
-詳見 `MD/p13_fix_plan.md`。
+所有 174 blargg 測試 + 136 AccuracyCoin 測試全數通過。
+P13 DMA 測試的 4 個失敗透過 BUGFIX53-56 逐一修復，
+採用 TriCNES 風格的 DMA timing（deferred status、bus conflicts、
+explicit/implicit abort 機制），在不改變核心 tick model 的前提下達成。
 
 ---
 

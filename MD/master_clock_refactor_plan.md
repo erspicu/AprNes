@@ -3,6 +3,7 @@
 **目的**: 從 CPU-driven tick 升級到 M2 phase-aware 架構，解決 AccuracyCoin 剩餘 17 FAIL
 **日期**: 2026-03-07
 **基線**: blargg 174/174, AccuracyCoin 118/136 (87%)
+**狀態**: **未採用** — 最終透過 Per-cycle CPU + DMA timing fixes (BUGFIX50-56) 達成 136/136，無需 Master Clock 重構
 
 ---
 

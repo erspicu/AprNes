@@ -3,6 +3,7 @@
 **目標**: 修復 AccuracyCoin 剩餘 14 FAIL + 1 SKIP（全部與 DMA timing 相關）
 **潛在收益**: +14 PASS（121/136 → 135/136），另外 +1 從 SKIP 變 PASS（→ 136/136）
 **難度**: 極高（需要結構性改動，涉及 MEM.cs / APU.cs / CPU.cs 核心時序）
+**狀態**: **已完成** — 最終成果 136/136 AC (BUGFIX33-56)，不需要方案 A (MCU Split)
 
 ---
 
