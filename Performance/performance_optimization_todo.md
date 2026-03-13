@@ -115,13 +115,54 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 ---
 
-### PRIORITY 8 — Instruction dispatch table (defer)
-- **Target**: CPU.cs — 256-case switch in cpu_step_one_cycle()
-- **Expected gain**: 2–4%
-- **Effort**: 3–4 hours
-- **Method**: Replace switch with delegate array `opFuncs[opcode]()`
-- **Risk**: High — large refactor, JIT already compiles switch as jump table
-- **Note**: Current implementation already near-optimal; defer unless priorities 1–7 exhausted
+### PRIORITY 8 — If/else branch reordering (high-frequency path first)
+- **Target**: PPU.cs `RenderBGTile()`、MEM.cs `init_function()` 讀寫 dispatch 設定
+- **Expected gain**: 1–3%
+- **Effort**: ~1 hour
+- **Method**:
+  - **PPU.cs RenderBGTile() 像素繪製（~line 181-188）**：透明/遮罩像素（~80-85%）移到第一個 if，彩色像素（稀少）移到 else；消除重複的 `(!ShowBgLeft8 && inLeft8)` 判斷
+  - **MEM.cs init_function() mem_read_fun（~line 383-388）**：PRG ROM 讀取（~50% of all reads）目前排在最後，改成先判斷 `>= 0x8000` 最快到達最常見路徑
+  - **MEM.cs VRAM read dispatch（~line 396-435）**：Palette（0x3F00, 僅 ~1%）目前排第一，改成 pattern table（~35-40%）優先
+- **Risk**: Low — 純順序調整，邏輯不變；改前需確認每個 else-if 的 address range 沒有重疊
+- **Status**: 🔲 TODO
+
+---
+
+### PRIORITY 9 — CPU opcode dispatch: function pointer table
+- **Target**: CPU.cs `cpu_step_one_cycle()` — 目前外層 `switch(opcode)` 共 256 個 case，每個 case 內再用 `if/switch(operationCycle)` 判斷執行週期
+- **Expected gain**: 2–5%（取決於 JIT 是否已最佳化 switch；function pointer table 可減少 branch miss）
+- **Effort**: 4–6 hours（大型重構）
+- **Method**:
+  ```csharp
+  // 建立 256 個 delegate，每個對應一個 opcode 的所有週期邏輯
+  static Action[] opHandlers = new Action[256];
+
+  static void InitOpHandlers()
+  {
+      opHandlers[0x09] = () => { GetImmediate(); Op_ORA(dl); CompleteOperation(); };
+      opHandlers[0x05] = () => {
+          if (operationCycle == 1) GetAddressZeroPage();
+          else { Op_ORA(CpuRead(addressBus)); CompleteOperation(); }
+      };
+      // ... 依此類推
+  }
+
+  // cpu_step_one_cycle() 改為：
+  opHandlers[opcode]();
+  ```
+  - 外層 switch 改為單一 array index，消除 JIT switch jump table 的間接跳躍
+  - 每個 handler 仍保有內層 operationCycle 邏輯
+- **Risk**: High — 256 個 opcode 全部重構，容易遺漏；需要完整跑過 AccuracyCoin 136/136 + blargg 174/174 驗證
+- **Note**: JIT 本身會將 switch 編譯為 jump table，實際增益需實測才能確認；可先實作 10-20 個高頻 opcode（LDA/STA/BNE/JMP/JSR/RTS）做對比測試再決定是否全面替換
+- **Status**: 🔲 TODO
+
+---
+
+### PRIORITY 10 — Instruction dispatch table (full replace, defer)
+- **Target**: CPU.cs — 完整替換 256-case switch（PRIORITY 9 的延伸）
+- **Expected gain**: 2–4%（與 Priority 9 合併後確認）
+- **Risk**: High — large refactor
+- **Note**: 先完成 Priority 9 的局部實驗，確認有效後再全面替換
 - **Status**: 🔲 DEFERRED
 
 ---
