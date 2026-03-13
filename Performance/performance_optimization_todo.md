@@ -50,8 +50,8 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 - **Expected gain**: 5–8%
 - **Effort**: ~5 minutes
 - **Method**: Delete all `PollInterrupts();` calls from each `case 0xXX:` in cpu_step_one_cycle()
-- **Risk**: Low — function is confirmed empty stub
-- **Status**: 🔲 TODO
+- **Risk**: ~~Low~~ → **INVALID** — PollInterrupts() has actual runtime function (interrupt polling timing per-instruction), NOT a pure empty stub
+- **Status**: ❌ FAILED — 移除後測試全部失敗，已 revert。**此方法不可行。**
 
 ---
 
@@ -120,11 +120,10 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 - **Expected gain**: 1–3%
 - **Effort**: ~1 hour
 - **Method**:
-  - **PPU.cs RenderBGTile() 像素繪製（~line 181-188）**：透明/遮罩像素（~80-85%）移到第一個 if，彩色像素（稀少）移到 else；消除重複的 `(!ShowBgLeft8 && inLeft8)` 判斷
-  - **MEM.cs init_function() mem_read_fun（~line 383-388）**：PRG ROM 讀取（~50% of all reads）目前排在最後，改成先判斷 `>= 0x8000` 最快到達最常見路徑
-  - **MEM.cs VRAM read dispatch（~line 396-435）**：Palette（0x3F00, 僅 ~1%）目前排第一，改成 pattern table（~35-40%）優先
-- **Risk**: Low — 純順序調整，邏輯不變；改前需確認每個 else-if 的 address range 沒有重疊
-- **Status**: 🔲 TODO
+  - **PPU.cs RenderBGTile()（已實作）**：pre-compute `bgColor = NesColors[ppu_ram[0x3f00]&0x3f]` 移至 loop 外；合併重複 `(!ShowBgLeft8 && inLeft8)` 雙重判斷為單一 `masked` 變數；cases 1+2 合流為 `(masked || bgPixel == 0) ? bgColor : ...`
+  - **MEM.cs init_function() mem_read_fun / VRAM dispatch**：這兩個是 init 時期的 if/else，執行時已是 O(1) function pointer 陣列索引，重排無效
+- **Risk**: Low
+- **Status**: ✅ DONE — **+0.4%** (187.70 → 188.55 FPS) — 效果微小但程式碼更簡潔，保留
 
 ---
 
@@ -206,6 +205,7 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 |---|-------------|-----------|----------|-------|--------|--------|
 | 1 | Baseline | — | 181.70 | — | — | [v1](2026-03-14_perf_v1.md) |
 | 2 | Priority 11: managed array → unsafe pointer (TRI_SEQ, DUTYLOOKUP, secondaryOAM, corruptOamRow) | 181.70 | 187.70 | **+3.3%** | ✅ KEEP | [v2](2026-03-14_perf_v2.md) |
+| 3 | Priority 8: RenderBGTile pre-compute bgColor + eliminate duplicate condition | 187.70 | 188.55 | +0.4% | ✅ KEEP (cleaner code) | [v6](2026-03-14_perf_v6.md) |
 
 ---
 

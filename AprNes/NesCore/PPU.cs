@@ -167,25 +167,22 @@ namespace AprNes
 
             int baseX = ppu_cycles_x - 7;
             int scanOff = scanline << 8;
+            uint bgColor = NesColors[ppu_ram[0x3f00] & 0x3f]; // pre-compute once per tile
             for (int loc = 0; loc < 8; loc++)
             {
                 int screenX = baseX + loc;
                 if (screenX > 255) break;
 
-                bool inLeft8 = screenX < 8;
                 int bit = 15 - loc - FineX;           // 1..15 always (FineX 0..7, loc 0..7)
                 byte attrUse = (bit >= 8) ? renderAttr : nextAttr;
                 int bgPixel = ((lowshift >> bit) & 1) | (((highshift >> bit) & 1) << 1);
 
+                bool masked = !ShowBgLeft8 && screenX < 8;
                 int slot = scanOff + screenX;
-                Buffer_BG_array[slot] = (!ShowBgLeft8 && inLeft8) ? 0 : bgPixel;
-
-                if (!ShowBgLeft8 && inLeft8)
-                    ScreenBuf1x[slot] = NesColors[ppu_ram[0x3f00] & 0x3f];
-                else if (bgPixel == 0)
-                    ScreenBuf1x[slot] = NesColors[ppu_ram[0x3f00] & 0x3f];
-                else
-                    ScreenBuf1x[slot] = NesColors[ppu_ram[(0x3f00 | (attrUse << 2)) + bgPixel] & 0x3f];
+                Buffer_BG_array[slot] = masked ? 0 : bgPixel;
+                ScreenBuf1x[slot] = (masked || bgPixel == 0)
+                    ? bgColor
+                    : NesColors[ppu_ram[(0x3f00 | (attrUse << 2)) + bgPixel] & 0x3f];
             }
         }
 
