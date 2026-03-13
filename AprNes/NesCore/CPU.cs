@@ -818,345 +818,356 @@ namespace AprNes
                         break;
 
                     // ===== ORA =====
-                    case 0x09: // ORA Imm GetImmediate(); Op_ORA(dl); CompleteOperation(); break;
+                    case 0x09: // ORA Imm
+                        PollInterrupts(); GetImmediate(); Op_ORA(dl); CompleteOperation(); break;
                     case 0x05: // ORA ZP
                         if (operationCycle == 1) GetAddressZeroPage();
-                        else { Op_ORA(CpuRead(addressBus)); CompleteOperation(); }
+                        else { PollInterrupts(); Op_ORA(CpuRead(addressBus)); CompleteOperation(); }
                         break;
                     case 0x15: // ORA ZP,X
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
-                            case 3: Op_ORA(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); Op_ORA(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
                     case 0x0D: // ORA Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
-                            case 3: Op_ORA(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); Op_ORA(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
                     case 0x1D: // ORA Abs,X
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffX(true); break;
-                            case 4: Op_ORA(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); Op_ORA(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
                     case 0x19: // ORA Abs,Y
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(true); break;
-                            case 4: Op_ORA(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); Op_ORA(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
                     case 0x01: // ORA (Ind,X)
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
-                            case 5: Op_ORA(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_ORA(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
                     case 0x11: // ORA (Ind),Y
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(true); break;
-                            case 5: Op_ORA(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_ORA(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
 
                     // ===== AND =====
-                    case 0x29: // AND Imm GetImmediate(); Op_AND(dl); CompleteOperation(); break;
+                    case 0x29: // AND Imm
+                        PollInterrupts(); GetImmediate(); Op_AND(dl); CompleteOperation(); break;
                     case 0x25: // AND ZP
                         if (operationCycle == 1) GetAddressZeroPage();
-                        else { Op_AND(CpuRead(addressBus)); CompleteOperation(); }
+                        else { PollInterrupts(); Op_AND(CpuRead(addressBus)); CompleteOperation(); }
                         break;
                     case 0x35: // AND ZP,X
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
-                            case 3: Op_AND(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); Op_AND(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
                     case 0x2D: // AND Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
-                            case 3: Op_AND(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); Op_AND(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
                     case 0x3D: // AND Abs,X
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffX(true); break;
-                            case 4: Op_AND(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); Op_AND(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
                     case 0x39: // AND Abs,Y
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(true); break;
-                            case 4: Op_AND(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); Op_AND(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
                     case 0x21: // AND (Ind,X)
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
-                            case 5: Op_AND(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_AND(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
                     case 0x31: // AND (Ind),Y
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(true); break;
-                            case 5: Op_AND(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_AND(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
 
                     // ===== EOR =====
-                    case 0x49: // EOR Imm GetImmediate(); Op_EOR(dl); CompleteOperation(); break;
+                    case 0x49: // EOR Imm
+                        PollInterrupts(); GetImmediate(); Op_EOR(dl); CompleteOperation(); break;
                     case 0x45: // EOR ZP
                         if (operationCycle == 1) GetAddressZeroPage();
-                        else { Op_EOR(CpuRead(addressBus)); CompleteOperation(); }
+                        else { PollInterrupts(); Op_EOR(CpuRead(addressBus)); CompleteOperation(); }
                         break;
                     case 0x55: // EOR ZP,X
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
-                            case 3: Op_EOR(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); Op_EOR(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
                     case 0x4D: // EOR Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
-                            case 3: Op_EOR(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); Op_EOR(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
                     case 0x5D: // EOR Abs,X
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffX(true); break;
-                            case 4: Op_EOR(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); Op_EOR(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
                     case 0x59: // EOR Abs,Y
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(true); break;
-                            case 4: Op_EOR(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); Op_EOR(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
                     case 0x41: // EOR (Ind,X)
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
-                            case 5: Op_EOR(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_EOR(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
                     case 0x51: // EOR (Ind),Y
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(true); break;
-                            case 5: Op_EOR(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_EOR(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
 
                     // ===== ADC =====
-                    case 0x69: // ADC Imm GetImmediate(); Op_ADC(dl); CompleteOperation(); break;
+                    case 0x69: // ADC Imm
+                        PollInterrupts(); GetImmediate(); Op_ADC(dl); CompleteOperation(); break;
                     case 0x65: // ADC ZP
                         if (operationCycle == 1) GetAddressZeroPage();
-                        else { Op_ADC(CpuRead(addressBus)); CompleteOperation(); }
+                        else { PollInterrupts(); Op_ADC(CpuRead(addressBus)); CompleteOperation(); }
                         break;
                     case 0x75: // ADC ZP,X
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
-                            case 3: Op_ADC(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); Op_ADC(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
                     case 0x6D: // ADC Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
-                            case 3: Op_ADC(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); Op_ADC(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
                     case 0x7D: // ADC Abs,X
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffX(true); break;
-                            case 4: Op_ADC(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); Op_ADC(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
                     case 0x79: // ADC Abs,Y
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(true); break;
-                            case 4: Op_ADC(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); Op_ADC(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
                     case 0x61: // ADC (Ind,X)
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
-                            case 5: Op_ADC(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_ADC(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
                     case 0x71: // ADC (Ind),Y
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(true); break;
-                            case 5: Op_ADC(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_ADC(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
 
                     // ===== SBC =====
                     case 0xE9: // SBC Imm
-                    case 0xEB: // SBC Imm *** (unofficial) GetImmediate(); Op_SBC(dl); CompleteOperation(); break;
+                    case 0xEB: // SBC Imm *** (unofficial)
+                        PollInterrupts(); GetImmediate(); Op_SBC(dl); CompleteOperation(); break;
                     case 0xE5: // SBC ZP
                         if (operationCycle == 1) GetAddressZeroPage();
-                        else { Op_SBC(CpuRead(addressBus)); CompleteOperation(); }
+                        else { PollInterrupts(); Op_SBC(CpuRead(addressBus)); CompleteOperation(); }
                         break;
                     case 0xF5: // SBC ZP,X
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
-                            case 3: Op_SBC(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); Op_SBC(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
                     case 0xED: // SBC Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
-                            case 3: Op_SBC(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); Op_SBC(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
                     case 0xFD: // SBC Abs,X
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffX(true); break;
-                            case 4: Op_SBC(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); Op_SBC(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
                     case 0xF9: // SBC Abs,Y
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(true); break;
-                            case 4: Op_SBC(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); Op_SBC(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
                     case 0xE1: // SBC (Ind,X)
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
-                            case 5: Op_SBC(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_SBC(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
                     case 0xF1: // SBC (Ind),Y
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(true); break;
-                            case 5: Op_SBC(CpuRead(addressBus)); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_SBC(CpuRead(addressBus)); CompleteOperation(); break; }
                         break;
 
                     // ===== CMP =====
-                    case 0xC9: // CMP Imm GetImmediate(); Op_CMP(dl, r_A); CompleteOperation(); break;
+                    case 0xC9: // CMP Imm
+                        PollInterrupts(); GetImmediate(); Op_CMP(dl, r_A); CompleteOperation(); break;
                     case 0xC5: // CMP ZP
                         if (operationCycle == 1) GetAddressZeroPage();
-                        else { Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); }
+                        else { PollInterrupts(); Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); }
                         break;
                     case 0xD5: // CMP ZP,X
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
-                            case 3: Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); break; }
                         break;
                     case 0xCD: // CMP Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
-                            case 3: Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); break; }
                         break;
                     case 0xDD: // CMP Abs,X
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffX(true); break;
-                            case 4: Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); break; }
                         break;
                     case 0xD9: // CMP Abs,Y
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(true); break;
-                            case 4: Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); break; }
                         break;
                     case 0xC1: // CMP (Ind,X)
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
-                            case 5: Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); break; }
                         break;
                     case 0xD1: // CMP (Ind),Y
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(true); break;
-                            case 5: Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); break; }
                         break;
 
                     // ===== CPX =====
-                    case 0xE0: // CPX Imm GetImmediate(); Op_CMP(dl, r_X); CompleteOperation(); break;
+                    case 0xE0: // CPX Imm
+                        PollInterrupts(); GetImmediate(); Op_CMP(dl, r_X); CompleteOperation(); break;
                     case 0xE4: // CPX ZP
                         if (operationCycle == 1) GetAddressZeroPage();
-                        else { Op_CMP(CpuRead(addressBus), r_X); CompleteOperation(); }
+                        else { PollInterrupts(); Op_CMP(CpuRead(addressBus), r_X); CompleteOperation(); }
                         break;
                     case 0xEC: // CPX Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
-                            case 3: Op_CMP(CpuRead(addressBus), r_X); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); Op_CMP(CpuRead(addressBus), r_X); CompleteOperation(); break; }
                         break;
 
                     // ===== CPY =====
-                    case 0xC0: // CPY Imm GetImmediate(); Op_CMP(dl, r_Y); CompleteOperation(); break;
+                    case 0xC0: // CPY Imm
+                        PollInterrupts(); GetImmediate(); Op_CMP(dl, r_Y); CompleteOperation(); break;
                     case 0xC4: // CPY ZP
                         if (operationCycle == 1) GetAddressZeroPage();
-                        else { Op_CMP(CpuRead(addressBus), r_Y); CompleteOperation(); }
+                        else { PollInterrupts(); Op_CMP(CpuRead(addressBus), r_Y); CompleteOperation(); }
                         break;
                     case 0xCC: // CPY Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
-                            case 3: Op_CMP(CpuRead(addressBus), r_Y); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); Op_CMP(CpuRead(addressBus), r_Y); CompleteOperation(); break; }
                         break;
 
                     // ===== LDA =====
-                    case 0xA9: // LDA Imm GetImmediate(); r_A = dl; SetNZ(r_A); CompleteOperation(); break;
+                    case 0xA9: // LDA Imm
+                        PollInterrupts(); GetImmediate(); r_A = dl; SetNZ(r_A); CompleteOperation(); break;
                     case 0xA5: // LDA ZP
                         if (operationCycle == 1) GetAddressZeroPage();
-                        else { r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); }
+                        else { PollInterrupts(); r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); }
                         break;
                     case 0xB5: // LDA ZP,X
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
-                            case 3: r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); break; }
                         break;
                     case 0xAD: // LDA Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
-                            case 3: r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); break; }
                         break;
                     case 0xBD: // LDA Abs,X
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffX(true); break;
-                            case 4: r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); break; }
                         break;
                     case 0xB9: // LDA Abs,Y
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(true); break;
-                            case 4: r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); break; }
                         break;
                     case 0xA1: // LDA (Ind,X)
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
-                            case 5: r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); break; }
                         break;
                     case 0xB1: // LDA (Ind),Y
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(true); break;
-                            case 5: r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); break; }
                         break;
 
                     // ===== LDX =====
-                    case 0xA2: // LDX Imm GetImmediate(); r_X = dl; SetNZ(r_X); CompleteOperation(); break;
+                    case 0xA2: // LDX Imm
+                        PollInterrupts(); GetImmediate(); r_X = dl; SetNZ(r_X); CompleteOperation(); break;
                     case 0xA6: // LDX ZP
                         if (operationCycle == 1) GetAddressZeroPage();
-                        else { r_X = CpuRead(addressBus); SetNZ(r_X); CompleteOperation(); }
+                        else { PollInterrupts(); r_X = CpuRead(addressBus); SetNZ(r_X); CompleteOperation(); }
                         break;
                     case 0xB6: // LDX ZP,Y
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffY(); break;
-                            case 3: r_X = CpuRead(addressBus); SetNZ(r_X); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); r_X = CpuRead(addressBus); SetNZ(r_X); CompleteOperation(); break; }
                         break;
                     case 0xAE: // LDX Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
-                            case 3: r_X = CpuRead(addressBus); SetNZ(r_X); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); r_X = CpuRead(addressBus); SetNZ(r_X); CompleteOperation(); break; }
                         break;
                     case 0xBE: // LDX Abs,Y
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(true); break;
-                            case 4: r_X = CpuRead(addressBus); SetNZ(r_X); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); r_X = CpuRead(addressBus); SetNZ(r_X); CompleteOperation(); break; }
                         break;
 
                     // ===== LDY =====
-                    case 0xA0: // LDY Imm GetImmediate(); r_Y = dl; SetNZ(r_Y); CompleteOperation(); break;
+                    case 0xA0: // LDY Imm
+                        PollInterrupts(); GetImmediate(); r_Y = dl; SetNZ(r_Y); CompleteOperation(); break;
                     case 0xA4: // LDY ZP
                         if (operationCycle == 1) GetAddressZeroPage();
-                        else { r_Y = CpuRead(addressBus); SetNZ(r_Y); CompleteOperation(); }
+                        else { PollInterrupts(); r_Y = CpuRead(addressBus); SetNZ(r_Y); CompleteOperation(); }
                         break;
                     case 0xB4: // LDY ZP,X
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
-                            case 3: r_Y = CpuRead(addressBus); SetNZ(r_Y); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); r_Y = CpuRead(addressBus); SetNZ(r_Y); CompleteOperation(); break; }
                         break;
                     case 0xAC: // LDY Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
-                            case 3: r_Y = CpuRead(addressBus); SetNZ(r_Y); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); r_Y = CpuRead(addressBus); SetNZ(r_Y); CompleteOperation(); break; }
                         break;
                     case 0xBC: // LDY Abs,X
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffX(true); break;
-                            case 4: r_Y = CpuRead(addressBus); SetNZ(r_Y); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); r_Y = CpuRead(addressBus); SetNZ(r_Y); CompleteOperation(); break; }
                         break;
 
                     // ===== STA =====
                     case 0x85: // STA ZP
                         if (operationCycle == 1) { GetAddressZeroPage(); CPU_Read = false; }
-                        else { CpuWrite(addressBus, r_A); CompleteOperation(); }
+                        else { PollInterrupts(); CpuWrite(addressBus, r_A); CompleteOperation(); }
                         break;
                     case 0x95: // STA ZP,X
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); if (operationCycle == 2) CPU_Read = false; break;
-                            case 3: CpuWrite(addressBus, r_A); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); CpuWrite(addressBus, r_A); CompleteOperation(); break; }
                         break;
                     case 0x8D: // STA Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); if (operationCycle == 2) CPU_Read = false; break;
-                            case 3: CpuWrite(addressBus, r_A); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); CpuWrite(addressBus, r_A); CompleteOperation(); break; }
                         break;
                     case 0x9D: // STA Abs,X
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffX(false); if (operationCycle == 3) CPU_Read = false; break;
-                            case 4: CpuWrite(addressBus, r_A); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); CpuWrite(addressBus, r_A); CompleteOperation(); break; }
                         break;
                     case 0x99: // STA Abs,Y
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(false); if (operationCycle == 3) CPU_Read = false; break;
-                            case 4: CpuWrite(addressBus, r_A); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); CpuWrite(addressBus, r_A); CompleteOperation(); break; }
                         break;
                     case 0x81: // STA (Ind,X)
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); if (operationCycle == 4) CPU_Read = false; break;
-                            case 5: CpuWrite(addressBus, r_A); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); CpuWrite(addressBus, r_A); CompleteOperation(); break; }
                         break;
                     case 0x91: // STA (Ind),Y
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(false); if (operationCycle == 4) CPU_Read = false; break;
-                            case 5: CpuWrite(addressBus, r_A); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); CpuWrite(addressBus, r_A); CompleteOperation(); break; }
                         break;
 
                     // ===== STX =====
                     case 0x86: // STX ZP
                         if (operationCycle == 1) { GetAddressZeroPage(); CPU_Read = false; }
-                        else { CpuWrite(addressBus, r_X); CompleteOperation(); }
+                        else { PollInterrupts(); CpuWrite(addressBus, r_X); CompleteOperation(); }
                         break;
                     case 0x96: // STX ZP,Y
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffY(); if (operationCycle == 2) CPU_Read = false; break;
-                            case 3: CpuWrite(addressBus, r_X); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); CpuWrite(addressBus, r_X); CompleteOperation(); break; }
                         break;
                     case 0x8E: // STX Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); if (operationCycle == 2) CPU_Read = false; break;
-                            case 3: CpuWrite(addressBus, r_X); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); CpuWrite(addressBus, r_X); CompleteOperation(); break; }
                         break;
 
                     // ===== STY =====
                     case 0x84: // STY ZP
                         if (operationCycle == 1) { GetAddressZeroPage(); CPU_Read = false; }
-                        else { CpuWrite(addressBus, r_Y); CompleteOperation(); }
+                        else { PollInterrupts(); CpuWrite(addressBus, r_Y); CompleteOperation(); }
                         break;
                     case 0x94: // STY ZP,X
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); if (operationCycle == 2) CPU_Read = false; break;
-                            case 3: CpuWrite(addressBus, r_Y); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); CpuWrite(addressBus, r_Y); CompleteOperation(); break; }
                         break;
                     case 0x8C: // STY Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); if (operationCycle == 2) CPU_Read = false; break;
-                            case 3: CpuWrite(addressBus, r_Y); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); CpuWrite(addressBus, r_Y); CompleteOperation(); break; }
                         break;
 
                     // ===== BIT =====
                     case 0x24: // BIT ZP
                         switch (operationCycle) { case 1: GetAddressZeroPage(); break;
-                            case 2: dl = CpuRead(addressBus);
+                            case 2: PollInterrupts(); dl = CpuRead(addressBus);
                                 flagZ = (byte)(((r_A & dl) == 0) ? 1 : 0);
                                 flagN = (byte)((dl & 0x80) >> 7);
                                 flagV = (byte)((dl & 0x40) >> 6);
@@ -1164,7 +1175,7 @@ namespace AprNes
                         break;
                     case 0x2C: // BIT Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
-                            case 3: dl = CpuRead(addressBus);
+                            case 3: PollInterrupts(); dl = CpuRead(addressBus);
                                 flagZ = (byte)(((r_A & dl) == 0) ? 1 : 0);
                                 flagN = (byte)((dl & 0x80) >> 7);
                                 flagV = (byte)((dl & 0x40) >> 6);
@@ -1172,115 +1183,119 @@ namespace AprNes
                         break;
 
                     // ===== ASL =====
-                    case 0x0A: // ASL A CpuRead(addressBus); // dummy read
+                    case 0x0A: // ASL A
+                        PollInterrupts(); CpuRead(addressBus); // dummy read
                         flagC = (byte)((r_A & 0x80) >> 7); r_A <<= 1; SetNZ(r_A);
                         CompleteOperation(); break;
                     case 0x06: // ASL ZP
                         switch (operationCycle) { case 1: GetAddressZeroPage(); break;
                             case 2: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 3: CpuWrite(addressBus, dl); break; // dummy write
-                            case 4: Op_ASL_mem(addressBus); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); Op_ASL_mem(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x16: // ASL ZP,X
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
                             case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 4: CpuWrite(addressBus, dl); break;
-                            case 5: Op_ASL_mem(addressBus); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_ASL_mem(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x0E: // ASL Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
                             case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 4: CpuWrite(addressBus, dl); break;
-                            case 5: Op_ASL_mem(addressBus); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_ASL_mem(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x1E: // ASL Abs,X
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffX(false); if (operationCycle == 4) CPU_Read = false; break;
                             case 5: CpuWrite(addressBus, dl); break;
-                            case 6: Op_ASL_mem(addressBus); CompleteOperation(); break; }
+                            case 6: PollInterrupts(); Op_ASL_mem(addressBus); CompleteOperation(); break; }
                         break;
 
                     // ===== LSR =====
-                    case 0x4A: // LSR A CpuRead(addressBus);
+                    case 0x4A: // LSR A
+                        PollInterrupts(); CpuRead(addressBus);
                         flagC = (byte)(r_A & 1); r_A >>= 1; SetNZ(r_A);
                         CompleteOperation(); break;
                     case 0x46: // LSR ZP
                         switch (operationCycle) { case 1: GetAddressZeroPage(); break;
                             case 2: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 3: CpuWrite(addressBus, dl); break;
-                            case 4: Op_LSR_mem(addressBus); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); Op_LSR_mem(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x56: // LSR ZP,X
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
                             case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 4: CpuWrite(addressBus, dl); break;
-                            case 5: Op_LSR_mem(addressBus); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_LSR_mem(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x4E: // LSR Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
                             case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 4: CpuWrite(addressBus, dl); break;
-                            case 5: Op_LSR_mem(addressBus); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_LSR_mem(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x5E: // LSR Abs,X
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffX(false); if (operationCycle == 4) CPU_Read = false; break;
                             case 5: CpuWrite(addressBus, dl); break;
-                            case 6: Op_LSR_mem(addressBus); CompleteOperation(); break; }
+                            case 6: PollInterrupts(); Op_LSR_mem(addressBus); CompleteOperation(); break; }
                         break;
 
                     // ===== ROL =====
-                    case 0x2A: // ROL A CpuRead(addressBus);
+                    case 0x2A: // ROL A
+                        PollInterrupts(); CpuRead(addressBus);
                         { byte oc = flagC; flagC = (byte)((r_A & 0x80) >> 7); r_A = (byte)((r_A << 1) | oc); SetNZ(r_A); }
                         CompleteOperation(); break;
                     case 0x26: // ROL ZP
                         switch (operationCycle) { case 1: GetAddressZeroPage(); break;
                             case 2: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 3: CpuWrite(addressBus, dl); break;
-                            case 4: Op_ROL_mem(addressBus); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); Op_ROL_mem(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x36: // ROL ZP,X
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
                             case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 4: CpuWrite(addressBus, dl); break;
-                            case 5: Op_ROL_mem(addressBus); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_ROL_mem(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x2E: // ROL Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
                             case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 4: CpuWrite(addressBus, dl); break;
-                            case 5: Op_ROL_mem(addressBus); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_ROL_mem(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x3E: // ROL Abs,X
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffX(false); if (operationCycle == 4) CPU_Read = false; break;
                             case 5: CpuWrite(addressBus, dl); break;
-                            case 6: Op_ROL_mem(addressBus); CompleteOperation(); break; }
+                            case 6: PollInterrupts(); Op_ROL_mem(addressBus); CompleteOperation(); break; }
                         break;
 
                     // ===== ROR =====
-                    case 0x6A: // ROR A CpuRead(addressBus);
+                    case 0x6A: // ROR A
+                        PollInterrupts(); CpuRead(addressBus);
                         { byte oc = flagC; flagC = (byte)(r_A & 1); r_A = (byte)((r_A >> 1) | (oc << 7)); SetNZ(r_A); }
                         CompleteOperation(); break;
                     case 0x66: // ROR ZP
                         switch (operationCycle) { case 1: GetAddressZeroPage(); break;
                             case 2: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 3: CpuWrite(addressBus, dl); break;
-                            case 4: Op_ROR_mem(addressBus); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); Op_ROR_mem(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x76: // ROR ZP,X
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
                             case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 4: CpuWrite(addressBus, dl); break;
-                            case 5: Op_ROR_mem(addressBus); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_ROR_mem(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x6E: // ROR Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
                             case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 4: CpuWrite(addressBus, dl); break;
-                            case 5: Op_ROR_mem(addressBus); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_ROR_mem(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x7E: // ROR Abs,X
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffX(false); if (operationCycle == 4) CPU_Read = false; break;
                             case 5: CpuWrite(addressBus, dl); break;
-                            case 6: Op_ROR_mem(addressBus); CompleteOperation(); break; }
+                            case 6: PollInterrupts(); Op_ROR_mem(addressBus); CompleteOperation(); break; }
                         break;
 
                     // ===== INC =====
@@ -1288,24 +1303,24 @@ namespace AprNes
                         switch (operationCycle) { case 1: GetAddressZeroPage(); break;
                             case 2: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 3: CpuWrite(addressBus, dl); break;
-                            case 4: Op_INC_mem(addressBus); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); Op_INC_mem(addressBus); CompleteOperation(); break; }
                         break;
                     case 0xF6: // INC ZP,X
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
                             case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 4: CpuWrite(addressBus, dl); break;
-                            case 5: Op_INC_mem(addressBus); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_INC_mem(addressBus); CompleteOperation(); break; }
                         break;
                     case 0xEE: // INC Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
                             case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 4: CpuWrite(addressBus, dl); break;
-                            case 5: Op_INC_mem(addressBus); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_INC_mem(addressBus); CompleteOperation(); break; }
                         break;
                     case 0xFE: // INC Abs,X
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffX(false); if (operationCycle == 4) CPU_Read = false; break;
                             case 5: CpuWrite(addressBus, dl); break;
-                            case 6: Op_INC_mem(addressBus); CompleteOperation(); break; }
+                            case 6: PollInterrupts(); Op_INC_mem(addressBus); CompleteOperation(); break; }
                         break;
 
                     // ===== DEC =====
@@ -1313,67 +1328,84 @@ namespace AprNes
                         switch (operationCycle) { case 1: GetAddressZeroPage(); break;
                             case 2: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 3: CpuWrite(addressBus, dl); break;
-                            case 4: Op_DEC_mem(addressBus); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); Op_DEC_mem(addressBus); CompleteOperation(); break; }
                         break;
                     case 0xD6: // DEC ZP,X
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
                             case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 4: CpuWrite(addressBus, dl); break;
-                            case 5: Op_DEC_mem(addressBus); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_DEC_mem(addressBus); CompleteOperation(); break; }
                         break;
                     case 0xCE: // DEC Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
                             case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 4: CpuWrite(addressBus, dl); break;
-                            case 5: Op_DEC_mem(addressBus); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_DEC_mem(addressBus); CompleteOperation(); break; }
                         break;
                     case 0xDE: // DEC Abs,X
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffX(false); if (operationCycle == 4) CPU_Read = false; break;
                             case 5: CpuWrite(addressBus, dl); break;
-                            case 6: Op_DEC_mem(addressBus); CompleteOperation(); break; }
+                            case 6: PollInterrupts(); Op_DEC_mem(addressBus); CompleteOperation(); break; }
                         break;
 
                     // ===== INX/INY/DEX/DEY =====
-                    case 0xE8: // INX CpuRead(addressBus); r_X++; SetNZ(r_X); CompleteOperation(); break;
-                    case 0xC8: // INY CpuRead(addressBus); r_Y++; SetNZ(r_Y); CompleteOperation(); break;
-                    case 0xCA: // DEX CpuRead(addressBus); r_X--; SetNZ(r_X); CompleteOperation(); break;
-                    case 0x88: // DEY CpuRead(addressBus); r_Y--; SetNZ(r_Y); CompleteOperation(); break;
+                    case 0xE8: // INX
+                        PollInterrupts(); CpuRead(addressBus); r_X++; SetNZ(r_X); CompleteOperation(); break;
+                    case 0xC8: // INY
+                        PollInterrupts(); CpuRead(addressBus); r_Y++; SetNZ(r_Y); CompleteOperation(); break;
+                    case 0xCA: // DEX
+                        PollInterrupts(); CpuRead(addressBus); r_X--; SetNZ(r_X); CompleteOperation(); break;
+                    case 0x88: // DEY
+                        PollInterrupts(); CpuRead(addressBus); r_Y--; SetNZ(r_Y); CompleteOperation(); break;
 
                     // ===== Transfer =====
-                    case 0xAA: // TAX r_X = r_A; CpuRead(addressBus); SetNZ(r_X); CompleteOperation(); break;
-                    case 0x8A: // TXA r_A = r_X; CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); break;
-                    case 0xA8: // TAY r_Y = r_A; CpuRead(addressBus); SetNZ(r_Y); CompleteOperation(); break;
-                    case 0x98: // TYA r_A = r_Y; CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); break;
-                    case 0xBA: // TSX r_X = r_SP; CpuRead(addressBus); SetNZ(r_X); CompleteOperation(); break;
-                    case 0x9A: // TXS r_SP = r_X; CpuRead(addressBus); CompleteOperation(); break;
+                    case 0xAA: // TAX
+                        PollInterrupts(); r_X = r_A; CpuRead(addressBus); SetNZ(r_X); CompleteOperation(); break;
+                    case 0x8A: // TXA
+                        PollInterrupts(); r_A = r_X; CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); break;
+                    case 0xA8: // TAY
+                        PollInterrupts(); r_Y = r_A; CpuRead(addressBus); SetNZ(r_Y); CompleteOperation(); break;
+                    case 0x98: // TYA
+                        PollInterrupts(); r_A = r_Y; CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); break;
+                    case 0xBA: // TSX
+                        PollInterrupts(); r_X = r_SP; CpuRead(addressBus); SetNZ(r_X); CompleteOperation(); break;
+                    case 0x9A: // TXS
+                        PollInterrupts(); r_SP = r_X; CpuRead(addressBus); CompleteOperation(); break;
 
                     // ===== Flag instructions =====
-                    case 0x18: // CLC CpuRead(addressBus); flagC = 0; CompleteOperation(); break;
-                    case 0x38: // SEC CpuRead(addressBus); flagC = 1; CompleteOperation(); break;
-                    case 0x58: // CLI CpuRead(addressBus); flagI = 0; CompleteOperation(); break;
-                    case 0x78: // SEI CpuRead(addressBus); flagI = 1; CompleteOperation(); break;
-                    case 0xD8: // CLD CpuRead(addressBus); flagD = 0; CompleteOperation(); break;
-                    case 0xF8: // SED CpuRead(addressBus); flagD = 1; CompleteOperation(); break;
-                    case 0xB8: // CLV CpuRead(addressBus); flagV = 0; CompleteOperation(); break;
+                    case 0x18: // CLC
+                        PollInterrupts(); CpuRead(addressBus); flagC = 0; CompleteOperation(); break;
+                    case 0x38: // SEC
+                        PollInterrupts(); CpuRead(addressBus); flagC = 1; CompleteOperation(); break;
+                    case 0x58: // CLI
+                        PollInterrupts(); CpuRead(addressBus); flagI = 0; CompleteOperation(); break;
+                    case 0x78: // SEI
+                        PollInterrupts(); CpuRead(addressBus); flagI = 1; CompleteOperation(); break;
+                    case 0xD8: // CLD
+                        PollInterrupts(); CpuRead(addressBus); flagD = 0; CompleteOperation(); break;
+                    case 0xF8: // SED
+                        PollInterrupts(); CpuRead(addressBus); flagD = 1; CompleteOperation(); break;
+                    case 0xB8: // CLV
+                        PollInterrupts(); CpuRead(addressBus); flagV = 0; CompleteOperation(); break;
 
                     // ===== Stack instructions =====
                     case 0x48: // PHA
                         switch (operationCycle) { case 1: CpuRead(addressBus); break; // dummy fetch
-                            case 2: StackPush(r_A); CompleteOperation(); break; }
+                            case 2: PollInterrupts(); StackPush(r_A); CompleteOperation(); break; }
                         break;
                     case 0x08: // PHP
                         switch (operationCycle) { case 1: CpuRead(addressBus); break;
-                            case 2: StackPush((byte)(GetFlag() | 0x30)); CompleteOperation(); break; }
+                            case 2: PollInterrupts(); StackPush((byte)(GetFlag() | 0x30)); CompleteOperation(); break; }
                         break;
                     case 0x68: // PLA
                         switch (operationCycle) { case 1: CpuRead(addressBus); break; // dummy fetch
                             case 2: CpuRead((ushort)(0x100 | r_SP)); r_SP++; break; // dummy stack read
-                            case 3: r_A = CpuRead((ushort)(0x100 | r_SP)); SetNZ(r_A); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); r_A = CpuRead((ushort)(0x100 | r_SP)); SetNZ(r_A); CompleteOperation(); break; }
                         break;
                     case 0x28: // PLP
                         switch (operationCycle) { case 1: CpuRead(addressBus); break;
                             case 2: CpuRead((ushort)(0x100 | r_SP)); r_SP++; break;
-                            case 3: SetFlag(CpuRead((ushort)(0x100 | r_SP))); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); SetFlag(CpuRead((ushort)(0x100 | r_SP))); CompleteOperation(); break; }
                         break;
 
                     // ===== Branches =====
@@ -1389,13 +1421,13 @@ namespace AprNes
                     // ===== JMP =====
                     case 0x4C: // JMP abs
                         if (operationCycle == 1) GetAddressAbsolute();
-                        else { GetAddressAbsolute(); r_PC = addressBus; CompleteOperation(); }
+                        else { PollInterrupts(); GetAddressAbsolute(); r_PC = addressBus; CompleteOperation(); }
                         break;
                     case 0x6C: // JMP (ind)
                         switch (operationCycle) {
                             case 1: case 2: GetAddressAbsolute(); break;
                             case 3: specialBus = CpuRead(addressBus); break;
-                            case 4: 
+                            case 4: PollInterrupts();
                                 dl = CpuRead((ushort)((addressBus & 0xFF00) | (byte)(addressBus + 1)));
                                 r_PC = (ushort)((dl << 8) | specialBus);
                                 CompleteOperation(); break;
@@ -1427,6 +1459,7 @@ namespace AprNes
                                 CPU_Read = true;
                                 break;
                             case 5:
+                                PollInterrupts();
                                 r_PC = (ushort)((CpuRead(r_PC) << 8) | specialBus);
                                 CompleteOperation();
                                 break;
@@ -1452,6 +1485,7 @@ namespace AprNes
                                 r_PC = (ushort)((r_PC & 0xFF) | (dl << 8));
                                 break;
                             case 5:
+                                PollInterrupts();
                                 r_SP = (byte)addressBus;
                                 GetImmediate(); // PC++ (skip return address)
                                 CompleteOperation();
@@ -1481,6 +1515,7 @@ namespace AprNes
                                 addressBus = (ushort)((byte)(addressBus + 1) | 0x100);
                                 break;
                             case 5:
+                                PollInterrupts();
                                 dl = CpuRead(addressBus);
                                 r_PC = (ushort)((r_PC & 0xFF) | (dl << 8));
                                 r_SP = (byte)addressBus;
@@ -1491,33 +1526,35 @@ namespace AprNes
 
                     // ===== NOP =====
                     case 0xEA: // NOP
-                    case 0x1A: case 0x3A: case 0x5A: case 0x7A: case 0xDA: case 0xFA: // NOP *** (implied) CpuRead(addressBus); CompleteOperation(); break;
+                    case 0x1A: case 0x3A: case 0x5A: case 0x7A: case 0xDA: case 0xFA: // NOP *** (implied)
+                        PollInterrupts(); CpuRead(addressBus); CompleteOperation(); break;
 
                     // ===== DOP (Double NOP) *** - Immediate =====
-                    case 0x80: case 0x82: case 0x89: case 0xC2: case 0xE2: GetImmediate(); CompleteOperation(); break;
+                    case 0x80: case 0x82: case 0x89: case 0xC2: case 0xE2:
+                        PollInterrupts(); GetImmediate(); CompleteOperation(); break;
 
                     // ===== DOP *** - ZeroPage =====
                     case 0x04: case 0x44: case 0x64:
                         if (operationCycle == 1) GetAddressZeroPage();
-                        else { CpuRead(addressBus); CompleteOperation(); }
+                        else { PollInterrupts(); CpuRead(addressBus); CompleteOperation(); }
                         break;
 
                     // ===== DOP *** - ZeroPage,X =====
                     case 0x14: case 0x34: case 0x54: case 0x74: case 0xD4: case 0xF4:
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
-                            case 3: CpuRead(addressBus); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); CpuRead(addressBus); CompleteOperation(); break; }
                         break;
 
                     // ===== TOP (Triple NOP) *** - Absolute =====
                     case 0x0C:
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
-                            case 3: CpuRead(addressBus); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); CpuRead(addressBus); CompleteOperation(); break; }
                         break;
 
                     // ===== TOP *** - Absolute,X =====
                     case 0x1C: case 0x3C: case 0x5C: case 0x7C: case 0xDC: case 0xFC:
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffX(true); break;
-                            case 4: CpuRead(addressBus); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); CpuRead(addressBus); CompleteOperation(); break; }
                         break;
 
                     // ===== SLO *** =====
@@ -1525,41 +1562,41 @@ namespace AprNes
                         switch (operationCycle) { case 1: GetAddressZeroPage(); break;
                             case 2: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 3: CpuWrite(addressBus, dl); break;
-                            case 4: Op_SLO(addressBus); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); Op_SLO(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x17: // SLO ZP,X
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
                             case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 4: CpuWrite(addressBus, dl); break;
-                            case 5: Op_SLO(addressBus); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_SLO(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x0F: // SLO Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
                             case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 4: CpuWrite(addressBus, dl); break;
-                            case 5: Op_SLO(addressBus); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_SLO(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x1F: // SLO Abs,X
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffX(false); if (operationCycle == 4) CPU_Read = false; break;
                             case 5: CpuWrite(addressBus, dl); break;
-                            case 6: Op_SLO(addressBus); CompleteOperation(); break; }
+                            case 6: PollInterrupts(); Op_SLO(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x1B: // SLO Abs,Y
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffY(false); if (operationCycle == 4) CPU_Read = false; break;
                             case 5: CpuWrite(addressBus, dl); break;
-                            case 6: Op_SLO(addressBus); CompleteOperation(); break; }
+                            case 6: PollInterrupts(); Op_SLO(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x03: // SLO (Ind,X)
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
                             case 5: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 6: CpuWrite(addressBus, dl); break;
-                            case 7: Op_SLO(addressBus); CompleteOperation(); break; }
+                            case 7: PollInterrupts(); Op_SLO(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x13: // SLO (Ind),Y
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(false); break;
                             case 5: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 6: CpuWrite(addressBus, dl); break;
-                            case 7: Op_SLO(addressBus); CompleteOperation(); break; }
+                            case 7: PollInterrupts(); Op_SLO(addressBus); CompleteOperation(); break; }
                         break;
 
                     // ===== RLA *** =====
@@ -1567,41 +1604,41 @@ namespace AprNes
                         switch (operationCycle) { case 1: GetAddressZeroPage(); break;
                             case 2: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 3: CpuWrite(addressBus, dl); break;
-                            case 4: Op_RLA(addressBus); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); Op_RLA(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x37: // RLA ZP,X
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
                             case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 4: CpuWrite(addressBus, dl); break;
-                            case 5: Op_RLA(addressBus); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_RLA(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x2F: // RLA Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
                             case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 4: CpuWrite(addressBus, dl); break;
-                            case 5: Op_RLA(addressBus); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_RLA(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x3F: // RLA Abs,X
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffX(false); if (operationCycle == 4) CPU_Read = false; break;
                             case 5: CpuWrite(addressBus, dl); break;
-                            case 6: Op_RLA(addressBus); CompleteOperation(); break; }
+                            case 6: PollInterrupts(); Op_RLA(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x3B: // RLA Abs,Y
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffY(false); if (operationCycle == 4) CPU_Read = false; break;
                             case 5: CpuWrite(addressBus, dl); break;
-                            case 6: Op_RLA(addressBus); CompleteOperation(); break; }
+                            case 6: PollInterrupts(); Op_RLA(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x23: // RLA (Ind,X)
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
                             case 5: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 6: CpuWrite(addressBus, dl); break;
-                            case 7: Op_RLA(addressBus); CompleteOperation(); break; }
+                            case 7: PollInterrupts(); Op_RLA(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x33: // RLA (Ind),Y
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(false); break;
                             case 5: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 6: CpuWrite(addressBus, dl); break;
-                            case 7: Op_RLA(addressBus); CompleteOperation(); break; }
+                            case 7: PollInterrupts(); Op_RLA(addressBus); CompleteOperation(); break; }
                         break;
 
                     // ===== SRE *** =====
@@ -1609,41 +1646,41 @@ namespace AprNes
                         switch (operationCycle) { case 1: GetAddressZeroPage(); break;
                             case 2: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 3: CpuWrite(addressBus, dl); break;
-                            case 4: Op_SRE(addressBus); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); Op_SRE(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x57: // SRE ZP,X
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
                             case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 4: CpuWrite(addressBus, dl); break;
-                            case 5: Op_SRE(addressBus); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_SRE(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x4F: // SRE Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
                             case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 4: CpuWrite(addressBus, dl); break;
-                            case 5: Op_SRE(addressBus); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_SRE(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x5F: // SRE Abs,X
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffX(false); if (operationCycle == 4) CPU_Read = false; break;
                             case 5: CpuWrite(addressBus, dl); break;
-                            case 6: Op_SRE(addressBus); CompleteOperation(); break; }
+                            case 6: PollInterrupts(); Op_SRE(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x5B: // SRE Abs,Y
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffY(false); if (operationCycle == 4) CPU_Read = false; break;
                             case 5: CpuWrite(addressBus, dl); break;
-                            case 6: Op_SRE(addressBus); CompleteOperation(); break; }
+                            case 6: PollInterrupts(); Op_SRE(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x43: // SRE (Ind,X)
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
                             case 5: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 6: CpuWrite(addressBus, dl); break;
-                            case 7: Op_SRE(addressBus); CompleteOperation(); break; }
+                            case 7: PollInterrupts(); Op_SRE(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x53: // SRE (Ind),Y
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(false); break;
                             case 5: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 6: CpuWrite(addressBus, dl); break;
-                            case 7: Op_SRE(addressBus); CompleteOperation(); break; }
+                            case 7: PollInterrupts(); Op_SRE(addressBus); CompleteOperation(); break; }
                         break;
 
                     // ===== RRA *** =====
@@ -1651,85 +1688,85 @@ namespace AprNes
                         switch (operationCycle) { case 1: GetAddressZeroPage(); break;
                             case 2: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 3: CpuWrite(addressBus, dl); break;
-                            case 4: Op_RRA(addressBus); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); Op_RRA(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x77: // RRA ZP,X
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
                             case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 4: CpuWrite(addressBus, dl); break;
-                            case 5: Op_RRA(addressBus); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_RRA(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x6F: // RRA Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
                             case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 4: CpuWrite(addressBus, dl); break;
-                            case 5: Op_RRA(addressBus); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_RRA(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x7F: // RRA Abs,X
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffX(false); if (operationCycle == 4) CPU_Read = false; break;
                             case 5: CpuWrite(addressBus, dl); break;
-                            case 6: Op_RRA(addressBus); CompleteOperation(); break; }
+                            case 6: PollInterrupts(); Op_RRA(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x7B: // RRA Abs,Y
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffY(false); if (operationCycle == 4) CPU_Read = false; break;
                             case 5: CpuWrite(addressBus, dl); break;
-                            case 6: Op_RRA(addressBus); CompleteOperation(); break; }
+                            case 6: PollInterrupts(); Op_RRA(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x63: // RRA (Ind,X)
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
                             case 5: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 6: CpuWrite(addressBus, dl); break;
-                            case 7: Op_RRA(addressBus); CompleteOperation(); break; }
+                            case 7: PollInterrupts(); Op_RRA(addressBus); CompleteOperation(); break; }
                         break;
                     case 0x73: // RRA (Ind),Y
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(false); break;
                             case 5: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 6: CpuWrite(addressBus, dl); break;
-                            case 7: Op_RRA(addressBus); CompleteOperation(); break; }
+                            case 7: PollInterrupts(); Op_RRA(addressBus); CompleteOperation(); break; }
                         break;
 
                     // ===== SAX *** =====
                     case 0x87: // SAX ZP
                         if (operationCycle == 1) { GetAddressZeroPage(); CPU_Read = false; }
-                        else { CpuWrite(addressBus, (byte)(r_A & r_X)); CompleteOperation(); }
+                        else { PollInterrupts(); CpuWrite(addressBus, (byte)(r_A & r_X)); CompleteOperation(); }
                         break;
                     case 0x97: // SAX ZP,Y
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffY(); if (operationCycle == 2) CPU_Read = false; break;
-                            case 3: CpuWrite(addressBus, (byte)(r_A & r_X)); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); CpuWrite(addressBus, (byte)(r_A & r_X)); CompleteOperation(); break; }
                         break;
                     case 0x8F: // SAX Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); if (operationCycle == 2) CPU_Read = false; break;
-                            case 3: CpuWrite(addressBus, (byte)(r_A & r_X)); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); CpuWrite(addressBus, (byte)(r_A & r_X)); CompleteOperation(); break; }
                         break;
                     case 0x83: // SAX (Ind,X)
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); if (operationCycle == 4) CPU_Read = false; break;
-                            case 5: CpuWrite(addressBus, (byte)(r_A & r_X)); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); CpuWrite(addressBus, (byte)(r_A & r_X)); CompleteOperation(); break; }
                         break;
 
                     // ===== LAX *** =====
                     case 0xA7: // LAX ZP
                         if (operationCycle == 1) GetAddressZeroPage();
-                        else { r_A = CpuRead(addressBus); r_X = r_A; SetNZ(r_X); CompleteOperation(); }
+                        else { PollInterrupts(); r_A = CpuRead(addressBus); r_X = r_A; SetNZ(r_X); CompleteOperation(); }
                         break;
                     case 0xB7: // LAX ZP,Y
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffY(); break;
-                            case 3: r_A = CpuRead(addressBus); r_X = r_A; SetNZ(r_X); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); r_A = CpuRead(addressBus); r_X = r_A; SetNZ(r_X); CompleteOperation(); break; }
                         break;
                     case 0xAF: // LAX Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
-                            case 3: r_A = CpuRead(addressBus); r_X = r_A; SetNZ(r_X); CompleteOperation(); break; }
+                            case 3: PollInterrupts(); r_A = CpuRead(addressBus); r_X = r_A; SetNZ(r_X); CompleteOperation(); break; }
                         break;
                     case 0xBF: // LAX Abs,Y
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(true); break;
-                            case 4: r_A = CpuRead(addressBus); r_X = r_A; SetNZ(r_X); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); r_A = CpuRead(addressBus); r_X = r_A; SetNZ(r_X); CompleteOperation(); break; }
                         break;
                     case 0xA3: // LAX (Ind,X)
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
-                            case 5: r_A = CpuRead(addressBus); r_X = r_A; SetNZ(r_X); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); r_A = CpuRead(addressBus); r_X = r_A; SetNZ(r_X); CompleteOperation(); break; }
                         break;
                     case 0xB3: // LAX (Ind),Y
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(true); break;
-                            case 5: r_A = CpuRead(addressBus); r_X = r_A; SetNZ(r_X); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); r_A = CpuRead(addressBus); r_X = r_A; SetNZ(r_X); CompleteOperation(); break; }
                         break;
 
                     // ===== DCP *** =====
@@ -1737,41 +1774,41 @@ namespace AprNes
                         switch (operationCycle) { case 1: GetAddressZeroPage(); break;
                             case 2: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 3: CpuWrite(addressBus, dl); break;
-                            case 4: Op_DCP(addressBus); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); Op_DCP(addressBus); CompleteOperation(); break; }
                         break;
                     case 0xD7: // DCP ZP,X
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
                             case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 4: CpuWrite(addressBus, dl); break;
-                            case 5: Op_DCP(addressBus); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_DCP(addressBus); CompleteOperation(); break; }
                         break;
                     case 0xCF: // DCP Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
                             case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 4: CpuWrite(addressBus, dl); break;
-                            case 5: Op_DCP(addressBus); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_DCP(addressBus); CompleteOperation(); break; }
                         break;
                     case 0xDF: // DCP Abs,X
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffX(false); if (operationCycle == 4) CPU_Read = false; break;
                             case 5: CpuWrite(addressBus, dl); break;
-                            case 6: Op_DCP(addressBus); CompleteOperation(); break; }
+                            case 6: PollInterrupts(); Op_DCP(addressBus); CompleteOperation(); break; }
                         break;
                     case 0xDB: // DCP Abs,Y
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffY(false); if (operationCycle == 4) CPU_Read = false; break;
                             case 5: CpuWrite(addressBus, dl); break;
-                            case 6: Op_DCP(addressBus); CompleteOperation(); break; }
+                            case 6: PollInterrupts(); Op_DCP(addressBus); CompleteOperation(); break; }
                         break;
                     case 0xC3: // DCP (Ind,X)
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
                             case 5: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 6: CpuWrite(addressBus, dl); break;
-                            case 7: Op_DCP(addressBus); CompleteOperation(); break; }
+                            case 7: PollInterrupts(); Op_DCP(addressBus); CompleteOperation(); break; }
                         break;
                     case 0xD3: // DCP (Ind),Y
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(false); break;
                             case 5: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 6: CpuWrite(addressBus, dl); break;
-                            case 7: Op_DCP(addressBus); CompleteOperation(); break; }
+                            case 7: PollInterrupts(); Op_DCP(addressBus); CompleteOperation(); break; }
                         break;
 
                     // ===== ISC (ISB) *** =====
@@ -1779,58 +1816,61 @@ namespace AprNes
                         switch (operationCycle) { case 1: GetAddressZeroPage(); break;
                             case 2: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 3: CpuWrite(addressBus, dl); break;
-                            case 4: Op_ISC(addressBus); CompleteOperation(); break; }
+                            case 4: PollInterrupts(); Op_ISC(addressBus); CompleteOperation(); break; }
                         break;
                     case 0xF7: // ISC ZP,X
                         switch (operationCycle) { case 1: case 2: GetAddressZPOffX(); break;
                             case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 4: CpuWrite(addressBus, dl); break;
-                            case 5: Op_ISC(addressBus); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_ISC(addressBus); CompleteOperation(); break; }
                         break;
                     case 0xEF: // ISC Abs
                         switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
                             case 3: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 4: CpuWrite(addressBus, dl); break;
-                            case 5: Op_ISC(addressBus); CompleteOperation(); break; }
+                            case 5: PollInterrupts(); Op_ISC(addressBus); CompleteOperation(); break; }
                         break;
                     case 0xFF: // ISC Abs,X
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffX(false); if (operationCycle == 4) CPU_Read = false; break;
                             case 5: CpuWrite(addressBus, dl); break;
-                            case 6: Op_ISC(addressBus); CompleteOperation(); break; }
+                            case 6: PollInterrupts(); Op_ISC(addressBus); CompleteOperation(); break; }
                         break;
                     case 0xFB: // ISC Abs,Y
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressAbsOffY(false); if (operationCycle == 4) CPU_Read = false; break;
                             case 5: CpuWrite(addressBus, dl); break;
-                            case 6: Op_ISC(addressBus); CompleteOperation(); break; }
+                            case 6: PollInterrupts(); Op_ISC(addressBus); CompleteOperation(); break; }
                         break;
                     case 0xE3: // ISC (Ind,X)
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffX(); break;
                             case 5: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 6: CpuWrite(addressBus, dl); break;
-                            case 7: Op_ISC(addressBus); CompleteOperation(); break; }
+                            case 7: PollInterrupts(); Op_ISC(addressBus); CompleteOperation(); break; }
                         break;
                     case 0xF3: // ISC (Ind),Y
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(false); break;
                             case 5: dl = CpuRead(addressBus); CPU_Read = false; break;
                             case 6: CpuWrite(addressBus, dl); break;
-                            case 7: Op_ISC(addressBus); CompleteOperation(); break; }
+                            case 7: PollInterrupts(); Op_ISC(addressBus); CompleteOperation(); break; }
                         break;
 
                     // ===== ANC *** =====
-                    case 0x0B: case 0x2B: GetImmediate();
+                    case 0x0B: case 0x2B:
+                        PollInterrupts(); GetImmediate();
                         r_A = (byte)(r_A & dl);
                         flagC = (byte)((r_A & 0x80) >> 7);
                         SetNZ(r_A);
                         CompleteOperation(); break;
 
                     // ===== ALR (ASR) *** =====
-                    case 0x4B: GetImmediate();
+                    case 0x4B:
+                        PollInterrupts(); GetImmediate();
                         r_A = (byte)(r_A & dl);
                         flagC = (byte)(r_A & 1); r_A >>= 1; SetNZ(r_A);
                         CompleteOperation(); break;
 
                     // ===== ARR *** =====
-                    case 0x6B: GetImmediate();
+                    case 0x6B:
+                        PollInterrupts(); GetImmediate();
                         r_A = (byte)(r_A & dl);
                         { byte oc = flagC; flagC = (byte)(r_A & 1); r_A = (byte)((r_A >> 1) | (oc << 7)); }
                         SetNZ(r_A);
@@ -1839,7 +1879,8 @@ namespace AprNes
                         CompleteOperation(); break;
 
                     // ===== SBX (AXS) *** =====
-                    case 0xCB: GetImmediate();
+                    case 0xCB:
+                        PollInterrupts(); GetImmediate();
                         {
                             int tmp = (r_A & r_X) - dl;
                             flagC = (tmp >= 0) ? (byte)1 : (byte)0;
@@ -1849,13 +1890,15 @@ namespace AprNes
                         CompleteOperation(); break;
 
                     // ===== ANE (XAA) *** =====
-                    case 0x8B: GetImmediate();
+                    case 0x8B:
+                        PollInterrupts(); GetImmediate();
                         r_A = (byte)((r_A | 0xFF) & r_X & dl); // MAGIC = 0xFF
                         SetNZ(r_A);
                         CompleteOperation(); break;
 
                     // ===== LXA (LAX imm) *** =====
-                    case 0xAB: GetImmediate();
+                    case 0xAB:
+                        PollInterrupts(); GetImmediate();
                         r_A = (byte)((r_A | 0xFF) & dl); // MAGIC = 0xFF
                         r_X = r_A;
                         SetNZ(r_X);
@@ -1864,7 +1907,7 @@ namespace AprNes
                     // ===== LAE (LAS) *** Abs,Y =====
                     case 0xBB:
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(true); break;
-                            case 4: 
+                            case 4: PollInterrupts();
                                 dl = CpuRead(addressBus);
                                 r_A = (byte)(dl & r_SP);
                                 r_X = r_A;
@@ -1876,7 +1919,7 @@ namespace AprNes
                     // ===== SHA (Ind),Y *** =====
                     case 0x93: // SHA (Ind),Y — alternate behavior: A & (X|magic) & H
                         switch (operationCycle) { case 1: case 2: case 3: case 4: GetAddressIndOffY(false); if (operationCycle == 4) CPU_Read = false; break;
-                            case 5: 
+                            case 5: PollInterrupts();
                                 if ((temporaryAddress & 0xFF00) != (addressBus & 0xFF00))
                                     addressBus = (ushort)((byte)addressBus | (((addressBus >> 8) & r_X) << 8));
                                 if (ignoreH) H = 0xFF;
@@ -1887,7 +1930,7 @@ namespace AprNes
                     // ===== SHA Abs,Y *** =====
                     case 0x9F: // SHA Abs,Y — alternate behavior: A & (X|magic) & H
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(false); if (operationCycle == 3) CPU_Read = false; break;
-                            case 4: 
+                            case 4: PollInterrupts();
                                 if ((temporaryAddress & 0xFF00) != (addressBus & 0xFF00))
                                     addressBus = (ushort)((byte)addressBus | (((addressBus >> 8) & r_X) << 8));
                                 if (ignoreH) H = 0xFF;
@@ -1898,7 +1941,7 @@ namespace AprNes
                     // ===== SHY Abs,X *** =====
                     case 0x9C:
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffX(false); if (operationCycle == 3) CPU_Read = false; break;
-                            case 4: 
+                            case 4: PollInterrupts();
                                 if ((temporaryAddress & 0xFF00) != (addressBus & 0xFF00))
                                     addressBus = (ushort)((byte)addressBus | (((addressBus >> 8) & r_Y) << 8));
                                 if (ignoreH) H = 0xFF;
@@ -1909,7 +1952,7 @@ namespace AprNes
                     // ===== SHX Abs,Y *** =====
                     case 0x9E:
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(false); if (operationCycle == 3) CPU_Read = false; break;
-                            case 4: 
+                            case 4: PollInterrupts();
                                 if ((temporaryAddress & 0xFF00) != (addressBus & 0xFF00))
                                     addressBus = (ushort)((byte)addressBus | (((addressBus >> 8) & r_X) << 8));
                                 if (ignoreH) H = 0xFF;
@@ -1920,7 +1963,7 @@ namespace AprNes
                     // ===== SHS (TAS) Abs,Y *** =====
                     case 0x9B: // SHS — alternate behavior: A & (X|magic) & H
                         switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(false); if (operationCycle == 3) CPU_Read = false; break;
-                            case 4: 
+                            case 4: PollInterrupts();
                                 if ((temporaryAddress & 0xFF00) != (addressBus & 0xFF00))
                                     addressBus = (ushort)((byte)addressBus | (((addressBus >> 8) & r_X) << 8));
                                 r_SP = (byte)(r_A & r_X);

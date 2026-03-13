@@ -47,11 +47,11 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 ### PRIORITY 1 — Remove PollInterrupts() calls
 - **Target**: CPU.cs — 255+ empty stub calls in instruction dispatch switch
-- **Expected gain**: 5–8% (actual: **+78%** — far exceeded expectation)
+- **Expected gain**: 5–8%
 - **Effort**: ~5 minutes
 - **Method**: Delete all `PollInterrupts();` calls from each `case 0xXX:` in cpu_step_one_cycle()
 - **Risk**: Low — function is confirmed empty stub
-- **Status**: ✅ DONE — **+78.3% improvement** (187.70 → 334.75 FPS, +147.05 FPS)
+- **Status**: 🔲 TODO
 
 ---
 
@@ -206,7 +206,6 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 |---|-------------|-----------|----------|-------|--------|--------|
 | 1 | Baseline | — | 181.70 | — | — | [v1](2026-03-14_perf_v1.md) |
 | 2 | Priority 11: managed array → unsafe pointer (TRI_SEQ, DUTYLOOKUP, secondaryOAM, corruptOamRow) | 181.70 | 187.70 | **+3.3%** | ✅ KEEP | [v2](2026-03-14_perf_v2.md) |
-| 3 | Priority 1: remove PollInterrupts() empty stub calls (~214 calls) | 187.70 | 334.75 | **+78.3%** | ✅ KEEP | [v4](2026-03-14_perf_v4.md) |
 
 ---
 
