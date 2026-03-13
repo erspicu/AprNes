@@ -35,6 +35,16 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 ## Optimization Tasks
 
+### PRIORITY 0 — Remove DMA trace logging code
+- **Target**: APU.cs, IO.cs, TestRunner.cs — `dmcTraceEnabled` 條件式 `[DMA-TRACE]` Console.Error.WriteLine 及相關 field
+- **Expected gain**: 微小（消除每次 APU write 路徑上的條件判斷）
+- **Effort**: 已完成
+- **Method**: 移除所有 `if (dmcTraceEnabled)` trace block、`dmcTraceStart` unused field、`--dma-trace` CLI 參數及 `NesCore.dmcTraceEnabled` 設定
+- **Risk**: 無 — 純 debug 輸出，不影響模擬邏輯
+- **Status**: ✅ DONE (build 0 errors)
+
+---
+
 ### PRIORITY 1 — Remove PollInterrupts() calls
 - **Target**: CPU.cs — 255+ empty stub calls in instruction dispatch switch
 - **Expected gain**: 5–8%

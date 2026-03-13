@@ -124,7 +124,6 @@ namespace AprNes
             string timedScreenshotsSpec = null; // --timed-screenshots "path1:t1,path2:t2,..."
             bool dumpAcResults = false; // --dump-ac-results: print AC_RESULTS_HEX after run
             bool dumpDebug = false; // --dump-debug: print debug memory ranges ($50-$6F, $500-$5FF)
-            bool dmaTrace = false; // --dma-trace: enable DMA timing trace
 
             // Parse arguments
             for (int i = 0; i < args.Length; i++)
@@ -173,9 +172,6 @@ namespace AprNes
                     case "--dump-debug":
                         dumpDebug = true;
                         break;
-                    case "--dma-trace":
-                        dmaTrace = true;
-                        break;
                     case "--expected-crc":
                         if (i + 1 < args.Length)
                         {
@@ -206,7 +202,6 @@ namespace AprNes
 
             // Headless init
             NesCore.HeadlessMode = true;
-            NesCore.dmcTraceEnabled = dmaTrace;
             NesCore.OnError = msg => Console.Error.WriteLine("ERROR: " + msg);
             NesCore.AudioEnabled = false;
             if (debugLog != null)

@@ -21,8 +21,6 @@ namespace AprNes
                 case 0x4016: return gamepad_r_4016();
                 case 0x4017: return (byte)(cpubus & 0xE0); // Controller 2: no controller → D0-D4=0, D5-D7=open bus
                 default:
-                    if (dmcTraceEnabled && addr == 0x4000)
-                        System.Console.Error.WriteLine("[DMA-TRACE] cc={0} LDA $4000 cpubus=${1:X2}", cpuCycleCount, cpubus);
                     return cpubus; // APU write-only registers return CPU data bus value
             }
         }
