@@ -167,6 +167,39 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 ---
 
+### PRIORITY 11 — 將 managed array 改為 unsafe pointer 存取
+- **Target**: APU.cs、PPU.cs — 熱路徑中仍使用 managed array 的部分
+- **Expected gain**: 1–3%（消除 managed array bounds check 及 2D index 計算）
+- **Effort**: ~2 hours
+- **Method**:
+
+  **① APU.cs `DUTYLOOKUP[4,8]`（2D → 1D flatten + unsafe pointer）**
+  - 目前：`static int[,] DUTYLOOKUP = new int[4,8];`，每次存取 `DUTYLOOKUP[duty, seq]`
+  - 改為：`static int* DUTYLOOKUP;`（Marshal.AllocHGlobal 32 ints）
+  - 存取：`DUTYLOOKUP[_pulseDuty[i] * 8 + _pulseSeq[i]]`
+  - 熱路徑：`apu_step()` 每 CPU cycle 呼叫，約 **3.6M 次/秒**
+
+  **② APU.cs `TRI_SEQ[32]`（managed readonly → unsafe pointer）**
+  - 目前：`static readonly int[] TRI_SEQ = { 15,14,...,15 };`
+  - 改為：`static int* TRI_SEQ;`（Marshal.AllocHGlobal 32 ints，initAPU 初始化）
+  - 熱路徑：`apu_step()` 每 CPU cycle，約 **1.8M 次/秒**
+
+  **③ PPU.cs `secondaryOAM[32]`（managed byte[] → unsafe byte*）**
+  - 目前：`static byte[] secondaryOAM = new byte[32];`
+  - 改為：`static byte* secondaryOAM;`（Marshal.AllocHGlobal 32 bytes）
+  - 熱路徑：sprite evaluation，每 scanline dot 多次存取
+
+  **④ PPU.cs `corruptOamRow[32]`（managed bool[] → unsafe byte*）**
+  - 目前：`static bool[] corruptOamRow = new bool[32];`
+  - 改為：`static byte* corruptOamRow;`（0=false, 1=true）
+  - 判斷由 `if (corruptOamRow[i])` 改為 `if (corruptOamRow[i] != 0)`
+
+- **Risk**: Low — codebase 已大量使用相同的 `Marshal.AllocHGlobal` + unsafe pointer 模式（NES_MEM、ppu_ram、ScreenBuf1x 等），此改法為既有慣例
+- **Verify**: 改後跑 AccuracyCoin 136/136 + blargg 174/174
+- **Status**: 🔲 TODO
+
+---
+
 ## Results Log
 
 | # | Optimization | Before FPS | After FPS | Delta | Result | Report |
