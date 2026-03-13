@@ -96,7 +96,7 @@ namespace AprNes
         static int dmcDmaCooldown = 0;         // TriCNES: CannotRunDMCDMARightNow (blocks new DMA for 2 cycles after completion)
         static bool dmcImplicitAbortPending = false;  // TriCNES: APU_SetImplicitAbortDMC4015
         static bool dmcImplicitAbortActive = false;   // TriCNES: APU_ImplicitAbortDMC4015
-        static bool dmcAutoRefillPending = false;     // Deferred auto-refill: schedule DMA 1 cycle later (TriCNES: CPU before APU)
+        static bool dmcStatusEnabled = false;         // TriCNES: APU_Status_DMC — per-cycle DMA gate
 
         // Length counter 欄位
         static int* lengthctr;
@@ -310,7 +310,7 @@ namespace AprNes
             dmcsilence = true; dmcirq = false; dmcloop = false; dmcBufferEmpty = true;
             dmcLoadDmaCountdown = 0; dmcStatusDelay = 0; dmcDelayedEnable = false; dmcAbortDma = false;
             dmcDmaRunning = false; dmcNeedDummyRead = false; dmaNeedHalt = false;
-            dmcDmaCooldown = 0; dmcImplicitAbortPending = false; dmcImplicitAbortActive = false; dmcAutoRefillPending = false;
+            dmcDmaCooldown = 0; dmcImplicitAbortPending = false; dmcImplicitAbortActive = false; dmcStatusEnabled = false;
             spriteDmaTransfer = false; spriteDmaOffset = 0;
         }
 
@@ -594,27 +594,8 @@ namespace AprNes
                 }
             }
 
-            // Handle deferred $4015 status update (TriCNES: APU_DelayedDMC4015)
-            // Must decrement EVERY cycle, even during DMA (TriCNES: lines 983-993)
-            if (dmcStatusDelay > 0)
-            {
-                --dmcStatusDelay;
-                if (dmcStatusDelay == 0)
-                {
-                    if (dmcTraceEnabled)
-                        System.Console.Error.WriteLine("[DMA-TRACE] cc={0} DEFERRED STATUS APPLIED: enable={1} samplesLeft={2} dmaRunning={3}",
-                            cpuCycleCount, dmcDelayedEnable, dmcsamplesleft, dmcDmaRunning);
-                    if (!dmcDelayedEnable)
-                    {
-                        dmcsamplesleft = 0;
-                        dmcStopTransfer();
-                    }
-                    // For enable: nothing needed here — dmcLoadDmaCountdown handles it
-                }
-            }
-
             // Don't trigger new DMA during active DMA
-            if (dmcDmaRunning) return;
+            if (dmcDmaRunning) goto deferredStatus;
 
             // TriCNES: CannotRunDMCDMARightNow cooldown (blocks back-to-back DMA)
             if (dmcDmaCooldown > 0) dmcDmaCooldown--;
@@ -632,11 +613,13 @@ namespace AprNes
                     if (dmcLoadDmaCountdown == 0 && dmcBufferEmpty && dmcsamplesleft > 0)
                         dmcStartTransfer();
                 }
-                return;
+                goto deferredStatus;
             }
 
             // Reload DMA: buffer emptied by output unit → request DMA
-            // TriCNES: also trigger DMA for implicit abort (phantom DMA)
+            // TriCNES order: DMA trigger BEFORE deferred status (lines 930-953 vs 983-993)
+            // This ensures a timer fire and deferred disable on the same cycle
+            // triggers DMA first, then applies the disable (zeroing dmcsamplesleft).
             if (dmcBufferEmpty && (dmcsamplesleft > 0 || dmcImplicitAbortPending))
             {
                 if (dmcDmaCooldown != 2) // block if just finished DMA
@@ -647,6 +630,28 @@ namespace AprNes
                         dmcImplicitAbortPending = false;
                     }
                     dmcStartTransfer();
+                }
+            }
+
+        deferredStatus:
+            // Handle deferred $4015 status update (TriCNES: APU_DelayedDMC4015)
+            // Must decrement EVERY cycle, even during DMA (TriCNES: lines 983-993)
+            // Placed AFTER DMA trigger to match TriCNES ordering.
+            if (dmcStatusDelay > 0)
+            {
+                --dmcStatusDelay;
+                if (dmcStatusDelay == 0)
+                {
+                    if (dmcTraceEnabled)
+                        System.Console.Error.WriteLine("[DMA-TRACE] cc={0} DEFERRED STATUS APPLIED: enable={1} samplesLeft={2} dmaRunning={3}",
+                            cpuCycleCount, dmcDelayedEnable, dmcsamplesleft, dmcDmaRunning);
+                    dmcStatusEnabled = dmcDelayedEnable;
+                    if (!dmcDelayedEnable)
+                    {
+                        dmcsamplesleft = 0;
+                        dmcStopTransfer();
+                    }
+                    // For enable: dmcStatusEnabled = true allows DMA entry gate
                 }
             }
         }
@@ -687,21 +692,25 @@ namespace AprNes
             }
         }
 
-        // Complete DMC DMA read — update buffer and advance address (Mesen2: SetDmcReadBuffer)
+        // Complete DMC DMA read — update buffer and advance address
+        // TriCNES: DMCDMA_Get() always saves byte and advances address,
+        // only guards the BytesRemaining decrement to prevent underflow.
         static void dmcSetReadBuffer(byte val)
         {
-            if (dmcsamplesleft <= 0) return;
             dmcbuffer = val;
             dmcBufferEmpty = false;
             dmcaddr++;
             if (dmcaddr > 0xffff) dmcaddr = 0x8000;
-            --dmcsamplesleft;
-            if (dmcsamplesleft == 0)
+            if (dmcsamplesleft > 0)
             {
-                if (dmcloop)
-                    restartdmc();
-                else if (dmcirq)
-                    statusdmcint = true;
+                --dmcsamplesleft;
+                if (dmcsamplesleft == 0)
+                {
+                    if (dmcloop)
+                        restartdmc();
+                    else if (dmcirq)
+                        statusdmcint = true;
+                }
             }
         }
 
@@ -905,7 +914,7 @@ namespace AprNes
             // AprNes APU runs BEFORE CPU, no same-cycle decrement → set 2/3 directly
             bool getCycle = (cpuCycleCount & 1) == 0;
             dmcDelayedEnable = dmcEnable;
-            dmcStatusDelay = getCycle ? 3 : 2;
+            dmcStatusDelay = getCycle ? 4 : 3;
 
             if (dmcEnable)
             {
@@ -919,10 +928,10 @@ namespace AprNes
                 // Implicit abort: TriCNES checks specific timer values
                 // TriCNES: (timer==10 && !APU_PutCycle) || (timer==8 && APU_PutCycle)
                 // AprNes: APU already ran, timer decremented by 1.
-                // TriCNES GET → AprNes getCycle, TriCNES PUT → AprNes !getCycle
-                // Condition 1: TriCNES timer==10/GET → AprNes timer==9, getCycle
-                // Condition 2: TriCNES timer==8/PUT → AprNes timer==7, !getCycle
-                if ((dmctimer == 9 && getCycle) || (dmctimer == 7 && !getCycle))
+                // Parity mapping: AprNes getCycle ↔ TriCNES PUT, AprNes !getCycle ↔ TriCNES GET
+                // Condition 1: TriCNES timer==10/GET → AprNes timer==9, !getCycle
+                // Condition 2: TriCNES timer==8/PUT → AprNes timer==7, getCycle
+                if ((dmctimer == 9 && !getCycle) || (dmctimer == 7 && getCycle))
                 {
                     dmcImplicitAbortPending = true;
                     if (dmcTraceEnabled)
@@ -935,19 +944,25 @@ namespace AprNes
                 // Cancel pending Load DMA
                 dmcLoadDmaCountdown = 0;
 
-                // Explicit abort: extend delay if timer just fired (DMA may be in progress)
-                // TriCNES: (timer==2 && GET) || (timer==Rate && PUT) → delay += 2 effective
-                // AprNes: timer fires on any parity (decrements by 1 per cycle)
-                // timer==dmcrate → fire THIS cycle; timer==dmcrate-1 → fire PREVIOUS cycle
-                // Add 3 cycles to normal delay to allow in-progress DMA to complete
-                // (+2 for TriCNES delay, +1 for AprNes APU-before-DMA execution order)
-                bool timerJustFired = (dmctimer == dmcrate) || (dmctimer == dmcrate - 1);
-                if (timerJustFired)
+                // Explicit abort: extend delay if timer is at fire boundary
+                // TriCNES: (timer==2 && GET) || (timer==Rate && PUT) — covers 2-cycle window
+                // In AprNes (clockdmc already ran): timer==dmcrate means just fired,
+                // timer==1 means will fire next cycle. Both need extended delay.
+                if (dmctimer == dmcrate)
                 {
-                    dmcStatusDelay += 3;
+                    // Just fired (TriCNES Rate&&PUT): effective delay=4
+                    dmcStatusDelay = 4;
                     if (dmcTraceEnabled)
-                        System.Console.Error.WriteLine("[DMA-TRACE] cc={0} EXPLICIT ABORT: timer={1} rate={2} getCycle={3} delay={4}",
-                            cpuCycleCount, dmctimer, dmcrate, getCycle, dmcStatusDelay);
+                        System.Console.Error.WriteLine("[DMA-TRACE] cc={0} EXPLICIT ABORT (fired): timer={1} rate={2} delay={3}",
+                            cpuCycleCount, dmctimer, dmcrate, dmcStatusDelay);
+                }
+                else if (dmctimer == 1)
+                {
+                    // About to fire (TriCNES 2&&GET): effective delay=5
+                    dmcStatusDelay = 5;
+                    if (dmcTraceEnabled)
+                        System.Console.Error.WriteLine("[DMA-TRACE] cc={0} EXPLICIT ABORT (pending): timer={1} rate={2} delay={3}",
+                            cpuCycleCount, dmctimer, dmcrate, dmcStatusDelay);
                 }
             }
             statusdmcint = false;

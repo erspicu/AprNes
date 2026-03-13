@@ -146,6 +146,17 @@ namespace AprNes
 
             while (dmcDmaRunning || spriteDmaTransfer)
             {
+                // TriCNES per-cycle gate (line 3974): DoDMCDMA && (APU_Status_DMC || ImplicitAbort)
+                // Only abort when deferred $4015 disable has been APPLIED (dmcStatusEnabled=false)
+                // AND the pending value is also disable (dmcDelayedEnable=false).
+                // This avoids blocking DMA before the initial enable status has been applied.
+                if (dmcDmaRunning && !dmcStatusEnabled && !dmcDelayedEnable && !dmcImplicitAbortActive)
+                {
+                    dmcDmaRunning = false;
+                    dmcNeedDummyRead = false;
+                    if (!spriteDmaTransfer) break;
+                }
+
                 bool getCycle = (cpuCycleCount & 1) == 0;
 
                 if (getCycle)
@@ -218,6 +229,9 @@ namespace AprNes
                         EndCpuCycle();
                     }
                 }
+
+                // TriCNES: clear implicit abort after each DMA cycle (line 8758-8761)
+                if (dmcImplicitAbortActive) dmcImplicitAbortActive = false;
             }
         }
 

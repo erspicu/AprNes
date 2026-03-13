@@ -1,6 +1,6 @@
 # AccuracyCoin 修復追蹤
 
-**基線**: 134/136 PASS, 2 FAIL, 0 SKIP
+**基線**: 135/136 PASS, 1 FAIL, 0 SKIP
 **最後更新**: 2026-03-13
 **分支**: master
 
@@ -14,7 +14,7 @@
 | P10 | Unofficial: SH* | 全 PASS | Per-cycle CPU rewrite + SH* fix |
 | P11 | Unofficial: Misc | 全 PASS | |
 | P12 | CPU Interrupts | 全 PASS | Per-cycle CPU rewrite 修復 IFlagLatency |
-| P13 | DMA Tests | 2 FAIL / 10 | 8 PASS，BUGFIX53+54 修復 DMA+$2002 Read + Bus Conflicts |
+| P13 | DMA Tests | 1 FAIL / 11 | 10 PASS，BUGFIX55 修復 Explicit DMA Abort |
 | P14 | APU Tests | 全 PASS | BUGFIX49: DMC enable delay always set |
 | P15 | Power On State | DRAW only | 無自動判定 |
 | P16 | PPU Rendering | 全 PASS | |
@@ -61,99 +61,48 @@
 
 - [x] DMC DMA Bus Conflicts (P13) — **BUGFIX54**: bus conflict rewrite + deferred $4015 status update
 
-### Phase 3: TIMING-DEPENDENT（全部完成）
+### Phase 2.9: Explicit DMA Abort
 
-- [x] $2007 read w/ rendering (P16) — BUGFIX34
-- [x] Stale BG Shift Registers (P19) — BUGFIX40
-- [x] Suddenly Resize Sprite (P18) — BUGFIX42
-- [x] Sprites On Scanline 0 (P19) — **BUGFIX47**: secondary OAM + per-dot eval FSM + pre-render sprite data
-- [x] $2004 Stress Test (P19) — **BUGFIX48**: per-dot $2004 read accuracy, attribute masking at read level, post-eval OAM2 read
+- [x] Explicit DMA Abort (P13) — **BUGFIX55**: 2-cycle fire window detection + parity-dependent normal delay
 
 ---
 
-## 剩餘 2 FAIL
+## 剩餘 1 FAIL
 
-### 根因: DMA Sub-cycle 精度（2 項，共用根因）
-
-所有剩餘失敗都在 P13 DMA Tests，需要更精確的 DMA abort stolen cycle 時序。
-
-**P13: DMA Tests (2 FAIL / 10 total)**
+### P13: Implicit DMA Abort
 
 | 測試 | 狀態 | err | 分析 |
 |------|------|-----|------|
 | DMA + Open Bus | **PASS** | — | |
-| DMA + $2002 Read | **PASS** | — | **BUGFIX53**: DMC Load DMA countdown timing |
+| DMA + $2002 Read | **PASS** | — | **BUGFIX53** |
 | DMA + $2007 Read | **PASS** | — | |
 | DMA + $2007 Write | **PASS** | — | |
 | DMA + $4015 Read | **PASS** | — | Per-cycle CPU 修復 |
 | DMA + $4016 Read | **PASS** | — | |
-| DMC DMA Bus Conflicts | **PASS** | — | **BUGFIX54**: bus conflict + deferred $4015 status |
+| DMC DMA Bus Conflicts | **PASS** | — | **BUGFIX54** |
 | DMC DMA + OAM DMA | **PASS** | — | Per-cycle CPU 修復 |
-| Explicit DMA Abort | FAIL | 2 | DMA 中止 stolen cycle 數 |
-| Implicit DMA Abort | FAIL | 2 | 隱式 DMA 中止 stolen cycle 數 |
+| Explicit DMA Abort | **PASS** | — | **BUGFIX55** |
+| Implicit DMA Abort | FAIL | 2 | 隱式 DMA 中止：1-cycle phantom DMA + write cycle cancellation |
 
-### 已解決的根因
+### Implicit DMA Abort 分析
+
+測試包含 3 個 sub-test（$500, $520, $540），有兩組 answer key（pre/post-1990 CPU）。
+核心行為：enable ($4015=$10) 在 1-byte non-looping sample 即將結束時寫入，
+觸發「幽靈」1-cycle DMA，此 DMA 若遇到 write cycle 會被完全取消（非延遲）。
+
+TriCNES 實作要點：
+- `APU_SetImplicitAbortDMC4015 = true` 設於 $4015 write（timer 接近 fire）
+- Timer fire 時轉為 `APU_ImplicitAbortDMC4015 = true`，觸發 1-cycle DMA
+- PUT cycle（write）遇到此 DMA 時直接取消：`APU_ImplicitAbortDMC4015 = false`
+- 與 explicit abort 不同：implicit abort DMA 不會被 write cycle delay，而是直接不執行
+
+---
+
+## 已解決的根因
 
 - ~~根因 B: DMC/APU 複雜互動~~ — **已修復 BUGFIX49** (P14 全 PASS)
 - ~~根因 C: PPU Per-dot 精度~~ — **已修復** (P19 全 PASS)
 - ~~根因 D: DMC DMA 累積偏移~~ — **已修復** Per-cycle CPU rewrite (P12 全 PASS)
 - ~~P10 SH* unofficial opcodes~~ — **已修復** (P10 全 PASS)
 - ~~P20 CPU Behavior 2~~ — **已修復** Per-cycle CPU rewrite (P20 全 PASS)
-
----
-
-## 突破口分析
-
-| 方向 | 潛在收益 | 難度 | 說明 |
-|------|----------|------|------|
-| P13 DMA abort | +2 | 極高 | 需要更精確的 explicit/implicit abort stolen cycle 時序 |
-| 136/136 完美分數 | +2 | 極高 | 剩餘 2 項全在 P13，共用 DMA abort 根因 |
-
----
-
-## 已嘗試但未成功的修復
-
-| 目標 | 嘗試 | 結果 | 原因 |
-|------|------|------|------|
-| P18 $2002 flag clear | Dot 2→3 VBL stagger | P17 -2 回歸 | VBL end timing 被延後 1 dot |
-| P18 $2002 flag clear | Dot 1 統一清除 | 無改善 | sprite flags 需比 VBL 更早清除 |
-| P18 $2002 flag clear | **Dot 1 sprite / Dot 2 VBL** | **PASS** | **BUGFIX45** |
-| P14 APU Reg Test 6 | $4020-$40FF mirror | P14 -1 回歸 | Controller Strobing 受影響 |
-| P14 Controller Strobing | 翻轉 strobe parity | -1 回歸 | 其他測試依賴當前 parity |
-| P14 APU Reg Activation | cpuLastReadAddr tracking | err 4→6 惡化 | 已 revert |
-| P19 $2004 Stress | oamCopyBuffer + secondaryOam | **已修復 BUGFIX48** | 需 attr mask at read + post-eval OAM2 read |
-| DMA timing | Reorder ProcessPendingDma before StartCpuCycle | 172/174, AC 114/136 | irq_and_dma 失敗 (OAM parity shift)，AC 反而變差 -7 |
-| DMA timing | Reorder + OAM parity compensation tick | 170/174 | 多出 1 CC，破壞 sprite overflow timing |
-| DMA timing | dmcDmaPending deferred flag | 168/174 | DMC halt CC shift +1 → getCycle parity flip |
-| DMA timing | dmcDmaTriggerCycle same-cycle skip | 168/174 | 同上：halt CC = X+2 (應為 X+1) |
-| DMA timing | Load DMA countdown +1 (3/4) | 170/174 | 全域偏移，非目標性修正 |
-| DMA timing | DMC defer + DMA before Start | 172/174, AC 121/136 | sprdma ±1 cycle，AC 無改善 |
-| DMA timing | DMC defer + getCycle flip | 170/174 | irq_and_dma 失敗 |
-| DMA timing | DMC defer + pre-increment CC | 168/174 | APU 在 DMA 中位置偏移 |
-| DMA timing | DMC defer + OAM-aware | 172/174, AC 121/136 | DMC-only DMA 仍差 ±1 |
-
-### 2026-03-10 P13 深入調查結論
-
-| 嘗試 | 結果 | 原因 |
-|------|------|------|
-| 延遲 $4015 disable (TriCNES APU_DelayedDMC4015) | 174/174, AC 132/136 (無改善) | 延遲正確但不是根因 |
-| 簡單 DMA reorder (ProcessPendingDma→StartCpuCycle) | 172/174, AC P13 不變 | irq_and_dma 回歸 |
-| DMA reorder + getCycle parity flip | 168/174, P13 10/10 全 FAIL | 補償不正確 |
-
-**P13 err=2 的具體含義** (從 AccuracyCoin ROM 錯誤碼確認):
-- DMA + $2002 Read err=2: halt/alignment cycles 沒正確讀取 $2002
-- DMC DMA Bus Conflicts err=2: 與 APU 暫存器的 bus conflict 不正確
-- Explicit DMA Abort err=2: 被中止的 DMA stolen cycle 數量錯
-- Implicit DMA Abort err=2: 被中止的 DMA stolen cycle 數量錯
-
-**根本結論: 需要三個修復同時到位**
-
-1. **Asymmetric DMA split** — Read cycle: DMA before StartCpuCycle; Write cycle: 不變
-   - 修正 halt cycle phantom read 晚 1 CC 的問題
-   - 最大結構改動，影響全部 174+136 測試
-2. **Abort mechanism** — 延遲 $4015 disable + explicit/implicit abort stolen cycle 計數
-   - TriCNES parity 映射已確認: post-toggle `APU_PutCycle` = 我們的 `!putCycle`
-3. **Bus conflict 邏輯** — DMC DMA 讀 APU 暫存器時的 bus-OR 行為
-   - 最獨立、最低風險
-
-詳細修復計畫見 Claude memory: `p13_fix_plan.md`
+- ~~P13 Explicit DMA Abort~~ — **已修復 BUGFIX55** (2-cycle fire window + parity delay)
