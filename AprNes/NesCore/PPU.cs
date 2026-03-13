@@ -69,7 +69,7 @@ namespace AprNes
         // secondary OAM addressing glitches and marks rows for corruption.
         // When rendering re-enables (or at next frame start), first 8 bytes of OAM
         // are copied over each marked row.
-        static bool[] corruptOamRow = new bool[32];
+        static byte* corruptOamRow; // 32 bytes, 0=clean 1=corrupt
         static bool prevRenderingEnabled = false;
         static public uint* ScreenBuf1x;
         static uint* NesColors; //, targetSize;
@@ -482,7 +482,7 @@ namespace AprNes
         static bool spriteSizeLatchedForFetch; // Spritesize8x16 latched at dot 261 (sprite 0 CHR fetch timing)
 
         // ========== Secondary OAM and Per-dot Sprite Evaluation FSM ==========
-        static byte[] secondaryOAM = new byte[32]; // 8 sprites × 4 bytes
+        static byte* secondaryOAM; // 8 sprites × 4 bytes
         static byte oamCopyBuffer;                  // Last byte read during evaluation ($2004 returns this)
         static byte spriteEvalAddrH;                // Primary OAM sprite index (0-63)
         static byte spriteEvalAddrL;                // Byte offset within sprite (0-3)
@@ -509,7 +509,7 @@ namespace AprNes
             if (ppu_cycles_x >= 0 && ppu_cycles_x < 64)
             {
                 // Secondary OAM clear phase: every 2 dots shifts corruption down 1 row
-                corruptOamRow[ppu_cycles_x >> 1] = true;
+                corruptOamRow[ppu_cycles_x >> 1] = 1;
             }
             else if (ppu_cycles_x >= 256 && ppu_cycles_x < 320)
             {
@@ -518,7 +518,7 @@ namespace AprNes
                 int baseIdx = rel >> 3;
                 int offset = rel & 0x07;
                 if (offset > 3) offset = 3;
-                corruptOamRow[baseIdx * 4 + offset] = true;
+                corruptOamRow[baseIdx * 4 + offset] = 1;
             }
         }
 
@@ -527,14 +527,14 @@ namespace AprNes
         {
             for (int i = 0; i < 32; i++)
             {
-                if (corruptOamRow[i])
+                if (corruptOamRow[i] != 0)
                 {
                     if (i > 0)
                     {
                         for (int j = 0; j < 8; j++)
                             spr_ram[i * 8 + j] = spr_ram[j];
                     }
-                    corruptOamRow[i] = false;
+                    corruptOamRow[i] = 0;
                 }
             }
         }

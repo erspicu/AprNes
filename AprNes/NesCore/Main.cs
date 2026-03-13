@@ -172,6 +172,8 @@ namespace AprNes
                 Buffer_BG_array = (int*)Marshal.AllocHGlobal(sizeof(int) * 61440);
                 NesColors = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 64);
                 spr_ram = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
+                secondaryOAM  = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
+                corruptOamRow = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
 
                 ppu_ram = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 0x4000);
                 P1_joypad_status = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
@@ -211,6 +213,7 @@ namespace AprNes
                 for (int i = 0; i < 61440; i++) ScreenBuf1x[i] = 0;
                 for (int i = 0; i < 16384; i++) ppu_ram[i] = 0;
                 for (int i = 0; i < 256; i++) spr_ram[i] = 0;
+                for (int i = 0; i < 32; i++) { secondaryOAM[i] = 0; corruptOamRow[i] = 0; }
                 for (int i = 0; i < 8; i++) P1_joypad_status[i] = 0x40;
                 for (int i = 0; i < 65536; i++) NES_MEM[i] = 0;
 

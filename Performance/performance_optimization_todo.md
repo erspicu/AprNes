@@ -196,7 +196,7 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 - **Risk**: Low — codebase 已大量使用相同的 `Marshal.AllocHGlobal` + unsafe pointer 模式（NES_MEM、ppu_ram、ScreenBuf1x 等），此改法為既有慣例
 - **Verify**: 改後跑 AccuracyCoin 136/136 + blargg 174/174
-- **Status**: 🔲 TODO
+- **Status**: ✅ DONE — **+3.3% improvement** (181.70 → 187.70 FPS, +120 frames/20s)
 
 ---
 
@@ -205,6 +205,7 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 | # | Optimization | Before FPS | After FPS | Delta | Result | Report |
 |---|-------------|-----------|----------|-------|--------|--------|
 | 1 | Baseline | — | 181.70 | — | — | [v1](2026-03-14_perf_v1.md) |
+| 2 | Priority 11: managed array → unsafe pointer (TRI_SEQ, DUTYLOOKUP, secondaryOAM, corruptOamRow) | 181.70 | 187.70 | **+3.3%** | ✅ KEEP | [v2](2026-03-14_perf_v2.md) |
 
 ---
 

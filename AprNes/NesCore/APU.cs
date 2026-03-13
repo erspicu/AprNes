@@ -44,10 +44,7 @@ namespace AprNes
         static int _triPeriod = 0;
         static int _triSeq    = 0; // 0-31 序列位置
         static int _triOut    = 0;
-        static readonly int[] TRI_SEQ = {
-            15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0,
-             0, 1, 2, 3, 4, 5,6,7,8,9,10,11,12,13,14,15
-        };
+        static int* TRI_SEQ;
 
         // Noise (雜音聲道)
         static int    _noiseTimer     = 0;
@@ -125,13 +122,8 @@ namespace AprNes
         static int*  sweepshift;
         static int*  sweeppos;
 
-        // Duty 波形查找表
-        static int[,] DUTYLOOKUP = new int[,] {
-            { 0, 1, 0, 0, 0, 0, 0, 0 }, // 12.5%
-            { 0, 1, 1, 0, 0, 0, 0, 0 }, // 25%
-            { 0, 1, 1, 1, 1, 0, 0, 0 }, // 50%
-            { 1, 0, 0, 1, 1, 1, 1, 1 }  // 75%
-        };
+        // Duty 波形查找表 (flattened 4×8 → 32 ints, index = duty*8 + seq)
+        static int* DUTYLOOKUP;
 
         // =====================================================================
         // APU Soft Reset — 只重置內部狀態，不碰 WaveOut 音效設備
@@ -226,6 +218,12 @@ namespace AprNes
             if (sweepnegate            == null) sweepnegate            = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 2);
             if (sweepsilence           == null) sweepsilence           = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 2);
             if (sweepreload            == null) sweepreload            = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 2);
+            if (TRI_SEQ    == null) { TRI_SEQ    = (int*)Marshal.AllocHGlobal(sizeof(int) * 32);
+                int[] tv = { 15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0, 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 };
+                for (int i = 0; i < 32; i++) TRI_SEQ[i] = tv[i]; }
+            if (DUTYLOOKUP == null) { DUTYLOOKUP = (int*)Marshal.AllocHGlobal(sizeof(int) * 32);
+                int[] dv = { 0,1,0,0,0,0,0,0, 0,1,1,0,0,0,0,0, 0,1,1,1,1,0,0,0, 1,0,0,1,1,1,1,1 };
+                for (int i = 0; i < 32; i++) DUTYLOOKUP[i] = dv[i]; }
 
             // Initialize fixed data arrays
             frameReload4[0] = 7458; frameReload4[1] = 7456; frameReload4[2] = 7458; frameReload4[3] = 7458;
@@ -367,7 +365,7 @@ namespace AprNes
                     _pulseSeq[0]   = (_pulseSeq[0] + 1) & 7;
                 }
                 _pulseOut[0] = (_pulsePeriod[0] >= 8 && lengthctr[0] > 0 && sweepsilence[0] == 0)
-                    ? DUTYLOOKUP[_pulseDuty[0], _pulseSeq[0]] : 0;
+                    ? DUTYLOOKUP[_pulseDuty[0] * 8 + _pulseSeq[0]] : 0;
 
                 // Pulse 2
                 if (--_pulseTimer[1] < 0)
@@ -376,7 +374,7 @@ namespace AprNes
                     _pulseSeq[1]   = (_pulseSeq[1] + 1) & 7;
                 }
                 _pulseOut[1] = (_pulsePeriod[1] >= 8 && lengthctr[1] > 0 && sweepsilence[1] == 0)
-                    ? DUTYLOOKUP[_pulseDuty[1], _pulseSeq[1]] : 0;
+                    ? DUTYLOOKUP[_pulseDuty[1] * 8 + _pulseSeq[1]] : 0;
 
                 // Noise
                 if (--_noiseTimer < 0)
