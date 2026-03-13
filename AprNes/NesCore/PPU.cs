@@ -184,7 +184,6 @@ namespace AprNes
             for (int loc = 0; loc < 8; loc++)
             {
                 int screenX = baseX + loc;
-                if (screenX > 255) break;
 
                 int bit = 15 - loc - FineX;
                 byte attrUse = (bit >= 8) ? renderAttr : nextAttr;

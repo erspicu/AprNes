@@ -100,11 +100,11 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 ### PRIORITY 6 — Remove redundant screenX > 255 check in RenderBGTile()
 - **Target**: PPU.cs `RenderBGTile()` line ~173 — bounds check every iteration when only last tile pixel can overflow
-- **Expected gain**: <1%
+- **Expected gain**: <1%（實際遠超預期）
 - **Effort**: ~30 minutes
-- **Method**: Move break condition outside loop, or restructure loop to only run valid iterations
+- **Method**: 確認呼叫方已有 `ppu_cycles_x < 256` guard，直接移除 `if (screenX > 255) break;`
 - **Risk**: Low
-- **Status**: 🔲 TODO
+- **Status**: ✅ DONE — **+6.1%** (204.10 → 216.45 FPS)；移除 inner loop branch 後 JIT 能更好 unroll/最佳化，遠超預期
 
 ---
 
@@ -213,6 +213,7 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 | 5 | Priority 5 v2: static palCacheR/N (Marshal.AllocHGlobal, reuse) | 188.55 | 189.75 | **+0.6%** | ✅ KEEP | [v8](2026-03-14_perf_v8.md) |
 | 6 | Priority 4 v2: APU int counter (單獨測試) | 189.75 | 186.50 | -1.7% | ❌ REVERT | [v10](2026-03-14_perf_v10.md) |
 | 7 | Priority 9: CPU opcode dispatch Action[256] table | 189.75 | 204.10 | **+7.6%** | ✅ KEEP | [v11](2026-03-14_perf_v11.md) |
+| 8 | Priority 6: remove redundant screenX > 255 check in RenderBGTile() | 204.10 | 216.45 | **+6.1%** | ✅ KEEP | [v12](2026-03-14_perf_v12.md) |
 
 ---
 
