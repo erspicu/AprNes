@@ -78,9 +78,12 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 ### PRIORITY 4 — Integer fixed-point sample accumulator in APU
 - **Target**: APU.cs — floating-point `_sampleAccum += 1.0` comparison done every CPU cycle
 - **Expected gain**: 1–2%
-- **Method**: Replace `double _sampleAccum` with `int _sampleCounter += APU_SAMPLE_RATE`，觸發條件改為 `>= CPU_FREQ`；避免 double 浮點加法與比較
+- **Method**: Replace `double _sampleAccum` + `_cycPerSample` with `int _sampleCounter += APU_SAMPLE_RATE`，觸發條件 `>= (int)CPU_FREQ`
 - **Risk**: Low — only affects sample timing precision (negligible)
-- **Status**: ❌ FAILED — 實測 188.55 → 187.90 FPS（-0.3%），已 revert。Debug mode JIT 對 double 加法的 overhead 不如預期高。
+- **Status**: ❌ FAILED — 兩次實測均為負效益
+  - v1（與 Priority 5 stackalloc 合併）：188.55 → 187.90（-0.3%）
+  - v2（單獨測試）：189.75 → 186.50（**-1.7%**），已 revert
+  - 原因：Debug JIT 對 `int += int` 與 `double += double` 的差異不大，反而 `(int)CPU_FREQ` 的 cast overhead 可能更高
 
 ---
 
@@ -208,6 +211,7 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 | 3 | Priority 8: RenderBGTile pre-compute bgColor + merge duplicate condition | 187.70 | 188.55 | +0.4% | ✅ KEEP (cleaner code) | [v6](2026-03-14_perf_v6.md) |
 | 4 | Priority 4+5 v1: APU int counter + stackalloc palette | 188.55 | 187.90 | -0.3% | ❌ REVERT | [v7](2026-03-14_perf_v7.md) |
 | 5 | Priority 5 v2: static palCacheR/N (Marshal.AllocHGlobal, reuse) | 188.55 | 189.75 | **+0.6%** | ✅ KEEP | [v8](2026-03-14_perf_v8.md) |
+| 6 | Priority 4 v2: APU int counter (單獨測試) | 189.75 | 186.50 | -1.7% | ❌ REVERT | [v10](2026-03-14_perf_v10.md) |
 
 ---
 
