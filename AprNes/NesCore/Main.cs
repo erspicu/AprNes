@@ -167,19 +167,17 @@ namespace AprNes
                 }
 
                 //init allocate
-                ScreenBuf1x = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 61440);
-
-                Buffer_BG_array = (int*)Marshal.AllocHGlobal(sizeof(int) * 61440);
-                NesColors = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 64);
-                palCacheR = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 4);
-                palCacheN = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 4);
-                spr_ram = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
-                secondaryOAM  = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
-                corruptOamRow = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
-
-                ppu_ram = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 0x4000);
+                ScreenBuf1x      = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 61440);
+                Buffer_BG_array  = (int* )Marshal.AllocHGlobal(sizeof(int)  * 61440);
+                NesColors        = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 64);
+                palCacheR        = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 4);
+                palCacheN        = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 4);
+                spr_ram          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
+                secondaryOAM     = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
+                corruptOamRow    = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
+                ppu_ram          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 0x4000);
                 P1_joypad_status = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
-                NES_MEM = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 65536);
+                NES_MEM          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 65536);
 
                 if (mapper == 4)
                 {
