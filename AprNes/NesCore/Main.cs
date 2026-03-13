@@ -171,6 +171,8 @@ namespace AprNes
 
                 Buffer_BG_array = (int*)Marshal.AllocHGlobal(sizeof(int) * 61440);
                 NesColors = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 64);
+                palCacheR = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 4);
+                palCacheN = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 4);
                 spr_ram = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
                 secondaryOAM  = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
                 corruptOamRow = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);

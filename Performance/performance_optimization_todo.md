@@ -87,9 +87,11 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 ### PRIORITY 5 — Cache palette lookups in RenderBGTile()
 - **Target**: PPU.cs `RenderBGTile()` — redundant ppu_ram[] + NesColors[] lookups per pixel
 - **Expected gain**: 1–2%
-- **Method**: 在 loop 外用 `stackalloc uint[4]` 預計算 palR / palN，loop 內直接 `pal[bgPixel]` 存取
+- **Method**: 用靜態 `palCacheR / palCacheN`（`Marshal.AllocHGlobal(uint*4)` in Main.cs init），每次 RenderBGTile 開頭更新 6 個 entry，loop 內直接 `pal[bgPixel]`
 - **Risk**: Low — pure refactor, no logic change
-- **Status**: ❌ FAILED — 實測 188.55 → 187.90 FPS（-0.3%），已 revert。`stackalloc` 初始化成本抵銷了 lookup 節省；Priority 8 已做 bgColor pre-compute，殘餘收益不足。
+- **Status**: ✅ DONE — **+0.6%** (188.55 → 189.75 FPS)
+  - ❌ v1（stackalloc）: -0.3%（每次 tile 都 allocate，開銷更大）
+  - ✅ v2（static pre-alloc）: +0.6%（一次分配，重複使用）
 
 ---
 
@@ -204,7 +206,8 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 | 1 | Baseline | — | 181.70 | — | — | [v1](2026-03-14_perf_v1.md) |
 | 2 | Priority 11: managed array → unsafe pointer (TRI_SEQ, DUTYLOOKUP, secondaryOAM, corruptOamRow) | 181.70 | 187.70 | **+3.3%** | ✅ KEEP | [v2](2026-03-14_perf_v2.md) |
 | 3 | Priority 8: RenderBGTile pre-compute bgColor + merge duplicate condition | 187.70 | 188.55 | +0.4% | ✅ KEEP (cleaner code) | [v6](2026-03-14_perf_v6.md) |
-| 4 | Priority 4+5: APU int counter + RenderBGTile stackalloc palette | 188.55 | 187.90 | -0.3% | ❌ REVERT | [v7](2026-03-14_perf_v7.md) |
+| 4 | Priority 4+5 v1: APU int counter + stackalloc palette | 188.55 | 187.90 | -0.3% | ❌ REVERT | [v7](2026-03-14_perf_v7.md) |
+| 5 | Priority 5 v2: static palCacheR/N (Marshal.AllocHGlobal, reuse) | 188.55 | 189.75 | **+0.6%** | ✅ KEEP | [v8](2026-03-14_perf_v8.md) |
 
 ---
 

@@ -74,6 +74,8 @@ namespace AprNes
         static public uint* ScreenBuf1x;
         static uint* NesColors; //, targetSize;
         static int* Buffer_BG_array;
+        static uint* palCacheR; // 4 pre-computed palette colors for renderAttr
+        static uint* palCacheN; // 4 pre-computed palette colors for nextAttr
         static byte spr_ram_add = 0;
 
         static bool oddSwap = false;
@@ -165,24 +167,34 @@ namespace AprNes
             byte renderAttr = bg_attr_p3;
             byte nextAttr   = bg_attr_p2;
 
+            // Refresh palette caches for this tile (static alloc, no heap activity)
+            int baseAddrR = 0x3f00 | (renderAttr << 2);
+            int baseAddrN = 0x3f00 | (nextAttr   << 2);
+            uint bgColor = NesColors[ppu_ram[0x3f00] & 0x3f];
+            palCacheR[0] = palCacheN[0] = bgColor;
+            palCacheR[1] = NesColors[ppu_ram[baseAddrR + 1] & 0x3f];
+            palCacheR[2] = NesColors[ppu_ram[baseAddrR + 2] & 0x3f];
+            palCacheR[3] = NesColors[ppu_ram[baseAddrR + 3] & 0x3f];
+            palCacheN[1] = NesColors[ppu_ram[baseAddrN + 1] & 0x3f];
+            palCacheN[2] = NesColors[ppu_ram[baseAddrN + 2] & 0x3f];
+            palCacheN[3] = NesColors[ppu_ram[baseAddrN + 3] & 0x3f];
+
             int baseX = ppu_cycles_x - 7;
             int scanOff = scanline << 8;
-            uint bgColor = NesColors[ppu_ram[0x3f00] & 0x3f]; // pre-compute once per tile
             for (int loc = 0; loc < 8; loc++)
             {
                 int screenX = baseX + loc;
                 if (screenX > 255) break;
 
-                int bit = 15 - loc - FineX;           // 1..15 always (FineX 0..7, loc 0..7)
+                int bit = 15 - loc - FineX;
                 byte attrUse = (bit >= 8) ? renderAttr : nextAttr;
                 int bgPixel = ((lowshift >> bit) & 1) | (((highshift >> bit) & 1) << 1);
 
                 bool masked = !ShowBgLeft8 && screenX < 8;
                 int slot = scanOff + screenX;
                 Buffer_BG_array[slot] = masked ? 0 : bgPixel;
-                ScreenBuf1x[slot] = (masked || bgPixel == 0)
-                    ? bgColor
-                    : NesColors[ppu_ram[(0x3f00 | (attrUse << 2)) + bgPixel] & 0x3f];
+                uint* pal = (attrUse == renderAttr) ? palCacheR : palCacheN;
+                ScreenBuf1x[slot] = masked ? bgColor : pal[bgPixel];
             }
         }
 
