@@ -9,6 +9,8 @@
 | Blargg 綜合測試 | 174 | 174 | 100% |
 | AccuracyCoin | 136 | 136 | 100% |
 
+![AccuracyCoin 136/136 PERFECT](report/screenshots-ac/ac_summary.webp)
+
 ## 目錄結構說明
 
 ### 核心程式碼 (AprNes/)
