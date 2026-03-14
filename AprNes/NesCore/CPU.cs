@@ -20,7 +20,9 @@ namespace AprNes
 
         // Per-cycle state machine state
         static byte operationCycle = 0;   // 0 = opcode fetch, 1..N = subsequent cycles
+#pragma warning disable CS0414
         static bool CPU_Read = true;      // true = read cycle, false = write cycle (for DMA halt logic)
+#pragma warning restore CS0414
         static ushort addressBus = 0;     // current address on bus
         static byte dl = 0;              // data latch (intermediate value between cycles)
         static ushort temporaryAddress;   // used for branch/page-cross calculations
