@@ -58,10 +58,15 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 ### PRIORITY 2 — AudioEnabled early-exit guard in apu_step()
 - **Target**: APU.cs — `apu_step()` runs all pulse/noise/triangle/DMC timers even when audio disabled
 - **Expected gain**: 3–5% (when running headless/benchmark)
-- **Effort**: ~30 minutes
-- **Method**: Wrap timer/sample logic with `if (AudioEnabled)` guard; keep only frame counter and length counter snapshot outside guard
-- **Risk**: Medium — must not break $4015 status reads or IRQ timing
-- **Status**: 🔲 TODO
+- **Status**: ❌ REMOVED — 邏輯正確性問題，不實作
+- **原因**:
+  - `apu_step()` 中以下邏輯**必須在 audio disabled 時繼續執行**，無法 guard：
+    1. **`clockdmc()`** — DMC timer 驅動 DMA 週期偷取（stolen cycles），影響 CPU timing，與音效無關
+    2. **frame counter / IRQ** — `framectrdiv` 倒數、`statusframeint` 設定，影響 IRQ 時序
+    3. **`lengthctr_snapshot[]`** — `$4015` read 的 length counter 狀態來源
+    4. **envelope/sweep/length 時鐘** — 影響 frame counter 狀態一致性
+  - 只有最末段的「sample 輸出」可 guard，但那部分本身已有 `if (AudioEnabled)` 路徑（WaveOut 不播放）
+  - 有效 guard 範圍極小，幾乎無收益，且容易遺漏，風險高
 
 ---
 
@@ -69,8 +74,12 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 - **Target**: MEM.cs — `ProcessPendingDma()` called on every CpuRead even when no DMA active
 - **Expected gain**: 3–5%
 - **Effort**: ~1 hour
-- **Method**: Add fast-path guard at entry: `if (!dmaNeedHalt && !dmcDmaRunning && !spriteDmaTransfer) return;`
-- **Risk**: Low — guard only skips when no DMA in progress
+- **Method**: Add fast-path guard at entry（**修正版**，原版不完整）：
+  ```csharp
+  if (!dmaNeedHalt && !dmcDmaRunning && !dmcNeedDummyRead && !spriteDmaTransfer && !dmcImplicitAbortPending) return;
+  ```
+  - 原版 guard 漏掉 `!dmcNeedDummyRead`（dummy read 進行中會跳過）和 `!dmcImplicitAbortPending`（1-cycle phantom DMA 會被跳過）
+- **Risk**: Low（修正後）— 確認 5 個 flag 都覆蓋所有 DMA 入口條件
 - **Status**: 🔲 TODO
 
 ---
@@ -111,10 +120,13 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 ### PRIORITY 7 — Memory write dispatch inlining
 - **Target**: MEM.cs — `mem_write_fun[addr](addr, val)` function pointer call on every write
 - **Expected gain**: 1–2%
-- **Effort**: ~1 hour
-- **Method**: Replace function pointer with inline range-based dispatch (if/else chain with AggressiveInlining)
-- **Risk**: Medium — must cover all mapper variants correctly
-- **Status**: 🔲 TODO
+- **Status**: ❌ REMOVED — 無效且有正確性風險，不實作
+- **原因**:
+  - `mem_write_fun[]` 已是 O(1) array 索引，dispatch overhead 本身幾乎為零
+  - 真正的成本在 **handler 內部**（`IO_write` 21-case switch、mapper bank switching），inline dispatch 層無法改善
+  - Mapper handler（`MapperW_PRG` 等）為虛擬方法，**runtime polymorphism 無法 inline**（10+ mapper 類型，JIT 無法確定單一目標）
+  - 若自行複製 mapper dispatch 邏輯，mapper 新增/修改時極易產生不一致 → 靜默錯誤（bank switch 失效、MMC3 IRQ 錯誤等）
+  - 結論：此最佳化在架構上無效，且正確性風險不對等
 
 ---
 
