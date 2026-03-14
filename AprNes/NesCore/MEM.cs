@@ -32,30 +32,31 @@ namespace AprNes
         static long ppuClock = 7 * MASTER_PER_CPU;    // PPU catch-up position (master clock units)
         static long apuClock = 7 * MASTER_PER_CPU - 4; // APU catch-up position (4 MCU behind → fires in tick_pre)
 
-        // Catch up PPU to current master clock position
+        // Catch up PPU to current master clock position.
+        // masterClock always advances by MASTER_PER_CPU (12) per CPU cycle,
+        // and each PPU step advances ppuClock by MASTER_PER_PPU (4), so exactly
+        // 3 steps are always needed — loop unrolled to eliminate branch overhead.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void catchUpPPU()
         {
-            while (ppuClock + MASTER_PER_PPU <= masterClock)
-            {
-                ppuClock += MASTER_PER_PPU;
-                ppu_step_new();
-                bool nmi_output = isVblank && NMIable;
-                if (nmi_output && !nmi_output_prev)
-                    nmi_delay_cycle = cpuCycleCount;
-                nmi_output_prev = nmi_output;
-            }
+            bool o;
+            ppuClock += MASTER_PER_PPU; ppu_step_new();
+            o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
+            ppuClock += MASTER_PER_PPU; ppu_step_new();
+            o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
+            ppuClock += MASTER_PER_PPU; ppu_step_new();
+            o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
         }
 
-        // Catch up APU to current master clock position
+        // Catch up APU to current master clock position.
+        // masterClock always advances by MASTER_PER_CPU (12) per CPU cycle,
+        // and each APU step also advances apuClock by MASTER_PER_CPU (12),
+        // so exactly 1 step is always needed — while loop eliminated.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void catchUpAPU()
         {
-            while (apuClock + MASTER_PER_CPU <= masterClock)
-            {
-                apuClock += MASTER_PER_CPU;
-                apu_step();
-            }
+            apuClock += MASTER_PER_CPU;
+            apu_step();
         }
 
         // --- M2 Phase Split (Mesen2 model) ---
