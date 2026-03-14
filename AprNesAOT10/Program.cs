@@ -11,6 +11,16 @@ namespace AprNes
         [STAThread]
         static void Main(string[] args)
         {
+            // ── perf mode (auto-save to Performance/ MD) ─────────────────────
+            if (args.Length >= 2 && args[0] == "--perf")
+            {
+                string rom    = args[1];
+                int s; int seconds = args.Length >= 3 && int.TryParse(args[2], out s) ? s : 20;
+                string note   = args.Length >= 4 ? args[3] : null;
+                BenchmarkRunner.RunPerf(rom, seconds, note);
+                return;
+            }
+
             // ── CLI benchmark mode ────────────────────────────────────────────
             if (args.Length >= 2 && (args[0] == "--benchmark" || args[0] == "--benchmark-simd" || args[0] == "--benchmark-nosimd"))
             {
