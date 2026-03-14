@@ -602,7 +602,9 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 - **Risk**: Low — 邏輯完全等價，只是把迴圈展開
 - **Verify**: blargg 174/174 + AC 136/136
-- **Status**: 🔲 TODO
+- **Status**: ❌ FAILED — 實測負效益 -1.8%（245.30 → 240.85）
+- **失敗原因**: 展開後 RenderBGTile 方法體積大幅增加，造成 JIT I-cache 壓力 + 方法過大難以最佳化。
+  JIT 對 8 次小型迴圈的 loop unrolling 已內建優化，手動展開反而劣化。
 
 ---
 
