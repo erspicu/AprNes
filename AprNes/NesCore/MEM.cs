@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.CompilerServices;
 
 namespace AprNes
@@ -9,7 +9,6 @@ namespace AprNes
 
         static ushort cpuBusAddr = 0;    // CPU current bus address (for DMC phantom reads)
 #pragma warning disable CS0414
-        static bool cpuBusIsWrite = false; // true = write cycle, false = read cycle
 #pragma warning restore CS0414
 
         // M2 phase tracking: true = PUT (M2 low, write phase), false = GET (M2 high, read phase)
@@ -119,9 +118,7 @@ namespace AprNes
             // --- Halt cycle ---
             dmaNeedHalt = false;
             cpuBusAddr = readAddress;
-            cpuBusIsWrite = true;
             StartCpuCycle();
-            cpuBusIsWrite = false;
             if (!(dmcAbortDma && skipDummyReads))
             {
                 ppu2007ReadCooldown = 0;
@@ -200,7 +197,6 @@ namespace AprNes
                         StartCpuCycle();
                         ushort srcAddr = (ushort)(spriteDmaOffset * 0x100 + spriteReadAddr);
                         cpuBusAddr = srcAddr;
-                        cpuBusIsWrite = false;
                         readValue = ProcessDmaRead(srcAddr, enableInternalRegReads);
                         cpubus = readValue;
                         EndCpuCycle();
@@ -212,7 +208,6 @@ namespace AprNes
                         absorbDmaFlags();
                         StartCpuCycle();
                         cpuBusAddr = readAddress;
-                        cpuBusIsWrite = false;
                         if (!skipDummyReads)
                         {
                             ppu2007ReadCooldown = 0;
@@ -228,7 +223,6 @@ namespace AprNes
                         absorbDmaFlags();
                         StartCpuCycle();
                         cpuBusAddr = 0x2004;
-                        cpuBusIsWrite = true;
                         spr_ram[spr_ram_add++] = readValue;
                         EndCpuCycle();
                         spriteDmaCounter++;
@@ -240,7 +234,6 @@ namespace AprNes
                         absorbDmaFlags();
                         StartCpuCycle();
                         cpuBusAddr = readAddress;
-                        cpuBusIsWrite = false;
                         if (!skipDummyReads)
                         {
                             ppu2007ReadCooldown = 0;
@@ -319,7 +312,6 @@ namespace AprNes
         static byte Mem_r(ushort address)
         {
             cpuBusAddr = address;
-            cpuBusIsWrite = false;
             StartCpuCycle();
             byte val;
             if (address < 0x2000)
@@ -340,7 +332,6 @@ namespace AprNes
         static void Mem_w(ushort address, byte value)
         {
             cpuBusAddr = address;
-            cpuBusIsWrite = true;
             StartCpuCycle();
             cpubus = value;
             mem_write_fun[address](address, value);
@@ -350,7 +341,7 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ZP_r(byte addr)
         {
-            cpuBusAddr = addr; cpuBusIsWrite = false;
+            cpuBusAddr = addr;
             StartCpuCycle();
             byte val = NES_MEM[addr]; cpubus = val;
             EndCpuCycle();
@@ -360,7 +351,7 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ZP_w(byte addr, byte value)
         {
-            cpuBusAddr = addr; cpuBusIsWrite = true;
+            cpuBusAddr = addr;
             StartCpuCycle();
             NES_MEM[addr] = value; cpubus = value;
             EndCpuCycle();

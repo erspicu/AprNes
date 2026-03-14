@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.CompilerServices;
 
 namespace AprNes
@@ -105,7 +105,6 @@ namespace AprNes
         {
             CPU_Read = true;
             cpuBusAddr = addr;
-            cpuBusIsWrite = false;
             StartCpuCycle();
             if (dmaNeedHalt) ProcessPendingDma(addr);
             byte val;
@@ -128,7 +127,6 @@ namespace AprNes
         {
             CPU_Read = false;
             cpuBusAddr = addr;
-            cpuBusIsWrite = true;
             StartCpuCycle();
             // TriCNES line 8758: implicit abort DMA cancelled if delayed by write cycle
             // "The 1-cycle DMA should not get delayed by a write cycle, rather it just shouldn't occur"
@@ -149,7 +147,6 @@ namespace AprNes
         {
             CPU_Read = true;
             cpuBusAddr = addr;
-            cpuBusIsWrite = false;
             StartCpuCycle();
             if (dmaNeedHalt) ProcessPendingDma(addr);
             byte val = NES_MEM[addr];
@@ -163,7 +160,6 @@ namespace AprNes
         {
             CPU_Read = false;
             cpuBusAddr = addr;
-            cpuBusIsWrite = true;
             StartCpuCycle();
             NES_MEM[addr] = val;
             cpubus = val;
