@@ -303,6 +303,35 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 ---
 
+### PRIORITY 16 — Lazy N/Z flag evaluation（cache lastNZResult）
+- **Target**: CPU.cs — `SetNZ()` 每次呼叫做 2–3 ops（bit shift + comparison），每幀被呼叫 ~57 種位置
+- **Expected gain**: 0.5–1.5%
+- **Effort**: ~1 小時（需修改多處，非單一函式）
+- **Method**:
+  1. 新增 `static byte lastNZResult = 0;` 作為 lazy cache
+  2. `SetNZ(byte val)` 改為只存 `lastNZResult = val;`（1 assignment，省去 bit shift + comparison）
+  3. 8 個 branch handler 改讀 cache：
+     - `BPL/BMI`：`(lastNZResult & 0x80) == 0` / `!= 0`
+     - `BEQ/BNE`：`lastNZResult == 0` / `!= 0`
+  4. `GetFlag()` 從 cache 派生 N,Z：
+     ```csharp
+     byte n = (byte)((lastNZResult & 0x80) >> 7);
+     byte z = (lastNZResult == 0) ? (byte)1 : (byte)0;
+     ```
+  5. `SetFlag()`（PLP/RTI 用）加上 cache 同步：
+     ```csharp
+     // 重建 lastNZResult：N→bit7，Z→0或1
+     lastNZResult = (byte)((flagN != 0 ? 0x80 : 0) | (flagZ == 0 ? 0xFF : 0x00));
+     ```
+  6. `Op_CMP()` 和 BIT 指令直接寫 flagN/flagZ 的地方加 `lastNZResult = sub_result;`
+- **Risk**: Low — 邏輯等效替換；需確認所有直接讀 `flagN`/`flagZ` 的地方都改為讀 cache
+  - 特別注意：`flagN` / `flagZ` 在 CPU.cs 以外是否被讀取（需 grep 確認）
+  - 若有遺漏會導致 branch 條件錯誤 → blargg 立即暴露
+- **Verify**: blargg 174/174 + AC 136/136
+- **Status**: 🔲 TODO
+
+---
+
 ## Failed / Ineffective Attempts
 
 *(None yet)*
