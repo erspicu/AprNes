@@ -47,6 +47,7 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 | 8 | Priority 6: remove redundant screenX > 255 check in RenderBGTile() | 204.10 | 216.45 | **+6.1%** | ✅ KEEP | [v12](2026-03-14_perf_v12.md) |
 | 9 | Priority 3: ProcessPendingDma early-exit guard (5-flag) | 216.45 | 227.40 | **+5.1%** | ✅ KEEP | [v14](2026-03-14_perf_v14.md) |
 | 10 | Priority 12: RAM read fast-path in Mem_r() / CpuRead() | 227.40 | 233.75 | **+2.8%** | ✅ KEEP | [v15](2026-03-14_perf_v15.md) |
+| 11 | Priority 17ABC: ppu_cycles_x local shadow + cx param + apu pulse/tri shadow | 233.75 | 237.00 | **+1.4%** | ✅ KEEP | [v17](2026-03-14_perf_v17.md) |
 
 ---
 
@@ -451,7 +452,10 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 - **實作順序建議**: 17A（最安全最快）→ 17B（需要改 signature）→ 17C（小補充）
 - **Verify**: blargg 174/174 + AC 136/136（各子項分開驗證）
-- **Status**: 🔲 TODO
+- **Status**: ✅ DONE — **+1.4%** (233.75 → 237.00 FPS)；blargg 174/174 + AC 136/136 驗證通過
+  - 17A（RenderBGTile loop shadow）：單獨測試 0%，整合後協同有效
+  - 17B（ppu_cycles_x local + cx param）：主要貢獻
+  - 17C（apu pulse/tri shadow）：小幅貢獻
 
 ---
 

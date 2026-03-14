@@ -162,7 +162,7 @@ namespace AprNes
 
         // Render 8 BG pixels at screen positions [ppu_cycles_x-7 .. ppu_cycles_x]
         // using shift registers BEFORE reload (high byte = current tile data).
-        static void RenderBGTile()
+        static void RenderBGTile(int cx)
         {
             byte renderAttr = bg_attr_p3;
             byte nextAttr   = bg_attr_p2;
@@ -179,17 +179,21 @@ namespace AprNes
             palCacheN[2] = NesColors[ppu_ram[baseAddrN + 2] & 0x3f];
             palCacheN[3] = NesColors[ppu_ram[baseAddrN + 3] & 0x3f];
 
-            int baseX = ppu_cycles_x - 7;
+            int baseX = cx - 7;
             int scanOff = scanline << 8;
+            int fineX = FineX;
+            bool bgLeft8 = ShowBgLeft8;
+            ushort ls = lowshift;
+            ushort hs = highshift;
             for (int loc = 0; loc < 8; loc++)
             {
                 int screenX = baseX + loc;
 
-                int bit = 15 - loc - FineX;
+                int bit = 15 - loc - fineX;
                 byte attrUse = (bit >= 8) ? renderAttr : nextAttr;
-                int bgPixel = ((lowshift >> bit) & 1) | (((highshift >> bit) & 1) << 1);
+                int bgPixel = ((ls >> bit) & 1) | (((hs >> bit) & 1) << 1);
 
-                bool masked = !ShowBgLeft8 && screenX < 8;
+                bool masked = !bgLeft8 && screenX < 8;
                 int slot = scanOff + screenX;
                 Buffer_BG_array[slot] = masked ? 0 : bgPixel;
                 uint* pal = (attrUse == renderAttr) ? palCacheR : palCacheN;
@@ -201,11 +205,11 @@ namespace AprNes
         // BG tiles fetched at cycles 0-255 (visible) and 320-335 (next-scanline prefetch).
         // A12 notifications: BG at phases 0 (NT addr, A12=0) and 4 (CHR low addr, A12=BG table bit12),
         // sprites at phases 0 (garbage NT, A12=0) and 3 (sprite CHR, A12=sprite table bit12).
-        static void ppu_rendering_tick()
+        static void ppu_rendering_tick(int cx)
         {
-            if (ppu_cycles_x < 256 || (ppu_cycles_x >= 320 && ppu_cycles_x < 336))
+            if (cx < 256 || (cx >= 320 && cx < 336))
             {
-                switch (ppu_cycles_x & 7)
+                switch (cx & 7)
                 {
                     case 0:
                         ioaddr = 0x2000 | (vram_addr & 0x0FFF);
@@ -234,8 +238,8 @@ namespace AprNes
                     case 7:
                         highTile = MapperObj.MapperR_CHR(ioaddr);
                         // Render 8 pixels using shift registers BEFORE reload (visible only, BG on)
-                        if (scanline < 240 && ppu_cycles_x < 256 && ShowBackGround)
-                            RenderBGTile();
+                        if (scanline < 240 && cx < 256 && ShowBackGround)
+                            RenderBGTile(cx);
                         // Load shift registers (high = old-low = previous tile, low = new tile)
                         lowshift  = (ushort)((lowshift  << 8) | lowTile);
                         highshift = (ushort)((highshift << 8) | highTile);
@@ -247,41 +251,41 @@ namespace AprNes
                         break;
                 }
             }
-            else if (ppu_cycles_x == 256)
+            else if (cx == 256)
             {
                 Yinc();
             }
-            else if (ppu_cycles_x >= 257 && ppu_cycles_x < 320)
+            else if (cx >= 257 && cx < 320)
             {
-                if (ppu_cycles_x == 257) { CopyHoriV(); spr_ram_add = 0; }
+                if (cx == 257) { CopyHoriV(); spr_ram_add = 0; }
 
                 // Latch sprite size at dot 261 (sprite 0 CHR low fetch address).
                 // On real hardware, the Spritesize8x16 value at CHR fetch time determines
                 // tile addressing. Mid-HBlank $2000 writes after this dot won't affect
                 // the current scanline's sprite 0 tile data.
-                if (ppu_cycles_x == 261) spriteSizeLatchedForFetch = Spritesize8x16;
+                if (cx == 261) spriteSizeLatchedForFetch = Spritesize8x16;
 
                 if (mapper == 4)
                 {
-                    int phase = (ppu_cycles_x - 257) & 7;
+                    int phase = (cx - 257) & 7;
                     if (phase == 0) NotifyMapperA12(0x2000);                // garbage NT addr, A12=0
                     else if (phase == 3) NotifyMapperA12(SpPatternTableAddr); // sprite CHR addr (pre-output)
                 }
             }
 
             // Dot 321: latch secondary OAM[0] into oamCopyBuffer for dots 321-340
-            if (ppu_cycles_x == 321 && scanline < 240 && (ShowBackGround || ShowSprites))
+            if (cx == 321 && scanline < 240 && (ShowBackGround || ShowSprites))
                 oamCopyBuffer = secondaryOAM[0];
 
             // Pre-render scanline: continuous vert(v) = vert(t) copy at cycles 280-304
-            if (scanline == 261 && ppu_cycles_x >= 280 && ppu_cycles_x <= 304)
+            if (scanline == 261 && cx >= 280 && cx <= 304)
             {
                 vram_addr = (vram_addr & ~0x7BE0) | (vram_addr_internal & 0x7BE0);
             }
 
             // Garbage NT fetches at dots 336-339: notify A12=0 to create falling edge
             // after BG prefetch CHR (A12=1 for BG=$1000), needed for scanline-boundary timing
-            if (mapper == 4 && ppu_cycles_x == 336)
+            if (mapper == 4 && cx == 336)
                 NotifyMapperA12(0x2000);
         }
 
@@ -307,21 +311,23 @@ namespace AprNes
             // ppuRenderingEnabled is the delayed version (Mesen2 model: updated at end of previous dot).
             // Used for tile fetch gating — the mask write takes effect 1 PPU dot later for rendering.
 
+            // Shadow ppu_cycles_x to local for JIT enregistration
+            int cx = ppu_cycles_x;
+
             // At dot 0 of visible scanlines: precompute sprite 0 data for hit detection.
             // Must run BEFORE the hit check so sprite0_on_line is valid at dot 0.
             // On real hardware, sprite evaluation happens during the previous scanline.
-            if (scanline >= 0 && scanline < 240 && ppu_cycles_x == 0)
+            if (scanline >= 0 && scanline < 240 && cx == 0)
                 PrecomputeSprite0Line();
 
             // Per-pixel sprite 0 hit detection using per-dot shifted shadow registers.
-            if (scanline >= 0 && scanline < 240 && ppu_cycles_x < 256
+            if (scanline >= 0 && scanline < 240 && cx < 256
                 && sprite0_on_line && !isSprite0hit && ShowBackGround && ShowSprites)
             {
-                int screenX = ppu_cycles_x;
-                bool inLeft8 = screenX < 8;
-                if (!(!ShowBgLeft8 && inLeft8) && !(!ShowSprLeft8 && inLeft8) && screenX != 255)
+                bool inLeft8 = cx < 8;
+                if (!(!ShowBgLeft8 && inLeft8) && !(!ShowSprLeft8 && inLeft8) && cx != 255)
                 {
-                    int sprCol = screenX - sprite0_line_x;
+                    int sprCol = cx - sprite0_line_x;
                     if (sprCol >= 0 && sprCol < 8)
                     {
                         int bit = 15 - FineX;
@@ -346,9 +352,9 @@ namespace AprNes
             // Use delayed ppuRenderingEnabled: shift registers are clocked by the same signal as tile fetches.
             if (ppuRenderingEnabled)
             {
-                if ((scanline >= 0 && scanline < 240 && ppu_cycles_x < 256)
+                if ((scanline >= 0 && scanline < 240 && cx < 256)
                     || ((scanline < 240 || scanline == 261)
-                        && ppu_cycles_x >= 320 && ppu_cycles_x < 336))
+                        && cx >= 320 && cx < 336))
                 {
                     lowshift_s0 <<= 1;
                     highshift_s0 = (ushort)((highshift_s0 << 1) | 1);
@@ -358,34 +364,34 @@ namespace AprNes
             if (scanline < 240 || scanline == 261)
             {
                 if (ppuRenderingEnabled)
-                    ppu_rendering_tick();
+                    ppu_rendering_tick(cx);
 
                 // Per-dot sprite evaluation (visible scanlines only)
                 if (scanline >= 0 && scanline < 240 && ppuRenderingEnabled)
                 {
                     // Dots 1-64: clear secondary OAM (write $FF, 2 dots per byte)
-                    if (ppu_cycles_x >= 1 && ppu_cycles_x <= 64)
+                    if (cx >= 1 && cx <= 64)
                     {
                         oamCopyBuffer = 0xFF;
-                        if ((ppu_cycles_x & 1) == 0)
-                            secondaryOAM[(ppu_cycles_x >> 1) - 1] = 0xFF;
+                        if ((cx & 1) == 0)
+                            secondaryOAM[(cx >> 1) - 1] = 0xFF;
                     }
                     // Dot 65: initialize evaluation FSM
-                    else if (ppu_cycles_x == 65)
+                    else if (cx == 65)
                     {
                         sprite0_eval_addr = spr_ram_add;
                         SpriteEvalInit();
                         SpriteEvalTick();
                     }
                     // Dots 66-256: per-dot evaluation
-                    else if (ppu_cycles_x >= 66 && ppu_cycles_x <= 256)
+                    else if (cx >= 66 && cx <= 256)
                     {
                         SpriteEvalTick();
-                        if (ppu_cycles_x == 256) SpriteEvalEnd();
+                        if (cx == 256) SpriteEvalEnd();
                     }
                 }
                 // Pre-render line: save sprite0_eval_addr at dot 65
-                else if (scanline == 261 && ppu_cycles_x == 65 && ppuRenderingEnabled)
+                else if (scanline == 261 && cx == 65 && ppuRenderingEnabled)
                 {
                     sprite0_eval_addr = spr_ram_add;
                 }
@@ -394,7 +400,7 @@ namespace AprNes
                 {
                     // At start of each visible scanline: always zero Buffer_BG_array to prevent
                     // stale data from prior frames causing incorrect sprite priority decisions.
-                    if (ppu_cycles_x == 0)
+                    if (cx == 0)
                     {
                         int scanOff = scanline << 8;
                         for (int i = 0; i < 256; i++)
@@ -409,23 +415,23 @@ namespace AprNes
                     }
 
                     // Per-cycle sprite overflow flag (set at the exact evaluation cycle)
-                    if (spriteOverflowCycle >= 0 && ppu_cycles_x == spriteOverflowCycle)
+                    if (spriteOverflowCycle >= 0 && cx == spriteOverflowCycle)
                         isSpriteOverflow = true;
 
                     // Sprite evaluation + rendering at cycle 257 (after BG tiles complete at cycle 255)
-                    if (ppu_cycles_x == 257)
+                    if (cx == 257)
                         RenderSpritesLine();
 
                 }
 
                 // Pre-render line: compute pre-render sprite data at dot 257
-                if (scanline == 261 && ppu_cycles_x == 257 && ppuRenderingEnabled)
+                if (scanline == 261 && cx == 257 && ppuRenderingEnabled)
                     PrecomputePreRenderSprites();
 
             }
 
             // Screen output at scanline 240 cycle 1 (matches ppu_step timing)
-            if (scanline == 240 && ppu_cycles_x == 1)
+            if (scanline == 240 && cx == 1)
             {
                 RenderScreen();
                 frame_count++;
@@ -435,11 +441,11 @@ namespace AprNes
             // Update delayed rendering flag (Mesen2: _renderingEnabled updated at end of dot)
             ppuRenderingEnabled = renderingEnabled;
 
-            // Advance cycle counter
-            ppu_cycles_x++;
+            // Advance cycle counter; writeback to static
+            ppu_cycles_x = ++cx;
 
             // VBlank start at scanline 241, cycle 1 (post-increment)
-            if (scanline == 241 && ppu_cycles_x == 1)
+            if (scanline == 241 && cx == 1)
             {
                 if (!SuppressVbl)
                 {
@@ -451,20 +457,20 @@ namespace AprNes
             // Pre-render: clear PPU status flags
             // M2 duty cycle effect: sprite flags are read at M2 fall (~1.875 PPU dots after M2 rise)
             // So sprite flags appear to clear ~2 dots earlier than VBL flag
-            if (scanline == 261 && ppu_cycles_x == 1)
+            if (scanline == 261 && cx == 1)
                 isSprite0hit = isSpriteOverflow = false;
-            if (scanline == 261 && ppu_cycles_x == 2)
+            if (scanline == 261 && cx == 2)
                 isVblank = false;
 
             // Odd frame skip: on odd frames with rendering enabled, skip last idle cycle of pre-render
-            if (scanline == 261 && ppu_cycles_x == 339)
+            if (scanline == 261 && cx == 339)
             {
                 oddSwap = !oddSwap;
-                if (!oddSwap && (ShowBackGround || ShowSprites)) ppu_cycles_x++;
+                if (!oddSwap && (ShowBackGround || ShowSprites)) ppu_cycles_x = ++cx;
             }
 
             // Advance scanline
-            if (ppu_cycles_x == 341)
+            if (cx == 341)
             {
                 if (++scanline == 262)
                 {

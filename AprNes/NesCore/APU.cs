@@ -358,23 +358,29 @@ namespace AprNes
             // Pulse & Noise 計時器：每 2 個 CPU cycles 計數一次 (APU clock)
             if ((apucycle & 1) == 0)
             {
+                // Shadow read-only channel state into locals for JIT enregistration
+                int p0 = _pulsePeriod[0], p1 = _pulsePeriod[1];
+                int d0 = _pulseDuty[0],   d1 = _pulseDuty[1];
+                int lc0 = lengthctr[0],   lc1 = lengthctr[1];
+                int sw0 = sweepsilence[0], sw1 = sweepsilence[1];
+
                 // Pulse 1
                 if (--_pulseTimer[0] < 0)
                 {
-                    _pulseTimer[0] = _pulsePeriod[0];
+                    _pulseTimer[0] = p0;
                     _pulseSeq[0]   = (_pulseSeq[0] + 1) & 7;
                 }
-                _pulseOut[0] = (_pulsePeriod[0] >= 8 && lengthctr[0] > 0 && sweepsilence[0] == 0)
-                    ? DUTYLOOKUP[_pulseDuty[0] * 8 + _pulseSeq[0]] : 0;
+                _pulseOut[0] = (p0 >= 8 && lc0 > 0 && sw0 == 0)
+                    ? DUTYLOOKUP[d0 * 8 + _pulseSeq[0]] : 0;
 
                 // Pulse 2
                 if (--_pulseTimer[1] < 0)
                 {
-                    _pulseTimer[1] = _pulsePeriod[1];
+                    _pulseTimer[1] = p1;
                     _pulseSeq[1]   = (_pulseSeq[1] + 1) & 7;
                 }
-                _pulseOut[1] = (_pulsePeriod[1] >= 8 && lengthctr[1] > 0 && sweepsilence[1] == 0)
-                    ? DUTYLOOKUP[_pulseDuty[1] * 8 + _pulseSeq[1]] : 0;
+                _pulseOut[1] = (p1 >= 8 && lc1 > 0 && sw1 == 0)
+                    ? DUTYLOOKUP[d1 * 8 + _pulseSeq[1]] : 0;
 
                 // Noise
                 if (--_noiseTimer < 0)
@@ -389,14 +395,19 @@ namespace AprNes
             }
 
             // Triangle 計時器：每個 CPU cycle 計數一次
-            if (--_triTimer < 0)
             {
-                _triTimer = _triPeriod;
-                if (linearctr > 0 && lengthctr[2] > 0 && _triPeriod >= 2)
-                    _triSeq = (_triSeq + 1) & 31;
+                int triPeriod = _triPeriod;
+                int lc2 = lengthctr[2];
+                int linCtr = linearctr;
+                if (--_triTimer < 0)
+                {
+                    _triTimer = triPeriod;
+                    if (linCtr > 0 && lc2 > 0 && triPeriod >= 2)
+                        _triSeq = (_triSeq + 1) & 31;
+                }
+                _triOut = (linCtr > 0 && lc2 > 0 && triPeriod >= 2)
+                    ? TRI_SEQ[_triSeq] : 0;
             }
-            _triOut = (linearctr > 0 && lengthctr[2] > 0 && _triPeriod >= 2)
-                ? TRI_SEQ[_triSeq] : 0;
 
             // DMC
             clockdmc();
