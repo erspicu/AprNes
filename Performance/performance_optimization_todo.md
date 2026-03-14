@@ -333,6 +333,128 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 ---
 
+### PRIORITY 17 — JIT enregistration: 將熱路徑 static 讀取改為 method-local 變數
+
+- **Target**: PPU.cs `RenderBGTile()` / `ppu_step_new()` / `ppu_rendering_tick()`；APU.cs `apu_step()`
+- **Expected gain**: 3–6%（總和，分三個子項）
+- **Effort**: ~1–2 小時
+- **背景原理**:
+  - **static 欄位**在 JIT 中永遠是 memory-resident（無論 Debug/Release），每次讀取都是記憶體 load，無法放入 CPU register，因為它可能被其他執行緒或 debugger 觀察
+  - **local 變數**可被 JIT enregister（Debug 模式保守但仍比 static 少一層間接定址）
+  - 「在 loop 開頭 shadow 一次 → loop 內使用 local → loop 結束後 writeback（若有修改）」是標準做法
+  - 適合對象：在緊密 loop 或高呼叫頻率 function 內**多次讀取、中途不被外部修改**的 static 欄位
+
+---
+
+#### 17A — `RenderBGTile()` 8-pixel 內層 loop：cache 4 個 statics
+
+- **呼叫頻率**: 每幀 `240 scanlines × 33 tiles = ~7,920 次`；每次 8 iterations = ~63,360 次 loop body
+- **候選 statics**（每次 loop iteration 都從記憶體重讀）:
+
+  | Static 欄位 | 類型 | 目前讀取次數/call | 可否 shadow |
+  |------------|------|-----------------|-------------|
+  | `FineX` | `int` | 8×（`15 - loc - FineX`） | ✅ loop 中不變 |
+  | `ShowBgLeft8` | `bool` | 8×（`!ShowBgLeft8 && screenX < 8`） | ✅ loop 中不變 |
+  | `lowshift` | `ushort` | 8×（bit extraction） | ✅ loop 中不變（RenderBGTile 不寫 lowshift） |
+  | `highshift` | `ushort` | 8×（bit extraction） | ✅ loop 中不變 |
+
+- **Method**:
+  ```csharp
+  static void RenderBGTile()
+  {
+      // ... palette cache setup (unchanged) ...
+      int fineX = FineX;          // shadow: 1 load → 8 register reads
+      bool bgLeft8 = ShowBgLeft8; // shadow
+      ushort ls = lowshift;       // shadow
+      ushort hs = highshift;      // shadow
+      int baseX = ppu_cycles_x - 7;
+      int scanOff = scanline << 8;
+      for (int loc = 0; loc < 8; loc++)
+      {
+          int bit = 15 - loc - fineX;       // register
+          int bgPixel = ((ls >> bit) & 1) | (((hs >> bit) & 1) << 1);  // register
+          bool masked = !bgLeft8 && (baseX + loc) < 8;  // register
+          // ...
+      }
+      // lowshift/highshift 不需要 writeback（RenderBGTile 不修改它們）
+  }
+  ```
+- **Risk**: Very Low — 純 shadow read，無 writeback（lowshift/highshift 在 ppu_step_new case 7 才更新，RenderBGTile 只讀不寫）
+- **Expected gain**: ~1–2%
+
+---
+
+#### 17B — `ppu_rendering_tick()` + `ppu_step_new()` 傳遞 `cx` 參數
+
+- **呼叫頻率**: `ppu_step_new()` 每幀 89,342 次（341 dots × 262 scanlines），`ppu_rendering_tick()` 每幀 ~59,000 次（僅 visible/pre-render + rendering enabled）
+- **問題**: `ppu_cycles_x`（全域 static）在 `ppu_rendering_tick()` 中被讀取 **約 15 次**（多層 if/else if + switch）；在 `ppu_step_new()` 中讀取 **約 12 次**（多個 `ppu_cycles_x == N` 條件）
+  - 每次讀取都是一次 memory load（static 欄位無法 enregister）
+  - 總計約 27 次 static load 可被消除
+
+- **Method**: 改為傳參
+  ```csharp
+  // ppu_step_new() 開頭 shadow：
+  int cx = ppu_cycles_x;
+  int sl = scanline;
+  // ... 函式本體全部用 cx / sl 取代 ppu_cycles_x / scanline ...
+  ppu_cycles_x = cx + 1;   // writeback（目前的 ppu_cycles_x++ 改為此）
+
+  // ppu_rendering_tick() 改為接受參數：
+  static void ppu_rendering_tick(int cx, int sl)
+  { ... }  // 內部全改用 cx / sl
+
+  // RenderBGTile() 同樣接受：
+  static void RenderBGTile(int cx, int sl)
+  { int baseX = cx - 7; int scanOff = sl << 8; ... }
+  ```
+- **注意**: `ppu_rendering_tick()` 呼叫 `NotifyMapperA12()`，後者讀取 `scanline` 計算 `scanline * 341 + ppu_cycles_x`；需一併傳入或改用 sl*341+cx 表達式
+- **Risk**: Low — 純 refactor，行為等效；函式簽名改變但全在 PPU.cs partial class 內
+- **Expected gain**: ~2–3%
+
+---
+
+#### 17C — `apu_step()` pulse block：shadow per-channel timer/period/seq/duty
+
+- **呼叫頻率**: 每幀 ~29,830 次；pulse block（`if ((apucycle & 1) == 0)`）每幀 ~14,915 次
+- **候選 statics**（在 pulse block 內重複讀取）:
+
+  | Static | 讀取次數/call | 寫入？ |
+  |--------|-------------|--------|
+  | `_pulsePeriod[0]` / `[1]` | 3× each（timer reset + output guard × 2） | ❌ 只讀 |
+  | `_pulseDuty[0]` / `[1]` | 1× each（DUTYLOOKUP index） | ❌ 只讀 |
+  | `lengthctr[0]` / `[1]` / `[3]` | 1× each | ❌ 只讀 |
+  | `sweepsilence[0]` / `[1]` | 1× each | ❌ 只讀 |
+
+- **Method**:
+  ```csharp
+  if ((apucycle & 1) == 0)
+  {
+      int p0 = _pulsePeriod[0], p1 = _pulsePeriod[1];  // shadow
+      int d0 = _pulseDuty[0],   d1 = _pulseDuty[1];
+      int lc0 = lengthctr[0], lc1 = lengthctr[1];
+      int sw0 = sweepsilence[0], sw1 = sweepsilence[1];
+
+      // Pulse 1
+      if (--_pulseTimer[0] < 0) { _pulseTimer[0] = p0; _pulseSeq[0] = (_pulseSeq[0]+1)&7; }
+      _pulseOut[0] = (p0 >= 8 && lc0 > 0 && sw0 == 0) ? DUTYLOOKUP[d0*8+_pulseSeq[0]] : 0;
+
+      // Pulse 2 (similar)
+      // Noise (lengthctr[3] / _noiseLfsr — shorter, less benefit)
+  }
+  ```
+  - `_pulseTimer` 仍需讀寫（有 `--_pulseTimer[i]` 修改），不能 shadow
+  - `_pulseSeq` 在輸出計算後已取新值，需用更新後的值
+- **Risk**: Very Low — 只有 read-only statics 被 shadowed，寫入路徑（timer/seq）保持直接存取
+- **Expected gain**: ~0.5–1%
+
+---
+
+- **實作順序建議**: 17A（最安全最快）→ 17B（需要改 signature）→ 17C（小補充）
+- **Verify**: blargg 174/174 + AC 136/136（各子項分開驗證）
+- **Status**: 🔲 TODO
+
+---
+
 ## Failed / Ineffective Attempts
 
 *(None yet)*
