@@ -263,7 +263,8 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
   - `Increment2007()` 每次 $2007 存取都呼叫，遊戲中頻率高
   - 非 MMC3 遊戲（佔多數）完全跳過 A12 通知邏輯
 - **Risk**: Low — 純 cache，mapper 不會中途改變
-- **Status**: 🔲 TODO
+- **Status**: ❌ FAILED — 實測 **-2.2%** (237.00 → 231.80 FPS)，已 revert
+  - 原因：`bool` 欄位 load + branch vs. `int` load + cmp + branch，在 Debug JIT 下沒有改善；推測 int `mapper` 與其他高頻欄位在同一 cache line，而新增的 `isMapper4` 位於不同位置，反而增加 cache miss
 
 ---
 
