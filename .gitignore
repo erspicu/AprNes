@@ -61,6 +61,9 @@ result/
 # Website files (static site, not source code)
 site/
 
+# Community post drafts (personal, not for repo)
+MD/intro.md
+
 # Performance test ROMs
 Performance/*.nes
 
