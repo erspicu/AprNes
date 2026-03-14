@@ -106,8 +106,17 @@ namespace AprNes
             cpuBusIsWrite = false;
             StartCpuCycle();
             if (dmaNeedHalt) ProcessPendingDma(addr);
-            byte val = mem_read_fun[addr](addr);
-            if (addr != 0x4015) cpubus = val;
+            byte val;
+            if (addr < 0x2000)
+            {
+                val = NES_MEM[addr & 0x7FF];
+                cpubus = val;
+            }
+            else
+            {
+                val = mem_read_fun[addr](addr);
+                if (addr != 0x4015) cpubus = val;
+            }
             EndCpuCycle();
             return val;
         }

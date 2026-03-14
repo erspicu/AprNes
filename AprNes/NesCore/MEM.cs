@@ -319,8 +319,17 @@ namespace AprNes
             cpuBusAddr = address;
             cpuBusIsWrite = false;
             StartCpuCycle();
-            byte val = mem_read_fun[address](address);
-            if (address != 0x4015) cpubus = val;
+            byte val;
+            if (address < 0x2000)
+            {
+                val = NES_MEM[address & 0x7FF];
+                cpubus = val;
+            }
+            else
+            {
+                val = mem_read_fun[address](address);
+                if (address != 0x4015) cpubus = val;
+            }
             EndCpuCycle();
             return val;
         }

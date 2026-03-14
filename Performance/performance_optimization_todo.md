@@ -33,6 +33,23 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 ---
 
+## Results Log
+
+| # | Optimization | Before FPS | After FPS | Delta | Result | Report |
+|---|-------------|-----------|----------|-------|--------|--------|
+| 1 | Baseline | — | 181.70 | — | — | [v1](2026-03-14_perf_v1.md) |
+| 2 | Priority 11: managed array → unsafe pointer (TRI_SEQ, DUTYLOOKUP, secondaryOAM, corruptOamRow) | 181.70 | 187.70 | **+3.3%** | ✅ KEEP | [v2](2026-03-14_perf_v2.md) |
+| 3 | Priority 8: RenderBGTile pre-compute bgColor + merge duplicate condition | 187.70 | 188.55 | +0.4% | ✅ KEEP (cleaner code) | [v6](2026-03-14_perf_v6.md) |
+| 4 | Priority 4+5 v1: APU int counter + stackalloc palette | 188.55 | 187.90 | -0.3% | ❌ REVERT | [v7](2026-03-14_perf_v7.md) |
+| 5 | Priority 5 v2: static palCacheR/N (Marshal.AllocHGlobal, reuse) | 188.55 | 189.75 | **+0.6%** | ✅ KEEP | [v8](2026-03-14_perf_v8.md) |
+| 6 | Priority 4 v2: APU int counter (單獨測試) | 189.75 | 186.50 | -1.7% | ❌ REVERT | [v10](2026-03-14_perf_v10.md) |
+| 7 | Priority 9: CPU opcode dispatch Action[256] table | 189.75 | 204.10 | **+7.6%** | ✅ KEEP | [v11](2026-03-14_perf_v11.md) |
+| 8 | Priority 6: remove redundant screenX > 255 check in RenderBGTile() | 204.10 | 216.45 | **+6.1%** | ✅ KEEP | [v12](2026-03-14_perf_v12.md) |
+| 9 | Priority 3: ProcessPendingDma early-exit guard (5-flag) | 216.45 | 227.40 | **+5.1%** | ✅ KEEP | [v14](2026-03-14_perf_v14.md) |
+| 10 | Priority 12: RAM read fast-path in Mem_r() / CpuRead() | 227.40 | 233.75 | **+2.8%** | ✅ KEEP | [v15](2026-03-14_perf_v15.md) |
+
+---
+
 ## Optimization Tasks
 
 ### PRIORITY 0 — Remove DMA trace logging code
@@ -213,22 +230,6 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 ---
 
-## Results Log
-
-| # | Optimization | Before FPS | After FPS | Delta | Result | Report |
-|---|-------------|-----------|----------|-------|--------|--------|
-| 1 | Baseline | — | 181.70 | — | — | [v1](2026-03-14_perf_v1.md) |
-| 2 | Priority 11: managed array → unsafe pointer (TRI_SEQ, DUTYLOOKUP, secondaryOAM, corruptOamRow) | 181.70 | 187.70 | **+3.3%** | ✅ KEEP | [v2](2026-03-14_perf_v2.md) |
-| 3 | Priority 8: RenderBGTile pre-compute bgColor + merge duplicate condition | 187.70 | 188.55 | +0.4% | ✅ KEEP (cleaner code) | [v6](2026-03-14_perf_v6.md) |
-| 4 | Priority 4+5 v1: APU int counter + stackalloc palette | 188.55 | 187.90 | -0.3% | ❌ REVERT | [v7](2026-03-14_perf_v7.md) |
-| 5 | Priority 5 v2: static palCacheR/N (Marshal.AllocHGlobal, reuse) | 188.55 | 189.75 | **+0.6%** | ✅ KEEP | [v8](2026-03-14_perf_v8.md) |
-| 6 | Priority 4 v2: APU int counter (單獨測試) | 189.75 | 186.50 | -1.7% | ❌ REVERT | [v10](2026-03-14_perf_v10.md) |
-| 7 | Priority 9: CPU opcode dispatch Action[256] table | 189.75 | 204.10 | **+7.6%** | ✅ KEEP | [v11](2026-03-14_perf_v11.md) |
-| 8 | Priority 6: remove redundant screenX > 255 check in RenderBGTile() | 204.10 | 216.45 | **+6.1%** | ✅ KEEP | [v12](2026-03-14_perf_v12.md) |
-| 9 | Priority 3: ProcessPendingDma early-exit guard (5-flag) | 216.45 | 227.40 | **+5.1%** | ✅ KEEP | [v14](2026-03-14_perf_v14.md) |
-
----
-
 ### PRIORITY 12 — RAM read fast-path in Mem_r() / CpuRead()
 - **Target**: MEM.cs `Mem_r()` + CPU.cs `CpuRead()` — 目前所有記憶體讀取都走 `mem_read_fun[addr](addr)` 陣列 dispatch
 - **Expected gain**: 5–10%
@@ -244,7 +245,7 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
   - `mem_read_fun[addr]` 在 $0000–$1FFF 只是 `NES_MEM[addr & 0x7FF]`，等效替換
 - **Risk**: Low — RAM 行為固定，不涉及 mapper 或 PPU；需確認 open bus 行為在此範圍不需要特殊處理
 - **Verify**: blargg 174/174 + AC 136/136
-- **Status**: 🔲 TODO
+- **Status**: ✅ DONE — **+2.8%** (227.40 → 233.75 FPS)；blargg 174/174 + AC 136/136 驗證通過
 
 ---
 
