@@ -109,6 +109,20 @@
 
 ---
 
+### ❌ PPU tile fetch 快取 — generation-based per-scanline CHR cache
+**實際收益：負（259 → ~256 FPS，-1.2%）** — 2026-03-15
+
+- 設計：`tileFetchTag[8192]`（ushort）+ `tileFetchData[8192]`（byte），以 scanline generation 為有效期
+- 邏輯：cases 5/7 先查 tag，hit 直接返回 cached byte，miss 才呼叫 MapperR_CHR
+- 失敗原因：
+  - 24KB 額外陣列（16KB tag + 8KB data）侵佔 L1 cache（32KB），造成其他熱資料的 eviction
+  - `MapperR_CHR`（MMC3）本身已很快：1 interface virtual call + 3-4 branch + 1 array access，被 branch predictor 預測良好
+  - 即使 cache hit，tag/data 兩次隨機 array access 的 overhead 幾乎等於省下的 MapperR_CHR cost
+  - Cache hit rate 不如預期：Mega Man 5 複雜背景，同 scanline 上重複 NTVal 比例不高
+- 已 revert
+
+---
+
 ### P1（SIMD）— RenderBGTile Vector128 8-pixel 寫入
 **評估：中等複雜度，預估收益 < 1%**
 
@@ -133,5 +147,6 @@
 | 原始基線 | 241 | — |
 | catchUpPPU/APU loop unroll | +10.5 | **252** |
 | Sprite 0 hit range check | +7.0 | **259** |
+| PPU tile fetch 快取 | -1.2%（~256） | revert |
 | 其他嘗試（均 revert） | — | — |
 | **當前基線** | **~259** | **+7.5%** |
