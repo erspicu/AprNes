@@ -525,6 +525,149 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 ---
 
+### PRIORITY 19 — APU apu_step() 稀有路徑合併 guard
+
+- **Target**: APU.cs — `apu_step()` 中每個 CPU cycle 都執行兩個幾乎永遠為 false 的獨立 if 判斷
+- **Expected gain**: 0.3–1%（每 CPU cycle 省一次 branch + memory load）
+- **Effort**: ~5 min
+- **背景**:
+  - `frameIrqClearPending`：每幀僅在極少數 cycle 為 true（$4015 write 後才設置）
+  - `irqAssertCycles`：每幀僅在 frame counter step 後 2–3 個 cycle 內 > 0
+  - 兩者每個 CPU cycle（~1.79M/frame）各自需一次 memory load + branch
+  - Branch predictor 通常預測正確（always not-taken），但仍需每次 load static field
+
+- **Method**: 合併成一個 outer guard，讓絕大多數 cycle 只需一次判斷即可跳過：
+  ```csharp
+  // 目前（兩個獨立 if，各需一次 load + branch）：
+  if (frameIrqClearPending && (cpuCycleCount & 1) == 0) { ... }
+  if (irqAssertCycles > 0) { ... }
+
+  // 改為（一個 outer guard 合併兩個稀有路徑）：
+  if (frameIrqClearPending || irqAssertCycles > 0)
+  {
+      if (frameIrqClearPending && (cpuCycleCount & 1) == 0)
+      {
+          statusframeint = false;
+          frameIrqClearPending = false;
+      }
+      if (irqAssertCycles > 0)
+      {
+          statusframeint = true;
+          frameIrqClearPending = false;
+          --irqAssertCycles;
+          if (irqAssertCycles == 0 && apuintflag)
+              statusframeint = false;
+      }
+  }
+  ```
+  當兩者都 false 時（99.99% 的情況），只需一次 `||` 短路判斷即可跳過兩個 block。
+
+- **Risk**: Low — 邏輯不變，僅結構調整
+- **Verify**: blargg 174/174 + AC 136/136
+- **Status**: 🔲 TODO
+
+---
+
+### PRIORITY 20 — RenderBGTile() 內層 8-pixel 迴圈展開
+
+- **Target**: PPU.cs — `RenderBGTile(int cx)` 中 `for (int loc = 0; loc < 8; loc++)` 固定 8 次迴圈
+- **Expected gain**: 0.5–1.5%（消除迴圈控制 overhead，每幀 7,680–9,600 次呼叫）
+- **Effort**: ~15 min
+- **背景**:
+  - 每個可見 scanline 有 32 tiles + 8 prefetch tiles = 最多 40 次 RenderBGTile 呼叫（可見 240 scanlines）
+  - 每次呼叫都有 `for (int loc = 0; loc < 8; loc++)` 共 8 次疊代
+  - 固定 8 次 = 可完全手動展開，完全消除 `loc++`、`loc < 8`、迴圈 counter 的 overhead
+  - Debug JIT 不自動展開小型迴圈
+
+- **展開 pattern**（8 次手動展開）：
+  ```csharp
+  // 展開 loc=0..7，每個都是：
+  {
+      const int loc = 0;  // 或直接用常數
+      int bit = 15 - loc - fineX;  // = 15 - fineX（loc=0 固定）
+      byte attrUse = (bit >= 8) ? renderAttr : nextAttr;
+      int bgPixel = ((ls >> bit) & 1) | (((hs >> bit) & 1) << 1);
+      bool masked = !bgLeft8 && (baseX + loc) < 8;
+      int slot = scanOff + baseX + loc;
+      Buffer_BG_array[slot] = masked ? 0 : bgPixel;
+      uint* pal = (attrUse == renderAttr) ? palCacheR : palCacheN;
+      ScreenBuf1x[slot] = masked ? bgColor : pal[bgPixel];
+  }
+  // ... loc=1, loc=2, ..., loc=7
+  ```
+  注意：`bit = 15 - loc - fineX` 中的 `loc` 是已知常數 0–7，JIT 可進一步常數折疊。
+
+- **Risk**: Low — 邏輯完全等價，只是把迴圈展開
+- **Verify**: blargg 174/174 + AC 136/136
+- **Status**: 🔲 TODO
+
+---
+
+### PRIORITY 21 — RenderBGTile() 調色盤快取去重複（attr 不變時跳過刷新）
+
+- **Target**: PPU.cs — `RenderBGTile()` 每次都重新讀取 palette 顏色（7 次 ppu_ram + NesColors 查詢）
+- **Expected gain**: 0.5–2%（對 attr 穩定的畫面，大量節省記憶體查詢）
+- **Effort**: ~15 min
+- **背景**:
+  - 每個 tile 開始時，從 `bg_attr_p3` / `bg_attr_p2` 讀取 attr，再查 7 個調色盤顏色
+  - 連續的 tile 若屬於同一 attribute block（8×8 tile 共享 palette），attr 不會改變
+  - 一般遊戲中，同一 scanline 上大量相鄰 tile 有相同 attr（實心背景、單一色彩區域）
+  - 可快取上次 renderAttr / nextAttr，只有變化時才刷新 palCacheR / palCacheN
+
+- **Method**:
+  ```csharp
+  static byte lastRenderAttr = 0xFF; // impossible attr value
+  static byte lastNextAttr   = 0xFF;
+
+  static void RenderBGTile(int cx)
+  {
+      byte renderAttr = bg_attr_p3;
+      byte nextAttr   = bg_attr_p2;
+
+      if (renderAttr != lastRenderAttr || nextAttr != lastNextAttr)
+      {
+          lastRenderAttr = renderAttr;
+          lastNextAttr   = nextAttr;
+          int baseAddrR = 0x3f00 | (renderAttr << 2);
+          int baseAddrN = 0x3f00 | (nextAttr   << 2);
+          uint bgColor = NesColors[ppu_ram[0x3f00] & 0x3f];
+          palCacheR[0] = palCacheN[0] = bgColor;
+          palCacheR[1] = NesColors[ppu_ram[baseAddrR + 1] & 0x3f];
+          // ... etc.
+      }
+      uint bgColor2 = palCacheR[0]; // 從快取讀取
+      // ... render pixels
+  }
+  ```
+
+- **Risk**: Medium
+  - `ppu_ram` 調色盤可在渲染途中被寫入（mid-frame palette write）
+  - 若 palette 顏色被寫入但 attr 未改變，快取會返回舊顏色
+  - 正確處理：同時在 `ppu_w_palette()` 設置 `paletteChanged = true` flag，強制下一 tile 刷新
+  - 若加入 paletteDirty flag 較繁瑣，可先不加、跑測試，若通過則 palette mid-write 問題不常見
+
+- **Verify**: blargg 174/174 + AC 136/136
+- **Status**: 🔲 TODO
+
+---
+
+### PRIORITY 22 — setenvelope() / setsweep() 小型迴圈展開
+
+- **Target**: APU.cs — `setenvelope()` 4-iteration loop、`setsweep()` 2-iteration loop
+- **Expected gain**: 0.1–0.3%（低頻呼叫，僅約 240/frame，但展開乾淨）
+- **Effort**: ~20 min
+- **背景**:
+  - `setenvelope()`：`for (int i = 0; i < 4; ++i)` — 固定 4 次
+  - `setsweep()`：`for (int i = 0; i < 2; ++i)` — 固定 2 次
+  - 均由 frame counter 驅動，每幀 ~240 次（4-step mode 4 次 step，每 step 觸發 envelope + sweep）
+  - Debug JIT 不展開，手動展開消除迴圈 overhead
+  - 影響相對低，但展開後程式碼更清晰且無 counter variable
+- **Risk**: Low — 純展開，邏輯完全等價
+- **Verify**: blargg 174/174 + AC 136/136
+- **Status**: 🔲 TODO（低優先）
+
+---
+
 ## Failed / Ineffective Attempts
 
 *(None yet)*
