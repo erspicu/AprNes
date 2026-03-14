@@ -49,6 +49,7 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 | 10 | Priority 12: RAM read fast-path in Mem_r() / CpuRead() | 227.40 | 233.75 | **+2.8%** | ✅ KEEP | [v15](2026-03-14_perf_v15.md) |
 | 11 | Priority 17ABC: ppu_cycles_x local shadow + cx param + apu pulse/tri shadow | 233.75 | 237.00 | **+1.4%** | ✅ KEEP | [v17](2026-03-14_perf_v17.md) |
 | 12 | Priority 14: Buffer_BG_array / ScreenBuf1x pointer loop clear | 237.00 | 239.95 | **+1.2%** | ✅ KEEP | [v19](2026-03-14_perf_v19.md) |
+| 13 | Priority 18A: AggressiveInlining on Yinc/SpriteEvalInit/SpriteEvalEnd/SpriteEvalTick | 239.95 | 245.30 | **+2.2%** | ✅ KEEP | [v21](2026-03-14_perf_v21.md) |
 
 ---
 
@@ -504,7 +505,7 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 - **Method**: 在各方法定義前加 `[MethodImpl(MethodImplOptions.AggressiveInlining)]`
 - **Risk**: Very Low — 純 attribute 加法，不改邏輯
-- **Status**: 🔲 TODO
+- **Status**: ✅ DONE — +2.2% (239.95 → 245.30)；blargg 174/174 + AC 136/136 驗證通過
 
 ---
 
@@ -520,7 +521,7 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 ---
 
 - **Verify**: blargg 174/174 + AC 136/136
-- **Status**: 🔲 TODO（整體）
+- **Status**: ✅ DONE（18A）；18B 🔲 TODO（低優先）
 
 ---
 

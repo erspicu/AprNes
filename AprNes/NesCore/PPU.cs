@@ -101,6 +101,7 @@ namespace AprNes
         }
 
         // Y increment
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void Yinc()
         {
             if ((vram_addr & 0x7000) != 0x7000)
@@ -679,6 +680,7 @@ namespace AprNes
         }
 
         // Initialize sprite evaluation state at dot 65 of visible scanlines
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void SpriteEvalInit()
         {
             sprite0Added = false;
@@ -691,6 +693,7 @@ namespace AprNes
         }
 
         // Per-dot sprite evaluation: odd dots read, even dots write/check
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void SpriteEvalTick()
         {
             bool isOdd = (ppu_cycles_x & 1) != 0;
@@ -812,6 +815,7 @@ namespace AprNes
         }
 
         // Finalize evaluation at dot 256
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void SpriteEvalEnd()
         {
             evalSprite0Visible = sprite0Added;
