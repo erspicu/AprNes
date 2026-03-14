@@ -887,7 +887,13 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 - **注意**：`Mem_r` / `Mem_w` / `ProcessPendingDma` / `ProcessDmaRead` 中所有 `mem_read_fun[addr](addr)` / `mem_write_fun[addr](addr, val)` 呼叫語法不變，型別推斷自動適用。
 - **Risk**: Low — 邏輯完全等價，只是分派方式改變；Mapper 方法行為透過 wrapper 完全保留
 - **Verify**: blargg 174/174 + AC 136/136
-- **Status**: 🔲 TODO
+- **Status**: ❌ FAILED — 實測 -4.8%（247.95 → 236.15 FPS）
+- **失敗原因**:
+  - Mapper instance method 無法直接取 `delegate*`，必須加 static wrapper（如 `MemRead_MapperRPG` → `MapperObj.MapperR_RPG`）
+  - 原本的 managed delegate 已把 `MapperObj` 實例嵌入 `_target`，一次 dispatch 就能直接呼叫
+  - 新版：function pointer call → wrapper static method → interface virtual dispatch = 比原來多一層跳轉
+  - ROM read（≥$8000）佔所有記憶體存取絕大多數（每個 opcode fetch + 運算元 fetch），每次多一個 static call 累積影響巨大
+  - **根本限制**：`delegate*` 無法攜帶 `this` 指標，instance method 必須透過 wrapper，抵消了 dispatch 節省
 
 ---
 
@@ -929,7 +935,7 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 - **建議**：與 P25 同批實作，不值得單獨測試（收益 < 量測誤差）
 - **Risk**: Low
 - **Verify**: blargg 174/174 + AC 136/136
-- **Status**: 🔲 TODO（建議與 P25 同批次實作，合計一次 perf 測試）
+- **Status**: ❌ FAILED（隨 P25 一起實測，同樣受 Mapper wrapper 問題影響；呼叫頻率本就極低，無法抵消額外開銷）
 
 ---
 
@@ -943,6 +949,11 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 ---
 
 ## Failed / Ineffective Attempts
+
+### P25/P26 — mem/ppu function table delegate* upgrade（-4.8%）
+- Mapper instance method 需透過 static wrapper，抵消 dispatch 節省並增加額外呼叫層
+- ROM read 頻率極高（每個 opcode fetch），wrapper 開銷累積顯著
+- delegate* 無法攜帶 `this` 指標是根本限制
 
 ---
 
