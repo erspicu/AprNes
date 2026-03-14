@@ -950,6 +950,14 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 ## Failed / Ineffective Attempts
 
+### P27 — Mapper004 precomputed bank pointer table（-1.46%）
+- 用 `byte* prg0-prg3` + `byte* chr0-chr7` 預計算 offset-corrected 指標，MapperR_RPG/CHR 免去 shift/subtract 計算
+- 兩個變體（managed `byte*[]` / 8 個獨立 `byte*` 欄位）皆退步
+- **失敗根本原因**：新增 12 個指標欄位（prg0-3 + chr0-7 = 96B）使 Mapper 物件跨更多 cache line；
+  原本 `PRG_ROM`、`PRG0_Bankselect`、`PRG_Bankmode` 在同一 cache line 被一起加載，JIT 可直接計算；
+  新版需額外 load `prg0` 欄位，field layout 惡化抵消了省去 shift/subtract 的收益
+- .NET Debug JIT 無 register allocation 最佳化，每次欄位存取都是記憶體 load，field 數量對 cache 影響顯著
+
 ### P25/P26 — mem/ppu function table delegate* upgrade（-4.8%）
 - Mapper instance method 需透過 static wrapper，抵消 dispatch 節省並增加額外呼叫層
 - ROM read 頻率極高（每個 opcode fetch），wrapper 開銷累積顯著
