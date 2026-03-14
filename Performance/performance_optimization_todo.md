@@ -652,7 +652,10 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
   - 若加入 paletteDirty flag 較繁瑣，可先不加、跑測試，若通過則 palette mid-write 問題不常見
 
 - **Verify**: blargg 174/174 + AC 136/136
-- **Status**: 🔲 TODO
+- **Status**: ❌ FAILED — 實測負效益 -1.4%（245.30 → 241.85）
+- **失敗原因**: 每個 tile 需額外執行 3 個條件判斷（renderAttr != last, nextAttr != last, paletteChanged），
+  Mega Man 5 中 attr 變化頻繁（複雜背景），cache miss 率高，條件判斷 overhead 超過節省的 palette lookup。
+  對 attr 穩定的畫面（純色背景）理論上有效，但不適用於複雜場景。
 
 ---
 
