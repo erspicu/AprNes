@@ -673,7 +673,9 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
   - 影響相對低，但展開後程式碼更清晰且無 counter variable
 - **Risk**: Low — 純展開，邏輯完全等價
 - **Verify**: blargg 174/174 + AC 136/136
-- **Status**: 🔲 TODO（低優先）
+- **Status**: ❌ FAILED — 實測負效益 -1.0%（245.30 → 242.85）
+- **失敗原因**: 展開後方法體積變大，JIT 最佳化困難。Debug JIT 對 4/2 次小型迴圈已有良好處理，
+  手動展開反而造成 I-cache 壓力，與 P20 同樣模式。
 
 ---
 
