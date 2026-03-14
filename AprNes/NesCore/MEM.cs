@@ -8,8 +8,6 @@ namespace AprNes
         public static byte* NES_MEM;
 
         static ushort cpuBusAddr = 0;    // CPU current bus address (for DMC phantom reads)
-#pragma warning disable CS0414
-#pragma warning restore CS0414
 
         // M2 phase tracking: true = PUT (M2 low, write phase), false = GET (M2 high, read phase)
         // Derived from cpuCycleCount parity — represents the absolute M2 clock phase,
