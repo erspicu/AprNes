@@ -1884,350 +1884,42 @@ namespace AprNes
 
         static unsafe void InitOpHandlers()
         {
-            // Default: treat unknown opcode as NOP-like
-            for (int i = 0; i < 256; i++) opFnPtrs[i] = &Op_Default;
-
-            // === BRK / NMI / IRQ / RESET ===
-            opFnPtrs[0x00] = &Op_00;
-
-            // === ORA ===
-            opFnPtrs[0x09] = &Op_09;
-            opFnPtrs[0x05] = &Op_05;
-            opFnPtrs[0x15] = &Op_15;
-            opFnPtrs[0x0D] = &Op_0D;
-            opFnPtrs[0x1D] = &Op_1D;
-            opFnPtrs[0x19] = &Op_19;
-            opFnPtrs[0x01] = &Op_01;
-            opFnPtrs[0x11] = &Op_11;
-
-            // === AND ===
-            opFnPtrs[0x29] = &Op_29;
-            opFnPtrs[0x25] = &Op_25;
-            opFnPtrs[0x35] = &Op_35;
-            opFnPtrs[0x2D] = &Op_2D;
-            opFnPtrs[0x3D] = &Op_3D;
-            opFnPtrs[0x39] = &Op_39;
-            opFnPtrs[0x21] = &Op_21;
-            opFnPtrs[0x31] = &Op_31;
-
-            // === EOR ===
-            opFnPtrs[0x49] = &Op_49;
-            opFnPtrs[0x45] = &Op_45;
-            opFnPtrs[0x55] = &Op_55;
-            opFnPtrs[0x4D] = &Op_4D;
-            opFnPtrs[0x5D] = &Op_5D;
-            opFnPtrs[0x59] = &Op_59;
-            opFnPtrs[0x41] = &Op_41;
-            opFnPtrs[0x51] = &Op_51;
-
-            // === ADC ===
-            opFnPtrs[0x69] = &Op_69;
-            opFnPtrs[0x65] = &Op_65;
-            opFnPtrs[0x75] = &Op_75;
-            opFnPtrs[0x6D] = &Op_6D;
-            opFnPtrs[0x7D] = &Op_7D;
-            opFnPtrs[0x79] = &Op_79;
-            opFnPtrs[0x61] = &Op_61;
-            opFnPtrs[0x71] = &Op_71;
-
-            // === SBC ===
-            opFnPtrs[0xE9] = opFnPtrs[0xEB] = &Op_E9_SBC_Imm;
-            opFnPtrs[0xE5] = &Op_E5;
-            opFnPtrs[0xF5] = &Op_F5;
-            opFnPtrs[0xED] = &Op_ED;
-            opFnPtrs[0xFD] = &Op_FD;
-            opFnPtrs[0xF9] = &Op_F9;
-            opFnPtrs[0xE1] = &Op_E1;
-            opFnPtrs[0xF1] = &Op_F1;
-
-            // === CMP ===
-            opFnPtrs[0xC9] = &Op_C9;
-            opFnPtrs[0xC5] = &Op_C5;
-            opFnPtrs[0xD5] = &Op_D5;
-            opFnPtrs[0xCD] = &Op_CD;
-            opFnPtrs[0xDD] = &Op_DD;
-            opFnPtrs[0xD9] = &Op_D9;
-            opFnPtrs[0xC1] = &Op_C1;
-            opFnPtrs[0xD1] = &Op_D1;
-
-            // === CPX ===
-            opFnPtrs[0xE0] = &Op_E0;
-            opFnPtrs[0xE4] = &Op_E4;
-            opFnPtrs[0xEC] = &Op_EC;
-
-            // === CPY ===
-            opFnPtrs[0xC0] = &Op_C0;
-            opFnPtrs[0xC4] = &Op_C4;
-            opFnPtrs[0xCC] = &Op_CC;
-
-            // === LDA ===
-            opFnPtrs[0xA9] = &Op_A9;
-            opFnPtrs[0xA5] = &Op_A5;
-            opFnPtrs[0xB5] = &Op_B5;
-            opFnPtrs[0xAD] = &Op_AD;
-            opFnPtrs[0xBD] = &Op_BD;
-            opFnPtrs[0xB9] = &Op_B9;
-            opFnPtrs[0xA1] = &Op_A1;
-            opFnPtrs[0xB1] = &Op_B1;
-
-            // === LDX ===
-            opFnPtrs[0xA2] = &Op_A2;
-            opFnPtrs[0xA6] = &Op_A6;
-            opFnPtrs[0xB6] = &Op_B6;
-            opFnPtrs[0xAE] = &Op_AE;
-            opFnPtrs[0xBE] = &Op_BE;
-
-            // === LDY ===
-            opFnPtrs[0xA0] = &Op_A0;
-            opFnPtrs[0xA4] = &Op_A4;
-            opFnPtrs[0xB4] = &Op_B4;
-            opFnPtrs[0xAC] = &Op_AC;
-            opFnPtrs[0xBC] = &Op_BC;
-
-            // === STA ===
-            opFnPtrs[0x85] = &Op_85;
-            opFnPtrs[0x95] = &Op_95;
-            opFnPtrs[0x8D] = &Op_8D;
-            opFnPtrs[0x9D] = &Op_9D;
-            opFnPtrs[0x99] = &Op_99;
-            opFnPtrs[0x81] = &Op_81;
-            opFnPtrs[0x91] = &Op_91;
-
-            // === STX ===
-            opFnPtrs[0x86] = &Op_86;
-            opFnPtrs[0x96] = &Op_96;
-            opFnPtrs[0x8E] = &Op_8E;
-
-            // === STY ===
-            opFnPtrs[0x84] = &Op_84;
-            opFnPtrs[0x94] = &Op_94;
-            opFnPtrs[0x8C] = &Op_8C;
-
-            // === BIT ===
-            opFnPtrs[0x24] = &Op_24;
-            opFnPtrs[0x2C] = &Op_2C;
-
-            // === ASL ===
-            opFnPtrs[0x0A] = &Op_0A;
-            opFnPtrs[0x06] = &Op_06;
-            opFnPtrs[0x16] = &Op_16;
-            opFnPtrs[0x0E] = &Op_0E;
-            opFnPtrs[0x1E] = &Op_1E;
-
-            // === LSR ===
-            opFnPtrs[0x4A] = &Op_4A;
-            opFnPtrs[0x46] = &Op_46;
-            opFnPtrs[0x56] = &Op_56;
-            opFnPtrs[0x4E] = &Op_4E;
-            opFnPtrs[0x5E] = &Op_5E;
-
-            // === ROL ===
-            opFnPtrs[0x2A] = &Op_2A;
-            opFnPtrs[0x26] = &Op_26;
-            opFnPtrs[0x36] = &Op_36;
-            opFnPtrs[0x2E] = &Op_2E;
-            opFnPtrs[0x3E] = &Op_3E;
-
-            // === ROR ===
-            opFnPtrs[0x6A] = &Op_6A;
-            opFnPtrs[0x66] = &Op_66;
-            opFnPtrs[0x76] = &Op_76;
-            opFnPtrs[0x6E] = &Op_6E;
-            opFnPtrs[0x7E] = &Op_7E;
-
-            // === INC ===
-            opFnPtrs[0xE6] = &Op_E6;
-            opFnPtrs[0xF6] = &Op_F6;
-            opFnPtrs[0xEE] = &Op_EE;
-            opFnPtrs[0xFE] = &Op_FE;
-
-            // === DEC ===
-            opFnPtrs[0xC6] = &Op_C6;
-            opFnPtrs[0xD6] = &Op_D6;
-            opFnPtrs[0xCE] = &Op_CE;
-            opFnPtrs[0xDE] = &Op_DE;
-
-            // === INX / INY / DEX / DEY ===
-            opFnPtrs[0xE8] = &Op_E8;
-            opFnPtrs[0xC8] = &Op_C8;
-            opFnPtrs[0xCA] = &Op_CA;
-            opFnPtrs[0x88] = &Op_88;
-
-            // === Transfer ===
-            opFnPtrs[0xAA] = &Op_AA;
-            opFnPtrs[0x8A] = &Op_8A;
-            opFnPtrs[0xA8] = &Op_A8;
-            opFnPtrs[0x98] = &Op_98;
-            opFnPtrs[0xBA] = &Op_BA;
-            opFnPtrs[0x9A] = &Op_9A;
-
-            // === Flag instructions ===
-            opFnPtrs[0x18] = &Op_18;
-            opFnPtrs[0x38] = &Op_38;
-            opFnPtrs[0x58] = &Op_58;
-            opFnPtrs[0x78] = &Op_78;
-            opFnPtrs[0xD8] = &Op_D8;
-            opFnPtrs[0xF8] = &Op_F8;
-            opFnPtrs[0xB8] = &Op_B8;
-
-            // === Stack instructions ===
-            opFnPtrs[0x48] = &Op_48;
-            opFnPtrs[0x08] = &Op_08;
-            opFnPtrs[0x68] = &Op_68;
-            opFnPtrs[0x28] = &Op_28;
-
-            // === Branches ===
-            opFnPtrs[0x10] = &Op_10;
-            opFnPtrs[0x30] = &Op_30;
-            opFnPtrs[0x50] = &Op_50;
-            opFnPtrs[0x70] = &Op_70;
-            opFnPtrs[0x90] = &Op_90;
-            opFnPtrs[0xB0] = &Op_B0;
-            opFnPtrs[0xD0] = &Op_D0;
-            opFnPtrs[0xF0] = &Op_F0;
-
-            // === JMP ===
-            opFnPtrs[0x4C] = &Op_4C;
-            opFnPtrs[0x6C] = &Op_6C;
-
-            // === JSR ===
-            opFnPtrs[0x20] = &Op_20;
-
-            // === RTS ===
-            opFnPtrs[0x60] = &Op_60;
-
-            // === RTI ===
-            opFnPtrs[0x40] = &Op_40;
-
-            // === NOP (implied) ===
-            opFnPtrs[0xEA] = opFnPtrs[0x1A] = opFnPtrs[0x3A] = opFnPtrs[0x5A] =
-                opFnPtrs[0x7A] = opFnPtrs[0xDA] = opFnPtrs[0xFA] = &Op_NOP;
-
-            // === DOP Immediate ===
-            opFnPtrs[0x80] = opFnPtrs[0x82] = opFnPtrs[0x89] = opFnPtrs[0xC2] = opFnPtrs[0xE2] = &Op_DOP_Imm;
-
-            // === DOP ZeroPage ===
-            opFnPtrs[0x04] = opFnPtrs[0x44] = opFnPtrs[0x64] = &Op_DOP_ZP;
-
-            // === DOP ZeroPage,X ===
-            opFnPtrs[0x14] = opFnPtrs[0x34] = opFnPtrs[0x54] = opFnPtrs[0x74] =
-                opFnPtrs[0xD4] = opFnPtrs[0xF4] = &Op_DOP_ZPX;
-
-            // === TOP Absolute ===
-            opFnPtrs[0x0C] = &Op_0C;
-
-            // === TOP Absolute,X ===
-            opFnPtrs[0x1C] = opFnPtrs[0x3C] = opFnPtrs[0x5C] = opFnPtrs[0x7C] =
-                opFnPtrs[0xDC] = opFnPtrs[0xFC] = &Op_TOP_AbsX;
-
-            // === SLO ===
-            opFnPtrs[0x07] = &Op_07;
-            opFnPtrs[0x17] = &Op_17;
-            opFnPtrs[0x0F] = &Op_0F;
-            opFnPtrs[0x1F] = &Op_1F;
-            opFnPtrs[0x1B] = &Op_1B;
-            opFnPtrs[0x03] = &Op_03;
-            opFnPtrs[0x13] = &Op_13;
-
-            // === RLA ===
-            opFnPtrs[0x27] = &Op_27;
-            opFnPtrs[0x37] = &Op_37;
-            opFnPtrs[0x2F] = &Op_2F;
-            opFnPtrs[0x3F] = &Op_3F;
-            opFnPtrs[0x3B] = &Op_3B;
-            opFnPtrs[0x23] = &Op_23;
-            opFnPtrs[0x33] = &Op_33;
-
-            // === SRE ===
-            opFnPtrs[0x47] = &Op_47;
-            opFnPtrs[0x57] = &Op_57;
-            opFnPtrs[0x4F] = &Op_4F;
-            opFnPtrs[0x5F] = &Op_5F;
-            opFnPtrs[0x5B] = &Op_5B;
-            opFnPtrs[0x43] = &Op_43;
-            opFnPtrs[0x53] = &Op_53;
-
-            // === RRA ===
-            opFnPtrs[0x67] = &Op_67;
-            opFnPtrs[0x77] = &Op_77;
-            opFnPtrs[0x6F] = &Op_6F;
-            opFnPtrs[0x7F] = &Op_7F;
-            opFnPtrs[0x7B] = &Op_7B;
-            opFnPtrs[0x63] = &Op_63;
-            opFnPtrs[0x73] = &Op_73;
-
-            // === SAX ===
-            opFnPtrs[0x87] = &Op_87;
-            opFnPtrs[0x97] = &Op_97;
-            opFnPtrs[0x8F] = &Op_8F;
-            opFnPtrs[0x83] = &Op_83;
-
-            // === LAX ===
-            opFnPtrs[0xA7] = &Op_A7;
-            opFnPtrs[0xB7] = &Op_B7;
-            opFnPtrs[0xAF] = &Op_AF;
-            opFnPtrs[0xBF] = &Op_BF;
-            opFnPtrs[0xA3] = &Op_A3;
-            opFnPtrs[0xB3] = &Op_B3;
-
-            // === DCP ===
-            opFnPtrs[0xC7] = &Op_C7;
-            opFnPtrs[0xD7] = &Op_D7;
-            opFnPtrs[0xCF] = &Op_CF;
-            opFnPtrs[0xDF] = &Op_DF;
-            opFnPtrs[0xDB] = &Op_DB;
-            opFnPtrs[0xC3] = &Op_C3;
-            opFnPtrs[0xD3] = &Op_D3;
-
-            // === ISC ===
-            opFnPtrs[0xE7] = &Op_E7;
-            opFnPtrs[0xF7] = &Op_F7;
-            opFnPtrs[0xEF] = &Op_EF;
-            opFnPtrs[0xFF] = &Op_FF;
-            opFnPtrs[0xFB] = &Op_FB;
-            opFnPtrs[0xE3] = &Op_E3;
-            opFnPtrs[0xF3] = &Op_F3;
-
-            // === ANC ===
-            opFnPtrs[0x0B] = opFnPtrs[0x2B] = &Op_ANC;
-
-            // === ALR ===
-            opFnPtrs[0x4B] = &Op_4B;
-
-            // === ARR ===
-            opFnPtrs[0x6B] = &Op_6B;
-
-            // === SBX ===
-            opFnPtrs[0xCB] = &Op_CB;
-
-            // === ANE ===
-            opFnPtrs[0x8B] = &Op_8B;
-
-            // === LXA ===
-            opFnPtrs[0xAB] = &Op_AB;
-
-            // === LAE ===
-            opFnPtrs[0xBB] = &Op_BB;
-
-            // === SHA (Ind),Y ===
-            opFnPtrs[0x93] = &Op_93;
-
-            // === SHA Abs,Y ===
-            opFnPtrs[0x9F] = &Op_9F;
-
-            // === SHY Abs,X ===
-            opFnPtrs[0x9C] = &Op_9C;
-
-            // === SHX Abs,Y ===
-            opFnPtrs[0x9E] = &Op_9E;
-
-            // === SHS Abs,Y ===
-            opFnPtrs[0x9B] = &Op_9B;
-
-            // === HLT (JAM) ===
-            opFnPtrs[0x02] = opFnPtrs[0x12] = opFnPtrs[0x22] = opFnPtrs[0x32] =
-                opFnPtrs[0x42] = opFnPtrs[0x52] = opFnPtrs[0x62] = opFnPtrs[0x72] =
-                opFnPtrs[0x92] = opFnPtrs[0xB2] = opFnPtrs[0xD2] = opFnPtrs[0xF2] = &Op_HLT;
+            delegate*<void>[] t =
+            {
+                &Op_00                , &Op_01                , &Op_HLT               , &Op_03                , &Op_DOP_ZP            , &Op_05                , &Op_06                , &Op_07                ,  // 0x00-0x07
+                &Op_08                , &Op_09                , &Op_0A                , &Op_ANC               , &Op_0C                , &Op_0D                , &Op_0E                , &Op_0F                ,  // 0x08-0x0f
+                &Op_10                , &Op_11                , &Op_HLT               , &Op_13                , &Op_DOP_ZPX           , &Op_15                , &Op_16                , &Op_17                ,  // 0x10-0x17
+                &Op_18                , &Op_19                , &Op_NOP               , &Op_1B                , &Op_TOP_AbsX          , &Op_1D                , &Op_1E                , &Op_1F                ,  // 0x18-0x1f
+                &Op_20                , &Op_21                , &Op_HLT               , &Op_23                , &Op_24                , &Op_25                , &Op_26                , &Op_27                ,  // 0x20-0x27
+                &Op_28                , &Op_29                , &Op_2A                , &Op_ANC               , &Op_2C                , &Op_2D                , &Op_2E                , &Op_2F                ,  // 0x28-0x2f
+                &Op_30                , &Op_31                , &Op_HLT               , &Op_33                , &Op_DOP_ZPX           , &Op_35                , &Op_36                , &Op_37                ,  // 0x30-0x37
+                &Op_38                , &Op_39                , &Op_NOP               , &Op_3B                , &Op_TOP_AbsX          , &Op_3D                , &Op_3E                , &Op_3F                ,  // 0x38-0x3f
+                &Op_40                , &Op_41                , &Op_HLT               , &Op_43                , &Op_DOP_ZP            , &Op_45                , &Op_46                , &Op_47                ,  // 0x40-0x47
+                &Op_48                , &Op_49                , &Op_4A                , &Op_4B                , &Op_4C                , &Op_4D                , &Op_4E                , &Op_4F                ,  // 0x48-0x4f
+                &Op_50                , &Op_51                , &Op_HLT               , &Op_53                , &Op_DOP_ZPX           , &Op_55                , &Op_56                , &Op_57                ,  // 0x50-0x57
+                &Op_58                , &Op_59                , &Op_NOP               , &Op_5B                , &Op_TOP_AbsX          , &Op_5D                , &Op_5E                , &Op_5F                ,  // 0x58-0x5f
+                &Op_60                , &Op_61                , &Op_HLT               , &Op_63                , &Op_DOP_ZP            , &Op_65                , &Op_66                , &Op_67                ,  // 0x60-0x67
+                &Op_68                , &Op_69                , &Op_6A                , &Op_6B                , &Op_6C                , &Op_6D                , &Op_6E                , &Op_6F                ,  // 0x68-0x6f
+                &Op_70                , &Op_71                , &Op_HLT               , &Op_73                , &Op_DOP_ZPX           , &Op_75                , &Op_76                , &Op_77                ,  // 0x70-0x77
+                &Op_78                , &Op_79                , &Op_NOP               , &Op_7B                , &Op_TOP_AbsX          , &Op_7D                , &Op_7E                , &Op_7F                ,  // 0x78-0x7f
+                &Op_DOP_Imm           , &Op_81                , &Op_DOP_Imm           , &Op_83                , &Op_84                , &Op_85                , &Op_86                , &Op_87                ,  // 0x80-0x87
+                &Op_88                , &Op_DOP_Imm           , &Op_8A                , &Op_8B                , &Op_8C                , &Op_8D                , &Op_8E                , &Op_8F                ,  // 0x88-0x8f
+                &Op_90                , &Op_91                , &Op_HLT               , &Op_93                , &Op_94                , &Op_95                , &Op_96                , &Op_97                ,  // 0x90-0x97
+                &Op_98                , &Op_99                , &Op_9A                , &Op_9B                , &Op_9C                , &Op_9D                , &Op_9E                , &Op_9F                ,  // 0x98-0x9f
+                &Op_A0                , &Op_A1                , &Op_A2                , &Op_A3                , &Op_A4                , &Op_A5                , &Op_A6                , &Op_A7                ,  // 0xa0-0xa7
+                &Op_A8                , &Op_A9                , &Op_AA                , &Op_AB                , &Op_AC                , &Op_AD                , &Op_AE                , &Op_AF                ,  // 0xa8-0xaf
+                &Op_B0                , &Op_B1                , &Op_HLT               , &Op_B3                , &Op_B4                , &Op_B5                , &Op_B6                , &Op_B7                ,  // 0xb0-0xb7
+                &Op_B8                , &Op_B9                , &Op_BA                , &Op_BB                , &Op_BC                , &Op_BD                , &Op_BE                , &Op_BF                ,  // 0xb8-0xbf
+                &Op_C0                , &Op_C1                , &Op_DOP_Imm           , &Op_C3                , &Op_C4                , &Op_C5                , &Op_C6                , &Op_C7                ,  // 0xc0-0xc7
+                &Op_C8                , &Op_C9                , &Op_CA                , &Op_CB                , &Op_CC                , &Op_CD                , &Op_CE                , &Op_CF                ,  // 0xc8-0xcf
+                &Op_D0                , &Op_D1                , &Op_HLT               , &Op_D3                , &Op_DOP_ZPX           , &Op_D5                , &Op_D6                , &Op_D7                ,  // 0xd0-0xd7
+                &Op_D8                , &Op_D9                , &Op_NOP               , &Op_DB                , &Op_TOP_AbsX          , &Op_DD                , &Op_DE                , &Op_DF                ,  // 0xd8-0xdf
+                &Op_E0                , &Op_E1                , &Op_DOP_Imm           , &Op_E3                , &Op_E4                , &Op_E5                , &Op_E6                , &Op_E7                ,  // 0xe0-0xe7
+                &Op_E8                , &Op_E9_SBC_Imm        , &Op_NOP               , &Op_E9_SBC_Imm        , &Op_EC                , &Op_ED                , &Op_EE                , &Op_EF                ,  // 0xe8-0xef
+                &Op_F0                , &Op_F1                , &Op_HLT               , &Op_F3                , &Op_DOP_ZPX           , &Op_F5                , &Op_F6                , &Op_F7                ,  // 0xf0-0xf7
+                &Op_F8                , &Op_F9                , &Op_NOP               , &Op_FB                , &Op_TOP_AbsX          , &Op_FD                , &Op_FE                , &Op_FF                  // 0xf8-0xff
+            };
+            Array.Copy(t, opFnPtrs, 256);
         }
 
         // Legacy cpu_step() wrapper - runs one full instruction using the per-cycle model

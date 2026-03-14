@@ -4,6 +4,13 @@
 
 A cycle-accurate NES (Nintendo Entertainment System) emulator written in C#, developed in collaboration with AI (GitHub Copilot / Claude). The project achieves **perfect scores** on both the blargg and AccuracyCoin test suites.
 
+## Links
+
+- **Website**: https://erspicu.github.io/AprNes/
+- **GitHub**: https://github.com/erspicu/AprNes
+- **Test Reports**: https://erspicu.github.io/AprNes/report/
+- **Support**: https://buymeacoffee.com/baxermux
+
 ## Test Results
 
 | Test Suite | Passed | Total | Rate |
@@ -137,6 +144,13 @@ python run_tests.py -j 10
 > [🇺🇸 English](#aprnes---c-nes-emulator) | 🇹🇼 繁體中文
 
 使用 C# 開發的 NES（任天堂娛樂系統）cycle-accurate 模擬器，與 AI（GitHub Copilot / Claude）協作開發完成。在 blargg 與 AccuracyCoin 兩大測試套件上均達到**滿分**。
+
+## 連結
+
+- **官方網站**: https://erspicu.github.io/AprNes/
+- **GitHub**: https://github.com/erspicu/AprNes
+- **測試報告**: https://erspicu.github.io/AprNes/report/
+- **贊助**: https://buymeacoffee.com/baxermux
 
 ## 測試成績
 
