@@ -115,8 +115,7 @@ namespace AprNes
             string logPath = null;
             bool waitResult = false;
             double maxWait = 30;
-            string debugLog = null;
-            int debugMax = 15000;
+
             double softResetSec = -1; // <0 means not set
             string inputSpec = null;
             HashSet<string> expectedCrcs = null; // --expected-crc "CRC1,CRC2,..."
@@ -148,12 +147,7 @@ namespace AprNes
                     case "--max-wait":
                         if (i + 1 < args.Length) double.TryParse(args[++i], out maxWait);
                         break;
-                    case "--debug-log":
-                        if (i + 1 < args.Length) debugLog = args[++i];
-                        break;
-                    case "--debug-max":
-                        if (i + 1 < args.Length) int.TryParse(args[++i], out debugMax);
-                        break;
+
                     case "--soft-reset":
                         if (i + 1 < args.Length) double.TryParse(args[++i], out softResetSec);
                         break;
@@ -188,7 +182,7 @@ namespace AprNes
 
             if (romPath == null)
             {
-                Console.Error.WriteLine("Usage: AprNes.exe --rom <file.nes> [--time <seconds>] [--wait-result] [--max-wait <seconds>] [--soft-reset <seconds>] [--input \"A:1.0,B:2.0,...\"] [--screenshot <out.png>] [--timed-screenshots \"path1:t1,path2:t2,...\"] [--dump-ac-results] [--log <results.log>] [--debug-log <path>] [--debug-max <n>]");
+                Console.Error.WriteLine("Usage: AprNes.exe --rom <file.nes> [--time <seconds>] [--wait-result] [--max-wait <seconds>] [--soft-reset <seconds>] [--input \"A:1.0,B:2.0,...\"] [--screenshot <out.png>] [--timed-screenshots \"path1:t1,path2:t2,...\"] [--dump-ac-results] [--log <results.log>]");
                 return 2;
             }
 
@@ -204,9 +198,6 @@ namespace AprNes
             NesCore.HeadlessMode = true;
             NesCore.OnError = msg => Console.Error.WriteLine("ERROR: " + msg);
             NesCore.AudioEnabled = false;
-            if (debugLog != null)
-                NesCore.DebugLogPath = debugLog;
-            NesCore.dbgMaxConfig = debugMax;
 
             // Compute max frames
             // NES runs ~60.0988 fps; if --time given, compute frame limit
@@ -565,13 +556,6 @@ namespace AprNes
                 }
             }
 
-            // Close debug log if still open
-            if (NesCore.dbgLog != null)
-            {
-                NesCore.dbgLog.Flush();
-                NesCore.dbgLog.Close();
-                NesCore.dbgLog = null;
-            }
 
             return passed ? 0 : 1;
         }

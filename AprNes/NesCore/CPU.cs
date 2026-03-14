@@ -16,8 +16,6 @@ namespace AprNes
         static bool irqLinePrev = false;
         static bool irqLineCurrent = false;
         static public bool statusmapperint = false;
-        static int nmi_trace_count = 0;
-
         // Per-cycle state machine state
         static byte operationCycle = 0;   // 0 = opcode fetch, 1..N = subsequent cycles
         static ushort addressBus = 0;     // current address on bus
@@ -36,38 +34,6 @@ namespace AprNes
 
         // Headless mode (console test runner)
         static public bool HeadlessMode = false;
-
-        // Debug logging
-        static public System.IO.StreamWriter dbgLog;
-        static public int dbgCount = 0;
-        static public int dbgMaxConfig = 15000;
-        static public string DebugLogPath = @"c:\ai_project\AprNes\emu_debug.log";
-        static public void dbgInit()
-        {
-            if (!HeadlessMode) { dbgLog = null; return; }
-            string pidLog = System.IO.Path.Combine(System.IO.Path.GetTempPath(),
-                "aprnes_debug_" + System.Diagnostics.Process.GetCurrentProcess().Id + ".log");
-            if (DebugLogPath != null && DebugLogPath.Length > 0)
-                pidLog = DebugLogPath;
-            try {
-                if (System.IO.File.Exists(pidLog))
-                    System.IO.File.Delete(pidLog);
-                dbgLog = System.IO.File.AppendText(pidLog);
-            } catch {
-                dbgLog = null;
-                return;
-            }
-            dbgCount = 0;
-        }
-        static public void dbgWrite(string s)
-        {
-            if (dbgLog != null && dbgCount < dbgMaxConfig)
-            {
-                dbgLog.WriteLine(s);
-                dbgCount++;
-                if (dbgCount >= dbgMaxConfig) { dbgLog.Flush(); dbgLog.Close(); dbgLog = null; }
-            }
-        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte GetFlag()
@@ -713,12 +679,6 @@ namespace AprNes
                     doBRK = true;
                 }
 
-                // Pre-instruction trace
-                if (nmi_trace_count > 0)
-                    dbgWrite("TRACE: PC=$" + r_PC.ToString("X4") + " op=$" + opcode.ToString("X2")
-                        + " A=$" + r_A.ToString("X2") + " X=$" + r_X.ToString("X2")
-                        + " Y=$" + r_Y.ToString("X2") + " SP=$" + r_SP.ToString("X2")
-                        + " P=$" + (GetFlag() | 0x20).ToString("X2"));
 
                 if (!doNMI && !doIRQ && !doReset)
                 {
@@ -774,7 +734,7 @@ namespace AprNes
                     if (doNMI) r_PC = (ushort)((r_PC & 0xFF) | (CpuRead(0xFFFB) << 8));
                     else if (doReset) r_PC = (ushort)((r_PC & 0xFF) | (CpuRead(0xFFFD) << 8));
                     else r_PC = (ushort)((r_PC & 0xFF) | (CpuRead(0xFFFF) << 8));
-                    if (doNMI) { dbgWrite("NMI_PUSH: PC=$" + r_PC.ToString("X4") + " SP=$" + r_SP.ToString("X2")); }
+
                     if (doReset)
                     {
                         Console.WriteLine("soft reset !");

@@ -39,13 +39,6 @@ namespace AprNes
         static public int  RomChrCount => CHR_ROM_count;
         static public bool RomHorizMirror => (ROM_Control_1 & 1) == 0;
 
-        // PPU/CPU state accessors for WASM debug
-        static public bool   DbgNMIable     => NMIable;
-        static public bool   DbgShowBG      => ShowBackGround;
-        static public bool   DbgShowSpr     => ShowSprites;
-        static public ushort DbgPC          => r_PC;
-        static public bool   DbgNmiPending  => nmi_pending;
-
         // FPS limiting flag (set by UI, checked in VideoOutput handler)
         static public bool LimitFPS = false;
 
@@ -229,8 +222,7 @@ namespace AprNes
                 //init cpu pc (read reset vector — no tick needed, boot cycles already counted)
                 r_PC = (ushort)(mem_read_fun[0xfffc](0xfffc) | (mem_read_fun[0xfffd](0xfffd) << 8));
 
-                //init debug log
-                dbgInit();
+
             }
             catch (Exception e)
             {
