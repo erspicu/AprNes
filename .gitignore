@@ -58,6 +58,9 @@ AprNesWasm/wwwroot/_framework/
 temp/
 result/
 
+# Website files (static site, not source code)
+site/
+
 # Performance test ROMs
 Performance/*.nes
 
