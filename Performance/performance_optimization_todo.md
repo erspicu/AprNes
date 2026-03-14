@@ -812,13 +812,25 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 - **Risk**: Medium（框架版本升級 + 大量 handler 改寫）
 - **Verify**: blargg 174/174 + AC 136/136
-- **Status**: 🔲 TODO（先決條件：升級 .NET 4.8 或 .NET 8，**並將所有 lambda handler 改為靜態方法**）
+- **Status**: ✅ DONE — +1.08% (245.30 → 247.95 FPS)；blargg 174/174 + AC 136/136 驗證通過
+- **實作紀錄**:
+  - `.csproj` 升級至 `v4.8` + `<LangVersion>11</LangVersion>`（MSBuild 路徑改用 VS 2022）
+  - `static Action[] opHandlers` → `static unsafe delegate*<void>[] opFnPtrs`
+  - 226 個 lambda 全部改寫為具名靜態方法（`static void Op_09()` 等）
+  - 分派改為 `opFnPtrs[opcode]()`（單次 calli indirect call，無 delegate 物件查詢）
+
+---
+
+## Results Log
+
+| # | Priority | Description | Before FPS | After FPS | Delta | Report |
+|---|----------|-------------|-----------|-----------|-------|--------|
+| 1 | P1 | ... | ... | ... | ... | ... |
+| 24 | P24 | opHandlers Action[] → delegate*<void>[] | 245.30 | 247.95 | +1.08% | 2026-03-14_perf_v28.md |
 
 ---
 
 ## Failed / Ineffective Attempts
-
-*(None yet)*
 
 ---
 

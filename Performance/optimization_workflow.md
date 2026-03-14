@@ -160,4 +160,4 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
 | 基線 | 目前 | 累計改善 |
 |------|------|---------|
-| 181.70 FPS | 245.30 FPS | +35.0% |
+| 181.70 FPS | 247.95 FPS | +36.5% |

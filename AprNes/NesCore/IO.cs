@@ -1,4 +1,4 @@
-﻿
+
 namespace AprNes
 {
     public unsafe partial class NesCore
