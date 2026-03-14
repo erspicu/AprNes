@@ -98,7 +98,7 @@ namespace AprNes
         // Runs ALL DMA cycles in one blocking call (each with Start/EndCpuCycle)
         static void ProcessPendingDma(ushort readAddress)
         {
-            if (!dmaNeedHalt) return;
+            if (!dmaNeedHalt && !dmcDmaRunning && !dmcNeedDummyRead && !spriteDmaTransfer && !dmcImplicitAbortPending) return;
 
             // SH* opcodes: DMA during critical cycle makes H invisible (TriCNES IgnoreH)
             if ((opcode == 0x93 && operationCycle == 4) ||

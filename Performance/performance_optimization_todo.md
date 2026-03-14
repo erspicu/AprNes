@@ -73,14 +73,13 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 ### PRIORITY 3 — Early-exit in ProcessPendingDma()
 - **Target**: MEM.cs — `ProcessPendingDma()` called on every CpuRead even when no DMA active
 - **Expected gain**: 3–5%
-- **Effort**: ~1 hour
 - **Method**: Add fast-path guard at entry（**修正版**，原版不完整）：
   ```csharp
   if (!dmaNeedHalt && !dmcDmaRunning && !dmcNeedDummyRead && !spriteDmaTransfer && !dmcImplicitAbortPending) return;
   ```
   - 原版 guard 漏掉 `!dmcNeedDummyRead`（dummy read 進行中會跳過）和 `!dmcImplicitAbortPending`（1-cycle phantom DMA 會被跳過）
-- **Risk**: Low（修正後）— 確認 5 個 flag 都覆蓋所有 DMA 入口條件
-- **Status**: 🔲 TODO
+- **Risk**: Low — 確認 5 個 flag 都覆蓋所有 DMA 入口條件
+- **Status**: ✅ DONE — **+5.1%** (216.45 → 227.40 FPS)；blargg 174/174 + AC 136/136 驗證通過
 
 ---
 
@@ -226,6 +225,7 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 | 6 | Priority 4 v2: APU int counter (單獨測試) | 189.75 | 186.50 | -1.7% | ❌ REVERT | [v10](2026-03-14_perf_v10.md) |
 | 7 | Priority 9: CPU opcode dispatch Action[256] table | 189.75 | 204.10 | **+7.6%** | ✅ KEEP | [v11](2026-03-14_perf_v11.md) |
 | 8 | Priority 6: remove redundant screenX > 255 check in RenderBGTile() | 204.10 | 216.45 | **+6.1%** | ✅ KEEP | [v12](2026-03-14_perf_v12.md) |
+| 9 | Priority 3: ProcessPendingDma early-exit guard (5-flag) | 216.45 | 227.40 | **+5.1%** | ✅ KEEP | [v14](2026-03-14_perf_v14.md) |
 
 ---
 
