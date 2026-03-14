@@ -305,7 +305,7 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
   - 每秒 44,100 次 × Volume change 很少 → 預計算幾乎沒有 cache miss
   - `_volumeScale` 在 Volume 改變時（UI 操作）重新計算即可
 - **Risk**: Low — 輸出差異在 ±1 sample 內（float 精度），聽覺上無差別
-- **Status**: 🔲 TODO
+- **Status**: ⏭ SKIP — `generateSample()` 開頭有 `if (!AudioEnabled) return;`，benchmark 模式（無音效）下整個函式直接回傳，此優化對 FPS 無效。僅在實際音效播放時有意義。
 
 ---
 
