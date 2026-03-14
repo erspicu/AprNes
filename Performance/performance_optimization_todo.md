@@ -465,6 +465,65 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 ---
 
+### PRIORITY 18 — AggressiveInlining：符合 JIT 條件的候選方法
+
+- **Target**: PPU.cs — 高頻呼叫但缺少 `[MethodImpl(AggressiveInlining)]` 的小型方法
+- **Expected gain**: 0.5–2%（各子項分開測試）
+- **背景原理**:
+  - Debug JIT 預設不 inline 任何方法（即使很小），除非有 `AggressiveInlining` 屬性或方法體極度簡單（~1-2 行）
+  - `AggressiveInlining` 繞過大小限制，強制嘗試 inline，但以下情況 **JIT 仍無法 inline**：
+    1. 方法含 `goto` label（`goto` 指令本身 JIT 無法追蹤）→ 代碼跳轉超出 inline 分析範圍
+    2. 方法含 `try/catch/finally`（異常表結構複雜）
+    3. 虛擬方法（runtime polymorphism，JIT 不知道實際型別）
+  - 過大的方法（>30 lines）force-inline 會 **降低效能**（I-cache 壓力 + 呼叫方 JIT 最佳化困難）
+
+---
+
+#### 不可加 AggressiveInlining（即使加了也沒效果）
+
+| 方法 | 原因 |
+|------|------|
+| `clockdmc()` APU.cs | 含 `goto deferredStatus:` label → JIT 無法 inline |
+| `ppu_rendering_tick(int cx)` PPU.cs | ~80 lines → 太大，force-inline 造成 I-cache 壓力 |
+| `ppu_step_new()` PPU.cs | ~180 lines → 遠超合理 inline 大小 |
+| `SpriteEvalWrite()` PPU.cs | ~100 lines → 太大 |
+| `RenderBGTile(int cx)` PPU.cs | ~35 lines → borderline，若要試放在 18B |
+
+---
+
+#### 18A — PPU.cs 小型 sprite eval 方法
+
+- **候選方法**（無 `goto`、無 exception、體積小）：
+
+  | 方法 | 行數 | 呼叫頻率 | 說明 |
+  |------|------|----------|------|
+  | `SpriteEvalInit()` | 8 lines | 240/frame（dot 65 per scanline） | 初始化 FSM，8 個賦值 |
+  | `SpriteEvalEnd()` | 3 lines | 240/frame（dot 256 per scanline） | 3 個賦值，極小 |
+  | `SpriteEvalTick()` | 15 lines | ~46K/frame（dots 65-256 per scanline） | 最熱，但呼叫 SpriteEvalWrite() |
+  | `Yinc()` | 18 lines | 240/frame（dot 256 via ppu_rendering_tick） | Y scroll increment |
+
+- **Method**: 在各方法定義前加 `[MethodImpl(MethodImplOptions.AggressiveInlining)]`
+- **Risk**: Very Low — 純 attribute 加法，不改邏輯
+- **Status**: 🔲 TODO
+
+---
+
+#### 18B — PPU.cs `RenderBGTile(int cx)` inline into ppu_rendering_tick
+
+- **背景**: `RenderBGTile()` 每幀 7,920 次（每 visible scanline 每 tile call 一次），體積 ~35 lines
+- **風險評估**:
+  - 35 lines 屬 borderline — Debug JIT 的 I-cache 影響不如 Release 嚴重
+  - `ppu_rendering_tick()` 本身已是 80 lines，加上 inline 後約 115 lines，可能造成 JIT 最佳化困難
+- **Verdict**: 先嘗試 18A；若效果不足再試 18B
+- **Status**: 🔲 TODO（低優先）
+
+---
+
+- **Verify**: blargg 174/174 + AC 136/136
+- **Status**: 🔲 TODO（整體）
+
+---
+
 ## Failed / Ineffective Attempts
 
 *(None yet)*
