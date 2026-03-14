@@ -50,6 +50,7 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 | 11 | Priority 17ABC: ppu_cycles_x local shadow + cx param + apu pulse/tri shadow | 233.75 | 237.00 | **+1.4%** | ✅ KEEP | [v17](2026-03-14_perf_v17.md) |
 | 12 | Priority 14: Buffer_BG_array / ScreenBuf1x pointer loop clear | 237.00 | 239.95 | **+1.2%** | ✅ KEEP | [v19](2026-03-14_perf_v19.md) |
 | 13 | Priority 18A: AggressiveInlining on Yinc/SpriteEvalInit/SpriteEvalEnd/SpriteEvalTick | 239.95 | 245.30 | **+2.2%** | ✅ KEEP | [v21](2026-03-14_perf_v21.md) |
+| 14 | Priority 24: opHandlers Action[] → delegate*<void>[] unsafe function pointer | 245.30 | 247.95 | **+1.08%** | ✅ KEEP | [v28](2026-03-14_perf_v28.md) |
 
 ---
 
@@ -936,15 +937,6 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 - **Risk**: Low
 - **Verify**: blargg 174/174 + AC 136/136
 - **Status**: ❌ FAILED（隨 P25 一起實測，同樣受 Mapper wrapper 問題影響；呼叫頻率本就極低，無法抵消額外開銷）
-
----
-
-## Results Log
-
-| # | Priority | Description | Before FPS | After FPS | Delta | Report |
-|---|----------|-------------|-----------|-----------|-------|--------|
-| 1 | P1 | ... | ... | ... | ... | ... |
-| 24 | P24 | opHandlers Action[] → delegate*<void>[] | 245.30 | 247.95 | +1.08% | 2026-03-14_perf_v28.md |
 
 ---
 
