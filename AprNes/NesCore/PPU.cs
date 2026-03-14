@@ -403,13 +403,13 @@ namespace AprNes
                     if (cx == 0)
                     {
                         int scanOff = scanline << 8;
-                        for (int i = 0; i < 256; i++)
-                            Buffer_BG_array[scanOff + i] = 0;
+                        int* bgp = Buffer_BG_array + scanOff;
+                        for (int* bge = bgp + 256; bgp < bge; bgp++) *bgp = 0;
                         if (!ShowBackGround)
                         {
                             uint bgColor = NesColors[ppu_ram[0x3f00] & 0x3f];
-                            for (int i = 0; i < 256; i++)
-                                ScreenBuf1x[scanOff + i] = bgColor;
+                            uint* sp = ScreenBuf1x + scanOff;
+                            for (uint* se = sp + 256; sp < se; sp++) *sp = bgColor;
                         }
                         PrecomputeOverflow();
                     }

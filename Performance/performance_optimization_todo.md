@@ -48,6 +48,7 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 | 9 | Priority 3: ProcessPendingDma early-exit guard (5-flag) | 216.45 | 227.40 | **+5.1%** | ✅ KEEP | [v14](2026-03-14_perf_v14.md) |
 | 10 | Priority 12: RAM read fast-path in Mem_r() / CpuRead() | 227.40 | 233.75 | **+2.8%** | ✅ KEEP | [v15](2026-03-14_perf_v15.md) |
 | 11 | Priority 17ABC: ppu_cycles_x local shadow + cx param + apu pulse/tri shadow | 233.75 | 237.00 | **+1.4%** | ✅ KEEP | [v17](2026-03-14_perf_v17.md) |
+| 12 | Priority 14: Buffer_BG_array / ScreenBuf1x pointer loop clear | 237.00 | 239.95 | **+1.2%** | ✅ KEEP | [v19](2026-03-14_perf_v19.md) |
 
 ---
 
@@ -284,7 +285,8 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
   - `Array.Clear()` 在 .NET 內部有 JIT 向量化，比逐元素 loop 快
   - 每幀 240 scanline × 1KB = 240KB 清零工作
 - **Risk**: Low — 純清零，無邏輯變動
-- **Status**: 🔲 TODO
+- **Status**: ✅ DONE — **+1.2%** (237.00 → 239.95 FPS)；blargg 174/174 + AC 136/136 驗證通過
+  - 實際改法：`Buffer_BG_array` 和 `ScreenBuf1x` 改為指標 loop（`int* p; *p++ = 0`），避免每次迭代的 `scanOff + i` index 加法
 
 ---
 
