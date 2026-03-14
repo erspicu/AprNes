@@ -679,6 +679,66 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 ---
 
+### PRIORITY 23 — IO_read / IO_write switch → function pointer array
+
+- **Target**: IO.cs — `IO_read()` 11-case switch + `IO_write()` 27-case switch
+- **Expected gain**: 0.1–0.5%（呼叫頻率低，但消除 switch 比對 overhead）
+- **Effort**: ~30 min
+- **背景**:
+  - `IO_read(addr)` / `IO_write(addr, val)` 對 PPU ($2000-$2007) 和 APU ($4000-$4017) 寄存器做 switch 分派
+  - 與 Priority 9（CPU opcode dispatch，+7.6%）同樣模式，但**呼叫頻率差很多**：
+    - CPU opcode dispatch：~1.7M 次/frame
+    - IO_read：~幾百次/frame（ppu_r_2002/joypad/APU status）
+    - IO_write：~幾十到幾百次/frame（遊戲對 PPU/APU 寄存器的設定）
+  - Switch 27 case → JIT 可能已生成 jump table（case 連續），但仍需範圍 bound check
+  - 改成 `Action<byte>[]` / `Func<byte>[]` 陣列（indexed by `addr - 0x2000`）
+    可直接消除所有 switch 比對
+
+- **Method**:
+  ```csharp
+  // 陣列大小：0x4018 - 0x2000 = 0x2018 = 8216 entries（含 gap 全填 default handler）
+  static Action<byte>[] io_write_table = new Action<byte>[0x2018];
+  static Func<byte>[]   io_read_table  = new Func<byte>[0x2018];
+
+  // 初始化（在 init_function() 中）：
+  // 先全填 default：
+  for (int i = 0; i < 0x2018; i++) {
+      io_write_table[i] = _ => {};               // no-op
+      io_read_table[i]  = () => cpubus;          // open bus
+  }
+  // 再填各寄存器：
+  io_write_table[0x2000 - 0x2000] = v => ppu_w_2000(v);
+  io_write_table[0x2001 - 0x2000] = v => ppu_w_2001(v);
+  // ... etc.
+  io_read_table[0x2002 - 0x2000] = () => ppu_r_2002();
+  // ... etc.
+
+  // 分派（不再需要 switch）：
+  static byte IO_read(ushort addr) {
+      if (addr < 0x4000) addr = (ushort)(0x2000 | (addr & 7));
+      int idx = addr - 0x2000;
+      if ((uint)idx < 0x2018) return io_read_table[idx]();
+      return cpubus;
+  }
+  static void IO_write(ushort addr, byte val) {
+      if (addr < 0x4000) addr = (ushort)(0x2000 | (addr & 7));
+      int idx = addr - 0x2000;
+      if ((uint)idx < 0x2018) io_write_table[idx](val);
+  }
+  ```
+
+- **注意事項**:
+  - `$4017` write 有複雜 inline 邏輯（jitter 計算、frame counter 初始化），需提取為 helper method `apu_4017(val)`
+  - `$4009` / `$400d` 目前 switch 無對應 case → 填 no-op
+  - memory footprint 增加：8216 × 2 張 delegate table（每個 ~8 bytes ptr）= ~131 KB，可接受
+  - Lambda delegate 呼叫比直接方法呼叫略慢（virtual dispatch）；但比 switch chain 快
+
+- **Risk**: Low — 邏輯完全等價，只是分派方式改變
+- **Verify**: blargg 174/174 + AC 136/136
+- **Status**: 🔲 TODO
+
+---
+
 ## Failed / Ineffective Attempts
 
 *(None yet)*
