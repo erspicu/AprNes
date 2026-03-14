@@ -322,25 +322,28 @@ namespace AprNes
                 PrecomputeSprite0Line();
 
             // Per-pixel sprite 0 hit detection using per-dot shifted shadow registers.
-            if (scanline >= 0 && scanline < 240 && cx < 256
-                && sprite0_on_line && !isSprite0hit && ShowBackGround && ShowSprites)
+            // Condition order: cheapest short-circuits first.
+            // sprite0_on_line / !isSprite0hit eliminate most scanlines instantly.
+            // Range check (cx in [sprite0_line_x, +8)) narrows to 8 dots from 256,
+            // avoiding the inner sprCol calculation for the other 248 dots per scanline.
+            if (sprite0_on_line && !isSprite0hit
+                && cx >= sprite0_line_x && cx < sprite0_line_x + 8
+                && scanline >= 0 && scanline < 240
+                && ShowBackGround && ShowSprites)
             {
                 bool inLeft8 = cx < 8;
                 if (!(!ShowBgLeft8 && inLeft8) && !(!ShowSprLeft8 && inLeft8) && cx != 255)
                 {
                     int sprCol = cx - sprite0_line_x;
-                    if (sprCol >= 0 && sprCol < 8)
+                    int bit = 15 - FineX;
+                    int bgPixel = ((lowshift_s0 >> bit) & 1) | (((highshift_s0 >> bit) & 1) << 1);
+                    if (bgPixel != 0)
                     {
-                        int bit = 15 - FineX;
-                        int bgPixel = ((lowshift_s0 >> bit) & 1) | (((highshift_s0 >> bit) & 1) << 1);
-                        if (bgPixel != 0)
-                        {
-                            int loc_t = sprite0_flip_x ? (7 - sprCol) : sprCol;
-                            int mask = 1 << (7 - loc_t);
-                            int sprPx = (((sprite0_tile_high & mask) << 1) + (sprite0_tile_low & mask)) >> (7 - loc_t);
-                            if (sprPx != 0)
-                                isSprite0hit = true;
-                        }
+                        int loc_t = sprite0_flip_x ? (7 - sprCol) : sprCol;
+                        int mask = 1 << (7 - loc_t);
+                        int sprPx = (((sprite0_tile_high & mask) << 1) + (sprite0_tile_low & mask)) >> (7 - loc_t);
+                        if (sprPx != 0)
+                            isSprite0hit = true;
                     }
                 }
             }
