@@ -2,8 +2,10 @@
 
 > **研究對象**: AprNes — C# / .NET 4.8 / unsafe code / Windows Forms NES 模擬器
 > **測試平台**: Mega Man 5 (USA).nes（Mapper 004 MMC3，複雜場景，代表性負載）
-> **Benchmark 方法**: 20 秒無上限 FPS 跑分，headless 模式，無音效
-> **最終結果**: 181.70 FPS → 247.95 FPS（**+36.5% 累計改善**）
+> **Benchmark 方法**: 20 秒無上限 FPS 跑分，headless 模式，無音效；每次測試前 `sleep 60` 等 CPU 降溫
+> **結果（Debug 組態 #1–12）**: 181.70 FPS → 247.95 FPS（**+36.5%**）
+> **結果（Release 組態 #13–14）**: 241.45 FPS → ~259 FPS（**+7.3%**，等效 Debug 基線 +42.5%）
+> **.NET 10 RyuJIT**: ~348 FPS（同程式碼，JIT 升級帶來額外 ~34%）
 > **正確性驗證**: blargg 174/174 + AccuracyCoin 136/136（每項最佳化後皆需全數通過）
 
 ---
@@ -439,26 +441,31 @@ Clean re-run:       246.30 FPS  (自然波動範圍內)
 
 ### 最終累計（14 項成功最佳化）
 
-| # | 項目 | FPS 前 | FPS 後 | 改善 |
-|---|------|-------|-------|------|
-| 1 | 基線 | — | 181.70 | — |
-| 2 | P11：managed array → unsafe pointer | 181.70 | 187.70 | **+3.3%** |
-| 3 | P8：RenderBGTile 條件合流 | 187.70 | 188.55 | +0.4% |
-| 4 | P5：靜態調色盤快取 | 188.55 | 189.75 | **+0.6%** |
-| 5 | P9：opcode dispatch table | 189.75 | 204.10 | **+7.6%** |
-| 6 | P6：移除冗餘 screenX bounds check | 204.10 | 216.45 | **+6.1%** |
-| 7 | P3：ProcessPendingDma early-exit | 216.45 | 227.40 | **+5.1%** |
-| 8 | P12：RAM read fast-path | 227.40 | 233.75 | **+2.8%** |
-| 9 | P17：static 欄位 local shadow | 233.75 | 237.00 | **+1.4%** |
-| 10 | P14：pointer loop scanline clear | 237.00 | 239.95 | **+1.2%** |
-| 11 | P18A：AggressiveInlining 小型方法 | 239.95 | 245.30 | **+2.2%** |
-| 12 | P24：opHandlers → delegate*<void>[] | 245.30 | 247.95 | **+1.08%** |
+| # | 項目 | Build | FPS 前 | FPS 後 | 改善 |
+|---|------|-------|-------|-------|------|
+| 1 | 基線 | Debug | — | 181.70 | — |
+| 2 | P11：managed array → unsafe pointer | Debug | 181.70 | 187.70 | **+3.3%** |
+| 3 | P8：RenderBGTile 條件合流 | Debug | 187.70 | 188.55 | +0.4% |
+| 4 | P5：靜態調色盤快取 | Debug | 188.55 | 189.75 | **+0.6%** |
+| 5 | P9：opcode dispatch table | Debug | 189.75 | 204.10 | **+7.6%** |
+| 6 | P6：移除冗餘 screenX bounds check | Debug | 204.10 | 216.45 | **+6.1%** |
+| 7 | P3：ProcessPendingDma early-exit | Debug | 216.45 | 227.40 | **+5.1%** |
+| 8 | P12：RAM read fast-path | Debug | 227.40 | 233.75 | **+2.8%** |
+| 9 | P17：static 欄位 local shadow | Debug | 233.75 | 237.00 | **+1.4%** |
+| 10 | P14：pointer loop scanline clear | Debug | 237.00 | 239.95 | **+1.2%** |
+| 11 | P18A：AggressiveInlining 小型方法 | Debug | 239.95 | 245.30 | **+2.2%** |
+| 12 | P24：opHandlers → delegate*<void>[] | Debug | 245.30 | 247.95 | **+1.08%** |
+| — | *切換至 Release 組態* | **Release** | — | 241.45 | (新基線) |
+| 13 | catchUpPPU/APU loop unroll | Release | 241.45 | 252.00 | **+4.3%** |
+| 14 | Sprite 0 hit range check 條件重排 | Release | 252.00 | ~259.00 | **+2.8%** |
 
-**總改善：181.70 → 247.95 FPS（+36.5%）**
+**Debug 組態累計：181.70 → 247.95 FPS（+36.5%）**
+**Release 組態新增：241.45 → ~259 FPS（+7.3%）**
+**.NET 10 RyuJIT（相同程式碼）：~348 FPS**
 
-### 失敗嘗試（12 項，已全數 revert）
+### 失敗嘗試（14 項，已全數 revert）
 
-P1、P2、P4、P13、P16、P18B、P19、P20、P21、P22、P23、P25/P26、P27
+P1、P2、P4（v1+v2）、P13、P16、P18B、P19、P20、P21、P22、P23、P25/P26、P27
 
 ---
 
@@ -467,6 +474,7 @@ P1、P2、P4、P13、P16、P18B、P19、P20、P21、P22、P23、P25/P26、P27
 若要繼續改善效能，以下方向尚未嘗試且理論上可行：
 
 - **P16 改版**：lazy N/Z flag 評估，但避免 GetFlag 中的 reverse encoding overhead
-- **Release 組態 benchmark**：現有基礎設施支援，切換至 Release JIT 可能帶來 2–3× 提升（但失去 debug 能力）
-- **SIMD 化 framebuffer 操作**：`ScreenBuf1x` 是 `uint*`，可用 `System.Runtime.Intrinsics` AVX2 一次處理 8 像素
+- ~~**Release 組態 benchmark**~~：已完成，Release ~259 FPS；.NET 10 RyuJIT ~348 FPS（+34%）
+- **SIMD 化 framebuffer 操作**：`ScreenBuf1x` 是 `uint*`，可用 `System.Runtime.Intrinsics` AVX2 一次處理 8 像素（palette lookup 仍需 scalar，預估收益 <1%）
 - **PPU tile fetch 快取**：相同 tile index 在同一幀內可能重複 fetch，快取 tile pattern data 避免重複 mapper call
+- **P3 IRQ dirty flag**：每 CPU 週期省下 4-field OR 運算，但 mutation sites 多（APU 8+、IO 2、Mapper），漏掉一處會造成 IRQ timing 錯誤，風險高

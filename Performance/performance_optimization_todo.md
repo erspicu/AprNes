@@ -18,8 +18,8 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 ### Test Steps for Each Optimization
 1. Record baseline FPS (latest `_perf_vN.md`)
 2. Apply code change
-3. Build: `MSBuild AprNes.csproj /p:Configuration=Debug /p:Platform=x64`
-4. Run: `AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"`
+3. Build: `MSBuild AprNes.csproj /p:Configuration=Release /p:Platform=x64`
+4. Run: `sleep 60 && AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"`
 5. Compare FPS delta
 6. Update this file with result
 
@@ -27,9 +27,12 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 ## Baseline
 
-| Date | Frames (20s) | Avg FPS | Report |
-|------|-------------|---------|--------|
-| 2026-03-14 | 3634 | 181.70 | [perf_v1](2026-03-14_perf_v1.md) |
+| Date | Build | Frames (20s) | Avg FPS | Report |
+|------|-------|-------------|---------|--------|
+| 2026-03-14 | Debug | 3634 | 181.70 | [perf_v1](2026-03-14_perf_v1.md) |
+| 2026-03-15 | **Release** | — | **241.45** | (Release 組態基線，含全部 Debug 優化) |
+
+> ⚠️ 2026-03-15 起改用 **Release** 組態。每次測試前必須 `sleep 60` 讓 CPU 降溫。
 
 ---
 
@@ -51,6 +54,9 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 | 12 | Priority 14: Buffer_BG_array / ScreenBuf1x pointer loop clear | 237.00 | 239.95 | **+1.2%** | ✅ KEEP | [v19](2026-03-14_perf_v19.md) |
 | 13 | Priority 18A: AggressiveInlining on Yinc/SpriteEvalInit/SpriteEvalEnd/SpriteEvalTick | 239.95 | 245.30 | **+2.2%** | ✅ KEEP | [v21](2026-03-14_perf_v21.md) |
 | 14 | Priority 24: opHandlers Action[] → delegate*<void>[] unsafe function pointer | 245.30 | 247.95 | **+1.08%** | ✅ KEEP | [v28](2026-03-14_perf_v28.md) |
+| — | *切換至 Release 組態基線* | — | **241.45** | — | — | — |
+| 15 | catchUpPPU/APU loop unroll（while→固定 3+1 展開） | 241.45 | 252.00 | **+4.3%** | ✅ KEEP | — |
+| 16 | P4: ppu_step_new Sprite 0 hit range check 條件重排 | 252.00 | ~259.00 | **+2.8%** | ✅ KEEP | — |
 
 ---
 
@@ -960,6 +966,7 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 ## Notes
 
 - All tests use the same ROM, same machine, same duration (20s)
-- Build must be **Debug x64** to match baseline (same JIT optimization level)
+- Build is now **Release x64**（2026-03-15 起）。早期測試（#1–14）使用 Debug x64。
+- **CPU 降溫**：每次 `--perf` 前必須 `sleep 60`（連續測試後 CPU 熱降頻可造成 FPS 虛假偏低 10%+）
 - If machine load varies, re-run baseline before comparing
 - AccuracyCoin 136/136 and blargg 174/174 must still pass after each change
