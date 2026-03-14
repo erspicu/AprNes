@@ -229,6 +229,80 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 ---
 
+### PRIORITY 12 — RAM read fast-path in Mem_r() / CpuRead()
+- **Target**: MEM.cs `Mem_r()` + CPU.cs `CpuRead()` — 目前所有記憶體讀取都走 `mem_read_fun[addr](addr)` 陣列 dispatch
+- **Expected gain**: 5–10%
+- **Effort**: ~30 分鐘
+- **Method**: 在陣列 dispatch 前加 `$0000–$1FFF` fast path，直接 `return NES_MEM[addr & 0x7FF]`：
+  ```csharp
+  // Mem_r() 最前面
+  if (addr < 0x2000) { tick(); return NES_MEM[addr & 0x7FF]; }
+  // 其他地址走原有 mem_read_fun[addr](addr)
+  ```
+  - RAM read 是最高頻的記憶體操作（stack、zero page、PRG code 大量落在此範圍）
+  - 省掉 delegate lookup + 間接 call overhead，直接 inline array access
+  - `mem_read_fun[addr]` 在 $0000–$1FFF 只是 `NES_MEM[addr & 0x7FF]`，等效替換
+- **Risk**: Low — RAM 行為固定，不涉及 mapper 或 PPU；需確認 open bus 行為在此範圍不需要特殊處理
+- **Verify**: blargg 174/174 + AC 136/136
+- **Status**: 🔲 TODO
+
+---
+
+### PRIORITY 13 — Cache mapper==4 static bool（A12 通知 + Increment2007 fast path）
+- **Target**: PPU.cs `ppu_rendering_tick()` + `Increment2007()` — 每次呼叫都做 `if (mapper == 4)` 或 cast 判斷
+- **Expected gain**: 1–2%
+- **Effort**: ~15 分鐘
+- **Method**: 在 `init()` 或 mapper 載入時設置一次：
+  ```csharp
+  static bool isMapper4 = false;  // set in init_function() after mapper load
+  // ppu_rendering_tick() / Increment2007() 改用 if (isMapper4) 取代 if (mapper == 4)
+  ```
+  - `ppu_rendering_tick()` 每 PPU dot 呼叫（每幀 ~89,342 次），目前每次都要做 int 比較
+  - `Increment2007()` 每次 $2007 存取都呼叫，遊戲中頻率高
+  - 非 MMC3 遊戲（佔多數）完全跳過 A12 通知邏輯
+- **Risk**: Low — 純 cache，mapper 不會中途改變
+- **Status**: 🔲 TODO
+
+---
+
+### PRIORITY 14 — Buffer_BG_array scanline clear 改用 Buffer.BlockCopy / InitBlock
+- **Target**: PPU.cs `ppu_step_new()` scanline 開頭 — 目前用 for loop 清 256 int（1KB）
+- **Expected gain**: 1–3%
+- **Effort**: ~15 分鐘
+- **Method**:
+  ```csharp
+  // 目前: for (int i = 0; i < 256; i++) Buffer_BG_array[i] = 0;
+  // 改為: unsafe { fixed (int* p = Buffer_BG_array) NativeMemory equivalent or:
+  Array.Clear(Buffer_BG_array, 0, 256);
+  // 或 unsafe InitBlock:
+  fixed (int* p = Buffer_BG_array) { for (int* q=p; q<p+256; q++) *q=0; }
+  ```
+  - 或改為 `Buffer_BG_array` 是 `int*`（unsafe pointer），用 `NativeMemory`/`Unsafe.InitBlock`
+  - `Array.Clear()` 在 .NET 內部有 JIT 向量化，比逐元素 loop 快
+  - 每幀 240 scanline × 1KB = 240KB 清零工作
+- **Risk**: Low — 純清零，無邏輯變動
+- **Status**: 🔲 TODO
+
+---
+
+### PRIORITY 15 — generateSample() Volume 乘法改為預計算 float 係數
+- **Target**: APU.cs `generateSample()` — 每個 sample 執行 `mixed * Volume / 100`（整數除法）
+- **Expected gain**: 1–2%
+- **Effort**: ~10 分鐘
+- **Method**:
+  ```csharp
+  // 目前: short sample = (short)(mixed * Volume / 100);
+  // 改為: 在 Volume setter 或初始化時: static float _volumeScale = Volume / 100f;
+  // generateSample(): short sample = (short)(mixed * _volumeScale);
+  ```
+  - 整數除法（`/ 100`）在 x86 是較貴的指令；改為 float 乘法更快
+  - 每秒 44,100 次 × Volume change 很少 → 預計算幾乎沒有 cache miss
+  - `_volumeScale` 在 Volume 改變時（UI 操作）重新計算即可
+- **Risk**: Low — 輸出差異在 ±1 sample 內（float 精度），聽覺上無差別
+- **Status**: 🔲 TODO
+
+---
+
 ## Failed / Ineffective Attempts
 
 *(None yet)*
