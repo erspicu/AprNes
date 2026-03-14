@@ -516,12 +516,13 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
   - 35 lines 屬 borderline — Debug JIT 的 I-cache 影響不如 Release 嚴重
   - `ppu_rendering_tick()` 本身已是 80 lines，加上 inline 後約 115 lines，可能造成 JIT 最佳化困難
 - **Verdict**: 先嘗試 18A；若效果不足再試 18B
-- **Status**: 🔲 TODO（低優先）
+- **Status**: ❌ FAILED — 實測負效益 -1.5%（245.30 → 241.65）
+  - 35 lines inline 後 `ppu_rendering_tick()` 膨脹至 ~115 lines，I-cache 壓力劣化。
 
 ---
 
 - **Verify**: blargg 174/174 + AC 136/136
-- **Status**: ✅ DONE（18A）；18B 🔲 TODO（低優先）
+- **Status**: ✅ DONE（18A）；18B ❌ FAILED
 
 ---
 
