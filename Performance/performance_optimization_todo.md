@@ -746,7 +746,7 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 - **Target**: CPU.cs — `static Action[] opHandlers = new Action[256]`，每幀 ~1.7M 次 dispatch
 - **Expected gain**: 5–15%（消除 managed delegate virtual dispatch overhead，與 P9 同量級）
-- **Effort**: 中（需先升級 .NET target 或採 IL emit 方案）
+- **Effort**: 中（需先升級 .NET target）
 - **背景 — 目前 Action[] 的成本**:
   - `opHandlers[opcode]()` 在 JIT 層面展開為：
     1. Array bounds check + load Action object
@@ -766,53 +766,53 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 - **可行性評估**:
 
-  | 方法 | 可行性 | 複雜度 | 說明 |
-  |------|--------|--------|------|
-  | `delegate*<void>[]`（C# 9）| ❌ 目前不可行 | 低 | 需 C# 9 + .NET 5+；目前是 .NET 4.6.1 + C# ≤7 |
-  | `IntPtr[]` + Reflection.Emit `calli` | ⚠️ 可行但複雜 | 高 | 用 `DynamicMethod` emit `calli` IL 指令；可在 .NET 4.6.1 運作，但 debug/維護困難 |
-  | 升級到 .NET 8 Windows | ✅ 最乾淨 | 中 | 改 .csproj `TargetFramework` → `net8.0-windows`；已有 `#if NET8_0_OR_GREATER` 基礎設施；啟用 `delegate*<void>` + SIMD + 其他現代 API |
+  | 方法 | 可行性 | 預估收益 | 說明 |
+  |------|--------|---------|------|
+  | .NET 4.6.1（現況）| ❌ 無法直接用 | — | C# 9 語法不支援，MSBuild 14 Roslyn 太舊 |
+  | **升級 .NET 4.8 + LangVersion 9** | ✅ **可行** | 3–8% | CLR 支援 `calli` IL，加 `<LangVersion>9.0</LangVersion>` 即可用 `delegate*<managed, void>`；JIT 最佳化不如 .NET 8 |
+  | 升級 .NET 8 Windows | ✅ 最完整 | 5–15% | 改 `TargetFramework` → `net8.0-windows`；CoreCLR JIT 對 `calli` 最佳化更強；連帶啟用 SIMD / PGO |
+  | `IntPtr[]` + Reflection.Emit `calli` | ⚠️ 複雜 | 3–8% | 不升級也能用，但維護困難，幾乎不值得 |
 
-- **推薦路徑：升級到 .NET 8 Windows**:
+- **.NET 4.8 升級步驟（最低成本路徑）**:
   ```xml
-  <!-- AprNes.csproj 修改 -->
-  <!-- 從: -->
-  <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
-  <!-- 改為: -->
-  <TargetFramework>net8.0-windows</TargetFramework>
+  <!-- AprNes.csproj 修改 1：升級 target -->
+  <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+
+  <!-- AprNes.csproj 修改 2：啟用 C# 9 語法 -->
+  <LangVersion>9.0</LangVersion>
   ```
+  注意：需 VS 2019 16.8+ 或 VS 2022（Roslyn 3.8+），MSBuild 14 不夠。
+
   升級後 CPU.cs 可改為：
   ```csharp
-  // 改用 unsafe 函式指標陣列（C# 9 語法）
-  static unsafe delegate*<void>[] opFnPtrs;
+  // 宣告 fixed-size unsafe function pointer array
+  static unsafe delegate*<void>[] opFnPtrs = new delegate*<void>[256];
 
-  // InitOpHandlers() 中：
-  opFnPtrs = (delegate*<void>[])/* ... */;
-  // 每個 handler 改為靜態方法：
-  static void Op_09() { PollInterrupts(); GetImmediate(); Op_ORA(dl); CompleteOperation(); }
-  opFnPtrs[0x09] = &Op_09;
+  // 每個 handler 必須是 static method（不能是 lambda，函式指標不接受閉包）：
+  static void Op_09_ORA_Imm() { PollInterrupts(); GetImmediate(); Op_ORA(dl); CompleteOperation(); }
+  // ...
 
-  // dispatch：
-  opFnPtrs[opcode]();  // 單次 indirect call，無 virtual dispatch
+  // InitOpHandlers() 中賦值：
+  opFnPtrs[0x09] = &Op_09_ORA_Imm;
+  // ...
+
+  // dispatch（取代 opHandlers[opcode]()）：
+  unsafe { opFnPtrs[opcode](); }  // 單次 indirect call，無 virtual dispatch overhead
   ```
 
-- **注意：升級 .NET 8 的連帶效益**:
-  - `delegate*<void>[]` dispatch（本項）
-  - SIMD intrinsics（已有 `NET8_0_OR_GREATER` 條件編譯）
-  - JIT PGO（Profile-Guided Optimization）自動優化熱點
-  - `Unsafe.InitBlockUnaligned` 替代 pointer memset loops
-  - 整體可能帶來 20–40% 額外效能提升（除本項外）
+  **重要限制**：
+  - 所有 handler 必須是 **靜態方法**，不能是 lambda（函式指標不支援閉包捕獲）
+  - 目前 InitOpHandlers() 有數百個 `() => { ... }` lambda → 需全部改為具名靜態方法（工作量大）
+  - 使用 `delegate*<managed, void>` 而非 `delegate*<unmanaged, void>`（.NET Framework 上 unmanaged calling convention 行為未定義）
 
-- **IL emit 替代方案（不升級情況下）**:
-  ```csharp
-  // 用 RuntimeMethodHandle.GetFunctionPointer() 獲取函式指標
-  // 用 DynamicMethod + ILGenerator.Emit(OpCodes.Calli) 生成直接呼叫
-  // 儲存在 IntPtr[] 中，dispatch 時透過動態方法轉發
-  // 缺點：需要 GC.KeepAlive 防止 delegate 被回收；debug 困難；維護成本高
-  ```
+- **工作量估算**（改寫 lambda → static method）:
+  - InitOpHandlers() 約有 256 個 handler，每個 1–10 行
+  - 需提取為約 256 個具名靜態方法（可用命名規則自動化，如 `Op_09_ORA_Imm`）
+  - 估計 2–4 小時手工改寫 + 測試
 
-- **Risk**: Medium（需框架升級或 IL emit 複雜實作）
+- **Risk**: Medium（框架版本升級 + 大量 handler 改寫）
 - **Verify**: blargg 174/174 + AC 136/136
-- **Status**: 🔲 TODO（先決條件：.NET 8 升級 或 IL emit 方案）
+- **Status**: 🔲 TODO（先決條件：升級 .NET 4.8 或 .NET 8，**並將所有 lambda handler 改為靜態方法**）
 
 ---
 
