@@ -564,7 +564,10 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 - **Risk**: Low — 邏輯不變，僅結構調整
 - **Verify**: blargg 174/174 + AC 136/136
-- **Status**: 🔲 TODO
+- **Status**: ❌ FAILED — 實測負效益 -1.0%（245.30 → 242.90）
+- **失敗原因**: 加入 outer `||` guard 本身需要一次 combined bool evaluate（兩次 load + OR），
+  比兩個獨立 if 的分支預測 overhead 還高。JIT 對兩個獨立的永遠-not-taken branch 預測效率更好，
+  outer guard 反而增加了 code path complexity，造成 JIT 最佳化劣化。
 
 ---
 
