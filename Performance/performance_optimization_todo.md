@@ -742,6 +742,80 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 ---
 
+### PRIORITY 24 — opHandlers Action[] → unsafe function pointer array (delegate*<void>[])
+
+- **Target**: CPU.cs — `static Action[] opHandlers = new Action[256]`，每幀 ~1.7M 次 dispatch
+- **Expected gain**: 5–15%（消除 managed delegate virtual dispatch overhead，與 P9 同量級）
+- **Effort**: 中（需先升級 .NET target 或採 IL emit 方案）
+- **背景 — 目前 Action[] 的成本**:
+  - `opHandlers[opcode]()` 在 JIT 層面展開為：
+    1. Array bounds check + load Action object
+    2. Load `_methodPtr` from delegate struct
+    3. Load `_target` from delegate struct (static handler → null)
+    4. Null check → branch (static vs instance invoke path)
+    5. Indirect call through `_methodPtr`
+  - 共 ~4–5 extra loads/checks per dispatch，**無法被 JIT devirtualize**（陣列每格型別在執行期才知道）
+  - 1.7M calls/frame × 245 FPS = ~416M dispatch/second → overhead 積累顯著
+
+- **目標 — `delegate*<void>[]` 的成本**:
+  - `fnPtrs[opcode]()` 展開為：
+    1. Load function pointer from array（一次 load，無 bounds check in unsafe）
+    2. Single indirect `call` 指令
+  - 省去 delegate struct 查詢、null check、virtual dispatch path selection
+  - 等效於 C 語言 `void (*fnTable[256])(void)` function table
+
+- **可行性評估**:
+
+  | 方法 | 可行性 | 複雜度 | 說明 |
+  |------|--------|--------|------|
+  | `delegate*<void>[]`（C# 9）| ❌ 目前不可行 | 低 | 需 C# 9 + .NET 5+；目前是 .NET 4.6.1 + C# ≤7 |
+  | `IntPtr[]` + Reflection.Emit `calli` | ⚠️ 可行但複雜 | 高 | 用 `DynamicMethod` emit `calli` IL 指令；可在 .NET 4.6.1 運作，但 debug/維護困難 |
+  | 升級到 .NET 8 Windows | ✅ 最乾淨 | 中 | 改 .csproj `TargetFramework` → `net8.0-windows`；已有 `#if NET8_0_OR_GREATER` 基礎設施；啟用 `delegate*<void>` + SIMD + 其他現代 API |
+
+- **推薦路徑：升級到 .NET 8 Windows**:
+  ```xml
+  <!-- AprNes.csproj 修改 -->
+  <!-- 從: -->
+  <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+  <!-- 改為: -->
+  <TargetFramework>net8.0-windows</TargetFramework>
+  ```
+  升級後 CPU.cs 可改為：
+  ```csharp
+  // 改用 unsafe 函式指標陣列（C# 9 語法）
+  static unsafe delegate*<void>[] opFnPtrs;
+
+  // InitOpHandlers() 中：
+  opFnPtrs = (delegate*<void>[])/* ... */;
+  // 每個 handler 改為靜態方法：
+  static void Op_09() { PollInterrupts(); GetImmediate(); Op_ORA(dl); CompleteOperation(); }
+  opFnPtrs[0x09] = &Op_09;
+
+  // dispatch：
+  opFnPtrs[opcode]();  // 單次 indirect call，無 virtual dispatch
+  ```
+
+- **注意：升級 .NET 8 的連帶效益**:
+  - `delegate*<void>[]` dispatch（本項）
+  - SIMD intrinsics（已有 `NET8_0_OR_GREATER` 條件編譯）
+  - JIT PGO（Profile-Guided Optimization）自動優化熱點
+  - `Unsafe.InitBlockUnaligned` 替代 pointer memset loops
+  - 整體可能帶來 20–40% 額外效能提升（除本項外）
+
+- **IL emit 替代方案（不升級情況下）**:
+  ```csharp
+  // 用 RuntimeMethodHandle.GetFunctionPointer() 獲取函式指標
+  // 用 DynamicMethod + ILGenerator.Emit(OpCodes.Calli) 生成直接呼叫
+  // 儲存在 IntPtr[] 中，dispatch 時透過動態方法轉發
+  // 缺點：需要 GC.KeepAlive 防止 delegate 被回收；debug 困難；維護成本高
+  ```
+
+- **Risk**: Medium（需框架升級或 IL emit 複雜實作）
+- **Verify**: blargg 174/174 + AC 136/136
+- **Status**: 🔲 TODO（先決條件：.NET 8 升級 或 IL emit 方案）
+
+---
+
 ## Failed / Ineffective Attempts
 
 *(None yet)*
