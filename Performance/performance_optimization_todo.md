@@ -11,9 +11,9 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 - Result: automatically saved to `Performance/YYYY-MM-DD_perf_vN.md`
 
 ### Pass/Fail Criteria
-- **Improvement ≥ 3%** → keep change, commit, create new perf report
-- **Improvement 1–3%** → keep if code stays clean, note in TODO
-- **No improvement / regression** → revert, mark as FAILED in TODO
+- **Improvement > 0.25%** → keep change, commit, create new perf report
+- **Improvement ≤ 0.25% or flat** → revert, mark as FAILED in TODO
+- **Regression** → revert, mark as FAILED in TODO
 
 ### Test Steps for Each Optimization
 1. Record baseline FPS (latest `_perf_vN.md`)
