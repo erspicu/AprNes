@@ -735,7 +735,10 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 - **Risk**: Low — 邏輯完全等價，只是分派方式改變
 - **Verify**: blargg 174/174 + AC 136/136
-- **Status**: 🔲 TODO
+- **Status**: ❌ FAILED — 實測持平 -0.1%（245.30 → 244.95）
+- **失敗原因**: IO_read/write 呼叫頻率太低（~幾百次/frame），switch→table 節省的 overhead
+  遠不及 delegate call overhead 增加量。與 CPU opcode dispatch（1.7M/frame）相比，
+  IO 只有 ~1/5000 的頻率，效益完全不成比例。
 
 ---
 
