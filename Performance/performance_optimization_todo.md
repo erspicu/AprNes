@@ -821,6 +821,118 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 ---
 
+### PRIORITY 25 — mem_read_fun / mem_write_fun Action[]/Func[] → unsafe function pointer array
+
+- **Target**: `MEM.cs` — `static Func<ushort, byte>[] mem_read_fun` 及 `static Action<ushort, byte>[] mem_write_fun`
+- **Call frequency**: ~2–4M 次/秒（mem_read_fun：所有 ROM fetch + IO read；mem_write_fun：所有 Mem_w）
+- **Expected gain**: +0.5–2%（與 P24 機制相同：消除 managed delegate virtual dispatch overhead）
+- **Effort**: 低（比 P24 少得多：只有 ~10 種不同 handler，不是 226 個）
+
+- **簽章對應**:
+  ```csharp
+  // Before
+  static Func<ushort, byte>[]       mem_read_fun;   // Func<ushort, byte>
+  static Action<ushort, byte>[]     mem_write_fun;  // Action<ushort, byte>
+
+  // After
+  static unsafe delegate*<ushort, byte>[]      mem_read_fun;
+  static unsafe delegate*<ushort, byte, void>[] mem_write_fun;
+  ```
+
+- **Mapper instance method 問題**（唯一障礙）:
+  `MapperObj.MapperR_RPG` 等是 instance method，無法直接取 `delegate*`。
+  解法：加 5–8 個一行靜態 wrapper：
+  ```csharp
+  static byte  MemRead_MapperRPG(ushort addr)          => MapperObj.MapperR_RPG(addr);
+  static byte  MemRead_MapperRAM(ushort addr)          => MapperObj.MapperR_RAM(addr);
+  static void  MemWrite_MapperPRG(ushort addr, byte v) => MapperObj.MapperW_PRG(addr, v);
+  static void  MemWrite_MapperRAM(ushort addr, byte v) => MapperObj.MapperW_RAM(addr, v);
+  static void  MemWrite_MapperExp(ushort addr, byte v) => MapperObj.MapperW_ExpansionROM(addr, v);
+  ```
+
+- **需提取的靜態 handler**（全部無 closure，只參照靜態欄位）:
+  ```csharp
+  // mem_read_fun (~5 種)
+  static byte MemRead_RAM(ushort addr)     => NES_MEM[addr & 0x7FF];
+  static byte MemRead_IO(ushort addr)      => IO_read(addr);
+  static byte MemRead_OpenBus(ushort addr) => cpubus;
+  // + MemRead_MapperRAM, MemRead_MapperRPG
+
+  // mem_write_fun (~5 種)
+  static void MemWrite_RAM(ushort addr, byte v)    { NES_MEM[addr & 0x7FF] = v; }
+  static void MemWrite_IO(ushort addr, byte v)     => IO_write(addr, v);
+  static void MemWrite_NoOp(ushort addr, byte v)   { }
+  // + MemWrite_MapperExp, MemWrite_MapperRAM, MemWrite_MapperPRG
+  ```
+
+- **init_function() 改寫模式**:
+  ```csharp
+  static unsafe void init_function()
+  {
+      mem_read_fun  = new delegate*<ushort, byte>[0x10000];
+      mem_write_fun = new delegate*<ushort, byte, void>[0x10000];
+
+      for (int a = 0; a < 0x10000; a++)
+      {
+          if      (a < 0x2000) mem_read_fun[a] = &MemRead_RAM;
+          else if (a < 0x4020) mem_read_fun[a] = &MemRead_IO;
+          else if (a < 0x6000) mem_read_fun[a] = &MemRead_OpenBus;
+          else if (a < 0x8000) mem_read_fun[a] = &MemRead_MapperRAM;
+          else                 mem_read_fun[a] = &MemRead_MapperRPG;
+      }
+      // mem_write_fun 同樣結構
+  }
+  ```
+
+- **注意**：`Mem_r` / `Mem_w` / `ProcessPendingDma` / `ProcessDmaRead` 中所有 `mem_read_fun[addr](addr)` / `mem_write_fun[addr](addr, val)` 呼叫語法不變，型別推斷自動適用。
+- **Risk**: Low — 邏輯完全等價，只是分派方式改變；Mapper 方法行為透過 wrapper 完全保留
+- **Verify**: blargg 174/174 + AC 136/136
+- **Status**: 🔲 TODO
+
+---
+
+### PRIORITY 26 — ppu_read_fun / ppu_write_fun Func[]/Action[] → unsafe function pointer array（低優先，可與 P25 合併）
+
+- **Target**: `MEM.cs` — `static Func<int, byte>[] ppu_read_fun` 及 `static Action<byte>[] ppu_write_fun`
+- **Call frequency**: 極低（僅 CPU 讀寫 $2007 時觸發），dispatch 節省可忽略
+- **Expected gain**: < 0.1%（無法量測）；主要效益：減少 65536×2 = 131K 個 managed delegate 物件（GC 壓力）
+- **Effort**: 極低（只有 3-4 種不同 handler，`vram_addr_wrap` 看似 closure 但實際使用 `vram_addr` 靜態欄位）
+
+- **簽章對應**:
+  ```csharp
+  // Before
+  static Func<int, byte>[] ppu_read_fun;    // Func<int, byte>
+  static Action<byte>[]    ppu_write_fun;   // Action<byte>
+
+  // After
+  static unsafe delegate*<int, byte>[]  ppu_read_fun;
+  static unsafe delegate*<byte, void>[] ppu_write_fun;
+  ```
+
+- **ppu_read_fun handler 種類**（4 種，依 address 區間）:
+  ```csharp
+  static byte PpuRead_PaletteCHR(int val)  { /* palette + MapperR_CHR */ }
+  static byte PpuRead_PaletteRAM(int val)  { /* palette + ppu_ram[2FFF] */ }
+  static byte PpuRead_PatternTable(int val){ /* buffer + MapperR_CHR */ }
+  static byte PpuRead_NameTable(int val)   { /* buffer + ppu_ram[2FFF] */ }
+  static byte PpuRead_Palette2(int val)    { /* buffer + palette wrap */ }
+  ```
+
+- **ppu_write_fun handler 種類**（3 種）:
+  ```csharp
+  static void PpuWrite_CHR(byte val)       { /* CHR RAM write if CHR_ROM_count==0 */ }
+  static void PpuWrite_NameTable(byte val) { /* mirroring logic */ }
+  static void PpuWrite_Palette(byte val)   { /* palette write */ }
+  ```
+
+- **MapperObj.MapperR_CHR 問題**：同 P25，需加 wrapper `static byte PpuRead_MapperCHR(int addr) => MapperObj.MapperR_CHR(addr);`
+- **建議**：與 P25 同批實作，不值得單獨測試（收益 < 量測誤差）
+- **Risk**: Low
+- **Verify**: blargg 174/174 + AC 136/136
+- **Status**: 🔲 TODO（建議與 P25 同批次實作，合計一次 perf 測試）
+
+---
+
 ## Results Log
 
 | # | Priority | Description | Before FPS | After FPS | Delta | Report |
