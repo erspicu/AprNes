@@ -333,7 +333,10 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
   - 特別注意：`flagN` / `flagZ` 在 CPU.cs 以外是否被讀取（需 grep 確認）
   - 若有遺漏會導致 branch 條件錯誤 → blargg 立即暴露
 - **Verify**: blargg 174/174 + AC 136/136
-- **Status**: 🔲 TODO
+- **Status**: ❌ FAILED — 實測 **-1.9%** (239.95 → 235.50 FPS)，已 revert
+  - blargg 174/174 通過（邏輯正確），但效能退步
+  - 實際實作：用 `nz_n`（bit-7 position）+ `nz_z`（raw value, 0=Z set）取代 `flagN`/`flagZ`，省去 `>>7` shift 和 `==0?1:0` conditional
+  - 原因推測：GetFlag 的 `(nz_z == 0 ? 1 : 0) << 1` 比 `flagZ << 1` 更貴；branch handler lambda 內的反向 Z 編碼增加計算；新 field 位置可能增加 cache miss
 
 ---
 
