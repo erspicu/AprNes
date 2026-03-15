@@ -44,7 +44,7 @@ namespace AprNes
 
         // Accuracy option: per-dot secondary OAM evaluation FSM (dots 1-64 clear, 65-256 evaluate)
         // true = full hardware accuracy; false = skip FSM for ~13% performance gain (no test failures)
-        static public bool AccuracyOptA = true;
+        static public bool AccuracyOptA = false;
 
 #if NET8_0_OR_GREATER
         // SIMD toggle：false 時強制走 scalar fallback（用於 benchmark 對比）
