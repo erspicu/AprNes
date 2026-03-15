@@ -58,10 +58,21 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 | 15 | catchUpPPU/APU loop unroll（while→固定 3+1 展開） | 241.45 | 252.00 | **+4.3%** | ✅ KEEP | — |
 | 16 | P4: ppu_step_new Sprite 0 hit range check 條件重排 | 252.00 | ~259.00 | **+2.8%** | ✅ KEEP | — |
 | 17 | CPU.cs operationCycle switch(≤8 cases) → if/else（Op_XX 單行 + addressing helpers） | ~259.00 | ~264.8 | **+2.2%** | ✅ KEEP | [v60](2026-03-15_perf_v60.md) [v61](2026-03-15_perf_v61.md) |
+| 18 | Op_XX 共用 dispatch helpers（delegate*<byte/ushort,void> 參數化 161 個 handler） | ~264.8 | ~256.2 | **-3.2%** | ❌ REVERT | [v62](2026-03-15_perf_v62.md) [v63](2026-03-15_perf_v63.md) [v64](2026-03-15_perf_v64.md) |
 
 ---
 
 ## Optimization Tasks
+
+### ❌ FAILED — Op_XX 共用 dispatch helpers (delegate* 參數化)
+- **Target**: CPU.cs — 161 個 Op_XX handler 改用 ExecReadZP/ExecReadZPX/ExecRMW_ZP 等 shared helper，以 `delegate*<byte,void>` 傳入操作函式
+- **Expected gain**: i-cache 壓力減少（每個 handler 從 ~60 bytes → ~10 bytes）
+- **Actual result**: **-3.2%**（~264.8 → ~256.2 FPS）
+- **Root cause**: `delegate*<byte,void>` 函式指標呼叫阻擋 JIT 內聯 Op_ORA/Op_AND 等操作函式，每個 opcode 多一次 indirect call (~3-5 cycles)。此開銷超過 i-cache 節省的效益。即使搭配 `[AggressiveInlining]` 也無法透過函式指標內聯。
+- **Conclusion**: 此類共用 helper 設計不適用於效能敏感路徑，除非操作函式可內聯（不能是 delegate*）。
+- **Status**: ❌ REVERTED
+
+---
 
 ### PRIORITY 0 — Remove DMA trace logging code
 - **Target**: APU.cs, IO.cs, TestRunner.cs — `dmcTraceEnabled` 條件式 `[DMA-TRACE]` Console.Error.WriteLine 及相關 field
