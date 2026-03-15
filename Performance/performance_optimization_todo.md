@@ -755,10 +755,10 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 - **Risk**: Low — 邏輯完全等價，只是分派方式改變
 - **Verify**: blargg 174/174 + AC 136/136
-- **Status**: ❌ FAILED — 實測持平 -0.1%（245.30 → 244.95）
-- **失敗原因**: IO_read/write 呼叫頻率太低（~幾百次/frame），switch→table 節省的 overhead
-  遠不及 delegate call overhead 增加量。與 CPU opcode dispatch（1.7M/frame）相比，
-  IO 只有 ~1/5000 的頻率，效益完全不成比例。
+- **Status**: ✅ KEPT（改版 — 分段 if/else）+1.3%（270.15 → 273.75 FPS，run1=273.70, run2=273.80）
+- **實作**: switch 改為三段式 if/else（PPU $2000-$2007 / APU channels $4000-$4013 / OAM+APU $4014-$4017）
+  先用範圍判斷縮小候選集，再於段內做 if/else。比 switch 少比對次數，branch predictor 效果更好。
+- **注意**: 原 `Func<byte>[]`/`Action<byte>[]` delegate table 方案測試結果 -4.0%（v70/v71，已棄用）
 
 ---
 
