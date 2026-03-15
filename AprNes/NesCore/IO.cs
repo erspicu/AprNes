@@ -1,4 +1,3 @@
-
 namespace AprNes
 {
     public unsafe partial class NesCore
@@ -7,70 +6,76 @@ namespace AprNes
         {
             if (addr < 0x4000) addr = (ushort)(0x2000 | (addr & 7));
 
-            switch (addr)
+            if (addr < 0x4000)  // PPU $2000-$2007
             {
-                case 0x2000: return openbus;
-                case 0x2001: return openbus;
-                case 0x2002: return ppu_r_2002();
-                case 0x2003: return openbus;
-                case 0x2004: return ppu_r_2004();
-                case 0x2005: return openbus;
-                case 0x2006: return openbus;
-                case 0x2007: return ppu_r_2007();
-                case 0x4015: return apu_r_4015();
-                case 0x4016: return gamepad_r_4016();
-                case 0x4017: return (byte)(cpubus & 0xE0); // Controller 2: no controller → D0-D4=0, D5-D7=open bus
-                default:
-                    return cpubus; // APU write-only registers return CPU data bus value
+                if      (addr == 0x2002) return ppu_r_2002();
+                else if (addr == 0x2004) return ppu_r_2004();
+                else if (addr == 0x2007) return ppu_r_2007();
+                else                     return cpubus;
+            }
+            else  // APU/IO $4015-$4017
+            {
+                if      (addr == 0x4015) return apu_r_4015();
+                else if (addr == 0x4016) return gamepad_r_4016();
+                else if (addr == 0x4017) return (byte)(cpubus & 0xE0);
+                else                     return cpubus;
             }
         }
 
         static void IO_write(ushort addr, byte val)
         {
             if (addr < 0x4000) addr = (ushort)(0x2000 | (addr & 7));
-            switch (addr)
+
+            if (addr < 0x4000)  // PPU $2000-$2007
             {
-                case 0x2000: ppu_w_2000(val); break;
-                case 0x2001: ppu_w_2001(val); break;
-                case 0x2002: openbus = val; break;
-                case 0x2003: ppu_w_2003(val); break;
-                case 0x2004: ppu_w_2004(val); break;
-                case 0x2005: ppu_w_2005(val); break;
-                case 0x2006: ppu_w_2006(val); break;
-                case 0x2007: ppu_w_2007(val); break;
-                case 0x4000: apu_4000(val); break;
-                case 0x4001: apu_4001(val); break;
-                case 0x4002: apu_4002(val); break;
-                case 0x4003: apu_4003(val); break;
-                case 0x4004: apu_4004(val); break;
-                case 0x4005: apu_4005(val); break;
-                case 0x4006: apu_4006(val); break;
-                case 0x4007: apu_4007(val); break;
-                case 0x4008: apu_4008(val); break;
-                case 0x4009: apu_4009(val); break;
-                case 0x400a: apu_400a(val); break;
-                case 0x400b: apu_400b(val); break;
-                case 0x400c: apu_400c(val); break;
-                case 0x400e: apu_400e(val); break;
-                case 0x400f: apu_400f(val); break;
-                case 0x4010: apu_4010(val); break;
-                case 0x4011: apu_4011(val); break;
-                case 0x4012: apu_4012(val); break;
-                case 0x4013: apu_4013(val); break;
-                case 0x4014: ppu_w_4014(val); break;
-                case 0x4015: apu_4015(val); break;
-                case 0x4016: gamepad_w_4016(val); break;
-                case 0x4017:                          // Frame counter mode
+                if      (addr == 0x2000) ppu_w_2000(val);
+                else if (addr == 0x2001) ppu_w_2001(val);
+                else if (addr == 0x2002) { openbus = val; }
+                else if (addr == 0x2003) ppu_w_2003(val);
+                else if (addr == 0x2004) ppu_w_2004(val);
+                else if (addr == 0x2005) ppu_w_2005(val);
+                else if (addr == 0x2006) ppu_w_2006(val);
+                else                     ppu_w_2007(val); // 0x2007
+            }
+            else if (addr < 0x4014)  // APU channels $4000-$4013
+            {
+                int lo = addr & 0xFF;
+                if      (lo == 0x00) apu_4000(val);
+                else if (lo == 0x01) apu_4001(val);
+                else if (lo == 0x02) apu_4002(val);
+                else if (lo == 0x03) apu_4003(val);
+                else if (lo == 0x04) apu_4004(val);
+                else if (lo == 0x05) apu_4005(val);
+                else if (lo == 0x06) apu_4006(val);
+                else if (lo == 0x07) apu_4007(val);
+                else if (lo == 0x08) apu_4008(val);
+                else if (lo == 0x09) apu_4009(val);
+                else if (lo == 0x0a) apu_400a(val);
+                else if (lo == 0x0b) apu_400b(val);
+                else if (lo == 0x0c) apu_400c(val);
+                else if (lo == 0x0e) apu_400e(val);
+                else if (lo == 0x0f) apu_400f(val);
+                else if (lo == 0x10) apu_4010(val);
+                else if (lo == 0x11) apu_4011(val);
+                else if (lo == 0x12) apu_4012(val);
+                else                 apu_4013(val); // 0x13
+            }
+            else  // OAM DMA + APU/IO $4014-$4017
+            {
+                if      (addr == 0x4014) ppu_w_4014(val);
+                else if (addr == 0x4015) apu_4015(val);
+                else if (addr == 0x4016) gamepad_w_4016(val);
+                else if (addr == 0x4017)
+                {
                     last4017Val    = val;
                     ctrmode        = ((val & 0x80) != 0) ? 5 : 4;
                     apuintflag     = (val & 0x40) != 0;
-                    if (apuintflag) statusframeint = false; // 只有 bit6 設定時才清除 frame IRQ flag
+                    if (apuintflag) statusframeint = false;
                     framectr       = 0;
                     irqAssertCycles = 0;
-                    int jitter = 2 + (apucycle & 1); // even/odd CPU cycle jitter
+                    int jitter = 2 + (apucycle & 1);
                     if (ctrmode == 5)
                     {
-                        // Mode 1: 立即 clock length/envelope/sweep (不推進 framectr)
                         setenvelope();
                         setlinctr();
                         setlength();
@@ -82,8 +87,7 @@ namespace AprNes
                     {
                         framectrdiv = frameReload4[0] + jitter - 1;
                     }
-                    break;
-                default: break;
+                }
             }
         }
     }

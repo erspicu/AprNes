@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AprNes — NES Emulator</title>
+  <link rel="stylesheet" href="libs/bootstrap.min.css">
+  <style>
+    :root {
+      --nes-teal:   #008080;
+      --nes-teal2:  #0d9488;
+      --nes-dark:   #0a0f1a;
+      --nes-surface:#111827;
+      --nes-card:   #1a2332;
+      --nes-border: #1e3a4a;
+      --nes-text:   #e2e8f0;
+      --nes-muted:  #94a3b8;
+      --nes-pass:   #22c55e;
+      --nes-yellow: #fbbf24;
+      --nes-accent: #38bdf8;
+    }
+    body { background: var(--nes-dark); color: var(--nes-text); font-family: 'Segoe UI', system-ui, sans-serif; }
+
+    /* NAV */
+    .navbar { background: rgba(10,15,26,.95) !important; border-bottom: 1px solid var(--nes-border); backdrop-filter: blur(8px); }
+    .navbar-brand { font-weight: 700; font-size: 1.35rem; color: var(--nes-yellow) !important; letter-spacing: .03em; }
+    .nav-link { color: var(--nes-muted) !important; transition: color .2s; }
+    .nav-link:hover { color: var(--nes-accent) !important; }
+    #lang-btn { font-size: .78rem; padding: .3rem .7rem; border-radius: 20px; border: 1px solid var(--nes-border); background: transparent; color: var(--nes-muted); cursor: pointer; transition: all .2s; }
+    #lang-btn:hover { border-color: var(--nes-accent); color: var(--nes-accent); }
+
+    /* HERO */
+    .hero { padding: 7rem 0 5rem; text-align: center; background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(0,128,128,.22), transparent); }
+    .hero h1 { font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 800; letter-spacing: -.03em; }
+    .hero .sub { font-size: 1.05rem; color: var(--nes-muted); max-width: 640px; margin: .8rem auto 1.5rem; }
+    .badge-row { display: flex; justify-content: center; gap: .6rem; flex-wrap: wrap; margin-bottom: 2rem; }
+    .nbadge { padding: .35rem .85rem; border-radius: 20px; font-size: .8rem; font-weight: 600; }
+    .nbadge-green  { background: rgba(34,197,94,.15); color: #22c55e; border: 1px solid rgba(34,197,94,.3); }
+    .nbadge-blue   { background: rgba(56,189,248,.12); color: #38bdf8; border: 1px solid rgba(56,189,248,.25); }
+    .nbadge-yellow { background: rgba(251,191,36,.12); color: #fbbf24; border: 1px solid rgba(251,191,36,.25); }
+    .nbadge-teal   { background: rgba(0,128,128,.18); color: #2dd4bf; border: 1px solid rgba(0,128,128,.35); }
+
+    /* SECTION */
+    section { padding: 4.5rem 0; }
+    .sec-title { font-size: 1.55rem; font-weight: 700; margin-bottom: .4rem; }
+    .sec-sub   { color: var(--nes-muted); font-size: .92rem; margin-bottom: 2.5rem; }
+    .divider   { border-color: var(--nes-border) !important; margin: 0; }
+
+    /* FEATURE CARDS */
+    .feat-card { background: var(--nes-card); border: 1px solid var(--nes-border); border-radius: 12px; padding: 1.6rem; height: 100%; transition: transform .18s, box-shadow .18s; }
+    .feat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,128,128,.18); }
+    .feat-icon { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.35rem; margin-bottom: 1rem; }
+    .feat-card h5 { font-size: 1rem; font-weight: 700; margin-bottom: .5rem; }
+    .feat-card p  { font-size: .87rem; color: var(--nes-muted); margin: 0; line-height: 1.6; }
+
+    /* PERF */
+    .perf-bar-wrap { background: var(--nes-card); border: 1px solid var(--nes-border); border-radius: 12px; padding: 1.4rem 1.6rem; }
+    .perf-label { font-size: .8rem; color: var(--nes-muted); margin-bottom: .3rem; }
+    .perf-bar { height: 10px; background: rgba(255,255,255,.06); border-radius: 5px; overflow: hidden; margin-bottom: .2rem; }
+    .perf-bar .fill { height: 100%; border-radius: 5px; background: linear-gradient(90deg, var(--nes-teal), var(--nes-accent)); }
+    .perf-val { font-size: .78rem; color: var(--nes-pass); font-weight: 600; }
+    .stat-big { font-size: 2.8rem; font-weight: 800; line-height: 1; }
+    .stat-big.green  { color: var(--nes-pass); }
+    .stat-big.yellow { color: var(--nes-yellow); }
+    .stat-big.blue   { color: var(--nes-accent); }
+
+    /* REPORT LINKS */
+    .report-card { background: var(--nes-card); border: 1px solid var(--nes-border); border-radius: 10px; padding: 1.1rem 1.3rem; display: flex; align-items: center; gap: 1rem; text-decoration: none; color: var(--nes-text); transition: border-color .2s, background .2s; }
+    .report-card:hover { border-color: var(--nes-accent); background: rgba(56,189,248,.05); color: var(--nes-text); }
+    .report-card .ri { font-size: 1.5rem; flex-shrink: 0; }
+    .report-card h6 { font-size: .9rem; font-weight: 600; margin: 0 0 .15rem; }
+    .report-card small { color: var(--nes-muted); font-size: .78rem; }
+
+    /* GALLERY */
+    .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: .75rem; }
+    .gallery-item { border-radius: 8px; overflow: hidden; border: 1px solid var(--nes-border); cursor: pointer; position: relative; }
+    .gallery-item img { width: 100%; display: block; image-rendering: pixelated; aspect-ratio: 256/240; object-fit: contain; background: #000; transition: transform .2s; }
+    .gallery-item:hover img { transform: scale(1.03); }
+    .mapper-badge { position: absolute; top: 6px; right: 6px; font-size: .65rem; padding: .2rem .5rem; border-radius: 4px; font-weight: 700; background: rgba(0,0,0,.72); color: var(--nes-yellow); }
+
+    /* TIMELINE */
+    .timeline { position: relative; padding-left: 2rem; }
+    .timeline::before { content:''; position: absolute; left: .55rem; top: 0; bottom: 0; width: 2px; background: linear-gradient(to bottom, var(--nes-teal), transparent); }
+    .tl-item { position: relative; margin-bottom: 1.8rem; }
+    .tl-dot  { position: absolute; left: -1.55rem; top: .3rem; width: 12px; height: 12px; border-radius: 50%; background: var(--nes-teal); border: 2px solid var(--nes-dark); }
+    .tl-dot.highlight { background: var(--nes-yellow); }
+    .tl-year { font-size: .75rem; color: var(--nes-accent); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; margin-bottom: .15rem; }
+    .tl-title { font-size: .98rem; font-weight: 600; margin-bottom: .25rem; }
+    .tl-desc  { font-size: .85rem; color: var(--nes-muted); line-height: 1.55; }
+
+    /* ROADMAP */
+    .road-card { background: var(--nes-card); border: 1px solid var(--nes-border); border-radius: 10px; padding: 1.2rem 1.4rem; height: 100%; }
+    .road-card .phase { font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin-bottom: .5rem; }
+    .road-card h6 { font-size: .95rem; font-weight: 700; margin-bottom: .5rem; }
+    .road-card ul { font-size: .83rem; color: var(--nes-muted); padding-left: 1.1rem; margin: 0; line-height: 1.7; }
+    .phase-now    { color: var(--nes-pass); }
+    .phase-near   { color: var(--nes-yellow); }
+    .phase-future { color: var(--nes-accent); }
+    .phase-vision { color: #c084fc; }
+
+    /* ACK */
+    .ack-card { background: var(--nes-card); border: 1px solid var(--nes-border); border-radius: 10px; padding: 1rem 1.2rem; }
+    .ack-card h6 { font-size: .82rem; font-weight: 700; color: var(--nes-accent); margin-bottom: .5rem; text-transform: uppercase; letter-spacing: .04em; }
+    .ack-card ul { font-size: .82rem; color: var(--nes-muted); padding-left: 1.1rem; margin: 0; line-height: 1.8; }
+    .ack-card ul a { color: var(--nes-muted); text-decoration: underline dotted; }
+    .ack-card ul a:hover { color: var(--nes-accent); }
+
+    /* DOWNLOAD */
+    .dl-row { background: var(--nes-card); border: 1px solid var(--nes-border); border-radius: 10px; padding: .9rem 1.2rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .6rem; }
+    .dl-row .ver { font-weight: 700; font-size: .9rem; }
+    .dl-row .note { font-size: .8rem; color: var(--nes-muted); }
+    .btn-dl { font-size: .8rem; padding: .35rem .9rem; background: var(--nes-teal); border: none; border-radius: 6px; color: #fff; text-decoration: none; transition: background .2s; white-space: nowrap; }
+    .btn-dl:hover { background: var(--nes-teal2); color: #fff; }
+    .btn-dl.old { background: rgba(255,255,255,.07); color: var(--nes-muted); }
+    .btn-dl.old:hover { background: rgba(255,255,255,.12); color: var(--nes-text); }
+
+    /* SPONSOR */
+    .sponsor-box { background: linear-gradient(135deg, rgba(255,221,0,.07), rgba(255,221,0,.03)); border: 1px solid rgba(255,221,0,.2); border-radius: 14px; padding: 2.5rem; text-align: center; }
+    .bmc-btn { display: inline-flex; align-items: center; gap: .6rem; background: #FFDD00; color: #000; font-weight: 700; font-size: 1rem; padding: .75rem 1.8rem; border-radius: 10px; text-decoration: none; transition: transform .15s, box-shadow .15s; }
+    .bmc-btn:hover { color: #000; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(255,221,0,.35); }
+    .bmc-btn .coffee { font-size: 1.4rem; }
+
+    /* FOOTER */
+    footer { background: rgba(0,0,0,.4); border-top: 1px solid var(--nes-border); padding: 2rem 0; font-size: .83rem; color: var(--nes-muted); }
+    footer a { color: var(--nes-muted); }
+    footer a:hover { color: var(--nes-accent); }
+
+    /* LIGHTBOX */
+    .lb-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.88); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+    .lb-overlay img { max-width: 90vw; max-height: 85vh; image-rendering: pixelated; border-radius: 4px; }
+    .lb-close { position: fixed; top: 1.2rem; right: 1.5rem; font-size: 2rem; color: #fff; cursor: pointer; z-index: 10000; line-height: 1; }
+
+    /* UTIL */
+    .text-teal   { color: #2dd4bf !important; }
+    .text-yellow { color: var(--nes-yellow) !important; }
+    .text-pass   { color: var(--nes-pass) !important; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar navbar-expand-lg fixed-top">
+  <div class="container">
+    <a class="navbar-brand" href="#">🎮 AprNes</a>
+    <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav ms-auto align-items-center gap-2">
+        <li class="nav-item"><a class="nav-link" href="#features"   data-i18n="nav_feat">特色</a></li>
+        <li class="nav-item"><a class="nav-link" href="#reports"    data-i18n="nav_rep">測試報告</a></li>
+        <li class="nav-item"><a class="nav-link" href="#gallery"    data-i18n="nav_gal">截圖</a></li>
+        <li class="nav-item"><a class="nav-link" href="#history"    data-i18n="nav_hist">歷史</a></li>
+        <li class="nav-item"><a class="nav-link" href="#roadmap"    data-i18n="nav_road">Roadmap</a></li>
+        <li class="nav-item"><a class="nav-link" href="#ack"        data-i18n="nav_ack">致謝</a></li>
+        <li class="nav-item"><a class="nav-link" href="#download"   data-i18n="nav_dl">下載</a></li>
+        <li class="nav-item">
+          <a class="nav-link" href="https://github.com/erspicu/AprNes" target="_blank">GitHub</a>
+        </li>
+        <li class="nav-item ms-2">
+          <button id="lang-btn" onclick="toggleLang()">EN</button>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero" style="padding-top:8rem">
+  <div class="container">
+    <div class="badge-row">
+      <span class="nbadge nbadge-green"  data-i18n="badge_acc">cycle-accurate</span>
+      <span class="nbadge nbadge-yellow">blargg 174 / 174 ✓</span>
+      <span class="nbadge nbadge-green">AccuracyCoin 136 / 136 ✓</span>
+      <span class="nbadge nbadge-blue"   data-i18n="badge_perf">效能 +36.5%</span>
+      <span class="nbadge nbadge-teal"   data-i18n="badge_ai">AI 輔助開發</span>
+    </div>
+    <h1><span class="text-yellow">AprNes</span></h1>
+    <p class="sub" data-i18n="hero_sub">
+      C# 實作的任天堂紅白機模擬器，以 cycle-accurate 精準度為目標，通過業界最嚴格的測試驗證，
+      並運用 AI 協作持續演進。
+    </p>
+    <div class="d-flex justify-content-center gap-3 flex-wrap">
+      <a href="https://github.com/erspicu/AprNes" target="_blank" class="btn btn-outline-light px-4">
+        ⭐ GitHub
+      </a>
+      <a href="#download" class="btn px-4" style="background:var(--nes-teal);color:#fff;" data-i18n="hero_dl">
+        下載最新版
+      </a>
+      <a href="#reports" class="btn btn-outline-secondary px-4" data-i18n="hero_rep">
+        查看測試報告
+      </a>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="container">
+    <div class="text-center mb-5">
+      <h2 class="sec-title" data-i18n="feat_title">核心特色</h2>
+      <p class="sec-sub" data-i18n="feat_sub">從硬體文件出發，逐一實作每個 NES 子系統的精確行為</p>
+    </div>
+    <div class="row g-3">
+      <div class="col-sm-6 col-lg-3">
+        <div class="feat-card">
+          <div class="feat-icon" style="background:rgba(0,128,128,.18)">⏱️</div>
+          <h5 data-i18n="f1_title">Cycle-Accurate 時序</h5>
+          <p data-i18n="f1_desc">CPU、PPU、APU 全部以 per-cycle 精度模擬。每次記憶體存取觸發精確的 tick 計時，NMI/IRQ 延遲、DMA 週期偷取等細節均符合真實硬體行為。</p>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="feat-card">
+          <div class="feat-icon" style="background:rgba(251,191,36,.12)">🔀</div>
+          <h5 data-i18n="f2_title">完整 DMA 模擬</h5>
+          <p data-i18n="f2_desc">OAM DMA 514 cycle、DMC 週期偷取（3–4 cycle）、phantom read、implicit abort 等所有 DMA 時序邊界情況均正確實作，通過最嚴苛的 DMA 測試 ROM。</p>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="feat-card">
+          <div class="feat-icon" style="background:rgba(56,189,248,.12)">🎵</div>
+          <h5 data-i18n="f3_title">APU 五聲道音效</h5>
+          <p data-i18n="f3_desc">Pulse×2、Triangle、Noise、DMC 完整實作。自製 WaveOut 輸出（winmm.dll），44100Hz 16-bit，無任何第三方音效套件依賴。</p>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="feat-card">
+          <div class="feat-icon" style="background:rgba(192,132,252,.12)">🤖</div>
+          <h5 data-i18n="f4_title">AI 協作開發</h5>
+          <p data-i18n="f4_desc">以 AI 輔助研究 NES 硬體行為、分析測試 ROM 失敗原因、設計修復方案、效能最佳化。探索 AI-driven 嵌入式系統模擬開發的可行邊界。</p>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="feat-card">
+          <div class="feat-icon" style="background:rgba(34,197,94,.1)">🧪</div>
+          <h5 data-i18n="f5_title">自動化測試流程</h5>
+          <p data-i18n="f5_desc">174 個 blargg test ROM + 136 個 AccuracyCoin 測試全自動化。截圖比對、CRC 驗證、headless 批次執行，每次 commit 均有正確性保障。</p>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="feat-card">
+          <div class="feat-icon" style="background:rgba(251,191,36,.1)">⚡</div>
+          <h5 data-i18n="f6_title">效能最佳化研究</h5>
+          <p data-i18n="f6_desc">從 181 FPS 提升至 ~273.8 FPS（+50.7%）。19 項成功最佳化，涵蓋 unsafe pointer、函式指標表、JIT AggressiveInlining、early-exit guard、Release 組態 loop unroll、switch→if/else（CPU/PPU/IO）等技巧。</p>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="feat-card">
+          <div class="feat-icon" style="background:rgba(0,128,128,.15)">🗺️</div>
+          <h5 data-i18n="f7_title">多 Mapper 支援</h5>
+          <p data-i18n="f7_desc">支援 Mapper 0/1/2/3/4（MMC3）/5（MMC5）/7/11/66/71，涵蓋市場上約 90% 的 NES 遊戲。MMC3 含完整 IRQ A12 上升沿時序。</p>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="feat-card">
+          <div class="feat-icon" style="background:rgba(56,189,248,.08)">🖼️</div>
+          <h5 data-i18n="f8_title">畫面 Scaler Filter</h5>
+          <p data-i18n="f8_desc">xBRZ 2x/4x/6x 高品質影像放大濾鏡，多核心平行加速。內建 NTSC CRT 比例修正與 YIQ color bleeding 模擬效果。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ACCURACY + PERF STATS -->
+<section style="padding: 4rem 0;">
+  <div class="container">
+    <div class="row g-4 text-center mb-5">
+      <div class="col-4">
+        <div class="stat-big green">174<span style="font-size:1.2rem">/174</span></div>
+        <div style="font-size:.8rem;color:var(--nes-muted);margin-top:.3rem" data-i18n="stat_blargg">blargg 測試通過</div>
+      </div>
+      <div class="col-4">
+        <div class="stat-big yellow">136<span style="font-size:1.2rem">/136</span></div>
+        <div style="font-size:.8rem;color:var(--nes-muted);margin-top:.3rem" data-i18n="stat_ac">AccuracyCoin 通過</div>
+      </div>
+      <div class="col-4">
+        <div class="stat-big blue">+50.7%</div>
+        <div style="font-size:.8rem;color:var(--nes-muted);margin-top:.3rem" data-i18n="stat_fps">效能改善</div>
+      </div>
+    </div>
+    <div class="row g-3">
+      <div class="col-12">
+        <h5 class="mb-3" data-i18n="perf_title">效能最佳化歷程（Mega Man 5, 20s headless benchmark）</h5>
+      </div>
+      <div class="col-md-6">
+        <div class="perf-bar-wrap mb-2">
+          <div class="perf-label" data-i18n="perf_base">基線（未最佳化）</div>
+          <div class="perf-bar"><div class="fill" style="width:66.4%;background:rgba(148,163,184,.4)"></div></div>
+          <div class="perf-val" style="color:var(--nes-muted)">181.70 FPS</div>
+        </div>
+        <div class="perf-bar-wrap mb-2">
+          <div class="perf-label">+ unsafe pointer / managed array</div>
+          <div class="perf-bar"><div class="fill" style="width:68.6%"></div></div>
+          <div class="perf-val">187.70 FPS <span style="color:var(--nes-muted)">(+3.3%)</span></div>
+        </div>
+        <div class="perf-bar-wrap mb-2">
+          <div class="perf-label">+ opcode dispatch table (Action[])</div>
+          <div class="perf-bar"><div class="fill" style="width:74.5%"></div></div>
+          <div class="perf-val">204.10 FPS <span style="color:var(--nes-muted)">(+12.3% total)</span></div>
+        </div>
+        <div class="perf-bar-wrap mb-2">
+          <div class="perf-label">+ remove inner loop branch</div>
+          <div class="perf-bar"><div class="fill" style="width:79.1%"></div></div>
+          <div class="perf-val">216.45 FPS <span style="color:var(--nes-muted)">(+19.1% total)</span></div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="perf-bar-wrap mb-2">
+          <div class="perf-label">+ DMA early-exit guard</div>
+          <div class="perf-bar"><div class="fill" style="width:83.1%"></div></div>
+          <div class="perf-val">227.40 FPS <span style="color:var(--nes-muted)">(+25.2% total)</span></div>
+        </div>
+        <div class="perf-bar-wrap mb-2">
+          <div class="perf-label">+ RAM read fast-path</div>
+          <div class="perf-bar"><div class="fill" style="width:85.4%"></div></div>
+          <div class="perf-val">233.75 FPS <span style="color:var(--nes-muted)">(+28.6% total)</span></div>
+        </div>
+        <div class="perf-bar-wrap mb-2">
+          <div class="perf-label">+ AggressiveInlining + local shadow</div>
+          <div class="perf-bar"><div class="fill" style="width:89.6%"></div></div>
+          <div class="perf-val">245.30 FPS <span style="color:var(--nes-muted)">(+35.0% total)</span></div>
+        </div>
+        <div class="perf-bar-wrap mb-2">
+          <div class="perf-label">+ delegate*&lt;void&gt;[] function pointer</div>
+          <div class="perf-bar"><div class="fill" style="width:90.6%"></div></div>
+          <div class="perf-val">247.95 FPS <span style="color:var(--nes-muted)">(+36.5% total)</span></div>
+        </div>
+        <div style="border-top:1px solid rgba(255,255,255,.1);margin:.6rem 0 .5rem;padding-top:.4rem;font-size:.75rem;color:var(--nes-muted)">⚙ <span data-i18n="perf_release_label">切換至 Release 組態</span></div>
+        <div class="perf-bar-wrap mb-2">
+          <div class="perf-label">+ <span data-i18n="perf_opt15">catchUp loop unroll（PPU/APU 3+1 展開）</span></div>
+          <div class="perf-bar"><div class="fill" style="width:92.1%"></div></div>
+          <div class="perf-val">252.00 FPS <span style="color:var(--nes-muted)">(+38.7% total)</span></div>
+        </div>
+        <div class="perf-bar-wrap mb-2">
+          <div class="perf-label">+ <span data-i18n="perf_opt16">sprite 0 hit range check 重排</span></div>
+          <div class="perf-bar"><div class="fill" style="width:94.6%"></div></div>
+          <div class="perf-val">~259.00 FPS <span style="color:var(--nes-muted)">(+42.5% total)</span></div>
+        </div>
+        <div class="perf-bar-wrap mb-2">
+          <div class="perf-label">+ <span data-i18n="perf_opt17">CPU switch → if/else（branch predictor）</span></div>
+          <div class="perf-bar"><div class="fill" style="width:96.7%"></div></div>
+          <div class="perf-val">~264.8 FPS <span style="color:var(--nes-muted)">(+45.7% total)</span></div>
+        </div>
+        <div class="perf-bar-wrap mb-2">
+          <div class="perf-label">+ <span data-i18n="perf_opt18">PPU switch → if/else（branch predictor）</span></div>
+          <div class="perf-bar"><div class="fill" style="width:98.7%"></div></div>
+          <div class="perf-val">~270.2 FPS <span style="color:var(--nes-muted)">(+48.7% total)</span></div>
+        </div>
+        <div class="perf-bar-wrap">
+          <div class="perf-label">+ <span data-i18n="perf_opt19">IO switch → segmented if/else（branch predictor）</span></div>
+          <div class="perf-bar"><div class="fill" style="width:100%"></div></div>
+          <div class="perf-val text-pass">~273.8 FPS <span style="color:var(--nes-muted)">(+50.7% total)</span></div>
+        </div>
+      </div>
+      <div class="col-12 mt-2">
+        <a href="perf.html" target="_blank" style="font-size:.83rem;color:var(--nes-accent)" data-i18n="perf_link">→ 完整效能分析技術研究</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- TEST REPORTS -->
+<section id="reports">
+  <div class="container">
+    <div class="text-center mb-4">
+      <h2 class="sec-title" data-i18n="rep_title">測試報告</h2>
+      <p class="sec-sub" data-i18n="rep_sub">所有測試均為自動化流程，結果含截圖存檔</p>
+    </div>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <a href="report/index.html" target="_blank" class="report-card">
+          <span class="ri">📊</span>
+          <div>
+            <h6 data-i18n="rc1_title">blargg 174 測試報告</h6>
+            <small data-i18n="rc1_desc">174 / 174 PASS — CPU、PPU、APU、DMA、Interrupt 全數通過</small>
+          </div>
+        </a>
+      </div>
+      <div class="col-md-6">
+        <a href="report/AccuracyCoin_report.html" target="_blank" class="report-card">
+          <span class="ri">🏆</span>
+          <div>
+            <h6 data-i18n="rc2_title">AccuracyCoin 136 測試報告</h6>
+            <small data-i18n="rc2_desc">136 / 136 PASS — 滿分通過，涵蓋 DMA 時序、PPU timing 等進階測試</small>
+          </div>
+        </a>
+      </div>
+      <div class="col-md-6">
+        <a href="report/methodology.html" target="_blank" class="report-card">
+          <span class="ri">📋</span>
+          <div>
+            <h6>Test Methodology (English)</h6>
+            <small data-i18n="rc3_desc">Testing tools, workflow, CRC verification, automated screenshot comparison</small>
+          </div>
+        </a>
+      </div>
+      <div class="col-md-6">
+        <a href="report/methodology_zh.html" target="_blank" class="report-card">
+          <span class="ri">📋</span>
+          <div>
+            <h6 data-i18n="rc4_title">測試流程說明（中文）</h6>
+            <small data-i18n="rc4_desc">測試工具、自動化流程、CRC 驗證、截圖比對說明</small>
+          </div>
+        </a>
+      </div>
+      <div class="col-md-6">
+        <a href="report/AccuracyCoin_methodology_zh.html" target="_blank" class="report-card">
+          <span class="ri">🎯</span>
+          <div>
+            <h6 data-i18n="rc5_title">AccuracyCoin 測試說明</h6>
+            <small data-i18n="rc5_desc">AccuracyCoin 136 項目分類解說與技術背景</small>
+          </div>
+        </a>
+      </div>
+      <div class="col-md-6">
+        <a href="report/AccuracyCoin_report_baseline.html" target="_blank" class="report-card">
+          <span class="ri">📈</span>
+          <div>
+            <h6 data-i18n="rc6_title">AccuracyCoin 基線比較報告</h6>
+            <small data-i18n="rc6_desc">修復前後的通過率演進，包含修復過程的詳細紀錄</small>
+          </div>
+        </a>
+      </div>
+      <div class="col-md-6">
+        <a href="report/TriCNES_report.html" target="_blank" class="report-card">
+          <span class="ri">🔬</span>
+          <div>
+            <h6 data-i18n="rc7_title">TriCNES 參考比較</h6>
+            <small data-i18n="rc7_desc">與 TriCNES 模擬器的準確度對照分析</small>
+          </div>
+        </a>
+      </div>
+      <div class="col-md-6">
+        <a href="legacy/AccuracyTests/AccuracyTests-report_20170224.htm" target="_blank" class="report-card">
+          <span class="ri">📜</span>
+          <div>
+            <h6 data-i18n="rc8_title">2017 歷史測試報告</h6>
+            <small data-i18n="rc8_desc">2017.02.24 版本的原始測試報告（歷史存檔）</small>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- GALLERY -->
+<section id="gallery">
+  <div class="container">
+    <div class="text-center mb-4">
+      <h2 class="sec-title" data-i18n="gal_title">遊戲截圖</h2>
+      <p class="sec-sub" data-i18n="gal_sub">支援 Mapper 0/1/2/3/4，涵蓋大多數經典遊戲</p>
+    </div>
+
+    <!-- Mapper 0 -->
+    <h6 class="mb-2 text-yellow">NROM — Mapper 0</h6>
+    <div class="gallery-grid mb-4">
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/1-1.png" loading="lazy"><span class="mapper-badge">M0</span></div>
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/1-2.png" loading="lazy"><span class="mapper-badge">M0</span></div>
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/4-1.png" loading="lazy"><span class="mapper-badge">M0</span></div>
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/4-2.png" loading="lazy"><span class="mapper-badge">M0</span></div>
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/3-1.png" loading="lazy"><span class="mapper-badge">M0</span></div>
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/3-2.png" loading="lazy"><span class="mapper-badge">M0</span></div>
+    </div>
+
+    <!-- Mapper 1 -->
+    <h6 class="mb-2 text-teal">MMC1 — Mapper 1</h6>
+    <div class="gallery-grid mb-4">
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/10-1.png" loading="lazy"><span class="mapper-badge">M1</span></div>
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/10-2.png" loading="lazy"><span class="mapper-badge">M1</span></div>
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/11-1.png" loading="lazy"><span class="mapper-badge">M1</span></div>
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/11-2.png" loading="lazy"><span class="mapper-badge">M1</span></div>
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/12-1.png" loading="lazy"><span class="mapper-badge">M1</span></div>
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/12-2.png" loading="lazy"><span class="mapper-badge">M1</span></div>
+    </div>
+
+    <!-- Mapper 2 -->
+    <h6 class="mb-2" style="color:#a78bfa">UNROM — Mapper 2</h6>
+    <div class="gallery-grid mb-4">
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/2-1.png" loading="lazy"><span class="mapper-badge">M2</span></div>
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/2-2.png" loading="lazy"><span class="mapper-badge">M2</span></div>
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/5-1.png" loading="lazy"><span class="mapper-badge">M2</span></div>
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/5-2.png" loading="lazy"><span class="mapper-badge">M2</span></div>
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/6-1.png" loading="lazy"><span class="mapper-badge">M2</span></div>
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/6-2.png" loading="lazy"><span class="mapper-badge">M2</span></div>
+    </div>
+
+    <!-- Mapper 3 -->
+    <h6 class="mb-2" style="color:#fb923c">CNROM — Mapper 3</h6>
+    <div class="gallery-grid mb-4">
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/7-1.png" loading="lazy"><span class="mapper-badge">M3</span></div>
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/7-2.png" loading="lazy"><span class="mapper-badge">M3</span></div>
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/8-1.png" loading="lazy"><span class="mapper-badge">M3</span></div>
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/8-2.png" loading="lazy"><span class="mapper-badge">M3</span></div>
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/9-1.png" loading="lazy"><span class="mapper-badge">M3</span></div>
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/9-2.png" loading="lazy"><span class="mapper-badge">M3</span></div>
+    </div>
+
+    <!-- Mapper 4 -->
+    <h6 class="mb-2 text-pass">MMC3 — Mapper 4</h6>
+    <div class="gallery-grid mb-2">
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/13-1.png" loading="lazy"><span class="mapper-badge">M4</span></div>
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/13-2.png" loading="lazy"><span class="mapper-badge">M4</span></div>
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/14-1.png" loading="lazy"><span class="mapper-badge">M4</span></div>
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/14-2.png" loading="lazy"><span class="mapper-badge">M4</span></div>
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/15-1.png" loading="lazy"><span class="mapper-badge">M4</span></div>
+      <div class="gallery-item" onclick="openLb(this)"><img src="legacy/pic/samples/15-2.png" loading="lazy"><span class="mapper-badge">M4</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- Lightbox -->
+<div id="lb" class="lb-overlay hidden" onclick="closeLb()">
+  <span class="lb-close" onclick="closeLb()">✕</span>
+  <img id="lb-img" src="">
+</div>
+
+<hr class="divider">
+
+<!-- HISTORY -->
+<section id="history">
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-5 mb-4 mb-lg-0">
+        <h2 class="sec-title" data-i18n="hist_title">開發歷史</h2>
+        <p class="sec-sub mb-0" data-i18n="hist_sub">從業餘學習到 cycle-accurate 精準度的演進歷程</p>
+      </div>
+      <div class="col-lg-7">
+        <div class="timeline">
+
+          <div class="tl-item">
+            <div class="tl-dot"></div>
+            <div class="tl-year">2015</div>
+            <div class="tl-title" data-i18n="tl1_t">重啟舊專案</div>
+            <div class="tl-desc" data-i18n="tl1_d">將未完成的 NES 模擬器重新啟動，目標是以學習和研究為主，理解 NES 硬體架構。</div>
+          </div>
+
+          <div class="tl-item">
+            <div class="tl-dot"></div>
+            <div class="tl-year">2016.10</div>
+            <div class="tl-title" data-i18n="tl2_t">首版發布 — Mapper 0</div>
+            <div class="tl-desc" data-i18n="tl2_d">第一個公開版本，支援 NROM (Mapper 0)。Sprite0Hit、SpriteOverflow flag 已實作，sprite/背景穿透正確。</div>
+          </div>
+
+          <div class="tl-item">
+            <div class="tl-dot"></div>
+            <div class="tl-year">2016.11</div>
+            <div class="tl-title" data-i18n="tl3_t">Mapper 擴充 + 介面完善</div>
+            <div class="tl-desc" data-i18n="tl3_d">加入 MMC1 (M1)、UNROM (M2)、CNROM (M3) 支援；SRAM 存檔；ZIP 讀取；介面設定項目。</div>
+          </div>
+
+          <div class="tl-item">
+            <div class="tl-dot"></div>
+            <div class="tl-year">2016.11.21</div>
+            <div class="tl-title" data-i18n="tl4_t">MMC3 + xBRZ Filter</div>
+            <div class="tl-desc" data-i18n="tl4_d">MMC3 (Mapper 4) 支援，整體遊戲相容度約 70%。xBRZ 2x/4x/6x 影像濾鏡加入，多核心加速。</div>
+          </div>
+
+          <div class="tl-item">
+            <div class="tl-dot"></div>
+            <div class="tl-year">2017.02</div>
+            <div class="tl-title" data-i18n="tl5_t">Scanline Filter + 暫停更新</div>
+            <div class="tl-desc" data-i18n="tl5_d">加入 NTSC Scanline Filter、YIQ color bleeding 效果，移除所有第三方依賴（單一 167KB EXE）。
+              版本暫停："I will be back."</div>
+          </div>
+
+          <div class="tl-item">
+            <div class="tl-dot highlight"></div>
+            <div class="tl-year">2026.02</div>
+            <div class="tl-title" data-i18n="tl6_t">AI 輔助復活 — APU + 精準時序</div>
+            <div class="tl-desc" data-i18n="tl6_d">以 Claude AI 協作全面重建：APU 五聲道音效完成、VBL/NMI 精確時序、CPU interrupt 修正、
+              Sprite timing 修正，通過 blargg 全部測試。</div>
+          </div>
+
+          <div class="tl-item">
+            <div class="tl-dot highlight"></div>
+            <div class="tl-year">2026.03</div>
+            <div class="tl-title" data-i18n="tl7_t">Cycle-Accurate 達成 — 效能最佳化</div>
+            <div class="tl-desc" data-i18n="tl7_d">AccuracyCoin 136/136 滿分達成（DMA timing、per-dot sprite eval、PPU rendering 精準修正）。
+              效能最佳化 +50.7%（181→273.8 FPS）。</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ROADMAP -->
+<section id="roadmap">
+  <div class="container">
+    <div class="text-center mb-5">
+      <h2 class="sec-title" data-i18n="road_title">Roadmap</h2>
+      <p class="sec-sub" data-i18n="road_sub">AprNes 的未來發展方向</p>
+    </div>
+    <div class="row g-3">
+
+      <div class="col-md-6 col-lg-3">
+        <div class="road-card">
+          <div class="phase phase-now" data-i18n="phase_now">▶ 進行中</div>
+          <h6 data-i18n="road1_t">效能持續改善</h6>
+          <ul>
+            <li data-i18n="road1_1">Release JIT / NativeAOT 測試</li>
+            <li data-i18n="road1_2">Release PGO / NativeAOT 研究</li>
+            <li data-i18n="road1_3">SIMD 化 framebuffer 操作</li>
+            <li data-i18n="road1_4">持續 benchmark 追蹤</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="col-md-6 col-lg-3">
+        <div class="road-card">
+          <div class="phase phase-near" data-i18n="phase_near">◎ 近期計畫</div>
+          <h6 data-i18n="road2_t">Mapper 擴充</h6>
+          <ul>
+            <li>VRC6 / VRC7 (Konami)</li>
+            <li>FDS (Famicom Disk System)</li>
+            <li>Namco 163</li>
+            <li data-i18n="road2_4">更多精準 IRQ 時序修正</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="col-md-6 col-lg-3">
+        <div class="road-card">
+          <div class="phase phase-near" data-i18n="phase_near2">◎ 近期計畫</div>
+          <h6 data-i18n="road3_t">NesCore Library</h6>
+          <ul>
+            <li data-i18n="road3_1">抽離 NesCore 為獨立模組</li>
+            <li data-i18n="road3_2">設計友善的公開 API</li>
+            <li>NuGet 套件發布</li>
+            <li data-i18n="road3_4">開發者文件與範例</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="col-md-6 col-lg-3">
+        <div class="road-card">
+          <div class="phase phase-future" data-i18n="phase_fut">◇ 中長期</div>
+          <h6 data-i18n="road4_t">Web 版支援</h6>
+          <ul>
+            <li data-i18n="road4_1">WebAssembly / Blazor 移植</li>
+            <li data-i18n="road4_2">瀏覽器直接遊玩</li>
+            <li data-i18n="road4_3">線上 ROM 測試工具</li>
+            <li data-i18n="road4_4">雲端測試報告</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="col-md-6 col-lg-3">
+        <div class="road-card">
+          <div class="phase phase-future" data-i18n="phase_fut2">◇ 中長期</div>
+          <h6 data-i18n="road5_t">多平台移植</h6>
+          <ul>
+            <li data-i18n="road5_1">Linux / macOS 支援</li>
+            <li data-i18n="road5_2">Android / iOS App</li>
+            <li data-i18n="road5_3">.NET MAUI 跨平台 UI</li>
+            <li data-i18n="road5_4">Raspberry Pi / 嵌入式</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="col-md-6 col-lg-3">
+        <div class="road-card">
+          <div class="phase phase-future" data-i18n="phase_fut3">◇ 中長期</div>
+          <h6 data-i18n="road6_t">UI / 功能優化</h6>
+          <ul>
+            <li data-i18n="road6_1">現代化介面重設計</li>
+            <li data-i18n="road6_2">遊戲庫管理</li>
+            <li data-i18n="road6_3">即時存檔 / 回溯</li>
+            <li data-i18n="road6_4">網路對戰（Netplay）</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="col-md-6 col-lg-3">
+        <div class="road-card">
+          <div class="phase phase-vision" data-i18n="phase_vis">✦ 願景</div>
+          <h6 data-i18n="road7_t">教學 / 研究平台</h6>
+          <ul>
+            <li data-i18n="road7_1">NES 硬體教學文件</li>
+            <li data-i18n="road7_2">模擬器開發入門教程</li>
+            <li data-i18n="road7_3">Issue 驅動社群研究</li>
+            <li data-i18n="road7_4">AI 協作開發方法論</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="col-md-6 col-lg-3">
+        <div class="road-card">
+          <div class="phase phase-vision" data-i18n="phase_vis2">✦ 願景</div>
+          <h6 data-i18n="road8_t">AI 整合深化</h6>
+          <ul>
+            <li data-i18n="road8_1">AI 自動化 bug 分析流程</li>
+            <li data-i18n="road8_2">LLM 驅動的 test ROM 解析</li>
+            <li data-i18n="road8_3">自動效能回歸偵測</li>
+            <li data-i18n="road8_4">AI pair programming 方法分享</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ACKNOWLEDGEMENTS -->
+<section id="ack">
+  <div class="container">
+    <div class="text-center mb-5">
+      <h2 class="sec-title" data-i18n="ack_title">致謝</h2>
+      <p class="sec-sub" data-i18n="ack_sub">AprNes 的發展受益於 NES 社群多年來積累的文獻、工具與開放精神</p>
+    </div>
+    <div class="row g-3">
+
+      <div class="col-md-6 col-lg-4">
+        <div class="ack-card">
+          <h6 data-i18n="ack1_t">測試 ROM 作者</h6>
+          <ul>
+            <li><a href="https://www.nesdev.org/wiki/Emulator_tests" target="_blank">blargg (Shay Green)</a> — cpu_interrupts, instr_test, ppu_vbl_nmi, apu_test 等 174 個測試 ROM</li>
+            <li><a href="https://github.com/100thCoin/AccuracyCoin" target="_blank">100thCoin</a> — AccuracyCoin 136 項精準度測試套件</li>
+            <li>lidnariq — sprdma_and_dmc_dma</li>
+            <li>quietust — dmc_dma_during_read4</li>
+            <li>NESdev Forum 社群 — 各式邊界測試 ROM</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="col-md-6 col-lg-4">
+        <div class="ack-card">
+          <h6 data-i18n="ack2_t">硬體文件與知識來源</h6>
+          <ul>
+            <li><a href="https://www.nesdev.org/wiki/Nesdev_Wiki" target="_blank">NESdev Wiki</a> — NES 硬體規格最完整的公開文件庫</li>
+            <li><a href="http://problemkaputt.de/everynes.htm" target="_blank">EveryNES (nocash)</a> — NES/FC 硬體手冊</li>
+            <li><a href="http://nesdev.com/NESDoc.pdf" target="_blank">NESDoc</a> — NES 入門文件</li>
+            <li><a href="http://nesdev.com/6502.txt" target="_blank">6502 Spec</a> — MOS 6502 CPU 規格</li>
+            <li>NESdev Forum — DMA timing、APU、PPU 深度討論</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="col-md-6 col-lg-4">
+        <div class="ack-card">
+          <h6 data-i18n="ack3_t">參考專案</h6>
+          <ul>
+            <li><a href="https://github.com/SourMesen/Mesen2" target="_blank">Mesen2</a> — 高精準度參考模擬器，DMA / PPU 時序研究基礎</li>
+            <li><a href="https://github.com/100thCoin/TriCNES" target="_blank">TriCNES</a> — AccuracyCoin 136/136 滿分參考實作</li>
+            <li><a href="https://github.com/scottferg/Fergulator" target="_blank">Fergulator</a> — PPU rendering / timing 初期參考（Go）</li>
+            <li><a href="https://sourceforge.net/projects/mynes/" target="_blank">MyNes</a> — PPU memory access / CPU 修正參考（C#）</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="col-md-6 col-lg-4">
+        <div class="ack-card">
+          <h6 data-i18n="ack4_t">圖像與素材</h6>
+          <ul>
+            <li><a href="https://github.com/atheros/xbrzscale" target="_blank">xBRZ</a> — 高品質像素藝術放大算法（Hyllian / Zenju）</li>
+            <li><a href="http://www.easyicon.net" target="_blank">EasyIcon</a> — 程式 Icon 圖示來源</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="col-md-6 col-lg-4">
+        <div class="ack-card">
+          <h6 data-i18n="ack5_t">AI 協作工具</h6>
+          <ul>
+            <li><a href="https://claude.ai" target="_blank">Anthropic Claude</a> — 主要 AI 協作夥伴（Claude Sonnet 4.6）</li>
+            <li><a href="https://github.com/anthropics/claude-code" target="_blank">Claude Code</a> — AI-driven 開發工具，驅動整個 2026 重建流程</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="col-md-6 col-lg-4">
+        <div class="ack-card">
+          <h6 data-i18n="ack6_t">開放原始碼社群</h6>
+          <ul>
+            <li data-i18n="ack6_1">感謝所有在 NESdev Forum 上無私分享知識的研究者</li>
+            <li data-i18n="ack6_2">感謝提供測試回饋的使用者</li>
+            <li data-i18n="ack6_3">感謝所有讓這個小小模擬器能夠持續演進的一切</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- DOWNLOAD -->
+<section id="download">
+  <div class="container">
+    <div class="text-center mb-4">
+      <h2 class="sec-title" data-i18n="dl_title">下載</h2>
+      <p class="sec-sub" data-i18n="dl_sub">需要 .NET Framework 4.8.1 或以上執行環境</p>
+    </div>
+
+    <div class="d-flex flex-column gap-2" style="max-width:700px;margin:0 auto">
+
+      <div class="dl-row" style="border-color:var(--nes-teal)">
+        <div>
+          <div class="ver text-teal" data-i18n="dl1_ver">2026.03.15 — 最新版</div>
+          <div class="note" data-i18n="dl1_note">效能最佳化 +50.7%（181→273.8 FPS）、19 項優化、CPU/PPU/IO switch→if/else branch predictor 改善。blargg 174/174 + AccuracyCoin 136/136 通過。</div>
+        </div>
+        <a href="file/AprNes-20260314.7z" class="btn-dl" data-i18n="dl_btn">下載 .7z</a>
+      </div>
+
+      <div class="dl-row">
+        <div>
+          <div class="ver" data-i18n="dl2_ver">2026.03.03</div>
+          <div class="note" data-i18n="dl2_note">xinput / DirectInput 相容性修正。blargg 174/174 + AccuracyCoin 136/136 通過。</div>
+        </div>
+        <a href="legacy/files/AprNes-20260303.7z" class="btn-dl old" data-i18n="dl_btn2">下載</a>
+      </div>
+
+      <div class="dl-row">
+        <div>
+          <div class="ver" data-i18n="dl3_ver">2026.02.23</div>
+          <div class="note" data-i18n="dl3_note">blargg 174/174 全數通過版本。</div>
+        </div>
+        <a href="legacy/files/AprNes-20260223.7z" class="btn-dl old" data-i18n="dl_btn2">下載</a>
+      </div>
+
+      <div class="dl-row">
+        <div>
+          <div class="ver" data-i18n="dl4_ver">2026.02.21</div>
+          <div class="note" data-i18n="dl4_note">APU 音效加入版本，Super Mario Bros 3 畫面修正。</div>
+        </div>
+        <a href="legacy/files/AprNes-20260221.7z" class="btn-dl old" data-i18n="dl_btn2">下載</a>
+      </div>
+
+      <div class="dl-row">
+        <div>
+          <div class="ver text-muted" data-i18n="dl5_ver">2017.02.24 — 歷史版</div>
+          <div class="note" data-i18n="dl5_note">Scanline Filter、移除第三方依賴，單一 167KB EXE。</div>
+        </div>
+        <a href="legacy/files/AprNes-20170224-1.7z" class="btn-dl old" data-i18n="dl_btn2">下載</a>
+      </div>
+    </div>
+
+    <p class="text-center mt-3" style="font-size:.82rem;color:var(--nes-muted)">
+      <span data-i18n="dl_req">需要 </span>
+      <a href="https://dotnet.microsoft.com/en-us/download/dotnet-framework/net481" target="_blank">.NET Framework 4.8.1</a>
+      <span data-i18n="dl_req2"> 執行環境 | Windows 10/11</span>
+    </p>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- SPONSOR -->
+<section id="sponsor" style="padding:3.5rem 0">
+  <div class="container">
+    <div class="sponsor-box">
+      <div style="font-size:2.5rem;margin-bottom:.5rem">☕</div>
+      <h4 class="mb-2 fw-700" data-i18n="bmc_title">支持這個專案</h4>
+      <p style="color:var(--nes-muted);font-size:.9rem;max-width:500px;margin:.5rem auto 1.5rem" data-i18n="bmc_desc">
+        AprNes 是個人業餘開源專案，如果你覺得這個模擬器有趣、研究內容有幫助，歡迎請我喝杯咖啡！
+      </p>
+      <a href="https://buymeacoffee.com/baxermux" target="_blank" class="bmc-btn">
+        <span class="coffee">☕</span>
+        Buy me a coffee
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="row align-items-center">
+      <div class="col-md-6 mb-2 mb-md-0">
+        <strong class="text-yellow">AprNes</strong>
+        <span style="margin:0 .5rem;opacity:.3">|</span>
+        <span data-i18n="footer_by">by erspicu_brox</span>
+        <span style="margin:0 .5rem;opacity:.3">|</span>
+        <a href="https://github.com/erspicu/AprNes" target="_blank">GitHub</a>
+      </div>
+      <div class="col-md-6 text-md-end">
+        <a href="legacy/index.html" target="_blank" data-i18n="footer_legacy">
+          🕹️ 舊版網站（2017 年版）
+        </a>
+        <span style="margin:0 .5rem;opacity:.3">|</span>
+        <a href="report/index.html" target="_blank" data-i18n="footer_rep">測試報告</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="libs/bootstrap.bundle.min.js"></script>
+<script>
+// ─── i18n ───────────────────────────────────────────────────────────────
+const LANG = {
+  zh: {
+    nav_feat:'特色', nav_rep:'測試報告', nav_gal:'截圖', nav_hist:'歷史',
+    nav_road:'Roadmap', nav_ack:'致謝', nav_dl:'下載',
+    badge_acc:'cycle-accurate', badge_perf:'效能 +50.7%', badge_ai:'AI 輔助開發',
+    hero_sub:'C# 實作的任天堂紅白機模擬器，以 cycle-accurate 精準度為目標，通過業界最嚴格的測試驗證，並運用 AI 協作持續演進。',
+    hero_dl:'下載最新版', hero_rep:'查看測試報告',
+    feat_title:'核心特色', feat_sub:'從硬體文件出發，逐一實作每個 NES 子系統的精確行為',
+    f1_title:'Cycle-Accurate 時序',
+    f1_desc:'CPU、PPU、APU 全部以 per-cycle 精度模擬。每次記憶體存取觸發精確的 tick 計時，NMI/IRQ 延遲、DMA 週期偷取等細節均符合真實硬體行為。',
+    f2_title:'完整 DMA 模擬',
+    f2_desc:'OAM DMA 514 cycle、DMC 週期偷取（3–4 cycle）、phantom read、implicit abort 等所有 DMA 時序邊界情況均正確實作，通過最嚴苛的 DMA 測試 ROM。',
+    f3_title:'APU 五聲道音效',
+    f3_desc:'Pulse×2、Triangle、Noise、DMC 完整實作。自製 WaveOut 輸出（winmm.dll），44100Hz 16-bit，無任何第三方音效套件依賴。',
+    f4_title:'AI 協作開發',
+    f4_desc:'以 AI 輔助研究 NES 硬體行為、分析測試 ROM 失敗原因、設計修復方案、效能最佳化。探索 AI-driven 嵌入式系統模擬開發的可行邊界。',
+    f5_title:'自動化測試流程',
+    f5_desc:'174 個 blargg test ROM + 136 個 AccuracyCoin 測試全自動化。截圖比對、CRC 驗證、headless 批次執行，每次 commit 均有正確性保障。',
+    f6_title:'效能最佳化研究',
+    f6_desc:'從 181 FPS 提升至 ~273.8 FPS（+50.7%）。19 項成功最佳化，涵蓋 unsafe pointer、函式指標表、JIT AggressiveInlining、early-exit guard、Release 組態 loop unroll、switch→if/else（CPU/PPU/IO）等技巧。',
+    f7_title:'多 Mapper 支援',
+    f7_desc:'支援 Mapper 0/1/2/3/4（MMC3）/5（MMC5）/7/11/66/71，涵蓋市場上約 90% 的 NES 遊戲。MMC3 含完整 IRQ A12 上升沿時序。',
+    f8_title:'畫面 Scaler Filter',
+    f8_desc:'xBRZ 2x/4x/6x 高品質影像放大濾鏡，多核心平行加速。內建 NTSC CRT 比例修正與 YIQ color bleeding 模擬效果。',
+    stat_blargg:'blargg 測試通過', stat_ac:'AccuracyCoin 通過', stat_fps:'效能改善',
+    perf_title:'效能最佳化歷程（Mega Man 5, 20s headless benchmark）',
+    perf_base:'基線（未最佳化）', perf_link:'→ 完整效能分析技術研究',
+    perf_release_label:'切換至 Release 組態',
+    perf_opt15:'catchUp loop unroll（PPU/APU 3+1 展開）',
+    perf_opt16:'sprite 0 hit range check 重排',
+    perf_opt17:'CPU switch → if/else（branch predictor）',
+    perf_opt18:'PPU switch → if/else（branch predictor）',
+    perf_opt19:'IO switch → 三段式 if/else（branch predictor）',
+    rep_title:'測試報告', rep_sub:'所有測試均為自動化流程，結果含截圖存檔',
+    rc1_title:'blargg 174 測試報告', rc1_desc:'174 / 174 PASS — CPU、PPU、APU、DMA、Interrupt 全數通過',
+    rc2_title:'AccuracyCoin 136 測試報告', rc2_desc:'136 / 136 PASS — 滿分通過，涵蓋 DMA 時序、PPU timing 等進階測試',
+    rc3_desc:'Testing tools, workflow, CRC verification, automated screenshot comparison',
+    rc4_title:'測試流程說明（中文）', rc4_desc:'測試工具、自動化流程、CRC 驗證、截圖比對說明',
+    rc5_title:'AccuracyCoin 測試說明', rc5_desc:'AccuracyCoin 136 項目分類解說與技術背景',
+    rc6_title:'AccuracyCoin 基線比較報告', rc6_desc:'修復前後的通過率演進，包含修復過程的詳細紀錄',
+    rc7_title:'TriCNES 參考比較', rc7_desc:'與 TriCNES 模擬器的準確度對照分析',
+    rc8_title:'2017 歷史測試報告', rc8_desc:'2017.02.24 版本的原始測試報告（歷史存檔）',
+    gal_title:'遊戲截圖', gal_sub:'支援 Mapper 0/1/2/3/4，涵蓋大多數經典遊戲',
+    hist_title:'開發歷史', hist_sub:'從業餘學習到 cycle-accurate 精準度的演進歷程',
+    tl1_t:'重啟舊專案', tl1_d:'將未完成的 NES 模擬器重新啟動，目標是以學習和研究為主，理解 NES 硬體架構。',
+    tl2_t:'首版發布 — Mapper 0', tl2_d:'第一個公開版本，支援 NROM (Mapper 0)。Sprite0Hit、SpriteOverflow flag 已實作，sprite/背景穿透正確。',
+    tl3_t:'Mapper 擴充 + 介面完善', tl3_d:'加入 MMC1 (M1)、UNROM (M2)、CNROM (M3) 支援；SRAM 存檔；ZIP 讀取；介面設定項目。',
+    tl4_t:'MMC3 + xBRZ Filter', tl4_d:'MMC3 (Mapper 4) 支援，整體遊戲相容度約 70%。xBRZ 2x/4x/6x 影像濾鏡加入，多核心加速。',
+    tl5_t:'Scanline Filter + 暫停更新', tl5_d:'加入 NTSC Scanline Filter、YIQ color bleeding 效果，移除所有第三方依賴（單一 167KB EXE）。版本暫停："I will be back."',
+    tl6_t:'AI 輔助復活 — APU + 精準時序', tl6_d:'以 Claude AI 協作全面重建：APU 五聲道音效完成、VBL/NMI 精確時序、CPU interrupt 修正、Sprite timing 修正，通過 blargg 全部測試。',
+    tl7_t:'Cycle-Accurate 達成 — 效能最佳化', tl7_d:'AccuracyCoin 136/136 滿分達成（DMA timing、per-dot sprite eval、PPU rendering 精準修正）。效能最佳化 +50.7%（181→273.8 FPS）。',
+    road_title:'Roadmap', road_sub:'AprNes 的未來發展方向',
+    phase_now:'▶ 進行中', phase_near:'◎ 近期計畫', phase_near2:'◎ 近期計畫',
+    phase_fut:'◇ 中長期', phase_fut2:'◇ 中長期', phase_fut3:'◇ 中長期',
+    phase_vis:'✦ 願景', phase_vis2:'✦ 願景',
+    road1_t:'效能持續改善', road1_1:'Release JIT / NativeAOT 測試', road1_2:'Release PGO / NativeAOT 研究', road1_3:'SIMD 化 framebuffer 操作', road1_4:'持續 benchmark 追蹤',
+    road2_t:'Mapper 擴充', road2_4:'更多精準 IRQ 時序修正',
+    road3_t:'NesCore Library', road3_1:'抽離 NesCore 為獨立模組', road3_2:'設計友善的公開 API', road3_4:'開發者文件與範例',
+    road4_t:'Web 版支援', road4_1:'WebAssembly / Blazor 移植', road4_2:'瀏覽器直接遊玩', road4_3:'線上 ROM 測試工具', road4_4:'雲端測試報告',
+    road5_t:'多平台移植', road5_1:'Linux / macOS 支援', road5_2:'Android / iOS App', road5_3:'.NET MAUI 跨平台 UI', road5_4:'Raspberry Pi / 嵌入式',
+    road6_t:'UI / 功能優化', road6_1:'現代化介面重設計', road6_2:'遊戲庫管理', road6_3:'即時存檔 / 回溯', road6_4:'網路對戰（Netplay）',
+    road7_t:'教學 / 研究平台', road7_1:'NES 硬體教學文件', road7_2:'模擬器開發入門教程', road7_3:'Issue 驅動社群研究', road7_4:'AI 協作開發方法論',
+    road8_t:'AI 整合深化', road8_1:'AI 自動化 bug 分析流程', road8_2:'LLM 驅動的 test ROM 解析', road8_3:'自動效能回歸偵測', road8_4:'AI pair programming 方法分享',
+    ack_title:'致謝', ack_sub:'AprNes 的發展受益於 NES 社群多年來積累的文獻、工具與開放精神',
+    ack1_t:'測試 ROM 作者', ack2_t:'硬體文件與知識來源', ack3_t:'參考專案',
+    ack4_t:'圖像與素材', ack5_t:'AI 協作工具', ack6_t:'開放原始碼社群',
+    ack6_1:'感謝所有在 NESdev Forum 上無私分享知識的研究者',
+    ack6_2:'感謝提供測試回饋的使用者',
+    ack6_3:'感謝所有讓這個小小模擬器能夠持續演進的一切',
+    dl_title:'下載', dl_sub:'需要 .NET Framework 4.8.1 或以上執行環境',
+    dl1_ver:'2026.03.15 — 最新版', dl1_note:'效能最佳化 +50.7%（181→273.8 FPS）、19 項優化、CPU/PPU/IO switch→if/else branch predictor 改善。blargg 174/174 + AccuracyCoin 136/136 通過。',
+    dl2_ver:'2026.03.03', dl2_note:'xinput / DirectInput 相容性修正。blargg 174/174 + AccuracyCoin 136/136 通過。',
+    dl3_ver:'2026.02.23', dl3_note:'blargg 174/174 全數通過版本。',
+    dl4_ver:'2026.02.21', dl4_note:'APU 音效加入版本，Super Mario Bros 3 畫面修正。',
+    dl5_ver:'2017.02.24 — 歷史版', dl5_note:'Scanline Filter、移除第三方依賴，單一 167KB EXE。',
+    dl_btn:'下載 .7z', dl_btn2:'下載',
+    dl_req:'需要 ', dl_req2:' 執行環境 | Windows 10 22H2 / Windows 11',
+    bmc_title:'支持這個專案',
+    bmc_desc:'AprNes 是個人業餘開源專案，如果你覺得這個模擬器有趣、研究內容有幫助，歡迎請我喝杯咖啡！',
+    footer_by:'by erspicu_brox', footer_legacy:'🕹️ 舊版網站（2017 年版）', footer_rep:'測試報告',
+  },
+  en: {
+    nav_feat:'Features', nav_rep:'Reports', nav_gal:'Gallery', nav_hist:'History',
+    nav_road:'Roadmap', nav_ack:'Credits', nav_dl:'Download',
+    badge_acc:'cycle-accurate', badge_perf:'Performance +50.7%', badge_ai:'AI-assisted',
+    hero_sub:'A Nintendo NES emulator written in C#, targeting cycle-accurate precision. Passes the most rigorous test suites, continuously evolving through AI collaboration.',
+    hero_dl:'Download Latest', hero_rep:'View Test Reports',
+    feat_title:'Core Features', feat_sub:'Built from hardware documentation — every NES subsystem implemented with precision.',
+    f1_title:'Cycle-Accurate Timing',
+    f1_desc:'CPU, PPU, and APU all simulated at per-cycle granularity. Every memory access triggers precise tick timing. NMI/IRQ delays, DMA cycle stealing — all match real hardware.',
+    f2_title:'Full DMA Emulation',
+    f2_desc:'OAM DMA (514 cycles), DMC cycle stealing (3–4 cycles), phantom reads, implicit aborts — all edge cases correctly implemented, verified by the strictest DMA test ROMs.',
+    f3_title:'5-Channel APU Audio',
+    f3_desc:'Pulse×2, Triangle, Noise, and DMC fully implemented. Custom WaveOut output via winmm.dll, 44100Hz 16-bit. Zero third-party audio dependencies.',
+    f4_title:'AI-Assisted Development',
+    f4_desc:'Claude AI helps research NES hardware, analyze test ROM failures, design fixes, and optimize performance — exploring the frontier of AI-driven emulator development.',
+    f5_title:'Automated Test Pipeline',
+    f5_desc:'174 blargg ROMs + 136 AccuracyCoin tests, fully automated. Screenshot comparison, CRC verification, headless batch runs — correctness guaranteed per commit.',
+    f6_title:'Performance Research',
+    f6_desc:'181 → ~273.8 FPS (+50.7%). 19 successful optimizations: unsafe pointers, function pointer tables, JIT AggressiveInlining, early-exit guards, Release build loop unrolling, switch→if/else (CPU+PPU+IO).',
+    f7_title:'Multi-Mapper Support',
+    f7_desc:'Mapper 0/1/2/3/4(MMC3)/5(MMC5)/7/11/66/71 — covering ~90% of NES titles. MMC3 includes full IRQ A12 rising-edge timing.',
+    f8_title:'Image Scaler Filters',
+    f8_desc:'xBRZ 2x/4x/6x high-quality upscaling, multi-core parallel acceleration. Built-in NTSC CRT aspect correction and YIQ color bleeding simulation.',
+    stat_blargg:'blargg Tests Passed', stat_ac:'AccuracyCoin Passed', stat_fps:'Performance Gain',
+    perf_title:'Performance Optimization History (Mega Man 5, 20s headless benchmark)',
+    perf_base:'Baseline (unoptimized)', perf_link:'→ Full Performance Analysis Technical Study',
+    perf_release_label:'Switched to Release build',
+    perf_opt15:'catchUp loop unroll (PPU/APU 3+1 unrolled)',
+    perf_opt16:'sprite 0 hit range check reorder',
+    perf_opt17:'CPU switch → if/else (branch predictor)',
+    perf_opt18:'PPU switch → if/else (branch predictor)',
+    perf_opt19:'IO switch → segmented if/else (branch predictor)',
+    rep_title:'Test Reports', rep_sub:'All tests are fully automated with screenshot archiving.',
+    rc1_title:'blargg 174 Test Report', rc1_desc:'174 / 174 PASS — CPU, PPU, APU, DMA, Interrupt all passed',
+    rc2_title:'AccuracyCoin 136 Test Report', rc2_desc:'136 / 136 PASS — Perfect score: DMA timing, PPU timing, and more',
+    rc3_desc:'Testing tools, workflow, CRC verification, automated screenshot comparison',
+    rc4_title:'Test Methodology (Chinese)', rc4_desc:'Testing tools, workflow, CRC verification, screenshot comparison',
+    rc5_title:'AccuracyCoin Methodology', rc5_desc:'Category breakdown and technical background of all 136 AccuracyCoin tests',
+    rc6_title:'AccuracyCoin Baseline Comparison', rc6_desc:'Pass rate progression before/after fixes, with detailed fix history',
+    rc7_title:'TriCNES Comparison Report', rc7_desc:'Accuracy comparison analysis against TriCNES emulator',
+    rc8_title:'2017 Legacy Test Report', rc8_desc:'Original test report for the 2017.02.24 release (archived)',
+    gal_title:'Game Screenshots', gal_sub:'Mapper 0/1/2/3/4 support covers most classic NES titles.',
+    hist_title:'Development History', hist_sub:'From hobbyist learning to cycle-accurate precision.',
+    tl1_t:'Project Restart', tl1_d:'Restarted an unfinished NES emulator project, primarily as a learning exercise to understand NES hardware architecture.',
+    tl2_t:'First Release — Mapper 0', tl2_d:'First public release with NROM (Mapper 0) support. Sprite0Hit, SpriteOverflow flags implemented, sprite/background transparency correct.',
+    tl3_t:'Mapper Expansion + UI', tl3_d:'Added MMC1 (M1), UNROM (M2), CNROM (M3); SRAM save; ZIP loading; configuration UI.',
+    tl4_t:'MMC3 + xBRZ Filter', tl4_d:'MMC3 (Mapper 4) support, ~70% game compatibility. xBRZ 2x/4x/6x image filters with multi-core acceleration.',
+    tl5_t:'Scanline Filter + Hiatus', tl5_d:'Added NTSC scanline filter, YIQ color bleeding. Removed all third-party dependencies (single 167KB EXE). Hiatus: "I will be back."',
+    tl6_t:'AI Revival — APU + Accurate Timing', tl6_d:'Rebuilt with Claude AI: 5-channel APU audio, precise VBL/NMI timing, CPU interrupt fixes, sprite timing corrections. All blargg tests pass.',
+    tl7_t:'Cycle-Accurate + Performance', tl7_d:'AccuracyCoin 136/136 perfect score (DMA timing, per-dot sprite eval, PPU rendering). Performance +50.7% (181→273.8 FPS).',
+    road_title:'Roadmap', road_sub:"AprNes' future development directions.",
+    phase_now:'▶ In Progress', phase_near:'◎ Near-term', phase_near2:'◎ Near-term',
+    phase_fut:'◇ Mid-term', phase_fut2:'◇ Mid-term', phase_fut3:'◇ Mid-term',
+    phase_vis:'✦ Vision', phase_vis2:'✦ Vision',
+    road1_t:'Performance Improvements', road1_1:'Release JIT / NativeAOT benchmarks', road1_2:'Release PGO / NativeAOT research', road1_3:'SIMD framebuffer ops', road1_4:'Ongoing benchmark tracking',
+    road2_t:'Mapper Expansion', road2_4:'More precise IRQ timing fixes',
+    road3_t:'NesCore Library', road3_1:'Extract NesCore as standalone module', road3_2:'Design clean public API', road3_4:'Developer docs & samples',
+    road4_t:'Web Support', road4_1:'WebAssembly / Blazor port', road4_2:'Play in browser', road4_3:'Online ROM testing tool', road4_4:'Cloud test reports',
+    road5_t:'Cross-Platform', road5_1:'Linux / macOS support', road5_2:'Android / iOS App', road5_3:'.NET MAUI cross-platform UI', road5_4:'Raspberry Pi / embedded',
+    road6_t:'UI / UX Improvements', road6_1:'Modern interface redesign', road6_2:'Game library management', road6_3:'Save states / rewind', road6_4:'Netplay',
+    road7_t:'Research & Education', road7_1:'NES hardware tutorials', road7_2:'Emulator dev beginner guides', road7_3:'Issue-driven community research', road7_4:'AI co-development methodology',
+    road8_t:'Deeper AI Integration', road8_1:'AI-automated bug analysis', road8_2:'LLM-driven test ROM analysis', road8_3:'Auto performance regression detection', road8_4:'AI pair programming methodology sharing',
+    ack_title:'Acknowledgements', ack_sub:'AprNes benefits from decades of NES community documentation, tools, and open spirit.',
+    ack1_t:'Test ROM Authors', ack2_t:'Hardware Docs & References', ack3_t:'Reference Projects',
+    ack4_t:'Graphics & Assets', ack5_t:'AI Collaboration Tools', ack6_t:'Open Source Community',
+    ack6_1:'Thanks to all researchers sharing knowledge on NESdev Forum',
+    ack6_2:'Thanks to users who provided testing feedback',
+    ack6_3:'Thanks to everything that keeps this little emulator evolving',
+    dl_title:'Download', dl_sub:'Requires .NET Framework 4.8.1 or later',
+    dl1_ver:'2026.03.15 — Latest', dl1_note:'Performance +50.7% (181→273.8 FPS), 19 optimizations, CPU+PPU+IO switch→if/else. blargg 174/174 + AccuracyCoin 136/136 passed.',
+    dl2_ver:'2026.03.03', dl2_note:'xinput / DirectInput compatibility fix. blargg 174/174 + AccuracyCoin 136/136 passed.',
+    dl3_ver:'2026.02.23', dl3_note:'Version with all blargg 174/174 tests passing.',
+    dl4_ver:'2026.02.21', dl4_note:'APU audio added, Super Mario Bros 3 rendering fix.',
+    dl5_ver:'2017.02.24 — Legacy', dl5_note:'Scanline filter, no third-party deps, single 167KB EXE.',
+    dl_btn:'Download .7z', dl_btn2:'Download',
+    dl_req:'Requires ', dl_req2:' runtime | Windows 10 22H2 / Windows 11',
+    bmc_title:'Support This Project',
+    bmc_desc:"AprNes is a personal open-source hobby project. If you find the emulator interesting or the research helpful, feel free to buy me a coffee!",
+    footer_by:'by erspicu_brox', footer_legacy:'🕹️ Legacy Site (2017 version)', footer_rep:'Test Reports',
+  }
+};
+
+let curLang = 'zh';
+
+function applyLang(lang) {
+  const d = LANG[lang];
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const k = el.getAttribute('data-i18n');
+    if (d[k] !== undefined) el.textContent = d[k];
+  });
+  document.documentElement.lang = lang === 'zh' ? 'zh-TW' : 'en';
+  document.getElementById('lang-btn').textContent = lang === 'zh' ? 'EN' : '中文';
+}
+
+function toggleLang() {
+  curLang = curLang === 'zh' ? 'en' : 'zh';
+  applyLang(curLang);
+}
+
+// ─── Lightbox ───────────────────────────────────────────────────────────
+function openLb(el) {
+  const src = el.querySelector('img').src;
+  document.getElementById('lb-img').src = src;
+  document.getElementById('lb').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+function closeLb() {
+  document.getElementById('lb').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLb(); });
+
+// ─── Smooth scroll ──────────────────────────────────────────────────────
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    const tgt = document.querySelector(a.getAttribute('href'));
+    if (tgt) { e.preventDefault(); tgt.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  });
+});
+</script>
+</body>
+</html>

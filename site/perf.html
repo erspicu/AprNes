@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AprNes — 效能最佳化技術研究</title>
+  <style>
+    :root{
+      --bg:#0d0117;--card:#160028;--border:#2d1b40;
+      --accent:#a78bfa;--teal:#2dd4bf;--pass:#4ade80;--fail:#f87171;--warn:#fbbf24;
+      --muted:#6b7280;--text:#e2e8f0;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:15px;line-height:1.6}
+    a{color:var(--accent);text-decoration:none}
+    a:hover{text-decoration:underline}
+    /* layout */
+    .container{max-width:960px;margin:0 auto;padding:0 1.2rem}
+    .header{background:linear-gradient(135deg,#1a0033 0%,#0d0117 60%);border-bottom:1px solid var(--border);padding:1.5rem 0}
+    .header h1{font-size:1.5rem;font-weight:700;color:var(--accent)}
+    .header p{font-size:.88rem;color:var(--muted);margin-top:.25rem}
+    .lang-btn{background:none;border:1px solid var(--border);color:var(--muted);padding:.25rem .7rem;border-radius:4px;cursor:pointer;font-size:.8rem;margin-left:.5rem}
+    .lang-btn.active{border-color:var(--accent);color:var(--accent)}
+    section{padding:2.5rem 0}
+    h2{font-size:1.2rem;font-weight:700;color:var(--accent);margin-bottom:1rem;border-left:3px solid var(--accent);padding-left:.75rem}
+    h3{font-size:1rem;font-weight:600;color:var(--teal);margin-bottom:.6rem;margin-top:1.4rem}
+    p{margin-bottom:.8rem;color:#cbd5e1}
+    /* cards */
+    .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.2rem 1.4rem;margin-bottom:1rem}
+    /* stat row */
+    .stat-row{display:flex;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem}
+    .stat-box{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:.9rem 1.2rem;flex:1;min-width:130px;text-align:center}
+    .stat-box .num{font-size:1.6rem;font-weight:700}
+    .stat-box .lbl{font-size:.78rem;color:var(--muted);margin-top:.15rem}
+    .num.blue{color:#60a5fa}.num.green{color:var(--pass)}.num.teal{color:var(--teal)}.num.yellow{color:var(--warn)}
+    /* table */
+    table{width:100%;border-collapse:collapse;font-size:.85rem;margin-bottom:.8rem}
+    th{background:rgba(167,139,250,.12);color:var(--accent);padding:.5rem .7rem;text-align:left;border-bottom:1px solid var(--border)}
+    td{padding:.45rem .7rem;border-bottom:1px solid rgba(45,27,64,.6);vertical-align:top}
+    tr:hover td{background:rgba(255,255,255,.02)}
+    .badge{display:inline-block;padding:.15rem .5rem;border-radius:4px;font-size:.75rem;font-weight:600}
+    .badge-pass{background:rgba(74,222,128,.15);color:var(--pass)}
+    .badge-fail{background:rgba(248,113,113,.15);color:var(--fail)}
+    .badge-skip{background:rgba(251,191,36,.15);color:var(--warn)}
+    .badge-rel{background:rgba(45,212,191,.15);color:var(--teal)}
+    /* perf bar */
+    .bar-row{display:flex;align-items:center;gap:.6rem;margin-bottom:.45rem}
+    .bar-label{width:260px;font-size:.78rem;color:#94a3b8;flex-shrink:0;text-align:right}
+    .bar-track{flex:1;height:8px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden}
+    .bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--teal),var(--accent))}
+    .bar-fill.muted{background:rgba(148,163,184,.35)}
+    .bar-fill.rel{background:linear-gradient(90deg,#fbbf24,#f97316)}
+    .bar-val{width:120px;font-size:.78rem;font-weight:600;color:var(--pass)}
+    .bar-sep{font-size:.73rem;color:var(--muted);border-top:1px solid rgba(255,255,255,.08);padding-top:.4rem;margin-bottom:.4rem;margin-top:.15rem}
+    /* code */
+    pre,code{background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:6px;font-family:'Cascadia Code','Consolas',monospace;font-size:.82rem}
+    pre{padding:.8rem 1rem;overflow-x:auto;margin-bottom:.8rem}
+    code{padding:.1rem .35rem}
+    /* note */
+    .note{background:rgba(251,191,36,.07);border-left:3px solid var(--warn);border-radius:0 6px 6px 0;padding:.6rem .9rem;font-size:.83rem;margin-bottom:.8rem;color:#fde68a}
+    .note-teal{background:rgba(45,212,191,.07);border-left:3px solid var(--teal);color:#a7f3d0}
+    /* back link */
+    .back{font-size:.82rem}
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="container" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+    <div>
+      <div style="margin-bottom:.35rem"><a href="index.html" class="back" style="color:var(--muted)">← AprNes</a></div>
+      <h1 data-i18n="title">效能最佳化技術研究</h1>
+      <p data-i18n="subtitle">AprNes C# NES 模擬器 — Mega Man 5 (USA).nes headless benchmark</p>
+    </div>
+    <div style="display:flex;align-items:center;margin-top:.3rem">
+      <button class="lang-btn active" onclick="setLang('zh')" id="btn-zh">繁中</button>
+      <button class="lang-btn" onclick="setLang('en')" id="btn-en">EN</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== KEY STATS ===== -->
+<section>
+  <div class="container">
+    <div class="stat-row">
+      <div class="stat-box">
+        <div class="num blue">181.70</div>
+        <div class="lbl" data-i18n="stat_base">Debug 基線 FPS</div>
+      </div>
+      <div class="stat-box">
+        <div class="num teal">~273.8</div>
+        <div class="lbl" data-i18n="stat_cur">Release 目前 FPS</div>
+      </div>
+      <div class="stat-box">
+        <div class="num green">+50.7%</div>
+        <div class="lbl" data-i18n="stat_gain">總效能提升</div>
+      </div>
+      <div class="stat-box">
+        <div class="num" style="color:var(--accent)">19</div>
+        <div class="lbl" data-i18n="stat_count">成功最佳化項</div>
+      </div>
+      <div class="stat-box">
+        <div class="num yellow">~348</div>
+        <div class="lbl" data-i18n="stat_net10">.NET 10 RyuJIT FPS</div>
+      </div>
+    </div>
+
+    <!-- FPS Progress Bar Chart -->
+    <div class="card">
+      <h2 style="margin-bottom:1rem" data-i18n="chart_title">效能最佳化歷程</h2>
+
+      <div class="bar-row">
+        <div class="bar-label" data-i18n="bar0">Debug 基線（未最佳化）</div>
+        <div class="bar-track"><div class="bar-fill muted" style="width:52.3%"></div></div>
+        <div class="bar-val" style="color:var(--muted)">181.70 FPS</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label" data-i18n="bar1">+ unsafe pointer（P11）</div>
+        <div class="bar-track"><div class="bar-fill" style="width:54.1%"></div></div>
+        <div class="bar-val">187.70 <span style="color:var(--muted);font-weight:400">(+3.3%)</span></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label" data-i18n="bar2">+ palette cache（P5）</div>
+        <div class="bar-track"><div class="bar-fill" style="width:54.7%"></div></div>
+        <div class="bar-val">189.75 <span style="color:var(--muted);font-weight:400">(+4.4%)</span></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label" data-i18n="bar3">+ opcode dispatch Action[]（P9）</div>
+        <div class="bar-track"><div class="bar-fill" style="width:58.8%"></div></div>
+        <div class="bar-val">204.10 <span style="color:var(--muted);font-weight:400">(+12.3%)</span></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label" data-i18n="bar4">+ remove inner loop branch（P6）</div>
+        <div class="bar-track"><div class="bar-fill" style="width:62.4%"></div></div>
+        <div class="bar-val">216.45 <span style="color:var(--muted);font-weight:400">(+19.1%)</span></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label" data-i18n="bar5">+ DMA early-exit guard（P3）</div>
+        <div class="bar-track"><div class="bar-fill" style="width:65.6%"></div></div>
+        <div class="bar-val">227.40 <span style="color:var(--muted);font-weight:400">(+25.2%)</span></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label" data-i18n="bar6">+ RAM read fast-path（P12）</div>
+        <div class="bar-track"><div class="bar-fill" style="width:67.5%"></div></div>
+        <div class="bar-val">233.75 <span style="color:var(--muted);font-weight:400">(+28.6%)</span></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label" data-i18n="bar7">+ pointer loop clear（P14）</div>
+        <div class="bar-track"><div class="bar-fill" style="width:69.2%"></div></div>
+        <div class="bar-val">237.00 <span style="color:var(--muted);font-weight:400">(+30.4%)</span></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label" data-i18n="bar8">+ AggressiveInlining（P18A）</div>
+        <div class="bar-track"><div class="bar-fill" style="width:70.7%"></div></div>
+        <div class="bar-val">245.30 <span style="color:var(--muted);font-weight:400">(+35.0%)</span></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label" data-i18n="bar9">+ delegate*&lt;void&gt;[]（P24）</div>
+        <div class="bar-track"><div class="bar-fill" style="width:71.5%"></div></div>
+        <div class="bar-val">247.95 <span style="color:var(--muted);font-weight:400">(+36.5%)</span></div>
+      </div>
+
+      <div class="bar-sep" style="margin-left:266px">⚙ <span data-i18n="rel_switch">切換至 Release 組態（含全部以上最佳化）— 基線 241.45 FPS</span></div>
+
+      <div class="bar-row">
+        <div class="bar-label" data-i18n="bar10">+ catchUp loop unroll（Release）</div>
+        <div class="bar-track"><div class="bar-fill rel" style="width:72.7%"></div></div>
+        <div class="bar-val">252.00 <span style="color:var(--muted);font-weight:400">(+38.7%)</span></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label" data-i18n="bar11">+ sprite 0 hit range check（Release）</div>
+        <div class="bar-track"><div class="bar-fill rel" style="width:74.4%"></div></div>
+        <div class="bar-val">~259.00 <span style="color:var(--muted);font-weight:400">(+42.5%)</span></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label" data-i18n="bar12">+ operationCycle switch → if/else（Release）</div>
+        <div class="bar-track"><div class="bar-fill rel" style="width:96.7%"></div></div>
+        <div class="bar-val">~264.8 <span style="color:var(--muted);font-weight:400">(+45.7%)</span></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label" data-i18n="bar13">+ PPU ppu_rendering_tick switch → if/else（Release）</div>
+        <div class="bar-track"><div class="bar-fill rel" style="width:98.7%"></div></div>
+        <div class="bar-val">~270.2 <span style="color:var(--muted);font-weight:400">(+48.7%)</span></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label" data-i18n="bar14">+ IO_read/IO_write switch → segmented if/else（Release）</div>
+        <div class="bar-track"><div class="bar-fill rel" style="width:100%"></div></div>
+        <div class="bar-val" style="color:var(--pass)">~273.8 <span style="color:var(--muted);font-weight:400">(+50.7%)</span></div>
+      </div>
+
+      <div class="bar-sep" style="margin-left:266px">🚀 <span data-i18n="net10_note">.NET 10 RyuJIT（同程式碼，不同執行環境）</span></div>
+      <div class="bar-row">
+        <div class="bar-label" data-i18n="bar15">.NET 10 RyuJIT</div>
+        <div class="bar-track"><div class="bar-fill" style="width:100%;background:linear-gradient(90deg,#8b5cf6,#ec4899)"></div></div>
+        <div class="bar-val" style="color:#f0abfc">~348 FPS <span style="color:var(--muted);font-weight:400">(+91.5%)</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== RESULTS TABLE ===== -->
+<section style="padding-top:0">
+  <div class="container">
+    <h2 data-i18n="tbl_title">完整最佳化紀錄</h2>
+    <div class="note note-teal" data-i18n="tbl_note">所有測試：ROM = Mega Man 5 (USA).nes，20 秒 headless benchmark，無音效，無 FPS 上限。每次測試前 sleep 60–90 秒讓 CPU 降溫。#1–12 為 Debug 組態，#13–17 為 Release 組態。</div>
+    <div style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th data-i18n="col_opt">最佳化項目</th>
+          <th data-i18n="col_before">前 FPS</th>
+          <th data-i18n="col_after">後 FPS</th>
+          <th data-i18n="col_delta">變化</th>
+          <th data-i18n="col_result">結果</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td data-i18n="opt1">Debug 基線</td>
+          <td>—</td><td>181.70</td><td>—</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td data-i18n="opt2">managed array → unsafe pointer（P11：DUTYLOOKUP, TRI_SEQ, secondaryOAM, corruptOamRow）</td>
+          <td>181.70</td><td>187.70</td><td style="color:var(--pass)">+3.3%</td>
+          <td><span class="badge badge-pass">✅ KEEP</span></td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td data-i18n="opt3">branch reordering + palette cache P8（RenderBGTile pre-compute）</td>
+          <td>187.70</td><td>188.55</td><td style="color:var(--pass)">+0.4%</td>
+          <td><span class="badge badge-pass">✅ KEEP</span></td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td data-i18n="opt4">palette cache static pre-alloc（P5 v2）</td>
+          <td>188.55</td><td>189.75</td><td style="color:var(--pass)">+0.6%</td>
+          <td><span class="badge badge-pass">✅ KEEP</span></td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td data-i18n="opt5">CPU opcode dispatch Action[]（P9）</td>
+          <td>189.75</td><td>204.10</td><td style="color:var(--pass)">+7.6%</td>
+          <td><span class="badge badge-pass">✅ KEEP</span></td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td data-i18n="opt6">remove inner loop bounds check in RenderBGTile（P6）</td>
+          <td>204.10</td><td>216.45</td><td style="color:var(--pass)">+6.1%</td>
+          <td><span class="badge badge-pass">✅ KEEP</span></td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td data-i18n="opt7">ProcessPendingDma() 5-flag early-exit guard（P3）</td>
+          <td>216.45</td><td>227.40</td><td style="color:var(--pass)">+5.1%</td>
+          <td><span class="badge badge-pass">✅ KEEP</span></td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td data-i18n="opt8">RAM read fast-path $0000–$1FFF（P12）</td>
+          <td>227.40</td><td>233.75</td><td style="color:var(--pass)">+2.8%</td>
+          <td><span class="badge badge-pass">✅ KEEP</span></td>
+        </tr>
+        <tr>
+          <td>9</td>
+          <td data-i18n="opt9">ppu_cycles_x local shadow + cx param（P17B）</td>
+          <td>233.75</td><td>237.00</td><td style="color:var(--pass)">+1.4%</td>
+          <td><span class="badge badge-pass">✅ KEEP</span></td>
+        </tr>
+        <tr>
+          <td>10</td>
+          <td data-i18n="opt10">Buffer_BG_array / ScreenBuf1x pointer loop clear（P14）</td>
+          <td>237.00</td><td>239.95</td><td style="color:var(--pass)">+1.2%</td>
+          <td><span class="badge badge-pass">✅ KEEP</span></td>
+        </tr>
+        <tr>
+          <td>11</td>
+          <td data-i18n="opt11">AggressiveInlining: SpriteEvalTick/Init/End/Yinc（P18A）</td>
+          <td>239.95</td><td>245.30</td><td style="color:var(--pass)">+2.2%</td>
+          <td><span class="badge badge-pass">✅ KEEP</span></td>
+        </tr>
+        <tr>
+          <td>12</td>
+          <td data-i18n="opt12">opcode dispatch delegate*&lt;void&gt;[]（P24）</td>
+          <td>245.30</td><td>247.95</td><td style="color:var(--pass)">+1.1%</td>
+          <td><span class="badge badge-pass">✅ KEEP</span></td>
+        </tr>
+        <tr style="background:rgba(45,212,191,.04)">
+          <td>—</td>
+          <td colspan="5" style="color:var(--teal);font-size:.8rem" data-i18n="rel_row">⚙ 切換至 Release 組態（含全部以上最佳化）— Release 基線 241.45 FPS</td>
+        </tr>
+        <tr>
+          <td>13</td>
+          <td data-i18n="opt13">catchUpPPU/APU loop unroll（while → 固定 3+1 展開）</td>
+          <td>241.45</td><td>252.00</td><td style="color:var(--pass)">+4.3%</td>
+          <td><span class="badge badge-rel">✅ Release</span></td>
+        </tr>
+        <tr>
+          <td>14</td>
+          <td data-i18n="opt14">ppu_step_new sprite 0 hit range check 條件重排（P4）</td>
+          <td>252.00</td><td>~259.00</td><td style="color:var(--pass)">+2.8%</td>
+          <td><span class="badge badge-rel">✅ Release</span></td>
+        </tr>
+        <tr>
+          <td>15</td>
+          <td data-i18n="opt15">CPU.cs operationCycle switch(≤8 cases) → if/else（Op_XX 單行 + addressing helpers）</td>
+          <td>~259.00</td><td>~264.8</td><td style="color:var(--pass)">+2.2%</td>
+          <td><span class="badge badge-rel">✅ Release</span></td>
+        </tr>
+        <tr>
+          <td>16</td>
+          <td data-i18n="opt16">PPU.cs ppu_rendering_tick() switch(cx &amp; 7)（8 cases）→ if/else chain</td>
+          <td>~264.8</td><td>~270.2</td><td style="color:var(--pass)">+2.0%</td>
+          <td><span class="badge badge-rel">✅ Release</span></td>
+        </tr>
+        <tr>
+          <td>17</td>
+          <td data-i18n="opt17">IO.cs IO_read/IO_write switch → 三段式 if/else（PPU $2000-$2007 / APU $4000-$4013 / $4014-$4017）</td>
+          <td>~270.2</td><td>~273.8</td><td style="color:var(--pass)">+1.3%</td>
+          <td><span class="badge badge-rel">✅ Release</span></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h2 style="margin-top:2rem" data-i18n="fail_title">失敗 / 無效嘗試</h2>
+    <div style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr>
+          <th data-i18n="col_opt">嘗試項目</th>
+          <th data-i18n="col_delta">實測變化</th>
+          <th data-i18n="col_reason">失敗原因</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td data-i18n="fail1">PPU tile fetch cache（per-scanline MapperR_CHR 快取）</td>
+          <td style="color:var(--fail)">-1.2%</td>
+          <td data-i18n="fail1r">24KB tag+data 陣列與熱路徑資料競爭 32KB L1 cache；MapperR_CHR 本身已很快</td>
+        </tr>
+        <tr>
+          <td data-i18n="fail2">RenderBGTile() 8-pixel 迴圈手動展開（P20）</td>
+          <td style="color:var(--fail)">-1.8%</td>
+          <td data-i18n="fail2r">展開後方法體積增大，I-cache 壓力 + JIT 最佳化困難</td>
+        </tr>
+        <tr>
+          <td data-i18n="fail3">RenderBGTile() 調色盤快取去重複（P21）</td>
+          <td style="color:var(--fail)">-1.4%</td>
+          <td data-i18n="fail3r">複雜背景中 attr 變化頻繁，cache miss 率高，條件判斷 overhead 超過節省量</td>
+        </tr>
+        <tr>
+          <td data-i18n="fail4">mapper==4 static bool cache（P13）</td>
+          <td style="color:var(--fail)">-2.2%</td>
+          <td data-i18n="fail4r">新增欄位位置不同，cache line 碎片化；原本 int 比較已在同一 cache line</td>
+        </tr>
+        <tr>
+          <td data-i18n="fail5">Lazy N/Z flag evaluation（P16）</td>
+          <td style="color:var(--fail)">-1.9%</td>
+          <td data-i18n="fail5r">GetFlag 反向編碼增加計算量；新 field 位置增加 cache miss</td>
+        </tr>
+        <tr>
+          <td data-i18n="fail6">mem_read_fun / mem_write_fun delegate*（P25）</td>
+          <td style="color:var(--fail)">-4.8%</td>
+          <td data-i18n="fail6r">Mapper instance method 需 static wrapper，反而多一層呼叫；ROM read 頻率極高，累積顯著</td>
+        </tr>
+        <tr>
+          <td data-i18n="fail7">IO_read/write switch → function table（P23）</td>
+          <td style="color:var(--fail)">持平</td>
+          <td data-i18n="fail7r">IO 呼叫頻率太低（~幾百次/幀），節省遠不及 delegate call overhead</td>
+        </tr>
+        <tr>
+          <td data-i18n="fail8">APU apu_step() 稀有路徑合併 guard（P19）</td>
+          <td style="color:var(--fail)">-1.0%</td>
+          <td data-i18n="fail8r">outer || guard 比兩個獨立 branch 更貴；JIT 對 always-not-taken branch 預測效率高</td>
+        </tr>
+        <tr>
+          <td data-i18n="fail9">setenvelope/setsweep 迴圈展開（P22）</td>
+          <td style="color:var(--fail)">-1.0%</td>
+          <td data-i18n="fail9r">方法體積增大，I-cache 壓力；JIT 對小型固定迴圈已有良好處理</td>
+        </tr>
+        <tr>
+          <td data-i18n="fail10">Mapper004 precomputed bank pointer（P27）</td>
+          <td style="color:var(--fail)">-1.5%</td>
+          <td data-i18n="fail10r">新增 12 個指標欄位使 Mapper 物件跨更多 cache line，field layout 惡化</td>
+        </tr>
+        <tr>
+          <td data-i18n="fail11">APU int fixed-point sample accumulator（P4）</td>
+          <td style="color:var(--fail)">-1.7%</td>
+          <td data-i18n="fail11r">Debug JIT 對 int/double 差異不大；cast overhead 可能更高</td>
+        </tr>
+        <tr>
+          <td data-i18n="fail12">AggressiveInlining RenderBGTile（P18B）</td>
+          <td style="color:var(--fail)">-1.5%</td>
+          <td data-i18n="fail12r">35 行 inline 後 ppu_rendering_tick 膨脹至 ~115 行，I-cache 壓力劣化</td>
+        </tr>
+        <tr>
+          <td data-i18n="fail13">Op_XX shared dispatch helpers（delegate*&lt;byte/ushort,void&gt; 參數化 161 個 handler）</td>
+          <td style="color:var(--fail)">-3.2%</td>
+          <td data-i18n="fail13r">delegate* 函式指標呼叫阻斷 JIT 對 Op_ORA/Op_AND 等操作函式的 inlining，每個 opcode 多一次 indirect call（~3–5 cycles）；i-cache 節省效益不足以彌補呼叫開銷</td>
+        </tr>
+        <tr>
+          <td data-i18n="fail14">IO_read/IO_write switch → Func&lt;byte&gt;[]/Action&lt;byte&gt;[] delegate table（P23 第一次嘗試）</td>
+          <td style="color:var(--fail)">-4.0%</td>
+          <td data-i18n="fail14r">Func/Action delegate 呼叫需透過 delegate 物件做 virtual dispatch，遠比 switch jump table 慢；IO 呼叫頻率低，改善上限本就極小，delegate overhead 直接淹沒所有收益</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</section>
+
+<!-- ===== KEY FINDINGS ===== -->
+<section style="padding-top:0">
+  <div class="container">
+    <h2 data-i18n="key_title">關鍵技術發現</h2>
+
+    <div class="card">
+      <h3 data-i18n="k1_t">1. Debug JIT 的特殊性</h3>
+      <p data-i18n="k1_p1">AprNes 核心使用 .NET Framework Debug 組態，JIT 最佳化等級遠低於 Release。許多在 Release 由 JIT 自動完成的工作（loop unrolling、register allocation、inlining）必須手動完成。</p>
+      <p data-i18n="k1_p2">所有欄位均為 <code>static</code>，JIT 無法 enregister，每次讀取都是記憶體 load。「local shadow」技法（在函式開頭 copy static 至 local）可將多次 static read 降為 1 次。</p>
+    </div>
+
+    <div class="card">
+      <h3 data-i18n="k2_t">2. 函式指標化 dispatch 的邊際效應（P9 +7.6%，P24 +1.1%）</h3>
+      <p data-i18n="k2_p">256-case switch → Action[] 的改善遠超預期（+7.6%），因為 Debug JIT 不生成完整 jump table。進一步升級至 <code>delegate*&lt;void&gt;[]</code>（原生函式指標）再獲 +1.1%，但效益因 Mem_r()/tick() 的固有開銷而有上限。同樣機制應用於 mem_read_fun（P25）卻退步 -4.8%，原因是 Mapper instance method 需要 static wrapper，抵消了 dispatch 節省。</p>
+      <pre><code>// P9: switch → Action[]
+opHandlers[opcode]();      // delegate call: ~5 loads + null check
+
+// P24: Action[] → delegate*&lt;void&gt;[]
+opFnPtrs[opcode]();        // 1 load + 1 calli — C-style function table</code></pre>
+    </div>
+
+    <div class="card">
+      <h3 data-i18n="k3_t">3. 移除冗餘 branch 的意外收益（P6 +6.1%）</h3>
+      <p data-i18n="k3_p">RenderBGTile() 內層 8-pixel 迴圈中的 <code>if (screenX &gt; 255) break;</code> 看似無害，但呼叫方已有邊界 guard。移除後 JIT 能對整個迴圈做更積極的 unrolling，效益遠超預期（+6.1%）。任何內層迴圈中的非必要 conditional exit 都值得審視。</p>
+    </div>
+
+    <div class="card">
+      <h3 data-i18n="k4_t">4. 快取新增欄位的 cache line 成本</h3>
+      <p data-i18n="k4_p">多次嘗試「增加快取欄位來省略計算」均以退步告終（P13 -2.2%，P27 -1.5%，tile fetch -1.2%）。根本原因：新欄位改變物件 field layout，使熱路徑資料跨越更多 cache line，增加 cache miss。在 .NET Debug JIT 下，欄位位置對效能的影響往往超過演算法節省。</p>
+    </div>
+
+    <div class="card">
+      <h3 data-i18n="k5_t">5. 測試方法與 CPU 熱降頻</h3>
+      <p data-i18n="k5_p">連續 benchmark 會導致 CPU 熱降頻，FPS 可虛假偏低 10% 以上。每次測試前 <code>sleep 60</code> 必不可少。第一次 run 結果往往比 run2/run3 低 3–5%（CPU 從冷啟動暖機），建議以多次平均為準。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== ENVIRONMENT ===== -->
+<section style="padding-top:0;padding-bottom:3rem">
+  <div class="container">
+    <h2 data-i18n="env_title">測試環境</h2>
+    <div class="card">
+      <table style="margin:0">
+        <tr><th data-i18n="env_item">項目</th><th data-i18n="env_val">數值</th></tr>
+        <tr><td data-i18n="env_cpu">CPU</td><td>AMD Ryzen 7 3700X 8-Core</td></tr>
+        <tr><td>OS</td><td>Windows 11 (10.0.26200)</td></tr>
+        <tr><td data-i18n="env_rom">ROM</td><td>Mega Man 5 (USA).nes — Mapper 004 MMC3</td></tr>
+        <tr><td data-i18n="env_dur">測試時長</td><td>20 秒，無 FPS 上限，headless，無音效</td></tr>
+        <tr><td data-i18n="env_dbg">Debug 執行環境</td><td>.NET Framework 4.8.1 Debug JIT</td></tr>
+        <tr><td data-i18n="env_rel">Release 執行環境</td><td>.NET Framework 4.8.1 Release JIT</td></tr>
+        <tr><td data-i18n="env_n10">.NET 10 執行環境</td><td>.NET 10 RyuJIT（實驗性）</td></tr>
+        <tr><td data-i18n="env_ver">正確性驗證</td><td>blargg 174/174 + AccuracyCoin 136/136</td></tr>
+      </table>
+    </div>
+    <p style="margin-top:1rem"><a href="index.html" data-i18n="back_link">← 返回 AprNes 主頁</a></p>
+  </div>
+</section>
+
+<script>
+const LANG = {
+  zh: {
+    title:'效能最佳化技術研究',
+    subtitle:'AprNes C# NES 模擬器 — Mega Man 5 (USA).nes headless benchmark',
+    stat_base:'Debug 基線 FPS', stat_cur:'Release 目前 FPS', stat_gain:'總效能提升',
+    stat_count:'成功最佳化項', stat_net10:'.NET 10 RyuJIT FPS',
+    chart_title:'效能最佳化歷程',
+    bar0:'Debug 基線（未最佳化）', bar1:'+ unsafe pointer（P11）',
+    bar2:'+ palette cache（P5）', bar3:'+ opcode dispatch Action[]（P9）',
+    bar4:'+ remove inner loop branch（P6）', bar5:'+ DMA early-exit guard（P3）',
+    bar6:'+ RAM read fast-path（P12）', bar7:'+ pointer loop clear（P14）',
+    bar8:'+ AggressiveInlining（P18A）', bar9:'+ delegate*&lt;void&gt;[]（P24）',
+    bar10:'+ catchUp loop unroll（Release）', bar11:'+ sprite 0 hit range check（Release）',
+    bar12:'+ CPU operationCycle switch → if/else（Release）',
+    bar13:'+ PPU ppu_rendering_tick switch → if/else（Release）',
+    bar14:'+ IO_read/IO_write switch → segmented if/else（Release）',
+    bar15:'.NET 10 RyuJIT',
+    rel_switch:'切換至 Release 組態（含全部以上最佳化）— 基線 241.45 FPS',
+    net10_note:'.NET 10 RyuJIT（同程式碼，不同執行環境）',
+    tbl_title:'完整最佳化紀錄',
+    tbl_note:'所有測試：ROM = Mega Man 5 (USA).nes，20 秒 headless benchmark，無音效，無 FPS 上限。每次測試前 sleep 60–90 秒讓 CPU 降溫。#1–12 為 Debug 組態，#13–17 為 Release 組態。',
+    col_opt:'最佳化項目', col_before:'前 FPS', col_after:'後 FPS', col_delta:'變化', col_result:'結果',
+    opt1:'Debug 基線',
+    opt2:'managed array → unsafe pointer（P11：DUTYLOOKUP, TRI_SEQ, secondaryOAM, corruptOamRow）',
+    opt3:'branch reordering + palette cache P8（RenderBGTile pre-compute）',
+    opt4:'palette cache static pre-alloc（P5 v2）',
+    opt5:'CPU opcode dispatch Action[]（P9）',
+    opt6:'remove inner loop bounds check in RenderBGTile（P6）',
+    opt7:'ProcessPendingDma() 5-flag early-exit guard（P3）',
+    opt8:'RAM read fast-path $0000–$1FFF（P12）',
+    opt9:'ppu_cycles_x local shadow + cx param（P17B）',
+    opt10:'Buffer_BG_array / ScreenBuf1x pointer loop clear（P14）',
+    opt11:'AggressiveInlining: SpriteEvalTick/Init/End/Yinc（P18A）',
+    opt12:'opcode dispatch delegate*&lt;void&gt;[]（P24）',
+    rel_row:'⚙ 切換至 Release 組態（含全部以上最佳化）— Release 基線 241.45 FPS',
+    opt13:'catchUpPPU/APU loop unroll（while → 固定 3+1 展開）',
+    opt14:'ppu_step_new sprite 0 hit range check 條件重排（P4）',
+    opt15:'CPU.cs operationCycle switch(≤8 cases) → if/else（Op_XX 單行 + addressing helpers）',
+    opt16:'PPU.cs ppu_rendering_tick() switch(cx &amp; 7)（8 cases）→ if/else chain',
+    opt17:'IO.cs IO_read/IO_write switch → 三段式 if/else（PPU $2000-$2007 / APU $4000-$4013 / $4014-$4017）',
+    fail_title:'失敗 / 無效嘗試', col_reason:'失敗原因',
+    fail1:'PPU tile fetch cache（per-scanline MapperR_CHR 快取）',
+    fail1r:'24KB tag+data 陣列與熱路徑資料競爭 32KB L1 cache；MapperR_CHR 本身已很快',
+    fail2:'RenderBGTile() 8-pixel 迴圈手動展開（P20）',
+    fail2r:'展開後方法體積增大，I-cache 壓力 + JIT 最佳化困難',
+    fail3:'RenderBGTile() 調色盤快取去重複（P21）',
+    fail3r:'複雜背景中 attr 變化頻繁，cache miss 率高，條件判斷 overhead 超過節省量',
+    fail4:'mapper==4 static bool cache（P13）',
+    fail4r:'新增欄位位置不同，cache line 碎片化；原本 int 比較已在同一 cache line',
+    fail5:'Lazy N/Z flag evaluation（P16）',
+    fail5r:'GetFlag 反向編碼增加計算量；新 field 位置增加 cache miss',
+    fail6:'mem_read_fun / mem_write_fun delegate*（P25）',
+    fail6r:'Mapper instance method 需 static wrapper，反而多一層呼叫；ROM read 頻率極高，累積顯著',
+    fail7:'IO_read/write switch → function table（P23）',
+    fail7r:'IO 呼叫頻率太低（~幾百次/幀），節省遠不及 delegate call overhead',
+    fail8:'APU apu_step() 稀有路徑合併 guard（P19）',
+    fail8r:'outer || guard 比兩個獨立 branch 更貴；JIT 對 always-not-taken branch 預測效率高',
+    fail9:'setenvelope/setsweep 迴圈展開（P22）',
+    fail9r:'方法體積增大，I-cache 壓力；JIT 對小型固定迴圈已有良好處理',
+    fail10:'Mapper004 precomputed bank pointer（P27）',
+    fail10r:'新增 12 個指標欄位使 Mapper 物件跨更多 cache line，field layout 惡化',
+    fail11:'APU int fixed-point sample accumulator（P4）',
+    fail11r:'Debug JIT 對 int/double 差異不大；cast overhead 可能更高',
+    fail12:'AggressiveInlining RenderBGTile（P18B）',
+    fail12r:'35 行 inline 後 ppu_rendering_tick 膨脹至 ~115 行，I-cache 壓力劣化',
+    fail13:'Op_XX shared dispatch helpers（delegate*&lt;byte/ushort,void&gt; 參數化 161 個 handler）',
+    fail13r:'delegate* 函式指標呼叫阻斷 JIT inlining，每個 opcode 多一次 indirect call（~3–5 cycles）；i-cache 節省效益不足以彌補呼叫開銷',
+    fail14:'IO_read/IO_write switch → Func&lt;byte&gt;[]/Action&lt;byte&gt;[] delegate table（P23 第一次嘗試）',
+    fail14r:'Func/Action delegate 呼叫需透過 delegate 物件 virtual dispatch，遠比 switch jump table 慢；IO 呼叫頻率低，delegate overhead 直接淹沒所有收益',
+    key_title:'關鍵技術發現',
+    k1_t:'1. Debug JIT 的特殊性',
+    k1_p1:'AprNes 核心使用 .NET Framework Debug 組態，JIT 最佳化等級遠低於 Release。許多在 Release 由 JIT 自動完成的工作（loop unrolling、register allocation、inlining）必須手動完成。',
+    k1_p2:'所有欄位均為 static，JIT 無法 enregister，每次讀取都是記憶體 load。「local shadow」技法（在函式開頭 copy static 至 local）可將多次 static read 降為 1 次。',
+    k2_t:'2. 函式指標化 dispatch 的邊際效應（P9 +7.6%，P24 +1.1%）',
+    k2_p:'256-case switch → Action[] 的改善遠超預期（+7.6%），因為 Debug JIT 不生成完整 jump table。進一步升級至 delegate*&lt;void&gt;[]（原生函式指標）再獲 +1.1%，但效益因 Mem_r()/tick() 的固有開銷而有上限。同樣機制應用於 mem_read_fun（P25）卻退步 -4.8%，原因是 Mapper instance method 需要 static wrapper，抵消了 dispatch 節省。',
+    k3_t:'3. 移除冗餘 branch 的意外收益（P6 +6.1%）',
+    k3_p:'RenderBGTile() 內層 8-pixel 迴圈中的 if (screenX > 255) break; 看似無害，但呼叫方已有邊界 guard。移除後 JIT 能對整個迴圈做更積極的 unrolling，效益遠超預期（+6.1%）。任何內層迴圈中的非必要 conditional exit 都值得審視。',
+    k4_t:'4. 快取新增欄位的 cache line 成本',
+    k4_p:'多次嘗試「增加快取欄位來省略計算」均以退步告終（P13 -2.2%，P27 -1.5%，tile fetch -1.2%）。根本原因：新欄位改變物件 field layout，使熱路徑資料跨越更多 cache line。在 .NET Debug JIT 下，欄位位置對效能的影響往往超過演算法節省。',
+    k5_t:'5. 測試方法與 CPU 熱降頻',
+    k5_p:'連續 benchmark 會導致 CPU 熱降頻，FPS 可虛假偏低 10% 以上。每次測試前 sleep 60 必不可少。第一次 run 結果往往比 run2/run3 低 3–5%，建議以多次平均為準。',
+    env_title:'測試環境', env_item:'項目', env_val:'數值',
+    env_cpu:'CPU', env_rom:'ROM', env_dur:'測試時長', env_dbg:'Debug 執行環境',
+    env_rel:'Release 執行環境', env_n10:'.NET 10 執行環境', env_ver:'正確性驗證',
+    back_link:'← 返回 AprNes 主頁',
+  },
+  en: {
+    title:'Performance Optimization Research',
+    subtitle:'AprNes C# NES Emulator — Mega Man 5 (USA).nes headless benchmark',
+    stat_base:'Debug Baseline FPS', stat_cur:'Release Current FPS', stat_gain:'Total Gain',
+    stat_count:'Successful Opts', stat_net10:'.NET 10 RyuJIT FPS',
+    chart_title:'Performance Optimization History',
+    bar0:'Debug baseline (unoptimized)', bar1:'+ unsafe pointer (P11)',
+    bar2:'+ palette cache (P5)', bar3:'+ opcode dispatch Action[] (P9)',
+    bar4:'+ remove inner loop branch (P6)', bar5:'+ DMA early-exit guard (P3)',
+    bar6:'+ RAM read fast-path (P12)', bar7:'+ pointer loop clear (P14)',
+    bar8:'+ AggressiveInlining (P18A)', bar9:'+ delegate*&lt;void&gt;[] (P24)',
+    bar10:'+ catchUp loop unroll (Release)', bar11:'+ sprite 0 hit range check (Release)',
+    bar12:'+ CPU operationCycle switch → if/else (Release)',
+    bar13:'+ PPU ppu_rendering_tick switch → if/else (Release)',
+    bar14:'+ IO_read/IO_write switch → segmented if/else (Release)',
+    rel_switch:'Switched to Release build (includes all above optimizations) — baseline 241.45 FPS',
+    net10_note:'.NET 10 RyuJIT (same code, different runtime)',
+    tbl_title:'Complete Optimization Log',
+    tbl_note:'All tests: ROM = Mega Man 5 (USA).nes, 20s headless benchmark, no audio, no FPS cap. sleep 60–90s before each run to let CPU cool. #1–12 Debug build, #13–17 Release build.',
+    col_opt:'Optimization', col_before:'Before', col_after:'After', col_delta:'Delta', col_result:'Result',
+    opt1:'Debug baseline',
+    opt2:'managed array → unsafe pointer (P11: DUTYLOOKUP, TRI_SEQ, secondaryOAM, corruptOamRow)',
+    opt3:'branch reordering + palette cache P8 (RenderBGTile pre-compute)',
+    opt4:'palette cache static pre-alloc (P5 v2)',
+    opt5:'CPU opcode dispatch Action[] (P9)',
+    opt6:'remove inner loop bounds check in RenderBGTile (P6)',
+    opt7:'ProcessPendingDma() 5-flag early-exit guard (P3)',
+    opt8:'RAM read fast-path $0000–$1FFF (P12)',
+    opt9:'ppu_cycles_x local shadow + cx param (P17B)',
+    opt10:'Buffer_BG_array / ScreenBuf1x pointer loop clear (P14)',
+    opt11:'AggressiveInlining: SpriteEvalTick/Init/End/Yinc (P18A)',
+    opt12:'opcode dispatch delegate*&lt;void&gt;[] (P24)',
+    rel_row:'⚙ Switched to Release build (includes all above) — Release baseline 241.45 FPS',
+    opt13:'catchUpPPU/APU loop unroll (while → fixed 3+1 unrolled)',
+    opt14:'ppu_step_new sprite 0 hit range check reorder (P4)',
+    opt15:'CPU.cs operationCycle switch(≤8 cases) → if/else (Op_XX one-liners + addressing helpers)',
+    opt16:'PPU.cs ppu_rendering_tick() switch(cx &amp; 7) (8 cases) → if/else chain',
+    opt17:'IO.cs IO_read/IO_write switch → three-segment if/else (PPU $2000-$2007 / APU $4000-$4013 / $4014-$4017)',
+    fail_title:'Failed / Ineffective Attempts', col_reason:'Reason',
+    fail1:'PPU tile fetch cache (per-scanline MapperR_CHR cache)',
+    fail1r:'24KB tag+data arrays compete with hot data for 32KB L1 cache; MapperR_CHR is already fast',
+    fail2:'RenderBGTile() 8-pixel loop manual unrolling (P20)',
+    fail2r:'Larger method body increases I-cache pressure and hurts JIT optimization',
+    fail3:'RenderBGTile() palette cache deduplication (P21)',
+    fail3r:'Complex backgrounds have frequent attr changes; cache miss overhead exceeds savings',
+    fail4:'mapper==4 static bool cache (P13)',
+    fail4r:'New field changes layout; original int compare was in the same cache line',
+    fail5:'Lazy N/Z flag evaluation (P16)',
+    fail5r:'GetFlag reverse encoding adds computation; new field position increases cache miss',
+    fail6:'mem_read_fun / mem_write_fun delegate* (P25)',
+    fail6r:'Mapper instance methods require static wrappers, adding an extra call layer; ROM reads are very frequent',
+    fail7:'IO_read/write switch → function table (P23)',
+    fail7r:'IO call frequency too low (~few hundred/frame); savings don\'t offset delegate overhead',
+    fail8:'APU apu_step() rare-path combined guard (P19)',
+    fail8r:'Outer || guard is more expensive than two independent branches; JIT predicts always-not-taken efficiently',
+    fail9:'setenvelope/setsweep loop unrolling (P22)',
+    fail9r:'Larger method body, I-cache pressure; JIT handles small fixed loops well already',
+    fail10:'Mapper004 precomputed bank pointer (P27)',
+    fail10r:'12 new pointer fields span more cache lines, hurting field layout',
+    fail11:'APU int fixed-point sample accumulator (P4)',
+    fail11r:'Debug JIT sees little difference between int/double; cast overhead may be higher',
+    fail12:'AggressiveInlining RenderBGTile (P18B)',
+    fail12r:'35-line inline causes ppu_rendering_tick to balloon to ~115 lines, I-cache pressure',
+    fail13:'Op_XX shared dispatch helpers (delegate*&lt;byte/ushort,void&gt; parameterizing 161 handlers)',
+    fail13r:'delegate* function pointer calls block JIT inlining of Op_ORA/Op_AND etc., adding one indirect call per opcode (~3–5 cycles); i-cache savings insufficient to offset call overhead',
+    fail14:'IO_read/IO_write switch → Func&lt;byte&gt;[]/Action&lt;byte&gt;[] delegate table (P23 first attempt)',
+    fail14r:'Func/Action delegate calls require virtual dispatch through the delegate object, much slower than a switch jump table; IO call frequency is low, so delegate overhead overwhelms any gains',
+    bar15:'.NET 10 RyuJIT',
+    key_title:'Key Technical Findings',
+    k1_t:'1. Debug JIT Characteristics',
+    k1_p1:'AprNes core uses .NET Framework Debug build, where JIT optimization is far below Release. Many things done automatically in Release (loop unrolling, register allocation, inlining) must be done manually.',
+    k1_p2:'All fields are static, so JIT cannot enregister them — every read is a memory load. The "local shadow" technique (copy static to local at function start) reduces multiple reads to a single load.',
+    k2_t:'2. Function Pointer Dispatch Diminishing Returns (P9 +7.6%, P24 +1.1%)',
+    k2_p:'switch → Action[] improved far beyond expectation (+7.6%) because Debug JIT does not generate a full jump table. Upgrading to delegate*&lt;void&gt;[] (raw function pointers) gained another +1.1%, but returns are bounded by Mem_r()/tick() intrinsic cost. The same approach for mem_read_fun (P25) regressed -4.8% because Mapper instance methods require static wrappers, negating dispatch savings.',
+    k3_t:'3. Unexpected Gains from Removing Redundant Branches (P6 +6.1%)',
+    k3_p:'The if (screenX > 255) break; in the inner 8-pixel loop of RenderBGTile() appeared harmless, but the caller already had a bounds guard. Removing it let JIT aggressively unroll the loop — far exceeding expectations (+6.1%). Any unnecessary conditional exit in an inner loop deserves scrutiny.',
+    k4_t:'4. Cache Line Cost of Adding New Fields',
+    k4_p:'Multiple attempts to "add a cache field to skip computation" regressed (P13 -2.2%, P27 -1.5%, tile fetch -1.2%). Root cause: new fields change object field layout, causing hot-path data to span more cache lines. Under .NET Debug JIT, field position can affect performance more than algorithmic savings.',
+    k5_t:'5. Benchmarking and CPU Thermal Throttling',
+    k5_p:'Continuous benchmarks cause CPU thermal throttling, creating falsely low FPS readings (10%+ gap). sleep 60 before every run is mandatory. First run is often 3–5% lower than run2/run3 due to warmup; average multiple runs for accuracy.',
+    env_title:'Test Environment', env_item:'Item', env_val:'Value',
+    env_cpu:'CPU', env_rom:'ROM', env_dur:'Duration', env_dbg:'Debug Runtime',
+    env_rel:'Release Runtime', env_n10:'.NET 10 Runtime', env_ver:'Correctness Verification',
+    back_link:'← Back to AprNes',
+  }
+};
+
+let curLang = 'zh';
+
+function setLang(lang) {
+  curLang = lang;
+  document.getElementById('btn-zh').className = 'lang-btn' + (lang==='zh'?' active':'');
+  document.getElementById('btn-en').className = 'lang-btn' + (lang==='en'?' active':'');
+  const d = LANG[lang];
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const k = el.getAttribute('data-i18n');
+    if (d[k] !== undefined) el.innerHTML = d[k];
+  });
+  document.title = 'AprNes — ' + d.title;
+}
+
+setLang('zh');
+</script>
+</body>
+</html>
