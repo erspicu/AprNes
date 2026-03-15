@@ -162,12 +162,13 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
 | 基線（Debug） | 最終 Debug | Release 基線 | 目前（Release） | .NET 10 |
 |---|---|---|---|---|
-| 181.70 FPS | 247.95 FPS (+36.5%) | 241.45 FPS | ~273.8 FPS (+50.7% from Debug baseline) | ~361 FPS |
+| 181.70 FPS | 247.95 FPS (+36.5%) | 241.45 FPS | ~277.3 FPS (+52.6% from Debug baseline) | ~361 FPS |
 
 > **注意**：2026-03-15 起改用 Release 組態測試。Release 基線 241.45 FPS 對應 Debug 247.95 FPS（同一份程式碼）。
-> Release 組態下新增的 7 項改善：
+> Release 組態下新增的 8 項改善：
 > 1. catchUpPPU/APU loop unroll +4.3%（241.45 → 252.00）
 > 2. Sprite 0 hit range check 條件重排 +2.8%（252.00 → ~259.0）
 > 3. CPU operationCycle switch → if/else +2.2%（~259.0 → ~264.8）
 > 4. PPU ppu_rendering_tick switch → if/else +2.0%（~264.8 → ~270.2）
 > 5. IO_read/IO_write switch → 三段式 if/else +1.3%（~270.2 → ~273.8）
+> 6. irqLinePrev/irqLineCurrent dirty flag +1.3%（~273.8 → ~277.3）
