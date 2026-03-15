@@ -4,8 +4,8 @@
 > **測試平台**: Mega Man 5 (USA).nes（Mapper 004 MMC3，複雜場景，代表性負載）
 > **Benchmark 方法**: 20 秒無上限 FPS 跑分，headless 模式，無音效；每次測試前 `sleep 60` 等 CPU 降溫
 > **結果（Debug 組態 #1–12）**: 181.70 FPS → 247.95 FPS（**+36.5%**）
-> **結果（Release 組態 #13–14）**: 241.45 FPS → ~259 FPS（**+7.3%**，等效 Debug 基線 +42.5%）
-> **.NET 10 RyuJIT**: ~348 FPS（同程式碼，JIT 升級帶來額外 ~34%）
+> **結果（Release 組態 #13–19）**: 241.45 FPS → ~273.8 FPS（**+13.4%**，等效 Debug 基線 **+50.7%**）
+> **.NET 10 RyuJIT**: ~348 FPS（同程式碼，JIT 升級帶來額外 ~27%）
 > **正確性驗證**: blargg 174/174 + AccuracyCoin 136/136（每項最佳化後皆需全數通過）
 
 ---
@@ -253,6 +253,54 @@ ScreenBuf1x[slot] = masked ? bgColor : pal[bgPixel];
 
 ---
 
+### 2.10 Priority 15/16/17 — switch → if/else（CPU +2.2% / PPU +2.0% / IO +1.3%）
+
+這三項最佳化都基於同一原理：將 `switch` 改為 `if/else` 鏈，讓 branch predictor 能學習實際使用模式。
+
+**為何 if/else 比 switch 快（Release JIT）？**
+
+`switch` 對連續整數 case 通常編譯為 jump table（O(1) dispatch，無 misprediction）。但 jump table 對 branch predictor 而言是「indirect jump」（每次目標不同），predictor 難以預測。
+
+`if/else` 鏈對 branch predictor 而言是一系列「taken/not-taken」的 conditional branch，predictor 能對每個 branch **獨立學習**。若某個 case 出現頻率遠高於其他（如 PPU 渲染時 `phase != 0` 佔 7/8），predictor 很快學會「幾乎永遠跳過 `if (phase == 0)`」。
+
+#### CPU（P15）：`operationCycle` switch → if/else（+2.2%）
+
+每個 Op_XX handler 內有 `if/switch(operationCycle)` 判斷目前執行到第幾個 cycle。大多數指令在 cycle 2 就結束（單週期操作或尋址），if/else 讓 predictor 學到「通常走早段 exit」。
+
+結果：~259.0 → ~264.8 FPS（+2.2%）。
+
+#### PPU（P16）：`ppu_rendering_tick()` switch(cx & 7) → if/else（+2.0%）
+
+PPU rendering 的 8-phase tile fetch 週期（`cx & 7` 等於 0–7）改為 if/else。雖然 8 個 phase 均勻分佈，但 if/else 讓 JIT 生成更好的條件分支代碼，加上消除 `cx & 7` 重複計算（local `phase` 變數）。
+
+結果：~264.8 → ~270.2 FPS（+2.0%）。
+
+#### IO（P17）：IO_read/IO_write switch → 三段式 if/else（+1.3%）
+
+注意：**不能用 `Func<byte>[]`/`Action<byte>[]` delegate table**（第一次嘗試 -4.0%，見 §3.7）。
+
+改用三段式結構：先範圍判斷縮小候選集，段內再 if/else：
+
+```csharp
+if (addr < 0x4000)        // PPU $2000-$2007（8 cases）
+    if (addr == 0x2000) ...
+    else if (addr == 0x2001) ...
+    ...
+else if (addr < 0x4014)   // APU channels $4000-$4013（段內用 lo byte if/else）
+    int lo = addr & 0xFF;
+    if (lo == 0x00) ...
+    ...
+else                      // OAM DMA + APU/IO $4014-$4017（4 cases）
+    if (addr == 0x4014) ...
+    ...
+```
+
+雖然 IO 呼叫頻率低（幾百次/幀），三段式結構減少平均比對次數，branch predictor 也更容易學習（PPU write 最常見就先命中第一段）。
+
+結果：~270.2 → ~273.8 FPS（+1.3%）。
+
+---
+
 ## 三、失敗嘗試分析
 
 ### 3.1 「手動展開固定次數迴圈」反效果模式
@@ -326,11 +374,30 @@ ROM fetch 是所有記憶體操作中最頻繁的（每個 opcode fetch + 所有
 
 ---
 
-### 3.7 Low-frequency target 的函式指標化（P23：-0.1%）
+### 3.7 Low-frequency target 的函式指標化（P23 第一次：-4.0%）
 
-IO_read/write（PPU/APU 寄存器分派）每幀僅被呼叫幾百次。將 27-case switch 改為 delegate table，每次呼叫的 overhead 從「switch 比對」改為「delegate call」，而後者本身的 overhead 反而更高。
+IO_read/write（PPU/APU 寄存器分派）每幀僅被呼叫幾百次。將 27-case switch 改為 `Func<byte>[]`/`Action<byte>[]` delegate table，每次呼叫的 overhead 從「switch jump table」改為「delegate object virtual dispatch」，後者更慢。
 
-**結論**：函式指標表最佳化只對高頻呼叫路徑（>100K 次/幀）有意義。CPU opcode dispatch（~30K/幀 × 多週期 ≈ 1.7M/幀）值得改；IO register dispatch（幾百次/幀）不值得。
+實測：270.2 → 259.3 FPS（-4.0%）。IO 呼叫頻率極低，delegate overhead 完全壓垮節省效果。
+
+**第二次嘗試（三段式 if/else）：見 §2.11，結果 +1.3%。**
+
+**結論**：`Func<T>`/`Action<T>` delegate table 在低頻路徑上沒有優勢。但 switch→if/else 結構改變在低頻路徑仍可有少量收益（branch predictor effect）。
+
+---
+
+### 3.8 delegate* 參數化 Op_XX shared helpers（-3.2%）
+
+嘗試將 161 個 Op_XX handler 中的重複邏輯提取為 shared helper，用 `delegate*<byte,void>` 參數傳入操作函式：
+
+```csharp
+// 改前：每個 handler 有自己的 operand + op 邏輯
+// 改後：shared ExecReadZP(delegate*<byte,void> op) { ... op(operand); }
+```
+
+結果：-3.2%（~264.8 → ~256.4 FPS）。
+
+**原因**：`delegate*<byte,void>` 的 callee 是各 Op_ORA/Op_AND/Op_EOR 等方法。當這些方法以函式指標傳遞時，JIT **無法 inline** 被呼叫的方法（函式指標是 indirect call，無法靜態分析目標）。原本 JIT 可以 inline `Op_ORA` 的 2 行邏輯，現在必須真正走一次 indirect `calli`，每個 opcode 多 ~3–5 cycles。~9.4M Op_XX calls/sec × 3 cycles = ~28ms/sec 額外開銷。
 
 ---
 
@@ -347,6 +414,7 @@ IO_read/write（PPU/APU 寄存器分派）每幀僅被呼叫幾百次。將 27-c
 | **熱路徑地址範圍 fast-path** | P12（RAM fast-path） | +2.8% | 最高頻地址範圍繞過所有 dispatch |
 | **AggressiveInlining 小型高頻方法** | P18A | +2.2% | Debug JIT 不主動 inline |
 | **static 欄位 local shadow** | P17 | +1.4% | 減少高頻函式的 memory load 次數 |
+| **switch → if/else 改善 branch predictor** | P15/P16/P17（CPU/PPU/IO） | +2.2/+2.0/+1.3% | Predictor 能對各 branch 獨立學習頻率，jump table 的 indirect jump 則無此優勢 |
 
 ### 4.2 不有效或反效果的最佳化類型
 
@@ -354,7 +422,8 @@ IO_read/write（PPU/APU 寄存器分派）每幀僅被呼叫幾百次。將 27-c
 |------|---------|------|
 | **手動展開固定迴圈** | P20、P22 | JIT 已處理，方法膨脹惡化 I-cache |
 | **過大方法 AggressiveInlining** | P18B | >30 行即有 I-cache 壓力風險 |
-| **低頻路徑函式指標化** | P23 | 呼叫頻率太低，dispatch 節省 < delegate 開銷 |
+| **低頻路徑 delegate table** | P23（第一次） | `Func<T>[]`/`Action<T>[]` virtual dispatch 比 switch jump table 慢，-4.0% |
+| **delegate* 參數化 shared helpers** | delegate* shared dispatch | 阻斷 JIT inlining，每 opcode 多一次 indirect call，-3.2% |
 | **instance method 的 delegate* 化** | P25/P26 | wrapper 增加呼叫層，比 managed delegate 更慢 |
 | **增加 cache 欄位數量** | P13、P27 | 額外欄位佔 cache line，反而 cache miss 增加 |
 | **合併永遠-not-taken 的 if** | P19 | Branch predictor 已預測正確，合併增加 load 次數 |
@@ -439,7 +508,7 @@ Clean re-run:       246.30 FPS  (自然波動範圍內)
 
 ## 五、成果摘要
 
-### 最終累計（14 項成功最佳化）
+### 最終累計（19 項成功最佳化）
 
 | # | 項目 | Build | FPS 前 | FPS 後 | 改善 |
 |---|------|-------|-------|-------|------|
@@ -458,14 +527,18 @@ Clean re-run:       246.30 FPS  (自然波動範圍內)
 | — | *切換至 Release 組態* | **Release** | — | 241.45 | (新基線) |
 | 13 | catchUpPPU/APU loop unroll | Release | 241.45 | 252.00 | **+4.3%** |
 | 14 | Sprite 0 hit range check 條件重排 | Release | 252.00 | ~259.00 | **+2.8%** |
+| 15 | CPU operationCycle switch → if/else | Release | ~259.00 | ~264.8 | **+2.2%** |
+| 16 | PPU ppu_rendering_tick switch(cx&7) → if/else | Release | ~264.8 | ~270.2 | **+2.0%** |
+| 17 | IO_read/IO_write switch → 三段式 if/else | Release | ~270.2 | ~273.8 | **+1.3%** |
 
 **Debug 組態累計：181.70 → 247.95 FPS（+36.5%）**
-**Release 組態新增：241.45 → ~259 FPS（+7.3%）**
+**Release 組態新增：241.45 → ~273.8 FPS（+13.4%）**
+**整體累計（Debug 基線起）：181.70 → ~273.8 FPS（+50.7%）**
 **.NET 10 RyuJIT（相同程式碼）：~348 FPS**
 
-### 失敗嘗試（14 項，已全數 revert）
+### 失敗嘗試（16 項，已全數 revert）
 
-P1、P2、P4（v1+v2）、P13、P16、P18B、P19、P20、P21、P22、P23、P25/P26、P27
+P1、P2、P4(v1+v2)、P13、P16(old)、P18B、P19、P20、P21、P22、P23(delegate table)、P25/P26、P27、delegate* shared dispatch helpers
 
 ---
 
