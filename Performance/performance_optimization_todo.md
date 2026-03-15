@@ -60,6 +60,8 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 | 17 | CPU.cs operationCycle switch(≤8 cases) → if/else（Op_XX 單行 + addressing helpers） | ~259.00 | ~264.8 | **+2.2%** | ✅ KEEP | [v60](2026-03-15_perf_v60.md) [v61](2026-03-15_perf_v61.md) |
 | 18 | Op_XX 共用 dispatch helpers（delegate*<byte/ushort,void> 參數化 161 個 handler） | ~264.8 | ~256.2 | **-3.2%** | ❌ REVERT | [v62](2026-03-15_perf_v62.md) [v63](2026-03-15_perf_v63.md) [v64](2026-03-15_perf_v64.md) |
 | 19 | PPU.cs ppu_rendering_tick() switch(cx & 7)（8 cases）→ if/else chain | ~264.8 | ~270.2 | **+2.0%** | ✅ KEEP | [v65](2026-03-15_perf_v65.md) [v66](2026-03-15_perf_v66.md) [v67](2026-03-15_perf_v67.md) |
+| 20 | IO.cs IO_read/IO_write switch → 三段式 if/else（PPU/APU channels/OAM+APU） | ~270.2 | ~273.8 | **+1.3%** | ✅ KEEP | [v73](2026-03-15_perf_v73.md) |
+| 21 | irqLinePrev/irqLineCurrent dirty flag（UpdateIRQLine 只在 flag 變動時呼叫） | ~273.8 | ~277.3 | **+1.3%** | ✅ KEEP | [v81](2026-03-15_perf_v81.md) [v82](2026-03-15_perf_v82.md) |
 
 ---
 
