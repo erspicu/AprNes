@@ -363,33 +363,36 @@ namespace AprNes
                     ppu_rendering_tick(cx);
 
                 // Per-dot sprite evaluation (visible scanlines only)
-                if (scanline >= 0 && scanline < 240 && ppuRenderingEnabled)
+                if (AccuracyOptA)
                 {
-                    // Dots 1-64: clear secondary OAM (write $FF, 2 dots per byte)
-                    if (cx >= 1 && cx <= 64)
+                    if (scanline >= 0 && scanline < 240 && ppuRenderingEnabled)
                     {
-                        oamCopyBuffer = 0xFF;
-                        if ((cx & 1) == 0)
-                            secondaryOAM[(cx >> 1) - 1] = 0xFF;
+                        // Dots 1-64: clear secondary OAM (write $FF, 2 dots per byte)
+                        if (cx >= 1 && cx <= 64)
+                        {
+                            oamCopyBuffer = 0xFF;
+                            if ((cx & 1) == 0)
+                                secondaryOAM[(cx >> 1) - 1] = 0xFF;
+                        }
+                        // Dot 65: initialize evaluation FSM
+                        else if (cx == 65)
+                        {
+                            sprite0_eval_addr = spr_ram_add;
+                            SpriteEvalInit();
+                            SpriteEvalTick();
+                        }
+                        // Dots 66-256: per-dot evaluation
+                        else if (cx >= 66 && cx <= 256)
+                        {
+                            SpriteEvalTick();
+                            if (cx == 256) SpriteEvalEnd();
+                        }
                     }
-                    // Dot 65: initialize evaluation FSM
-                    else if (cx == 65)
+                    // Pre-render line: save sprite0_eval_addr at dot 65
+                    else if (scanline == 261 && cx == 65 && ppuRenderingEnabled)
                     {
                         sprite0_eval_addr = spr_ram_add;
-                        SpriteEvalInit();
-                        SpriteEvalTick();
                     }
-                    // Dots 66-256: per-dot evaluation
-                    else if (cx >= 66 && cx <= 256)
-                    {
-                        SpriteEvalTick();
-                        if (cx == 256) SpriteEvalEnd();
-                    }
-                }
-                // Pre-render line: save sprite0_eval_addr at dot 65
-                else if (scanline == 261 && cx == 65 && ppuRenderingEnabled)
-                {
-                    sprite0_eval_addr = spr_ram_add;
                 }
 
                 if (scanline >= 0 && scanline < 240)

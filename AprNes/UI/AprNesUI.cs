@@ -236,6 +236,9 @@ namespace AprNes
             else
                 NesCore.Volume = 70;
 
+            // 讀取 Accuracy 選項設定 (預設全開)
+            NesCore.AccuracyOptA = !AppConfigure.ContainsKey("AccuracyOptA") || AppConfigure["AccuracyOptA"] != "0";
+
             NES_init_KeyMap();
 
         }
@@ -310,6 +313,7 @@ namespace AprNes
             AppConfigure["ScreenFull"] = ScreenCenterFull.ToString();
             AppConfigure["Sound"] = NesCore.AudioEnabled ? "1" : "0";
             AppConfigure["Volume"] = NesCore.Volume.ToString();
+            AppConfigure["AccuracyOptA"] = NesCore.AccuracyOptA ? "1" : "0";
 
             string conf = "";
             foreach (string i in AppConfigure.Keys)
