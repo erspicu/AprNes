@@ -1,6 +1,7 @@
 # AprNes - C# NES Emulator
 
 > 🇺🇸 English | [🇹🇼 繁體中文](#aprnes---c-nes-模擬器)
+> Last updated: 2026-03-15 11:50
 
 A cycle-accurate NES (Nintendo Entertainment System) emulator written in C#, developed in collaboration with AI (GitHub Copilot / Claude). The project achieves **perfect scores** on both the blargg and AccuracyCoin test suites.
 
@@ -290,3 +291,7 @@ python run_tests.py -j 10
 | 11 | 高爾夫俱樂部 |
 | 66 (GxROM) | 超級馬利歐兄弟 / 打鴨子 |
 | 71 | 生化戰士 |
+
+---
+
+*最後編修：2026-03-15 11:50*
