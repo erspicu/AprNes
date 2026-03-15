@@ -6,9 +6,10 @@ A cycle-accurate NES (Nintendo Entertainment System) emulator written in C#, dev
 
 ## Links
 
-- **Website**: https://erspicu.github.io/AprNes/
+- **Website**: https://www.baxermux.org/myemu/AprNes/
 - **GitHub**: https://github.com/erspicu/AprNes
-- **Test Reports**: https://erspicu.github.io/AprNes/report/
+- **Blargg & misc test report**: https://www.baxermux.org/myemu/AprNes/report/index.html
+- **AccuracyCoin report**: https://www.baxermux.org/myemu/AprNes/report/AccuracyCoin_report.html
 - **Support**: https://buymeacoffee.com/baxermux
 
 ## Test Results
@@ -147,9 +148,10 @@ python run_tests.py -j 10
 
 ## 連結
 
-- **官方網站**: https://erspicu.github.io/AprNes/
+- **官方網站**: https://www.baxermux.org/myemu/AprNes/
 - **GitHub**: https://github.com/erspicu/AprNes
-- **測試報告**: https://erspicu.github.io/AprNes/report/
+- **blargg 與其他零星測試 ROM 報告**: https://www.baxermux.org/myemu/AprNes/report/index.html
+- **AccuracyCoin 報告**: https://www.baxermux.org/myemu/AprNes/report/AccuracyCoin_report.html
 - **贊助**: https://buymeacoffee.com/baxermux
 
 ## 測試成績
