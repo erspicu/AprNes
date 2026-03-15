@@ -68,6 +68,7 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void StartCpuCycle()
         {
+            irqLinePrev = irqLineCurrent; // save BEFORE any mutations in this cycle
             masterClock += MASTER_PER_CPU;
             cpuCycleCount++;
             m2PhaseIsWrite = (cpuCycleCount & 1) != 0;
@@ -82,7 +83,14 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void EndCpuCycle()
         {
-            irqLinePrev = irqLineCurrent;
+            // irqLinePrev saved at start of StartCpuCycle
+            // irqLineCurrent maintained by UpdateIRQLine() at every mutation site
+        }
+
+        // Called at every site that changes statusframeint, apuintflag, statusdmcint, or statusmapperint
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void UpdateIRQLine()
+        {
             irqLineCurrent = (statusframeint && !apuintflag) || statusdmcint || statusmapperint;
         }
 
