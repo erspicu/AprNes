@@ -28,6 +28,7 @@ namespace AprNes
             groupBox2.Text = LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["joypad"];
             groupBox4.Text = LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["screen"];
             LimitFPS_checkBox.Text = LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["limitfps"];
+            perdotFSM.Text = LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["perdotFSM"];
             label18.Text = LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["langchoose"];
             label9.Text = "Shift + p " + LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["capture_path"];
             groupBox3.Text = LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["scanline"];
@@ -153,6 +154,9 @@ namespace AprNes
             // 音效設定寫入並立即生效
             NesCore.AudioEnabled = SoundcheckBox.Checked;
             NesCore.Volume = SoundtrackBar.Value;
+
+            // Accuracy 設定寫入並立即生效
+            NesCore.AccuracyOptA = perdotFSM.Checked;
 
             AprNesUI.GetInstance().AppConfigure["CaptureScreenPath"] = screen_path.Text;
             AprNesUI.GetInstance().key_A = key_A;
@@ -482,6 +486,9 @@ namespace AprNes
             SoundcheckBox.Checked = NesCore.AudioEnabled;
             SoundtrackBar.Value = Math.Max(0, Math.Min(100, NesCore.Volume));
             UpdateSoundUI();
+
+            // Accuracy 設定載入
+            perdotFSM.Checked = NesCore.AccuracyOptA;
         }
 
         private void choose_dir_Click(object sender, EventArgs e)
