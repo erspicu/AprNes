@@ -157,6 +157,7 @@ namespace AprNes
             // 清除 IRQ flags
             statusframeint = false;
             statusdmcint = false;
+            UpdateIRQLine();
 
             // 模擬 $4015=$00: 停止所有聲道
             for (int i = 0; i < 4; i++)
@@ -299,6 +300,7 @@ namespace AprNes
             apuintflag = false;      // $4017=$00: IRQ 未禁止
             statusframeint = false;
             statusdmcint = false;
+            UpdateIRQLine();
 
             // DMC 完整重置
             dmcrate = dmcperiods[0]; dmctimer = dmcrate;
@@ -334,6 +336,7 @@ namespace AprNes
             {
                 statusframeint = false;
                 frameIrqClearPending = false;
+                UpdateIRQLine();
             }
 
             // Mode 0: IRQ post-fire (continues for 2 cycles after initial set)
@@ -346,6 +349,7 @@ namespace AprNes
                 // On the last assertion cycle, check if suppress flag clears it
                 if (irqAssertCycles == 0 && apuintflag)
                     statusframeint = false;
+                UpdateIRQLine();
             }
 
             // Frame Counter：non-uniform step intervals matching real NES (~240Hz)
@@ -479,6 +483,7 @@ namespace AprNes
             ++framectr;
             framectr %= ctrmode;
             setvolumes();
+            UpdateIRQLine();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -706,7 +711,10 @@ namespace AprNes
                     if (dmcloop)
                         restartdmc();
                     else if (dmcirq)
+                    {
                         statusdmcint = true;
+                        UpdateIRQLine();
+                    }
                 }
             }
         }
@@ -863,7 +871,7 @@ namespace AprNes
         static void apu_4010(byte val)
         {
             dmcirq  = (val & 0x80) != 0;
-            if (!dmcirq) statusdmcint = false;   // disable 時清除 DMC IRQ flag
+            if (!dmcirq) { statusdmcint = false; UpdateIRQLine(); }   // disable 時清除 DMC IRQ flag
             dmcloop = (val & 0x40) != 0;
             dmcrate = dmcperiods[val & 0x0F];
         }
@@ -947,6 +955,7 @@ namespace AprNes
                 }
             }
             statusdmcint = false;
+            UpdateIRQLine();
         }
 
     }

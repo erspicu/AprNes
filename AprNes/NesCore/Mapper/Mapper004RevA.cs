@@ -19,7 +19,10 @@ namespace AprNes
             //   - explicit reload was requested via $C001 write (IRQReset)
             // Does NOT fire when counter auto-reloads to 0 from already being 0
             if (IRQCounter == 0 && IRQ_enable && (oldCounter != 0 || wasReset))
+            {
                 NesCore.statusmapperint = true;
+                NesCore.UpdateIRQLine();
+            }
         }
     }
 }

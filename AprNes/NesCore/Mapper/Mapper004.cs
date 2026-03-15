@@ -72,6 +72,7 @@ namespace AprNes
             if (IRQCounter == 0 && IRQ_enable)
             {
                 NesCore.statusmapperint = true; // assert /IRQ line, polled at instruction boundary
+                NesCore.UpdateIRQLine();
             }
         }
 
@@ -126,6 +127,7 @@ namespace AprNes
                 {
                     IRQ_enable = false;
                     NesCore.statusmapperint = false; // acknowledge: de-assert /IRQ line
+                    NesCore.UpdateIRQLine();
                 }
             }
             else//odd
