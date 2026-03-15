@@ -67,7 +67,7 @@
 
 - 新增 `int sl = scanline` + `bool rend = ppuRenderingEnabled` 兩個 local
 - 反而增加 register pressure，JIT 生成更差的程式碼
-- **結論**：在 .NET Fx 4.6.1 JIT 下，函數已有足夠 local，多加反而有害
+- **結論**：在 .NET Fx 4.8.1 JIT 下，函數已有足夠 local，多加反而有害
 - 已 revert，不採用
 
 ---
@@ -128,7 +128,7 @@
 
 - 每次呼叫 8 個間接 palette lookup（bgPixel 0-3 → uint 顏色）是主要成本
 - SIMD 僅能加速最後的 store 階段（8 uint → 2 × Vector128 stores）
-- Palette lookup 仍是 scalar（gather 需要 AVX2，.NET Fx 4.6.1 可用但複雜）
+- Palette lookup 仍是 scalar（gather 需要 AVX2，.NET Fx 4.8.1 可用但複雜）
 - **建議**：與其費工實作，.NET 10 RyuJIT 自動向量化已提供 +34% 收益
 
 ---
@@ -140,7 +140,7 @@
 - **測試時注意 CPU 熱降頻**：連續多次 20s 測試後需休息 30s，否則 FPS 會虛假偏低
 - ProcessPendingDma 的 state machine 正確性敏感，暫不列入優化
 
-## 優化收益總結（.NET Fx 4.6.1 Release）
+## 優化收益總結（.NET Fx 4.8.1 Release）
 
 | 優化 | FPS | 累計 |
 |------|-----|------|

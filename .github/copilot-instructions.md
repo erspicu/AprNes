@@ -38,7 +38,7 @@ AprNes/bin/Debug/AprNes.exe
 
 ## Architecture
 
-C# NES emulator targeting .NET Framework 4.6.1, Windows Forms, x64 only. `AllowUnsafeBlocks = true` is required.
+C# NES emulator targeting .NET Framework 4.8.1, Windows Forms, x64 only. `AllowUnsafeBlocks = true` is required.
 
 ### Single partial class design
 

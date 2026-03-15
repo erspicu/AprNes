@@ -16,13 +16,13 @@
 
 | # | Runtime | Total Frames | FPS | Relative Baseline |
 |---|----------|------------|-----|---------|
-| 1 | .NET Framework 4.6.1 JIT | 4,220 | **422.0** | 100% |
+| 1 | .NET Framework 4.8.1 JIT | 4,220 | **422.0** | 100% |
 | 2 | Native AOT (NesCoreNative.dll) | 5,500 | **550.0** | +30.3% |
 | 3 | .NET 8 RyuJIT | 7,018 | **701.8** | +66.3% |
 | 4 | .NET 10 RyuJIT | 7,640 | **764.0** | +81.0% |
 
 ```
-.NET Framework 4.6.1 JIT  ████████████████████  422 FPS  (baseline 100%)
+.NET Framework 4.8.1 JIT  ████████████████████  422 FPS  (baseline 100%)
 Native AOT                 ██████████████████████████  550 FPS  (+30%)
 .NET 8 RyuJIT              █████████████████████████████████  702 FPS  (+66%)
 .NET 10 RyuJIT             ████████████████████████████████████  764 FPS  (+81%)
@@ -91,7 +91,7 @@ Difference      : +62.2 FPS (.NET 10 is ~+8.9% faster)
 
 | Runtime | FPS | Best Use Case | Poor Fit |
 |----------|-----|---------|---------|
-| .NET Framework 4.6.1 JIT | 422 | Maintaining existing Windows projects | High-performance requirements, cross-platform |
+| .NET Framework 4.8.1 JIT | 422 | Maintaining existing Windows projects | High-performance requirements, cross-platform |
 | Native AOT | 550 | CLI tools, containers, fast startup | Long-running CPU-bound computation |
 | .NET 8 RyuJIT | 702 | High-performance apps, broad deployment environments | Startup-time-critical scenarios |
 | **.NET 10 RyuJIT** | **764** | **High performance + latest version optimizations** | Environments requiring older compatibility |
@@ -104,7 +104,7 @@ Difference      : +62.2 FPS (.NET 10 is ~+8.9% faster)
 
 3. **Native AOT is not the best choice for computational throughput**: AOT's role is "startup speed" and "deployment convenience". In this project, the existence of NesCoreNative.dll is to allow other languages to call the NES core, not to pursue maximum FPS.
 
-4. **.NET Framework 4.6.1 JIT is still usable**: 422 FPS gives a 7× headroom over the NES 60 FPS target; there is no perceivable difference for users, but its performance ceiling is much lower than modern .NET.
+4. **.NET Framework 4.8.1 JIT is still usable**: 422 FPS gives a 7× headroom over the NES 60 FPS target; there is no perceivable difference for users, but its performance ceiling is much lower than modern .NET.
 
 5. **Migrating to .NET 8 or .NET 10 provides real benefits**: For performance alone, migrating to .NET 8 yields a free +66% performance gain; upgrading further to .NET 10 adds another +8.9%, at the cost of requiring the corresponding Runtime on the target machine.
 
@@ -135,7 +135,7 @@ writeMask    = hasSprMask & condMask
 result       = BlendVariable(screen, sprColor, writeMask)  ← SSE4.1 core
 ```
 
-.NET Framework 4.6.1 retains the original scalar path (no `System.Runtime.Intrinsics`).
+.NET Framework 4.8.1 retains the original scalar path (no `System.Runtime.Intrinsics`).
 
 ---
 
@@ -181,9 +181,9 @@ Test method: Two independent processes, running in alternating order (to elimina
 ### Core Findings of This Study
 
 #### 1. Runtime Selection
-- **.NET 10 RyuJIT** is currently the highest-throughput choice (764 FPS): **+81%** faster than .NET Framework 4.6.1, and +9% faster than .NET 8
+- **.NET 10 RyuJIT** is currently the highest-throughput choice (764 FPS): **+81%** faster than .NET Framework 4.8.1, and +9% faster than .NET 8
 - **Native AOT** is not positioned as "a faster JIT" but as "fast startup + deployment convenience"; for long-running CPU-bound computation, AOT (550) trails JIT (764) by about 28%
-- **.NET Framework 4.6.1** provides a 7× headroom over the NES 60 FPS target with no perceptible difference for users, but its performance ceiling is fixed
+- **.NET Framework 4.8.1** provides a 7× headroom over the NES 60 FPS target with no perceptible difference for users, but its performance ceiling is fixed
 
 #### 2. Why JIT Consistently Outperforms AOT (Computation Throughput)
 - **PGO (Profile-Guided Optimization)**: JIT can observe real hot paths at runtime and re-optimize; AOT can only rely on static analysis
@@ -215,7 +215,7 @@ This project's Sprite Pass 3 (240 times/frame, 1KB within L1 cache) does not mee
 #endif
         CompositeSpritesScalar(...);
 ```
-- `NETFRAMEWORK`: .NET Framework 4.6.1
+- `NETFRAMEWORK`: .NET Framework 4.8.1
 - `NET8_0_OR_GREATER`: covers .NET 8 and .NET 10
 - `NET10_0_OR_GREATER`: .NET 10+ only
 - Conditional compilation symbols are automatically defined by the SDK; no extra csproj configuration needed
@@ -231,7 +231,7 @@ This project's Sprite Pass 3 (240 times/frame, 1KB within L1 cache) does not mee
 #### 6. Confirmed Role of Each Target
 | Project | Runtime | Primary Purpose |
 |------|---------|---------|
-| `AprNes` (.NET Fx 4.6.1) | JIT | Original development version, maximum compatibility |
+| `AprNes` (.NET Fx 4.8.1) | JIT | Original development version, maximum compatibility |
 | `NesCoreNative` (Native AOT) | AOT | NES core DLL, callable from other languages |
 | `AprNesAOT` (.NET 8) | JIT | High-performance version, broad deployment environments |
 | `AprNesAOT10` (.NET 10) | JIT | Highest performance, requires .NET 10 Runtime |

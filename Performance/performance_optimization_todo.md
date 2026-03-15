@@ -775,7 +775,7 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
   | 方法 | 可行性 | 預估收益 | 說明 |
   |------|--------|---------|------|
-  | .NET 4.6.1（現況）| ❌ 無法直接用 | — | C# 9 語法不支援，MSBuild 14 Roslyn 太舊 |
+  | .NET 4.8.1（現況）| ❌ 無法直接用 | — | C# 9 語法不支援，MSBuild 14 Roslyn 太舊 |
   | **升級 .NET 4.8 + LangVersion 9** | ✅ **可行** | 3–8% | CLR 支援 `calli` IL，加 `<LangVersion>9.0</LangVersion>` 即可用 `delegate*<managed, void>`；JIT 最佳化不如 .NET 8 |
   | 升級 .NET 8 Windows | ✅ 最完整 | 5–15% | 改 `TargetFramework` → `net8.0-windows`；CoreCLR JIT 對 `calli` 最佳化更強；連帶啟用 SIMD / PGO |
   | `IntPtr[]` + Reflection.Emit `calli` | ⚠️ 複雜 | 3–8% | 不升級也能用，但維護困難，幾乎不值得 |

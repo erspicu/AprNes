@@ -36,7 +36,7 @@ bash run_tests_report.sh --json --screenshots
 
 ## Architecture
 
-This is a cycle-accurate NES emulator in C# (.NET Framework 4.6.1, Windows Forms, unsafe code).
+This is a cycle-accurate NES emulator in C# (.NET Framework 4.8.1, Windows Forms, unsafe code).
 
 ### Single partial class design
 

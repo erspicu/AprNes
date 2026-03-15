@@ -15,7 +15,7 @@
 
 | 項目 | 說明 |
 |------|------|
-| 語言 | C# (.NET Framework 4.6.1) |
+| 語言 | C# (.NET Framework 4.8.1) |
 | UI 框架 | Windows Forms |
 | 平台 | Windows x64 |
 | 編譯選項 | `AllowUnsafeBlocks = true` |

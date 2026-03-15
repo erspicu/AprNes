@@ -198,7 +198,7 @@ Or directly in PowerShell:
 ### Test Flow
 
 ```
-[1/4] .NET Framework 4.6.1 JIT  (AprNes.exe)         ← writes header + line 1
+[1/4] .NET Framework 4.8.1 JIT  (AprNes.exe)         ← writes header + line 1
 [2/4] .NET 8 RyuJIT              (AprNesAOT.exe)       ← appends line 2 (JIT)
 [3/4] Native AOT                 (AprNesAOT.exe)       ← appends line 3 (AOT DLL)
 [4/4] .NET 10 RyuJIT             (AprNesAOT10.exe)     ← appends line 4
@@ -222,7 +222,7 @@ Date : 2026-03-03 15:00:00
 OS   : Microsoft Windows NT 10.0.19045.0
 CPU  : 13th Gen Intel(R) Core(TM) i7-1370P
 
-JIT [.NET Framework 4.6.1 JIT] :    4220 frames      422.0 FPS
+JIT [.NET Framework 4.8.1 JIT] :    4220 frames      422.0 FPS
 JIT [.NET 8 RyuJIT]            :    7018 frames      701.8 FPS
 AOT [NesCoreNative]            :    5500 frames      550.0 FPS
 JIT [.NET 10 RyuJIT]           :    7640 frames      764.0 FPS

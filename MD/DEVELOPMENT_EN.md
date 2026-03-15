@@ -15,7 +15,7 @@
 
 | Item | Description |
 |------|------|
-| Language | C# (.NET Framework 4.6.1) |
+| Language | C# (.NET Framework 4.8.1) |
 | UI Framework | Windows Forms |
 | Platform | Windows x64 |
 | Compiler Option | `AllowUnsafeBlocks = true` |
