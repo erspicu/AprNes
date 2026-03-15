@@ -210,46 +210,37 @@ namespace AprNes
         {
             if (cx < 256 || (cx >= 320 && cx < 336))
             {
-                switch (cx & 7)
-                {
-                    case 0:
-                        ioaddr = 0x2000 | (vram_addr & 0x0FFF);
-                        if (mapper == 4) NotifyMapperA12(ioaddr);  // NT addr, A12=0
-                        break;
-                    case 1:
-                        NTVal = ppu_ram[ioaddr];
-                        break;
-                    case 2:
-                        ioaddr = 0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07);
-                        break;
-                    case 3:
-                        ATVal = (byte)((ppu_ram[ioaddr] >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
-                        bg_attr_p3 = bg_attr_p2; bg_attr_p2 = bg_attr_p1; bg_attr_p1 = ATVal;
-                        break;
-                    case 4:
-                        ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
-                        if (mapper == 4) NotifyMapperA12(ioaddr);  // CHR low addr, A12=BG table bit
-                        break;
-                    case 5:
-                        lowTile = MapperObj.MapperR_CHR(ioaddr);
-                        break;
-                    case 6:
-                        ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
-                        break;
-                    case 7:
-                        highTile = MapperObj.MapperR_CHR(ioaddr);
-                        // Render 8 pixels using shift registers BEFORE reload (visible only, BG on)
-                        if (scanline < 240 && cx < 256 && ShowBackGround)
-                            RenderBGTile(cx);
-                        // Load shift registers (high = old-low = previous tile, low = new tile)
-                        lowshift  = (ushort)((lowshift  << 8) | lowTile);
-                        highshift = (ushort)((highshift << 8) | highTile);
-                        // Sync per-dot shadow registers: load new tile into low byte
-                        // (the per-dot shifting already shifted the old data up by 8 bits)
-                        lowshift_s0  = (ushort)((lowshift_s0  & 0xFF00) | lowTile);
-                        highshift_s0 = (ushort)((highshift_s0 & 0xFF00) | highTile);
-                        CXinc();
-                        break;
+                int phase = cx & 7;
+                if (phase == 0) {
+                    ioaddr = 0x2000 | (vram_addr & 0x0FFF);
+                    if (mapper == 4) NotifyMapperA12(ioaddr);  // NT addr, A12=0
+                } else if (phase == 1) {
+                    NTVal = ppu_ram[ioaddr];
+                } else if (phase == 2) {
+                    ioaddr = 0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07);
+                } else if (phase == 3) {
+                    ATVal = (byte)((ppu_ram[ioaddr] >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
+                    bg_attr_p3 = bg_attr_p2; bg_attr_p2 = bg_attr_p1; bg_attr_p1 = ATVal;
+                } else if (phase == 4) {
+                    ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
+                    if (mapper == 4) NotifyMapperA12(ioaddr);  // CHR low addr, A12=BG table bit
+                } else if (phase == 5) {
+                    lowTile = MapperObj.MapperR_CHR(ioaddr);
+                } else if (phase == 6) {
+                    ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
+                } else {
+                    highTile = MapperObj.MapperR_CHR(ioaddr);
+                    // Render 8 pixels using shift registers BEFORE reload (visible only, BG on)
+                    if (scanline < 240 && cx < 256 && ShowBackGround)
+                        RenderBGTile(cx);
+                    // Load shift registers (high = old-low = previous tile, low = new tile)
+                    lowshift  = (ushort)((lowshift  << 8) | lowTile);
+                    highshift = (ushort)((highshift << 8) | highTile);
+                    // Sync per-dot shadow registers: load new tile into low byte
+                    // (the per-dot shifting already shifted the old data up by 8 bits)
+                    lowshift_s0  = (ushort)((lowshift_s0  & 0xFF00) | lowTile);
+                    highshift_s0 = (ushort)((highshift_s0 & 0xFF00) | highTile);
+                    CXinc();
                 }
             }
             else if (cx == 256)
