@@ -319,6 +319,7 @@ namespace AprNes
             // avoiding the inner sprCol calculation for the other 248 dots per scanline.
             if (sprite0_on_line && !isSprite0hit
                 && cx >= sprite0_line_x && cx < sprite0_line_x + 8
+                && cx < 256
                 && scanline >= 0 && scanline < 240
                 && ShowBackGround && ShowSprites)
             {
