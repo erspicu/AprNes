@@ -11,7 +11,7 @@ namespace AprNes
                 if      (addr == 0x2002) return ppu_r_2002();
                 else if (addr == 0x2004) return ppu_r_2004();
                 else if (addr == 0x2007) return ppu_r_2007();
-                else                     return cpubus;
+                else                     return openbus;  // write-only PPU regs return PPU open bus
             }
             else  // APU/IO $4015-$4017
             {
