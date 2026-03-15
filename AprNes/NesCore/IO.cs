@@ -71,6 +71,7 @@ namespace AprNes
                     ctrmode        = ((val & 0x80) != 0) ? 5 : 4;
                     apuintflag     = (val & 0x40) != 0;
                     if (apuintflag) statusframeint = false;
+                    UpdateIRQLine();
                     framectr       = 0;
                     irqAssertCycles = 0;
                     int jitter = 2 + (apucycle & 1);

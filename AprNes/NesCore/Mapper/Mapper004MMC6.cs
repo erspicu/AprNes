@@ -18,7 +18,10 @@ namespace AprNes
             IRQReset = false;
 
             if (IRQCounter == 0 && IRQ_enable && (oldCounter != 0 || wasReset))
+            {
                 NesCore.statusmapperint = true;
+                NesCore.UpdateIRQLine();
+            }
         }
 
         // $A001 odd -> PRG-RAM protect register
