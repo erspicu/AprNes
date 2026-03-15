@@ -87,6 +87,34 @@ namespace AprNes
 
         public static int Run(string[] args)
         {
+            // Load accuracy settings from INI (same file as GUI uses)
+            string iniPath = Path.Combine(
+                Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location),
+                "AprNes.ini");
+            if (File.Exists(iniPath))
+            {
+                foreach (string line in File.ReadAllLines(iniPath))
+                {
+                    string[] kv = line.Split(new char[] { '=' }, 2);
+                    if (kv.Length == 2 && kv[0].Trim() == "AccuracyOptA")
+                    {
+                        NesCore.AccuracyOptA = kv[1].Trim() != "0";
+                        break;
+                    }
+                }
+            }
+
+            // --accuracy flag overrides INI: presence of 'A' enables OPT-A, absence disables it
+            for (int i = 0; i < args.Length - 1; i++)
+            {
+                if (args[i] == "--accuracy")
+                {
+                    string flags = args[i + 1].ToUpper();
+                    NesCore.AccuracyOptA = flags.IndexOf('A') >= 0;
+                    break;
+                }
+            }
+
             // ── benchmark mode: AprNes.exe --benchmark <rom> [seconds] [output] ──
             if (args.Length >= 2 && args[0] == "--benchmark")
             {
@@ -98,15 +126,18 @@ namespace AprNes
                 return 0;
             }
 
-            // ── perf mode: AprNes.exe --perf <rom> [seconds] [note] ──
+            // ── perf mode: AprNes.exe [--accuracy FLAGS] --perf <rom> [seconds] [note] ──
             // Runs a headless benchmark, saves versioned MD report to Performance/
-            if (args.Length >= 2 && args[0] == "--perf")
             {
-                string rom     = args[1];
-                int s; int seconds = args.Length >= 3 && int.TryParse(args[2], out s) ? s : 20;
-                string note    = args.Length >= 4 ? args[3] : null;
-                BenchmarkRunner.RunPerf(rom, seconds, note);
-                return 0;
+                int perfIdx = Array.IndexOf(args, "--perf");
+                if (perfIdx >= 0 && perfIdx + 1 < args.Length)
+                {
+                    string rom     = args[perfIdx + 1];
+                    int s; int seconds = (perfIdx + 2 < args.Length && int.TryParse(args[perfIdx + 2], out s)) ? s : 20;
+                    string note    = (perfIdx + 3 < args.Length) ? args[perfIdx + 3] : null;
+                    BenchmarkRunner.RunPerf(rom, seconds, note);
+                    return 0;
+                }
             }
 
             string romPath = null;
@@ -166,6 +197,9 @@ namespace AprNes
                     case "--dump-debug":
                         dumpDebug = true;
                         break;
+                    case "--accuracy":
+                        if (i + 1 < args.Length) i++; // already pre-parsed
+                        break;
                     case "--expected-crc":
                         if (i + 1 < args.Length)
                         {
@@ -198,6 +232,7 @@ namespace AprNes
             NesCore.HeadlessMode = true;
             NesCore.OnError = msg => Console.Error.WriteLine("ERROR: " + msg);
             NesCore.AudioEnabled = false;
+
 
             // Compute max frames
             // NES runs ~60.0988 fps; if --time given, compute frame limit

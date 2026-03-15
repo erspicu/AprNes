@@ -96,7 +96,7 @@ def build_test_list():
     return tests
 
 
-def run_one(idx, suite, rom, extra, exe, rombase):
+def run_one(idx, suite, rom, extra, exe, rombase, accuracy_flags=None):
     """Run a single test ROM. Returns (idx, status, name, detail)."""
     name = f"{suite}/{rom}"
     rompath = os.path.join(rombase, suite, rom)
@@ -104,6 +104,8 @@ def run_one(idx, suite, rom, extra, exe, rombase):
         return (idx, "SKIP", name, "")
 
     cmd = [exe, "--rom", rompath, "--wait-result"] + extra.split()
+    if accuracy_flags is not None:
+        cmd += ["--accuracy", accuracy_flags]
     try:
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout_b, stderr_b = proc.communicate(timeout=30)
@@ -124,6 +126,7 @@ def run_one(idx, suite, rom, extra, exe, rombase):
 def main():
     parser = argparse.ArgumentParser(description="Run NES test ROMs")
     parser.add_argument("-j", "--jobs", type=int, default=10, help="Parallel threads (default: 10)")
+    parser.add_argument("--accuracy", type=str, default=None, help="Accuracy flags e.g. ABCDEF (all on) or BCDEF (A off)")
     args = parser.parse_args()
 
     os.chdir(SCRIPT_DIR)
@@ -131,6 +134,7 @@ def main():
     tests = build_test_list()
     total = len(tests)
     jobs = args.jobs
+    accuracy_flags = args.accuracy
 
     print(f"=== Starting test run ({total} tests, {jobs} threads) ===")
     start_time = time.time()
@@ -144,7 +148,7 @@ def main():
     with ThreadPoolExecutor(max_workers=jobs) as executor:
         futures = {}
         for i, (suite, rom, extra) in enumerate(tests):
-            fut = executor.submit(run_one, i, suite, rom, extra, EXE, ROMBASE)
+            fut = executor.submit(run_one, i, suite, rom, extra, EXE, ROMBASE, accuracy_flags)
             futures[fut] = i
 
         for fut in as_completed(futures):

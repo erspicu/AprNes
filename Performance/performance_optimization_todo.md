@@ -1134,10 +1134,23 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 ---
 
+## Accuracy Options（非優化，精確度/效能取捨）
+
+詳細說明見 [accuracy_options.md](accuracy_options.md)。
+
+### AccuracyOptA — Per-dot Secondary OAM Evaluation FSM（2026-03-16）
+
+- **INI**：`AccuracyOptA=1`（預設 ON）
+- **OFF 效能增益**：+14.2%（264.45 → 302.00 FPS，90s 冷卻，20s 測試）
+- **OFF 正確性**：blargg 174/174 ✅，AccuracyCoin **131/136** ❌（P18 × 3、P19 × 2 失敗）
+- **結論**：預設 ON 保持完整精確度；進階使用者可在 INI 設 0 換取效能
+
+---
+
 ## Notes
 
 - All tests use the same ROM, same machine, same duration (20s)
 - Build is now **Release x64**（2026-03-15 起）。早期測試（#1–14）使用 Debug x64。
-- **CPU 降溫**：每次 `--perf` 前必須 `sleep 60`（連續測試後 CPU 熱降頻可造成 FPS 虛假偏低 10%+）
+- **CPU 降溫**：每次 `--perf` 前必須 `sleep 90`（連續測試後 CPU 熱降頻可造成 FPS 虛假偏低 10%+）
 - If machine load varies, re-run baseline before comparing
 - AccuracyCoin 136/136 and blargg 174/174 must still pass after each change
