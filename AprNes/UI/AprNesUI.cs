@@ -858,6 +858,21 @@ namespace AprNes
             NesCore._event.Set();  // 恢復模擬線程，cpu_step 中偵測 softreset flag
         }
 
+        // 僅重建 RenderObj（filter/尺寸變更），不重置遊戲狀態
+        unsafe public void ApplyRenderSettings()
+        {
+            if (!running) return;
+
+            NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
+            NesCore._event.Reset();
+            while (NesCore.screen_lock) Thread.Sleep(1);
+            if (RenderObj != null) RenderObj.freeMem();
+            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType("AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
+            RenderObj.init(NesCore.ScreenBuf1x, grfx);
+            NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
+            NesCore._event.Set();
+        }
+
         unsafe public void HardReset()
         {
             if (!running || current_rom_bytes == null) return;
