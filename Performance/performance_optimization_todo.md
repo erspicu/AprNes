@@ -57,6 +57,7 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 | — | *切換至 Release 組態基線* | — | **241.45** | — | — | — |
 | 15 | catchUpPPU/APU loop unroll（while→固定 3+1 展開） | 241.45 | 252.00 | **+4.3%** | ✅ KEEP | — |
 | 16 | P4: ppu_step_new Sprite 0 hit range check 條件重排 | 252.00 | ~259.00 | **+2.8%** | ✅ KEEP | — |
+| 17 | CPU.cs operationCycle switch(≤8 cases) → if/else（Op_XX 單行 + addressing helpers） | ~259.00 | ~264.8 | **+2.2%** | ✅ KEEP | [v60](2026-03-15_perf_v60.md) [v61](2026-03-15_perf_v61.md) |
 
 ---
 
