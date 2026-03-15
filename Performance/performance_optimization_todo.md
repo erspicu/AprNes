@@ -985,7 +985,8 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
   ```
 - **正確性評估**: ✅ **無風險** — $0000–$1FFF 為純 RAM，寫入無副作用，無 mapper/IO 觸發
 - **Verify**: blargg 174/174 + AC 136/136
-- **Status**: 🔲 TODO
+- **Status**: ❌ FAILED — 實測 -0.14%（277.3 → 276.9 FPS，run1=276.95, run2=276.80）
+- **失敗原因**: Mega Man 5 的 RAM 寫入比例不夠高以抵消 `address < 0x2000` 額外 branch 判斷的開銷。大多數 Mem_w 呼叫是 mapper register 寫入（$8000+），fast-path 對這些完全無效。P12 的 read fast-path 有效是因為 ROM fetch 頻率極高，write fast-path 無相同效果。
 
 ---
 
@@ -1011,7 +1012,7 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
   - **計算 dmaActive**：在每個 set/clear 後加 `dmaActive = dmaNeedHalt || dmcDmaRunning || dmcNeedDummyRead || spriteDmaTransfer || dmcImplicitAbortPending;`
 - **正確性評估**: ⚠️ **中風險** — 邏輯正確，但若任一 mutation site 漏掉，DMA 會被跳過導致測試失敗（blargg/AC 會立即暴露）。需用 grep 確認所有 flag 寫入點後才動手。
 - **Verify**: blargg 174/174 + AC 136/136
-- **Status**: 🔲 TODO
+- **Status**: ⏭ SKIP — **已實質存在**。分析後發現 `CpuRead` / `CpuReadZP` 的呼叫位點已是 `if (dmaNeedHalt) ProcessPendingDma(addr)`，即單一 flag 判斷。`dmcDmaRunning` / `dmcNeedDummyRead` 總與 `dmaNeedHalt` 同時設置，`dmcImplicitAbortPending` 在轉為 `dmcImplicitAbortActive` 前也會設置 `dmaNeedHalt`。熱路徑（>99.9% 無 DMA cycles）僅 1 次 bool load + branch，已是最優解，無需另設 `dmaActive` 旗標。
 
 ---
 
@@ -1062,7 +1063,8 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
   4. `open_bus_decay_timer` / `ppu2007ReadCooldown` 必須繼續倒數 ✅
   - 已知潛在問題：sl=241 cx≥2 理論上也可以 fast-path，但 sl=241 有 VBL 設定（cx==1），保守起見只 fast-path 242–260
 - **Verify**: blargg 174/174 + AC 136/136
-- **Status**: 🔲 TODO
+- **Status**: ❌ FAILED — 實測 **-2.96%**（277.3 → 269.1 FPS）；blargg 174/174 + AC 136/136 通過（邏輯正確）
+- **失敗原因**: early `return` 在 ppu_step_new() 中段改變了函式控制流程圖，干擾 JIT 對後半段（可見 scanline 路徑）的最佳化。非短路 `&` 使 91.6% 的呼叫（sl=0–239）都執行雙重比較，反而增加熱路徑 overhead。ppu_step_new() 本身體積大（~180 lines），JIT 不 inline，extra branch 影響比預期顯著。
 
 ---
 
@@ -1104,7 +1106,9 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 - **正確性評估**: 🔴 **高風險** — 需正確處理所有 mapper 的 bank 邊界、WRAM 區間、mapper 特殊邏輯（如 MMC3 PRG mode 位元）。任何錯誤都會造成 ROM 讀取偏移 → 遊戲立即死機（blargg/AC 暴露）。實作前需仔細研讀每個 mapper 的 bank switch 邏輯。
 - **建議實作順序**: 先 Mapper000（最簡單，固定 bank），驗證後再 Mapper004，最後其他。
 - **Verify**: blargg 174/174 + AC 136/136
-- **Status**: 🔲 TODO
+- **Status**: ❌ FAILED — 實測 **-0.58%**（277.3 → ~275.7 FPS；run1=275.95[v86], run2=275.50[v87]）；blargg 174/174 + AC 136/136 通過（邏輯正確）
+- **失敗原因**: 在 `CpuRead()` 中新增第三個 `else if (addr >= 0x8000 && prgRomPtr != null)` 分支，打亂了 JIT 對整個函式的最佳化（特別是最熱的 $0000-$1FFF 與 $8000+ 兩段路徑的 code layout 與 branch prediction）。managed `int[] prgOffsets` 的 bounds check 也增加了每次 ROM read 的 overhead。儘管消除了 delegate + interface virtual call（理論上省 ~4-5 loads），新增的 branch + array access 成本超過節省。根本原因同 P30：在已高度最佳化的熱函式中加入額外分支往往造成 JIT 退化，而非 improvement。
+- **已嘗試的實作**: prgRomPtr (byte*) + prgOffsets int[4]，SetPRGBanks() 更新所有 mapper（000/001/002/003/004/007/011/066/071），CpuRead 中 else-if 分支直接 `*(prgRomPtr + prgOffsets[(addr>>13)&3] + (addr&0x1FFF))`。架構正確，但 .NET 4.8.1 Release JIT 對此模式的實際效果為負。
 
 ---
 
@@ -1122,6 +1126,11 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 - Mapper instance method 需透過 static wrapper，抵消 dispatch 節省並增加額外呼叫層
 - ROM read 頻率極高（每個 opcode fetch），wrapper 開銷累積顯著
 - delegate* 無法攜帶 `this` 指標是根本限制
+
+### P31 — NesCore PRG bank cache / else-if fast-path（-0.58%）
+- 在 CpuRead 加第三個 `else if` 分支（RAM / ROM fast-path / fallback），打亂 JIT 對熱函式的 branch prediction 與 code layout
+- managed `int[]` bounds check overhead 抵消了省去 delegate+interface call 的效益
+- 根本模式：在 ~180 行熱函式中加任何額外分支（即使短路）都有 JIT 退化風險（同 P30/P28）
 
 ---
 
