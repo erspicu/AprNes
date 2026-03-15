@@ -5,7 +5,7 @@
 > **Benchmark 方法**: 20 秒無上限 FPS 跑分，headless 模式，無音效；每次測試前 `sleep 60` 等 CPU 降溫
 > **結果（Debug 組態 #1–12）**: 181.70 FPS → 247.95 FPS（**+36.5%**）
 > **結果（Release 組態 #13–19）**: 241.45 FPS → ~273.8 FPS（**+13.4%**，等效 Debug 基線 **+50.7%**）
-> **.NET 10 RyuJIT**: ~348 FPS（同程式碼，JIT 升級帶來額外 ~27%）
+> **.NET 10 RyuJIT**: ~361 FPS（同程式碼，JIT 升級帶來額外 ~32%）
 > **正確性驗證**: blargg 174/174 + AccuracyCoin 136/136（每項最佳化後皆需全數通過）
 
 ---
@@ -534,7 +534,7 @@ Clean re-run:       246.30 FPS  (自然波動範圍內)
 **Debug 組態累計：181.70 → 247.95 FPS（+36.5%）**
 **Release 組態新增：241.45 → ~273.8 FPS（+13.4%）**
 **整體累計（Debug 基線起）：181.70 → ~273.8 FPS（+50.7%）**
-**.NET 10 RyuJIT（相同程式碼）：~348 FPS**
+**.NET 10 RyuJIT（相同程式碼）：~361 FPS**
 
 ### 失敗嘗試（16 項，已全數 revert）
 
@@ -547,7 +547,7 @@ P1、P2、P4(v1+v2)、P13、P16(old)、P18B、P19、P20、P21、P22、P23(delega
 若要繼續改善效能，以下方向尚未嘗試且理論上可行：
 
 - **P16 改版**：lazy N/Z flag 評估，但避免 GetFlag 中的 reverse encoding overhead
-- ~~**Release 組態 benchmark**~~：已完成，Release ~259 FPS；.NET 10 RyuJIT ~348 FPS（+34%）
+- ~~**Release 組態 benchmark**~~：已完成，Release ~273.8 FPS；.NET 10 RyuJIT ~361 FPS（+32%）
 - **SIMD 化 framebuffer 操作**：`ScreenBuf1x` 是 `uint*`，可用 `System.Runtime.Intrinsics` AVX2 一次處理 8 像素（palette lookup 仍需 scalar，預估收益 <1%）
 - **PPU tile fetch 快取**：相同 tile index 在同一幀內可能重複 fetch，快取 tile pattern data 避免重複 mapper call
 - **P3 IRQ dirty flag**：每 CPU 週期省下 4-field OR 運算，但 mutation sites 多（APU 8+、IO 2、Mapper），漏掉一處會造成 IRQ timing 錯誤，風險高

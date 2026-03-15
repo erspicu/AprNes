@@ -162,7 +162,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
 | 基線（Debug） | 最終 Debug | Release 基線 | 目前（Release） | .NET 10 |
 |---|---|---|---|---|
-| 181.70 FPS | 247.95 FPS (+36.5%) | 241.45 FPS | ~273.8 FPS (+50.7% from Debug baseline) | ~348 FPS |
+| 181.70 FPS | 247.95 FPS (+36.5%) | 241.45 FPS | ~273.8 FPS (+50.7% from Debug baseline) | ~361 FPS |
 
 > **注意**：2026-03-15 起改用 Release 組態測試。Release 基線 241.45 FPS 對應 Debug 247.95 FPS（同一份程式碼）。
 > Release 組態下新增的 7 項改善：
