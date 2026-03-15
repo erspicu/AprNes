@@ -961,6 +961,153 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 
 ---
 
+### PRIORITY 28 — Mem_w RAM write fast-path（$0000–$1FFF）
+
+- **Target**: `MEM.cs` — `Mem_w()` 對所有寫入都走 `mem_write_fun[address](address, value)` delegate dispatch
+- **Expected gain**: +0.5–1.5%
+- **Effort**: ~10 分鐘
+- **背景**:
+  - P12 為 Mem_r 加了 $0000–$1FFF RAM read fast-path（+2.8%），Mem_w 同樣可以做
+  - Stack push/pop 寫入 $0100–$01FF；絕對模式 STA/STX/STY 可能寫入 $0200–$07FF，都走 Mem_w
+  - ZP_w 已處理 $00–$FF，但 Mem_w 仍承擔 $0100–$1FFF 的 stack + RAM 寫入
+  - `mem_write_fun[$0000–$1FFF]` 的 handler 只有 `NES_MEM[addr & 0x7FF] = val`，無副作用
+- **Method**:
+  ```csharp
+  static void Mem_w(ushort address, byte value)
+  {
+      cpuBusAddr = address;
+      StartCpuCycle();
+      cpubus = value;
+      if (address < 0x2000) { NES_MEM[address & 0x7FF] = value; EndCpuCycle(); return; }
+      mem_write_fun[address](address, value);
+      EndCpuCycle();
+  }
+  ```
+- **正確性評估**: ✅ **無風險** — $0000–$1FFF 為純 RAM，寫入無副作用，無 mapper/IO 觸發
+- **Verify**: blargg 174/174 + AC 136/136
+- **Status**: 🔲 TODO
+
+---
+
+### PRIORITY 29 — dmaActive 單一 guard flag（取代 ProcessPendingDma 5-flag 判斷）
+
+- **Target**: `MEM.cs` — `Mem_r()` / `CpuRead()` 每次都呼叫 `ProcessPendingDma(addr)`，內部才做 5 個 flag 的 OR 判斷
+- **Expected gain**: +0.5–1.5%（每次 Mem_r 省去函式呼叫 + 5 個靜態 field load）
+- **Effort**: ~30 分鐘
+- **背景**:
+  - 現況：每次 Mem_r/CpuRead（~1.79M/frame）都 call `ProcessPendingDma`，函式內第一行做：
+    `if (!dmaNeedHalt && !dmcDmaRunning && !dmcNeedDummyRead && !spriteDmaTransfer && !dmcImplicitAbortPending) return;`
+  - 即使 JIT 未 inline ProcessPendingDma（它太大），仍需 function call overhead + 5 load
+  - 超過 99.9% 的 cycle 無 DMA，這個 check 幾乎永遠走 early return
+  - 改法：維護 `static bool dmaActive`（5 個 flag 的 OR cache）
+    - call site：`if (dmaActive) ProcessPendingDma(addr);`（1 load + branch，無函式呼叫）
+    - 每個 flag 的 set/clear 處同步更新 `dmaActive`
+- **需同步的 mutation sites**（5 個 flag 的所有 set/clear 位置）:
+  - `dmaNeedHalt`: `dmcfillbuffer()`, `ppu_w_4014()`, cleared in `ProcessPendingDma()`
+  - `dmcDmaRunning`: `clockdmc()`, cleared in `ProcessPendingDma()`
+  - `dmcNeedDummyRead`: `clockdmc()`, cleared in `ProcessPendingDma()`
+  - `spriteDmaTransfer`: `ppu_w_4014()`, cleared in `ProcessPendingDma()`
+  - `dmcImplicitAbortPending`: `apu_4015()`, cleared in `ProcessPendingDma()`
+  - **計算 dmaActive**：在每個 set/clear 後加 `dmaActive = dmaNeedHalt || dmcDmaRunning || dmcNeedDummyRead || spriteDmaTransfer || dmcImplicitAbortPending;`
+- **正確性評估**: ⚠️ **中風險** — 邏輯正確，但若任一 mutation site 漏掉，DMA 會被跳過導致測試失敗（blargg/AC 會立即暴露）。需用 grep 確認所有 flag 寫入點後才動手。
+- **Verify**: blargg 174/174 + AC 136/136
+- **Status**: 🔲 TODO
+
+---
+
+### PRIORITY 30 — ppu_step_new() vblank fast-path（scanlines 242–260）
+
+- **Target**: `PPU.cs` `ppu_step_new()` — 每個 PPU dot 都執行完整函式，但 vblank 中段（sl=242–260）什麼都不會觸發
+- **Expected gain**: +0.5–1.5%
+- **Effort**: ~20 分鐘
+- **背景**:
+  - vblank 期間 sl=242–260（20 scanline × 341 dot = 6820 dots）佔全幀 PPU dots 的 7.6%
+  - 這些 dots 目前執行完整的 ppu_step_new()，但實際上只需要：
+    1. `ppu2007ReadCooldown--`（cooldown 倒數）
+    2. `open_bus_decay_timer--`（openbus 衰減）
+    3. `ppuRenderingEnabled = renderingEnabled`（延遲 rendering flag 更新）
+    4. `cx++` + scanline wrap（cx==341 → scanline++, cx=0）
+  - 以下邏輯確認**不觸發** sl=242–260：
+    - Sprite 0 hit：`scanline < 240` guard → SKIP
+    - Shift register clocking：inner condition `scanline < 240 || scanline == 261` → SKIP
+    - `ppu_rendering_tick()`：`scanline < 240 || scanline == 261` → SKIP（含 A12 通知）
+    - Sprite evaluation：`scanline >= 0 && scanline < 240` → SKIP
+    - VBL set：`scanline == 241` → SKIP（已在 sl=241 觸發）
+    - Sprite/VBL flag clear：`scanline == 261` → SKIP
+    - RenderScreen：`scanline == 240` → SKIP
+- **Method**:
+  ```csharp
+  static void ppu_step_new()
+  {
+      if (ppu2007ReadCooldown > 0) ppu2007ReadCooldown--;
+      if (--open_bus_decay_timer == 0) { open_bus_decay_timer = 77777; openbus = 0; }
+
+      int cx = ppu_cycles_x;
+
+      // vblank fast-path: scanlines 242-260 do nothing except cx advance
+      if (scanline >= 242 && scanline <= 260)
+      {
+          ppuRenderingEnabled = ShowBackGround || ShowSprites;
+          ppu_cycles_x = ++cx;
+          if (cx == 341) { ppu_cycles_x = 0; scanline++; }
+          return;
+      }
+      // ... rest of full logic
+  }
+  ```
+- **正確性評估**: ⚠️ **中風險** — 需確認：
+  1. 無任何 mapper 在 vblank 242–260 期間依賴 PPU dot 計數（A12 通知在 ppu_rendering_tick 內，已不呼叫）✅
+  2. scanline wrap 邏輯（341→0, scanline++）必須保留 ✅
+  3. `ppuRenderingEnabled` 必須繼續更新（遊戲在 vblank 寫入 $2001）✅
+  4. `open_bus_decay_timer` / `ppu2007ReadCooldown` 必須繼續倒數 ✅
+  - 已知潛在問題：sl=241 cx≥2 理論上也可以 fast-path，但 sl=241 有 VBL 設定（cx==1），保守起見只 fast-path 242–260
+- **Verify**: blargg 174/174 + AC 136/136
+- **Status**: 🔲 TODO
+
+---
+
+### PRIORITY 31 — NesCore 層級 PRG bank cache（消除 ROM read 的 interface dispatch）
+
+- **Target**: `MEM.cs` — ROM read（$8000–$FFFF）佔所有記憶體存取最大比例（每個 opcode fetch + 運算元）
+- **Expected gain**: +1–4%（若成功，這是最高潛在收益的剩餘優化）
+- **Effort**: ~2–3 小時（需修改所有 mapper 的 bank switch 通知）
+- **背景 & 已失敗的方案**:
+  - P25：`mem_read_fun[]` delegate* — 失敗，mapper virtual call 需 wrapper，反而更慢
+  - P27：Mapper004 內部預計算 bank 指標 — 失敗，增加 mapper 物件 field 數量，cache miss 劣化
+  - **根本問題**：ROM read path = delegate dispatch → static wrapper → interface virtual call，三層間接
+- **新方案（NesCore 層級，不在 Mapper 物件內）**:
+  ```csharp
+  // NesCore 靜態欄位（4 個 int，已在熱路徑 cache line 中）
+  static int prgOff0, prgOff1, prgOff2, prgOff3;  // 4 × 8KB bank offsets into PRG_ROM
+
+  // Mapper bank switch 後呼叫（由各 Mapper 的 SetPRGBank() 觸發）
+  public static void SetPRGBankOffsets(int b0, int b1, int b2, int b3)
+  {
+      prgOff0 = b0; prgOff1 = b1; prgOff2 = b2; prgOff3 = b3;
+  }
+
+  // Mem_r fast-path（在 RAM fast-path 後）
+  if (addr >= 0x8000)
+  {
+      tick();
+      int bankOff = (addr & 0x6000) switch { 0x0000 => prgOff0, 0x2000 => prgOff1, 0x4000 => prgOff2, _ => prgOff3 };
+      return PRG_ROM[bankOff + (addr & 0x1FFF)];
+  }
+  ```
+  或用 inline 4-entry lookup，避免 switch。
+- **與 P27 的本質差異**：新欄位在 NesCore（static 欄位，已常駐 CPU register/cache），不在 Mapper 物件（heap object，依賴 cache hit）
+- **需修改的 Mapper**（需呼叫 `NesCore.SetPRGBankOffsets`）：
+  - Mapper000：init 一次（fixed banks）
+  - Mapper004 MMC3：每次 PRG bank switch 時更新（已在 8KB 粒度）
+  - 其他 mapper：依各自 bank 粒度轉換
+- **$6000–$7FFF（WRAM）**：不能走此 fast-path，仍需走 mapper dispatch（MapperR_RAM 或 MapperR_RPG）
+- **正確性評估**: 🔴 **高風險** — 需正確處理所有 mapper 的 bank 邊界、WRAM 區間、mapper 特殊邏輯（如 MMC3 PRG mode 位元）。任何錯誤都會造成 ROM 讀取偏移 → 遊戲立即死機（blargg/AC 暴露）。實作前需仔細研讀每個 mapper 的 bank switch 邏輯。
+- **建議實作順序**: 先 Mapper000（最簡單，固定 bank），驗證後再 Mapper004，最後其他。
+- **Verify**: blargg 174/174 + AC 136/136
+- **Status**: 🔲 TODO
+
+---
+
 ## Failed / Ineffective Attempts
 
 ### P27 — Mapper004 precomputed bank pointer table（-1.46%）
