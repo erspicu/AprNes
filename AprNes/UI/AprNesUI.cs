@@ -239,6 +239,10 @@ namespace AprNes
             // 讀取 Accuracy 選項設定 (預設全開)
             NesCore.AccuracyOptA = !AppConfigure.ContainsKey("AccuracyOptA") || AppConfigure["AccuracyOptA"] != "0";
 
+            IsSpeedCore = AppConfigure.ContainsKey("CoreMode") && AppConfigure["CoreMode"] == "speed";
+            if (IsSpeedCore)
+                NesCoreSpeed.AudioEnabled_S = AppConfigure.ContainsKey("Sound") ? AppConfigure["Sound"] == "1" : true;
+
             NES_init_KeyMap();
 
         }
@@ -314,6 +318,7 @@ namespace AprNes
             AppConfigure["Sound"] = NesCore.AudioEnabled ? "1" : "0";
             AppConfigure["Volume"] = NesCore.Volume.ToString();
             AppConfigure["AccuracyOptA"] = NesCore.AccuracyOptA ? "1" : "0";
+            AppConfigure["CoreMode"] = IsSpeedCore ? "speed" : "accurate";
 
             string conf = "";
             foreach (string i in AppConfigure.Keys)
@@ -420,14 +425,14 @@ namespace AprNes
                                 {
                                     if (XY == "X")
                                     {
-                                        NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_LEFT);
-                                        NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_RIGHT);
+                                        if (IsSpeedCore) { NesCoreSpeed.P1_ButtonUnPress_S((byte)KeyMap.NES_btn_LEFT); NesCoreSpeed.P1_ButtonUnPress_S((byte)KeyMap.NES_btn_RIGHT); }
+                                        else             { NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_LEFT); NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_RIGHT); }
                                     }
 
                                     if (XY == "Y")
                                     {
-                                        NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_UP);
-                                        NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_DOWN);
+                                        if (IsSpeedCore) { NesCoreSpeed.P1_ButtonUnPress_S((byte)KeyMap.NES_btn_UP); NesCoreSpeed.P1_ButtonUnPress_S((byte)KeyMap.NES_btn_DOWN); }
+                                        else             { NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_UP); NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_DOWN); }
                                     }
                                 }
                                 continue;
@@ -440,63 +445,62 @@ namespace AprNes
                             case KeyMap.NES_btn_A:
                                 {
                                     if (joy_event.button_event == 1)
-                                        NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_A);
+                                        { if (IsSpeedCore) NesCoreSpeed.P1_ButtonPress_S((byte)KeyMap.NES_btn_A); else NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_A); }
                                     else
-                                        NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_A);
-
+                                        { if (IsSpeedCore) NesCoreSpeed.P1_ButtonUnPress_S((byte)KeyMap.NES_btn_A); else NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_A); }
                                 }
                                 break;
                             case KeyMap.NES_btn_B:
                                 {
                                     if (joy_event.button_event == 1)
-                                        NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_B);
+                                        { if (IsSpeedCore) NesCoreSpeed.P1_ButtonPress_S((byte)KeyMap.NES_btn_B); else NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_B); }
                                     else
-                                        NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_B);
+                                        { if (IsSpeedCore) NesCoreSpeed.P1_ButtonUnPress_S((byte)KeyMap.NES_btn_B); else NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_B); }
                                 }
                                 break;
 
                             case KeyMap.NES_btn_SELECT:
                                 {
                                     if (joy_event.button_event == 1)
-                                        NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_SELECT);
+                                        { if (IsSpeedCore) NesCoreSpeed.P1_ButtonPress_S((byte)KeyMap.NES_btn_SELECT); else NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_SELECT); }
                                     else
-                                        NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_SELECT);
+                                        { if (IsSpeedCore) NesCoreSpeed.P1_ButtonUnPress_S((byte)KeyMap.NES_btn_SELECT); else NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_SELECT); }
                                 }
                                 break;
                             case KeyMap.NES_btn_START:
                                 {
                                     if (joy_event.button_event == 1)
-                                        NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_START);
+                                        { if (IsSpeedCore) NesCoreSpeed.P1_ButtonPress_S((byte)KeyMap.NES_btn_START); else NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_START); }
                                     else
-                                        NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_START);
+                                        { if (IsSpeedCore) NesCoreSpeed.P1_ButtonUnPress_S((byte)KeyMap.NES_btn_START); else NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_START); }
                                 }
                                 break;
 
                             case KeyMap.NES_btn_UP:
                                 if (joy_event.event_type == 0 || joy_event.button_event == 1)
-                                    NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_UP);
+                                    { if (IsSpeedCore) NesCoreSpeed.P1_ButtonPress_S((byte)KeyMap.NES_btn_UP); else NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_UP); }
                                 else
-                                    NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_UP);
+                                    { if (IsSpeedCore) NesCoreSpeed.P1_ButtonUnPress_S((byte)KeyMap.NES_btn_UP); else NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_UP); }
                                 break;
 
                             case KeyMap.NES_btn_DOWN:
                                 if (joy_event.event_type == 0 || joy_event.button_event == 1)
-                                    NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_DOWN);
+                                    { if (IsSpeedCore) NesCoreSpeed.P1_ButtonPress_S((byte)KeyMap.NES_btn_DOWN); else NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_DOWN); }
                                 else
-                                    NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_DOWN);
+                                    { if (IsSpeedCore) NesCoreSpeed.P1_ButtonUnPress_S((byte)KeyMap.NES_btn_DOWN); else NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_DOWN); }
                                 break;
                             case KeyMap.NES_btn_LEFT:
                                 if (joy_event.event_type == 0 || joy_event.button_event == 1)
-                                    NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_LEFT);
+                                    { if (IsSpeedCore) NesCoreSpeed.P1_ButtonPress_S((byte)KeyMap.NES_btn_LEFT); else NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_LEFT); }
                                 else
-                                    NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_LEFT);
+                                    { if (IsSpeedCore) NesCoreSpeed.P1_ButtonUnPress_S((byte)KeyMap.NES_btn_LEFT); else NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_LEFT); }
                                 break;
 
                             case KeyMap.NES_btn_RIGHT:
                                 if (joy_event.event_type == 0 || joy_event.button_event == 1)
-                                    NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_RIGHT);
+                                    { if (IsSpeedCore) NesCoreSpeed.P1_ButtonPress_S((byte)KeyMap.NES_btn_RIGHT); else NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_RIGHT); }
                                 else
-                                    NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_RIGHT);
+                                    { if (IsSpeedCore) NesCoreSpeed.P1_ButtonUnPress_S((byte)KeyMap.NES_btn_RIGHT); else NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_RIGHT); }
                                 break;
                         }
                     }
@@ -652,37 +656,52 @@ namespace AprNes
             }
 
             rom_file_name = fd.FileName.Remove(fd.FileName.Length - 4, 4);
-            current_rom_bytes = rom_bytes;  // 保存供 Hard Reset 使用
+            loadrom(rom_bytes);
+        }
+
+        unsafe void loadrom(byte[] rom_bytes)
+        {
+            current_rom_bytes = rom_bytes;
 
             if (nes_t != null)
             {
                 try
                 {
                     EndHighResPeriod();
-                    NesCore.exit = true;
-                    NesCore._event.Set();
+                    if (IsSpeedCore) { NesCoreSpeed.exit_S = true; NesCoreSpeed._event_S.Set(); }
+                    else             { NesCore.exit = true; NesCore._event.Set(); }
                     nes_t.Join(500);
                 }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(ex.Message);
-                }
+                catch (Exception ex) { MessageBox.Show(ex.Message); }
             }
 
             SaveSRam();
-            NesCore.exit = false;
-            NesCore.rom_file_name = rom_file_name;
 
-            bool init_result = NesCore.init(rom_bytes);
+            bool init_result;
+            if (IsSpeedCore)
+            {
+                NesCoreSpeed.exit_S = false;
+                NesCoreSpeed.rom_file_name_S = rom_file_name;
+                init_result = NesCoreSpeed.init_S(rom_bytes);
+                if (RenderObj != null) RenderObj.freeMem();
+                RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType("AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
+                RenderObj.init(NesCoreSpeed.ScreenBuf1x_S, grfx);
+                NesCoreSpeed.VideoOutput_S -= new EventHandler(VideoOutputDeal);
+                NesCoreSpeed.VideoOutput_S += new EventHandler(VideoOutputDeal);
+            }
+            else
+            {
+                NesCore.exit = false;
+                NesCore.rom_file_name = rom_file_name;
+                init_result = NesCore.init(rom_bytes);
+                if (RenderObj != null) RenderObj.freeMem();
+                RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType("AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
+                RenderObj.init(NesCore.ScreenBuf1x, grfx);
+                NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
+                NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
+            }
 
-            if (RenderObj != null) RenderObj.freeMem();
-            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType("AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
-            RenderObj.init(NesCore.ScreenBuf1x, grfx);
-
-            NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
-            NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
-
-            Console.WriteLine("init finsih");
+            Console.WriteLine("init finish");
 
             if (!init_result)
             {
@@ -692,12 +711,16 @@ namespace AprNes
                 MessageBox.Show("fail !");
                 return;
             }
-            LoadSRam();
+
+            if (!IsSpeedCore) LoadSRam();
             _fpsDeadline = 0;
             _fpsStopWatch.Restart();
-            if (NesCore.AudioEnabled) WaveOutPlayer.OpenAudio();
+            if (!IsSpeedCore && NesCore.AudioEnabled) WaveOutPlayer.OpenAudio();
             BeginHighResPeriod();
-            nes_t = new Thread(NesCore.run);
+            if (IsSpeedCore)
+                nes_t = new Thread(NesCoreSpeed.run_S);
+            else
+                nes_t = new Thread(NesCore.run);
             nes_t.IsBackground = true;
             nes_t.Start();
             fps_count_timer.Enabled = true;
@@ -711,7 +734,9 @@ namespace AprNes
             {
                 double elapsed = _fpsSw.Elapsed.TotalSeconds;
                 _fpsSw.Restart();
-                int count = System.Threading.Interlocked.Exchange(ref NesCore.frame_count, 0);
+                int count = IsSpeedCore
+                    ? System.Threading.Interlocked.Exchange(ref NesCoreSpeed.frame_count_S, 0)
+                    : System.Threading.Interlocked.Exchange(ref NesCore.frame_count, 0);
                 fps = count;
                 double actualFps = elapsed > 0 ? count / elapsed : 0;
                 label3.Text = "fps : " + actualFps.ToString("F1");
@@ -723,6 +748,8 @@ namespace AprNes
             app_running = false;
             EndHighResPeriod();
             NesCore.exit = true;
+            NesCoreSpeed.exit_S = true;
+            NesCoreSpeed._event_S.Set();
             SaveSRam();
             WaveOutPlayer.CloseAudio();
             Thread.Sleep(10);
@@ -741,7 +768,10 @@ namespace AprNes
                 return true; ;
             }
             if (NES_KeyMAP.ContainsKey(keyboard_key))
-                NesCore.P1_ButtonPress((byte)NES_KeyMAP[keyboard_key]);
+            {
+                if (IsSpeedCore) NesCoreSpeed.P1_ButtonPress_S((byte)NES_KeyMAP[keyboard_key]);
+                else NesCore.P1_ButtonPress((byte)NES_KeyMAP[keyboard_key]);
+            }
             return true;
         }
 
@@ -778,10 +808,15 @@ namespace AprNes
         {
             if (!running) return;
             if (NES_KeyMAP.ContainsKey(e.KeyValue))
-                NesCore.P1_ButtonUnPress((byte)NES_KeyMAP[e.KeyValue]);
+            {
+                if (IsSpeedCore) NesCoreSpeed.P1_ButtonUnPress_S((byte)NES_KeyMAP[e.KeyValue]);
+                else NesCore.P1_ButtonUnPress((byte)NES_KeyMAP[e.KeyValue]);
+            }
         }
 
         bool LimitFPS = true;
+        bool IsSpeedCore = false;
+        ToolStripMenuItem _coreModeMenuItem = null;
         const double NES_FRAME_SECONDS = 1.0 / 60.0988;
         readonly Stopwatch _fpsStopWatch = new Stopwatch();
         double _fpsDeadline = 0;
@@ -842,20 +877,31 @@ namespace AprNes
         unsafe public void Reset()
         {
             if (!running) return;
-
             SaveSRam();
-            NesCore.rom_file_name = rom_file_name;
-
-            NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
-            NesCore._event.Reset();
-            while (NesCore.screen_lock) Thread.Sleep(1);
-            if (RenderObj != null) RenderObj.freeMem();
-            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType("AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
-            RenderObj.init(NesCore.ScreenBuf1x, grfx);
-            NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
-
-            NesCore.SoftReset();   // 設 flag（模擬線程暫停中，無 race condition）
-            NesCore._event.Set();  // 恢復模擬線程，cpu_step 中偵測 softreset flag
+            if (IsSpeedCore)
+            {
+                NesCoreSpeed.VideoOutput_S -= new EventHandler(VideoOutputDeal);
+                NesCoreSpeed._event_S.Reset();
+                if (RenderObj != null) RenderObj.freeMem();
+                RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType("AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
+                RenderObj.init(NesCoreSpeed.ScreenBuf1x_S, grfx);
+                NesCoreSpeed.VideoOutput_S += new EventHandler(VideoOutputDeal);
+                NesCoreSpeed.SoftReset_S();
+                NesCoreSpeed._event_S.Set();
+            }
+            else
+            {
+                NesCore.rom_file_name = rom_file_name;
+                NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
+                NesCore._event.Reset();
+                while (NesCore.screen_lock) Thread.Sleep(1);
+                if (RenderObj != null) RenderObj.freeMem();
+                RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType("AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
+                RenderObj.init(NesCore.ScreenBuf1x, grfx);
+                NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
+                NesCore.SoftReset();
+                NesCore._event.Set();
+            }
         }
 
         // 僅重建 RenderObj（filter/尺寸變更），不重置遊戲狀態
@@ -863,14 +909,27 @@ namespace AprNes
         {
             if (!running) return;
 
-            NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
-            NesCore._event.Reset();
-            while (NesCore.screen_lock) Thread.Sleep(1);
-            if (RenderObj != null) RenderObj.freeMem();
-            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType("AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
-            RenderObj.init(NesCore.ScreenBuf1x, grfx);
-            NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
-            NesCore._event.Set();
+            if (IsSpeedCore)
+            {
+                NesCoreSpeed.VideoOutput_S -= new EventHandler(VideoOutputDeal);
+                NesCoreSpeed._event_S.Reset();
+                if (RenderObj != null) RenderObj.freeMem();
+                RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType("AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
+                RenderObj.init(NesCoreSpeed.ScreenBuf1x_S, grfx);
+                NesCoreSpeed.VideoOutput_S += new EventHandler(VideoOutputDeal);
+                NesCoreSpeed._event_S.Set();
+            }
+            else
+            {
+                NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
+                NesCore._event.Reset();
+                while (NesCore.screen_lock) Thread.Sleep(1);
+                if (RenderObj != null) RenderObj.freeMem();
+                RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType("AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
+                RenderObj.init(NesCore.ScreenBuf1x, grfx);
+                NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
+                NesCore._event.Set();
+            }
         }
 
         unsafe public void HardReset()
@@ -879,8 +938,8 @@ namespace AprNes
 
             // 停止模擬線程
             EndHighResPeriod();
-            NesCore.exit = true;
-            NesCore._event.Set();
+            if (IsSpeedCore) { NesCoreSpeed.exit_S = true; NesCoreSpeed._event_S.Set(); }
+            else             { NesCore.exit = true; NesCore._event.Set(); }
             if (nes_t != null)
             {
                 nes_t.Join(500);
@@ -888,20 +947,32 @@ namespace AprNes
             }
 
             SaveSRam();
-            WaveOutPlayer.CloseAudio();
+            if (!IsSpeedCore) WaveOutPlayer.CloseAudio();
 
-            // 完整重新初始化（等同 power cycle）
-            NesCore.exit = false;
-            NesCore.rom_file_name = rom_file_name;
-
-            bool init_result = NesCore.init(current_rom_bytes);
-
-            if (RenderObj != null) RenderObj.freeMem();
-            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType("AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
-            RenderObj.init(NesCore.ScreenBuf1x, grfx);
-
-            NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
-            NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
+            bool init_result;
+            if (IsSpeedCore)
+            {
+                NesCoreSpeed.exit_S = false;
+                NesCoreSpeed.rom_file_name_S = rom_file_name;
+                init_result = NesCoreSpeed.init_S(current_rom_bytes);
+                if (RenderObj != null) RenderObj.freeMem();
+                RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType("AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
+                RenderObj.init(NesCoreSpeed.ScreenBuf1x_S, grfx);
+                NesCoreSpeed.VideoOutput_S -= new EventHandler(VideoOutputDeal);
+                NesCoreSpeed.VideoOutput_S += new EventHandler(VideoOutputDeal);
+            }
+            else
+            {
+                // 完整重新初始化（等同 power cycle）
+                NesCore.exit = false;
+                NesCore.rom_file_name = rom_file_name;
+                init_result = NesCore.init(current_rom_bytes);
+                if (RenderObj != null) RenderObj.freeMem();
+                RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType("AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
+                RenderObj.init(NesCore.ScreenBuf1x, grfx);
+                NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
+                NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
+            }
 
             if (!init_result)
             {
@@ -912,12 +983,15 @@ namespace AprNes
                 return;
             }
 
-            LoadSRam();
+            if (!IsSpeedCore) LoadSRam();
             _fpsDeadline = 0;
             _fpsStopWatch.Restart();
-            if (NesCore.AudioEnabled) WaveOutPlayer.OpenAudio();
+            if (!IsSpeedCore && NesCore.AudioEnabled) WaveOutPlayer.OpenAudio();
             BeginHighResPeriod();
-            nes_t = new Thread(NesCore.run);
+            if (IsSpeedCore)
+                nes_t = new Thread(NesCoreSpeed.run_S);
+            else
+                nes_t = new Thread(NesCore.run);
             nes_t.IsBackground = true;
             nes_t.Start();
         }
@@ -951,6 +1025,11 @@ namespace AprNes
             benchItem.Click += BenchmarkJit_Click;
             contextMenuStrip1.Items.Add(benchItem);
 
+            // Add CoreMode toggle
+            _coreModeMenuItem = new ToolStripMenuItem(IsSpeedCore ? "Core: Speed" : "Core: Accurate");
+            _coreModeMenuItem.Click += CoreMode_Click;
+            contextMenuStrip1.Items.Add(_coreModeMenuItem);
+
             _joystick.Init(this.Handle);
             new Thread(polling_listener).Start();
             new Thread(() =>
@@ -973,6 +1052,15 @@ namespace AprNes
             AotPreShowDialog();
             RomInfo.ShowDialog(this);
             AotPostShowDialog();
+        }
+
+        private void CoreMode_Click(object sender, EventArgs e)
+        {
+            IsSpeedCore = !IsSpeedCore;
+            if (_coreModeMenuItem != null)
+                _coreModeMenuItem.Text = IsSpeedCore ? "Core: Speed" : "Core: Accurate";
+            AppConfigure["CoreMode"] = IsSpeedCore ? "speed" : "accurate";
+            Configure_Write();
         }
 
         private void fun1ToolStripMenuItem_Click(object sender, EventArgs e)
