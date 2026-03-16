@@ -1163,12 +1163,26 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 - **Verify**: blargg 174/174 + AC 136/136
 - **Status**: ✅ KEEP — **+3.0%** (271.20 → 279.30 FPS，v110/v111 兩次一致)；blargg 174/174 + AC 136/136 通過
 - **實作細節**:
+
   - `static public byte*[] chrBankPtrs = new byte*[8]` 加到 NesCore/Main.cs
   - `void UpdateCHRBanks()` 加入 IMapper interface，所有 10 個 mapper 實作
   - Mapper004: MapperW_PRG 中 BankReg 0-5 寫入 + CHR_Bankmode 切換時呼叫 UpdateCHRBanks()
   - 其他 mapper: MapperW_PRG 中 CHR bank select 寫入時呼叫
   - PPU 6 處 MapperObj.MapperR_CHR() 改為 `chrBankPtrs[(addr>>10)&7][addr&0x3FF]`（加 `&7` 防止 ioaddr 為 stale nametable address 時越界）
   - MEM.cs $2007 讀取路徑保留使用 MapperObj.MapperR_CHR()（非熱路徑）
+
+---
+
+### P35+P36 — 陣列清零：Span<byte>.Clear() / ulong loop
+
+- **Target**: `PPU.cs`
+  - P35: `RenderSpritesLine()` line ~916 — `sprSet[256]` 清零
+  - P36: `ppu_step_new()` cx==0 — `Buffer_BG_array` 清零（int*256）
+- **測試結果**:
+  - `Span<T>` — ❌ 編譯失敗（.NET Framework 4.8.1 無內建 `Span<T>`，需 NuGet）
+  - `ulong` 展開/迴圈 — v112/v113: 278.15 / 270.35 FPS（平均 ~274 vs 基線 279.30 = **-1.8%**）
+- **Status**: ❌ FAILED — 兩種方式皆退步，已 revert
+- **失敗原因**: JIT 對原始 `for (int i=0; i<256; i++) arr[i]=0` 的 scalar store loop 已有良好優化（可能自動 vectorize）。手動 ulong 展開改變了 JIT code layout，引入額外暫存器壓力，反而破壞優化。結論：**固定大小的簡單清零迴圈不需要手動優化**，交給 JIT 即可。
 
 ---
 
