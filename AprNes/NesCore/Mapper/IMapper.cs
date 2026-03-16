@@ -10,5 +10,6 @@
         void MapperW_PRG(ushort address, byte value);
         byte MapperR_RPG(ushort address);
         byte MapperR_CHR(int address);
+        void UpdateCHRBanks();
     }
 }

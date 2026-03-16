@@ -30,6 +30,7 @@ namespace AprNes
         static public string rom_file_name = "";
 
         static IMapper MapperObj;
+        static public byte*[] chrBankPtrs = new byte*[8]; // P34: 8×1KB CHR bank pointers, updated by mapper
 
         static public int[] Mapper_Allow = new int[] { 0, 1, 2, 3, 4, 7, 11, 66 };
 
@@ -206,6 +207,7 @@ namespace AprNes
                     MapperObj = CreateMapper(mapper);
                 }
                 MapperObj.MapperInit(PRG_ROM, CHR_ROM, ppu_ram, PRG_ROM_count, CHR_ROM_count, Vertical);
+                MapperObj.UpdateCHRBanks();
 
                 for (int i = 0; i < 61440; i++) ScreenBuf1x[i] = 0;
                 for (int i = 0; i < 16384; i++) ppu_ram[i] = 0;

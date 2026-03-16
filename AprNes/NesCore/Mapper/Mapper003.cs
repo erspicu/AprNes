@@ -27,6 +27,7 @@
         public void MapperW_PRG(ushort address, byte value)
         {
             CHR_Bankselect = value & 3;
+            UpdateCHRBanks();
         }
 
         public byte MapperR_RPG(ushort address)
@@ -38,6 +39,12 @@
         {
             if (CHR_ROM_count == 0) return ppu_ram[address];
             return CHR_ROM[address + ((CHR_Bankselect) << 13)];
+        }
+
+        public void UpdateCHRBanks()
+        {
+            byte* b = CHR_ROM_count == 0 ? ppu_ram : CHR_ROM + (CHR_Bankselect << 13);
+            for (int i = 0; i < 8; i++) NesCore.chrBankPtrs[i] = b + i * 1024;
         }
     }
 }

@@ -79,9 +79,10 @@ namespace AprNes
                 //3: fix last bank at $C000 and switch 16 KB bank at $8000
 
                 CHR_Bankmode = (MapperRegBuffer & 0x10) >> 4;//(0: switch 8 KB at a time; 1: switch two separate 4 KB banks)
+                UpdateCHRBanks();
             }
-            else if (address < 0xc000) CHR0_Bankselect = MapperRegBuffer;// $A000-$BFFF (low bit ignored in 8 KB mode)
-            else if (address < 0xe000) CHR1_Bankselect = MapperRegBuffer; // $C000-$DFFF (ignored in 8 KB mode)   
+            else if (address < 0xc000) { CHR0_Bankselect = MapperRegBuffer; UpdateCHRBanks(); }// $A000-$BFFF (low bit ignored in 8 KB mode)
+            else if (address < 0xe000) { CHR1_Bankselect = MapperRegBuffer; UpdateCHRBanks(); } // $C000-$DFFF (ignored in 8 KB mode)
             else PRG_Bankselect = MapperRegBuffer & 0xf;//$E000-$FFFF
 
             MapperShiftCount = MapperRegBuffer = 0;
@@ -99,6 +100,28 @@ namespace AprNes
             {
                 if (address < 0xc000) return PRG_ROM[(address - 0x8000) + (PRG_Bankselect << 14)];//switch
                 else return PRG_ROM[(address - 0xc000) + ((PRG_ROM_count - 1) << 14)]; // fixed
+            }
+        }
+
+        public void UpdateCHRBanks()
+        {
+            if (CHR_ROM_count == 0)
+            {
+                for (int i = 0; i < 8; i++) NesCore.chrBankPtrs[i] = ppu_ram + i * 1024;
+                return;
+            }
+            if (CHR_Bankmode > 0) // 4K mode: two independent 4KB banks
+            {
+                int banks4k = CHR_ROM_count * 2;
+                byte* b0 = CHR_ROM + ((CHR0_Bankselect % banks4k) << 12);
+                byte* b1 = CHR_ROM + ((CHR1_Bankselect % banks4k) << 12);
+                for (int i = 0; i < 4; i++) NesCore.chrBankPtrs[i] = b0 + i * 1024;
+                for (int i = 4; i < 8; i++) NesCore.chrBankPtrs[i] = b1 + (i - 4) * 1024;
+            }
+            else // 8K mode
+            {
+                byte* b = CHR_ROM + (((CHR0_Bankselect >> 1) % CHR_ROM_count) << 13);
+                for (int i = 0; i < 8; i++) NesCore.chrBankPtrs[i] = b + i * 1024;
             }
         }
 

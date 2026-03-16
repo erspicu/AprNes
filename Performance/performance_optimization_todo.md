@@ -9,6 +9,7 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 - ROM: Mega Man 5 (USA).nes（Mapper 004 MMC3，代表性複雜場景）
 - Duration: 20 seconds, no FPS cap, no audio, headless mode
 - Result: automatically saved to `Performance/YYYY-MM-DD_perf_vN.md`
+- **AccuracyOptA=ON**（Release ini `AccuracyOptA=1`，此為標準測試條件）
 
 ### Pass/Fail Criteria
 - **Improvement > 0.25%** → keep change, commit, create new perf report
@@ -62,6 +63,9 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 | 19 | PPU.cs ppu_rendering_tick() switch(cx & 7)（8 cases）→ if/else chain | ~264.8 | ~270.2 | **+2.0%** | ✅ KEEP | [v65](2026-03-15_perf_v65.md) [v66](2026-03-15_perf_v66.md) [v67](2026-03-15_perf_v67.md) |
 | 20 | IO.cs IO_read/IO_write switch → 三段式 if/else（PPU/APU channels/OAM+APU） | ~270.2 | ~273.8 | **+1.3%** | ✅ KEEP | [v73](2026-03-15_perf_v73.md) |
 | 21 | irqLinePrev/irqLineCurrent dirty flag（UpdateIRQLine 只在 flag 變動時呼叫） | ~273.8 | ~277.3 | **+1.3%** | ✅ KEEP | [v81](2026-03-15_perf_v81.md) [v82](2026-03-15_perf_v82.md) |
+| — | *AccuracyOptA=ON 成為標準測試條件，基線重測* | — | **264.45** | — | — | [v103](2026-03-16_perf_v103.md) |
+| 22 | P33: RenderSpritesLine Pass 3 — ulong 8-byte block-scan（取代 256 次 byte loop） | 264.45 | 271.20 | **+2.5%** | ✅ KEEP | [v108](2026-03-16_perf_v108.md) [v109](2026-03-16_perf_v109.md) |
+| 23 | P34: PPU CHR bank 直接指標（static chrBankPtrs[8] 取代 MapperR_CHR interface call） | 271.20 | **279.30** | **+3.0%** | ✅ KEEP | [v110](2026-03-17_perf_v110.md) [v111](2026-03-17_perf_v111.md) |
 
 ---
 
@@ -1109,6 +1113,62 @@ AprNes.exe --perf "Performance\Mega Man 5 (USA).nes" 20 "description"
 - **Status**: ❌ FAILED — 實測 **-0.58%**（277.3 → ~275.7 FPS；run1=275.95[v86], run2=275.50[v87]）；blargg 174/174 + AC 136/136 通過（邏輯正確）
 - **失敗原因**: 在 `CpuRead()` 中新增第三個 `else if (addr >= 0x8000 && prgRomPtr != null)` 分支，打亂了 JIT 對整個函式的最佳化（特別是最熱的 $0000-$1FFF 與 $8000+ 兩段路徑的 code layout 與 branch prediction）。managed `int[] prgOffsets` 的 bounds check 也增加了每次 ROM read 的 overhead。儘管消除了 delegate + interface virtual call（理論上省 ~4-5 loads），新增的 branch + array access 成本超過節省。根本原因同 P30：在已高度最佳化的熱函式中加入額外分支往往造成 JIT 退化，而非 improvement。
 - **已嘗試的實作**: prgRomPtr (byte*) + prgOffsets int[4]，SetPRGBanks() 更新所有 mapper（000/001/002/003/004/007/011/066/071），CpuRead 中 else-if 分支直接 `*(prgRomPtr + prgOffsets[(addr>>13)&3] + (addr&0x1FFF))`。架構正確，但 .NET 4.8.1 Release JIT 對此模式的實際效果為負。
+
+---
+
+### P32 — Mem_r / Mem_w 改用 if/else 位址範圍分派（取代 65536 function pointer 陣列）
+
+- **假設**：`mem_read_fun[address](address)` 需要從 65536-entry 陣列 load delegate（可能 cache miss），再 invoke delegate（間接呼叫）。改用 if/else 位址範圍（`< 0x2000` / `< 0x4020` / `< 0x6000` / `< 0x8000` / else）可讓 JIT 生成直接 call，消除 array load + delegate dispatch overhead。
+- **實作方式**：Mem_r 與 Mem_w 改為 if/else 分支，直接呼叫 `IO_read` / `IO_write` / `MapperObj.MapperR_RPG` 等。`mem_read_fun` / `mem_write_fun` 陣列保留供 ProcessPendingDma 等非熱路徑使用。
+- **風險評估**：🟡 中風險 — 不影響 mapper 內部邏輯，僅改 dispatch 方式。需注意 ProcessDmaRead 等呼叫 `mem_read_fun` 的地方不能漏改（可保持不動，只改 Mem_r/Mem_w 熱路徑）。
+- **注意**: P31 已顯示「在熱函式加 else-if 分支可能 JIT 退化」，本實驗是「完全取代 array dispatch」而非「新增分支」，性質不同，值得實測。
+- **Verify**: blargg 174/174 + AC 136/136
+- **Status**: ❌ FAILED — AccuracyOptA=ON: 264.45 → 246.25/248.15 FPS（**-6.9%**，v106/v107）；AccuracyOptA=OFF: 302.00 → 283.45 FPS（**-6.2%**，v105）。兩種條件均退步。
+- **失敗原因**: `mem_read_fun[address](address)` delegate dispatch 雖然多一層間接，但 JIT 對此熱迴路模式優化極佳（array load + delegate invoke 已 cache-resident）。改成 if/else 引入額外 branch + virtual call，破壞 JIT code layout，同 P30/P31 規律：在熱函式加任何額外分支結構均有退化風險。
+
+---
+
+### P33 — RenderSpritesLine Pass 3 SIMD（System.Numerics.Vector<int>）
+
+- **Target**: `PPU.cs` `RenderSpritesLine()` — Pass 3：256 pixel 逐一合成 sprite 到 `Buffer_BG_array`
+- **Expected gain**: +1–3%（Pass 3 的 256 次迭代改為 SIMD，每次處理 4–8 pixel）
+- **Effort**: ~30 分鐘
+- **背景**:
+  - Pass 3 邏輯：`if (sprSet[i] != 0 && priority/transparency check) Buffer_BG_array[offset+i] = sprSet[i]`
+  - 這是標準的 **conditional select** 場景，SIMD 適合
+  - .NET Framework 4.8.1 提供 `System.Numerics.Vector<T>`（hardware-backed，Ryzen 3700X 支援 AVX2）
+  - `Vector.ConditionalSelect(mask, ifTrue, ifFalse)` 可一次處理 `Vector<int>.Count`（= 8 with AVX2）個 pixel
+  - 256 pixel / 8 = 32 個 SIMD iteration，取代 256 個 scalar 迭代
+- **風險評估**：🟡 中等 — 需正確處理 sprite priority（低優先 sprite 不可覆蓋高優先已設的 pixel）、透明色（sprSet == 0 跳過）、sprite 0 hit flag。條件較多，mask 邏輯需仔細驗證。
+- **注意**: `Vector<int>.Count` 在執行環境不支援 SIMD 時 fallback 為 1（scalar），需確認 Ryzen 3700X 上實際 Count == 8
+- **Verify**: blargg 174/174 + AC 136/136
+- **Status**: ✅ KEEP — **+2.5%** (264.45 → 271.05/271.35 FPS，v108/v109)；blargg 174/174 + AC 136/136 通過
+- **實際實作**: `Vector<byte>`（需 NuGet）→ 改用 `ulong` 8-byte cast（無額外依賴）。256 bytes / 8 = 32 次 ulong 比較取代 256 次 byte 比較，零區塊 O(32) 跳過 vs O(256)。stackalloc sprSet 多數為 0（NES 最多 8 sprite/scanline），掃描節省顯著。
+
+---
+
+### P34 — PPU CHR bank 直接指標（跳過 MapperR_CHR interface call）
+
+- **Target**: `PPU.cs` `ppu_rendering_tick()` — phase 3（CHR lo）與 phase 7（CHR hi）各呼叫一次 `MapperObj.MapperR_CHR(addr)`（interface virtual call）
+- **Expected gain**: +0.5–2%（每可見 scanline ~42 次 CHR 讀取 × 240 scanlines = ~10,000 次/幀，消除 interface dispatch）
+- **Effort**: ~30 分鐘
+- **背景**:
+  - 與 P27（Mapper 物件內 precompute，失敗）的本質差異：本提案將 8 個 CHR bank 指標存於 **NesCore 靜態欄位**（常駐 CPU cache），不在 Mapper heap 物件內
+  - `static byte* chrBankPtr0 ... chrBankPtr7`（8 × 1KB bank = 8 個指標）
+  - Mapper bank switch 時呼叫 `NesCore.SetCHRBankPtrs(...)` 更新
+  - ppu_rendering_tick CHR 讀取改為：`*(chrBankPtrs[addr >> 10] + (addr & 0x3FF))`
+  - P27 失敗原因是 chr0-7 放在 Mapper 物件（heap，cache miss）；本方案放在 NesCore static（與 ppu_cycles_x 等熱欄位同區域）
+- **風險評估**：🔴 高風險 — 需正確處理所有 mapper 的 CHR bank switch（包含 MMC3 的 8 × 1KB 切換、chr mode 位元）、CHR-RAM（可寫 CHR）、Mapper001 的細粒度切換。任何錯誤導致 CHR 讀取偏移 → 畫面花掉（blargg/AC 立即暴露）。
+- **建議順序**: 先 Mapper000（CHR-ROM fixed），驗證後 Mapper004，最後其他
+- **Verify**: blargg 174/174 + AC 136/136
+- **Status**: ✅ KEEP — **+3.0%** (271.20 → 279.30 FPS，v110/v111 兩次一致)；blargg 174/174 + AC 136/136 通過
+- **實作細節**:
+  - `static public byte*[] chrBankPtrs = new byte*[8]` 加到 NesCore/Main.cs
+  - `void UpdateCHRBanks()` 加入 IMapper interface，所有 10 個 mapper 實作
+  - Mapper004: MapperW_PRG 中 BankReg 0-5 寫入 + CHR_Bankmode 切換時呼叫 UpdateCHRBanks()
+  - 其他 mapper: MapperW_PRG 中 CHR bank select 寫入時呼叫
+  - PPU 6 處 MapperObj.MapperR_CHR() 改為 `chrBankPtrs[(addr>>10)&7][addr&0x3FF]`（加 `&7` 防止 ioaddr 為 stale nametable address 時越界）
+  - MEM.cs $2007 讀取路徑保留使用 MapperObj.MapperR_CHR()（非熱路徑）
 
 ---
 

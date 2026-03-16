@@ -30,5 +30,11 @@
             if (CHR_ROM_count == 0) return ppu_ram[address];
             return CHR_ROM[address];
         }
+
+        public void UpdateCHRBanks()
+        {
+            byte* b = CHR_ROM_count == 0 ? ppu_ram : CHR_ROM;
+            for (int i = 0; i < 8; i++) NesCore.chrBankPtrs[i] = b + i * 1024;
+        }
     }
 }

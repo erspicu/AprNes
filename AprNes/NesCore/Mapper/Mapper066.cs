@@ -30,6 +30,7 @@ namespace AprNes
         {
             CHR_Bankselect = value & 3; // Select 8 KB CHR ROM bank for PPU $0000-$1FFF
             PRG_Bankselect = (value & 0x30) >> 4; //select 32 KB PRG ROM bank for CPU $8000-$FFFF
+            UpdateCHRBanks();
         }
 
         public byte MapperR_RPG(ushort address)
@@ -41,6 +42,12 @@ namespace AprNes
         {
             if (CHR_ROM_count == 0) return ppu_ram[address];
             return CHR_ROM[address + (CHR_Bankselect << 13)];
+        }
+
+        public void UpdateCHRBanks()
+        {
+            byte* b = CHR_ROM_count == 0 ? ppu_ram : CHR_ROM + (CHR_Bankselect << 13);
+            for (int i = 0; i < 8; i++) NesCore.chrBankPtrs[i] = b + i * 1024;
         }
     }
 }

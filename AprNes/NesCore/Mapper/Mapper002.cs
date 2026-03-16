@@ -42,5 +42,10 @@
         {
             return ppu_ram[address];
         }
+
+        public void UpdateCHRBanks()
+        {
+            for (int i = 0; i < 8; i++) NesCore.chrBankPtrs[i] = ppu_ram + i * 1024;
+        }
     }
 }

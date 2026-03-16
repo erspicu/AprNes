@@ -102,6 +102,7 @@ namespace AprNes
                 case 0x5205: break; //??  Writes specify the eight-bit multiplicand; reads return the lower eight bits of the product
                 case 0x5206: break; //??  Writes specify the eight-bit multiplier; reads return the upper eight bits of the product
             }
+            UpdateCHRBanks();
         }
 
         public byte MapperR_RPG(ushort address)
@@ -165,6 +166,44 @@ namespace AprNes
                     else return 0;
                 }
                 else return 0;
+            }
+        }
+
+        public void UpdateCHRBanks()
+        {
+            if (CHR_Bankmode == 0) // 8K
+            {
+                byte* b = CHR_ROM + (CHR_Bankselect << 13);
+                for (int i = 0; i < 8; i++) NesCore.chrBankPtrs[i] = b + i * 1024;
+            }
+            else if (CHR_Bankmode == 1) // 4K
+            {
+                byte* b0 = CHR_ROM + (CHR0_Bankselect << 12);
+                byte* b1 = CHR_ROM + (CHR1_Bankselect << 12);
+                for (int i = 0; i < 4; i++) NesCore.chrBankPtrs[i] = b0 + i * 1024;
+                for (int i = 4; i < 8; i++) NesCore.chrBankPtrs[i] = b1 + (i - 4) * 1024;
+            }
+            else if (CHR_Bankmode == 2) // 2K
+            {
+                NesCore.chrBankPtrs[0] = CHR_ROM + (CHR0_Bankselect2k << 11);
+                NesCore.chrBankPtrs[1] = CHR_ROM + (CHR0_Bankselect2k << 11) + 1024;
+                NesCore.chrBankPtrs[2] = CHR_ROM + (CHR1_Bankselect2k << 11);
+                NesCore.chrBankPtrs[3] = CHR_ROM + (CHR1_Bankselect2k << 11) + 1024;
+                NesCore.chrBankPtrs[4] = CHR_ROM + (CHR2_Bankselect2k << 11);
+                NesCore.chrBankPtrs[5] = CHR_ROM + (CHR2_Bankselect2k << 11) + 1024;
+                NesCore.chrBankPtrs[6] = CHR_ROM + (CHR3_Bankselect2k << 11);
+                NesCore.chrBankPtrs[7] = CHR_ROM + (CHR3_Bankselect2k << 11) + 1024;
+            }
+            else // 1K
+            {
+                NesCore.chrBankPtrs[0] = CHR_ROM + (CHR0_Bankselect1k << 10);
+                NesCore.chrBankPtrs[1] = CHR_ROM + (CHR1_Bankselect1k << 10);
+                NesCore.chrBankPtrs[2] = CHR_ROM + (CHR2_Bankselect1k << 10);
+                NesCore.chrBankPtrs[3] = CHR_ROM + (CHR3_Bankselect1k << 10);
+                NesCore.chrBankPtrs[4] = CHR_ROM + (CHR4_Bankselect1k << 10);
+                NesCore.chrBankPtrs[5] = CHR_ROM + (CHR5_Bankselect1k << 10);
+                NesCore.chrBankPtrs[6] = CHR_ROM + (CHR6_Bankselect1k << 10);
+                NesCore.chrBankPtrs[7] = CHR_ROM + (CHR7_Bankselect1k << 10);
             }
         }
 

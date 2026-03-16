@@ -225,11 +225,11 @@ namespace AprNes
                     ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
                     if (mapper == 4) NotifyMapperA12(ioaddr);  // CHR low addr, A12=BG table bit
                 } else if (phase == 5) {
-                    lowTile = MapperObj.MapperR_CHR(ioaddr);
+                    lowTile = chrBankPtrs[(ioaddr >> 10) & 7][ioaddr & 0x3FF];
                 } else if (phase == 6) {
                     ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
                 } else {
-                    highTile = MapperObj.MapperR_CHR(ioaddr);
+                    highTile = chrBankPtrs[(ioaddr >> 10) & 7][ioaddr & 0x3FF];
                     // Render 8 pixels using shift registers BEFORE reload (visible only, BG on)
                     if (scanline < 240 && cx < 256 && ShowBackGround)
                         RenderBGTile(cx);
@@ -628,8 +628,8 @@ namespace AprNes
             }
             else line_t = line;
 
-            sprite0_tile_high = MapperObj.MapperR_CHR((tile_th_t << 4) | (line_t + 8));
-            sprite0_tile_low = MapperObj.MapperR_CHR((tile_th_t << 4) | line_t);
+            { int a = (tile_th_t << 4) | (line_t + 8); sprite0_tile_high = chrBankPtrs[(a >> 10) & 7][a & 0x3FF]; }
+            { int a = (tile_th_t << 4) | line_t;       sprite0_tile_low  = chrBankPtrs[(a >> 10) & 7][a & 0x3FF]; }
         }
 
         // Pre-compute the PPU cycle at which sprite overflow flag should be set.
@@ -875,8 +875,8 @@ namespace AprNes
                 }
                 else line_t = line;
 
-                prerender_sprite0_tile_high = MapperObj.MapperR_CHR((tile_th_t << 4) | (line_t + 8));
-                prerender_sprite0_tile_low = MapperObj.MapperR_CHR((tile_th_t << 4) | line_t);
+                { int a = (tile_th_t << 4) | (line_t + 8); prerender_sprite0_tile_high = chrBankPtrs[(a >> 10) & 7][a & 0x3FF]; }
+                { int a = (tile_th_t << 4) | line_t;       prerender_sprite0_tile_low  = chrBankPtrs[(a >> 10) & 7][a & 0x3FF]; }
             }
         }
 
@@ -960,8 +960,8 @@ namespace AprNes
                 }
                 else line_t = line;
 
-                byte tile_hbyte = MapperObj.MapperR_CHR((tile_th_t << 4) | (line_t + 8));
-                byte tile_lbyte = MapperObj.MapperR_CHR((tile_th_t << 4) | line_t);
+                int th_a = (tile_th_t << 4) | (line_t + 8); byte tile_hbyte = chrBankPtrs[(th_a >> 10) & 7][th_a & 0x3FF];
+                int tl_a = (tile_th_t << 4) | line_t;       byte tile_lbyte = chrBankPtrs[(tl_a >> 10) & 7][tl_a & 0x3FF];
                 bool flip_x = (sprite_attr & 0x40) != 0;
 
                 for (int loc = 0; loc < 8; loc++)
@@ -991,12 +991,30 @@ namespace AprNes
 #if NET8_0_OR_GREATER
             CompositeSpritesSimd(scanOff, sprSet, sprPriority, sprColor);
 #else
-            for (int screenX = 0; screenX < 256; screenX++)
+            // P33: ulong 8-byte block-scan — skip all-zero blocks 8 pixels at a time,
+            // fall back to scalar only for blocks that contain sprite pixels.
+            // No extra dependencies: uses unsafe ulong* cast (valid in unsafe context).
             {
-                if (sprSet[screenX] == 0) continue;
-                array_loc = scanOff + screenX;
-                if (!ShowBackGround || Buffer_BG_array[array_loc] == 0 || sprPriority[screenX] == 0)
-                    ScreenBuf1x[array_loc] = sprColor[screenX];
+                int sx = 0;
+                while (sx <= 248) // 256 - 8
+                {
+                    if (*(ulong*)(sprSet + sx) == 0) { sx += 8; continue; }
+                    int blockEnd = sx + 8;
+                    for (; sx < blockEnd; sx++)
+                    {
+                        if (sprSet[sx] == 0) continue;
+                        array_loc = scanOff + sx;
+                        if (!ShowBackGround || Buffer_BG_array[array_loc] == 0 || sprPriority[sx] == 0)
+                            ScreenBuf1x[array_loc] = sprColor[sx];
+                    }
+                }
+                for (; sx < 256; sx++)
+                {
+                    if (sprSet[sx] == 0) continue;
+                    array_loc = scanOff + sx;
+                    if (!ShowBackGround || Buffer_BG_array[array_loc] == 0 || sprPriority[sx] == 0)
+                        ScreenBuf1x[array_loc] = sprColor[sx];
+                }
             }
 #endif
         }

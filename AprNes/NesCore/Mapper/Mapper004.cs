@@ -119,7 +119,9 @@ namespace AprNes
                 {
                     BankReg = value & 7; // Specify which bank register to update on next write to Bank Data register
                     PRG_Bankmode = (value & 0x40) >> 6;
-                    CHR_Bankmode = (value & 0x80) >> 7;
+                    int newCHRMode = (value & 0x80) >> 7;
+                    if (newCHRMode != CHR_Bankmode) { CHR_Bankmode = newCHRMode; UpdateCHRBanks(); }
+                    else CHR_Bankmode = newCHRMode;
                 }
                 else if (address < 0xc000) *Vertical = ((value & 1) > 0) ? 0 : 1; //(0: vertical; 1: horizontal) $A000-$BFFF (Mirroring)
                 else if (address < 0xe000) IRQlatchVal = value;//$C000-$DFFF (IRQ latch) 
@@ -134,14 +136,16 @@ namespace AprNes
             {
                 if (address < 0xa000) //$8000-$9FFF (Bank data)
                 {
-                    if (BankReg == 0) CHR0_Bankselect2k = value; //0: Select 2 KB CHR bank at PPU $0000-$07FF (or $1000-$17FF);
-                    else if (BankReg == 1) CHR1_Bankselect2k = value; //1: Select 2 KB CHR bank at PPU $0800-$0FFF (or $1800-$1FFF);
-                    else if (BankReg == 2) CHR0_Bankselect1k = value; //2: Select 1 KB CHR bank at PPU $1000-$13FF (or $0000-$03FF);
-                    else if (BankReg == 3) CHR1_Bankselect1k = value; //3: Select 1 KB CHR bank at PPU $1400-$17FF (or $0400-$07FF);
-                    else if (BankReg == 4) CHR2_Bankselect1k = value; //4: Select 1 KB CHR bank at PPU $1800-$1BFF (or $0800-$0BFF);
-                    else if (BankReg == 5) CHR3_Bankselect1k = value; //5: Select 1 KB CHR bank at PPU $1C00-$1FFF (or $0C00-$0FFF);
+                    bool chrChanged = false;
+                    if (BankReg == 0) { CHR0_Bankselect2k = value; chrChanged = true; } //0: Select 2 KB CHR bank at PPU $0000-$07FF (or $1000-$17FF);
+                    else if (BankReg == 1) { CHR1_Bankselect2k = value; chrChanged = true; } //1: Select 2 KB CHR bank at PPU $0800-$0FFF (or $1800-$1FFF);
+                    else if (BankReg == 2) { CHR0_Bankselect1k = value; chrChanged = true; } //2: Select 1 KB CHR bank at PPU $1000-$13FF (or $0000-$03FF);
+                    else if (BankReg == 3) { CHR1_Bankselect1k = value; chrChanged = true; } //3: Select 1 KB CHR bank at PPU $1400-$17FF (or $0400-$07FF);
+                    else if (BankReg == 4) { CHR2_Bankselect1k = value; chrChanged = true; } //4: Select 1 KB CHR bank at PPU $1800-$1BFF (or $0800-$0BFF);
+                    else if (BankReg == 5) { CHR3_Bankselect1k = value; chrChanged = true; } //5: Select 1 KB CHR bank at PPU $1C00-$1FFF (or $0C00-$0FFF);
                     else if (BankReg == 6) PRG0_Bankselect = value;//6: Select 8 KB PRG ROM bank at $8000-$9FFF (or $C000-$DFFF);
                     else PRG1_Bankselect = value; //7: Select 8 KB PRG ROM bank at $A000-$BFFF
+                    if (chrChanged) UpdateCHRBanks();
                 }
                 else if (address < 0xc000) return; //$A000-$BFFF (PRG RAM protect) nothing do
                 else if (address < 0xe000)//$C000-$DFFF (IRQ reload)
@@ -168,6 +172,37 @@ namespace AprNes
                 else if (address < 0xc000) return PRG_ROM[(address - 0xa000) + (PRG1_Bankselect << 13)]; //$A000-$BFFF swap ok
                 else if (address < 0xe000) return PRG_ROM[(address - 0xc000) + (PRG0_Bankselect << 13)]; //$C000-$DFFF swap ok
                 else return PRG_ROM[(address - 0xe000) + (((PRG_ROM_count << 1) - 1) << 13)];//$E000-$FFFF fixed
+            }
+        }
+
+        public void UpdateCHRBanks()
+        {
+            if (CHR_ROM_count == 0)
+            {
+                for (int i = 0; i < 8; i++) NesCore.chrBankPtrs[i] = ppu_ram + i * 1024;
+                return;
+            }
+            if (CHR_Bankmode == 0) // two 2KB at $0000-$0FFF, four 1KB at $1000-$1FFF
+            {
+                NesCore.chrBankPtrs[0] = CHR_ROM + ((CHR0_Bankselect2k & 0xFE) << 10);
+                NesCore.chrBankPtrs[1] = CHR_ROM + ((CHR0_Bankselect2k | 1) << 10);
+                NesCore.chrBankPtrs[2] = CHR_ROM + ((CHR1_Bankselect2k & 0xFE) << 10);
+                NesCore.chrBankPtrs[3] = CHR_ROM + ((CHR1_Bankselect2k | 1) << 10);
+                NesCore.chrBankPtrs[4] = CHR_ROM + (CHR0_Bankselect1k << 10);
+                NesCore.chrBankPtrs[5] = CHR_ROM + (CHR1_Bankselect1k << 10);
+                NesCore.chrBankPtrs[6] = CHR_ROM + (CHR2_Bankselect1k << 10);
+                NesCore.chrBankPtrs[7] = CHR_ROM + (CHR3_Bankselect1k << 10);
+            }
+            else // four 1KB at $0000-$0FFF, two 2KB at $1000-$1FFF
+            {
+                NesCore.chrBankPtrs[0] = CHR_ROM + (CHR0_Bankselect1k << 10);
+                NesCore.chrBankPtrs[1] = CHR_ROM + (CHR1_Bankselect1k << 10);
+                NesCore.chrBankPtrs[2] = CHR_ROM + (CHR2_Bankselect1k << 10);
+                NesCore.chrBankPtrs[3] = CHR_ROM + (CHR3_Bankselect1k << 10);
+                NesCore.chrBankPtrs[4] = CHR_ROM + ((CHR0_Bankselect2k & 0xFE) << 10);
+                NesCore.chrBankPtrs[5] = CHR_ROM + ((CHR0_Bankselect2k | 1) << 10);
+                NesCore.chrBankPtrs[6] = CHR_ROM + ((CHR1_Bankselect2k & 0xFE) << 10);
+                NesCore.chrBankPtrs[7] = CHR_ROM + ((CHR1_Bankselect2k | 1) << 10);
             }
         }
 
