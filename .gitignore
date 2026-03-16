@@ -187,3 +187,4 @@ ClientBin/
 *.publishsettings
 __pycache__/
 *.pyc
+etc/
