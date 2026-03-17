@@ -106,12 +106,11 @@ namespace AprNes
 
             byte[] rom = File.ReadAllBytes(romPath);
             string perfDir = Path.Combine(
-                Path.GetDirectoryName(Path.GetDirectoryName(
-                    System.Reflection.Assembly.GetExecutingAssembly().Location)),
+                Path.GetDirectoryName(AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar)),
                 "Performance");
 
             // Locate project root Performance/ (walk up from exe)
-            string dir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            string dir = AppContext.BaseDirectory;
             for (int i = 0; i < 6; i++)
             {
                 string candidate = Path.Combine(dir, "Performance");

@@ -6,6 +6,7 @@ set OUT_DEBUG=AprNesAvalonia\bin\Debug\net10.0\AprNesAvalonia.exe
 set OUT_RELEASE=AprNesAvalonia\bin\Release\net10.0\AprNesAvalonia.exe
 set OUT_WIN=publish\win-x64\AprNesAvalonia.exe
 set OUT_LINUX=publish\linux-arm64\AprNesAvalonia
+set OUT_AOT=publish\win-x64-aot\AprNesAvalonia.exe
 
 echo ============================================================
 echo  AprNesAvalonia Build (Debug)
@@ -80,12 +81,31 @@ echo [PUBLISH OK] ^> %OUT_LINUX%
 echo.
 
 echo ============================================================
+echo  Publish: win-x64-aot (Native AOT, requires VS C++ tools)
+echo ============================================================
+
+set PATH=%PATH%;C:\Program Files (x86)\Microsoft Visual Studio\Installer
+dotnet publish "%PROJECT%" -c Release -r win-x64 -p:PublishAot=true ^
+  --output publish\win-x64-aot --nologo -v minimal
+if errorlevel 1 (
+    echo.
+    echo [PUBLISH FAILED] win-x64-aot
+    pause
+    exit /b 1
+)
+
+echo.
+echo [PUBLISH OK] ^> %OUT_AOT%
+echo.
+
+echo ============================================================
 echo  All done.
 echo ============================================================
-echo   Debug   : %OUT_DEBUG%
-echo   Release : %OUT_RELEASE%
-echo   win-x64 : %OUT_WIN%
-echo   linux-arm64 : %OUT_LINUX%
+echo   Debug       : %OUT_DEBUG%
+echo   Release     : %OUT_RELEASE%
+echo   win-x64     : %OUT_WIN%   (JIT single-file ~46MB)
+echo   linux-arm64 : %OUT_LINUX% (JIT single-file ~44MB)
+echo   win-x64-aot : %OUT_AOT%   (Native AOT ~19MB+3dll)
 echo.
 
 endlocal
