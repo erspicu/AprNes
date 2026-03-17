@@ -1,0 +1,49 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AprNesAvalonia.MainWindow"
+        Title="AprNes"
+        SizeToContent="WidthAndHeight"
+        CanResize="False"
+        Background="#F0F0F0"
+        WindowStartupLocation="CenterScreen">
+
+    <DockPanel>
+        <!-- Toolbar -->
+        <StackPanel DockPanel.Dock="Top"
+                    Orientation="Horizontal"
+                    Spacing="4"
+                    Margin="4,4,4,2">
+            <Button x:Name="BtnOpen"   Content="開啟遊戲" Padding="8,3" Click="BtnOpen_Click" />
+            <Button x:Name="BtnReset"  Content="重置"     Padding="8,3" Click="BtnReset_Click" />
+            <Button x:Name="BtnConfig" Content="功能設定" Padding="8,3" Click="BtnConfig_Click" />
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
+                <TextBlock Text="fps : " VerticalAlignment="Center" />
+                <TextBlock x:Name="FpsLabel" Text="--" VerticalAlignment="Center" MinWidth="40" />
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Status bar -->
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" Margin="4,2,4,4">
+            <TextBlock x:Name="RomInfoLabel"
+                       Grid.Column="0"
+                       Text="ROM資訊"
+                       VerticalAlignment="Center"
+                       Cursor="Hand"
+                       PointerPressed="RomInfoLabel_Click" />
+            <TextBlock x:Name="AboutLabel"
+                       Grid.Column="1"
+                       Text="關於"
+                       VerticalAlignment="Center"
+                       Cursor="Hand"
+                       PointerPressed="AboutLabel_Click" />
+        </Grid>
+
+        <!-- Game canvas: NES output 256x240 at 1x scale -->
+        <Border Background="Black" Margin="4,0,4,0"
+                Width="256" Height="240">
+            <Image x:Name="GameCanvas"
+                   Width="256" Height="240"
+                   Stretch="None" />
+        </Border>
+    </DockPanel>
+</Window>

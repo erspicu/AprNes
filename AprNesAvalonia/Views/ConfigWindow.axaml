@@ -1,0 +1,124 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AprNesAvalonia.Views.ConfigWindow"
+        Title="功能設定"
+        Width="780"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#F0F0F0">
+
+    <Grid RowDefinitions="*,Auto" Margin="8">
+
+        <!-- Main content row -->
+        <Grid Grid.Row="0" ColumnDefinitions="220,220,*">
+
+            <!-- Column 0: Keyboard mapping -->
+            <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                <TextBlock Text="遊戲按鈕鍵盤對應" FontWeight="Bold" Margin="0,0,0,6"/>
+                <Grid ColumnDefinitions="60,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="4">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="A"      VerticalAlignment="Center"/>
+                    <Button    Grid.Row="0" Grid.Column="1" x:Name="KB_A"      Content="Z"      HorizontalAlignment="Stretch"/>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="B"      VerticalAlignment="Center"/>
+                    <Button    Grid.Row="1" Grid.Column="1" x:Name="KB_B"      Content="X"      HorizontalAlignment="Stretch"/>
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="SELECT" VerticalAlignment="Center"/>
+                    <Button    Grid.Row="2" Grid.Column="1" x:Name="KB_SELECT" Content="S"      HorizontalAlignment="Stretch"/>
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="START"  VerticalAlignment="Center"/>
+                    <Button    Grid.Row="3" Grid.Column="1" x:Name="KB_START"  Content="A"      HorizontalAlignment="Stretch"/>
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="UP"     VerticalAlignment="Center"/>
+                    <Button    Grid.Row="4" Grid.Column="1" x:Name="KB_UP"     Content="Up"     HorizontalAlignment="Stretch"/>
+                    <TextBlock Grid.Row="5" Grid.Column="0" Text="DOWN"   VerticalAlignment="Center"/>
+                    <Button    Grid.Row="5" Grid.Column="1" x:Name="KB_DOWN"   Content="Down"   HorizontalAlignment="Stretch"/>
+                    <TextBlock Grid.Row="6" Grid.Column="0" Text="LEFT"   VerticalAlignment="Center"/>
+                    <Button    Grid.Row="6" Grid.Column="1" x:Name="KB_LEFT"   Content="Left"   HorizontalAlignment="Stretch"/>
+                    <TextBlock Grid.Row="7" Grid.Column="0" Text="RIGHT"  VerticalAlignment="Center"/>
+                    <Button    Grid.Row="7" Grid.Column="1" x:Name="KB_RIGHT"  Content="Right"  HorizontalAlignment="Stretch"/>
+                </Grid>
+            </StackPanel>
+
+            <!-- Column 1: Gamepad mapping -->
+            <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                <TextBlock Text="遊戲按鈕手把對應" FontWeight="Bold" Margin="0,0,0,6"/>
+                <Grid ColumnDefinitions="60,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="4">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="A"      VerticalAlignment="Center"/>
+                    <Button    Grid.Row="0" Grid.Column="1" x:Name="GP_A"      Content="Button 1" HorizontalAlignment="Stretch"/>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="B"      VerticalAlignment="Center"/>
+                    <Button    Grid.Row="1" Grid.Column="1" x:Name="GP_B"      Content="Button 3" HorizontalAlignment="Stretch"/>
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="SELECT" VerticalAlignment="Center"/>
+                    <Button    Grid.Row="2" Grid.Column="1" x:Name="GP_SELECT" Content="Button 8" HorizontalAlignment="Stretch"/>
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="START"  VerticalAlignment="Center"/>
+                    <Button    Grid.Row="3" Grid.Column="1" x:Name="GP_START"  Content="Button 7" HorizontalAlignment="Stretch"/>
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="UP"     VerticalAlignment="Center"/>
+                    <Button    Grid.Row="4" Grid.Column="1" x:Name="GP_UP"     Content="UP"       HorizontalAlignment="Stretch"/>
+                    <TextBlock Grid.Row="5" Grid.Column="0" Text="DOWN"   VerticalAlignment="Center"/>
+                    <Button    Grid.Row="5" Grid.Column="1" x:Name="GP_DOWN"   Content="DOWN"     HorizontalAlignment="Stretch"/>
+                    <TextBlock Grid.Row="6" Grid.Column="0" Text="LEFT"   VerticalAlignment="Center"/>
+                    <Button    Grid.Row="6" Grid.Column="1" x:Name="GP_LEFT"   Content="LEFT"     HorizontalAlignment="Stretch"/>
+                    <TextBlock Grid.Row="7" Grid.Column="0" Text="RIGHT"  VerticalAlignment="Center"/>
+                    <Button    Grid.Row="7" Grid.Column="1" x:Name="GP_RIGHT"  Content="RIGHT"    HorizontalAlignment="Stretch"/>
+                </Grid>
+            </StackPanel>
+
+            <!-- Column 2: Settings -->
+            <StackPanel Grid.Column="2" Spacing="8">
+
+                <!-- Limit FPS + screenshot path -->
+                <CheckBox x:Name="ChkLimitFps" Content="限制FPS速度"/>
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <TextBlock Text="Shift+p 抓取畫面擷圖存放處" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <TextBox x:Name="TxtScreenshotPath" Width="220" IsReadOnly="True"/>
+                    <Button  x:Name="BtnBrowse" Content="目錄選擇" Click="BtnBrowse_Click"/>
+                </StackPanel>
+
+                <!-- Screen size + Scanline + Language -->
+                <Grid ColumnDefinitions="Auto,Auto,Auto">
+                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                        <TextBlock Text="畫面大小" FontWeight="Bold" Margin="0,0,0,4"/>
+                        <Grid ColumnDefinitions="Auto,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="2">
+                            <RadioButton Grid.Row="0" Grid.Column="0" x:Name="Scale1" Content="x1" GroupName="Scale" IsChecked="True"/>
+                            <RadioButton Grid.Row="0" Grid.Column="1" x:Name="Scale5" Content="x5" GroupName="Scale"/>
+                            <RadioButton Grid.Row="1" Grid.Column="0" x:Name="Scale2" Content="x2" GroupName="Scale"/>
+                            <RadioButton Grid.Row="1" Grid.Column="1" x:Name="Scale6" Content="x6" GroupName="Scale"/>
+                            <RadioButton Grid.Row="2" Grid.Column="0" x:Name="Scale3" Content="x3" GroupName="Scale"/>
+                            <RadioButton Grid.Row="2" Grid.Column="1" x:Name="Scale8" Content="x8" GroupName="Scale"/>
+                            <RadioButton Grid.Row="3" Grid.Column="0" x:Name="Scale4" Content="x4" GroupName="Scale"/>
+                            <RadioButton Grid.Row="3" Grid.Column="1" x:Name="Scale9" Content="x9" GroupName="Scale"/>
+                        </Grid>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                        <TextBlock Text="掃描線" FontWeight="Bold" Margin="0,0,0,4"/>
+                        <RadioButton x:Name="Scan2" Content="x2" GroupName="Scan"/>
+                        <RadioButton x:Name="Scan4" Content="x4" GroupName="Scan"/>
+                        <RadioButton x:Name="Scan6" Content="x6" GroupName="Scan"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="語言選擇" FontWeight="Bold" Margin="0,0,0,4"/>
+                        <ComboBox x:Name="LangCombo" Width="140">
+                            <ComboBoxItem Content="zh-tw 繁體中文" IsSelected="True"/>
+                            <ComboBoxItem Content="zh-cn 简体中文"/>
+                            <ComboBoxItem Content="en-us English"/>
+                        </ComboBox>
+                    </StackPanel>
+                </Grid>
+
+                <!-- AccuracyOptA -->
+                <CheckBox x:Name="ChkAccuracyOptA" Content="逐點精確 Secondary OAM 評估 (AccuracyOptA)"/>
+
+                <!-- Sound -->
+                <TextBlock Text="音效" FontWeight="Bold"/>
+                <Slider x:Name="VolumeSlider" Minimum="0" Maximum="100" Value="80" Width="200" HorizontalAlignment="Left"/>
+                <CheckBox x:Name="ChkSound" Content="音效 - 關閉"/>
+
+            </StackPanel>
+        </Grid>
+
+        <!-- OK button row -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+            <Button Grid.Column="1" x:Name="BtnOK" Content="確定"
+                    Padding="20,4" Click="BtnOK_Click"
+                    HorizontalAlignment="Right"/>
+        </Grid>
+    </Grid>
+</Window>
