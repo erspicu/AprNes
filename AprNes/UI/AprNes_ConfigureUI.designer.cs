@@ -85,6 +85,7 @@
             this.SoundtrackBar = new System.Windows.Forms.TrackBar();
             this.groupBox5 = new System.Windows.Forms.GroupBox();
             this.SoundcheckBox = new System.Windows.Forms.CheckBox();
+            this.perdotFSM = new System.Windows.Forms.CheckBox();
             this.groupBox1.SuspendLayout();
             this.groupBox2.SuspendLayout();
             this.groupBox4.SuspendLayout();
@@ -810,7 +811,17 @@
             this.SoundcheckBox.Text = "音效 - ";
             this.SoundcheckBox.UseVisualStyleBackColor = true;
             this.SoundcheckBox.CheckedChanged += new System.EventHandler(this.SoundcheckBox_CheckedChanged);
-            // 
+            //
+            // perdotFSM
+            //
+            this.perdotFSM.AutoSize = true;
+            this.perdotFSM.Location = new System.Drawing.Point(591, 271);
+            this.perdotFSM.Name = "perdotFSM";
+            this.perdotFSM.Size = new System.Drawing.Size(320, 22);
+            this.perdotFSM.TabIndex = 23;
+            this.perdotFSM.Text = "Per-dot Secondary OAM Evaluation FSM";
+            this.perdotFSM.UseVisualStyleBackColor = true;
+            //
             // AprNes_ConfigureUI
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 18F);
@@ -826,6 +837,7 @@
             this.Controls.Add(this.choose_dir);
             this.Controls.Add(this.label9);
             this.Controls.Add(this.screen_path);
+            this.Controls.Add(this.perdotFSM);
             this.Controls.Add(this.LimitFPS_checkBox);
             this.Controls.Add(this.groupBox1);
             this.DoubleBuffered = true;
@@ -911,5 +923,6 @@
         private System.Windows.Forms.TrackBar SoundtrackBar;
         private System.Windows.Forms.GroupBox groupBox5;
         private System.Windows.Forms.CheckBox SoundcheckBox;
+        private System.Windows.Forms.CheckBox perdotFSM;
     }
 }
