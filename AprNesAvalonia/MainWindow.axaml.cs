@@ -15,7 +15,11 @@ public partial class MainWindow : Window
 {
     private readonly EmulatorEngine _emu = new();
     private readonly IniFile _ini;
-    private Bitmap? _lastFrame;
+    private readonly WriteableBitmap _writeableBitmap = new WriteableBitmap(
+        new Avalonia.PixelSize(256, 240),
+        new Avalonia.Vector(96, 96),
+        PixelFormats.Bgra8888,
+        AlphaFormat.Unpremul);
 
     // FPS display timer
     private readonly DispatcherTimer _fpsTimer = new() { Interval = TimeSpan.FromSeconds(1) };
@@ -29,6 +33,9 @@ public partial class MainWindow : Window
         _ini = new IniFile(iniPath);
         ApplyIniSettings();
 
+        // Set canvas source once — WriteableBitmap auto-invalidates on Lock/Unlock
+        GameCanvas.Source = _writeableBitmap;
+
         // Wire frame-ready event
         _emu.FrameReady += OnFrameReady;
 
@@ -40,7 +47,7 @@ public partial class MainWindow : Window
         KeyDown += OnKeyDown;
         KeyUp   += OnKeyUp;
 
-        Closing += (_, _) => _emu.Dispose();
+        Closing += (_, _) => { _emu.Dispose(); _writeableBitmap.Dispose(); };
     }
 
     // ── Settings ───────────────────────────────────────────────────────────
@@ -80,20 +87,11 @@ public partial class MainWindow : Window
     private unsafe void OnFrameReady()
     {
         var src = _emu.FrameBuffer;
+        int size = src.Length;
         fixed (byte* p = src)
-        {
-            var newFrame = new Bitmap(
-                PixelFormats.Bgra8888,
-                AlphaFormat.Unpremul,
-                (nint)p,
-                new Avalonia.PixelSize(256, 240),
-                new Avalonia.Vector(96, 96),
-                256 * 4);
-            var old = _lastFrame;
-            _lastFrame = newFrame;
-            GameCanvas.Source = newFrame;
-            old?.Dispose();
-        }
+        using (var fb = _writeableBitmap.Lock())
+            Buffer.MemoryCopy(p, fb.Address.ToPointer(), size, size);
+        GameCanvas.InvalidateVisual();
     }
 
     // ── Keyboard ───────────────────────────────────────────────────────────
