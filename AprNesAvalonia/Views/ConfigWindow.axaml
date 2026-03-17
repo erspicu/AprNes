@@ -18,21 +18,21 @@
                 <TextBlock Text="遊戲按鈕鍵盤對應" FontWeight="Bold" Margin="0,0,0,6"/>
                 <Grid ColumnDefinitions="60,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="4">
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="A"      VerticalAlignment="Center"/>
-                    <Button    Grid.Row="0" Grid.Column="1" x:Name="KB_A"      Content="Z"      HorizontalAlignment="Stretch"/>
+                    <Button    Grid.Row="0" Grid.Column="1" x:Name="KB_A"      Content="Z"      HorizontalAlignment="Stretch" Click="KB_Click"/>
                     <TextBlock Grid.Row="1" Grid.Column="0" Text="B"      VerticalAlignment="Center"/>
-                    <Button    Grid.Row="1" Grid.Column="1" x:Name="KB_B"      Content="X"      HorizontalAlignment="Stretch"/>
+                    <Button    Grid.Row="1" Grid.Column="1" x:Name="KB_B"      Content="X"      HorizontalAlignment="Stretch" Click="KB_Click"/>
                     <TextBlock Grid.Row="2" Grid.Column="0" Text="SELECT" VerticalAlignment="Center"/>
-                    <Button    Grid.Row="2" Grid.Column="1" x:Name="KB_SELECT" Content="S"      HorizontalAlignment="Stretch"/>
+                    <Button    Grid.Row="2" Grid.Column="1" x:Name="KB_SELECT" Content="S"      HorizontalAlignment="Stretch" Click="KB_Click"/>
                     <TextBlock Grid.Row="3" Grid.Column="0" Text="START"  VerticalAlignment="Center"/>
-                    <Button    Grid.Row="3" Grid.Column="1" x:Name="KB_START"  Content="A"      HorizontalAlignment="Stretch"/>
+                    <Button    Grid.Row="3" Grid.Column="1" x:Name="KB_START"  Content="A"      HorizontalAlignment="Stretch" Click="KB_Click"/>
                     <TextBlock Grid.Row="4" Grid.Column="0" Text="UP"     VerticalAlignment="Center"/>
-                    <Button    Grid.Row="4" Grid.Column="1" x:Name="KB_UP"     Content="Up"     HorizontalAlignment="Stretch"/>
+                    <Button    Grid.Row="4" Grid.Column="1" x:Name="KB_UP"     Content="Up"     HorizontalAlignment="Stretch" Click="KB_Click"/>
                     <TextBlock Grid.Row="5" Grid.Column="0" Text="DOWN"   VerticalAlignment="Center"/>
-                    <Button    Grid.Row="5" Grid.Column="1" x:Name="KB_DOWN"   Content="Down"   HorizontalAlignment="Stretch"/>
+                    <Button    Grid.Row="5" Grid.Column="1" x:Name="KB_DOWN"   Content="Down"   HorizontalAlignment="Stretch" Click="KB_Click"/>
                     <TextBlock Grid.Row="6" Grid.Column="0" Text="LEFT"   VerticalAlignment="Center"/>
-                    <Button    Grid.Row="6" Grid.Column="1" x:Name="KB_LEFT"   Content="Left"   HorizontalAlignment="Stretch"/>
+                    <Button    Grid.Row="6" Grid.Column="1" x:Name="KB_LEFT"   Content="Left"   HorizontalAlignment="Stretch" Click="KB_Click"/>
                     <TextBlock Grid.Row="7" Grid.Column="0" Text="RIGHT"  VerticalAlignment="Center"/>
-                    <Button    Grid.Row="7" Grid.Column="1" x:Name="KB_RIGHT"  Content="Right"  HorizontalAlignment="Stretch"/>
+                    <Button    Grid.Row="7" Grid.Column="1" x:Name="KB_RIGHT"  Content="Right"  HorizontalAlignment="Stretch" Click="KB_Click"/>
                 </Grid>
             </StackPanel>
 
@@ -109,7 +109,7 @@
                 <!-- Sound -->
                 <TextBlock Text="音效" FontWeight="Bold"/>
                 <Slider x:Name="VolumeSlider" Minimum="0" Maximum="100" Value="80" Width="200" HorizontalAlignment="Left"/>
-                <CheckBox x:Name="ChkSound" Content="音效 - 關閉"/>
+                <CheckBox x:Name="ChkSound" Content="音效 - 關閉" Click="ChkSound_Click"/>
 
             </StackPanel>
         </Grid>

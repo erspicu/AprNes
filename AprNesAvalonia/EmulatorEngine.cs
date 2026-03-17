@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using Avalonia.Input;
 using AprNes;
@@ -18,6 +20,8 @@ public sealed unsafe class EmulatorEngine : IDisposable
     private Thread?  _thread;
     private volatile bool _running;
     private volatile bool _romLoaded;
+    private byte[]? _romBytes;
+    private string  _romFileName = "";
 
     // ── Video ──────────────────────────────────────────────────────────────
     // Pre-allocated 256×240 BGRA8888 frame buffer (written on emulator thread, read on UI thread)
@@ -31,9 +35,12 @@ public sealed unsafe class EmulatorEngine : IDisposable
     /// <summary>Latest rendered frame (Bgra8888, 256×240). Access only after FrameReady fires.</summary>
     public ReadOnlySpan<byte> FrameBuffer => _frameBuffer;
 
+    // ── FPS limiting (mirrors original VideoOutputDeal) ─────────────────
+    private readonly Stopwatch _fpsStopWatch = new();
+    private double _fpsDeadline = 0;
+    private const double NES_FRAME_SECONDS = 1.0 / 60.0988;
+
     // ── Key map: Avalonia Key → NES button index (0-7) ────────────────────
-    // Defaults match AprNes.ini: A=Z(90), B=X(88), SELECT=S(83), START=A(65),
-    //   UP=38, DOWN=40, LEFT=37, RIGHT=39
     private readonly Dictionary<Key, byte> _keymap = new()
     {
         { Key.Z,     0 }, // A
@@ -60,7 +67,7 @@ public sealed unsafe class EmulatorEngine : IDisposable
     };
 
     // ── Public API ─────────────────────────────────────────────────────────
-    public bool IsRunning => _running;
+    public bool IsRunning   => _running;
     public bool IsRomLoaded => _romLoaded;
 
     /// <summary>Apply keyboard mapping from INI (Windows VK codes).</summary>
@@ -73,11 +80,20 @@ public sealed unsafe class EmulatorEngine : IDisposable
         Map(vkUp,     4); Map(vkDown,  5); Map(vkLeft,   6); Map(vkRight, 7);
     }
 
+    /// <summary>Apply audio settings: set NesCore flags and open/close WaveOut.</summary>
+    public void ApplyAudioSettings(bool enabled, int volume)
+    {
+        NesCore.AudioEnabled = enabled;
+        NesCore.Volume       = volume;
+        WaveOutPlayer.CloseAudio();
+        if (enabled && _running)
+            WaveOutPlayer.OpenAudio();
+    }
+
     /// <summary>Load and initialise a ROM. Returns true on success.</summary>
     public bool LoadRom(string path)
     {
         Stop();
-        NesCore.AudioEnabled = false;   // audio handled separately
         NesCore.AccuracyOptA = true;
 
         byte[] rom;
@@ -85,7 +101,10 @@ public sealed unsafe class EmulatorEngine : IDisposable
         catch { return false; }
 
         if (!NesCore.init(rom)) return false;
-        _romLoaded = true;
+        _romLoaded   = true;
+        _romBytes    = rom;
+        _romFileName = path;
+        NesCore.rom_file_name = Path.GetFileNameWithoutExtension(path);
 
         NesCore.VideoOutput -= OnVideoOutput;
         NesCore.VideoOutput += OnVideoOutput;
@@ -97,15 +116,21 @@ public sealed unsafe class EmulatorEngine : IDisposable
     {
         if (!_romLoaded || _running) return;
         _running = true;
+        _fpsDeadline = 0;
+        _fpsStopWatch.Reset();
         NesCore.exit = false;
         NesCore._event.Set();
         _thread = new Thread(NesCore.run) { IsBackground = true, Name = "NesCore" };
         _thread.Start();
+
+        if (NesCore.AudioEnabled)
+            WaveOutPlayer.OpenAudio();
     }
 
     /// <summary>Stop the emulator loop and wait for thread to exit.</summary>
     public void Stop()
     {
+        WaveOutPlayer.CloseAudio();
         if (!_running) return;
         _running = false;
         NesCore.exit = true;
@@ -123,6 +148,49 @@ public sealed unsafe class EmulatorEngine : IDisposable
     /// <summary>Returns frames rendered since last call (for FPS display).</summary>
     public int TakeFrameCount() => Interlocked.Exchange(ref _frameCounter, 0);
 
+    /// <summary>Returns iNES header info string, same format as original AprNes.</summary>
+    public string GetRomInfo()
+    {
+        if (_romBytes == null || _romBytes.Length < 16) return "No ROM loaded.";
+        if (!(_romBytes[0] == 'N' && _romBytes[1] == 'E' && _romBytes[2] == 'S' && _romBytes[3] == 0x1a))
+            return "Bad Magic Number! (not a valid NES ROM)";
+
+        var sb = new StringBuilder();
+        sb.AppendLine("FileName : " + Path.GetFileName(_romFileName));
+        sb.AppendLine("iNes Header");
+        byte prg = _romBytes[4]; sb.AppendLine("PRG-ROM count : " + prg);
+        byte chr = _romBytes[5]; sb.AppendLine("CHR-ROM count : " + chr);
+        byte ctrl1 = _romBytes[6], ctrl2 = _romBytes[7];
+        sb.AppendLine((ctrl1 & 1) != 0 ? "vertical mirroring" : "horizontal mirroring");
+        sb.AppendLine("battery-backed RAM : " + ((ctrl1 & 2) != 0 ? "yes" : "no"));
+        sb.AppendLine("trainer : "            + ((ctrl1 & 4) != 0 ? "yes" : "no"));
+        sb.AppendLine("fourscreen mirroring : " + ((ctrl1 & 8) != 0 ? "yes" : "no"));
+
+        int mapper;
+        bool iNesV2 = false;
+        if ((ctrl2 & 0xf) != 0)
+        {
+            if ((ctrl2 & 0xc) == 8)
+            {
+                iNesV2 = true;
+                mapper = ((ctrl1 & 0xf0) >> 4) | (ctrl2 & 0xf0);
+                sb.AppendLine("Nes header 2.0 version!");
+            }
+            else
+            {
+                mapper = (ctrl1 & 0xf0) >> 4;
+                sb.AppendLine("Old style Mapper info!");
+            }
+        }
+        else
+            mapper = ((ctrl1 & 0xf0) >> 4) | (ctrl2 & 0xf0);
+
+        sb.AppendLine("Mapper number : " + mapper);
+        if (iNesV2 && _romBytes.Length > 8)
+            sb.AppendLine("RAM banks count : " + _romBytes[8]);
+        return sb.ToString();
+    }
+
     // ── Private ────────────────────────────────────────────────────────────
     private void OnVideoOutput(object? sender, EventArgs e)
     {
@@ -133,6 +201,19 @@ public sealed unsafe class EmulatorEngine : IDisposable
             Buffer.MemoryCopy(NesCore.ScreenBuf1x, dst, _frameBuffer.Length, _frameBuffer.Length);
 
         Interlocked.Increment(ref _frameCounter);
+
+        // FPS limiting (mirrors original AprNes VideoOutputDeal)
+        if (NesCore.LimitFPS)
+        {
+            if (!_fpsStopWatch.IsRunning) _fpsStopWatch.Restart();
+            double now = _fpsStopWatch.Elapsed.TotalSeconds;
+            if (_fpsDeadline < now)
+                _fpsDeadline = now + NES_FRAME_SECONDS;
+            while (_fpsDeadline - _fpsStopWatch.Elapsed.TotalSeconds > 0.001)
+                Thread.Sleep(1);
+            while (_fpsStopWatch.Elapsed.TotalSeconds < _fpsDeadline) { }
+            _fpsDeadline += NES_FRAME_SECONDS;
+        }
 
         // Signal UI thread via Avalonia dispatcher
         if (Interlocked.Exchange(ref _pendingFrame, 1) == 0)

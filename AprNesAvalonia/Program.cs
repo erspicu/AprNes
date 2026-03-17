@@ -1,18 +1,32 @@
-﻿using Avalonia;
+using Avalonia;
+using AprNes;
 using System;
 
 namespace AprNesAvalonia;
 
 class Program
 {
-    // Initialization code. Don't use any Avalonia, third-party APIs or any
-    // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
-    // yet and stuff might break.
     [STAThread]
-    public static void Main(string[] args) => BuildAvaloniaApp()
-        .StartWithClassicDesktopLifetime(args);
+    public static int Main(string[] args)
+    {
+        // Headless mode: --rom / --benchmark / --perf → TestRunner (no GUI)
+        bool headless = false;
+        foreach (string a in args)
+        {
+            if (a == "--rom" || a == "--benchmark" || a == "--perf")
+            { headless = true; break; }
+        }
 
-    // Avalonia configuration, don't remove; also used by visual designer.
+        if (headless)
+        {
+            // Avalonia platform must be initialised for Bitmap (used in SaveScreenshot)
+            BuildAvaloniaApp().SetupWithoutStarting();
+            return TestRunner.Run(args);
+        }
+
+        return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+    }
+
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()

@@ -58,6 +58,22 @@ public partial class MainWindow : Window
 
         AprNes.NesCore.AccuracyOptA = _ini.GetBool("AccuracyOptA", true);
         AprNes.NesCore.LimitFPS     = _ini.GetBool("LimitFPS",    false);
+
+        _emu.ApplyAudioSettings(
+            _ini.GetBool("Sound",  false),
+            _ini.GetInt ("Volume", 80));
+
+        ApplyLanguage(_ini.Get("Lang", "zh-tw"));
+    }
+
+    private void ApplyLanguage(string lang)
+    {
+        if (!LangHelper.Loaded) return;
+        BtnOpen.Content   = LangHelper.Get(lang, "rom",     "開啟遊戲");
+        BtnReset.Content  = LangHelper.Get(lang, "reset",   "重置");
+        BtnConfig.Content = LangHelper.Get(lang, "setting", "功能設定");
+        RomInfoLabel.Text = LangHelper.Get(lang, "rominfo", "ROM資訊");
+        AboutLabel.Text   = LangHelper.Get(lang, "about",   "關於");
     }
 
     // ── Frame rendering ────────────────────────────────────────────────────
@@ -81,8 +97,92 @@ public partial class MainWindow : Window
     }
 
     // ── Keyboard ───────────────────────────────────────────────────────────
-    private new void OnKeyDown(object? sender, KeyEventArgs e) { _emu.KeyDown(e.Key); }
-    private new void OnKeyUp  (object? sender, KeyEventArgs e) { _emu.KeyUp(e.Key); }
+    private new void OnKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.KeyModifiers == KeyModifiers.Shift && e.Key == Key.P)
+        {
+            CaptureScreen();
+            e.Handled = true;
+            return;
+        }
+        _emu.KeyDown(e.Key);
+    }
+    private new void OnKeyUp(object? sender, KeyEventArgs e) { _emu.KeyUp(e.Key); }
+
+    // ── Screenshot (Shift+P) ───────────────────────────────────────────────
+    private volatile bool _capturing = false;
+    private async void CaptureScreen()
+    {
+        if (!_emu.IsRunning) return;
+        if (_capturing) return;
+        _capturing = true;
+
+        _emu.Pause();
+
+        string message;
+        try
+        {
+            string dir = _ini.Get("CaptureScreenPath", Path.Combine(AppContext.BaseDirectory, "Screenshot"));
+            Directory.CreateDirectory(dir);
+
+            string stamp = DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss");
+            string filePath = Path.Combine(dir, $"Screen-{stamp}.png");
+
+            var src = _emu.FrameBuffer;
+            unsafe
+            {
+                fixed (byte* p = src)
+                {
+                    var bmp = new Bitmap(
+                        PixelFormats.Bgra8888, AlphaFormat.Unpremul,
+                        (nint)p,
+                        new Avalonia.PixelSize(256, 240),
+                        new Avalonia.Vector(96, 96),
+                        256 * 4);
+                    using var fs = File.Create(filePath);
+                    bmp.Save(fs);
+                    bmp.Dispose();
+                }
+            }
+            message = filePath + " save!";
+        }
+        catch (Exception ex)
+        {
+            message = "截圖失敗: " + ex.Message;
+        }
+
+        _emu.Resume();
+        _capturing = false;
+
+        // Show message box (mirrors original MessageBox.Show)
+        await ShowMessageBox(message);
+    }
+
+    private async System.Threading.Tasks.Task ShowMessageBox(string message)
+    {
+        var win = new Window
+        {
+            Title = "AprNes",
+            Width = 420, SizeToContent = SizeToContent.Height,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Content = new StackPanel
+            {
+                Margin = new Avalonia.Thickness(16),
+                Spacing = 12,
+                Children =
+                {
+                    new TextBlock { Text = message, TextWrapping = Avalonia.Media.TextWrapping.Wrap },
+                    new Button    { Content = "確定", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                                    Padding = new Avalonia.Thickness(20, 4) }
+                }
+            }
+        };
+        // Wire OK button to close
+        var btn = ((StackPanel)win.Content).Children[1] as Button;
+        btn!.Click += (_, _) => win.Close();
+        await win.ShowDialog(this);
+    }
 
     // ── Toolbar buttons ────────────────────────────────────────────────────
     private async void BtnOpen_Click(object? sender, RoutedEventArgs e)
@@ -102,10 +202,9 @@ public partial class MainWindow : Window
         _emu.Stop();
         if (!_emu.LoadRom(path))
         {
-            RomInfoLabel.Text = "ROM 載入失敗";
+            // keep label as-is on failure
             return;
         }
-        RomInfoLabel.Text = Path.GetFileName(path);
         _emu.Start();
     }
 
@@ -121,7 +220,7 @@ public partial class MainWindow : Window
         bool wasPaused = _emu.IsRunning;
         if (wasPaused) _emu.Pause();
 
-        var dlg = new ConfigWindow();
+        var dlg = new ConfigWindow(_ini);
         await dlg.ShowDialog(this);
 
         ApplyIniSettings();
@@ -131,15 +230,7 @@ public partial class MainWindow : Window
     private async void RomInfoLabel_Click(object? sender, Avalonia.Input.PointerPressedEventArgs e)
     {
         var dlg = new RomInfoWindow();
-        if (AprNes.NesCore.rom_file_name != "")
-        {
-            string info = $"File : {AprNes.NesCore.rom_file_name}\r\n" +
-                          $"Mapper : {AprNes.NesCore.RomMapper}\r\n" +
-                          $"PRG-ROM : {AprNes.NesCore.RomPrgCount} × 16KB\r\n" +
-                          $"CHR-ROM : {AprNes.NesCore.RomChrCount} × 8KB\r\n" +
-                          $"Mirror : {(AprNes.NesCore.RomHorizMirror ? "Horizontal" : "Vertical")}";
-            dlg.SetInfo(info);
-        }
+        dlg.SetInfo(_emu.GetRomInfo());
         await dlg.ShowDialog(this);
     }
 
