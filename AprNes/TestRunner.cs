@@ -20,6 +20,7 @@ namespace AprNes
     {
         const double NES_FPS = 60.0988;
         const int DEFAULT_HOLD_FRAMES = 10; // ~166ms
+        static bool useSpeedCore = false;
 
         // 解析 --input 參數，格式: "A:1.0,B:2.0,Select:3.0,Start:4.0,Up:5.0,Down:6.0,Left:7.0,Right:8.0"
         static List<InputEvent> ParseInput(string input)
@@ -126,8 +127,8 @@ namespace AprNes
                 return 0;
             }
 
-            // ── perf mode: AprNes.exe [--accuracy FLAGS] --perf <rom> [seconds] [note] ──
-            // Runs a headless benchmark, saves versioned MD report to Performance/
+            // ── perf mode: AprNes.exe [--accuracy FLAGS] [--speed-core] --perf <rom> [seconds] [note] ──
+            // Runs a headless benchmark, saves versioned MD report to Performance/ or report_speed/Performance/
             {
                 int perfIdx = Array.IndexOf(args, "--perf");
                 if (perfIdx >= 0 && perfIdx + 1 < args.Length)
@@ -135,7 +136,11 @@ namespace AprNes
                     string rom     = args[perfIdx + 1];
                     int s; int seconds = (perfIdx + 2 < args.Length && int.TryParse(args[perfIdx + 2], out s)) ? s : 20;
                     string note    = (perfIdx + 3 < args.Length) ? args[perfIdx + 3] : null;
-                    BenchmarkRunner.RunPerf(rom, seconds, note);
+                    bool speedCorePerf = Array.IndexOf(args, "--speed-core") >= 0;
+                    if (speedCorePerf)
+                        BenchmarkRunner.RunSpeedCorePerf(rom, seconds, note);
+                    else
+                        BenchmarkRunner.RunPerf(rom, seconds, note);
                     return 0;
                 }
             }
@@ -200,6 +205,9 @@ namespace AprNes
                     case "--accuracy":
                         if (i + 1 < args.Length) i++; // already pre-parsed
                         break;
+                    case "--speed-core":
+                        useSpeedCore = true;
+                        break;
                     case "--expected-crc":
                         if (i + 1 < args.Length)
                         {
@@ -229,9 +237,17 @@ namespace AprNes
             string romName = Path.GetFileName(romPath);
 
             // Headless init
-            NesCore.HeadlessMode = true;
-            NesCore.OnError = msg => Console.Error.WriteLine("ERROR: " + msg);
-            NesCore.AudioEnabled = false;
+            if (!useSpeedCore)
+            {
+                NesCore.HeadlessMode = true;
+                NesCore.OnError = msg => Console.Error.WriteLine("ERROR: " + msg);
+                NesCore.AudioEnabled = false;
+            }
+            else
+            {
+                NesCoreSpeed.OnError_S = msg => Console.Error.WriteLine("ERROR: " + msg);
+                NesCoreSpeed.AudioEnabled_S = false;
+            }
 
 
             // Compute max frames
@@ -280,9 +296,9 @@ namespace AprNes
                 {
                     var ev = inputEvents[ie];
                     if (frameCount == ev.pressFrame)
-                        NesCore.P1_ButtonPress((byte)ev.buttonIndex);
+                        DoButtonPress(ev.buttonIndex);
                     else if (frameCount == ev.releaseFrame)
-                        NesCore.P1_ButtonUnPress((byte)ev.buttonIndex);
+                        DoButtonUnPress(ev.buttonIndex);
                 }
 
                 // --- Timed screenshots ---
@@ -299,7 +315,7 @@ namespace AprNes
                 if (!explicitResetDone && softResetFrame > 0 && frameCount >= softResetFrame)
                 {
                     Console.Error.WriteLine("[TestRunner] Soft reset at frame " + frameCount);
-                    NesCore.SoftReset();
+                    DoSoftReset();
                     explicitResetDone = true;
                 }
 
@@ -309,7 +325,7 @@ namespace AprNes
                     // $6000 = $80 means "test running"
                     // $6000 = $81 means "press reset now" (delay >= 100ms ≈ 6 frames)
                     // $6000 < $80 means "test finished" (0 = pass, N = fail code)
-                    byte status = NesCore.NES_MEM[0x6000];
+                    byte status = GetMem(0x6000);
 
                     // Auto-detect $81: test requests soft reset (supports multiple resets)
                     if (status == 0x81 && resetRequestFrame < 0
@@ -327,7 +343,7 @@ namespace AprNes
                         && frameCount >= resetRequestFrame + 6)
                     {
                         Console.Error.WriteLine("[TestRunner] Auto soft reset #" + (autoResetCount + 1) + " at frame " + frameCount + " ($6000=$81 at frame " + resetRequestFrame + ")");
-                        NesCore.SoftReset();
+                        DoSoftReset();
                         resetRequestFrame = -1;
                         waitForTestRestart = true;
                         autoResetCount++;
@@ -342,7 +358,7 @@ namespace AprNes
                     {
                         resultCode = status;
                         done = true;
-                        NesCore.exit = true;
+                        SetExit(true);
                         return;
                     }
                 }
@@ -355,10 +371,11 @@ namespace AprNes
                 {
                     uint hash = 1;
                     bool hasContent = false;
-                    uint firstPx = NesCore.ScreenBuf1x[0];
+                    uint* _sbuf = GetScreenBuf();
+                    uint firstPx = _sbuf[0];
                     for (int i = 0; i < 256 * 240; i += 37)
                     {
-                        uint px = NesCore.ScreenBuf1x[i];
+                        uint px = _sbuf[i];
                         hash = hash * 31 + px;
                         if (px != firstPx) hasContent = true;
                     }
@@ -428,7 +445,7 @@ namespace AprNes
                                 + (passOnStable && !NametableContains("Passed") && !NametableContains("PASSED")
                                    ? " (pass-on-stable)" : ""));
                             done = true;
-                            NesCore.exit = true;
+                            SetExit(true);
                             return;
                         }
                         // Screen stable but no result text yet — keep waiting
@@ -438,7 +455,7 @@ namespace AprNes
                 if (maxFrames > 0 && frameCount >= maxFrames)
                 {
                     if (HasBlarggSignature())
-                        resultCode = NesCore.NES_MEM[0x6000];
+                        resultCode = GetMem(0x6000);
                     else
                         resultCode = DetectNonProtocolResult();
                     // Override with CRC check if expected CRCs provided
@@ -449,7 +466,7 @@ namespace AprNes
                             resultCode = 0;
                     }
                     done = true;
-                    NesCore.exit = true;
+                    SetExit(true);
                     return;
                 }
 
@@ -458,7 +475,7 @@ namespace AprNes
                 {
                     if (testStarted || HasBlarggSignature())
                     {
-                        resultCode = NesCore.NES_MEM[0x6000];
+                        resultCode = GetMem(0x6000);
                     }
                     else
                     {
@@ -479,11 +496,12 @@ namespace AprNes
                         }
                     }
                     done = true;
-                    NesCore.exit = true;
+                    SetExit(true);
                 }
             };
 
-            NesCore.VideoOutput += handler;
+            if (useSpeedCore) NesCoreSpeed.VideoOutput_S += handler;
+            else NesCore.VideoOutput += handler;
 
             // Load ROM
             byte[] romBytes;
@@ -497,23 +515,44 @@ namespace AprNes
                 return 2;
             }
 
-            NesCore.rom_file_name = romPath;
-            NesCore.exit = false;
-
-            if (!NesCore.init(romBytes))
+            if (useSpeedCore)
             {
-                Console.Error.WriteLine("Failed to init ROM: " + romName);
-                NesCore.VideoOutput -= handler;
-                return 2;
+                NesCoreSpeed.rom_file_name_S = romPath;
+                NesCoreSpeed.exit_S = false;
+
+                if (!NesCoreSpeed.init_S(romBytes))
+                {
+                    Console.Error.WriteLine("Failed to init ROM (Speed Core): " + romName);
+                    NesCoreSpeed.VideoOutput_S -= handler;
+                    return 2;
+                }
+
+                Thread emuThread = new Thread(() => NesCoreSpeed.run_S());
+                emuThread.IsBackground = true;
+                emuThread.Start();
+                emuThread.Join();
+
+                NesCoreSpeed.VideoOutput_S -= handler;
             }
+            else
+            {
+                NesCore.rom_file_name = romPath;
+                NesCore.exit = false;
 
-            // Run emulation on a background thread
-            Thread emuThread = new Thread(() => NesCore.run());
-            emuThread.IsBackground = true;
-            emuThread.Start();
-            emuThread.Join();
+                if (!NesCore.init(romBytes))
+                {
+                    Console.Error.WriteLine("Failed to init ROM: " + romName);
+                    NesCore.VideoOutput -= handler;
+                    return 2;
+                }
 
-            NesCore.VideoOutput -= handler;
+                Thread emuThread = new Thread(() => NesCore.run());
+                emuThread.IsBackground = true;
+                emuThread.Start();
+                emuThread.Join();
+
+                NesCore.VideoOutput -= handler;
+            }
 
             // Read blargg test text from $6004+
             string resultText = ReadBlarggText();
@@ -536,7 +575,7 @@ namespace AprNes
             {
                 var sb = new StringBuilder("AC_RESULTS_HEX:");
                 for (int addr = 0x0300; addr < 0x0500; addr++)
-                    sb.Append(NesCore.NES_MEM[addr].ToString("X2"));
+                    sb.Append(GetMem(addr).ToString("X2"));
                 Console.WriteLine(sb.ToString());
             }
 
@@ -546,13 +585,13 @@ namespace AprNes
                 var sb = new StringBuilder();
                 sb.Append("DEBUG_ZP_00: ");
                 for (int addr = 0x00; addr < 0x20; addr++)
-                    sb.Append(NesCore.NES_MEM[addr].ToString("X2") + " ");
+                    sb.Append(GetMem(addr).ToString("X2") + " ");
                 Console.Error.WriteLine(sb.ToString().TrimEnd());
 
                 sb.Clear();
                 sb.Append("DEBUG_ZP_50: ");
                 for (int addr = 0x50; addr < 0x70; addr++)
-                    sb.Append(NesCore.NES_MEM[addr].ToString("X2") + " ");
+                    sb.Append(GetMem(addr).ToString("X2") + " ");
                 Console.Error.WriteLine(sb.ToString().TrimEnd());
 
                 for (int row = 0; row < 16; row++)
@@ -560,7 +599,7 @@ namespace AprNes
                     sb.Clear();
                     sb.Append("DEBUG_" + (0x500 + row * 16).ToString("X4") + ": ");
                     for (int col = 0; col < 16; col++)
-                        sb.Append(NesCore.NES_MEM[0x500 + row * 16 + col].ToString("X2") + " ");
+                        sb.Append(GetMem(0x500 + row * 16 + col).ToString("X2") + " ");
                     Console.Error.WriteLine(sb.ToString().TrimEnd());
                 }
             }
@@ -592,21 +631,60 @@ namespace AprNes
             }
 
 
+            if (useSpeedCore) NesCoreSpeed.cleanup_S();
+
             return passed ? 0 : 1;
+        }
+
+        // ── Speed Core / NesCore abstraction helpers ──────────────────────────
+        static byte GetMem(int addr)
+        {
+            if (useSpeedCore) return NesCoreSpeed.NES_MEM_S[addr];
+            return NesCore.NES_MEM[addr];
+        }
+        static unsafe byte* GetPpuRam()
+        {
+            if (useSpeedCore) return NesCoreSpeed.ppu_ram_S;
+            return NesCore.ppu_ram;
+        }
+        static unsafe uint* GetScreenBuf()
+        {
+            if (useSpeedCore) return NesCoreSpeed.ScreenBuf1x_S;
+            return NesCore.ScreenBuf1x;
+        }
+        static void SetExit(bool v)
+        {
+            if (useSpeedCore) { NesCoreSpeed.exit_S = v; if (v) NesCoreSpeed._event_S.Set(); }
+            else NesCore.exit = v;
+        }
+        static void DoSoftReset()
+        {
+            if (useSpeedCore) NesCoreSpeed.SoftReset_S();
+            else NesCore.SoftReset();
+        }
+        static void DoButtonPress(int btn)
+        {
+            if (useSpeedCore) NesCoreSpeed.P1_ButtonPress_S((byte)btn);
+            else NesCore.P1_ButtonPress((byte)btn);
+        }
+        static void DoButtonUnPress(int btn)
+        {
+            if (useSpeedCore) NesCoreSpeed.P1_ButtonUnPress_S((byte)btn);
+            else NesCore.P1_ButtonUnPress((byte)btn);
         }
 
         static bool HasBlarggSignature()
         {
-            return NesCore.NES_MEM[0x6001] == 0xDE
-                && NesCore.NES_MEM[0x6002] == 0xB0
-                && NesCore.NES_MEM[0x6003] == 0x61;
+            return GetMem(0x6001) == 0xDE
+                && GetMem(0x6002) == 0xB0
+                && GetMem(0x6003) == 0x61;
         }
 
         // Search PPU nametable 0 ($2000-$23BF) for ASCII text.
         // Blargg test ROMs use a font where tile index = ASCII code.
         static bool NametableContains(string text)
         {
-            byte* nt = NesCore.ppu_ram;
+            byte* nt = GetPpuRam();
             if (nt == null) return false;
             int len = text.Length;
             // Nametable 0: 30 rows × 32 cols = 960 bytes at $2000
@@ -626,7 +704,7 @@ namespace AprNes
         // Returns -1 if no match, 0 for pass ($01), 1+ for fail code
         static int DetectOldBlarggScreenCode()
         {
-            byte* nt = NesCore.ppu_ram;
+            byte* nt = GetPpuRam();
             if (nt == null) return -1;
 
             for (int off = 0x2000; off <= 0x23BF - 2; off++)
@@ -670,7 +748,7 @@ namespace AprNes
                 return 0; // pass
 
             // Fallback: old blargg $F0 protocol (1 = pass, 2-15 = fail code)
-            byte f0 = NesCore.NES_MEM[0xF0];
+            byte f0 = GetMem(0xF0);
             if (f0 == 1) return 0;       // pass
             if (f0 >= 2 && f0 <= 15) return f0; // fail code
 
@@ -681,7 +759,7 @@ namespace AprNes
         // Find an 8-character hex CRC in nametable, return it (uppercase) or null
         static string FindNametableCrc()
         {
-            byte* nt = NesCore.ppu_ram;
+            byte* nt = GetPpuRam();
             if (nt == null) return null;
             // Scan nametable 0 for 8 consecutive hex digits
             for (int off = 0x2000; off <= 0x23BF - 7; off++)
@@ -729,7 +807,7 @@ namespace AprNes
                 StringBuilder sb = new StringBuilder();
                 for (int addr = 0x6004; addr < 0x6800; addr++)
                 {
-                    byte c = NesCore.NES_MEM[addr];
+                    byte c = GetMem(addr);
                     if (c == 0) break;
                     sb.Append((char)c);
                 }
@@ -754,7 +832,7 @@ namespace AprNes
             string crc = FindNametableCrc();
             if (crc != null) return "(screen CRC: " + crc + ")";
 
-            byte f0 = NesCore.NES_MEM[0xF0];
+            byte f0 = GetMem(0xF0);
             if (f0 == 1)   return "(no $6000 signature, $F0=0x01 = passed)";
             if (f0 >= 2 && f0 <= 15) return "(no $6000 signature, $F0=0x" + f0.ToString("X2") + " = failed)";
             return "(no $6000 signature, $F0=0x" + f0.ToString("X2") + ")";
@@ -768,7 +846,7 @@ namespace AprNes
                 ImageLockMode.WriteOnly,
                 PixelFormat.Format32bppArgb);
 
-            uint* src = NesCore.ScreenBuf1x;
+            uint* src = GetScreenBuf();
             byte* dst = (byte*)data.Scan0;
             int stride = data.Stride;
 

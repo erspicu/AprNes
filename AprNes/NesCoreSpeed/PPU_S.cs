@@ -10,7 +10,7 @@ namespace AprNes
         static public byte* ppu_ram_S;   // 16KB PPU VRAM (allocated in Main_S.cs)
         static public uint* ScreenBuf1x_S;
         static uint* NesColors_S;
-        static int* Buffer_BG_array_S;   // 256*240 BG pixel index array for sprite priority
+        static byte* Buffer_BG_array_S;  // SP-5: 256*240 BG opacity bytes (byte not int = 4x smaller, better cache)
 
         // PPU control ($2000)
         static int VramaddrIncrement_S = 1;
@@ -55,8 +55,8 @@ namespace AprNes
             // Allocate screen buffer (256*240 pixels)
             ScreenBuf1x_S = (uint*)Marshal.AllocHGlobal(256 * 240 * 4);
 
-            // Allocate BG array (256*240 ints for sprite priority)
-            Buffer_BG_array_S = (int*)Marshal.AllocHGlobal(256 * 240 * 4);
+            // SP-5: Allocate BG array as bytes (4x smaller than int array)
+            Buffer_BG_array_S = (byte*)Marshal.AllocHGlobal(256 * 240);
 
             // Pin colors array
             NesColorsHandle_S = System.Runtime.InteropServices.GCHandle.Alloc(NesColorsData_S,
@@ -130,13 +130,30 @@ namespace AprNes
             int scanOff = sl << 8;
             bool rendering = ShowBackGround_S || ShowSprites_S;
 
-            // Clear BG array for this scanline
-            for (int i = 0; i < 256; i++) Buffer_BG_array_S[scanOff + i] = 0;
+            // SP-5: Clear BG byte array (256 bytes = 32 × 8-byte writes, 4x faster than int array clear)
+            ulong* bgDst = (ulong*)(Buffer_BG_array_S + scanOff);
+            for (int i = 0; i < 32; i++) bgDst[i] = 0;
 
             if (ShowBackGround_S)
             {
                 int fineX = FineX_S;
+                uint bgcolor = NesColors_S[ppu_ram_S[0x3F00] & 0x3F];
 
+                // SP-7: Precompute all 16 BG palette entries (4 palettes × 4 pixels) once per scanline.
+                // Eliminates ~260 ppu_ram lookups per scanline by reading 16 entries upfront.
+                uint* palCache = stackalloc uint[16];
+                for (int p = 0; p < 4; p++)
+                {
+                    int b = 0x3F00 | (p << 2);
+                    palCache[(p << 2) | 0] = bgcolor; // pixel 0 = universal BG color
+                    palCache[(p << 2) | 1] = NesColors_S[ppu_ram_S[b + 1] & 0x3F];
+                    palCache[(p << 2) | 2] = NesColors_S[ppu_ram_S[b + 2] & 0x3F];
+                    palCache[(p << 2) | 3] = NesColors_S[ppu_ram_S[b + 3] & 0x3F];
+                }
+
+                // SP-26: Restructured tile loop — eliminate bounds checks for tiles 1-31 (fast path).
+                // Tile 0: skip first fineX pixels (negative screenX). Tile 32: stop at fineX (>255 overflow).
+                // ShowBgLeft8_S applied as post-process to avoid per-pixel branch in the hot loop.
                 for (int tile = 0; tile < 33; tile++)
                 {
                     // Fetch NT byte
@@ -150,31 +167,60 @@ namespace AprNes
                     // Fetch CHR (fine Y from bits 12-14 of vram_addr)
                     int fineY = (vram_addr_S >> 12) & 7;
                     int chrAddr = BgPatternTableAddr_S | (ntVal << 4) | fineY;
-                    byte lowTile  = MapperObj_S.MapperR_CHR(chrAddr);
-                    byte highTile = MapperObj_S.MapperR_CHR(chrAddr | 8);
+                    // SP-1: direct CHR bank pointer access
+                    byte* tileBase = chrBankPtrs_S[chrAddr >> 10] + (chrAddr & 0x3FF);
+                    byte lowTile  = tileBase[0];
+                    byte highTile = tileBase[8];
 
-                    // Render 8 pixels
+                    // SP-7: Use precomputed palette — no branch needed (pixel 0 → bgcolor in cache)
+                    uint* tilePal = palCache + (atVal << 2);
                     int baseX = tile * 8 - fineX;
-                    for (int px = 0; px < 8; px++)
+
+                    if ((uint)(tile - 1) < 31u)
                     {
-                        int screenX = baseX + px;
-                        if (screenX < 0 || screenX > 255) continue;
-                        if (!ShowBgLeft8_S && screenX < 8)
+                        // SP-26 fast path: tiles 1-31 always have screenX in [1..255] — no bounds check
+                        for (int px = 0, bit = 7; px < 8; px++, bit--)
                         {
-                            Buffer_BG_array_S[scanOff + screenX] = 0;
-                            ScreenBuf1x_S[scanOff + screenX] = NesColors_S[ppu_ram_S[0x3F00] & 0x3F];
-                            continue;
+                            int screenX = baseX + px;
+                            int bgPixel = ((lowTile >> bit) & 1) | (((highTile >> bit) & 1) << 1);
+                            Buffer_BG_array_S[scanOff + screenX] = (byte)bgPixel;
+                            ScreenBuf1x_S[scanOff + screenX] = tilePal[bgPixel];
                         }
-                        int bit = 7 - px;
-                        int bgPixel = ((lowTile >> bit) & 1) | (((highTile >> bit) & 1) << 1);
-                        Buffer_BG_array_S[scanOff + screenX] = bgPixel;
-                        if (bgPixel == 0)
-                            ScreenBuf1x_S[scanOff + screenX] = NesColors_S[ppu_ram_S[0x3F00] & 0x3F];
-                        else
-                            ScreenBuf1x_S[scanOff + screenX] = NesColors_S[ppu_ram_S[(0x3F00 | (atVal << 2)) + bgPixel] & 0x3F];
+                    }
+                    else if (tile == 0)
+                    {
+                        // Tile 0: first fineX pixels have negative screenX — skip them
+                        for (int px = fineX, bit = 7 - fineX; px < 8; px++, bit--)
+                        {
+                            int screenX = px - fineX;
+                            int bgPixel = ((lowTile >> bit) & 1) | (((highTile >> bit) & 1) << 1);
+                            Buffer_BG_array_S[scanOff + screenX] = (byte)bgPixel;
+                            ScreenBuf1x_S[scanOff + screenX] = tilePal[bgPixel];
+                        }
+                    }
+                    else
+                    {
+                        // Tile 32: only first fineX pixels are valid (screenX 256-fineX .. 255)
+                        for (int px = 0, bit = 7; px < fineX; px++, bit--)
+                        {
+                            int screenX = baseX + px;
+                            int bgPixel = ((lowTile >> bit) & 1) | (((highTile >> bit) & 1) << 1);
+                            Buffer_BG_array_S[scanOff + screenX] = (byte)bgPixel;
+                            ScreenBuf1x_S[scanOff + screenX] = tilePal[bgPixel];
+                        }
                     }
 
                     CXinc_S();
+                }
+
+                // ShowBgLeft8_S post-process: overwrite left 8 pixels with bgcolor if BG left-8 disabled
+                if (!ShowBgLeft8_S)
+                {
+                    for (int x = 0; x < 8; x++)
+                    {
+                        Buffer_BG_array_S[scanOff + x] = 0;
+                        ScreenBuf1x_S[scanOff + x] = bgcolor;
+                    }
                 }
 
                 // Advance Y
@@ -182,8 +228,8 @@ namespace AprNes
             }
             else
             {
-                uint bgColor = NesColors_S[ppu_ram_S[0x3F00] & 0x3F];
-                for (int i = 0; i < 256; i++) ScreenBuf1x_S[scanOff + i] = bgColor;
+                uint bgcolor = NesColors_S[ppu_ram_S[0x3F00] & 0x3F];
+                for (int i = 0; i < 256; i++) ScreenBuf1x_S[scanOff + i] = bgcolor;
             }
 
             // Horizontal scroll reset
@@ -222,7 +268,18 @@ namespace AprNes
             uint* sprColor    = stackalloc uint[256];
             byte* sprPriority = stackalloc byte[256];
             byte* sprSet      = stackalloc byte[256];
-            for (int i = 0; i < 256; i++) sprSet[i] = 0;
+            // SP-5b: Clear sprSet with 32 ulong writes (4x fewer iterations than byte loop)
+            ulong* sprSetU = (ulong*)sprSet; for (int i = 0; i < 32; i++) sprSetU[i] = 0;
+
+            // SP-21: Precompute sprite palette (4 palettes × 4 entries = 16 lookups once per scanline)
+            uint* sprPalCache = stackalloc uint[16];
+            for (int p = 0; p < 4; p++)
+            {
+                int b = 0x3F10 | (p << 2);
+                sprPalCache[(p << 2) | 1] = NesColors_S[ppu_ram_S[b + 1] & 0x3F];
+                sprPalCache[(p << 2) | 2] = NesColors_S[ppu_ram_S[b + 2] & 0x3F];
+                sprPalCache[(p << 2) | 3] = NesColors_S[ppu_ram_S[b + 3] & 0x3F];
+            }
 
             // Pass 2: evaluate sprites in reverse OAM order so lower-index overrides higher
             for (int si = selCount - 1; si >= 0; si--)
@@ -268,9 +325,13 @@ namespace AprNes
                 }
                 else line_t = line;
 
-                byte tile_hbyte = MapperObj_S.MapperR_CHR((tile_th_t << 4) | (line_t + 8));
-                byte tile_lbyte = MapperObj_S.MapperR_CHR((tile_th_t << 4) | line_t);
+                int aHigh = (tile_th_t << 4) | (line_t + 8);
+                int aLow  = (tile_th_t << 4) | line_t;
+                byte tile_hbyte = chrBankPtrs_S[aHigh >> 10][aHigh & 0x3FF];
+                byte tile_lbyte = chrBankPtrs_S[aLow  >> 10][aLow  & 0x3FF];
                 bool flip_x = (sprite_attr & 0x40) != 0;
+                // SP-21: use precomputed palette base pointer for this sprite
+                uint* thisSprPal = sprPalCache + ((sprite_attr & 3) << 2);
 
                 for (int loc = 0; loc < 8; loc++)
                 {
@@ -284,18 +345,33 @@ namespace AprNes
 
                     sprSet[screenX]      = 1;
                     sprPriority[screenX] = (byte)(priority ? 1 : 0);
-                    sprColor[screenX]    = NesColors_S[ppu_ram_S[0x3F10 + ((sprite_attr & 3) << 2) | pixel] & 0x3F];
+                    sprColor[screenX]    = thisSprPal[pixel]; // SP-21: cached palette lookup
                 }
             }
 
-            // Pass 3: composite
+            // SP-20: P33 port — ulong 8-byte block-scan skips all-zero blocks in composite pass
             int scanOff = ppu_scanline_S << 8;
-            for (int sx = 0; sx < 256; sx++)
             {
-                if (sprSet[sx] == 0) continue;
-                int array_loc = scanOff + sx;
-                if (!ShowBackGround_S || Buffer_BG_array_S[array_loc] == 0 || sprPriority[sx] == 0)
-                    ScreenBuf1x_S[array_loc] = sprColor[sx];
+                int sx = 0;
+                while (sx <= 248)
+                {
+                    if (*(ulong*)(sprSet + sx) == 0) { sx += 8; continue; }
+                    int blockEnd = sx + 8;
+                    for (; sx < blockEnd; sx++)
+                    {
+                        if (sprSet[sx] == 0) continue;
+                        int array_loc = scanOff + sx;
+                        if (!ShowBackGround_S || Buffer_BG_array_S[array_loc] == 0 || sprPriority[sx] == 0)
+                            ScreenBuf1x_S[array_loc] = sprColor[sx];
+                    }
+                }
+                for (; sx < 256; sx++)
+                {
+                    if (sprSet[sx] == 0) continue;
+                    int array_loc = scanOff + sx;
+                    if (!ShowBackGround_S || Buffer_BG_array_S[array_loc] == 0 || sprPriority[sx] == 0)
+                        ScreenBuf1x_S[array_loc] = sprColor[sx];
+                }
             }
         }
 
@@ -327,8 +403,10 @@ namespace AprNes
             if ((sprite_attr & 0x80) != 0) { line_t = 7 - line; if (Spritesize8x16_S) tile_th_t ^= 1; }
             else line_t = line;
 
-            byte tile_high = MapperObj_S.MapperR_CHR((tile_th_t << 4) | (line_t + 8));
-            byte tile_low  = MapperObj_S.MapperR_CHR((tile_th_t << 4) | line_t);
+            int sp0High = (tile_th_t << 4) | (line_t + 8);
+            int sp0Low  = (tile_th_t << 4) | line_t;
+            byte tile_high = chrBankPtrs_S[sp0High >> 10][sp0High & 0x3FF];
+            byte tile_low  = chrBankPtrs_S[sp0Low  >> 10][sp0Low  & 0x3FF];
 
             int scanOff = sl << 8;
             for (int px = 0; px < 8; px++)
@@ -365,6 +443,9 @@ namespace AprNes
                     uint c = NesColors_S[ppu_ram_S[0x3F00] & 0x3F];
                     for (int i = 0; i < 256; i++) { ScreenBuf1x_S[scanOff + i] = c; Buffer_BG_array_S[scanOff + i] = 0; }
                 }
+                // Clock MMC3 scanline IRQ counter once per visible scanline when rendering is active
+                // (approximates A12 rising-edge per-scanline clocking for Mapper 004)
+                if (rendering) Mapper004Ref_S?.Mapper04step_IRQ_S(); // SP-12b: cached ref, no `as` cast
             }
             else if (ppu_scanline_S == 240)
             {
@@ -398,6 +479,7 @@ namespace AprNes
         {
             byte val = (byte)(((isVblank_S) ? 0x80 : 0) | ((isSprite0hit_S) ? 0x40 : 0) | ((isSpriteOverflow_S) ? 0x20 : 0) | (openbus_S & 0x1F));
             isVblank_S = false;
+            nmi_pending_S = false;  // suppress NMI if $2002 read cancels VBL
             vram_latch_S = false;
             return openbus_S = val;
         }
@@ -515,6 +597,32 @@ namespace AprNes
                 addr &= 0x1F;
                 if ((addr & 0x13) == 0x10) addr &= ~0x10; // mirror $3F10/$3F14/$3F18/$3F1C
                 ppu_ram_S[0x3F00 | addr] = value;
+            }
+            else if (addr >= 0x2000)
+            {
+                // Nametable write with mirroring (matches old-core ppu_write_fun logic)
+                int wrap  = addr & 0x2FFF; // $3000-$3EFF mirrors $2000-$2EFF
+                int range = wrap & 0x0C00;
+                int mirror = *Vertical_S;
+                if (mirror >= 2)
+                {
+                    // One-screen: all 4 NTs map to same 1KB
+                    int rel = wrap & 0x3FF;
+                    ppu_ram_S[0x2000 + rel] = ppu_ram_S[0x2400 + rel] =
+                    ppu_ram_S[0x2800 + rel] = ppu_ram_S[0x2C00 + rel] = value;
+                }
+                else if (mirror == 1) // Vertical mirroring ($2000=$2800, $2400=$2C00)
+                {
+                    if (range < 0x800) ppu_ram_S[wrap] = ppu_ram_S[wrap | 0x800]  = value;
+                    else               ppu_ram_S[wrap] = ppu_ram_S[wrap & 0x37FF] = value;
+                }
+                else // Horizontal mirroring ($2000=$2400, $2800=$2C00)
+                {
+                    if      (range < 0x400) ppu_ram_S[wrap] = ppu_ram_S[wrap | 0x400]  = value;
+                    else if (range < 0x800) ppu_ram_S[wrap] = ppu_ram_S[wrap & 0x3BFF] = value;
+                    else if (range < 0xC00) ppu_ram_S[wrap] = ppu_ram_S[wrap | 0x400]  = value;
+                    else                    ppu_ram_S[wrap] = ppu_ram_S[wrap & 0x3BFF] = value;
+                }
             }
             else
             {

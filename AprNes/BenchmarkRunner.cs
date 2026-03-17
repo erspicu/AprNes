@@ -92,6 +92,118 @@ namespace AprNes
             return frames;
         }
 
+        public static int RunSpeedCoreJit(byte[] rom, int seconds)
+        {
+            int frames = 0;
+            NesCoreSpeed.exit_S = false;
+            NesCoreSpeed.AudioEnabled_S = false;
+            if (!NesCoreSpeed.init_S(rom)) return -1;
+
+            EventHandler counter = (s, e) => Interlocked.Increment(ref frames);
+            NesCoreSpeed.VideoOutput_S += counter;
+
+            var t = new Thread(NesCoreSpeed.run_S) { IsBackground = true };
+            t.Start();
+            Thread.Sleep(seconds * 1000);
+            NesCoreSpeed.exit_S = true;
+            NesCoreSpeed._event_S.Set();
+            t.Join(2000);
+
+            NesCoreSpeed.VideoOutput_S -= counter;
+            NesCoreSpeed.cleanup_S();
+            return frames;
+        }
+
+        /// <summary>
+        /// 執行 Speed Core 20 秒 performance benchmark，結果寫入 report_speed/Performance/ 目錄的 MD 檔。
+        /// </summary>
+        public static void RunSpeedCorePerf(string romPath, int seconds, string note)
+        {
+            if (!File.Exists(romPath))
+            {
+                Console.WriteLine($"[ERROR] ROM not found: {romPath}");
+                Environment.Exit(1);
+            }
+
+            byte[] rom = File.ReadAllBytes(romPath);
+
+            // Locate project root report_speed/Performance/
+            string perfDir = null;
+            string dir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            for (int i = 0; i < 6; i++)
+            {
+                string candidate = Path.Combine(dir, "report_speed", "Performance");
+                if (Directory.Exists(candidate)) { perfDir = candidate; break; }
+                string candidate2 = Path.Combine(dir, "report_speed");
+                if (Directory.Exists(candidate2)) { perfDir = Path.Combine(candidate2, "Performance"); break; }
+                dir = Path.GetDirectoryName(dir);
+            }
+            if (perfDir == null) perfDir = Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location), "report_speed", "Performance");
+            Directory.CreateDirectory(perfDir);
+
+            int version = GetNextSpeedPerfVersion(perfDir);
+            string dateStr = DateTime.Now.ToString("yyyy-MM-dd");
+            string fileName = $"{dateStr}_speed_perf_v{version}.md";
+            string filePath = Path.Combine(perfDir, fileName);
+
+            Console.WriteLine($"[SPEED-PERF] Running {seconds}s benchmark: {Path.GetFileName(romPath)}");
+            Console.WriteLine($"[SPEED-PERF] No audio, no FPS cap, headless mode");
+
+            int frames = RunSpeedCoreJit(rom, seconds);
+            if (frames < 0) { Console.WriteLine("[SPEED-PERF] FAILED to init ROM"); return; }
+            double fps = frames / (double)seconds;
+
+            Console.WriteLine($"[SPEED-PERF] Result: {frames} frames in {seconds}s  →  {fps:F2} avg FPS");
+            Console.WriteLine($"[SPEED-PERF] Saving report: {filePath}");
+
+            string label = version == 1 ? "Baseline" : $"v{version}";
+            var sb = new StringBuilder();
+            sb.AppendLine($"# NesCoreSpeed Performance Benchmark – {label}");
+            sb.AppendLine();
+            sb.AppendLine("## Test Environment");
+            sb.AppendLine();
+            sb.AppendLine($"| Item | Value |");
+            sb.AppendLine($"|------|-------|");
+            sb.AppendLine($"| Date | {DateTime.Now:yyyy-MM-dd HH:mm:ss} |");
+            sb.AppendLine($"| ROM | {Path.GetFileName(romPath)} |");
+            sb.AppendLine($"| Duration | {seconds} seconds |");
+            sb.AppendLine($"| Mode | Headless, No audio, No FPS cap |");
+            sb.AppendLine($"| OS | {Environment.OSVersion} |");
+            sb.AppendLine($"| CPU | {GetCpuName()} |");
+            sb.AppendLine($"| Runtime | .NET Framework 4.8.1 JIT |");
+            sb.AppendLine();
+            sb.AppendLine("## Results");
+            sb.AppendLine();
+            sb.AppendLine("| Frames (20s) | Average FPS |");
+            sb.AppendLine("|-------------|-------------|");
+            sb.AppendLine($"| {frames} | {fps:F2} |");
+            sb.AppendLine();
+            sb.AppendLine("## Notes");
+            sb.AppendLine();
+            sb.AppendLine(string.IsNullOrWhiteSpace(note)
+                ? (version == 1 ? "Baseline measurement. No optimizations applied." : "(no description)")
+                : note);
+            sb.AppendLine();
+
+            File.WriteAllText(filePath, sb.ToString(), Encoding.UTF8);
+            Console.WriteLine($"[SPEED-PERF] Done. Saved to {fileName}");
+        }
+
+        static int GetNextSpeedPerfVersion(string perfDir)
+        {
+            int max = 0;
+            foreach (string f in Directory.GetFiles(perfDir, "*_speed_perf_v*.md"))
+            {
+                string name = Path.GetFileNameWithoutExtension(f);
+                int idx = name.LastIndexOf("_speed_perf_v", StringComparison.Ordinal);
+                if (idx < 0) continue;
+                string numStr = name.Substring(idx + 13);
+                int n;
+                if (int.TryParse(numStr, out n) && n > max) max = n;
+            }
+            return max + 1;
+        }
+
         /// <summary>
         /// 執行 20 秒 performance benchmark，結果寫入 Performance/ 目錄的 MD 檔。
         /// 第一次執行為 baseline（v1），之後每次執行自動遞增版本。

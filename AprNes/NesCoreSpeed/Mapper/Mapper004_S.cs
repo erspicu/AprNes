@@ -41,6 +41,56 @@ namespace AprNes
             CHR_ROM_count = _CHR_ROM_count;
             PRG_ROM_count = _PRG_ROM_count;
             Vertical      = _Vertical;
+            UpdateChrPtrs();
+            UpdatePrgPtrs();
+        }
+
+        void UpdatePrgPtrs()
+        {
+            int total8k = PRG_ROM_count * 2;
+            int secondLast = (total8k - 2) << 13;
+            int last       = (total8k - 1) << 13;
+            if (PRG_Bankmode == 0)
+            {
+                NesCoreSpeed.prgBankPtrs_S[4] = PRG_ROM + ((PRG0_Bankselect % total8k) << 13);
+                NesCoreSpeed.prgBankPtrs_S[5] = PRG_ROM + ((PRG1_Bankselect % total8k) << 13);
+                NesCoreSpeed.prgBankPtrs_S[6] = PRG_ROM + secondLast;
+                NesCoreSpeed.prgBankPtrs_S[7] = PRG_ROM + last;
+            }
+            else
+            {
+                NesCoreSpeed.prgBankPtrs_S[4] = PRG_ROM + secondLast;
+                NesCoreSpeed.prgBankPtrs_S[5] = PRG_ROM + ((PRG1_Bankselect % total8k) << 13);
+                NesCoreSpeed.prgBankPtrs_S[6] = PRG_ROM + ((PRG0_Bankselect % total8k) << 13);
+                NesCoreSpeed.prgBankPtrs_S[7] = PRG_ROM + last;
+            }
+        }
+
+        void UpdateChrPtrs()
+        {
+            if (CHR_ROM_count == 0) {
+                for (int i = 0; i < 8; i++) NesCoreSpeed.chrBankPtrs_S[i] = ppu_ram + i * 1024;
+                return;
+            }
+            if (CHR_Bankmode == 0) {
+                NesCoreSpeed.chrBankPtrs_S[0] = CHR_ROM + ((CHR0_Bankselect2k & 0xFE) << 10);
+                NesCoreSpeed.chrBankPtrs_S[1] = CHR_ROM + ((CHR0_Bankselect2k | 1)   << 10);
+                NesCoreSpeed.chrBankPtrs_S[2] = CHR_ROM + ((CHR1_Bankselect2k & 0xFE) << 10);
+                NesCoreSpeed.chrBankPtrs_S[3] = CHR_ROM + ((CHR1_Bankselect2k | 1)   << 10);
+                NesCoreSpeed.chrBankPtrs_S[4] = CHR_ROM + (CHR0_Bankselect1k << 10);
+                NesCoreSpeed.chrBankPtrs_S[5] = CHR_ROM + (CHR1_Bankselect1k << 10);
+                NesCoreSpeed.chrBankPtrs_S[6] = CHR_ROM + (CHR2_Bankselect1k << 10);
+                NesCoreSpeed.chrBankPtrs_S[7] = CHR_ROM + (CHR3_Bankselect1k << 10);
+            } else {
+                NesCoreSpeed.chrBankPtrs_S[0] = CHR_ROM + (CHR0_Bankselect1k << 10);
+                NesCoreSpeed.chrBankPtrs_S[1] = CHR_ROM + (CHR1_Bankselect1k << 10);
+                NesCoreSpeed.chrBankPtrs_S[2] = CHR_ROM + (CHR2_Bankselect1k << 10);
+                NesCoreSpeed.chrBankPtrs_S[3] = CHR_ROM + (CHR3_Bankselect1k << 10);
+                NesCoreSpeed.chrBankPtrs_S[4] = CHR_ROM + ((CHR0_Bankselect2k & 0xFE) << 10);
+                NesCoreSpeed.chrBankPtrs_S[5] = CHR_ROM + ((CHR0_Bankselect2k | 1)   << 10);
+                NesCoreSpeed.chrBankPtrs_S[6] = CHR_ROM + ((CHR1_Bankselect2k & 0xFE) << 10);
+                NesCoreSpeed.chrBankPtrs_S[7] = CHR_ROM + ((CHR1_Bankselect2k | 1)   << 10);
+            }
         }
 
         public byte MapperR_PRG(ushort address)
@@ -75,8 +125,11 @@ namespace AprNes
                 {
                     // $8000 (even): Bank select
                     BankReg      = value & 7;
-                    PRG_Bankmode = (value >> 6) & 1;
-                    CHR_Bankmode = (value >> 7) & 1;
+                    int newPrgMode = (value >> 6) & 1;
+                    if (newPrgMode != PRG_Bankmode) { PRG_Bankmode = newPrgMode; UpdatePrgPtrs(); }
+                    else PRG_Bankmode = newPrgMode;
+                    int newChrMode = (value >> 7) & 1;
+                    if (newChrMode != CHR_Bankmode) { CHR_Bankmode = newChrMode; UpdateChrPtrs(); }
                 }
                 else
                 {
@@ -89,9 +142,11 @@ namespace AprNes
                         case 3: CHR1_Bankselect1k = value; break;
                         case 4: CHR2_Bankselect1k = value; break;
                         case 5: CHR3_Bankselect1k = value; break;
-                        case 6: PRG0_Bankselect   = value; break;
-                        case 7: PRG1_Bankselect   = value; break;
+                        case 6: PRG0_Bankselect   = value; UpdatePrgPtrs(); return;
+                        case 7: PRG1_Bankselect   = value; UpdatePrgPtrs(); return;
                     }
+                    // CHR bank changed (cases 0-5)
+                    UpdateChrPtrs();
                 }
             }
             else if (address < 0xC000)

@@ -83,15 +83,21 @@ namespace AprNes
             apu_step_S();
         }
 
+        // SP-25: Inline hot paths for RAM and PRG ROM reads — bypass function pointer dispatch
+        // for the two most common address ranges (~80% of all data reads).
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte Mem_r_S(ushort addr)
         {
+            if (addr < 0x2000) return NES_MEM_S[addr & 0x7FF];
+            if (addr >= 0x8000) return prgBankPtrs_S[(addr >> 13) & 7][addr & 0x1FFF];
             return mem_read_fun_S[addr](addr);
         }
 
+        // SP-25: Inline RAM writes — bypass function pointer dispatch for $0000-$1FFF.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void Mem_w_S(ushort addr, byte val)
         {
+            if (addr < 0x2000) { NES_MEM_S[addr & 0x7FF] = val; return; }
             mem_write_fun_S[addr](addr, val);
         }
 
@@ -118,7 +124,8 @@ namespace AprNes
         static byte  sram_read_S(ushort a)          { return NES_MEM_S[a]; }
         static void  sram_write_S(ushort a, byte v)  { MapperObj_S.MapperW_RAM(a, v); }
 
-        static byte  prg_read_S(ushort a)           { return MapperObj_S.MapperR_PRG(a); }
+        // SP-6: Direct PRG bank pointer access (no virtual call, no branch chain)
+        static byte  prg_read_S(ushort a)           { return prgBankPtrs_S[(a >> 13) & 7][a & 0x1FFF]; }
         static void  prg_write_S(ushort a, byte v)   { MapperObj_S.MapperW_PRG(a, v); }
 
         static byte  exp_read_S(ushort a)           { return MapperObj_S.MapperR_EXP(a); }

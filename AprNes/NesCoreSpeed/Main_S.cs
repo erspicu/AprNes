@@ -15,7 +15,16 @@ namespace AprNes
         static byte*  PRG_ROM_S, CHR_ROM_S;
 
         static IMapper_S MapperObj_S;
+        static Mapper004_S Mapper004Ref_S; // SP-12b: cached reference, avoid `as` cast every scanline
         static int*      Vertical_S;
+
+        // SP-1: CHR bank direct pointers (8×1KB), updated by mapper on bank switch
+        // SP-14: Native byte** (no managed array overhead, 64 bytes = 1 cache line)
+        static public byte** chrBankPtrs_S;
+
+        // SP-6: PRG bank direct pointers (8×8KB slots covering $0000-$FFFF), updated by mapper
+        // SP-14: Native byte** (no managed array overhead, 64 bytes = 1 cache line)
+        static public byte** prgBankPtrs_S;
 
         static public int[]  Mapper_Allow_S = new int[] { 0, 1, 2, 3, 4, 7, 11, 66 };
         static public string rom_file_name_S = "";
@@ -70,6 +79,11 @@ namespace AprNes
                 for (int i = 0; i < 65536; i++) NES_MEM_S[i] = 0;
                 for (int i = 0; i < 16384; i++) ppu_ram_S[i] = 0;
 
+                // SP-14: Allocate native bank pointer arrays (64 bytes each = 1 cache line)
+                chrBankPtrs_S = (byte**)Marshal.AllocHGlobal(8 * sizeof(long));
+                prgBankPtrs_S = (byte**)Marshal.AllocHGlobal(8 * sizeof(long));
+                for (int i = 0; i < 8; i++) chrBankPtrs_S[i] = prgBankPtrs_S[i] = null;
+
                 // Mapper
                 MapperObj_S = CreateMapper_S(mapper_S);
                 if (MapperObj_S == null)
@@ -77,6 +91,7 @@ namespace AprNes
 
                 MapperObj_S.MapperInit(PRG_ROM_S, CHR_ROM_S, ppu_ram_S,
                                        PRG_ROM_count_S, CHR_ROM_count_S, Vertical_S);
+                Mapper004Ref_S = MapperObj_S as Mapper004_S; // SP-12b: cache once
 
                 // Joypad
                 P1_joypad_status_S = (byte*)Marshal.AllocHGlobal(8);
@@ -136,6 +151,8 @@ namespace AprNes
             if (NES_MEM_S  != null) { Marshal.FreeHGlobal((IntPtr)NES_MEM_S);  NES_MEM_S  = null; }
             if (ppu_ram_S  != null) { Marshal.FreeHGlobal((IntPtr)ppu_ram_S);  ppu_ram_S  = null; }
             if (Vertical_S != null) { Marshal.FreeHGlobal((IntPtr)Vertical_S); Vertical_S = null; }
+            if (chrBankPtrs_S != null) { Marshal.FreeHGlobal((IntPtr)chrBankPtrs_S); chrBankPtrs_S = null; }
+            if (prgBankPtrs_S != null) { Marshal.FreeHGlobal((IntPtr)prgBankPtrs_S); prgBankPtrs_S = null; }
         }
 
         static void RenderScreen_S()

@@ -51,6 +51,15 @@ namespace AprNes
             Interrupt_cycle_S = 0;
         }
 
+        // SP-23: Direct PRG ROM fetch for PC-relative reads — bypasses 65536-entry dispatch table.
+        // PC is always in $8000-$FFFF during normal execution; prgBankPtrs_S covers this range.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static byte Fetch_S()
+        {
+            ushort pc = r_PC_S++;
+            return prgBankPtrs_S[(pc >> 13) & 7][pc & 0x1FFF];
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte GetFlag_S()
         {
@@ -118,9 +127,20 @@ namespace AprNes
                 softreset_S = false;
             }
 
+            // NMI / IRQ check before opcode fetch
+            if (nmi_pending_S)
+            {
+                nmi_pending_S = false;
+                NMIInterrupt_S();
+            }
+            else if (irq_pending_S && flagI_S == 0)
+            {
+                irq_pending_S = false;
+                IRQInterrupt_S();
+            }
 
             byte prevFlagI = flagI_S;
-            opcode_S = Mem_r_S(r_PC_S++);
+            opcode_S = Fetch_S();
             cpu_cycles_S = OPCODE_CYCLE_TABLE[opcode_S];
 
             cpu_cycles_S += Interrupt_cycle_S;
@@ -130,7 +150,7 @@ namespace AprNes
             switch (opcode_S)
             {
                 case 0x69: //ADC  Immediate  fix
-                    byte1 = Mem_r_S(r_PC_S++);
+                    byte1 = Fetch_S();
                     int1 = byte1 + r_A_S + flagC_S;
                     if ((int1 & 0xff) == 0) flagZ_S = 1; else flagZ_S = 0;
                     if (int1 > 0xff) flagC_S = 1; else flagC_S = 0;
@@ -140,7 +160,7 @@ namespace AprNes
                     break;
 
                 case 0x65: //ADC  Zero Page
-                    byte1 = NES_MEM_S[Mem_r_S(r_PC_S++)];
+                    byte1 = NES_MEM_S[Fetch_S()];
                     int1 = byte1 + r_A_S + flagC_S;
                     if ((int1 & 0xff) == 0) flagZ_S = 1; else flagZ_S = 0;
                     if (int1 > 0xff) flagC_S = 1; else flagC_S = 0;
@@ -150,7 +170,7 @@ namespace AprNes
                     break;
 
                 case 0x75://ADC Zero Page,X
-                    byte1 = NES_MEM_S[(byte)(Mem_r_S(r_PC_S++) + r_X_S)];
+                    byte1 = NES_MEM_S[(byte)(Fetch_S() + r_X_S)];
                     int1 = byte1 + r_A_S + flagC_S;
                     if ((int1 & 0xff) == 0) flagZ_S = 1; else flagZ_S = 0;
                     if (int1 > 0xff) flagC_S = 1; else flagC_S = 0;
@@ -160,7 +180,7 @@ namespace AprNes
                     break;
 
                 case 0x6D: //ADC Absolute //fix
-                    byte1 = Mem_r_S((ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8)));
+                    byte1 = Mem_r_S((ushort)(Fetch_S() | (Fetch_S() << 8)));
                     int1 = byte1 + r_A_S + flagC_S;
                     if ((int1 & 0xff) == 0) flagZ_S = 1; else flagZ_S = 0;
                     if (int1 > 0xff) flagC_S = 1; else flagC_S = 0;
@@ -170,7 +190,7 @@ namespace AprNes
                     break;
 
                 case 0x7D: //ADC  Absolute,X
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort2 = (ushort)(ushort1 + r_X_S);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
@@ -187,7 +207,7 @@ namespace AprNes
                     break;
 
                 case 0x79: //ADC  Absolute,Y
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort2 = (ushort)(ushort1 + r_Y_S);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
@@ -204,7 +224,7 @@ namespace AprNes
                     break;
 
                 case 0x61: //ADC (Indirect,X)
-                    byte2 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte2 = (byte)(Fetch_S() + r_X_S);
                     byte1 = Mem_r_S((ushort)(NES_MEM_S[byte2++] | (NES_MEM_S[byte2] << 8)));
                     int1 = byte1 + r_A_S + flagC_S;
                     if ((int1 & 0xff) == 0) flagZ_S = 1; else flagZ_S = 0;
@@ -215,7 +235,7 @@ namespace AprNes
                     break;
 
                 case 0x71: //ADC (Indirect),Y
-                    byte2 = Mem_r_S(r_PC_S++);
+                    byte2 = Fetch_S();
                     ushort1 = (ushort)(NES_MEM_S[byte2++] | (NES_MEM_S[byte2] << 8));
                     ushort2 = (ushort)(ushort1 + r_Y_S);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
@@ -234,35 +254,35 @@ namespace AprNes
 
                 //--- AND BEGIN
                 case 0x29: //AND  Immediate
-                    int1 = Mem_r_S(r_PC_S++) & r_A_S;
+                    int1 = Fetch_S() & r_A_S;
                     if (int1 == 0) flagZ_S = 1; else flagZ_S = 0;
                     if ((int1 & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     r_A_S = (byte)int1;
                     break;
 
                 case 0x25: //AND  Zero Page
-                    int1 = NES_MEM_S[Mem_r_S(r_PC_S++)] & r_A_S;
+                    int1 = NES_MEM_S[Fetch_S()] & r_A_S;
                     if (int1 == 0) flagZ_S = 1; else flagZ_S = 0;
                     if ((int1 & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     r_A_S = (byte)int1;
                     break;
 
                 case 0x35://AND Zero Page,X
-                    int1 = NES_MEM_S[(byte)(Mem_r_S(r_PC_S++) + r_X_S)] & r_A_S;
+                    int1 = NES_MEM_S[(byte)(Fetch_S() + r_X_S)] & r_A_S;
                     if (int1 == 0) flagZ_S = 1; else flagZ_S = 0;
                     if ((int1 & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     r_A_S = (byte)int1;
                     break;
 
                 case 0x2D: //AND Absolute
-                    int1 = Mem_r_S((ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8))) & r_A_S;
+                    int1 = Mem_r_S((ushort)(Fetch_S() | (Fetch_S() << 8))) & r_A_S;
                     if (int1 == 0) flagZ_S = 1; else flagZ_S = 0;
                     if ((int1 & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     r_A_S = (byte)int1;
                     break;
 
                 case 0x3D: //AND  Absolute,X
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort2 = (ushort)(ushort1 + r_X_S);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
@@ -276,7 +296,7 @@ namespace AprNes
                     break;
 
                 case 0x39: //AND  Absolute,Y
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort2 = (ushort)(ushort1 + r_Y_S);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
@@ -290,7 +310,7 @@ namespace AprNes
                     break;
 
                 case 0x21: //AND (Indirect,X)
-                    byte1 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte1 = (byte)(Fetch_S() + r_X_S);
                     ushort1 = (ushort)(NES_MEM_S[byte1++] | (NES_MEM_S[byte1] << 8));
                     int1 = Mem_r_S(ushort1) & r_A_S;
                     if ((int1 & 0xff) == 0) flagZ_S = 1; else flagZ_S = 0;
@@ -299,7 +319,7 @@ namespace AprNes
                     break;
 
                 case 0x31: //AND (Indirect),Y
-                    byte1 = Mem_r_S(r_PC_S++);
+                    byte1 = Fetch_S();
                     ushort1 = (ushort)(NES_MEM_S[byte1++] | (NES_MEM_S[byte1] << 8));
                     ushort2 = (ushort)(ushort1 + r_Y_S);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
@@ -322,7 +342,7 @@ namespace AprNes
                     break;
 
                 case 0x06://ASL zp
-                    byte2 = Mem_r_S(r_PC_S++);
+                    byte2 = Fetch_S();
                     byte1 = NES_MEM_S[byte2];
                     if ((byte1 & 0x80) > 0) flagC_S = 1; else flagC_S = 0;
                     byte1 <<= 1;
@@ -332,7 +352,7 @@ namespace AprNes
                     break;
 
                 case 0x16://ASL zp,x
-                    byte2 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte2 = (byte)(Fetch_S() + r_X_S);
                     byte1 = NES_MEM_S[byte2];
                     if ((byte1 & 0x80) > 0) flagC_S = 1; else flagC_S = 0;
                     byte1 <<= 1;
@@ -342,7 +362,7 @@ namespace AprNes
                     break;
 
                 case 0x0E://ASL abs
-                    ushort2 = (ushort)((Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8)));
+                    ushort2 = (ushort)((Fetch_S() | (Fetch_S() << 8)));
                     byte1 = Mem_r_S(ushort2);
                     Mem_w_S(ushort2, byte1);//dummy write fixed
                     if ((byte1 & 0x80) > 0) flagC_S = 1; else flagC_S = 0;
@@ -353,7 +373,7 @@ namespace AprNes
                     break;
 
                 case 0x1E://ASL abs,x
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort2 = (ushort)(ushort1 + r_X_S);
                     Mem_r_S((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF))); // dummy read wrong page
                     byte1 = Mem_r_S(ushort2);
@@ -366,7 +386,7 @@ namespace AprNes
                     break;
 
                 case 0x90://BCC branch ,cycle fixed 2017.01.18
-                    byte1 = Mem_r_S(r_PC_S++);
+                    byte1 = Fetch_S();
                     if (flagC_S == 0)
                     {
                         cpu_cycles_S += 1;
@@ -394,7 +414,7 @@ namespace AprNes
                     break;
 
                 case 0xB0://BCS branch ,cycle fixed 2017.01.18
-                    byte1 = Mem_r_S(r_PC_S++);
+                    byte1 = Fetch_S();
                     if (flagC_S == 1)
                     {
                         cpu_cycles_S += 1;
@@ -422,7 +442,7 @@ namespace AprNes
                     break;
 
                 case 0xF0://BEQ branch ,cycle fixed 2017.01.18
-                    byte1 = Mem_r_S(r_PC_S++);
+                    byte1 = Fetch_S();
                     if (flagZ_S == 1)
                     {
                         cpu_cycles_S += 1;
@@ -450,14 +470,14 @@ namespace AprNes
                     break;
 
                 case 0x24://BIT zp fix
-                    byte1 = NES_MEM_S[Mem_r_S(r_PC_S++)];
+                    byte1 = NES_MEM_S[Fetch_S()];
                     if ((byte1 & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     if ((byte1 & 0x40) > 0) flagV_S = 1; else flagV_S = 0;
                     if ((byte1 & r_A_S) == 0) flagZ_S = 1; else flagZ_S = 0;
                     break;
 
                 case 0x2C://BIT abs //FIX
-                    ushort t1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort t1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     byte1 = Mem_r_S(t1);
                     if ((byte1 & 0x80) != 0) flagN_S = 1; else flagN_S = 0;
                     if ((byte1 & 0x40) > 0) flagV_S = 1; else flagV_S = 0;
@@ -465,7 +485,7 @@ namespace AprNes
                     break;
 
                 case 0x30://BMI branch ,cycle fixed 2017.01.18
-                    byte1 = Mem_r_S(r_PC_S++);
+                    byte1 = Fetch_S();
                     if (flagN_S == 1)
                     {
                         cpu_cycles_S += 1;
@@ -493,7 +513,7 @@ namespace AprNes
                     break;
 
                 case 0xD0://BNE branch ,cycle fixed 2017.01.18
-                    byte1 = Mem_r_S(r_PC_S++);
+                    byte1 = Fetch_S();
                     if (flagZ_S == 0)
                     {
                         cpu_cycles_S += 1;
@@ -521,7 +541,7 @@ namespace AprNes
                     break;
 
                 case 0x10://BPL branch ,cycle fixed 2017.01.18
-                    byte1 = Mem_r_S(r_PC_S++);
+                    byte1 = Fetch_S();
                     if (flagN_S == 0)
                     {
                         cpu_cycles_S += 1;
@@ -558,7 +578,7 @@ namespace AprNes
                     break;
 
                 case 0x50://BVC branch ,cycle fixed 2017.01.18
-                    byte1 = Mem_r_S(r_PC_S++);
+                    byte1 = Fetch_S();
                     if (flagV_S == 0)
                     {
                         cpu_cycles_S += 1;
@@ -586,7 +606,7 @@ namespace AprNes
                     break;
 
                 case 0x70://BVS branch ,cycle fixed 2017.01.18
-                    byte1 = Mem_r_S(r_PC_S++);
+                    byte1 = Fetch_S();
                     if (flagV_S == 1)
                     {
                         cpu_cycles_S += 1;
@@ -622,7 +642,7 @@ namespace AprNes
 
                 //--- CMP BEGIN
                 case 0xC9: //CMP  Immediate
-                    byte1 = Mem_r_S(r_PC_S++);
+                    byte1 = Fetch_S();
                     int1 = r_A_S - byte1;
                     if (int1 == 0) flagZ_S = 1; else flagZ_S = 0;
                     if (r_A_S >= byte1) flagC_S = 1; else flagC_S = 0;
@@ -630,7 +650,7 @@ namespace AprNes
                     break;
 
                 case 0xC5: //CMP  Zero Page
-                    byte1 = NES_MEM_S[Mem_r_S(r_PC_S++)];
+                    byte1 = NES_MEM_S[Fetch_S()];
                     int1 = r_A_S - byte1;
                     if (int1 == 0) flagZ_S = 1; else flagZ_S = 0;
                     if (r_A_S >= byte1) flagC_S = 1; else flagC_S = 0;
@@ -638,7 +658,7 @@ namespace AprNes
                     break;
 
                 case 0xD5://CMP Zero Page,X
-                    byte1 = NES_MEM_S[(byte)(Mem_r_S(r_PC_S++) + r_X_S)];
+                    byte1 = NES_MEM_S[(byte)(Fetch_S() + r_X_S)];
                     int1 = r_A_S - byte1;
                     if (int1 == 0) flagZ_S = 1; else flagZ_S = 0;
                     if (r_A_S >= byte1) flagC_S = 1; else flagC_S = 0;
@@ -646,7 +666,7 @@ namespace AprNes
                     break;
 
                 case 0xCD: //CMP Absolute
-                    byte1 = Mem_r_S((ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8)));
+                    byte1 = Mem_r_S((ushort)(Fetch_S() | (Fetch_S() << 8)));
                     int1 = r_A_S - byte1;
                     if (int1 == 0) flagZ_S = 1; else flagZ_S = 0;
                     if (r_A_S >= byte1) flagC_S = 1; else flagC_S = 0;
@@ -654,7 +674,7 @@ namespace AprNes
                     break;
 
                 case 0xDD: //CMP  Absolute,X
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort2 = (ushort)(ushort1 + r_X_S);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
@@ -669,7 +689,7 @@ namespace AprNes
                     break;
 
                 case 0xD9: //CMP  Absolute,Y
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort2 = (ushort)(ushort1 + r_Y_S);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
@@ -684,7 +704,7 @@ namespace AprNes
                     break;
 
                 case 0xC1: //CMP (Indirect,X)  fix
-                    byte2 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte2 = (byte)(Fetch_S() + r_X_S);
                     ushort1 = (ushort)(NES_MEM_S[byte2++] | (NES_MEM_S[byte2] << 8));
                     byte1 = Mem_r_S(ushort1);
                     int1 = r_A_S - byte1;
@@ -694,7 +714,7 @@ namespace AprNes
                     break;
 
                 case 0xD1: //CMP (Indirect),Y
-                    byte2 = Mem_r_S(r_PC_S++);
+                    byte2 = Fetch_S();
                     ushort1 = (ushort)(NES_MEM_S[byte2++] | (NES_MEM_S[byte2] << 8));
                     ushort2 = (ushort)(ushort1 + r_Y_S);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
@@ -711,7 +731,7 @@ namespace AprNes
                 //--- CMP END
 
                 case 0xE0: //CPX  Immediate
-                    byte1 = Mem_r_S(r_PC_S++);
+                    byte1 = Fetch_S();
                     int1 = r_X_S - byte1;
                     if ((int1 & 0xff) == 0) flagZ_S = 1; else flagZ_S = 0;
                     if (r_X_S >= byte1) flagC_S = 1; else flagC_S = 0;
@@ -719,7 +739,7 @@ namespace AprNes
                     break;
 
                 case 0xE4: //CPX  Zero Page
-                    byte1 = NES_MEM_S[Mem_r_S(r_PC_S++)];
+                    byte1 = NES_MEM_S[Fetch_S()];
                     int1 = r_X_S - byte1;
                     if ((int1 & 0xff) == 0) flagZ_S = 1; else flagZ_S = 0;
                     if (r_X_S >= byte1) flagC_S = 1; else flagC_S = 0;
@@ -727,7 +747,7 @@ namespace AprNes
                     break;
 
                 case 0xEC: //CPX Absolute
-                    byte1 = Mem_r_S((ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8)));
+                    byte1 = Mem_r_S((ushort)(Fetch_S() | (Fetch_S() << 8)));
                     int1 = r_X_S - byte1;
                     if ((int1 & 0xff) == 0) flagZ_S = 1; else flagZ_S = 0;
                     if (r_X_S >= byte1) flagC_S = 1; else flagC_S = 0;
@@ -736,7 +756,7 @@ namespace AprNes
 
                 //-- CPY BEGIN
                 case 0xC0: //CPY  Immediate
-                    byte1 = Mem_r_S(r_PC_S++);
+                    byte1 = Fetch_S();
                     int1 = r_Y_S - byte1;
                     if ((int1 & 0xff) == 0) flagZ_S = 1; else flagZ_S = 0;
                     if (r_Y_S >= byte1) flagC_S = 1; else flagC_S = 0;
@@ -744,7 +764,7 @@ namespace AprNes
                     break;
 
                 case 0xC4: //CPY  Zero Page
-                    byte1 = NES_MEM_S[Mem_r_S(r_PC_S++)];
+                    byte1 = NES_MEM_S[Fetch_S()];
                     int1 = r_Y_S - byte1;
                     if ((int1 & 0xff) == 0) flagZ_S = 1; else flagZ_S = 0;
                     if (r_Y_S >= byte1) flagC_S = 1; else flagC_S = 0;
@@ -752,7 +772,7 @@ namespace AprNes
                     break;
 
                 case 0xCC: //CPY Absolute
-                    byte1 = Mem_r_S((ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8)));
+                    byte1 = Mem_r_S((ushort)(Fetch_S() | (Fetch_S() << 8)));
                     int1 = r_Y_S - byte1;
                     if ((int1 & 0xff) == 0) flagZ_S = 1; else flagZ_S = 0;
                     if (r_Y_S >= byte1) flagC_S = 1; else flagC_S = 0;
@@ -761,7 +781,7 @@ namespace AprNes
                 //-- CPY END
 
                 case 0xC6://DEC zp
-                    byte1 = Mem_r_S(r_PC_S++);
+                    byte1 = Fetch_S();
                     byte2 = NES_MEM_S[byte1];
                     NES_MEM_S[byte1] = --byte2;
                     if ((byte2 & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
@@ -769,7 +789,7 @@ namespace AprNes
                     break;
 
                 case 0xD6://DEC zp,x
-                    byte1 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte1 = (byte)(Fetch_S() + r_X_S);
                     byte2 = NES_MEM_S[byte1];
                     NES_MEM_S[byte1] = --byte2;
                     if ((byte2 & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
@@ -777,7 +797,7 @@ namespace AprNes
                     break;
 
                 case 0xCE://DEC abs
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | Mem_r_S(r_PC_S++) << 8);
+                    ushort1 = (ushort)(Fetch_S() | Fetch_S() << 8);
                     byte1 = Mem_r_S(ushort1);
                     Mem_w_S(ushort1, byte1);//dummy write fixed
                     Mem_w_S(ushort1, --byte1);
@@ -786,7 +806,7 @@ namespace AprNes
                     break;
 
                 case 0xDE://DEC abs,x
-                    ushort2 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort2 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort1 = (ushort)(ushort2 + r_X_S);
                     Mem_r_S((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read wrong page
                     byte1 = Mem_r_S(ushort1);
@@ -808,35 +828,35 @@ namespace AprNes
 
                 //--- EOR BEGIN
                 case 0x49: //EOR  Immediate
-                    int1 = Mem_r_S(r_PC_S++) ^ r_A_S;
+                    int1 = Fetch_S() ^ r_A_S;
                     if (int1 == 0) flagZ_S = 1; else flagZ_S = 0;
                     if ((int1 & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     r_A_S = (byte)int1;
                     break;
 
                 case 0x45: //EOR  Zero Page
-                    int1 = NES_MEM_S[Mem_r_S(r_PC_S++)] ^ r_A_S;
+                    int1 = NES_MEM_S[Fetch_S()] ^ r_A_S;
                     if (int1 == 0) flagZ_S = 1; else flagZ_S = 0;
                     if ((int1 & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     r_A_S = (byte)int1;
                     break;
 
                 case 0x55://EOR Zero Page,X
-                    int1 = NES_MEM_S[(byte)(Mem_r_S(r_PC_S++) + r_X_S)] ^ r_A_S;
+                    int1 = NES_MEM_S[(byte)(Fetch_S() + r_X_S)] ^ r_A_S;
                     if (int1 == 0) flagZ_S = 1; else flagZ_S = 0;
                     if ((int1 & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     r_A_S = (byte)int1;
                     break;
 
                 case 0x4D: //EOR Absolute
-                    int1 = Mem_r_S((ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8))) ^ r_A_S;
+                    int1 = Mem_r_S((ushort)(Fetch_S() | (Fetch_S() << 8))) ^ r_A_S;
                     if (int1 == 0) flagZ_S = 1; else flagZ_S = 0;
                     if ((int1 & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     r_A_S = (byte)int1;
                     break;
 
                 case 0x5D: //EOR  Absolute,X
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort2 = (ushort)(ushort1 + r_X_S);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
@@ -850,7 +870,7 @@ namespace AprNes
                     break;
 
                 case 0x59: //EOR  Absolute,Y
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort2 = (ushort)(ushort1 + r_Y_S);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
@@ -864,7 +884,7 @@ namespace AprNes
                     break;
 
                 case 0x41: //EOR (Indirect,X)
-                    byte1 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte1 = (byte)(Fetch_S() + r_X_S);
                     int1 = Mem_r_S((ushort)((NES_MEM_S[byte1++] | (NES_MEM_S[byte1] << 8)))) ^ r_A_S;
                     if ((int1 & 0xff) == 0) flagZ_S = 1; else flagZ_S = 0;
                     if ((int1 & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
@@ -872,7 +892,7 @@ namespace AprNes
                     break;
 
                 case 0x51: //EOR (Indirect),Y
-                    byte1 = Mem_r_S(r_PC_S++);
+                    byte1 = Fetch_S();
                     ushort1 = (ushort)(NES_MEM_S[byte1++] | (NES_MEM_S[byte1] << 8));
                     ushort2 = (ushort)(ushort1 + r_Y_S);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
@@ -888,7 +908,7 @@ namespace AprNes
                 //--- EOR END
 
                 case 0xE6://INC zp
-                    byte1 = Mem_r_S(r_PC_S++);
+                    byte1 = Fetch_S();
                     byte2 = NES_MEM_S[byte1];
                     NES_MEM_S[byte1] = ++byte2;
                     if ((byte2 & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
@@ -896,7 +916,7 @@ namespace AprNes
                     break;
 
                 case 0xF6://INC zp,x
-                    byte1 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte1 = (byte)(Fetch_S() + r_X_S);
                     byte2 = NES_MEM_S[byte1];
                     NES_MEM_S[byte1] = ++byte2;
                     if ((byte2 & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
@@ -904,7 +924,7 @@ namespace AprNes
                     break;
 
                 case 0xEE://INC abs
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | Mem_r_S(r_PC_S++) << 8);
+                    ushort1 = (ushort)(Fetch_S() | Fetch_S() << 8);
                     byte2 = Mem_r_S(ushort1);
                     Mem_w_S(ushort1, byte2);//dummy write fixed 2017.0119
                     Mem_w_S(ushort1, ++byte2);
@@ -913,7 +933,7 @@ namespace AprNes
                     break;
 
                 case 0xFE://INC abs,x
-                    ushort2 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort2 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort1 = (ushort)(ushort2 + r_X_S);
                     Mem_r_S((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read wrong page
                     byte2 = Mem_r_S(ushort1);
@@ -934,12 +954,12 @@ namespace AprNes
                     break;
 
                 case 0x4C://JMP abs
-                    r_PC_S = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    r_PC_S = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     break;
 
                 case 0x6C://JMP indirect
-                    byte1 = Mem_r_S(r_PC_S++);
-                    byte2 = Mem_r_S(r_PC_S++);
+                    byte1 = Fetch_S();
+                    byte2 = Fetch_S();
                     r_PC_S = (ushort)(Mem_r_S((ushort)((byte1++) | (byte2 << 8))) | (Mem_r_S((ushort)(byte1 | (byte2 << 8))) << 8));
                     break;
 
@@ -947,36 +967,36 @@ namespace AprNes
                     ushort1 = (ushort)(r_PC_S + 1);
                     Mem_w_S((ushort)(r_SP_S-- | 0x100), (byte)(ushort1 >> 8));
                     Mem_w_S((ushort)(r_SP_S-- | 0x100), (byte)ushort1);
-                    r_PC_S = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    r_PC_S = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     break;
 
                 case 0xA9://LDA imm
-                    r_A_S = Mem_r_S(r_PC_S++);
+                    r_A_S = Fetch_S();
                     if ((r_A_S & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     if (r_A_S == 0) flagZ_S = 1; else flagZ_S = 0;
                     break;
 
                 case 0xA5://LDA zp
-                    r_A_S = NES_MEM_S[Mem_r_S(r_PC_S++)];
+                    r_A_S = NES_MEM_S[Fetch_S()];
                     if ((r_A_S & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     if (r_A_S == 0) flagZ_S = 1; else flagZ_S = 0;
                     break;
 
                 case 0xB5://LDA zp,x
-                    r_A_S = NES_MEM_S[(byte)(Mem_r_S(r_PC_S++) + r_X_S)];
+                    r_A_S = NES_MEM_S[(byte)(Fetch_S() + r_X_S)];
                     if ((r_A_S & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     if (r_A_S == 0) flagZ_S = 1; else flagZ_S = 0;
                     break;
 
                 case 0xAD://LDA abs
-                    r_A_S = Mem_r_S((ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8)));
+                    r_A_S = Mem_r_S((ushort)(Fetch_S() | (Fetch_S() << 8)));
                     if ((r_A_S & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     if (r_A_S == 0) flagZ_S = 1; else flagZ_S = 0;
                     break;
 
                 case 0xBD://LDA abs,x
-                    byte1 = Mem_r_S(r_PC_S++); //low
-                    byte2 = Mem_r_S(r_PC_S++); //heigh
+                    byte1 = Fetch_S(); //low
+                    byte2 = Fetch_S(); //heigh
                     ushort1 = (ushort)(byte1 | (byte2 << 8));
                     byte1 += r_X_S;
                     //
@@ -989,7 +1009,7 @@ namespace AprNes
                     break;
 
                 case 0xB9://LDA abs,y
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort2 = (ushort)(ushort1 + r_Y_S);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
@@ -1002,14 +1022,14 @@ namespace AprNes
                     break;
 
                 case 0xA1://LDA (indirect,x)
-                    byte1 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte1 = (byte)(Fetch_S() + r_X_S);
                     r_A_S = Mem_r_S((ushort)(NES_MEM_S[byte1++] | (NES_MEM_S[byte1] << 8)));
                     if ((r_A_S & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     if (r_A_S == 0) flagZ_S = 1; else flagZ_S = 0;
                     break;
 
                 case 0xB1://LDA (indirect),y
-                    byte3 = Mem_r_S(r_PC_S++);
+                    byte3 = Fetch_S();
                     byte1 = NES_MEM_S[byte3++];
                     byte2 = NES_MEM_S[byte3];
                     ushort1 = (ushort)(byte1 | (byte2 << 8));
@@ -1024,31 +1044,31 @@ namespace AprNes
                     break;
 
                 case 0xA2://LDX imm
-                    r_X_S = Mem_r_S(r_PC_S++);
+                    r_X_S = Fetch_S();
                     if ((r_X_S & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     if (r_X_S == 0) flagZ_S = 1; else flagZ_S = 0;
                     break;
 
                 case 0xA6://LDX zp
-                    r_X_S = NES_MEM_S[Mem_r_S(r_PC_S++)];
+                    r_X_S = NES_MEM_S[Fetch_S()];
                     if ((r_X_S & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     if (r_X_S == 0) flagZ_S = 1; else flagZ_S = 0;
                     break;
 
                 case 0xB6://LDX zp,y
-                    r_X_S = NES_MEM_S[(byte)(Mem_r_S(r_PC_S++) + r_Y_S)];
+                    r_X_S = NES_MEM_S[(byte)(Fetch_S() + r_Y_S)];
                     if ((r_X_S & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     if (r_X_S == 0) flagZ_S = 1; else flagZ_S = 0;
                     break;
 
                 case 0xAE://LDX abs
-                    r_X_S = Mem_r_S((ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8)));
+                    r_X_S = Mem_r_S((ushort)(Fetch_S() | (Fetch_S() << 8)));
                     if ((r_X_S & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     if (r_X_S == 0) flagZ_S = 1; else flagZ_S = 0;
                     break;
 
                 case 0xBE://LDX abs,y
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort2 = (ushort)(ushort1 + r_Y_S);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
@@ -1061,31 +1081,31 @@ namespace AprNes
                     break;
 
                 case 0xA0://LDY imm
-                    r_Y_S = Mem_r_S(r_PC_S++);
+                    r_Y_S = Fetch_S();
                     if ((r_Y_S & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     if (r_Y_S == 0) flagZ_S = 1; else flagZ_S = 0;
                     break;
 
                 case 0xA4://LDY zp
-                    r_Y_S = NES_MEM_S[Mem_r_S(r_PC_S++)];
+                    r_Y_S = NES_MEM_S[Fetch_S()];
                     if ((r_Y_S & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     if (r_Y_S == 0) flagZ_S = 1; else flagZ_S = 0;
                     break;
 
                 case 0xB4://LDY zp,x
-                    r_Y_S = NES_MEM_S[(byte)(Mem_r_S(r_PC_S++) + r_X_S)];
+                    r_Y_S = NES_MEM_S[(byte)(Fetch_S() + r_X_S)];
                     if ((r_Y_S & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     if (r_Y_S == 0) flagZ_S = 1; else flagZ_S = 0;
                     break;
 
                 case 0xAC://LDY abs
-                    r_Y_S = Mem_r_S((ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8)));
+                    r_Y_S = Mem_r_S((ushort)(Fetch_S() | (Fetch_S() << 8)));
                     if ((r_Y_S & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     if (r_Y_S == 0) flagZ_S = 1; else flagZ_S = 0;
                     break;
 
                 case 0xBC://LDY abs,x
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort2 = (ushort)(ushort1 + r_X_S);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
@@ -1106,7 +1126,7 @@ namespace AprNes
                     break;
 
                 case 0x46://LSR zp fix
-                    byte2 = Mem_r_S(r_PC_S++);
+                    byte2 = Fetch_S();
                     byte1 = NES_MEM_S[byte2];
                     if ((byte1 & 1) > 0) flagC_S = 1; else flagC_S = 0;
                     byte1 >>= 1;
@@ -1116,7 +1136,7 @@ namespace AprNes
                     break;
 
                 case 0x56://LSR zp,x
-                    byte2 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte2 = (byte)(Fetch_S() + r_X_S);
                     byte1 = NES_MEM_S[byte2];
                     if ((byte1 & 1) > 0) flagC_S = 1; else flagC_S = 0;
                     byte1 >>= 1;
@@ -1126,7 +1146,7 @@ namespace AprNes
                     break;
 
                 case 0x4E://LSR abs fix
-                    ushort2 = (ushort)(((Mem_r_S(r_PC_S++) << 0) | (Mem_r_S(r_PC_S++) << 8)));
+                    ushort2 = (ushort)(((Fetch_S() << 0) | (Fetch_S() << 8)));
                     byte1 = Mem_r_S(ushort2);
                     Mem_w_S(ushort2, byte1);//dummy write fixed
                     if ((byte1 & 1) > 0) flagC_S = 1; else flagC_S = 0;
@@ -1137,7 +1157,7 @@ namespace AprNes
                     break;
 
                 case 0x5E://LSR abs,x
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort2 = (ushort)(ushort1 + r_X_S);
                     Mem_r_S((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF))); // dummy read wrong page
                     byte1 = Mem_r_S(ushort2);
@@ -1154,36 +1174,36 @@ namespace AprNes
 
                 //--- ORA BEGIN
                 case 0x09: //ORA  Immediate
-                    int1 = Mem_r_S(r_PC_S++) | r_A_S;
+                    int1 = Fetch_S() | r_A_S;
                     if (int1 == 0) flagZ_S = 1; else flagZ_S = 0;
                     if ((int1 & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     r_A_S = (byte)int1;
                     break;
 
                 case 0x05: //ORA  Zero Page
-                    int1 = NES_MEM_S[Mem_r_S(r_PC_S++)] | r_A_S;
+                    int1 = NES_MEM_S[Fetch_S()] | r_A_S;
                     if (int1 == 0) flagZ_S = 1; else flagZ_S = 0;
                     if ((int1 & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     r_A_S = (byte)int1;
                     break;
 
                 case 0x15://ORA Zero Page,X
-                    int1 = NES_MEM_S[(byte)(Mem_r_S(r_PC_S++) + r_X_S)] | r_A_S;
+                    int1 = NES_MEM_S[(byte)(Fetch_S() + r_X_S)] | r_A_S;
                     if (int1 == 0) flagZ_S = 1; else flagZ_S = 0;
                     if ((int1 & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     r_A_S = (byte)int1;
                     break;
 
                 case 0x0D: //ORA Absolute
-                    int1 = Mem_r_S((ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8))) | r_A_S;
+                    int1 = Mem_r_S((ushort)(Fetch_S() | (Fetch_S() << 8))) | r_A_S;
                     if (int1 == 0) flagZ_S = 1; else flagZ_S = 0;
                     if ((int1 & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
                     r_A_S = (byte)int1;
                     break;
 
                 case 0x1D: //ORA  Absolute,X  fix
-                    byte1 = Mem_r_S(r_PC_S++);
-                    byte2 = Mem_r_S(r_PC_S++);
+                    byte1 = Fetch_S();
+                    byte2 = Fetch_S();
                     byte1 += r_X_S;
                     ushort2 = Mem_r_S((ushort)(byte1 | (byte2 << 8)));
                     if (byte1 < r_X_S)
@@ -1199,8 +1219,8 @@ namespace AprNes
                     break;
 
                 case 0x19: //ORA  Absolute,Y
-                    byte1 = Mem_r_S(r_PC_S++);
-                    byte2 = Mem_r_S(r_PC_S++);
+                    byte1 = Fetch_S();
+                    byte2 = Fetch_S();
                     byte1 += r_Y_S;
                     ushort2 = Mem_r_S((ushort)(byte1 | (byte2 << 8)));
                     if (byte1 < r_Y_S)
@@ -1216,7 +1236,7 @@ namespace AprNes
                     break;
 
                 case 0x01: //ORA (Indirect,X)
-                    byte1 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte1 = (byte)(Fetch_S() + r_X_S);
                     int1 = Mem_r_S((ushort)(NES_MEM_S[byte1++] | (NES_MEM_S[byte1] << 8))) | r_A_S;
                     if (int1 == 0) flagZ_S = 1; else flagZ_S = 0;
                     if ((int1 & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
@@ -1224,7 +1244,7 @@ namespace AprNes
                     break;
 
                 case 0x11: //ORA (Indirect),Y
-                    byte1 = Mem_r_S(r_PC_S++);
+                    byte1 = Fetch_S();
                     ushort1 = (ushort)(NES_MEM_S[byte1++] | (NES_MEM_S[byte1] << 8));
                     ushort2 = (ushort)(ushort1 + r_Y_S);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
@@ -1261,7 +1281,7 @@ namespace AprNes
                     break;
 
                 case 0x26://ROL zp //fix
-                    byte2 = Mem_r_S(r_PC_S++);
+                    byte2 = Fetch_S();
                     byte1 = NES_MEM_S[byte2];
                     ushort1 = (ushort)(byte1 << 1);
                     if (flagC_S == 1) ushort1 |= 0x1;
@@ -1272,7 +1292,7 @@ namespace AprNes
                     break;
 
                 case 0x36://ROL zp,x
-                    byte2 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte2 = (byte)(Fetch_S() + r_X_S);
                     byte1 = NES_MEM_S[byte2];
                     ushort1 = (ushort)(byte1 << 1);
                     if (flagC_S == 1) ushort1 |= 0x1;
@@ -1283,7 +1303,7 @@ namespace AprNes
                     break;
 
                 case 0x2E://ROL abs fix
-                    ushort2 = (ushort)((Mem_r_S(r_PC_S++) | Mem_r_S(r_PC_S++) << 8));
+                    ushort2 = (ushort)((Fetch_S() | Fetch_S() << 8));
                     byte1 = Mem_r_S(ushort2);
                     Mem_w_S(ushort2, byte1);//dummy write fixed
                     ushort1 = (ushort)(byte1 << 1);
@@ -1295,8 +1315,8 @@ namespace AprNes
                     break;
 
                 case 0x3E://ROL abs,x fix
-                    byte1 = Mem_r_S(r_PC_S++); //low
-                    byte2 = Mem_r_S(r_PC_S++); //heigh
+                    byte1 = Fetch_S(); //low
+                    byte2 = Fetch_S(); //heigh
                     byte1 += r_X_S;
                     Mem_r_S((ushort)(byte1 | ((byte2) << 8)));
                     if (byte1 < r_X_S) byte2++;
@@ -1323,7 +1343,7 @@ namespace AprNes
                     break;
 
                 case 0x66://ROR zp
-                    byte1 = Mem_r_S(r_PC_S++);
+                    byte1 = Fetch_S();
                     ushort1 = NES_MEM_S[byte1];
                     if (flagC_S == 1) ushort1 |= 0x100;
                     if ((ushort1 & 0x01) > 0) flagC_S = 1; else flagC_S = 0;
@@ -1335,7 +1355,7 @@ namespace AprNes
                     break;
 
                 case 0x76://ROR zp,x
-                    byte1 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte1 = (byte)(Fetch_S() + r_X_S);
                     ushort1 = NES_MEM_S[byte1];
                     if (flagC_S == 1) ushort1 |= 0x100;
                     if ((ushort1 & 0x01) > 0) flagC_S = 1; else flagC_S = 0;
@@ -1347,7 +1367,7 @@ namespace AprNes
                     break;
 
                 case 0x6E://ROR abs
-                    ushort2 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort2 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort1 = Mem_r_S(ushort2);
                     Mem_w_S(ushort2, (byte)ushort1);//dummy write fixed
                     if (flagC_S == 1) ushort1 |= 0x100;
@@ -1360,7 +1380,7 @@ namespace AprNes
                     break;
 
                 case 0x7E://ROR abs,x
-                    ushort3 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort3 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort2 = (ushort)(ushort3 + r_X_S);
                     Mem_r_S((ushort)((ushort3 & 0xFF00) | (ushort2 & 0x00FF))); // dummy read wrong page
                     ushort1 = Mem_r_S(ushort2);
@@ -1391,7 +1411,7 @@ namespace AprNes
 
                 //--- SBC BEGIN
                 case 0xE9: //SBC  Immediate
-                    byte1 = (byte)(Mem_r_S(r_PC_S++) ^ 0xFF);
+                    byte1 = (byte)(Fetch_S() ^ 0xFF);
                     int1 = r_A_S + byte1 + flagC_S;
                     if ((int1 & 0xff) == 0) flagZ_S = 1; else flagZ_S = 0;
                     if (int1 > 0xff) flagC_S = 1; else flagC_S = 0;
@@ -1401,7 +1421,7 @@ namespace AprNes
                     break;
 
                 case 0xE5: //SBC  Zero Page
-                    byte1 = (byte)(NES_MEM_S[Mem_r_S(r_PC_S++)] ^ 0xFF);
+                    byte1 = (byte)(NES_MEM_S[Fetch_S()] ^ 0xFF);
                     int1 = r_A_S + byte1 + flagC_S;
                     if ((int1 & 0xff) == 0) flagZ_S = 1; else flagZ_S = 0;
                     if (int1 > 0xff) flagC_S = 1; else flagC_S = 0;
@@ -1411,7 +1431,7 @@ namespace AprNes
                     break;
 
                 case 0xF5://SBC Zero Page,X
-                    byte1 = (byte)(NES_MEM_S[(byte)(Mem_r_S(r_PC_S++) + r_X_S)] ^ 0xFF);
+                    byte1 = (byte)(NES_MEM_S[(byte)(Fetch_S() + r_X_S)] ^ 0xFF);
                     int1 = r_A_S + byte1 + flagC_S;
                     if ((int1 & 0xff) == 0) flagZ_S = 1; else flagZ_S = 0;
                     if (int1 > 0xff) flagC_S = 1; else flagC_S = 0;
@@ -1421,7 +1441,7 @@ namespace AprNes
                     break;
 
                 case 0xED: //SBC Absolute fix
-                    byte1 = (byte)(Mem_r_S((ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8))) ^ 0xFF);
+                    byte1 = (byte)(Mem_r_S((ushort)(Fetch_S() | (Fetch_S() << 8))) ^ 0xFF);
                     int1 = r_A_S + byte1 + flagC_S;
                     if ((int1 & 0xff) == 0) flagZ_S = 1; else flagZ_S = 0;
                     if (int1 > 0xff) flagC_S = 1; else flagC_S = 0;
@@ -1431,7 +1451,7 @@ namespace AprNes
                     break;
 
                 case 0xFD: //SBC  Absolute,X
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort2 = (ushort)(ushort1 + r_X_S);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
@@ -1448,7 +1468,7 @@ namespace AprNes
                     break;
 
                 case 0xF9: //SBC  Absolute,Y
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort2 = (ushort)(ushort1 + r_Y_S);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
@@ -1465,7 +1485,7 @@ namespace AprNes
                     break;
 
                 case 0xE1: //SBC (Indirect,X)
-                    byte2 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte2 = (byte)(Fetch_S() + r_X_S);
                     byte1 = (byte)(Mem_r_S((ushort)(NES_MEM_S[byte2++] | (NES_MEM_S[byte2] << 8))) ^ 0xFF);
                     int1 = r_A_S + byte1 + flagC_S;
                     if ((int1 & 0xff) == 0) flagZ_S = 1; else flagZ_S = 0;
@@ -1476,7 +1496,7 @@ namespace AprNes
                     break;
 
                 case 0xF1: //SBC (Indirect),Y
-                    byte2 = Mem_r_S(r_PC_S++);
+                    byte2 = Fetch_S();
                     ushort1 = (ushort)(NES_MEM_S[byte2++] | (NES_MEM_S[byte2] << 8));
                     ushort2 = (ushort)(ushort1 + r_Y_S);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
@@ -1496,12 +1516,12 @@ namespace AprNes
                 case 0x38: flagC_S = 1; break; //SEC
                 case 0xF8: flagD_S = 1; break; // SED NES 6502 此 FLAG 無作用
                 case 0x78: flagI_S = 1; break; //SEI
-                case 0x85: NES_MEM_S[Mem_r_S(r_PC_S++)] = r_A_S; break;//STA zp
-                case 0x95: NES_MEM_S[(byte)(Mem_r_S(r_PC_S++) + r_X_S)] = r_A_S; break;//STA zp,x
-                case 0x8D: Mem_w_S((ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8)), r_A_S); break;//STA abs
+                case 0x85: NES_MEM_S[Fetch_S()] = r_A_S; break;//STA zp
+                case 0x95: NES_MEM_S[(byte)(Fetch_S() + r_X_S)] = r_A_S; break;//STA zp,x
+                case 0x8D: Mem_w_S((ushort)(Fetch_S() | (Fetch_S() << 8)), r_A_S); break;//STA abs
                 case 0x9D:  //STA abs,x
-                    byte1 = Mem_r_S(r_PC_S++); //low
-                    byte2 = Mem_r_S(r_PC_S++); //heigh
+                    byte1 = Fetch_S(); //low
+                    byte2 = Fetch_S(); //heigh
                     byte1 += r_X_S;
 
                     Mem_r_S((ushort)(byte1 | ((byte2) << 8)));
@@ -1511,19 +1531,19 @@ namespace AprNes
                     //
                     break;
                 case 0x99: //STA abs,Y
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort2 = (ushort)(ushort1 + r_Y_S);
                     Mem_r_S((ushort)((ushort1 & 0xFF00) | (ushort2 & 0x00FF))); // dummy read (always)
                     Mem_w_S(ushort2, r_A_S);
                     break;
 
                 case 0x81://STA (indirect,x)
-                    byte1 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte1 = (byte)(Fetch_S() + r_X_S);
                     Mem_w_S((ushort)(NES_MEM_S[byte1++] | (NES_MEM_S[byte1] << 8)), r_A_S);
                     break;
 
                 case 0x91://STA (indirect),y
-                    byte3 = Mem_r_S(r_PC_S++);
+                    byte3 = Fetch_S();
                     byte1 = Mem_r_S(byte3++); //low
                     byte2 = Mem_r_S(byte3); //heigh
                     byte1 += r_Y_S;
@@ -1535,12 +1555,12 @@ namespace AprNes
                     //
                     break;
 
-                case 0x86: NES_MEM_S[Mem_r_S(r_PC_S++)] = r_X_S; break; //STX zp
-                case 0x96: NES_MEM_S[(byte)(Mem_r_S(r_PC_S++) + r_Y_S)] = r_X_S; break; //STX zp,y
-                case 0x8E: Mem_w_S((ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8)), r_X_S); break; //STX abs //fixed 1/3
-                case 0x84: NES_MEM_S[Mem_r_S(r_PC_S++)] = r_Y_S; break;//STY  zp
-                case 0x94: NES_MEM_S[(byte)(Mem_r_S(r_PC_S++) + r_X_S)] = r_Y_S; break;//STY zp,x
-                case 0x8C: Mem_w_S((ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8)), r_Y_S); break;//STY abs
+                case 0x86: NES_MEM_S[Fetch_S()] = r_X_S; break; //STX zp
+                case 0x96: NES_MEM_S[(byte)(Fetch_S() + r_Y_S)] = r_X_S; break; //STX zp,y
+                case 0x8E: Mem_w_S((ushort)(Fetch_S() | (Fetch_S() << 8)), r_X_S); break; //STX abs //fixed 1/3
+                case 0x84: NES_MEM_S[Fetch_S()] = r_Y_S; break;//STY  zp
+                case 0x94: NES_MEM_S[(byte)(Fetch_S() + r_X_S)] = r_Y_S; break;//STY zp,x
+                case 0x8C: Mem_w_S((ushort)(Fetch_S() | (Fetch_S() << 8)), r_Y_S); break;//STY abs
 
                 case 0xAA: //TAX
                     if ((r_A_S & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
@@ -1605,12 +1625,12 @@ namespace AprNes
                     break;
 
                 case 0x0C: // NOP abs (unofficial)
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     Mem_r_S(ushort1); // read and discard
                     break;
 
                 case 0x1C: case 0x3C: case 0x5C: case 0x7C: case 0xDC: case 0xFC: // NOP abs,X (unofficial)
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort2 = (ushort)(ushort1 + r_X_S);
                     if ((ushort1 & 0xff00) != (ushort2 & 0xff00))
                     {
@@ -1621,7 +1641,7 @@ namespace AprNes
                     break;
 
                 case 0x6B:
-                    byte1 = Mem_r_S(r_PC_S++);
+                    byte1 = Fetch_S();
                     r_A_S = (byte)(((byte1 & r_A_S) >> 1) | (((byte)flagC_S) << 7));
                     if (r_A_S == 0) flagZ_S = 1; else flagZ_S = 0;
                     if ((r_A_S & 0x80) > 0) flagN_S = 1; else flagN_S = 0;
@@ -1631,14 +1651,14 @@ namespace AprNes
 
                 case 0x0B: //ANC
                 case 0x2B: //ANC
-                    r_A_S &= Mem_r_S(r_PC_S++);
+                    r_A_S &= Fetch_S();
                     if (r_A_S == 0) flagZ_S = 1; else flagZ_S = 0;
                     if ((r_A_S & 0x80) > 0) flagC_S = 1; else flagC_S = 0;
                     flagN_S = flagC_S;
                     break;
 
                 case 0x4B: //ALR
-                    r_A_S &= Mem_r_S(r_PC_S++);
+                    r_A_S &= Fetch_S();
                     if ((r_A_S & 0x1) != 0) flagC_S = 1; else flagC_S = 0;
                     r_A_S >>= 1;
                     if ((r_A_S & 0x80) != 0) flagN_S = 1; else flagN_S = 0;
@@ -1646,7 +1666,7 @@ namespace AprNes
                     break;
 
                 case 0xEB: //illegal sbc imm
-                    byte1 = (byte)(Mem_r_S(r_PC_S++) ^ 0xFF);
+                    byte1 = (byte)(Fetch_S() ^ 0xFF);
                     int1 = r_A_S + byte1 + flagC_S;
                     if ((int1 & 0xff) == 0) flagZ_S = 1; else flagZ_S = 0;
                     if (int1 > 0xff) flagC_S = 1; else flagC_S = 0;
@@ -1656,7 +1676,7 @@ namespace AprNes
                     break;
 
                 case 0x03: //SLO (  ASL M THEN (M "OR" A) -> A,M  )
-                    byte2 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte2 = (byte)(Fetch_S() + r_X_S);
                     ushort1 = (ushort)(NES_MEM_S[byte2++] | (NES_MEM_S[byte2] << 8));
                     byte1 = Mem_r_S(ushort1);
 
@@ -1671,7 +1691,7 @@ namespace AprNes
                     break;
 
                 case 0x07: //SLO (  ASL M THEN (M "OR" A) -> A,M  )
-                    byte2 = Mem_r_S(r_PC_S++);
+                    byte2 = Fetch_S();
                     byte1 = NES_MEM_S[byte2];
                     if ((byte1 & 0x80) > 0) flagC_S = 1; else flagC_S = 0;
                     byte1 <<= 1;
@@ -1682,7 +1702,7 @@ namespace AprNes
                     break;
 
                 case 0x13: //SLO (  ASL M THEN (M "OR" A) -> A,M  )
-                    byte2 = Mem_r_S(r_PC_S++);
+                    byte2 = Fetch_S();
                     ushort2 = (ushort)(NES_MEM_S[byte2++] | (NES_MEM_S[byte2] << 8));
                     ushort1 = (ushort)(ushort2 + r_Y_S);
                     Mem_r_S((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
@@ -1699,7 +1719,7 @@ namespace AprNes
                     break;
 
                 case 0x17: //SLO (  ASL M THEN (M "OR" A) -> A,M  )
-                    byte2 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte2 = (byte)(Fetch_S() + r_X_S);
                     byte1 = NES_MEM_S[byte2];
                     if ((byte1 & 0x80) > 0) flagC_S = 1; else flagC_S = 0;
                     byte1 <<= 1;
@@ -1710,7 +1730,7 @@ namespace AprNes
                     break;
 
                 case 0x1B: //SLO (  ASL M THEN (M "OR" A) -> A,M  )
-                    ushort2 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort2 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort1 = (ushort)(ushort2 + r_Y_S);
                     Mem_r_S((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte1 = Mem_r_S(ushort1);
@@ -1726,7 +1746,7 @@ namespace AprNes
                     break;
 
                 case 0x0F: //SLO (  ASL M THEN (M "OR" A) -> A,M  )
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     byte1 = Mem_r_S(ushort1);
 
                     Mem_w_S(ushort1, byte1);//dummy write fixed
@@ -1740,7 +1760,7 @@ namespace AprNes
                     break;
 
                 case 0x1F: //SLO (  ASL M THEN (M "OR" A) -> A,M  )
-                    ushort2 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort2 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort1 = (ushort)(ushort2 + r_X_S);
                     Mem_r_S((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte1 = Mem_r_S(ushort1);
@@ -1756,7 +1776,7 @@ namespace AprNes
                     break;
 
                 case 0x23: //RLA    ( ROL M  THEN (M "AND" A) -> A )
-                    byte3 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte3 = (byte)(Fetch_S() + r_X_S);
                     ushort1 = (ushort)(NES_MEM_S[byte3++] | (NES_MEM_S[byte3] << 8));
                     byte2 = Mem_r_S(ushort1);
 
@@ -1771,7 +1791,7 @@ namespace AprNes
                     break;
 
                 case 0x27: //RLA    ( ROL M  THEN (M "AND" A) -> A )
-                    byte3 = Mem_r_S(r_PC_S++);
+                    byte3 = Fetch_S();
                     byte2 = NES_MEM_S[byte3];
                     byte1 = (byte)((byte2 << 1) | flagC_S);
                     NES_MEM_S[byte3] = byte1;
@@ -1782,7 +1802,7 @@ namespace AprNes
                     break;
 
                 case 0x2F:// RLA
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     byte2 = Mem_r_S(ushort1);
 
                     Mem_w_S(ushort1, byte2);//dummy write fixed
@@ -1796,7 +1816,7 @@ namespace AprNes
                     break;
 
                 case 0x3F://RLA
-                    ushort2 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort2 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort1 = (ushort)(ushort2 + r_X_S);
                     Mem_r_S((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte2 = Mem_r_S(ushort1);
@@ -1812,7 +1832,7 @@ namespace AprNes
                     break;
 
                 case 0x3B://RLA
-                    ushort2 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort2 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort1 = (ushort)(ushort2 + r_Y_S);
                     Mem_r_S((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte2 = Mem_r_S(ushort1);
@@ -1828,7 +1848,7 @@ namespace AprNes
                     break;
 
                 case 0x33: //RLA    ( ROL M  THEN (M "AND" A) -> A )
-                    byte3 = Mem_r_S(r_PC_S++);
+                    byte3 = Fetch_S();
                     ushort2 = (ushort)(NES_MEM_S[byte3++] | (NES_MEM_S[byte3] << 8));
                     ushort1 = (ushort)(ushort2 + r_Y_S);
                     Mem_r_S((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
@@ -1846,7 +1866,7 @@ namespace AprNes
                     break;
 
                 case 0x37: //RLA    ( ROL M  THEN (M "AND" A) -> A )
-                    byte3 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte3 = (byte)(Fetch_S() + r_X_S);
                     byte2 = NES_MEM_S[byte3];
                     byte1 = (byte)(byte2 << 1);
                     byte1 |= (byte)(flagC_S);
@@ -1858,7 +1878,7 @@ namespace AprNes
                     break;
 
                 case 0x43://SRE (LSR M  THEN (M "EOR" A) -> A )
-                    byte2 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte2 = (byte)(Fetch_S() + r_X_S);
                     ushort1 = (ushort)(NES_MEM_S[byte2++] | (NES_MEM_S[byte2] << 8));
                     byte1 = Mem_r_S(ushort1);
 
@@ -1873,7 +1893,7 @@ namespace AprNes
                     break;
 
                 case 0x47://SRE (LSR M  THEN (M "EOR" A) -> A )
-                    byte2 = Mem_r_S(r_PC_S++);
+                    byte2 = Fetch_S();
                     byte1 = NES_MEM_S[byte2];
                     if ((byte1 & 1) > 0) flagC_S = 1; else flagC_S = 0;
                     byte1 >>= 1;
@@ -1884,7 +1904,7 @@ namespace AprNes
                     break;
 
                 case 0x4F://SRE (LSR M  THEN (M "EOR" A) -> A )
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     byte1 = Mem_r_S(ushort1);
 
                     Mem_w_S(ushort1, byte1);//dummy write fixed
@@ -1898,7 +1918,7 @@ namespace AprNes
                     break;
 
                 case 0x5F://SRE
-                    ushort2 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort2 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort1 = (ushort)(ushort2 + r_X_S);
                     Mem_r_S((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte1 = Mem_r_S(ushort1);
@@ -1914,7 +1934,7 @@ namespace AprNes
                     break;
 
                 case 0x5B://SRE
-                    ushort2 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort2 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort1 = (ushort)(ushort2 + r_Y_S);
                     Mem_r_S((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte1 = Mem_r_S(ushort1);
@@ -1930,7 +1950,7 @@ namespace AprNes
                     break;
 
                 case 0x53://SRE (LSR M  THEN (M "EOR" A) -> A )
-                    byte2 = Mem_r_S(r_PC_S++);
+                    byte2 = Fetch_S();
                     ushort2 = (ushort)(NES_MEM_S[byte2++] | (NES_MEM_S[byte2] << 8));
                     ushort1 = (ushort)(ushort2 + r_Y_S);
                     Mem_r_S((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
@@ -1947,7 +1967,7 @@ namespace AprNes
                     break;
 
                 case 0x57://SRE (LSR M  THEN (M "EOR" A) -> A )
-                    byte2 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte2 = (byte)(Fetch_S() + r_X_S);
                     byte1 = NES_MEM_S[byte2];
                     if ((byte1 & 1) > 0) flagC_S = 1; else flagC_S = 0;
                     byte1 >>= 1;
@@ -1958,7 +1978,7 @@ namespace AprNes
                     break;
 
                 case 0x63:// RRA (ROR M THEN (A + M + C) -> A  )  ok
-                    byte3 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte3 = (byte)(Fetch_S() + r_X_S);
                     ushort1 = (ushort)(NES_MEM_S[byte3++] | (NES_MEM_S[byte3] << 8));
                     byte2 = Mem_r_S(ushort1);
 
@@ -1976,7 +1996,7 @@ namespace AprNes
                     break;
 
                 case 0x67:// RRA (ROR M THEN (A + M + C) -> A  ) ok
-                    byte3 = Mem_r_S(r_PC_S++);
+                    byte3 = Fetch_S();
                     byte2 = NES_MEM_S[byte3];
                     byte1 = (byte)((byte2 >> 1) | ((flagC_S == 0) ? 0 : 0x80));
                     NES_MEM_S[byte3] = byte1;
@@ -1990,7 +2010,7 @@ namespace AprNes
                     break;
 
                 case 0x6F://RRA
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));//ok
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));//ok
                     byte2 = Mem_r_S(ushort1);
 
                     Mem_w_S(ushort1, byte2);//dummy write fixed
@@ -2007,7 +2027,7 @@ namespace AprNes
                     break;
 
                 case 0x73:// RRA (ROR M THEN (A + M + C) -> A  ) ok
-                    byte3 = Mem_r_S(r_PC_S++);
+                    byte3 = Fetch_S();
                     ushort2 = (ushort)(NES_MEM_S[byte3++] | (NES_MEM_S[byte3] << 8));
                     ushort1 = (ushort)(ushort2 + r_Y_S);
                     Mem_r_S((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
@@ -2027,7 +2047,7 @@ namespace AprNes
                     break;
 
                 case 0x77:// RRA (ROR M THEN (A + M + C) -> A  ) ok
-                    byte3 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte3 = (byte)(Fetch_S() + r_X_S);
                     byte2 = NES_MEM_S[byte3];
                     byte1 = (byte)((byte2 >> 1) | ((flagC_S == 0) ? 0 : 0x80));
                     NES_MEM_S[byte3] = byte1;
@@ -2041,7 +2061,7 @@ namespace AprNes
                     break;
 
                 case 0x7B:// RRA (ROR M THEN (A + M + C) -> A  )
-                    ushort2 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort2 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort1 = (ushort)(ushort2 + r_Y_S);
                     Mem_r_S((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte2 = Mem_r_S(ushort1);
@@ -2060,7 +2080,7 @@ namespace AprNes
                     break;
 
                 case 0x7F: //RRA
-                    ushort2 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort2 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort1 = (ushort)(ushort2 + r_X_S);
                     Mem_r_S((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte2 = Mem_r_S(ushort1);
@@ -2079,20 +2099,20 @@ namespace AprNes
                     break;
 
                 case 0x83://SAX ( (A "AND" (MSB(adr)+1)  "AND" X) -> M
-                    byte1 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte1 = (byte)(Fetch_S() + r_X_S);
                     Mem_w_S((ushort)(NES_MEM_S[byte1++] | (NES_MEM_S[byte1] << 8)), (byte)(r_X_S & r_A_S));
                     break;
 
                 case 0x87://SAX ( (A "AND" (MSB(adr)+1)  "AND" X) -> M
-                    Mem_w_S(Mem_r_S(r_PC_S++), (byte)(r_X_S & r_A_S));
+                    Mem_w_S(Fetch_S(), (byte)(r_X_S & r_A_S));
                     break;
 
                 case 0x8F://SAX ( (A "AND" (MSB(adr)+1)  "AND" X) -> M
-                    Mem_w_S((ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8)), (byte)(r_X_S & r_A_S));
+                    Mem_w_S((ushort)(Fetch_S() | (Fetch_S() << 8)), (byte)(r_X_S & r_A_S));
                     break;
 
                 case 0x9C://SHY
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     byte1 = (byte)(r_Y_S & (((ushort1 & 0xff00) >> 8) + 1));
                     ushort1 = (ushort)((ushort1 & 0xff00) | (byte)(ushort1 + r_X_S));
                     Mem_r_S(ushort1); // dummy read at wrong-page address
@@ -2101,7 +2121,7 @@ namespace AprNes
                     break;
 
                 case 0x9E://SHX
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     byte1 = (byte)(r_X_S & (((ushort1 & 0xff00) >> 8) + 1));
                     ushort1 = (ushort)((ushort1 & 0xff00) | (byte)(ushort1 + r_Y_S));
                     Mem_r_S(ushort1); // dummy read at wrong-page address
@@ -2110,7 +2130,7 @@ namespace AprNes
                     break;
 
                 case 0x9B://TAS/SHS abs,Y - SP = A & X, write SP & (H+1)
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     r_SP_S = (byte)(r_A_S & r_X_S);
                     byte1 = (byte)(r_SP_S & (((ushort1 & 0xff00) >> 8) + 1));
                     ushort1 = (ushort)((ushort1 & 0xff00) | (byte)(ushort1 + r_Y_S));
@@ -2120,7 +2140,7 @@ namespace AprNes
                     break;
 
                 case 0x9F://SHA/AXA abs,Y - write A & X & (H+1)
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     byte1 = (byte)(r_A_S & r_X_S & (((ushort1 & 0xff00) >> 8) + 1));
                     ushort1 = (ushort)((ushort1 & 0xff00) | (byte)(ushort1 + r_Y_S));
                     Mem_r_S(ushort1); // dummy read at wrong-page address
@@ -2129,7 +2149,7 @@ namespace AprNes
                     break;
 
                 case 0x93://SHA/AXA (ind),Y - write A & X & (H+1)
-                    byte2 = Mem_r_S(r_PC_S++);
+                    byte2 = Fetch_S();
                     ushort2 = (ushort)(NES_MEM_S[byte2++] | (NES_MEM_S[byte2] << 8));
                     ushort1 = (ushort)(ushort2 + r_Y_S);
                     byte1 = (byte)(r_A_S & r_X_S & (((ushort2 >> 8) & 0xFF) + 1));
@@ -2140,42 +2160,42 @@ namespace AprNes
                     break;
 
                 case 0x97://SAX ( (A "AND" (MSB(adr)+1)  "AND" X) -> M
-                    NES_MEM_S[(byte)(Mem_r_S(r_PC_S++) + r_Y_S)] = (byte)(r_X_S & r_A_S);
+                    NES_MEM_S[(byte)(Fetch_S() + r_Y_S)] = (byte)(r_X_S & r_A_S);
                     break;
 
                 case 0xB7://SAX ( (A "AND" (MSB(adr)+1)  "AND" X) -> M
-                    r_X_S = r_A_S = NES_MEM_S[(byte)(Mem_r_S(r_PC_S++) + r_Y_S)];
+                    r_X_S = r_A_S = NES_MEM_S[(byte)(Fetch_S() + r_Y_S)];
                     if (r_X_S == 0) flagZ_S = 1; else flagZ_S = 0;
                     if ((r_X_S & 0x80) != 0) flagN_S = 1; else flagN_S = 0;
                     break;
 
                 case 0xA3://LAX
-                    byte1 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte1 = (byte)(Fetch_S() + r_X_S);
                     r_X_S = r_A_S = Mem_r_S((ushort)(NES_MEM_S[byte1++] | (NES_MEM_S[byte1] << 8)));
                     if (r_X_S == 0) flagZ_S = 1; else flagZ_S = 0;
                     if ((r_X_S & 0x80) != 0) flagN_S = 1; else flagN_S = 0;
                     break;
 
                 case 0xA7://LAX
-                    r_X_S = r_A_S = NES_MEM_S[Mem_r_S(r_PC_S++)];
+                    r_X_S = r_A_S = NES_MEM_S[Fetch_S()];
                     if (r_X_S == 0) flagZ_S = 1; else flagZ_S = 0;
                     if ((r_X_S & 0x80) != 0) flagN_S = 1; else flagN_S = 0;
                     break;
 
                 case 0xAB://LAX
-                    r_X_S = r_A_S = Mem_r_S(r_PC_S++);
+                    r_X_S = r_A_S = Fetch_S();
                     if (r_X_S == 0) flagZ_S = 1; else flagZ_S = 0;
                     if ((r_X_S & 0x80) != 0) flagN_S = 1; else flagN_S = 0;
                     break;
 
                 case 0xAF://LAX
-                    r_X_S = r_A_S = Mem_r_S((ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8)));
+                    r_X_S = r_A_S = Mem_r_S((ushort)(Fetch_S() | (Fetch_S() << 8)));
                     if (r_X_S == 0) flagZ_S = 1; else flagZ_S = 0;
                     if ((r_X_S & 0x80) != 0) flagN_S = 1; else flagN_S = 0;
                     break;
 
                 case 0xBF://LAX
-                    ushort2 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort2 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort1 = (ushort)(ushort2 + r_Y_S);
                     if ((ushort1 & 0xFF00) != (ushort2 & 0xFF00)) // page cross
                         Mem_r_S((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
@@ -2185,7 +2205,7 @@ namespace AprNes
                     break;
 
                 case 0xB3://LAX
-                    byte1 = Mem_r_S(r_PC_S++);
+                    byte1 = Fetch_S();
                     ushort2 = (ushort)(NES_MEM_S[byte1++] | (NES_MEM_S[byte1] << 8));
                     ushort1 = (ushort)(ushort2 + r_Y_S);
                     if ((ushort1 & 0xFF00) != (ushort2 & 0xFF00)) // page cross
@@ -2196,7 +2216,7 @@ namespace AprNes
                     break;
 
                 case 0xBB://LAS/LAR abs,Y - A = X = SP = M & SP
-                    ushort2 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort2 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort1 = (ushort)(ushort2 + r_Y_S);
                     if ((ushort1 & 0xFF00) != (ushort2 & 0xFF00)) // page cross
                         Mem_r_S((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
@@ -2206,7 +2226,7 @@ namespace AprNes
                     break;
 
                 case 0xCB:// AXS
-                    int1 = (r_A_S & r_X_S) - Mem_r_S(r_PC_S++);
+                    int1 = (r_A_S & r_X_S) - Fetch_S();
                     if ((int1 & 0x80) != 0) flagN_S = 1; else flagN_S = 0;
                     if ((byte)int1 == 0) flagZ_S = 1; else flagZ_S = 0;
                     if ((~int1 >> 8) != 0) flagC_S = 1; else flagC_S = 0;
@@ -2214,7 +2234,7 @@ namespace AprNes
                     break;
 
                 case 0xC3: //DCP
-                    byte2 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte2 = (byte)(Fetch_S() + r_X_S);
                     ushort1 = (ushort)((NES_MEM_S[byte2++] | (NES_MEM_S[byte2] << 8)));
                     byte1 = Mem_r_S(ushort1);
 
@@ -2228,7 +2248,7 @@ namespace AprNes
                     break;
 
                 case 0xC7: //DCP
-                    byte2 = Mem_r_S(r_PC_S++);
+                    byte2 = Fetch_S();
                     byte1 = NES_MEM_S[byte2];
                     NES_MEM_S[byte2] = --byte1;
                     int1 = r_A_S - byte1;
@@ -2238,7 +2258,7 @@ namespace AprNes
                     break;
 
                 case 0xCF: //DCP
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     byte1 = Mem_r_S(ushort1);
 
                     Mem_w_S(ushort1, byte1);//dummy write fixed
@@ -2251,7 +2271,7 @@ namespace AprNes
                     break;
 
                 case 0xDF: //DCP
-                    ushort2 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort2 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort1 = (ushort)(ushort2 + r_X_S);
                     Mem_r_S((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte1 = Mem_r_S(ushort1);
@@ -2266,7 +2286,7 @@ namespace AprNes
                     break;
 
                 case 0xD3: //DCP
-                    byte2 = Mem_r_S(r_PC_S++);
+                    byte2 = Fetch_S();
                     ushort2 = (ushort)(NES_MEM_S[byte2++] | (NES_MEM_S[byte2] << 8));
                     ushort3 = (ushort)(ushort2 + r_Y_S);
                     Mem_r_S((ushort)((ushort2 & 0xFF00) | (ushort3 & 0x00FF))); // dummy read at wrong-page address
@@ -2282,7 +2302,7 @@ namespace AprNes
                     break;
 
                 case 0xD7: //DCP
-                    byte2 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte2 = (byte)(Fetch_S() + r_X_S);
                     byte1 = NES_MEM_S[byte2];
                     NES_MEM_S[byte2] = --byte1;
                     int1 = r_A_S - byte1;
@@ -2292,7 +2312,7 @@ namespace AprNes
                     break;
 
                 case 0xDB:// DCP
-                    ushort2 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort2 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort1 = (ushort)(ushort2 + r_Y_S);
                     Mem_r_S((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte1 = Mem_r_S(ushort1);
@@ -2307,7 +2327,7 @@ namespace AprNes
                     break;
 
                 case 0xE3://ISC
-                    byte2 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte2 = (byte)(Fetch_S() + r_X_S);
                     ushort3 = (ushort)((NES_MEM_S[byte2++] | (NES_MEM_S[byte2] << 8)));
                     byte1 = Mem_r_S(ushort3);
 
@@ -2323,7 +2343,7 @@ namespace AprNes
                     break;
 
                 case 0xE7://ISC
-                    byte2 = Mem_r_S(r_PC_S++);
+                    byte2 = Fetch_S();
                     byte1 = NES_MEM_S[byte2];
                     NES_MEM_S[byte2] = ++byte1;
                     int1 = r_A_S + (byte1 ^ 0xff) + flagC_S;
@@ -2335,7 +2355,7 @@ namespace AprNes
                     break;
 
                 case 0xEF://ISC
-                    ushort1 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort1 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     byte1 = Mem_r_S(ushort1);
 
                     Mem_w_S(ushort1, byte1);//dummy write fixed
@@ -2350,7 +2370,7 @@ namespace AprNes
                     break;
 
                 case 0xF3://ISC
-                    byte2 = Mem_r_S(r_PC_S++);
+                    byte2 = Fetch_S();
                     ushort2 = (ushort)(NES_MEM_S[byte2++] | (NES_MEM_S[byte2] << 8));
                     ushort3 = (ushort)(ushort2 + r_Y_S);
                     Mem_r_S((ushort)((ushort2 & 0xFF00) | (ushort3 & 0x00FF))); // dummy read at wrong-page address
@@ -2368,7 +2388,7 @@ namespace AprNes
                     break;
 
                 case 0xF7://ISC
-                    byte2 = (byte)(Mem_r_S(r_PC_S++) + r_X_S);
+                    byte2 = (byte)(Fetch_S() + r_X_S);
                     byte1 = NES_MEM_S[byte2];
                     NES_MEM_S[byte2] = ++byte1;
                     int1 = r_A_S + (byte1 ^ 0xff) + flagC_S;
@@ -2380,7 +2400,7 @@ namespace AprNes
                     break;
 
                 case 0xFB://ISC
-                    ushort2 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort2 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort1 = (ushort)(ushort2 + r_Y_S);
                     Mem_r_S((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte1 = Mem_r_S(ushort1);
@@ -2397,7 +2417,7 @@ namespace AprNes
                     break;
 
                 case 0xFF://ISC
-                    ushort2 = (ushort)(Mem_r_S(r_PC_S++) | (Mem_r_S(r_PC_S++) << 8));
+                    ushort2 = (ushort)(Fetch_S() | (Fetch_S() << 8));
                     ushort1 = (ushort)(ushort2 + r_X_S);
                     Mem_r_S((ushort)((ushort2 & 0xFF00) | (ushort1 & 0x00FF))); // dummy read at wrong-page address
                     byte1 = Mem_r_S(ushort1);
@@ -2417,8 +2437,26 @@ namespace AprNes
                 default: ShowError_S("unkonw opcode ! - 0x" + opcode_S.ToString("X2")); break;
             }
 
-            // Batch tick: advance all cycles accumulated for this instruction
-            for (int i = 0; i < cpu_cycles_S; i++) tick_S();
+            // SP-2: Batch tick — advance PPU once, APU in tight loop (no per-cycle PPU branch)
+            ppu_x_S += cpu_cycles_S * 3;
+            while (ppu_x_S >= 341) { ppu_x_S -= 341; end_scanline_S(); }
+
+            // SP-13: Batch APU step — eliminate per-cycle function call overhead when audio off.
+            // Bulk-update counters; frame counter fires at most once (7457 cycles >> max 7 cycles/instr).
+            if (!AudioEnabled_S)
+            {
+                apucycle_S += cpu_cycles_S;
+                framectrdiv_S -= cpu_cycles_S;
+                if (framectrdiv_S <= 0)
+                {
+                    clockframecounter_S();
+                    framectrdiv_S += (ctrmode_S == 4) ? frameReload4_S[framectr_S] : frameReload5_S[framectr_S];
+                }
+            }
+            else
+            {
+                for (int i = 0; i < cpu_cycles_S; i++) apu_step_S();
+            }
         }
     }
 }

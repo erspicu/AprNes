@@ -39,21 +39,21 @@ namespace AprNes
         }
 
         // 提升 Windows 計時器精度
-        [DllImport("winmm.dll")] static extern int timeBeginPeriod_S(int uPeriod);
-        [DllImport("winmm.dll")] static extern int timeEndPeriod_S(int uPeriod);
+        [DllImport("winmm.dll", EntryPoint = "timeBeginPeriod")] static extern int timeBeginPeriod_S(int uPeriod);
+        [DllImport("winmm.dll", EntryPoint = "timeEndPeriod")]   static extern int timeEndPeriod_S(int uPeriod);
 
-        [DllImport("winmm.dll")]
+        [DllImport("winmm.dll", EntryPoint = "waveOutOpen")]
         static extern int waveOutOpen_S(out IntPtr hwo, int devId, ref WAVEFORMATEX_S fmt,
                                         IntPtr cb, IntPtr inst, int flags);
-        [DllImport("winmm.dll")]
+        [DllImport("winmm.dll", EntryPoint = "waveOutPrepareHeader")]
         static extern int waveOutPrepareHeader_S(IntPtr hwo, IntPtr hdr, int sz);
-        [DllImport("winmm.dll")]
+        [DllImport("winmm.dll", EntryPoint = "waveOutWrite")]
         static extern int waveOutWrite_S(IntPtr hwo, IntPtr hdr, int sz);
-        [DllImport("winmm.dll")]
+        [DllImport("winmm.dll", EntryPoint = "waveOutUnprepareHeader")]
         static extern int waveOutUnprepareHeader_S(IntPtr hwo, IntPtr hdr, int sz);
-        [DllImport("winmm.dll")]
+        [DllImport("winmm.dll", EntryPoint = "waveOutClose")]
         static extern int waveOutClose_S(IntPtr hwo);
-        [DllImport("winmm.dll")]
+        [DllImport("winmm.dll", EntryPoint = "waveOutReset")]
         static extern int waveOutReset_S(IntPtr hwo);
 
         const int  WAVE_MAPPER_S    = -1;
@@ -78,8 +78,8 @@ namespace AprNes
         static WAVEHDR_S[] _waveHdrs_S  = new WAVEHDR_S[APU_NUM_BUFFERS_S];
         static int         _curBuf_S    = 0;
         static int         _curPos_S    = 0;
-        static double      _sampleAccum_S  = 0.0;
-        static double      _cycPerSample_S = CPU_FREQ_S / APU_SAMPLE_RATE_S; // ~40.58
+        static int         _sampleAccum_S  = 0;   // SP-9: integer accumulator (× APU_SAMPLE_RATE_S)
+        static double      _cycPerSample_S = CPU_FREQ_S / APU_SAMPLE_RATE_S; // ~40.58 (kept for reference)
 
         // 音效開關 (可由 UI 控制)
         static public bool AudioEnabled_S = true;
@@ -223,7 +223,7 @@ namespace AprNes
             _triTimer_S = _triPeriod_S = _triSeq_S = _triOut_S = 0;
             _noiseTimer_S = 0; _noisePeriodIdx_S = 0; _noiseLfsr_S = 1;
             _noiseMode_S = false; _noiseOut_S = 0;
-            _sampleAccum_S = 0.0;
+            _sampleAccum_S = 0;
             _dckiller_S = 0;
         }
 
@@ -247,7 +247,7 @@ namespace AprNes
             _triTimer_S  = _triPeriod_S = _triSeq_S = _triOut_S = 0;
             _noiseTimer_S = 0; _noisePeriodIdx_S = 0; _noiseLfsr_S = 1;
             _noiseMode_S = false; _noiseOut_S = 0;
-            _sampleAccum_S = 0.0;
+            _sampleAccum_S = 0;
             _dckiller_S    = 0;
 
             // Power-on 狀態
@@ -401,6 +401,20 @@ namespace AprNes
         {
             apucycle_S++;
 
+            // SP-8: Skip most APU computation when audio is disabled (saves ~1.79M ops/sec)
+            if (!AudioEnabled_S)
+            {
+                // Keep frame counter for IRQ generation
+                if (--framectrdiv_S <= 0)
+                {
+                    clockframecounter_S();
+                    framectrdiv_S = (ctrmode_S == 4) ? frameReload4_S[framectr_S] : frameReload5_S[framectr_S];
+                }
+                // Keep DMC clock for DMA cycle stealing
+                clockdmc_S();
+                return;
+            }
+
             // Frame Counter
             if (--framectrdiv_S <= 0)
             {
@@ -454,11 +468,11 @@ namespace AprNes
             // DMC
             clockdmc_S();
 
-            // 生成音效樣本
-            _sampleAccum_S += 1.0;
-            if (_sampleAccum_S >= _cycPerSample_S)
+            // 生成音效樣本 (SP-9: integer accumulator avoids FP dependency chain)
+            _sampleAccum_S += APU_SAMPLE_RATE_S;
+            if (_sampleAccum_S >= (int)CPU_FREQ_S)
             {
-                _sampleAccum_S -= _cycPerSample_S;
+                _sampleAccum_S -= (int)CPU_FREQ_S;
                 generateSample_S();
             }
         }

@@ -13,6 +13,27 @@ namespace AprNes
             PRG_ROM = _PRG_ROM; CHR_ROM = _CHR_ROM; ppu_ram = _ppu_ram;
             PRG_ROM_count = _PRG_ROM_count; CHR_ROM_count = _CHR_ROM_count;
             chrBank = 0;
+            UpdateChrPtrs();
+            UpdatePrgPtrs();
+        }
+
+        void UpdateChrPtrs()
+        {
+            byte* b = (CHR_ROM_count > 0) ? (CHR_ROM + chrBank * 0x2000) : ppu_ram;
+            for (int i = 0; i < 8; i++) NesCoreSpeed.chrBankPtrs_S[i] = b + i * 1024;
+        }
+
+        void UpdatePrgPtrs()
+        {
+            if (PRG_ROM_count == 1)
+            {
+                for (int i = 0; i < 4; i++) NesCoreSpeed.prgBankPtrs_S[4 + i] = PRG_ROM + i * 8192;
+                for (int i = 0; i < 4; i++) NesCoreSpeed.prgBankPtrs_S[i] = PRG_ROM + i * 8192;
+            }
+            else
+            {
+                for (int i = 0; i < 8; i++) NesCoreSpeed.prgBankPtrs_S[i] = PRG_ROM + i * 8192;
+            }
         }
 
         public byte MapperR_PRG(ushort address)
@@ -25,6 +46,7 @@ namespace AprNes
         public void MapperW_PRG(ushort address, byte value)
         {
             chrBank = value & 3;
+            UpdateChrPtrs();
         }
 
         public byte MapperR_CHR(int address)
