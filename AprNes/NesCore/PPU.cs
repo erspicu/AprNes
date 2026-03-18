@@ -211,11 +211,17 @@ namespace AprNes
                     ioaddr = 0x2000 | (vram_addr & 0x0FFF);
                     if (mapperA12IsMmc3) NotifyMapperA12(ioaddr);  // NT addr, A12=0
                 } else if (phase == 1) {
-                    NTVal = ppu_ram[ioaddr];
+                    if (ntChrOverrideEnabled)
+                        NTVal = ntBankPtrs[(ioaddr >> 10) & 3][ioaddr & 0x3FF];
+                    else
+                        NTVal = ppu_ram[ioaddr];
                 } else if (phase == 2) {
                     ioaddr = 0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07);
                 } else if (phase == 3) {
-                    ATVal = (byte)((ppu_ram[ioaddr] >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
+                    if (ntChrOverrideEnabled)
+                        ATVal = (byte)((ntBankPtrs[(ioaddr >> 10) & 3][ioaddr & 0x3FF] >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
+                    else
+                        ATVal = (byte)((ppu_ram[ioaddr] >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
                     bg_attr_p3 = bg_attr_p2; bg_attr_p2 = bg_attr_p1; bg_attr_p1 = ATVal;
                 } else if (phase == 4) {
                     ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);

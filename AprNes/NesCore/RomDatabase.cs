@@ -20,6 +20,7 @@ namespace AprNes
         // Entries: add one line per special-case ROM.
         // Submapper semantics per mapper:
         //   Mapper 4  (MMC3):  1=Rev A,  2=MMC6
+        //   Mapper 32 (G-101): 1=Major League (lock PRG mode 0 + single-A mirror)
         //   Mapper 78 (Irem):  3=Holy Diver (V/H mirroring)
         // -----------------------------------------------------------------------
         static readonly RomDbEntry[] Table =
@@ -30,6 +31,9 @@ namespace AprNes
             new RomDbEntry { Crc = 0xF312D1DE, Name = "[blargg] mmc3_irq_accuracy/5.MMC3_rev_A",  Submapper = 1, MirrorOverride = -1 },
             new RomDbEntry { Crc = 0x633AFE6F, Name = "[blargg] mmc3_irq_accuracy/6-MMC3_alt",    Submapper = 1, MirrorOverride = -1 },
             new RomDbEntry { Crc = 0xA512BDF6, Name = "[blargg] mmc3_irq_accuracy/6-MMC6",        Submapper = 2, MirrorOverride = -1 },
+
+            // --- Mapper 32 (Irem G-101) sub-variants ---
+            new RomDbEntry { Crc = 0x243A8735, Name = "Major League (J)",                         Submapper = 1, MirrorOverride = -1 },
 
             // --- Mapper 78 (Irem 74HC161/32) sub-variants ---
             new RomDbEntry { Crc = 0xBA51AC6F, Name = "Holy Diver (J)",                           Submapper = 3, MirrorOverride = -1 },

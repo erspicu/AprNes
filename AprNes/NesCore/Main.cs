@@ -33,6 +33,9 @@ namespace AprNes
         static public byte*[] chrBankPtrs = new byte*[8]; // P34: 8×1KB CHR bank pointers, updated by mapper
         static public bool mapperNeedsA12  = false; // any A12 notification needed (MMC3 or MMC2/4)
         static public bool mapperA12IsMmc3 = false; // true=MMC3-style, false=MMC2/4-style (only when mapperNeedsA12)
+        // Mapper 68 (Sunsoft #4): CHR ROM pages used as nametable tiles
+        static public byte*[] ntBankPtrs = new byte*[4]; // 4×1KB NT pointers (one per nametable slot)
+        static public bool ntChrOverrideEnabled = false; // when true PPU reads NT from ntBankPtrs instead of ppu_ram
 
 
         // ROM info accessors (read-only, set during init)
@@ -199,6 +202,7 @@ namespace AprNes
                 var a12mode = MapperObj.A12NotifyMode;
                 mapperNeedsA12  = a12mode != MapperA12Mode.None;
                 mapperA12IsMmc3 = a12mode == MapperA12Mode.MMC3;
+                ntChrOverrideEnabled = false;
                 MapperObj.MapperInit(PRG_ROM, CHR_ROM, ppu_ram, PRG_ROM_count, CHR_ROM_count, Vertical);
                 MapperObj.Reset();
                 if (!dbEntry.IsNone && dbEntry.MirrorOverride >= 0)

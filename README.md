@@ -172,8 +172,12 @@ python run_tests.py -j 10
 | 9 (MMC2) | Punch-Out!! |
 | 10 (MMC4) | Fire Emblem, Famicom Wars |
 | 11 (Color Dreams) | Crystal Mines |
+| 22 (VRC2a) | TwinBee 3 (J) |
+| 23 (VRC2b) | Contra (J), Getsufuu Maden (J) |
+| 32 (Irem G-101) | Image Fight (J), Major League (J) |
 | 34 (Nina-1) | Deadly Towers, Impossible Mission II |
 | 66 (GxROM) | Dragon Ball, Gumshoe |
+| 68 (Sunsoft #4) | After Burner II (J), Maharaja (J) |
 | 69 (FME-7) | Batman (J), Gimmick! (J) |
 | 71 (Camerica) | Firehawk, Linus Spacehead |
 | 78 (Irem 74HC161/32) | Holy Diver (J) |
@@ -353,8 +357,12 @@ python run_tests.py -j 10
 | 9 (MMC2) | 泰森拳擊 |
 | 10 (MMC4) | 火焰紋章、FC 大戰 |
 | 11 (Color Dreams) | Crystal Mines |
+| 22 (VRC2a) | TwinBee 3（日） |
+| 23 (VRC2b) | 魂斗羅（日）、月風魔傳（日） |
+| 32 (Irem G-101) | Image Fight（日）、Major League（日） |
 | 34 (Nina-1) | 魔神英雄傳、不可能的任務 II |
 | 66 (GxROM) | 七龍珠、彈弓 |
+| 68 (Sunsoft #4) | After Burner II（日）、Maharaja（日） |
 | 69 (FME-7) | 蝙蝠俠（日）、奇妙小子（日） |
 | 71 (Camerica) | Firehawk、Linus Spacehead |
 | 78 (Irem 74HC161/32) | 聖鬥士（Holy Diver 日版） |

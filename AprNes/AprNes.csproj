@@ -82,12 +82,14 @@
     <Compile Include="NesCore\Mapper\Mapper066.cs" />
     <Compile Include="NesCore\Mapper\Mapper022.cs" />
     <Compile Include="NesCore\Mapper\Mapper023.cs" />
+    <Compile Include="NesCore\Mapper\Mapper032.cs" />
     <Compile Include="NesCore\Mapper\Mapper034.cs" />
     <Compile Include="NesCore\Mapper\Mapper071.cs" />
     <Compile Include="NesCore\Mapper\Mapper078.cs" />
     <Compile Include="NesCore\Mapper\IMapper.cs" />
     <Compile Include="NesCore\Mapper\Mapper009.cs" />
     <Compile Include="NesCore\Mapper\Mapper010.cs" />
+    <Compile Include="NesCore\Mapper\Mapper068.cs" />
     <Compile Include="NesCore\Mapper\Mapper069.cs" />
     <Compile Include="NesCore\Mapper\Mapper206.cs" />
     <Compile Include="NesCore\Mapper\MapperRegistry.cs" />
