@@ -48,7 +48,8 @@ ref/Mesen2-master/
 knowledgebase/config.json
 knowledgebase/models_list.txt
 
-# WASM/AOT publish outputs (large build artifacts)
+# Publish outputs (large build artifacts)
+publish/
 publish_wasm/
 AprNesWasm/publish_out/
 AprNesWasm/wwwroot/lib/
