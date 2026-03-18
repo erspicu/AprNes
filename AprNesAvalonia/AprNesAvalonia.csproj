@@ -16,8 +16,10 @@
   </PropertyGroup>
 
   <!-- NesCoreNET: .NET 10 fork of NesCore (auto-included by SDK from project dir) -->
+  <!-- Mappers: shared directly from AprNes/NesCore/Mapper/ (no duplication) -->
   <!-- External tools from original AprNes project -->
   <ItemGroup>
+    <Compile Include="../AprNes/NesCore/Mapper/*.cs" Link="NesCoreNET/Mapper/%(Filename)%(Extension)" />
     <Compile Include="../AprNes/tool/WaveOutPlayer.cs" Link="WaveOutPlayer.cs" />
   </ItemGroup>
 
