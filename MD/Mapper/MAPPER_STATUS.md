@@ -11,15 +11,15 @@
 | 項目 | 數量 |
 |------|------|
 | 實作目標（扣除盜版 + 補充 020/085） | 28 個 |
-| 目標內已實作 | 20 個 |
+| 目標內已實作 | 21 個 |
 | 目標外額外實作（NROM、Namco 108） | 2 個 |
-| **總計已實作** | **22 個** |
-| 目標涵蓋完成率 | **20 / 28 = 71.4%** |
-| 整體完成率（含額外） | **22 / 30 = 73.3%** |
+| **總計已實作** | **23 個** |
+| 目標涵蓋完成率 | **21 / 28 = 75.0%** |
+| 整體完成率（含額外） | **23 / 31 = 74.2%** |
 
 ---
 
-## 已實作（20 個）
+## 已實作（21 個）
 
 | Mapper | 名稱 | 備註 |
 |:------:|------|------|
@@ -38,6 +38,7 @@
 | **032** | Irem G-101 | `Mapper032.cs` — PRG mode 0/1 切換，8×1K CHR；SubMapper 1 = Major League (mode 0 + single-A)；Image Fight (J), Major League (J) 驗證通過 |
 | **033** | Taito TC0190 | `Mapper033.cs` — 2×8K PRG switchable，addr & 0xA003 decode；$8002/$8003 各選 2K CHR，$A000-$A003 選 4×1K CHR；Akira (J), Don Doko Don (J) 驗證通過 |
 | **034** | Nina-1 | `Mapper034.cs` — 兩種子變體：CHR-RAM（Deadly Towers/Mashou）用 $8000 PRG 選擇；CHR-ROM（Impossible Mission II）用 $7FFD-$7FFF 寫入暫存器 |
+| **064** | Tengen RAMBO-1 | `Mapper064.cs` — 類 MMC3；3×8K PRG switchable (regs 6,7,15) + fixed last；CHR fine mode (regs 8,9)；A12 或 CPU-cycle IRQ ($C001 bit0 切換)；Skull&Crossbones forceClock 修正；Shinobi (Tengen), Klax (Tengen) 驗證通過 |
 | **065** | Irem H-3001 | `Mapper065.cs` — 3×8K PRG switchable + 固定末 8K；16-bit CPU cycle IRQ（$9003/$9004/$9005/$9006）。⚠️ Daiku no Gen San 2 (J) intro 捲軸場景畫面異常（條紋），尚待克服 |
 | **066** | GxROM | `Mapper066.cs` — DragonBall, Gumshoe |
 | **068** | Sunsoft #4 | `Mapper068.cs` — 4×2K CHR，16K PRG 切換，固定末尾 16K；CHR-as-nametable ($C000/$D000/$E000 bit4)；AfterBurner II (J), Maharaja (J) 驗證通過 |
@@ -48,7 +49,7 @@
 
 ---
 
-## 未實作（目標 28 個中剩餘 8 個）
+## 未實作（目標 28 個中剩餘 7 個）
 
 | Mapper | 名稱 | 代表作品 | 技術重點 |
 |:------:|------|---------|---------|
@@ -58,7 +59,6 @@
 | **019** | Namcot 106 | Splatterhouse, Family Stadium '90'、女神轉生II | 最多 8 通道波形音效，內建 RAM |
 | **021** | Konami VRC4 | Wai Wai World 2, Gradius 2、大盜五右衛門 | 掃描線 IRQ，多地址線變體 |
 | **024** | Konami VRC6 | Akumajo Dracula 3（惡魔城傳說日） | 額外 3 通道音效（方波×2、鋸齒波） |
-| **064** | Tengen RAMBO-1 | Shinobi, Klax, Skull & Crossbones | 類 MMC3，不同 IRQ 機制 |
 | **085** | Konami VRC7 | 《拉格朗日點》 | FM 合成音效 (OPLL/YM2413)，複雜度最高 |
 
 ---
@@ -77,7 +77,7 @@
 | ~~★~~ | ~~**032** Irem G-101~~ | ✅ 已完成 |
 | ~~★~~ | ~~**068** Sunsoft Mapper #4~~ | ✅ 已完成 |
 | ★★★ | **021** VRC4 | 涵蓋多款 Konami 大作，最重要 |
-| ★★★ | **064** Tengen RAMBO-1 | Shinobi 等知名作品 |
+| ~~★★★~~ | ~~**064** Tengen RAMBO-1~~ | ✅ 已完成 |
 | ★★ | **024** VRC6 | 需擴充音效 mixer（惡魔城傳說日） |
 | ★★ | **019** Namcot 106 | 需擴充音效 mixer，最多 8 通道 |
 | ★★ | **016** Bandai | DragonBall Z、聖鬥士等人氣作品 |
@@ -89,4 +89,4 @@
 
 ---
 
-*最後更新：2026-03-19*
+*最後更新：2026-03-19（Mapper064 RAMBO-1 加入）*
