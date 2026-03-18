@@ -11,15 +11,15 @@
 | 項目 | 數量 |
 |------|------|
 | 實作目標（扣除盜版 + 補充 020/085） | 28 個 |
-| 目標內已實作 | 14 個 |
+| 目標內已實作 | 16 個 |
 | 目標外額外實作（NROM、Namco 108） | 2 個 |
-| **總計已實作** | **16 個** |
-| 目標涵蓋完成率 | **14 / 28 = 50.0%** |
-| 整體完成率（含額外） | **16 / 30 = 53.3%** |
+| **總計已實作** | **18 個** |
+| 目標涵蓋完成率 | **16 / 28 = 57.1%** |
+| 整體完成率（含額外） | **18 / 30 = 60.0%** |
 
 ---
 
-## 已實作（14 個）
+## 已實作（16 個）
 
 | Mapper | 名稱 | 備註 |
 |:------:|------|------|
@@ -33,16 +33,18 @@
 | **009** | MMC2 | `Mapper009.cs` — PPU Latch 自動換頁；《泰森拳擊》驗證通過 |
 | **010** | MMC4 | `Mapper010.cs` — MMC2 演進版（16K PRG）；PPU Latch 延遲更新；Fire Emblem, Famicom Wars 驗證通過 |
 | **011** | Color Dreams | `Mapper011.cs` — Crystal Mines, Pesterminator（非授權正規廠商） |
+| **022** | VRC2a | `Mapper022.cs` — TwinBee 3 (J)；8K PRG×2 + 8×1K CHR；CHR index >> 1（低位忽略） |
+| **023** | VRC2b | `Mapper023.cs` — Contra (J), Getsufuu Maden (J)；同 VRC2a 但地址線標準配置，CHR index 不右移 |
+| **034** | Nina-1 | `Mapper034.cs` — 兩種子變體：CHR-RAM（Deadly Towers/Mashou）用 $8000 PRG 選擇；CHR-ROM（Impossible Mission II）用 $7FFD-$7FFF 寫入暫存器 |
 | **066** | GxROM | `Mapper066.cs` — DragonBall, Gumshoe |
 | **069** | FME-7 | `Mapper069.cs` — CPU 週期 IRQ，PRG-RAM 分頁，4 種鏡像；Batman (J), Gimmick! (J) 驗證通過。⚠️ Sunsoft 5B 擴充音效（YM2149）未實作。⚠️ PAL 版（Mr. Gimmick (E)）畫面異常，PAL timing 尚未支援 |
 | **071** | Camerica | `Mapper071.cs` — Firehawk, Linus Spacehead（非授權正規廠商） |
-| **034** | Nina-1 | `Mapper034.cs` — 兩種子變體：CHR-RAM（Deadly Towers/Mashou）用 $8000 PRG 選擇；CHR-ROM（Impossible Mission II）用 $7FFD-$7FFF 寫入暫存器 |
-| **078** | Irem 74HC161/32 | `Mapper078.cs` — 兩種子變體：submapper 1（Uchuusen Cosmo Carrier）單畫面鏡像；submapper 3（Holy Diver (J)）V/H 鏡像；CRC 識別 |
+| **078** | Irem 74HC161/32 | `Mapper078.cs` — ⚠️ Holy Diver (J) 可動；Uchuusen Cosmo Carrier (J) 有問題（intro 黑畫面），尚待完全克服 |
 | **206** | Namco 108 | `Mapper206.cs` — MMC3 雛形，無 IRQ；《Karnov》驗證通過（文件外額外支援） |
 
 ---
 
-## 未實作（目標 28 個中剩餘 16 個）
+## 未實作（目標 28 個中剩餘 12 個）
 
 | Mapper | 名稱 | 代表作品 | 技術重點 |
 |:------:|------|---------|---------|
@@ -51,16 +53,12 @@
 | **018** | Jaleco SS8806 | 忍者龍牙、Baseball 3 | 精密 IRQ + 多 CHR Bank |
 | **019** | Namcot 106 | Splatterhouse, Family Stadium '90'、女神轉生II | 最多 8 通道波形音效，內建 RAM |
 | **021** | Konami VRC4 | Wai Wai World 2, Gradius 2、大盜五右衛門 | 掃描線 IRQ，多地址線變體 |
-| **022** | Konami VRC2a | TwinBee 3、魂斗羅(日) | VRC4 簡化版，無 IRQ |
-| **023** | Konami VRC2b | Contra (J), Getsufuu Maden | VRC4 變體 |
 | **024** | Konami VRC6 | Akumajo Dracula 3（惡魔城傳說日） | 額外 3 通道音效（方波×2、鋸齒波） |
 | **032** | Irem G-101 | ImageFight 2、大工之源 | PRG 切換 + 鏡像控制 |
 | **033** | Taito TC0190 | Pon Poko Pon、影之傳說、泡泡龍2 | 類 MMC3 |
-| ~~**034**~~ | ~~Nina-1~~ | ~~Deadly Towers, Impossible Mission II~~ | ✅ 已完成 |
 | **064** | Tengen RAMBO-1 | Shinobi, Klax, Skull & Crossbones | 類 MMC3，不同 IRQ 機制 |
 | **065** | Irem H-3001 | Daiku no Gensan 2、開路先鋒 | 16-bit IRQ |
 | **068** | Sunsoft Mapper #4 | AfterBurner II | PRG + CHR 分頁，鏡像控制 |
-| ~~**078**~~ | ~~Irem 74HC161/32~~ | ~~數款日本 Irem 遊戲~~ | ✅ 已完成 |
 | **085** | Konami VRC7 | 《拉格朗日點》 | FM 合成音效 (OPLL/YM2413)，複雜度最高 |
 
 ---
@@ -75,7 +73,8 @@
 | ~~★★★~~ | ~~**206** Namco 108~~ | ✅ 已完成 |
 | ~~★★★~~ | ~~**069** FME-7~~ | ✅ 已完成 |
 | ~~★★~~ | ~~**010** MMC4~~ | ✅ 已完成 |
-| ★★★ | **021/022/023** VRC4/VRC2 | 涵蓋多款 Konami 大作，VRC4 最重要 |
+| ~~★★★~~ | ~~**022/023** VRC2a/VRC2b~~ | ✅ 已完成 |
+| ★★★ | **021** VRC4 | 涵蓋多款 Konami 大作，最重要 |
 | ★★★ | **064** Tengen RAMBO-1 | Shinobi 等知名作品 |
 | ★★ | **024** VRC6 | 需擴充音效 mixer（惡魔城傳說日） |
 | ★★ | **019** Namcot 106 | 需擴充音效 mixer，最多 8 通道 |
@@ -84,10 +83,7 @@
 | ★ | **033** Taito TC0190 | 影之傳說、泡泡龍2 |
 | ★ | **068** Sunsoft Mapper #4 | AfterBurner II |
 | ★ | **032** Irem G-101 | 大工之源 |
-| ~~★~~ | ~~**034** Nina-1~~ | ✅ 已完成 |
-| ★ | **064** Tengen RAMBO-1 | Shinobi |
 | ★ | **065** Irem H-3001 | 開路先鋒 |
-| ~~★~~ | ~~**078** Irem 74HC161/32~~ | ✅ 已完成 |
 | ✗ | **020** FDS | 磁碟機模擬，最高複雜度，需 BIOS |
 | ✗ | **085** VRC7 | 需 OPLL FM 合成，最高複雜度 |
 

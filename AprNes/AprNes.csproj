@@ -80,6 +80,8 @@
     <Compile Include="NesCore\Mapper\Mapper007.cs" />
     <Compile Include="NesCore\Mapper\Mapper011.cs" />
     <Compile Include="NesCore\Mapper\Mapper066.cs" />
+    <Compile Include="NesCore\Mapper\Mapper022.cs" />
+    <Compile Include="NesCore\Mapper\Mapper023.cs" />
     <Compile Include="NesCore\Mapper\Mapper034.cs" />
     <Compile Include="NesCore\Mapper\Mapper071.cs" />
     <Compile Include="NesCore\Mapper\Mapper078.cs" />
