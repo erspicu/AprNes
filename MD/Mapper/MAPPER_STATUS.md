@@ -38,7 +38,7 @@
 | **032** | Irem G-101 | `Mapper032.cs` — PRG mode 0/1 切換，8×1K CHR；SubMapper 1 = Major League (mode 0 + single-A)；Image Fight (J), Major League (J) 驗證通過 |
 | **033** | Taito TC0190 | `Mapper033.cs` — 2×8K PRG switchable，addr & 0xA003 decode；$8002/$8003 各選 2K CHR，$A000-$A003 選 4×1K CHR；Akira (J), Don Doko Don (J) 驗證通過 |
 | **034** | Nina-1 | `Mapper034.cs` — 兩種子變體：CHR-RAM（Deadly Towers/Mashou）用 $8000 PRG 選擇；CHR-ROM（Impossible Mission II）用 $7FFD-$7FFF 寫入暫存器 |
-| **065** | Irem H-3001 | `Mapper065.cs` — 3×8K PRG switchable + 固定末 8K；16-bit CPU cycle IRQ（$9003/$9004/$9005/$9006）；Daiku no Gen San 2 (J) 驗證通過 |
+| **065** | Irem H-3001 | `Mapper065.cs` — 3×8K PRG switchable + 固定末 8K；16-bit CPU cycle IRQ（$9003/$9004/$9005/$9006）。⚠️ Daiku no Gen San 2 (J) intro 捲軸場景畫面異常（條紋），尚待克服 |
 | **066** | GxROM | `Mapper066.cs` — DragonBall, Gumshoe |
 | **068** | Sunsoft #4 | `Mapper068.cs` — 4×2K CHR，16K PRG 切換，固定末尾 16K；CHR-as-nametable ($C000/$D000/$E000 bit4)；AfterBurner II (J), Maharaja (J) 驗證通過 |
 | **069** | FME-7 | `Mapper069.cs` — CPU 週期 IRQ，PRG-RAM 分頁，4 種鏡像；Batman (J), Gimmick! (J) 驗證通過。⚠️ Sunsoft 5B 擴充音效（YM2149）未實作。⚠️ PAL 版（Mr. Gimmick (E)）畫面異常，PAL timing 尚未支援 |
