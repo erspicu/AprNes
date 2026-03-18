@@ -132,7 +132,7 @@ namespace AprNes
             {
                 vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x7FFF);
             }
-            if (mapperA12Mode != MapperA12Mode.None) NotifyMapperA12(vram_addr);
+            if (mapperNeedsA12) NotifyMapperA12(vram_addr);
         }
 
         // hori(v) = hori(t)
@@ -209,7 +209,7 @@ namespace AprNes
                 int phase = cx & 7;
                 if (phase == 0) {
                     ioaddr = 0x2000 | (vram_addr & 0x0FFF);
-                    if (mapperA12Mode == MapperA12Mode.MMC3) NotifyMapperA12(ioaddr);  // NT addr, A12=0
+                    if (mapperA12IsMmc3) NotifyMapperA12(ioaddr);  // NT addr, A12=0
                 } else if (phase == 1) {
                     NTVal = ppu_ram[ioaddr];
                 } else if (phase == 2) {
@@ -219,12 +219,12 @@ namespace AprNes
                     bg_attr_p3 = bg_attr_p2; bg_attr_p2 = bg_attr_p1; bg_attr_p1 = ATVal;
                 } else if (phase == 4) {
                     ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
-                    if (mapperA12Mode != MapperA12Mode.None) NotifyMapperA12(ioaddr);  // CHR low addr
+                    if (mapperNeedsA12) NotifyMapperA12(ioaddr);  // CHR low addr
                 } else if (phase == 5) {
                     lowTile = chrBankPtrs[(ioaddr >> 10) & 7][ioaddr & 0x3FF];
                 } else if (phase == 6) {
                     ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
-                    if (mapperA12Mode == MapperA12Mode.MMC2_4) NotifyMapperA12(ioaddr);  // MMC2/MMC4: CHR high triggers latch
+                    if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(ioaddr);  // MMC2/MMC4: CHR high triggers latch
                 } else {
                     highTile = chrBankPtrs[(ioaddr >> 10) & 7][ioaddr & 0x3FF];
                     // Render 8 pixels using shift registers BEFORE reload (visible only, BG on)
@@ -254,13 +254,13 @@ namespace AprNes
                 // the current scanline's sprite 0 tile data.
                 if (cx == 261) spriteSizeLatchedForFetch = Spritesize8x16;
 
-                if (mapperA12Mode == MapperA12Mode.MMC3)
+                if (mapperA12IsMmc3)
                 {
                     int phase = (cx - 257) & 7;
                     if (phase == 0) NotifyMapperA12(0x2000);                // garbage NT addr, A12=0
                     else if (phase == 3) NotifyMapperA12(SpPatternTableAddr); // sprite CHR addr (pre-output)
                 }
-                else if (mapperA12Mode == MapperA12Mode.MMC2_4)
+                else if (mapperNeedsA12 && !mapperA12IsMmc3)
                 {
                     // MMC2/MMC4: per-sprite CHR high address for right-latch detection
                     int phase9 = (cx - 257) & 7;
@@ -286,7 +286,7 @@ namespace AprNes
 
             // Garbage NT fetches at dots 336-339: notify A12=0 to create falling edge
             // after BG prefetch CHR (A12=1 for BG=$1000), needed for scanline-boundary timing
-            if (mapperA12Mode != MapperA12Mode.None && cx == 336)
+            if (mapperNeedsA12 && cx == 336)
                 NotifyMapperA12(0x2000);
         }
 
@@ -1217,7 +1217,7 @@ namespace AprNes
             {
                 vram_addr_internal = (vram_addr_internal & 0x7F00) | value;
                 vram_addr = vram_addr_internal;
-                if (mapperA12Mode != MapperA12Mode.None) NotifyMapperA12(vram_addr);
+                if (mapperNeedsA12) NotifyMapperA12(vram_addr);
             }
             vram_latch = !vram_latch;
         }
