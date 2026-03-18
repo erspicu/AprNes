@@ -8,7 +8,7 @@ namespace AprNes
             {
                 case  0: case  1: case  2: case  3: case  4: case  5:
                 case  7: case  9: case 10: case 11: case 22: case 23:
-                case 32: case 34: case 66: case 68: case 69: case 71: case 78: case 206:
+                case 32: case 33: case 34: case 65: case 66: case 68: case 69: case 71: case 78: case 206:
                     return true;
                 default:
                     return false;
@@ -32,7 +32,9 @@ namespace AprNes
                 case 22: return "VRC2a";
                 case 23: return "VRC2b";
                 case 32: return "Irem G-101";
+                case 33: return "Taito TC0190";
                 case 34: return "Nina-1";
+                case 65: return "Irem H-3001";
                 case 66: return "GxROM";
                 case 68: return "Sunsoft #4";
                 case 69: return "FME-7";
@@ -77,7 +79,9 @@ namespace AprNes
                     if (db.Submapper == 1) { System.Console.WriteLine("Sub-variant: Mapper032 Major League"); m.majorLeague = true; }
                     return m;
                 }
+                case 33: return new Mapper033();
                 case 34: return new Mapper034();
+                case 65: return new Mapper065();
                 case 66: return new Mapper066();
                 case 68: return new Mapper068();
                 case 69: return new Mapper069();

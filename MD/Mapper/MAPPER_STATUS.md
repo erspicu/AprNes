@@ -11,15 +11,15 @@
 | 項目 | 數量 |
 |------|------|
 | 實作目標（扣除盜版 + 補充 020/085） | 28 個 |
-| 目標內已實作 | 18 個 |
+| 目標內已實作 | 20 個 |
 | 目標外額外實作（NROM、Namco 108） | 2 個 |
-| **總計已實作** | **20 個** |
-| 目標涵蓋完成率 | **18 / 28 = 64.3%** |
-| 整體完成率（含額外） | **20 / 30 = 66.7%** |
+| **總計已實作** | **22 個** |
+| 目標涵蓋完成率 | **20 / 28 = 71.4%** |
+| 整體完成率（含額外） | **22 / 30 = 73.3%** |
 
 ---
 
-## 已實作（18 個）
+## 已實作（20 個）
 
 | Mapper | 名稱 | 備註 |
 |:------:|------|------|
@@ -36,7 +36,9 @@
 | **022** | VRC2a | `Mapper022.cs` — TwinBee 3 (J)；8K PRG×2 + 8×1K CHR；CHR index >> 1（低位忽略） |
 | **023** | VRC2b | `Mapper023.cs` — Contra (J), Getsufuu Maden (J)；同 VRC2a 但地址線標準配置，CHR index 不右移 |
 | **032** | Irem G-101 | `Mapper032.cs` — PRG mode 0/1 切換，8×1K CHR；SubMapper 1 = Major League (mode 0 + single-A)；Image Fight (J), Major League (J) 驗證通過 |
+| **033** | Taito TC0190 | `Mapper033.cs` — 2×8K PRG switchable，addr & 0xA003 decode；$8002/$8003 各選 2K CHR，$A000-$A003 選 4×1K CHR；Akira (J), Don Doko Don (J) 驗證通過 |
 | **034** | Nina-1 | `Mapper034.cs` — 兩種子變體：CHR-RAM（Deadly Towers/Mashou）用 $8000 PRG 選擇；CHR-ROM（Impossible Mission II）用 $7FFD-$7FFF 寫入暫存器 |
+| **065** | Irem H-3001 | `Mapper065.cs` — 3×8K PRG switchable + 固定末 8K；16-bit CPU cycle IRQ（$9003/$9004/$9005/$9006）；Daiku no Gen San 2 (J) 驗證通過 |
 | **066** | GxROM | `Mapper066.cs` — DragonBall, Gumshoe |
 | **068** | Sunsoft #4 | `Mapper068.cs` — 4×2K CHR，16K PRG 切換，固定末尾 16K；CHR-as-nametable ($C000/$D000/$E000 bit4)；AfterBurner II (J), Maharaja (J) 驗證通過 |
 | **069** | FME-7 | `Mapper069.cs` — CPU 週期 IRQ，PRG-RAM 分頁，4 種鏡像；Batman (J), Gimmick! (J) 驗證通過。⚠️ Sunsoft 5B 擴充音效（YM2149）未實作。⚠️ PAL 版（Mr. Gimmick (E)）畫面異常，PAL timing 尚未支援 |
@@ -46,7 +48,7 @@
 
 ---
 
-## 未實作（目標 28 個中剩餘 10 個）
+## 未實作（目標 28 個中剩餘 8 個）
 
 | Mapper | 名稱 | 代表作品 | 技術重點 |
 |:------:|------|---------|---------|
@@ -56,9 +58,7 @@
 | **019** | Namcot 106 | Splatterhouse, Family Stadium '90'、女神轉生II | 最多 8 通道波形音效，內建 RAM |
 | **021** | Konami VRC4 | Wai Wai World 2, Gradius 2、大盜五右衛門 | 掃描線 IRQ，多地址線變體 |
 | **024** | Konami VRC6 | Akumajo Dracula 3（惡魔城傳說日） | 額外 3 通道音效（方波×2、鋸齒波） |
-| **033** | Taito TC0190 | Pon Poko Pon、影之傳說、泡泡龍2 | 類 MMC3 |
 | **064** | Tengen RAMBO-1 | Shinobi, Klax, Skull & Crossbones | 類 MMC3，不同 IRQ 機制 |
-| **065** | Irem H-3001 | Daiku no Gensan 2、開路先鋒 | 16-bit IRQ |
 | **085** | Konami VRC7 | 《拉格朗日點》 | FM 合成音效 (OPLL/YM2413)，複雜度最高 |
 
 ---
@@ -82,8 +82,8 @@
 | ★★ | **019** Namcot 106 | 需擴充音效 mixer，最多 8 通道 |
 | ★★ | **016** Bandai | DragonBall Z、聖鬥士等人氣作品 |
 | ★★ | **018** Jaleco SS8806 | 忍者龍牙系列 |
-| ★ | **033** Taito TC0190 | 影之傳說、泡泡龍2 |
-| ★ | **065** Irem H-3001 | 開路先鋒 |
+| ~~★~~ | ~~**033** Taito TC0190~~ | ✅ 已完成 |
+| ~~★~~ | ~~**065** Irem H-3001~~ | ✅ 已完成 |
 | ✗ | **020** FDS | 磁碟機模擬，最高複雜度，需 BIOS |
 | ✗ | **085** VRC7 | 需 OPLL FM 合成，最高複雜度 |
 
