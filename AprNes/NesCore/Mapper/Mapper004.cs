@@ -28,6 +28,7 @@ namespace AprNes
         public void MapperW_CHR(int addr, byte val) { if (CHR_ROM_count == 0) ppu_ram[addr] = val; }
         public void Reset() { }
         public void CpuCycle() { }
+        public MapperA12Mode A12NotifyMode => MapperA12Mode.MMC3;
 
         public void NotifyA12(int address, int ppuAbsCycle)
         {

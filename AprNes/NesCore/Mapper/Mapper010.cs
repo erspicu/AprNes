@@ -107,5 +107,6 @@ namespace AprNes
 
         public void MapperW_CHR(int addr, byte val) { }  // CHR-ROM only, no writes
         public void CpuCycle() { }
+        public MapperA12Mode A12NotifyMode => MapperA12Mode.MMC2_4;
     }
 }

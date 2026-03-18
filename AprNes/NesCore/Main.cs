@@ -31,6 +31,7 @@ namespace AprNes
 
         static IMapper MapperObj;
         static public byte*[] chrBankPtrs = new byte*[8]; // P34: 8×1KB CHR bank pointers, updated by mapper
+        static public MapperA12Mode mapperA12Mode = MapperA12Mode.None; // set at init from mapper, read-only by PPU
 
 
         // ROM info accessors (read-only, set during init)
@@ -194,6 +195,7 @@ namespace AprNes
                 if (!dbEntry.IsNone)
                     Console.WriteLine("ROM DB: " + dbEntry.Name);
                 MapperObj = MapperRegistry.Create(mapper, dbEntry);
+                mapperA12Mode = MapperObj.A12NotifyMode;
                 MapperObj.MapperInit(PRG_ROM, CHR_ROM, ppu_ram, PRG_ROM_count, CHR_ROM_count, Vertical);
                 MapperObj.Reset();
                 if (!dbEntry.IsNone && dbEntry.MirrorOverride >= 0)
