@@ -7,7 +7,8 @@ namespace AprNes
             switch (id)
             {
                 case  0: case  1: case  2: case  3: case  4: case  5:
-                case  7: case  9: case 11: case 66: case 71:
+                case  7: case  9: case 10: case 11: case 66: case 69:
+                case 71: case 206:
                     return true;
                 default:
                     return false;
@@ -26,9 +27,12 @@ namespace AprNes
                 case  5: return "MMC5";
                 case  7: return "AxROM";
                 case  9: return "MMC2";
+                case 10: return "MMC4";
                 case 11: return "Color Dreams";
                 case 66: return "GxROM";
+                case 69: return "FME-7";
                 case 71: return "Camerica";
+                case 206: return "Namco 108";
                 default: return "Unknown";
             }
         }
@@ -60,9 +64,12 @@ namespace AprNes
                 case  5: return new Mapper005();
                 case  7: return new Mapper007();
                 case  9: return new Mapper009();
+                case 10: return new Mapper010();
                 case 11: return new Mapper011();
                 case 66: return new Mapper066();
+                case 69: return new Mapper069();
                 case 71: return new Mapper071();
+                case 206: return new Mapper206();
                 default: throw new System.NotSupportedException("Mapper " + id + " not supported");
             }
         }

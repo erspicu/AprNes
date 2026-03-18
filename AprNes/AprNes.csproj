@@ -83,6 +83,9 @@
     <Compile Include="NesCore\Mapper\Mapper071.cs" />
     <Compile Include="NesCore\Mapper\IMapper.cs" />
     <Compile Include="NesCore\Mapper\Mapper009.cs" />
+    <Compile Include="NesCore\Mapper\Mapper010.cs" />
+    <Compile Include="NesCore\Mapper\Mapper069.cs" />
+    <Compile Include="NesCore\Mapper\Mapper206.cs" />
     <Compile Include="NesCore\Mapper\MapperRegistry.cs" />
     <Compile Include="tool\DirectInputHelper.cs" />
     <Compile Include="tool\joystick.cs" />
