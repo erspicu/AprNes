@@ -7,7 +7,7 @@ namespace AprNes
             switch (id)
             {
                 case  0: case  1: case  2: case  3: case  4: case  5:
-                case  7: case 11: case 66: case 71:
+                case  7: case  9: case 11: case 66: case 71:
                     return true;
                 default:
                     return false;
@@ -25,6 +25,7 @@ namespace AprNes
                 case  4: return "MMC3";
                 case  5: return "MMC5";
                 case  7: return "AxROM";
+                case  9: return "MMC2";
                 case 11: return "Color Dreams";
                 case 66: return "GxROM";
                 case 71: return "Camerica";
@@ -58,6 +59,7 @@ namespace AprNes
                 case  3: return new Mapper003();
                 case  5: return new Mapper005();
                 case  7: return new Mapper007();
+                case  9: return new Mapper009();
                 case 11: return new Mapper011();
                 case 66: return new Mapper066();
                 case 71: return new Mapper071();

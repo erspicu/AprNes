@@ -132,7 +132,7 @@ namespace AprNes
             {
                 vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x7FFF);
             }
-            if (mapper == 4) NotifyMapperA12(vram_addr);
+            if (mapper == 4 || mapper == 9) NotifyMapperA12(vram_addr);
         }
 
         // hori(v) = hori(t)
@@ -219,11 +219,12 @@ namespace AprNes
                     bg_attr_p3 = bg_attr_p2; bg_attr_p2 = bg_attr_p1; bg_attr_p1 = ATVal;
                 } else if (phase == 4) {
                     ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
-                    if (mapper == 4) NotifyMapperA12(ioaddr);  // CHR low addr, A12=BG table bit
+                    if (mapper == 4 || mapper == 9) NotifyMapperA12(ioaddr);  // CHR low addr
                 } else if (phase == 5) {
                     lowTile = chrBankPtrs[(ioaddr >> 10) & 7][ioaddr & 0x3FF];
                 } else if (phase == 6) {
                     ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
+                    if (mapper == 9) NotifyMapperA12(ioaddr);  // MMC2: CHR high triggers latch
                 } else {
                     highTile = chrBankPtrs[(ioaddr >> 10) & 7][ioaddr & 0x3FF];
                     // Render 8 pixels using shift registers BEFORE reload (visible only, BG on)
@@ -259,6 +260,18 @@ namespace AprNes
                     if (phase == 0) NotifyMapperA12(0x2000);                // garbage NT addr, A12=0
                     else if (phase == 3) NotifyMapperA12(SpPatternTableAddr); // sprite CHR addr (pre-output)
                 }
+                else if (mapper == 9)
+                {
+                    // MMC2: per-sprite CHR high address for right-latch detection ($1FD8/$1FE8)
+                    int phase9 = (cx - 257) & 7;
+                    int slot9  = (cx - 257) >> 3;
+                    if (phase9 == 0) NotifyMapperA12(0x2000);
+                    else if (phase9 == 5 && slot9 < 8)
+                    {
+                        byte tileNum = secondaryOAM[slot9 * 4 + 1];
+                        NotifyMapperA12(SpPatternTableAddr | (tileNum << 4) | 8);
+                    }
+                }
             }
 
             // Dot 321: latch secondary OAM[0] into oamCopyBuffer for dots 321-340
@@ -273,7 +286,7 @@ namespace AprNes
 
             // Garbage NT fetches at dots 336-339: notify A12=0 to create falling edge
             // after BG prefetch CHR (A12=1 for BG=$1000), needed for scanline-boundary timing
-            if (mapper == 4 && cx == 336)
+            if ((mapper == 4 || mapper == 9) && cx == 336)
                 NotifyMapperA12(0x2000);
         }
 
@@ -1204,7 +1217,7 @@ namespace AprNes
             {
                 vram_addr_internal = (vram_addr_internal & 0x7F00) | value;
                 vram_addr = vram_addr_internal;
-                if (mapper == 4) NotifyMapperA12(vram_addr);
+                if (mapper == 4 || mapper == 9) NotifyMapperA12(vram_addr);
             }
             vram_latch = !vram_latch;
         }
