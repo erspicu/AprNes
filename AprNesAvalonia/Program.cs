@@ -9,11 +9,11 @@ class Program
     [STAThread]
     public static int Main(string[] args)
     {
-        // Headless mode: --rom / --benchmark / --perf → TestRunner (no GUI)
+        // Headless mode: --rom / --perf → TestRunner (no GUI)
         bool headless = false;
         foreach (string a in args)
         {
-            if (a == "--rom" || a == "--benchmark" || a == "--perf")
+            if (a == "--rom" || a == "--perf")
             { headless = true; break; }
         }
 

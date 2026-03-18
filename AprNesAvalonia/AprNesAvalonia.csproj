@@ -13,11 +13,10 @@
     <TieredPGO>true</TieredPGO>
   </PropertyGroup>
 
-  <!-- Share NesCore + tools from original AprNes project (no duplication) -->
+  <!-- NesCoreNET: .NET 10 fork of NesCore (auto-included by SDK from project dir) -->
+  <!-- External tools from original AprNes project -->
   <ItemGroup>
-    <Compile Include="../AprNes/NesCore/**/*.cs" LinkBase="NesCore/" />
     <Compile Include="../AprNes/tool/WaveOutPlayer.cs" Link="WaveOutPlayer.cs" />
-    <Compile Include="../AprNes/BenchmarkRunner.cs" Link="BenchmarkRunner.cs" />
   </ItemGroup>
 
   <ItemGroup>

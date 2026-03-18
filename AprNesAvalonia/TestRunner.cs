@@ -113,19 +113,7 @@ namespace AprNes
                 }
             }
 
-            // ── benchmark mode: AprNes.exe --benchmark <rom> [seconds] [output] ──
-            if (args.Length >= 2 && args[0] == "--benchmark")
-            {
-                string rom     = args[1];
-                int s; int seconds = args.Length >= 3 && int.TryParse(args[2], out s) ? s : 10;
-                string outFile = args.Length >= 4 ? args[3] : null;
-                Console.Write(BenchmarkRunner.BuildHeader(rom, seconds));
-                BenchmarkRunner.Run(rom, seconds, outFile, ".NET Framework 4.6.1 JIT");
-                return 0;
-            }
-
-            // ── perf mode: AprNes.exe [--accuracy FLAGS] --perf <rom> [seconds] [note] ──
-            // Runs a headless benchmark, saves versioned MD report to Performance/
+            // ── perf mode: --perf <rom> [seconds] [note] ──
             {
                 int perfIdx = Array.IndexOf(args, "--perf");
                 if (perfIdx >= 0 && perfIdx + 1 < args.Length)
@@ -133,7 +121,7 @@ namespace AprNes
                     string rom     = args[perfIdx + 1];
                     int s; int seconds = (perfIdx + 2 < args.Length && int.TryParse(args[perfIdx + 2], out s)) ? s : 20;
                     string note    = (perfIdx + 3 < args.Length) ? args[perfIdx + 3] : null;
-                    BenchmarkRunner.RunPerf(rom, seconds, note);
+                    RunPerf(rom, seconds, note);
                     return 0;
                 }
             }
@@ -776,6 +764,130 @@ namespace AprNes
             using var fs = File.Create(path);
             bmp.Save(fs);
             bmp.Dispose();
+        }
+
+        // ── Perf benchmark (--perf mode) ───────────────────────────────────
+        static void RunPerf(string romPath, int seconds, string note)
+        {
+            if (!File.Exists(romPath))
+            {
+                Console.WriteLine($"[PERF] ROM not found: {romPath}");
+                Environment.Exit(1);
+            }
+
+            byte[] rom = File.ReadAllBytes(romPath);
+
+            // Walk up from exe to find project-root Performance/ directory
+            string perfDir = AppContext.BaseDirectory;
+            for (int i = 0; i < 6; i++)
+            {
+                string candidate = Path.Combine(perfDir, "Performance");
+                if (Directory.Exists(candidate)) { perfDir = candidate; break; }
+                perfDir = Path.GetDirectoryName(perfDir);
+            }
+            Directory.CreateDirectory(perfDir);
+
+            int version = GetNextPerfVersion(perfDir);
+            string dateStr = DateTime.Now.ToString("yyyy-MM-dd");
+            string fileName = $"{dateStr}_perf_v{version}.md";
+            string filePath = Path.Combine(perfDir, fileName);
+
+            Console.WriteLine($"[PERF] Running {seconds}s benchmark: {Path.GetFileName(romPath)}");
+            Console.WriteLine($"[PERF] No audio, no FPS cap, headless mode");
+
+            int frames = RunPerfJit(rom, seconds);
+            double fps = frames / (double)seconds;
+
+            Console.WriteLine($"[PERF] Result: {frames} frames in {seconds}s  \u00bb  {fps:F2} avg FPS");
+            Console.WriteLine($"[PERF] Saving report: {filePath}");
+
+            string label = version == 1 ? "Baseline" : $"v{version}";
+            var sb = new StringBuilder();
+            sb.AppendLine($"# AprNes Performance Benchmark – {label}");
+            sb.AppendLine();
+            sb.AppendLine("## Test Environment");
+            sb.AppendLine();
+            sb.AppendLine("| Item | Value |");
+            sb.AppendLine("|------|-------|");
+            sb.AppendLine($"| Date | {DateTime.Now:yyyy-MM-dd HH:mm:ss} |");
+            sb.AppendLine($"| ROM | {Path.GetFileName(romPath)} |");
+            sb.AppendLine($"| Duration | {seconds} seconds |");
+            sb.AppendLine($"| Mode | Headless, No audio, No FPS cap |");
+            sb.AppendLine($"| OS | {Environment.OSVersion} |");
+            sb.AppendLine($"| CPU | {GetCpuName()} |");
+            sb.AppendLine($"| Runtime | .NET 10 TieredPGO |");
+            sb.AppendLine();
+            sb.AppendLine("## Results");
+            sb.AppendLine();
+            sb.AppendLine("| Frames | Average FPS |");
+            sb.AppendLine("|--------|-------------|");
+            sb.AppendLine($"| {frames} | {fps:F2} |");
+            sb.AppendLine();
+            sb.AppendLine("## Notes");
+            sb.AppendLine();
+            sb.AppendLine(string.IsNullOrWhiteSpace(note)
+                ? (version == 1 ? "Baseline measurement." : "(no description)")
+                : note);
+            sb.AppendLine();
+
+            File.WriteAllText(filePath, sb.ToString(), System.Text.Encoding.UTF8);
+            Console.WriteLine($"[PERF] Done. Saved to {fileName}");
+        }
+
+        static int RunPerfJit(byte[] rom, int seconds)
+        {
+            int frames = 0;
+            NesCore.exit = false;
+            NesCore.AudioEnabled = false;
+            NesCore.HeadlessMode = true;
+            NesCore.init(rom);
+            NesCore.LimitFPS = false;
+            EventHandler counter = (s, e) => Interlocked.Increment(ref frames);
+            NesCore.VideoOutput += counter;
+            var t = new Thread(NesCore.run) { IsBackground = true };
+            t.Start();
+            Thread.Sleep(seconds * 1000);
+            NesCore.exit = true;
+            NesCore._event.Set();
+            t.Join(2000);
+            NesCore.VideoOutput -= counter;
+            NesCore.AudioEnabled = true;
+            NesCore.HeadlessMode = false;
+            return frames;
+        }
+
+        static int GetNextPerfVersion(string perfDir)
+        {
+            int max = 0;
+            foreach (string f in Directory.GetFiles(perfDir, "*_perf_v*.md"))
+            {
+                string name = Path.GetFileNameWithoutExtension(f);
+                int idx = name.LastIndexOf("_perf_v", StringComparison.Ordinal);
+                if (idx < 0) continue;
+                if (int.TryParse(name.Substring(idx + 7), out int n) && n > max) max = n;
+            }
+            return max + 1;
+        }
+
+        static string GetCpuName()
+        {
+            try
+            {
+                // Windows: read from registry
+                if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+                        System.Runtime.InteropServices.OSPlatform.Windows))
+                {
+                    using var key = Microsoft.Win32.Registry.LocalMachine
+                        .OpenSubKey(@"HARDWARE\DESCRIPTION\System\CentralProcessor\0");
+                    return key?.GetValue("ProcessorNameString") as string ?? "Unknown";
+                }
+                // Linux: read from /proc/cpuinfo
+                foreach (string line in File.ReadLines("/proc/cpuinfo"))
+                    if (line.StartsWith("model name", StringComparison.Ordinal))
+                        return line.Split(':')[1].Trim();
+            }
+            catch { }
+            return "Unknown";
         }
     }
 }
