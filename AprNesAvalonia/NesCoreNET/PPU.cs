@@ -330,7 +330,7 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void NotifyMapperA12(int address)
         {
-            ((Mapper004)MapperObj).NotifyA12(address, scanline * 341 + ppu_cycles_x);
+            ((Mapper004)MapperObj!).NotifyA12(address, scanline * 341 + ppu_cycles_x);
         }
 
         static void ppu_step_new()
@@ -1112,7 +1112,7 @@ namespace AprNes
         static void RenderScreen()
         {
             screen_lock = true;
-            VideoOutput?.Invoke(null, null);
+            VideoOutput?.Invoke(null, null!);
             screen_lock = false;
             _event.WaitOne();
         }

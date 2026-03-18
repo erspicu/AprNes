@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 
 namespace AprNesAvalonia.Views;
 
@@ -169,9 +170,8 @@ public partial class ConfigWindow : Window
     // ── Event handlers ────────────────────────────────────────────────────
     private async void BtnBrowse_Click(object? sender, RoutedEventArgs e)
     {
-        var dialog = new OpenFolderDialog { Title = "選擇截圖存放目錄" };
-        var result = await dialog.ShowAsync(this);
-        if (result != null) TxtScreenshotPath.Text = result;
+        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = "選擇截圖存放目錄", AllowMultiple = false });
+        if (folders.Count > 0) TxtScreenshotPath.Text = folders[0].Path.LocalPath;
     }
 
     private void BtnOK_Click(object? sender, RoutedEventArgs e)

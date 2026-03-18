@@ -20,7 +20,7 @@ namespace AprNes
         const int DEFAULT_HOLD_FRAMES = 10; // ~166ms
 
         // 解析 --input 參數，格式: "A:1.0,B:2.0,Select:3.0,Start:4.0,Up:5.0,Down:6.0,Left:7.0,Right:8.0"
-        static List<InputEvent> ParseInput(string input)
+        static List<InputEvent> ParseInput(string? input)
         {
             var events = new List<InputEvent>();
             if (string.IsNullOrEmpty(input)) return events;
@@ -51,7 +51,7 @@ namespace AprNes
         }
 
         // Parse --timed-screenshots "path1:t1,path2:t2,...", returns list sorted by frame
-        static List<KeyValuePair<int, string>> ParseTimedScreenshots(string spec)
+        static List<KeyValuePair<int, string>> ParseTimedScreenshots(string? spec)
         {
             var list = new List<KeyValuePair<int, string>>();
             if (string.IsNullOrEmpty(spec)) return list;
@@ -120,24 +120,24 @@ namespace AprNes
                 {
                     string rom     = args[perfIdx + 1];
                     int s; int seconds = (perfIdx + 2 < args.Length && int.TryParse(args[perfIdx + 2], out s)) ? s : 20;
-                    string note    = (perfIdx + 3 < args.Length) ? args[perfIdx + 3] : null;
+                    string? note   = (perfIdx + 3 < args.Length) ? args[perfIdx + 3] : null;
                     RunPerf(rom, seconds, note);
                     return 0;
                 }
             }
 
-            string romPath = null;
+            string? romPath = null;
             double timeSec = 0;
-            string screenshotPath = null;
-            string logPath = null;
+            string? screenshotPath = null;
+            string? logPath = null;
             bool waitResult = false;
             double maxWait = 30;
 
             double softResetSec = -1; // <0 means not set
-            string inputSpec = null;
-            HashSet<string> expectedCrcs = null; // --expected-crc "CRC1,CRC2,..."
+            string? inputSpec = null;
+            HashSet<string>? expectedCrcs = null; // --expected-crc "CRC1,CRC2,..."
             bool passOnStable = false; // --pass-on-stable: screen stable + no "Failed" = PASS
-            string timedScreenshotsSpec = null; // --timed-screenshots "path1:t1,path2:t2,..."
+            string? timedScreenshotsSpec = null; // --timed-screenshots "path1:t1,path2:t2,..."
             bool dumpAcResults = false; // --dump-ac-results: print AC_RESULTS_HEX after run
             bool dumpDebug = false; // --dump-debug: print debug memory ranges ($50-$6F, $500-$5FF)
 
@@ -256,7 +256,7 @@ namespace AprNes
             int stableFrameCount = 0;
 
             // Wire up VideoOutput handler
-            EventHandler handler = null;
+            EventHandler? handler = null;
             handler = (sender, e) =>
             {
                 frameCount++;
@@ -384,7 +384,7 @@ namespace AprNes
                         // CRC-based tests: match displayed CRC against expected values
                         if (!earlyPass && !earlyFail && expectedCrcs != null && expectedCrcs.Count > 0)
                         {
-                            string foundCrc = FindNametableCrc();
+                            string? foundCrc = FindNametableCrc();
                             if (foundCrc != null)
                             {
                                 if (expectedCrcs.Contains(foundCrc))
@@ -430,7 +430,7 @@ namespace AprNes
                     // Override with CRC check if expected CRCs provided
                     if (resultCode != 0 && expectedCrcs != null && expectedCrcs.Count > 0)
                     {
-                        string foundCrc = FindNametableCrc();
+                        string? foundCrc = FindNametableCrc();
                         if (foundCrc != null && expectedCrcs.Contains(foundCrc))
                             resultCode = 0;
                     }
@@ -455,7 +455,7 @@ namespace AprNes
                     // Override with CRC check if expected CRCs provided
                     if (resultCode != 0 && expectedCrcs != null && expectedCrcs.Count > 0)
                     {
-                        string foundCrc = FindNametableCrc();
+                        string? foundCrc = FindNametableCrc();
                         if (foundCrc != null)
                         {
                             Console.Error.WriteLine("[TestRunner] CRC on screen: " + foundCrc
@@ -502,7 +502,7 @@ namespace AprNes
             NesCore.VideoOutput -= handler;
 
             // Read blargg test text from $6004+
-            string resultText = ReadBlarggText();
+            string? resultText = ReadBlarggText();
 
             // Take screenshot
             if (screenshotPath != null)
@@ -561,7 +561,7 @@ namespace AprNes
             else
                 status_str = "FAIL(" + resultCode + ")";
 
-            string outputLine = status_str + " | " + romName + " | " + resultText.Trim();
+            string outputLine = status_str + " | " + romName + " | " + (resultText ?? "").Trim();
             Console.WriteLine(outputLine);
 
             // Write log
@@ -665,7 +665,7 @@ namespace AprNes
         }
 
         // Find an 8-character hex CRC in nametable, return it (uppercase) or null
-        static string FindNametableCrc()
+        static string? FindNametableCrc()
         {
             byte* nt = NesCore.ppu_ram;
             if (nt == null) return null;
@@ -708,7 +708,7 @@ namespace AprNes
             return null;
         }
 
-        static string ReadBlarggText()
+        static string? ReadBlarggText()
         {
             if (HasBlarggSignature())
             {
@@ -737,7 +737,7 @@ namespace AprNes
             if (NametableContains("All tests complete")) return "(screen: All tests complete = passed)";
 
             // CRC-based result
-            string crc = FindNametableCrc();
+            string? crc = FindNametableCrc();
             if (crc != null) return "(screen CRC: " + crc + ")";
 
             byte f0 = NesCore.NES_MEM[0xF0];
@@ -748,7 +748,7 @@ namespace AprNes
 
         static void SaveScreenshot(string path)
         {
-            string dir = Path.GetDirectoryName(path);
+            string? dir = Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
 
@@ -767,7 +767,7 @@ namespace AprNes
         }
 
         // ── Perf benchmark (--perf mode) ───────────────────────────────────
-        static void RunPerf(string romPath, int seconds, string note)
+        static void RunPerf(string romPath, int seconds, string? note)
         {
             if (!File.Exists(romPath))
             {
@@ -783,7 +783,7 @@ namespace AprNes
             {
                 string candidate = Path.Combine(perfDir, "Performance");
                 if (Directory.Exists(candidate)) { perfDir = candidate; break; }
-                perfDir = Path.GetDirectoryName(perfDir);
+                perfDir = Path.GetDirectoryName(perfDir) ?? perfDir;
             }
             Directory.CreateDirectory(perfDir);
 

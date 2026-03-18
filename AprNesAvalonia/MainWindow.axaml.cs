@@ -95,7 +95,7 @@ public partial class MainWindow : Window
     }
 
     // ── Keyboard ───────────────────────────────────────────────────────────
-    private new void OnKeyDown(object? sender, KeyEventArgs e)
+    private void OnKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.KeyModifiers == KeyModifiers.Shift && e.Key == Key.P)
         {
@@ -105,7 +105,7 @@ public partial class MainWindow : Window
         }
         _emu.KeyDown(e.Key);
     }
-    private new void OnKeyUp(object? sender, KeyEventArgs e) { _emu.KeyUp(e.Key); }
+    private void OnKeyUp(object? sender, KeyEventArgs e) { _emu.KeyUp(e.Key); }
 
     // ── Screenshot (Shift+P) ───────────────────────────────────────────────
     private volatile bool _capturing = false;

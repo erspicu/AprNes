@@ -16,7 +16,7 @@ cd /c/ai_project/AprNes
 
 EXE="AprNes/bin/Debug/AprNes.exe"
 ROM="nes-test-roms-master/AccuracyCoin-main/AccuracyCoin.nes"
-REPORT_DIR="report"
+REPORT_DIR="reports/report"
 SS_DIR="$REPORT_DIR/screenshots-ac"
 OUTPUT_HTML="$REPORT_DIR/AccuracyCoin_report.html"
 RESULTS_DIR="temp/ac_results"

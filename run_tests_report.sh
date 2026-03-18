@@ -13,7 +13,7 @@ cd /c/ai_project/AprNes
 
 EXE="AprNes/bin/Debug/AprNes.exe"
 ROMBASE="nes-test-roms-master/checked"
-REPORT_DIR="report"
+REPORT_DIR="reports/report"
 SCREENSHOT_DIR="$REPORT_DIR/screenshots"
 RESULTS_JSON="$REPORT_DIR/results.json"
 

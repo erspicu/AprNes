@@ -11,6 +11,8 @@
     <!-- .NET 10: full JIT tiered compilation + PGO -->
     <TieredCompilation>true</TieredCompilation>
     <TieredPGO>true</TieredPGO>
+    <!-- ConfigWindow uses parameterized constructor only; XAML runtime loader not used -->
+    <NoWarn>$(NoWarn);AVLN3001</NoWarn>
   </PropertyGroup>
 
   <!-- NesCoreNET: .NET 10 fork of NesCore (auto-included by SDK from project dir) -->
