@@ -180,6 +180,7 @@ UpgradeLog*.XML
 UpgradeLog*.htm
 
 # Others
+*.zip
 node_modules/
 ClientBin/
 ~$*
