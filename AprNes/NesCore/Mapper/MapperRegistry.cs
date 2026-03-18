@@ -7,7 +7,8 @@ namespace AprNes
             switch (id)
             {
                 case  0: case  1: case  2: case  3: case  4: case  5:
-                case  7: case  9: case 10: case 11: case 18: case 21: case 22: case 23:
+                case  7: case  9: case 10: case 11: case 16: case 18: case 21: case 22: case 23:
+                case 159:
                 case 32: case 33: case 34: case 64: case 65: case 66: case 68: case 69: case 71: case 78: case 206:
                     return true;
                 default:
@@ -29,6 +30,8 @@ namespace AprNes
                 case  9: return "MMC2";
                 case 10: return "MMC4";
                 case 11: return "Color Dreams";
+                case 16:  return "Bandai FCG";
+                case 159: return "Bandai LZ93D50+24C01";
                 case 18: return "Jaleco SS8806";
                 case 21: return "VRC4";
                 case 22: return "VRC2a";
@@ -75,6 +78,21 @@ namespace AprNes
                 case  9: return new Mapper009();
                 case 10: return new Mapper010();
                 case 11: return new Mapper011();
+                case 16: {
+                    var m = new Mapper016();
+                    m.Submapper = db.Submapper;
+                    if (db.Submapper == 4) System.Console.WriteLine("Sub-variant: Mapper016 FCG-1/2 ($6000)");
+                    else if (db.Submapper == 5) System.Console.WriteLine("Sub-variant: Mapper016 LZ93D50 ($8000)");
+                    else System.Console.WriteLine("Sub-variant: Mapper016 heuristic");
+                    return m;
+                }
+                case 159: {
+                    // LZ93D50 + 24C01 (128-byte EEPROM) — same logic as mapper 16 sub 5
+                    var m = new Mapper016();
+                    m.Submapper = 5;
+                    System.Console.WriteLine("Mapper159: LZ93D50+24C01 (sub5 behaviour)");
+                    return m;
+                }
                 case 18: return new Mapper018();
                 case 21: {
                     var m = new Mapper021();

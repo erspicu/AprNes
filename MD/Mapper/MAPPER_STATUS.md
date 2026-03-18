@@ -11,15 +11,15 @@
 | 項目 | 數量 |
 |------|------|
 | 實作目標（扣除盜版 + 補充 020/085） | 28 個 |
-| 目標內已實作 | 23 個 |
+| 目標內已實作 | 24 個 |
 | 目標外額外實作（NROM、Namco 108） | 2 個 |
-| **總計已實作** | **25 個** |
-| 目標涵蓋完成率 | **23 / 28 = 82.1%** |
-| 整體完成率（含額外） | **25 / 31 = 80.6%** |
+| **總計已實作** | **26 個** |
+| 目標涵蓋完成率 | **24 / 28 = 85.7%** |
+| 整體完成率（含額外） | **26 / 31 = 83.9%** |
 
 ---
 
-## 已實作（23 個）
+## 已實作（24 個）
 
 | Mapper | 名稱 | 備註 |
 |:------:|------|------|
@@ -33,6 +33,7 @@
 | **009** | MMC2 | `Mapper009.cs` — PPU Latch 自動換頁；《泰森拳擊》驗證通過 |
 | **010** | MMC4 | `Mapper010.cs` — MMC2 演進版（16K PRG）；PPU Latch 延遲更新；Fire Emblem, Famicom Wars 驗證通過 |
 | **011** | Color Dreams | `Mapper011.cs` — Crystal Mines, Pesterminator（非授權正規廠商） |
+| **016/159** | Bandai FCG / LZ93D50 | `Mapper016.cs` — 16K PRG + 8×1K CHR，16-bit CPU cycle IRQ（BEFORE decrement）；sub4=FCG-1/2（$6000 regs, direct counter）sub5=LZ93D50（$8000 regs, latch IRQ）；Mapper159 alias sub5；EEPROM stub（ACK 模擬）；Dragon Ball（FCG-1/2）、Famicom Jump、Magical Taruruuto-kun 驗證通過。⚠️ Dragon Ball Z - Kyoushuu Saiya Jin (J) 遊戲畫面 CHR bank 交換時序異常（garbled terrain），IRQ timing 問題尚待克服 |
 | **018** | Jaleco SS8806 | `Mapper018.cs` — 3×8K PRG + 8×1K CHR（nibble 寫入），可變寬度 IRQ（4/8/12/16-bit）；Ninja Jajamaru, Pizza Pop!, Magic John, Saiyuuki World 2 驗證通過 |
 | **021** | VRC4 | `Mapper021.cs` — VRC4a/VRC4c（subMapper 自動偵測）；4×8K PRG switchable (mode 0/1)，8×1K CHR，prescaler IRQ；Wai Wai World 2 (J), Ganbare Goemon Gaiden 2 (J) 驗證通過 |
 | **022** | VRC2a | `Mapper022.cs` — TwinBee 3 (J)；8K PRG×2 + 8×1K CHR；CHR index >> 1（低位忽略） |
@@ -56,7 +57,7 @@
 | Mapper | 名稱 | 代表作品 | 技術重點 |
 |:------:|------|---------|---------|
 | **020** | FDS（磁碟機系統） | 銀河戰士(日)、薩爾達(日)、惡魔城(日) | BIOS + 磁碟流模擬，複雜度最高 |
-| **016/153/159** | Bandai（含 EEPROM 變體） | DragonBall Z 系列、龍珠Z、聖鬥士星矢 | EEPROM 存檔 (24C01)；153/159 為 EEPROM 變體 |
+| **153** | Bandai LZ93D50+WRAM | Akumajo Densetsu 3（FCG+WRAM 變體） | 8K WRAM 取代 EEPROM；CHR-RAM；目前少見 |
 | **019** | Namcot 106 | Splatterhouse, Family Stadium '90'、女神轉生II | 最多 8 通道波形音效，內建 RAM |
 | **024** | Konami VRC6 | Akumajo Dracula 3（惡魔城傳說日） | 額外 3 通道音效（方波×2、鋸齒波） |
 | **085** | Konami VRC7 | 《拉格朗日點》 | FM 合成音效 (OPLL/YM2413)，複雜度最高 |
@@ -80,7 +81,7 @@
 | ~~★★★~~ | ~~**064** Tengen RAMBO-1~~ | ✅ 已完成 |
 | ★★ | **024** VRC6 | 需擴充音效 mixer（惡魔城傳說日） |
 | ★★ | **019** Namcot 106 | 需擴充音效 mixer，最多 8 通道 |
-| ★★ | **016** Bandai | DragonBall Z、聖鬥士等人氣作品 |
+| ~~★★~~ | ~~**016** Bandai~~ | ✅ 已完成（⚠️ DBZ1 IRQ timing 待克服） |
 | ~~★★~~ | ~~**018** Jaleco SS8806~~ | ✅ 已完成 |
 | ~~★~~ | ~~**033** Taito TC0190~~ | ✅ 已完成 |
 | ~~★~~ | ~~**065** Irem H-3001~~ | ✅ 已完成 |
@@ -89,4 +90,4 @@
 
 ---
 
-*最後更新：2026-03-19（Mapper018 Jaleco SS8806 加入）*
+*最後更新：2026-03-19（Mapper016 Bandai FCG / LZ93D50 + Mapper159 加入）*
