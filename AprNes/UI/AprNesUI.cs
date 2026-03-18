@@ -124,7 +124,6 @@ namespace AprNes
 
             RomInf.Location = new Point(5, 277 + 240 * (ScreenSize - 1));
             panel1.Visible = true;
-            AotUIAdjust();
         }
 
         public enum KeyMap
@@ -820,18 +819,14 @@ namespace AprNes
             configure = true;
             AprNes_ConfigureUI.GetInstance().StartPosition = FormStartPosition.CenterParent;
             AprNes_ConfigureUI.GetInstance().init();
-            AotPreShowDialog();
             AprNes_ConfigureUI.GetInstance().ShowDialog(this);
-            AotPostShowDialog();
             configure = false;
         }
         private void linkLabel1_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
         {
             AprNes_Infocs AprNesInf = new AprNes_Infocs();
             AprNesInf.StartPosition = FormStartPosition.CenterParent;
-            AotPreShowDialog();
             AprNesInf.ShowDialog(this);
-            AotPostShowDialog();
         }
 
         private void label4_Click(object sender, EventArgs e)
@@ -945,12 +940,6 @@ namespace AprNes
             initUIsize();
             UpdateSoundMenuText();
 
-            // Add JIT benchmark menu item
-            contextMenuStrip1.Items.Add(new ToolStripSeparator());
-            var benchItem = new ToolStripMenuItem("Benchmark (JIT)");
-            benchItem.Click += BenchmarkJit_Click;
-            contextMenuStrip1.Items.Add(benchItem);
-
             _joystick.Init(this.Handle);
             new Thread(polling_listener).Start();
             new Thread(() =>
@@ -970,9 +959,7 @@ namespace AprNes
         {
             AprNes_RomInfoUI RomInfo = new AprNes_RomInfoUI();
             RomInfo.StartPosition = FormStartPosition.CenterParent;
-            AotPreShowDialog();
             RomInfo.ShowDialog(this);
-            AotPostShowDialog();
         }
 
         private void fun1ToolStripMenuItem_Click(object sender, EventArgs e)
@@ -1048,49 +1035,5 @@ namespace AprNes
             initUIsize();
         }
 
-        void BenchmarkJit_Click(object sender, EventArgs e)
-        {
-            if (current_rom_bytes == null)
-            {
-                MessageBox.Show("請先載入 ROM", "Benchmark");
-                return;
-            }
-            if (MessageBox.Show(
-                "Benchmark 將以最大速度執行 5 秒，\n期間模擬器將停止，完成後需重新載入 ROM。\n\n繼續嗎？",
-                "Benchmark (JIT)", MessageBoxButtons.YesNo) != DialogResult.Yes)
-                return;
-
-            const int seconds = 5;
-            fps_count_timer.Enabled = false;
-            NesCore.exit = true;
-            NesCore._event.Set();
-            nes_t?.Join(1000);
-            WaveOutPlayer.CloseAudio();
-            running = false;
-
-            NesCore.exit = false;
-            NesCore.init(current_rom_bytes);
-            NesCore.LimitFPS = false;
-            int frames = 0;
-            EventHandler counter = (s2, e2) => Interlocked.Increment(ref frames);
-            NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
-            NesCore.VideoOutput += counter;
-            var t = new Thread(NesCore.run) { IsBackground = true };
-            t.Start();
-            Thread.Sleep(seconds * 1000);
-            NesCore.exit = true;
-            NesCore._event.Set();
-            t.Join(2000);
-            NesCore.VideoOutput -= counter;
-
-            MessageBox.Show(
-                $"Benchmark 結果（{seconds} 秒）\n\nJIT : {frames} 幀  ({frames / (float)seconds:F1} FPS)",
-                "Benchmark 結果");
-        }
-
-        // ── AOT-only hooks (實作於 AprNesUI.AotBenchmark.cs，.NET Fx 版為空) ──
-        partial void AotUIAdjust();
-        partial void AotPreShowDialog();
-        partial void AotPostShowDialog();
     }
 }

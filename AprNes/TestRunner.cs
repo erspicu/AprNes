@@ -115,31 +115,6 @@ namespace AprNes
                 }
             }
 
-            // ── benchmark mode: AprNes.exe --benchmark <rom> [seconds] [output] ──
-            if (args.Length >= 2 && args[0] == "--benchmark")
-            {
-                string rom     = args[1];
-                int s; int seconds = args.Length >= 3 && int.TryParse(args[2], out s) ? s : 10;
-                string outFile = args.Length >= 4 ? args[3] : null;
-                Console.Write(BenchmarkRunner.BuildHeader(rom, seconds));
-                BenchmarkRunner.Run(rom, seconds, outFile, ".NET Framework 4.6.1 JIT");
-                return 0;
-            }
-
-            // ── perf mode: AprNes.exe [--accuracy FLAGS] --perf <rom> [seconds] [note] ──
-            // Runs a headless benchmark, saves versioned MD report to Performance/
-            {
-                int perfIdx = Array.IndexOf(args, "--perf");
-                if (perfIdx >= 0 && perfIdx + 1 < args.Length)
-                {
-                    string rom     = args[perfIdx + 1];
-                    int s; int seconds = (perfIdx + 2 < args.Length && int.TryParse(args[perfIdx + 2], out s)) ? s : 20;
-                    string note    = (perfIdx + 3 < args.Length) ? args[perfIdx + 3] : null;
-                    BenchmarkRunner.RunPerf(rom, seconds, note);
-                    return 0;
-                }
-            }
-
             string romPath = null;
             double timeSec = 0;
             string screenshotPath = null;
