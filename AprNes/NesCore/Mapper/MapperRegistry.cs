@@ -7,8 +7,8 @@ namespace AprNes
             switch (id)
             {
                 case  0: case  1: case  2: case  3: case  4: case  5:
-                case  7: case  9: case 10: case 11: case 16: case 18: case 21: case 22: case 23:
-                case 159:
+                case  7: case  9: case 10: case 11: case 16: case 18: case 19: case 21: case 22: case 23: case 24: case 26:
+                case 159: case 153: case 85:
                 case 32: case 33: case 34: case 64: case 65: case 66: case 68: case 69: case 71: case 78: case 206:
                     return true;
                 default:
@@ -31,6 +31,11 @@ namespace AprNes
                 case 10: return "MMC4";
                 case 11: return "Color Dreams";
                 case 16:  return "Bandai FCG";
+                case 19:  return "Namco 163";
+                case 24:  return "VRC6a";
+                case 26:  return "VRC6b";
+                case 85:  return "VRC7";
+                case 153: return "Bandai LZ93D50+WRAM";
                 case 159: return "Bandai LZ93D50+24C01";
                 case 18: return "Jaleco SS8806";
                 case 21: return "VRC4";
@@ -85,6 +90,30 @@ namespace AprNes
                     else if (db.Submapper == 5) System.Console.WriteLine("Sub-variant: Mapper016 LZ93D50 ($8000)");
                     else System.Console.WriteLine("Sub-variant: Mapper016 heuristic");
                     return m;
+                }
+                case 19: {
+                    System.Console.WriteLine("Mapper019: Namco 163");
+                    return new Mapper019();
+                }
+                case 24: {
+                    var m = new Mapper024();
+                    m.IsVRC6b = false;
+                    System.Console.WriteLine("Mapper024: VRC6a");
+                    return m;
+                }
+                case 26: {
+                    var m = new Mapper024();
+                    m.IsVRC6b = true;
+                    System.Console.WriteLine("Mapper026: VRC6b");
+                    return m;
+                }
+                case 85: {
+                    System.Console.WriteLine("Mapper085: VRC7 (audio silent — OPLL not emulated)");
+                    return new Mapper085();
+                }
+                case 153: {
+                    System.Console.WriteLine("Mapper153: Bandai LZ93D50+WRAM");
+                    return new Mapper153();
                 }
                 case 159: {
                     // LZ93D50 + 24C01 (128-byte EEPROM) — same logic as mapper 16 sub 5

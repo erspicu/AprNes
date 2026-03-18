@@ -60,6 +60,9 @@ namespace AprNes
         // DC 消除狀態 (high-pass filter)
         static int _dckiller = 0;
 
+        // Expansion audio (VRC6, Namco163, VRC7 etc.) — set by mapper each CPU cycle
+        static public int mapperExpansionAudio = 0;
+
         // =====================================================================
         // 原有 APU 欄位 (保留相容)
         // =====================================================================
@@ -441,6 +444,7 @@ namespace AprNes
             if (tndIdx >= 203) tndIdx = 202;
 
             int mixed = SQUARELOOKUP[sqIdx] + TNDLOOKUP[tndIdx]; // 0..~98302
+            mixed += mapperExpansionAudio; // expansion audio (VRC6, Namco163, VRC7...)
 
             // High-pass filter 消除 DC 偏移
             mixed += _dckiller;

@@ -11,15 +11,15 @@
 | 項目 | 數量 |
 |------|------|
 | 實作目標（扣除盜版 + 補充 020/085） | 28 個 |
-| 目標內已實作 | 24 個 |
+| 目標內已實作 | 28 個 |
 | 目標外額外實作（NROM、Namco 108） | 2 個 |
-| **總計已實作** | **26 個** |
-| 目標涵蓋完成率 | **24 / 28 = 85.7%** |
-| 整體完成率（含額外） | **26 / 31 = 83.9%** |
+| **總計已實作** | **30 個** |
+| 目標涵蓋完成率 | **28 / 28 = 100%** |
+| 整體完成率（含額外） | **30 / 31 = 96.8%** |
 
 ---
 
-## 已實作（24 個）
+## 已實作（28 個）
 
 | Mapper | 名稱 | 備註 |
 |:------:|------|------|
@@ -48,19 +48,19 @@
 | **069** | FME-7 | `Mapper069.cs` — CPU 週期 IRQ，PRG-RAM 分頁，4 種鏡像；Batman (J), Gimmick! (J) 驗證通過。⚠️ Sunsoft 5B 擴充音效（YM2149）未實作。⚠️ PAL 版（Mr. Gimmick (E)）畫面異常，PAL timing 尚未支援 |
 | **071** | Camerica | `Mapper071.cs` — Firehawk, Linus Spacehead（非授權正規廠商） |
 | **078** | Irem 74HC161/32 | `Mapper078.cs` — ⚠️ Holy Diver (J) 可動；Uchuusen Cosmo Carrier (J) 有問題（intro 黑畫面），尚待完全克服 |
+| **019** | Namco 163 | `Mapper019.cs` — 3×8K PRG + 固定末；8×1K CHR（≥0xE0 映射 CIRAM）；4 NT regs（CHR-as-NT 覆蓋）；15-bit 上計數 IRQ；8 通道波形擴充音效（128-byte 內建 RAM，round-robin 更新，每 15 cycles）；Splatterhouse (J), Rolling Thunder 2 (J) |
+| **024/026** | VRC6a / VRC6b | `Mapper024.cs` — Konami VRC6；16K+8K PRG；8×1K CHR；多種 CHR/NT layout（bankingMode）；per-nametable CHR-ROM 映射（ntBankPtrs）；VRC prescaler IRQ；3 通道擴充音效（Pulse1+2 + Sawtooth）；`IsVRC6b` flag 控制地址 bit-swap；Akumajo Dracula 3 (J) |
+| **085** | VRC7 | `Mapper085.cs` — Konami VRC7；3×8K PRG + 固定末；8×1K CHR；VRC prescaler IRQ；WRAM enable（controlFlags bit7）；OPLL FM 音效 silent stub（$9010/$9030 接受但不合成）；Lagrange Point (J) |
+| **153** | Bandai LZ93D50+WRAM | `Mapper153.cs` — 5-bit PRG bank（chrReg OR bit0 << 4 延伸）；CHR-RAM only；8K WRAM（reg $0D bit5 enable）；latch IRQ；Dragon Ball 3 (J) |
 | **206** | Namco 108 | `Mapper206.cs` — MMC3 雛形，無 IRQ；《Karnov》驗證通過（文件外額外支援） |
 
 ---
 
-## 未實作（目標 28 個中剩餘 5 個）
+## 未實作（目標 28 個中剩餘 1 個）
 
 | Mapper | 名稱 | 代表作品 | 技術重點 |
 |:------:|------|---------|---------|
 | **020** | FDS（磁碟機系統） | 銀河戰士(日)、薩爾達(日)、惡魔城(日) | BIOS + 磁碟流模擬，複雜度最高 |
-| **153** | Bandai LZ93D50+WRAM | Akumajo Densetsu 3（FCG+WRAM 變體） | 8K WRAM 取代 EEPROM；CHR-RAM；目前少見 |
-| **019** | Namcot 106 | Splatterhouse, Family Stadium '90'、女神轉生II | 最多 8 通道波形音效，內建 RAM |
-| **024** | Konami VRC6 | Akumajo Dracula 3（惡魔城傳說日） | 額外 3 通道音效（方波×2、鋸齒波） |
-| **085** | Konami VRC7 | 《拉格朗日點》 | FM 合成音效 (OPLL/YM2413)，複雜度最高 |
 
 ---
 
@@ -79,15 +79,16 @@
 | ~~★~~ | ~~**068** Sunsoft Mapper #4~~ | ✅ 已完成 |
 | ~~★★★~~ | ~~**021** VRC4~~ | ✅ 已完成 |
 | ~~★★★~~ | ~~**064** Tengen RAMBO-1~~ | ✅ 已完成 |
-| ★★ | **024** VRC6 | 需擴充音效 mixer（惡魔城傳說日） |
-| ★★ | **019** Namcot 106 | 需擴充音效 mixer，最多 8 通道 |
+| ~~★★~~ | ~~**024** VRC6~~ | ✅ 已完成（Akumajo Dracula 3 日版） |
+| ~~★★~~ | ~~**019** Namcot 106~~ | ✅ 已完成（8 通道波形音效） |
 | ~~★★~~ | ~~**016** Bandai~~ | ✅ 已完成（⚠️ DBZ1 IRQ timing 待克服） |
 | ~~★★~~ | ~~**018** Jaleco SS8806~~ | ✅ 已完成 |
 | ~~★~~ | ~~**033** Taito TC0190~~ | ✅ 已完成 |
 | ~~★~~ | ~~**065** Irem H-3001~~ | ✅ 已完成 |
+| ~~★★~~ | ~~**153** Bandai LZ93D50+WRAM~~ | ✅ 已完成 |
+| ~~★★~~ | ~~**085** VRC7~~ | ✅ 已完成（OPLL silent stub） |
 | ✗ | **020** FDS | 磁碟機模擬，最高複雜度，需 BIOS |
-| ✗ | **085** VRC7 | 需 OPLL FM 合成，最高複雜度 |
 
 ---
 
-*最後更新：2026-03-19（Mapper016 Bandai FCG / LZ93D50 + Mapper159 加入）*
+*最後更新：2026-03-19（Mapper019 Namco163、Mapper024/026 VRC6、Mapper085 VRC7、Mapper153 Bandai+WRAM 加入；目標達成 28/28 = 100%）*
