@@ -146,28 +146,29 @@ namespace AprNes
             byte* base1 = CHR_ROM + ((ntReg1 % total1k) << 10);
 
             // Assign per-nametable pointers based on mirrorMode
-            switch (mirrorMode)
+            if (mirrorMode == 0)      // Vertical: $2000/$2800=NT0, $2400/$2C00=NT1
             {
-                case 0: // Vertical: $2000/$2800=NT0, $2400/$2C00=NT1
-                    NesCore.ntBankPtrs[0] = base0;
-                    NesCore.ntBankPtrs[1] = base1;
-                    NesCore.ntBankPtrs[2] = base0;
-                    NesCore.ntBankPtrs[3] = base1;
-                    break;
-                case 1: // Horizontal: $2000/$2400=NT0, $2800/$2C00=NT1
-                    NesCore.ntBankPtrs[0] = base0;
-                    NesCore.ntBankPtrs[1] = base0;
-                    NesCore.ntBankPtrs[2] = base1;
-                    NesCore.ntBankPtrs[3] = base1;
-                    break;
-                case 2: // Single-A
-                    NesCore.ntBankPtrs[0] = NesCore.ntBankPtrs[1] =
-                    NesCore.ntBankPtrs[2] = NesCore.ntBankPtrs[3] = base0;
-                    break;
-                case 3: // Single-B
-                    NesCore.ntBankPtrs[0] = NesCore.ntBankPtrs[1] =
-                    NesCore.ntBankPtrs[2] = NesCore.ntBankPtrs[3] = base1;
-                    break;
+                NesCore.ntBankPtrs[0] = base0;
+                NesCore.ntBankPtrs[1] = base1;
+                NesCore.ntBankPtrs[2] = base0;
+                NesCore.ntBankPtrs[3] = base1;
+            }
+            else if (mirrorMode == 1) // Horizontal: $2000/$2400=NT0, $2800/$2C00=NT1
+            {
+                NesCore.ntBankPtrs[0] = base0;
+                NesCore.ntBankPtrs[1] = base0;
+                NesCore.ntBankPtrs[2] = base1;
+                NesCore.ntBankPtrs[3] = base1;
+            }
+            else if (mirrorMode == 2) // Single-A
+            {
+                NesCore.ntBankPtrs[0] = NesCore.ntBankPtrs[1] =
+                NesCore.ntBankPtrs[2] = NesCore.ntBankPtrs[3] = base0;
+            }
+            else                      // Single-B
+            {
+                NesCore.ntBankPtrs[0] = NesCore.ntBankPtrs[1] =
+                NesCore.ntBankPtrs[2] = NesCore.ntBankPtrs[3] = base1;
             }
             NesCore.ntChrOverrideEnabled = true;
         }
