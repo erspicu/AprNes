@@ -83,6 +83,16 @@ namespace AprNes
                 if (PRG_ROM_count == 1) for (int i = 0; i < PRG_ROM_count * 16384; i++) PRG_ROM[i + 16384] = rom_bytes[16 + i]; // if only 1 RPG_ROM ,copy to another space
 
                 CHR_ROM_count = rom_bytes[5];
+                // Validate: clamp CHR_ROM_count to actual file data to handle corrupt headers
+                {
+                    int chrOffset = PRG_ROM_count * 16384 + 16;
+                    int maxChrBanks = (rom_bytes.Length - chrOffset) / 8192;
+                    if (CHR_ROM_count > maxChrBanks)
+                    {
+                        Console.WriteLine($"Warning: header claims {CHR_ROM_count} CHR banks but file only has {maxChrBanks}. Clamping.");
+                        CHR_ROM_count = (byte)maxChrBanks;
+                    }
+                }
                 Console.WriteLine("CHR-ROM count : " + CHR_ROM_count);
 
                 if (CHR_ROM_count != 0)
@@ -168,19 +178,18 @@ namespace AprNes
                 P1_joypad_status = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 NES_MEM          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 65536);
 
-                uint romCrc = 0;
-                if (mapper == 4)
+                // Compute PRG+CHR CRC32 (skip 16-byte iNES header, matching Mesen2 DB format)
+                uint romCrc = 0xFFFFFFFF;
+                int trainerOffset = ((ROM_Control_1 & 4) != 0) ? 512 : 0;
+                int prgChrStart = 16 + trainerOffset;
+                for (int i = prgChrStart; i < rom_bytes.Length; i++)
                 {
-                    romCrc = 0xFFFFFFFF;
-                    for (int i = 0; i < rom_bytes.Length; i++)
-                    {
-                        romCrc ^= rom_bytes[i];
-                        for (int j = 0; j < 8; j++)
-                            romCrc = (romCrc >> 1) ^ (((romCrc & 1) != 0) ? 0xEDB88320u : 0);
-                    }
-                    romCrc ^= 0xFFFFFFFF;
-                    Console.WriteLine("ROM CRC32: " + romCrc.ToString("X8"));
+                    romCrc ^= rom_bytes[i];
+                    for (int j = 0; j < 8; j++)
+                        romCrc = (romCrc >> 1) ^ (((romCrc & 1) != 0) ? 0xEDB88320u : 0);
                 }
+                romCrc ^= 0xFFFFFFFF;
+                Console.WriteLine("ROM CRC32: " + romCrc.ToString("X8"));
                 MapperObj = MapperRegistry.Create(mapper, romCrc);
                 MapperObj.MapperInit(PRG_ROM, CHR_ROM, ppu_ram, PRG_ROM_count, CHR_ROM_count, Vertical);
                 MapperObj.Reset();

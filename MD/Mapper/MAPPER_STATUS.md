@@ -11,11 +11,11 @@
 | 項目 | 數量 |
 |------|------|
 | 實作目標（扣除盜版 + 補充 020/085） | 28 個 |
-| 目標內已實作 | 12 個 |
+| 目標內已實作 | 14 個 |
 | 目標外額外實作（NROM、Namco 108） | 2 個 |
-| **總計已實作** | **14 個** |
-| 目標涵蓋完成率 | **12 / 28 = 42.9%** |
-| 整體完成率（含額外） | **14 / 30 = 46.7%** |
+| **總計已實作** | **16 個** |
+| 目標涵蓋完成率 | **14 / 28 = 50.0%** |
+| 整體完成率（含額外） | **16 / 30 = 53.3%** |
 
 ---
 
@@ -36,6 +36,8 @@
 | **066** | GxROM | `Mapper066.cs` — DragonBall, Gumshoe |
 | **069** | FME-7 | `Mapper069.cs` — CPU 週期 IRQ，PRG-RAM 分頁，4 種鏡像；Batman (J), Gimmick! (J) 驗證通過。⚠️ Sunsoft 5B 擴充音效（YM2149）未實作。⚠️ PAL 版（Mr. Gimmick (E)）畫面異常，PAL timing 尚未支援 |
 | **071** | Camerica | `Mapper071.cs` — Firehawk, Linus Spacehead（非授權正規廠商） |
+| **034** | Nina-1 | `Mapper034.cs` — 兩種子變體：CHR-RAM（Deadly Towers/Mashou）用 $8000 PRG 選擇；CHR-ROM（Impossible Mission II）用 $7FFD-$7FFF 寫入暫存器 |
+| **078** | Irem 74HC161/32 | `Mapper078.cs` — 兩種子變體：submapper 1（Uchuusen Cosmo Carrier）單畫面鏡像；submapper 3（Holy Diver (J)）V/H 鏡像；CRC 識別 |
 | **206** | Namco 108 | `Mapper206.cs` — MMC3 雛形，無 IRQ；《Karnov》驗證通過（文件外額外支援） |
 
 ---
@@ -54,11 +56,11 @@
 | **024** | Konami VRC6 | Akumajo Dracula 3（惡魔城傳說日） | 額外 3 通道音效（方波×2、鋸齒波） |
 | **032** | Irem G-101 | ImageFight 2、大工之源 | PRG 切換 + 鏡像控制 |
 | **033** | Taito TC0190 | Pon Poko Pon、影之傳說、泡泡龍2 | 類 MMC3 |
-| **034** | Nina-1 | Deadly Towers, Impossible Mission II | 簡單大容量 PRG 切換 |
+| ~~**034**~~ | ~~Nina-1~~ | ~~Deadly Towers, Impossible Mission II~~ | ✅ 已完成 |
 | **064** | Tengen RAMBO-1 | Shinobi, Klax, Skull & Crossbones | 類 MMC3，不同 IRQ 機制 |
 | **065** | Irem H-3001 | Daiku no Gensan 2、開路先鋒 | 16-bit IRQ |
 | **068** | Sunsoft Mapper #4 | AfterBurner II | PRG + CHR 分頁，鏡像控制 |
-| **078** | Irem 74HC161/32 | 數款日本 Irem 遊戲 | 硬體閂鎖切換 |
+| ~~**078**~~ | ~~Irem 74HC161/32~~ | ~~數款日本 Irem 遊戲~~ | ✅ 已完成 |
 | **085** | Konami VRC7 | 《拉格朗日點》 | FM 合成音效 (OPLL/YM2413)，複雜度最高 |
 
 ---
@@ -82,13 +84,13 @@
 | ★ | **033** Taito TC0190 | 影之傳說、泡泡龍2 |
 | ★ | **068** Sunsoft Mapper #4 | AfterBurner II |
 | ★ | **032** Irem G-101 | 大工之源 |
-| ★ | **034** Nina-1 | Deadly Towers |
+| ~~★~~ | ~~**034** Nina-1~~ | ✅ 已完成 |
 | ★ | **064** Tengen RAMBO-1 | Shinobi |
 | ★ | **065** Irem H-3001 | 開路先鋒 |
-| ★ | **078** Irem 74HC161/32 | Irem 日本遊戲 |
+| ~~★~~ | ~~**078** Irem 74HC161/32~~ | ✅ 已完成 |
 | ✗ | **020** FDS | 磁碟機模擬，最高複雜度，需 BIOS |
 | ✗ | **085** VRC7 | 需 OPLL FM 合成，最高複雜度 |
 
 ---
 
-*最後更新：2026-03-18*
+*最後更新：2026-03-19*

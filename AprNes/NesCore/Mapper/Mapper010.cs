@@ -61,7 +61,7 @@ namespace AprNes
         public byte MapperR_RPG(ushort address)
         {
             // $8000-$BFFF: selected 16K bank; $C000-$FFFF: last 16K fixed
-            if (address < 0xC000) return PRG_ROM[(address - 0x8000) + (prgBank << 14)];
+            if (address < 0xC000) return PRG_ROM[(address - 0x8000) + ((prgBank % PRG_ROM_count) << 14)];
             return PRG_ROM[(address - 0xC000) + ((PRG_ROM_count - 1) << 14)];
         }
 

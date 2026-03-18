@@ -163,15 +163,21 @@ python run_tests.py -j 10
 | Mapper | Representative Games |
 |--------|---------------------|
 | 0 (NROM) | Super Mario Bros., Donkey Kong |
-| 1 (MMC1) | The Legend of Zelda, Castlevania II |
-| 2 (UxROM) | Mega Man, Castlevania |
-| 3 (CNROM) | Ninja Gaiden |
-| 4 (MMC3) | Super Mario Bros. 3, TMNT |
-| 5 (MMC5) | Earthworm Jim |
-| 7 (AxROM) | Battle City |
-| 11 | Golf Club |
-| 66 (GxROM) | Super Mario Bros. / Duck Hunt |
-| 71 | Bio-hazard Battle |
+| 1 (MMC1) | The Legend of Zelda, Metroid, Mega Man 2 |
+| 2 (UxROM) | Mega Man, Castlevania, Ghosts 'n Goblins |
+| 3 (CNROM) | Ninja Gaiden, Solomon's Key |
+| 4 (MMC3) | Super Mario Bros. 2/3, Mega Man 3–6 |
+| 5 (MMC5) | Castlevania III (US) |
+| 7 (AxROM) | Battletoads, Wizards & Warriors |
+| 9 (MMC2) | Punch-Out!! |
+| 10 (MMC4) | Fire Emblem, Famicom Wars |
+| 11 (Color Dreams) | Crystal Mines |
+| 34 (Nina-1) | Deadly Towers, Impossible Mission II |
+| 66 (GxROM) | Dragon Ball, Gumshoe |
+| 69 (FME-7) | Batman (J), Gimmick! (J) |
+| 71 (Camerica) | Firehawk, Linus Spacehead |
+| 78 (Irem 74HC161/32) | Holy Diver (J) |
+| 206 (Namco 108) | Karnov |
 
 ---
 
@@ -338,12 +344,18 @@ python run_tests.py -j 10
 | Mapper | 代表遊戲 |
 |--------|---------|
 | 0 (NROM) | 超級瑪利歐兄弟、大金剛 |
-| 1 (MMC1) | 薩爾達傳說、惡魔城 II |
-| 2 (UxROM) | 洛克人、惡魔城 |
-| 3 (CNROM) | 忍者龍劍傳 |
-| 4 (MMC3) | 超級瑪利歐兄弟 3、忍者神龜 |
-| 5 (MMC5) | 百戰天蟲 |
-| 7 (AxROM) | 戰鬥城市 |
-| 11 | 高爾夫俱樂部 |
-| 66 (GxROM) | 超級馬利歐兄弟 / 打鴨子 |
-| 71 | 生化戰士 |
+| 1 (MMC1) | 薩爾達傳說、銀河戰士、洛克人 2 |
+| 2 (UxROM) | 洛克人、惡魔城、鬼屋魔域 |
+| 3 (CNROM) | 忍者龍劍傳、所羅門的鑰匙 |
+| 4 (MMC3) | 超級瑪利歐兄弟 2/3、洛克人 3–6 |
+| 5 (MMC5) | 惡魔城 III（美版） |
+| 7 (AxROM) | 熱血格鬥、騎士精英 |
+| 9 (MMC2) | 泰森拳擊 |
+| 10 (MMC4) | 火焰紋章、FC 大戰 |
+| 11 (Color Dreams) | Crystal Mines |
+| 34 (Nina-1) | 魔神英雄傳、不可能的任務 II |
+| 66 (GxROM) | 七龍珠、彈弓 |
+| 69 (FME-7) | 蝙蝠俠（日）、奇妙小子（日） |
+| 71 (Camerica) | Firehawk、Linus Spacehead |
+| 78 (Irem 74HC161/32) | 聖鬥士（Holy Diver 日版） |
+| 206 (Namco 108) | Karnov |
