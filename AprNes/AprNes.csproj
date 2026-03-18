@@ -89,6 +89,7 @@
     <Compile Include="NesCore\Mapper\Mapper069.cs" />
     <Compile Include="NesCore\Mapper\Mapper206.cs" />
     <Compile Include="NesCore\Mapper\MapperRegistry.cs" />
+    <Compile Include="NesCore\RomDatabase.cs" />
     <Compile Include="tool\DirectInputHelper.cs" />
     <Compile Include="tool\joystick.cs" />
     <Compile Include="tool\LangINI.cs" />

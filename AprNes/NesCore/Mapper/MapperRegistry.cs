@@ -39,18 +39,16 @@ namespace AprNes
             }
         }
 
-        // romCrc: CRC32 of the full ROM bytes; used for MMC3 sub-variant detection.
-        // Pass 0 for non-mapper-4 ROMs (ignored).
-        public static IMapper Create(int id, uint romCrc = 0)
+        public static IMapper Create(int id, RomDbEntry db)
         {
             if (id == 4)
             {
-                if (romCrc == 0xF312D1DE || romCrc == 0x633AFE6F)
+                if (db.Submapper == 1)
                 {
                     System.Console.WriteLine("Sub-variant: MMC3 Rev A");
                     return new Mapper004RevA();
                 }
-                if (romCrc == 0xA512BDF6)
+                if (db.Submapper == 2)
                 {
                     System.Console.WriteLine("Sub-variant: MMC6");
                     return new Mapper004MMC6();
@@ -73,9 +71,13 @@ namespace AprNes
                 case 69: return new Mapper069();
                 case 71: return new Mapper071();
                 case 78: {
-                    var m78 = new Mapper078();
-                    if (romCrc == 0xBA51AC6F) { System.Console.WriteLine("Sub-variant: Mapper078 Holy Diver"); m78.isHolyDiver = true; }
-                    return m78;
+                    var m = new Mapper078();
+                    if (db.Submapper == 3)
+                    {
+                        System.Console.WriteLine("Sub-variant: Mapper078 Holy Diver");
+                        m.isHolyDiver = true;
+                    }
+                    return m;
                 }
                 case 206: return new Mapper206();
                 default: throw new System.NotSupportedException("Mapper " + id + " not supported");

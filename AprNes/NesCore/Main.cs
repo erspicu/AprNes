@@ -190,9 +190,14 @@ namespace AprNes
                 }
                 romCrc ^= 0xFFFFFFFF;
                 Console.WriteLine("ROM CRC32: " + romCrc.ToString("X8"));
-                MapperObj = MapperRegistry.Create(mapper, romCrc);
+                RomDbEntry dbEntry = RomDatabase.Lookup(romCrc);
+                if (!dbEntry.IsNone)
+                    Console.WriteLine("ROM DB: " + dbEntry.Name);
+                MapperObj = MapperRegistry.Create(mapper, dbEntry);
                 MapperObj.MapperInit(PRG_ROM, CHR_ROM, ppu_ram, PRG_ROM_count, CHR_ROM_count, Vertical);
                 MapperObj.Reset();
+                if (!dbEntry.IsNone && dbEntry.MirrorOverride >= 0)
+                    *Vertical = dbEntry.MirrorOverride;
                 MapperObj.UpdateCHRBanks();
 
                 for (int i = 0; i < 61440; i++) ScreenBuf1x[i] = 0;
