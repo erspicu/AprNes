@@ -1,12 +1,16 @@
 namespace AprNes
 {
     // Sunsoft Mapper #4 — AfterBurner II (J), Maharaja (J)
-    // PRG: switchable 16K at $8000 ($F000 reg, bits 2-0), fixed last 16K at $C000
+    // PRG: switchable 16K at $8000 ($F000 bits 2-0), fixed last 16K at $C000
+    //      $F000 bit 3 = 0 → external ROM mode (only active when PRG_ROM_count > 8)
+    //      $F000 bit 4 = 1 → enable PRG RAM at $6000-$7FFF
     // CHR: 4×2K banks at PPU $0000-$1FFF ($8000/$9000/$A000/$B000 regs)
     // NT:  $C000/$D000 select 1K CHR pages (bit 7 forced) for nametables 0/1
     //      $E000 bit 4 = 1 → enable CHR-as-nametable (ntChrOverrideEnabled)
     // Mirror: $E000 bits 0-1 (0=Vertical, 1=Horizontal, 2=single-A, 3=single-B)
-    // No IRQ.
+    // Licensing timer: any write to $6000-$7FFF sets timer = 1024*105 CPU cycles;
+    //   timer counts down each CPU cycle; when it hits 0 in external ROM mode,
+    //   $8000-$BFFF returns open bus (copy protection lockout).
     unsafe public class Mapper068 : IMapper
     {
         byte* PRG_ROM, CHR_ROM, ppu_ram;
@@ -18,6 +22,10 @@ namespace AprNes
         bool useChrForNT;              // $E000 bit 4
         int mirrorMode;                // $E000 bits 0-1
         int prgBank;                   // $F000 bits 2-0
+        bool prgRamEnabled;            // $F000 bit 4: enables $6000-$7FFF access
+        bool usingExternalRom;         // $F000 bit 3 = 0 AND PRG_ROM_count > 8
+        int externalPage;              // external ROM page index when usingExternalRom
+        int licensingTimer;            // CPU-cycle countdown; write to $6000-$7FFF resets to 1024*105
 
         public MapperA12Mode A12NotifyMode => MapperA12Mode.None;
 
@@ -36,16 +44,29 @@ namespace AprNes
             ntReg0 = ntReg1 = 0x80;
             useChrForNT = false;
             mirrorMode = 0;
-            *Vertical = 1; // Vertical mirroring (bit 0 of $E000 default = 0 → Horizontal in doc; using H=1 in AprNes)
-            // Note: actual power-on mirror from iNES header; will be overridden on first $E000 write
+            prgRamEnabled = false;
+            usingExternalRom = false;
+            externalPage = 0;
+            licensingTimer = 0;
+            *Vertical = 1; // power-on default H; overridden on first $E000 write
             NesCore.ntChrOverrideEnabled = false;
             UpdateCHRBanks();
         }
 
         public byte MapperR_ExpansionROM(ushort address) { return 0; }
         public void MapperW_ExpansionROM(ushort address, byte value) { }
-        public byte MapperR_RAM(ushort address) { return NesCore.NES_MEM[address]; }
-        public void MapperW_RAM(ushort address, byte value) { NesCore.NES_MEM[address] = value; }
+
+        public byte MapperR_RAM(ushort address)
+        {
+            return prgRamEnabled ? NesCore.NES_MEM[address] : (byte)0;
+        }
+
+        public void MapperW_RAM(ushort address, byte value)
+        {
+            // Any write to $6000-$7FFF resets the licensing timer regardless of prgRamEnabled
+            licensingTimer = 1024 * 105;
+            if (prgRamEnabled) NesCore.NES_MEM[address] = value;
+        }
 
         public void MapperW_PRG(ushort address, byte value)
         {
@@ -66,7 +87,21 @@ namespace AprNes
                     UpdateNTBanks();
                     break;
                 case 0xF000:
-                    prgBank = value & 0x07;
+                    prgRamEnabled = (value & 0x10) != 0;
+                    bool isExternalMode = (value & 0x08) == 0;
+                    if (isExternalMode && PRG_ROM_count > 8)
+                    {
+                        // External ROM (>128 KB): upper pages via licensing mechanism
+                        usingExternalRom = true;
+                        int extBanks = PRG_ROM_count - 8;
+                        externalPage = 8 + ((value & 0x07) % extBanks);
+                        prgBank = externalPage;
+                    }
+                    else
+                    {
+                        usingExternalRom = false;
+                        prgBank = value & 0x07;
+                    }
                     break;
             }
         }
@@ -76,6 +111,9 @@ namespace AprNes
             // $C000-$FFFF: fixed last 16K bank
             if (address >= 0xC000)
                 return PRG_ROM[(address - 0xC000) + (PRG_ROM_count - 1) * 0x4000];
+            // $8000-$BFFF: external ROM license expired → open bus
+            if (usingExternalRom && licensingTimer == 0)
+                return 0;
             // $8000-$BFFF: switchable 16K bank
             return PRG_ROM[(address - 0x8000) + (prgBank % PRG_ROM_count) * 0x4000];
         }
@@ -136,7 +174,12 @@ namespace AprNes
 
         public byte MapperR_CHR(int address) { return NesCore.chrBankPtrs[(address >> 10) & 7][address & 0x3FF]; }
         public void MapperW_CHR(int addr, byte val) { if (CHR_ROM_count == 0) ppu_ram[addr] = val; }
-        public void CpuCycle() { }
+
+        public void CpuCycle()
+        {
+            if (licensingTimer > 0) licensingTimer--;
+        }
+
         public void NotifyA12(int addr, int ppuAbsCycle) { }
     }
 }
