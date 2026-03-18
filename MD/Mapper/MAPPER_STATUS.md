@@ -38,7 +38,7 @@
 | **032** | Irem G-101 | `Mapper032.cs` — PRG mode 0/1 切換，8×1K CHR；SubMapper 1 = Major League (mode 0 + single-A)；Image Fight (J), Major League (J) 驗證通過 |
 | **033** | Taito TC0190 | `Mapper033.cs` — 2×8K PRG switchable，addr & 0xA003 decode；$8002/$8003 各選 2K CHR，$A000-$A003 選 4×1K CHR；Akira (J), Don Doko Don (J) 驗證通過 |
 | **034** | Nina-1 | `Mapper034.cs` — 兩種子變體：CHR-RAM（Deadly Towers/Mashou）用 $8000 PRG 選擇；CHR-ROM（Impossible Mission II）用 $7FFD-$7FFF 寫入暫存器 |
-| **064** | Tengen RAMBO-1 | `Mapper064.cs` — 類 MMC3；3×8K PRG switchable (regs 6,7,15) + fixed last；CHR fine mode (regs 8,9)；A12 或 CPU-cycle IRQ ($C001 bit0 切換)；Skull&Crossbones forceClock 修正；Shinobi (Tengen), Klax (Tengen) 驗證通過 |
+| **064** | Tengen RAMBO-1 | `Mapper064.cs` — 類 MMC3；3×8K PRG switchable (regs 6,7,15) + fixed last；CHR fine mode (regs 8,9)；A12 或 CPU-cycle IRQ ($C001 bit0 切換)；Skull&Crossbones forceClock 修正；Shinobi (Tengen) 驗證通過。⚠️ Klax (Tengen) 進入遊戲後畫面異常（停留在標題畫面循環，無法進入遊戲），尚待克服 |
 | **065** | Irem H-3001 | `Mapper065.cs` — 3×8K PRG switchable + 固定末 8K；16-bit CPU cycle IRQ（$9003/$9004/$9005/$9006）。⚠️ Daiku no Gen San 2 (J) intro 捲軸場景畫面異常（條紋），尚待克服 |
 | **066** | GxROM | `Mapper066.cs` — DragonBall, Gumshoe |
 | **068** | Sunsoft #4 | `Mapper068.cs` — 4×2K CHR，16K PRG 切換，固定末尾 16K；CHR-as-nametable ($C000/$D000/$E000 bit4)；AfterBurner II (J), Maharaja (J) 驗證通過 |
