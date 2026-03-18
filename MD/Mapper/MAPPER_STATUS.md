@@ -11,15 +11,15 @@
 | 項目 | 數量 |
 |------|------|
 | 實作目標（扣除盜版 + 補充 020/085） | 28 個 |
-| 目標內已實作 | 22 個 |
+| 目標內已實作 | 23 個 |
 | 目標外額外實作（NROM、Namco 108） | 2 個 |
-| **總計已實作** | **24 個** |
-| 目標涵蓋完成率 | **22 / 28 = 78.6%** |
-| 整體完成率（含額外） | **24 / 31 = 77.4%** |
+| **總計已實作** | **25 個** |
+| 目標涵蓋完成率 | **23 / 28 = 82.1%** |
+| 整體完成率（含額外） | **25 / 31 = 80.6%** |
 
 ---
 
-## 已實作（22 個）
+## 已實作（23 個）
 
 | Mapper | 名稱 | 備註 |
 |:------:|------|------|
@@ -33,6 +33,7 @@
 | **009** | MMC2 | `Mapper009.cs` — PPU Latch 自動換頁；《泰森拳擊》驗證通過 |
 | **010** | MMC4 | `Mapper010.cs` — MMC2 演進版（16K PRG）；PPU Latch 延遲更新；Fire Emblem, Famicom Wars 驗證通過 |
 | **011** | Color Dreams | `Mapper011.cs` — Crystal Mines, Pesterminator（非授權正規廠商） |
+| **018** | Jaleco SS8806 | `Mapper018.cs` — 3×8K PRG + 8×1K CHR（nibble 寫入），可變寬度 IRQ（4/8/12/16-bit）；Ninja Jajamaru, Pizza Pop!, Magic John, Saiyuuki World 2 驗證通過 |
 | **021** | VRC4 | `Mapper021.cs` — VRC4a/VRC4c（subMapper 自動偵測）；4×8K PRG switchable (mode 0/1)，8×1K CHR，prescaler IRQ；Wai Wai World 2 (J), Ganbare Goemon Gaiden 2 (J) 驗證通過 |
 | **022** | VRC2a | `Mapper022.cs` — TwinBee 3 (J)；8K PRG×2 + 8×1K CHR；CHR index >> 1（低位忽略） |
 | **023** | VRC2b | `Mapper023.cs` — Contra (J), Getsufuu Maden (J)；同 VRC2a 但地址線標準配置，CHR index 不右移 |
@@ -50,13 +51,12 @@
 
 ---
 
-## 未實作（目標 28 個中剩餘 6 個）
+## 未實作（目標 28 個中剩餘 5 個）
 
 | Mapper | 名稱 | 代表作品 | 技術重點 |
 |:------:|------|---------|---------|
 | **020** | FDS（磁碟機系統） | 銀河戰士(日)、薩爾達(日)、惡魔城(日) | BIOS + 磁碟流模擬，複雜度最高 |
 | **016/153/159** | Bandai（含 EEPROM 變體） | DragonBall Z 系列、龍珠Z、聖鬥士星矢 | EEPROM 存檔 (24C01)；153/159 為 EEPROM 變體 |
-| **018** | Jaleco SS8806 | 忍者龍牙、Baseball 3 | 精密 IRQ + 多 CHR Bank |
 | **019** | Namcot 106 | Splatterhouse, Family Stadium '90'、女神轉生II | 最多 8 通道波形音效，內建 RAM |
 | **024** | Konami VRC6 | Akumajo Dracula 3（惡魔城傳說日） | 額外 3 通道音效（方波×2、鋸齒波） |
 | **085** | Konami VRC7 | 《拉格朗日點》 | FM 合成音效 (OPLL/YM2413)，複雜度最高 |
@@ -81,7 +81,7 @@
 | ★★ | **024** VRC6 | 需擴充音效 mixer（惡魔城傳說日） |
 | ★★ | **019** Namcot 106 | 需擴充音效 mixer，最多 8 通道 |
 | ★★ | **016** Bandai | DragonBall Z、聖鬥士等人氣作品 |
-| ★★ | **018** Jaleco SS8806 | 忍者龍牙系列 |
+| ~~★★~~ | ~~**018** Jaleco SS8806~~ | ✅ 已完成 |
 | ~~★~~ | ~~**033** Taito TC0190~~ | ✅ 已完成 |
 | ~~★~~ | ~~**065** Irem H-3001~~ | ✅ 已完成 |
 | ✗ | **020** FDS | 磁碟機模擬，最高複雜度，需 BIOS |
@@ -89,4 +89,4 @@
 
 ---
 
-*最後更新：2026-03-19（Mapper021 VRC4 加入）*
+*最後更新：2026-03-19（Mapper018 Jaleco SS8806 加入）*
