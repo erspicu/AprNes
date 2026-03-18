@@ -11,15 +11,15 @@
 | 項目 | 數量 |
 |------|------|
 | 實作目標（扣除盜版 + 補充 020/085） | 28 個 |
-| 目標內已實作 | 21 個 |
+| 目標內已實作 | 22 個 |
 | 目標外額外實作（NROM、Namco 108） | 2 個 |
-| **總計已實作** | **23 個** |
-| 目標涵蓋完成率 | **21 / 28 = 75.0%** |
-| 整體完成率（含額外） | **23 / 31 = 74.2%** |
+| **總計已實作** | **24 個** |
+| 目標涵蓋完成率 | **22 / 28 = 78.6%** |
+| 整體完成率（含額外） | **24 / 31 = 77.4%** |
 
 ---
 
-## 已實作（21 個）
+## 已實作（22 個）
 
 | Mapper | 名稱 | 備註 |
 |:------:|------|------|
@@ -33,6 +33,7 @@
 | **009** | MMC2 | `Mapper009.cs` — PPU Latch 自動換頁；《泰森拳擊》驗證通過 |
 | **010** | MMC4 | `Mapper010.cs` — MMC2 演進版（16K PRG）；PPU Latch 延遲更新；Fire Emblem, Famicom Wars 驗證通過 |
 | **011** | Color Dreams | `Mapper011.cs` — Crystal Mines, Pesterminator（非授權正規廠商） |
+| **021** | VRC4 | `Mapper021.cs` — VRC4a/VRC4c（subMapper 自動偵測）；4×8K PRG switchable (mode 0/1)，8×1K CHR，prescaler IRQ；Wai Wai World 2 (J), Ganbare Goemon Gaiden 2 (J) 驗證通過 |
 | **022** | VRC2a | `Mapper022.cs` — TwinBee 3 (J)；8K PRG×2 + 8×1K CHR；CHR index >> 1（低位忽略） |
 | **023** | VRC2b | `Mapper023.cs` — Contra (J), Getsufuu Maden (J)；同 VRC2a 但地址線標準配置，CHR index 不右移 |
 | **032** | Irem G-101 | `Mapper032.cs` — PRG mode 0/1 切換，8×1K CHR；SubMapper 1 = Major League (mode 0 + single-A)；Image Fight (J), Major League (J) 驗證通過 |
@@ -49,7 +50,7 @@
 
 ---
 
-## 未實作（目標 28 個中剩餘 7 個）
+## 未實作（目標 28 個中剩餘 6 個）
 
 | Mapper | 名稱 | 代表作品 | 技術重點 |
 |:------:|------|---------|---------|
@@ -57,7 +58,6 @@
 | **016/153/159** | Bandai（含 EEPROM 變體） | DragonBall Z 系列、龍珠Z、聖鬥士星矢 | EEPROM 存檔 (24C01)；153/159 為 EEPROM 變體 |
 | **018** | Jaleco SS8806 | 忍者龍牙、Baseball 3 | 精密 IRQ + 多 CHR Bank |
 | **019** | Namcot 106 | Splatterhouse, Family Stadium '90'、女神轉生II | 最多 8 通道波形音效，內建 RAM |
-| **021** | Konami VRC4 | Wai Wai World 2, Gradius 2、大盜五右衛門 | 掃描線 IRQ，多地址線變體 |
 | **024** | Konami VRC6 | Akumajo Dracula 3（惡魔城傳說日） | 額外 3 通道音效（方波×2、鋸齒波） |
 | **085** | Konami VRC7 | 《拉格朗日點》 | FM 合成音效 (OPLL/YM2413)，複雜度最高 |
 
@@ -76,7 +76,7 @@
 | ~~★★★~~ | ~~**022/023** VRC2a/VRC2b~~ | ✅ 已完成 |
 | ~~★~~ | ~~**032** Irem G-101~~ | ✅ 已完成 |
 | ~~★~~ | ~~**068** Sunsoft Mapper #4~~ | ✅ 已完成 |
-| ★★★ | **021** VRC4 | 涵蓋多款 Konami 大作，最重要 |
+| ~~★★★~~ | ~~**021** VRC4~~ | ✅ 已完成 |
 | ~~★★★~~ | ~~**064** Tengen RAMBO-1~~ | ✅ 已完成 |
 | ★★ | **024** VRC6 | 需擴充音效 mixer（惡魔城傳說日） |
 | ★★ | **019** Namcot 106 | 需擴充音效 mixer，最多 8 通道 |
@@ -89,4 +89,4 @@
 
 ---
 
-*最後更新：2026-03-19（Mapper064 RAMBO-1 加入）*
+*最後更新：2026-03-19（Mapper021 VRC4 加入）*

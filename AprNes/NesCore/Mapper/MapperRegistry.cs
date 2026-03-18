@@ -7,7 +7,7 @@ namespace AprNes
             switch (id)
             {
                 case  0: case  1: case  2: case  3: case  4: case  5:
-                case  7: case  9: case 10: case 11: case 22: case 23:
+                case  7: case  9: case 10: case 11: case 21: case 22: case 23:
                 case 32: case 33: case 34: case 64: case 65: case 66: case 68: case 69: case 71: case 78: case 206:
                     return true;
                 default:
@@ -29,6 +29,7 @@ namespace AprNes
                 case  9: return "MMC2";
                 case 10: return "MMC4";
                 case 11: return "Color Dreams";
+                case 21: return "VRC4";
                 case 22: return "VRC2a";
                 case 23: return "VRC2b";
                 case 32: return "Irem G-101";
@@ -73,6 +74,14 @@ namespace AprNes
                 case  9: return new Mapper009();
                 case 10: return new Mapper010();
                 case 11: return new Mapper011();
+                case 21: {
+                    var m = new Mapper021();
+                    m.Submapper = db.Submapper;
+                    if (db.Submapper == 1) System.Console.WriteLine("Sub-variant: VRC4a");
+                    else if (db.Submapper == 2) System.Console.WriteLine("Sub-variant: VRC4c");
+                    else System.Console.WriteLine("Sub-variant: VRC4 heuristic");
+                    return m;
+                }
                 case 22: return new Mapper022();
                 case 23: return new Mapper023();
                 case 32: {
