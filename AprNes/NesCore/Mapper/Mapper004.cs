@@ -25,6 +25,10 @@ namespace AprNes
         int PRG_Bankmode;
         int CHR_Bankmode;
 
+        public void MapperW_CHR(int addr, byte val) { if (CHR_ROM_count == 0) ppu_ram[addr] = val; }
+        public void Reset() { }
+        public void CpuCycle() { }
+
         public void NotifyA12(int address, int ppuAbsCycle)
         {
             int a12 = (address >> 12) & 1;

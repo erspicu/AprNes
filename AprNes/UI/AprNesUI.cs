@@ -510,21 +510,7 @@ namespace AprNes
         public byte[] rom_bytes;
         byte[] current_rom_bytes;  // 保存已解壓的 ROM 資料供 Hard Reset 使用
 
-        public enum MapperName
-        {
-            NROM = 0,
-            MMC1 = 1,
-            UNROM = 2,
-            CNROM = 3,
-            MMC3 = 4,
-            MMC5 = 5,
-            AxROM = 7,
-            ColorDreams = 11,
-            GxROM = 66,
-            Camerica = 71
-        }
-
-        public string GetRomInfo()
+public string GetRomInfo()
         {
             try
             {
@@ -568,7 +554,7 @@ namespace AprNes
                 else
                     mapper = (byte)(((ROM_Control_1 & 0xf0) >> 4) | (ROM_Control_2 & 0xf0));
 
-                string mapper_name = ((MapperName)mapper).ToString();
+                string mapper_name = MapperRegistry.GetName(mapper);
 
                 info += "Mapper number : " + mapper + " " + mapper_name + "\r\n";
 

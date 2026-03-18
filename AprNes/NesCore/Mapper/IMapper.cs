@@ -10,6 +10,10 @@
         void MapperW_PRG(ushort address, byte value);
         byte MapperR_RPG(ushort address);
         byte MapperR_CHR(int address);
+        void MapperW_CHR(int addr, byte val);
         void UpdateCHRBanks();
+        void Reset();
+        void CpuCycle();
+        void NotifyA12(int addr, int ppuAbsCycle);
     }
 }

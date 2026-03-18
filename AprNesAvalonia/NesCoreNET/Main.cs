@@ -32,7 +32,6 @@ namespace AprNes
         static IMapper? MapperObj;
         static public byte*[] chrBankPtrs = new byte*[8]; // P34: 8×1KB CHR bank pointers, updated by mapper
 
-        static public int[] Mapper_Allow = new int[] { 0, 1, 2, 3, 4, 7, 11, 66 };
 
         // ROM info accessors (read-only, set during init)
         static public int  RomMapper   => mapper;
@@ -146,10 +145,7 @@ namespace AprNes
                 }
                 else mapper = (byte)(((ROM_Control_1 & 0xf0) >> 4) | (ROM_Control_2 & 0xf0));
                 Console.WriteLine("Mapper number : " + mapper);
-                bool mapper_pass = false;
-                foreach (int i in Mapper_Allow) if (i == mapper) mapper_pass = true;
-
-                if (!mapper_pass)
+                if (!MapperRegistry.IsSupported(mapper))
                 {
                     ShowError("not support mapper ! " + mapper);
                     return false;
@@ -173,36 +169,22 @@ namespace AprNes
                 P1_joypad_status = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 NES_MEM          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 65536);
 
+                uint romCrc = 0;
                 if (mapper == 4)
                 {
-                    uint crc = 0xFFFFFFFF;
+                    romCrc = 0xFFFFFFFF;
                     for (int i = 0; i < rom_bytes.Length; i++)
                     {
-                        crc ^= rom_bytes[i];
+                        romCrc ^= rom_bytes[i];
                         for (int j = 0; j < 8; j++)
-                            crc = (crc >> 1) ^ (((crc & 1) != 0) ? 0xEDB88320u : 0);
+                            romCrc = (romCrc >> 1) ^ (((romCrc & 1) != 0) ? 0xEDB88320u : 0);
                     }
-                    crc ^= 0xFFFFFFFF;
-                    Console.WriteLine("ROM CRC32: " + crc.ToString("X8"));
-
-                    if (crc == 0x1D814D25 || crc == 0x59322B74)
-                    {
-                        MapperObj = new Mapper004RevA();
-                        Console.WriteLine("Sub-variant: MMC3 Rev A");
-                    }
-                    else if (crc == 0x9F1A68ED)
-                    {
-                        MapperObj = new Mapper004MMC6();
-                        Console.WriteLine("Sub-variant: MMC6");
-                    }
-                    else
-                        MapperObj = new Mapper004();
+                    romCrc ^= 0xFFFFFFFF;
+                    Console.WriteLine("ROM CRC32: " + romCrc.ToString("X8"));
                 }
-                else
-                {
-                    MapperObj = CreateMapper(mapper);
-                }
+                MapperObj = MapperRegistry.Create(mapper, romCrc);
                 MapperObj.MapperInit(PRG_ROM, CHR_ROM, ppu_ram, PRG_ROM_count, CHR_ROM_count, Vertical);
+                MapperObj.Reset();
                 MapperObj.UpdateCHRBanks();
 
                 for (int i = 0; i < 61440; i++) ScreenBuf1x[i] = 0;
@@ -233,24 +215,6 @@ namespace AprNes
             }
             return true;
         }
-
-        static IMapper CreateMapper(int id)
-        {
-            switch (id)
-            {
-                case   0: return new Mapper000();
-                case   1: return new Mapper001();
-                case   2: return new Mapper002();
-                case   3: return new Mapper003();
-                case   5: return new Mapper005();
-                case   7: return new Mapper007();
-                case  11: return new Mapper011();
-                case  66: return new Mapper066();
-                case  71: return new Mapper071();
-                default:  throw new NotSupportedException("Mapper " + id + " not supported");
-            }
-        }
-
 
         static public void LoadSRam(byte[] data)
         {

@@ -85,6 +85,7 @@ namespace AprNes
         {
             // irqLinePrev saved at start of StartCpuCycle
             // irqLineCurrent maintained by UpdateIRQLine() at every mutation site
+            MapperObj.CpuCycle();
         }
 
         // Called at every site that changes statusframeint, apuintflag, statusdmcint, or statusmapperint
@@ -508,7 +509,7 @@ namespace AprNes
                     {
                         int _vram_addr_wrap = vram_addr & 0x3FFF;
                         openbus = val;
-                        if (CHR_ROM_count == 0) ppu_ram[_vram_addr_wrap] = val;
+                        MapperObj.MapperW_CHR(_vram_addr_wrap, val);
                         Increment2007();
                     });
                 }

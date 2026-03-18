@@ -47,5 +47,10 @@
         {
             for (int i = 0; i < 8; i++) NesCore.chrBankPtrs[i] = ppu_ram + i * 1024;
         }
+
+        public void MapperW_CHR(int addr, byte val) { ppu_ram[addr] = val; }
+        public void Reset() { }
+        public void CpuCycle() { }
+        public void NotifyA12(int addr, int ppuAbsCycle) { }
     }
 }

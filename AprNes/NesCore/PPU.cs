@@ -1,9 +1,5 @@
 using System;
 using System.Runtime.CompilerServices;
-#if NET8_0_OR_GREATER
-using System.Runtime.Intrinsics;
-using System.Runtime.Intrinsics.X86;
-#endif
 
 namespace AprNes
 {
@@ -284,7 +280,7 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void NotifyMapperA12(int address)
         {
-            ((Mapper004)MapperObj).NotifyA12(address, scanline * 341 + ppu_cycles_x);
+            MapperObj.NotifyA12(address, scanline * 341 + ppu_cycles_x);
         }
 
         static void ppu_step_new()
@@ -988,12 +984,8 @@ namespace AprNes
             // A behind-BG winner (priority=1) with opaque BG blocks ALL sprites at that pixel,
             // correctly implementing the mask-sprite trick used by SMB3.
             int scanOff = scanline << 8;
-#if NET8_0_OR_GREATER
-            CompositeSpritesSimd(scanOff, sprSet, sprPriority, sprColor);
-#else
             // P33: ulong 8-byte block-scan — skip all-zero blocks 8 pixels at a time,
             // fall back to scalar only for blocks that contain sprite pixels.
-            // No extra dependencies: uses unsafe ulong* cast (valid in unsafe context).
             {
                 int sx = 0;
                 while (sx <= 248) // 256 - 8
@@ -1016,69 +1008,7 @@ namespace AprNes
                         ScreenBuf1x[array_loc] = sprColor[sx];
                 }
             }
-#endif
         }
-
-#if NET8_0_OR_GREATER
-        // Sprite Pass 3 SIMD composite (SSE4.1, 4 pixels/cycle)
-        // writeMask = sprSet[x]!=0  AND  (!ShowBG OR BG==0 OR priority==0)
-        // result    = writeMask ? sprColor[x] : ScreenBuf1x[scanOff+x]
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void CompositeSpritesSimd(int scanOff, byte* sprSet, byte* sprPriority, uint* sprColor)
-        {
-            if (Sse41.IsSupported && SIMDEnabled)
-            {
-                var zero    = Vector128<int>.Zero;
-                var allOnes = Vector128.Create(-1);
-
-                for (int x = 0; x < 256; x += 4)
-                {
-                    // Zero-extend 4 sprSet bytes → 4 × int32
-                    var sprSetExp = Sse41.ConvertToVector128Int32(
-                        Sse2.LoadScalarVector128((int*)(sprSet + x)).AsByte());
-                    var hasSprMask = Sse2.CompareGreaterThan(sprSetExp, zero);
-
-                    // Fast-skip: none of these 4 pixels has a sprite
-                    if (Sse2.MoveMask(hasSprMask.AsByte()) == 0) continue;
-
-                    // Zero-extend 4 sprPriority bytes → front-priority mask (priority==0 → front)
-                    var priExp = Sse41.ConvertToVector128Int32(
-                        Sse2.LoadScalarVector128((int*)(sprPriority + x)).AsByte());
-                    var frontMask = Sse2.CompareEqual(priExp, zero);
-
-                    // BG-transparent mask
-                    var bgVec         = Sse2.LoadVector128(Buffer_BG_array + scanOff + x);
-                    var bgTranspMask  = Sse2.CompareEqual(bgVec, zero);
-
-                    // condMask: !ShowBG → always write; else write if BG transparent or front-priority
-                    var condMask = ShowBackGround
-                        ? Sse2.Or(bgTranspMask, frontMask)
-                        : allOnes;
-
-                    // writeMask = hasSpr & cond
-                    var writeMask = Sse2.And(hasSprMask, condMask);
-
-                    // Blend: select sprColor where writeMask=0xFF…, else keep screen
-                    var sprColorVec = Sse2.LoadVector128((int*)(sprColor + x));
-                    var screenVec   = Sse2.LoadVector128((int*)(ScreenBuf1x + scanOff + x));
-                    var result      = Sse41.BlendVariable(screenVec, sprColorVec, writeMask);
-
-                    Sse2.Store((int*)(ScreenBuf1x + scanOff + x), result);
-                }
-            }
-            else
-            {
-                // SSE4.1 unavailable: scalar fallback
-                for (int x = 0; x < 256; x++)
-                {
-                    if (sprSet[x] == 0) continue;
-                    int loc = scanOff + x;
-                    if (!ShowBackGround || Buffer_BG_array[loc] == 0 || sprPriority[x] == 0)
-                        ScreenBuf1x[loc] = sprColor[x];
-                }
-            }
-        }
-#endif
 
         static public bool screen_lock = false;
         static void RenderScreen()
