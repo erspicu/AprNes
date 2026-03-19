@@ -9,6 +9,7 @@ namespace AprNes
                 case  0: case  1: case  2: case  3: case  4: case  5:
                 case  7: case  9: case 10: case 11: case 16: case 18: case 19: case 21: case 22: case 23: case 24: case 26:
                 case 159: case 153: case 85:
+                case 25: case 72: case 79: case 87: case 89: case 93: case 184: case 185:
                 case 32: case 33: case 34: case 64: case 65: case 66: case 68: case 69: case 71: case 78: case 206:
                     return true;
                 default:
@@ -52,6 +53,14 @@ namespace AprNes
                 case 71: return "Camerica";
                 case 78: return "Irem 74HC161/32";
                 case 206: return "Namco 108";
+                case  25: return "VRC4b/d";
+                case  72: return "Jaleco JF-17";
+                case  79: return "NINA-03/06";
+                case  87: return "Jaleco JF-09/10/18";
+                case  89: return "Sunsoft-2 (Ikki)";
+                case  93: return "Sunsoft-2 (Fantasy Zone II)";
+                case 184: return "Sunsoft-1";
+                case 185: return "CNROM+protection";
                 default: return "Unknown";
             }
         }
@@ -156,6 +165,21 @@ namespace AprNes
                     return m;
                 }
                 case 206: return new Mapper206();
+                case 25: {
+                    var m = new Mapper025();
+                    m.Submapper = db.Submapper;
+                    if (db.Submapper == 1) System.Console.WriteLine("Sub-variant: VRC4b");
+                    else if (db.Submapper == 2) System.Console.WriteLine("Sub-variant: VRC4d");
+                    else System.Console.WriteLine("Sub-variant: VRC4b/d heuristic");
+                    return m;
+                }
+                case 72: return new Mapper072();
+                case 79: return new Mapper079();
+                case 87: return new Mapper087();
+                case 89: return new Mapper089();
+                case 93: return new Mapper093();
+                case 184: return new Mapper184();
+                case 185: return new Mapper185();
                 default: throw new System.NotSupportedException("Mapper " + id + " not supported");
             }
         }

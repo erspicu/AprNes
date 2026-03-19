@@ -102,6 +102,14 @@
     <Compile Include="NesCore\Mapper\Mapper068.cs" />
     <Compile Include="NesCore\Mapper\Mapper069.cs" />
     <Compile Include="NesCore\Mapper\Mapper206.cs" />
+    <Compile Include="NesCore\Mapper\Mapper025.cs" />
+    <Compile Include="NesCore\Mapper\Mapper072.cs" />
+    <Compile Include="NesCore\Mapper\Mapper079.cs" />
+    <Compile Include="NesCore\Mapper\Mapper087.cs" />
+    <Compile Include="NesCore\Mapper\Mapper089.cs" />
+    <Compile Include="NesCore\Mapper\Mapper093.cs" />
+    <Compile Include="NesCore\Mapper\Mapper184.cs" />
+    <Compile Include="NesCore\Mapper\Mapper185.cs" />
     <Compile Include="NesCore\Mapper\MapperRegistry.cs" />
     <Compile Include="NesCore\RomDatabase.cs" />
     <Compile Include="tool\DirectInputHelper.cs" />
