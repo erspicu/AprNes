@@ -184,6 +184,8 @@ namespace AprNes
                 AppConfigure["filter"] = "xbrz";
                 AppConfigure["Sound"] = "1";
                 AppConfigure["Volume"] = "70";
+                AppConfigure["AnalogMode"] = "0";
+                AppConfigure["AnalogOutput"] = "AV";
                 Configure_Write();
             }
 
@@ -237,6 +239,24 @@ namespace AprNes
 
             // 讀取 Accuracy 選項設定 (預設全開)
             NesCore.AccuracyOptA = !AppConfigure.ContainsKey("AccuracyOptA") || AppConfigure["AccuracyOptA"] != "0";
+
+            // 讀取類比訊號模擬設定 (預設關閉)
+            NesCore.AnalogEnabled = AppConfigure.ContainsKey("AnalogMode") && AppConfigure["AnalogMode"] == "1";
+
+            // 讀取類比端子模式 (AnalogMode=1 時有效，預設 AV)
+            if (AppConfigure.ContainsKey("AnalogOutput"))
+            {
+                switch (AppConfigure["AnalogOutput"].ToUpper())
+                {
+                    case "RF":     NesCore.AnalogOutput = NesCore.AnalogOutputMode.RF;     break;
+                    case "SVIDEO": NesCore.AnalogOutput = NesCore.AnalogOutputMode.SVideo; break;
+                    default:       NesCore.AnalogOutput = NesCore.AnalogOutputMode.AV;     break;
+                }
+            }
+            else
+            {
+                NesCore.AnalogOutput = NesCore.AnalogOutputMode.AV;
+            }
 
             NES_init_KeyMap();
 

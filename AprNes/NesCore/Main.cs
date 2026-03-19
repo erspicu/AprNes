@@ -51,6 +51,19 @@ namespace AprNes
         // true = full hardware accuracy; false = skip FSM for ~13% performance gain (no test failures)
         static public bool AccuracyOptA = false;
 
+        // 類比訊號模擬模式 (Level 2 NTSC signal simulation)
+        // false = 傳統調色盤查表（預設）
+        // true  = NTSC 電壓波形生成 + YIQ 解碼重採樣
+        static public bool AnalogEnabled = false;
+
+        // 類比輸出端子模式（AnalogEnabled=true 時有效）
+        // AV     = Composite：Y+C 混合，標準 IIR 解碼，產生 Dot Crawl / 色彩暈染
+        // SVideo = S-Video：Y/C 分離傳輸，較銳利，色彩暈染較少
+        // RF     = RF 射頻：額外 AM 調變/解調，雜訊最多，
+        //          並包含音訊載波洩漏干擾（Buzz bar、音量振幅調變視訊亮度）
+        public enum AnalogOutputMode { AV, SVideo, RF }
+        static public AnalogOutputMode AnalogOutput = AnalogOutputMode.AV;
+
         static int* Vertical; //  Vertical = false,
 
         static public ManualResetEvent _event = new ManualResetEvent(true);
