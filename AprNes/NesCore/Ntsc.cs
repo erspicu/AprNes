@@ -65,7 +65,10 @@ namespace AprNes
         static int scanPhaseIdx = 0;
 
         // ── RF 音訊干擾電平 ──────────────────────────────────────────────────
+        // RfAudioLevel：|audio| 指數平滑值，控制 buzz bar 振幅（由 APU 更新）
+        // RfBuzzPhase ：累積音量 0..1，控制 buzz bar 垂直滾動位置（由 APU 更新）
         static public float RfAudioLevel = 0.0f;
+        static public float RfBuzzPhase  = 0.0f;
 
         // ── 初始化 ───────────────────────────────────────────────────────────
         public static void Init()
@@ -88,6 +91,7 @@ namespace AprNes
 
             scanPhaseIdx = 0;
             RfAudioLevel = 0f;
+            RfBuzzPhase  = 0f;
         }
 
         // ── 訊號生成（blargg 直接 YIQ 公式）────────────────────────────────
@@ -226,8 +230,11 @@ namespace AprNes
         // AV + AM 白雜訊 + 音訊 buzz bar
         static void DecodeRF(int sl, int phase0)
         {
-            float buzzAmp = RfAudioLevel * 0.04f;
-            float buzzRow = buzzAmp * (float)Math.Sin(sl * Math.PI / 25.0);
+            // buzz bar：振幅來自實際 NES 音訊電平，垂直位置隨音量累積滾動
+            // sin 引數：sl/240 = 0..1（掃描線位置），+ RfBuzzPhase = bar 滾動偏移
+            // × 2π = 1 個完整橫條貫穿全畫面
+            float buzzAmp = RfAudioLevel * 0.06f;
+            float buzzRow = buzzAmp * (float)Math.Sin((sl / 240.0 + RfBuzzPhase) * 2.0 * Math.PI);
             uint  ns      = (uint)(NesCore.frame_count * 1664525 + sl * 1013904223 + 1442695041);
 
             for (int outRow = 0; outRow < 3; outRow++)

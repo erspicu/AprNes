@@ -457,6 +457,16 @@ namespace AprNes
             if (clamped < -32768) clamped = -32768;
 
             AudioSampleReady?.Invoke((short)clamped);
+
+            // RF 音訊干擾：將實際音訊電平饋入 NTSC RF 模擬
+            // RfAudioLevel = |sample| 指數平滑 → buzz bar 振幅
+            // RfBuzzPhase  = 累積音量 → bar 垂直滾動速度（音量越大滾越快）
+            if (AnalogEnabled && AnalogOutput == AnalogOutputMode.RF)
+            {
+                float absS = clamped < 0 ? -clamped / 32767f : clamped / 32767f;
+                Ntsc.RfAudioLevel = Ntsc.RfAudioLevel * 0.95f + absS * 0.05f;
+                Ntsc.RfBuzzPhase  = (Ntsc.RfBuzzPhase + absS * 0.0001f) % 1.0f;
+            }
         }
 
         // =====================================================================
