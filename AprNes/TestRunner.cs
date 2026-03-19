@@ -172,6 +172,18 @@ namespace AprNes
                     case "--dump-debug":
                         dumpDebug = true;
                         break;
+                    case "--analog":
+                        NesCore.AnalogEnabled = true;
+                        break;
+                    case "--analog-output":
+                        if (i + 1 < args.Length)
+                        {
+                            var mode = args[++i].ToUpperInvariant();
+                            if (mode == "RF") NesCore.AnalogOutput = NesCore.AnalogOutputMode.RF;
+                            else if (mode == "SVIDEO") NesCore.AnalogOutput = NesCore.AnalogOutputMode.SVideo;
+                            else NesCore.AnalogOutput = NesCore.AnalogOutputMode.AV;
+                        }
+                        break;
                     case "--accuracy":
                         if (i + 1 < args.Length) i++; // already pre-parsed
                         break;
@@ -737,6 +749,32 @@ namespace AprNes
 
         static void SaveScreenshot(string path)
         {
+            // Use analog buffer (768×720) when AnalogEnabled, otherwise regular 256×240
+            if (NesCore.AnalogEnabled && NesCore.AnalogScreenBuf3x != null)
+            {
+                const int W = 768, H = 720;
+                Bitmap bmp = new Bitmap(W, H, PixelFormat.Format32bppArgb);
+                BitmapData data = bmp.LockBits(new Rectangle(0, 0, W, H),
+                    ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+                uint* src = NesCore.AnalogScreenBuf3x;
+                byte* dst = (byte*)data.Scan0;
+                int stride = data.Stride;
+                for (int y = 0; y < H; y++)
+                {
+                    uint* dstRow = (uint*)(dst + y * stride);
+                    uint* srcRow = src + y * W;
+                    for (int x = 0; x < W; x++) dstRow[x] = srcRow[x];
+                }
+                bmp.UnlockBits(data);
+                string dir = System.IO.Path.GetDirectoryName(path);
+                if (!string.IsNullOrEmpty(dir) && !System.IO.Directory.Exists(dir))
+                    System.IO.Directory.CreateDirectory(dir);
+                bmp.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+                bmp.Dispose();
+                return;
+            }
+
+            {
             Bitmap bmp = new Bitmap(256, 240, PixelFormat.Format32bppArgb);
             BitmapData data = bmp.LockBits(
                 new Rectangle(0, 0, 256, 240),
@@ -764,6 +802,7 @@ namespace AprNes
 
             bmp.Save(path, ImageFormat.Png);
             bmp.Dispose();
+            }
         }
     }
 }

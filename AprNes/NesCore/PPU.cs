@@ -50,6 +50,11 @@ namespace AprNes
         //ppu mask 0x2001
         public static bool ShowBackGround = false, ShowSprites = false;
         static bool ShowBgLeft8 = true, ShowSprLeft8 = true; // bit1/bit2: show in leftmost 8 pixels
+        static byte ppuEmphasis = 0; // $2001[7:5] emphasis bits (for NTSC signal amplitude)
+
+        // NTSC 類比模式：每條掃描線的原始調色盤索引緩衝區（256 bytes，0x00-0x3F）
+        // 由 RenderBGTile 和 RenderSpritesLine 在 AnalogEnabled=true 時填入
+        static byte[] ntscScanBuf = new byte[256];
 
         //ppu status 0x2002.
         static bool isSpriteOverflow = false, isSprite0hit = false, isVblank = false;
@@ -195,6 +200,15 @@ namespace AprNes
                 Buffer_BG_array[slot] = masked ? 0 : bgPixel;
                 uint* pal = (attrUse == renderAttr) ? palCacheR : palCacheN;
                 ScreenBuf1x[slot] = masked ? bgColor : pal[bgPixel];
+
+                // NTSC: 寫入原始調色盤索引（不經 NesColors RGB 轉換）
+                if (AnalogEnabled && (uint)screenX < 256)
+                {
+                    int padrBase = (attrUse == renderAttr) ? baseAddrR : baseAddrN;
+                    ntscScanBuf[screenX] = (masked || bgPixel == 0)
+                        ? (byte)(ppu_ram[0x3f00] & 0x3f)
+                        : (byte)(ppu_ram[padrBase + bgPixel] & 0x3f);
+                }
             }
         }
 
@@ -424,6 +438,12 @@ namespace AprNes
                             uint bgColor = NesColors[ppu_ram[0x3f00] & 0x3f];
                             uint* sp = ScreenBuf1x + scanOff;
                             for (uint* se = sp + 256; sp < se; sp++) *sp = bgColor;
+                            // NTSC: BG 關閉時填入背景色調色盤索引
+                            if (AnalogEnabled)
+                            {
+                                byte bgIdx = (byte)(ppu_ram[0x3f00] & 0x3f);
+                                for (int i = 0; i < 256; i++) ntscScanBuf[i] = bgIdx;
+                            }
                         }
                         PrecomputeOverflow();
                     }
@@ -928,6 +948,7 @@ namespace AprNes
             uint* sprColor    = stackalloc uint[256];
             byte* sprPriority = stackalloc byte[256]; // 1 = behind BG, 0 = in front
             byte* sprSet      = stackalloc byte[256]; // 1 = a winning sprite pixel exists here
+            byte* sprPalIdx   = stackalloc byte[256]; // NTSC: raw palette index of winning sprite
             for (int i = 0; i < 256; i++) sprSet[i] = 0;
 
             // Pass 2: evaluate sprites in reverse OAM order so lower-index sprites overwrite higher,
@@ -994,7 +1015,9 @@ namespace AprNes
                     // Record as winner at this column (lower OAM index will overwrite later)
                     sprSet[screenX]      = 1;
                     sprPriority[screenX] = (byte)(priority ? 1 : 0);
-                    sprColor[screenX]    = NesColors[ppu_ram[0x3f10 + ((sprite_attr & 3) << 2) | pixel] & 0x3f];
+                    byte sprRawPal       = (byte)(ppu_ram[0x3f10 + ((sprite_attr & 3) << 2) | pixel] & 0x3f);
+                    sprColor[screenX]    = NesColors[sprRawPal];
+                    sprPalIdx[screenX]   = sprRawPal; // NTSC: preserve raw palette index
                 }
             }
 
@@ -1016,7 +1039,10 @@ namespace AprNes
                         if (sprSet[sx] == 0) continue;
                         array_loc = scanOff + sx;
                         if (!ShowBackGround || Buffer_BG_array[array_loc] == 0 || sprPriority[sx] == 0)
+                        {
                             ScreenBuf1x[array_loc] = sprColor[sx];
+                            if (AnalogEnabled) ntscScanBuf[sx] = sprPalIdx[sx]; // NTSC: override with sprite palette
+                        }
                     }
                 }
                 for (; sx < 256; sx++)
@@ -1024,9 +1050,16 @@ namespace AprNes
                     if (sprSet[sx] == 0) continue;
                     array_loc = scanOff + sx;
                     if (!ShowBackGround || Buffer_BG_array[array_loc] == 0 || sprPriority[sx] == 0)
+                    {
                         ScreenBuf1x[array_loc] = sprColor[sx];
+                        if (AnalogEnabled) ntscScanBuf[sx] = sprPalIdx[sx]; // NTSC: override with sprite palette
+                    }
                 }
             }
+
+            // NTSC: 訊號解碼（使用已填好的 ntscScanBuf 原始調色盤索引）
+            if (AnalogEnabled)
+                Ntsc.DecodeScanline(scanline, ntscScanBuf, ppuEmphasis);
         }
 
         static public bool screen_lock = false;
@@ -1110,6 +1143,7 @@ namespace AprNes
             ShowSprLeft8 = (value & 0x04) != 0; // bit2: show sprites in leftmost 8 pixels
             ShowBackGround = (value & 0x08) != 0;
             ShowSprites    = (value & 0x10) != 0;
+            ppuEmphasis    = (byte)((value >> 5) & 0x7); // bits 5-7: RGB emphasis
 
             bool newRenderingEnabled = ShowBackGround || ShowSprites;
             if (prevRenderingEnabled != newRenderingEnabled && scanline >= 0 && scanline < 240)

@@ -82,11 +82,15 @@ namespace AprNes
         int ScreenSize = 1;
         public void initUIsize()
         {
-            panel1.Visible = false;
-            panel1.Width = 256 * ScreenSize;
-            panel1.Height = 240 * ScreenSize;
+            // AnalogEnabled 時輸出固定 768×720（3x 直接輸出），否則依 ScreenSize
+            int renderWidth  = NesCore.AnalogEnabled ? 768 : 256 * ScreenSize;
+            int renderHeight = NesCore.AnalogEnabled ? 720 : 240 * ScreenSize;
 
-            if (AppConfigure["filter"] == "scanline")
+            panel1.Visible = false;
+            panel1.Width  = renderWidth;
+            panel1.Height = renderHeight;
+
+            if (!NesCore.AnalogEnabled && AppConfigure["filter"] == "scanline")
             {
                 switch (ScreenSize)
                 {
@@ -95,6 +99,10 @@ namespace AprNes
                     case 6: panel1.Width = 1792; break;
                 }
             }
+
+            // panel 改變大小後重建 Graphics context
+            grfx?.Dispose();
+            grfx = panel1.CreateGraphics();
 
             if (ScreenCenterFull)
             {
@@ -107,10 +115,10 @@ namespace AprNes
 
             UIAbout.Visible = RomInf.Visible = UIOpenRom.Visible = UIReset.Visible = UIConfig.Visible = label3.Visible = true;
             panel1.Location = new Point(5, 35);
-            this.Width = 282 + 256 * (ScreenSize - 1);
-            this.Height = 332 + 240 * (ScreenSize - 1);
+            this.Width  = renderWidth  + 26;   // panel + 左右邊框
+            this.Height = renderHeight + 92;   // panel + 上工具列(35) + 下按鈕列(57)
 
-            if (AppConfigure["filter"] == "scanline")
+            if (!NesCore.AnalogEnabled && AppConfigure["filter"] == "scanline")
             {
                 switch (ScreenSize)
                 {
@@ -120,9 +128,8 @@ namespace AprNes
                 }
                 Width += 26;
             }
-            UIAbout.Location = new Point(Width - 82, 277 + 240 * (ScreenSize - 1));
-
-            RomInf.Location = new Point(5, 277 + 240 * (ScreenSize - 1));
+            UIAbout.Location = new Point(Width - 82, renderHeight + 37);
+            RomInf.Location  = new Point(5,          renderHeight + 37);
             panel1.Visible = true;
         }
 
@@ -681,7 +688,7 @@ public string GetRomInfo()
             bool init_result = NesCore.init(rom_bytes);
 
             if (RenderObj != null) RenderObj.freeMem();
-            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType("AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
+            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType(NesCore.AnalogEnabled ? "AprNes.Render_ntsc_3x" : "AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
             RenderObj.init(NesCore.ScreenBuf1x, grfx);
 
             NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
@@ -851,7 +858,7 @@ public string GetRomInfo()
             NesCore._event.Reset();
             while (NesCore.screen_lock) Thread.Sleep(1);
             if (RenderObj != null) RenderObj.freeMem();
-            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType("AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
+            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType(NesCore.AnalogEnabled ? "AprNes.Render_ntsc_3x" : "AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
             RenderObj.init(NesCore.ScreenBuf1x, grfx);
             NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
 
@@ -868,7 +875,7 @@ public string GetRomInfo()
             NesCore._event.Reset();
             while (NesCore.screen_lock) Thread.Sleep(1);
             if (RenderObj != null) RenderObj.freeMem();
-            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType("AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
+            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType(NesCore.AnalogEnabled ? "AprNes.Render_ntsc_3x" : "AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
             RenderObj.init(NesCore.ScreenBuf1x, grfx);
             NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
             NesCore._event.Set();
@@ -898,7 +905,7 @@ public string GetRomInfo()
             bool init_result = NesCore.init(current_rom_bytes);
 
             if (RenderObj != null) RenderObj.freeMem();
-            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType("AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
+            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType(NesCore.AnalogEnabled ? "AprNes.Render_ntsc_3x" : "AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
             RenderObj.init(NesCore.ScreenBuf1x, grfx);
 
             NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);

@@ -163,6 +163,7 @@
     <Compile Include="NesCore\Mapper\Mapper000.cs" />
     <Compile Include="NesCore\Mapper\Mapper002.cs" />
     <Compile Include="NesCore\MEM.cs" />
+    <Compile Include="NesCore\Ntsc.cs" />
     <Compile Include="NesCore\PPU.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="TestRunner.cs" />

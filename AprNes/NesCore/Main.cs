@@ -64,6 +64,10 @@ namespace AprNes
         public enum AnalogOutputMode { AV, SVideo, RF }
         static public AnalogOutputMode AnalogOutput = AnalogOutputMode.AV;
 
+        // 類比模式 3x 輸出緩衝區（768×720，NTSC.cs 直接寫入，Render_ntsc_3x 讀取）
+        // 僅在 AnalogEnabled=true 時分配，其他情況為 null
+        static public uint* AnalogScreenBuf3x = null;
+
         static int* Vertical; //  Vertical = false,
 
         static public ManualResetEvent _event = new ManualResetEvent(true);
@@ -90,7 +94,8 @@ namespace AprNes
             if (ppu_ram      != null) { Marshal.FreeHGlobal((IntPtr)ppu_ram);      ppu_ram      = null; }
             if (P1_joypad_status != null) { Marshal.FreeHGlobal((IntPtr)P1_joypad_status); P1_joypad_status = null; }
             if (NES_MEM      != null) { Marshal.FreeHGlobal((IntPtr)NES_MEM);      NES_MEM      = null; }
-            if (Vertical     != null) { Marshal.FreeHGlobal((IntPtr)Vertical);     Vertical     = null; }
+            if (Vertical           != null) { Marshal.FreeHGlobal((IntPtr)Vertical);           Vertical           = null; }
+            if (AnalogScreenBuf3x  != null) { Marshal.FreeHGlobal((IntPtr)AnalogScreenBuf3x);  AnalogScreenBuf3x  = null; }
         }
 
         static void HardResetState()
@@ -262,6 +267,8 @@ namespace AprNes
 
                 //init allocate
                 ScreenBuf1x      = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 61440);
+                if (AnalogEnabled)
+                    AnalogScreenBuf3x = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 768 * 720);
                 Buffer_BG_array  = (int* )Marshal.AllocHGlobal(sizeof(int)  * 61440);
                 NesColors        = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 64);
                 palCacheR        = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 4);
@@ -307,6 +314,8 @@ namespace AprNes
                 for (int i = 0; i < 65536; i++) NES_MEM[i] = 0;
 
                 HardResetState();  // reset all CPU/PPU/DMA static state
+
+                if (AnalogEnabled) Ntsc.Init(); // reset NTSC signal state
 
                 initPalette();
 
