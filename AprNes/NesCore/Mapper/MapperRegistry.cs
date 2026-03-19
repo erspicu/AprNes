@@ -11,6 +11,7 @@ namespace AprNes
                 case 159: case 153: case 85:
                 case 25: case 72: case 79: case 87: case 89: case 93: case 184: case 185:
                 case 32: case 33: case 34: case 64: case 65: case 66: case 68: case 69: case 71: case 78: case 206:
+                case 70: case 75: case 88: case 118: case 140: case 152: case 232:
                     return true;
                 default:
                     return false;
@@ -61,6 +62,13 @@ namespace AprNes
                 case  93: return "Sunsoft-2 (Fantasy Zone II)";
                 case 184: return "Sunsoft-1";
                 case 185: return "CNROM+protection";
+                case  70: return "Bandai 74161/32";
+                case  75: return "Konami VRC1";
+                case  88: return "Namco 118";
+                case 118: return "TxSROM";
+                case 140: return "Jaleco JF-11/14";
+                case 152: return "Bandai 74161/32+mirror";
+                case 232: return "Camerica Quattro";
                 default: return "Unknown";
             }
         }
@@ -180,6 +188,40 @@ namespace AprNes
                 case 93: return new Mapper093();
                 case 184: return new Mapper184();
                 case 185: return new Mapper185();
+                case 70: {
+                    System.Console.WriteLine("Mapper070: Bandai 74161/32 (fixed mirroring)");
+                    return new Mapper070();
+                }
+                case 75: {
+                    System.Console.WriteLine("Mapper075: Konami VRC1");
+                    return new Mapper075();
+                }
+                case 88: {
+                    System.Console.WriteLine("Mapper088: Namco 118");
+                    return new Mapper088();
+                }
+                case 118: {
+                    System.Console.WriteLine("Mapper118: TxSROM (MMC3+NT control)");
+                    return new Mapper118();
+                }
+                case 140: {
+                    System.Console.WriteLine("Mapper140: Jaleco JF-11/14");
+                    return new Mapper140();
+                }
+                case 152: {
+                    System.Console.WriteLine("Mapper152: Bandai 74161/32 (mirroring control)");
+                    return new Mapper152();
+                }
+                case 232: {
+                    var m = new Mapper232();
+                    if (db.Submapper == 1)
+                    {
+                        System.Console.WriteLine("Mapper232: Camerica Quattro (Aladdin variant)");
+                        m.IsAladdinVariant = true;
+                    }
+                    else System.Console.WriteLine("Mapper232: Camerica Quattro");
+                    return m;
+                }
                 default: throw new System.NotSupportedException("Mapper " + id + " not supported");
             }
         }

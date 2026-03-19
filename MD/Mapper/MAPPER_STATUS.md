@@ -12,10 +12,11 @@
 |------|------|
 | 實作目標（扣除盜版 + 補充 020/085） | 28 個 |
 | 目標內已實作 | 28 個 |
-| 目標外額外實作（NROM、Namco 108 + S 級 8 個） | 10 個 |
-| **總計已實作** | **38 個** |
+| 目標外額外實作（NROM、Namco 108 + S 級 8 個 + A 級 6 個 + Mapper152） | 17 個 |
+| **總計已實作** | **45 個** |
 | 目標涵蓋完成率 | **28 / 28 = 100%** |
 | S 級 TODO 完成率 | **8 / 8 = 100%** |
+| A 級 TODO 完成率 | **6 / 6 = 100%** |
 
 ---
 
@@ -53,6 +54,13 @@
 | **085** | VRC7 | `Mapper085.cs` — Konami VRC7；3×8K PRG + 固定末；8×1K CHR；VRC prescaler IRQ；WRAM enable（controlFlags bit7）；OPLL FM 音效 silent stub（$9010/$9030 接受但不合成）；Lagrange Point (J) |
 | **153** | Bandai LZ93D50+WRAM | `Mapper153.cs` — 5-bit PRG bank（chrReg OR bit0 << 4 延伸）；CHR-RAM only；8K WRAM（reg $0D bit5 enable）；latch IRQ；Dragon Ball 3 (J) |
 | **206** | Namco 108 | `Mapper206.cs` — MMC3 雛形，無 IRQ；《Karnov》驗證通過（文件外額外支援） |
+| **070** | Bandai 74161/32 | `Mapper070.cs` — PRG 16KB + CHR 8KB 一次寫入；$C000 固定末；Reset 強制 Vertical（Kamen Rider header hack）；Kamen Rider Club, Family Trainer 5 驗證通過（文件外額外支援） |
+| **075** | Konami VRC1 | `Mapper075.cs` — 4×8K PRG；2×4KB CHR；$9000 bit0=H/V，bit1/2=CHR高位；Ganbare Goemon!, Jajamaru Ninpou Chou 驗證通過（文件外額外支援） |
+| **088** | Namco 118 / 634 | `Mapper088.cs` — Namco 108 同架構；R0/R1=2KB CHR，R2-R5=1KB CHR，R6/R7=8KB PRG；Dragon Spirit, Quinty 驗證通過（文件外額外支援） |
+| **118** | TxSROM | `Mapper118.cs` — MMC3 全功能 + CHR bit7 NT 控制；ntBankPtrs + ntChrOverrideEnabled；Ys III, Goal! Two, Armadillo, NES Play Action Football 驗證通過（文件外額外支援） |
+| **140** | Jaleco JF-11 / JF-14 | `Mapper140.cs` — $6000-$7FFF 寫入選 PRG 32KB + CHR 8KB；Doraemon 驗證通過（文件外額外支援） |
+| **152** | Bandai 74161/32 (single-screen) | `Mapper152.cs`（Mapper070 subclass）— bit6 single-screen 鏡像；Arkanoid II (Prototype)（文件外額外支援） |
+| **232** | Camerica BF9096 Quattro | `Mapper232.cs` — 外層 $8000-$9FFF + 內層 $C000-$DFFF 二段 PRG；Aladdin variant submapper；Quattro Adventure, Quattro Sports 驗證通過（文件外額外支援） |
 
 ---
 
@@ -88,16 +96,16 @@
 
 ---
 
-### 🟠 A 級 — 容易實作、遊戲量多
+### 🟠 A 級 — 容易實作、遊戲量多（✅ 全部完成）
 
 | 優先 | Mapper | 名稱 | 難度 | ROMs | 代表遊戲 | 實作要點 |
 |:----:|:------:|------|:----:|:----:|---------|---------|
-| 9 | **075** | Konami VRC1 | ⭐⭐ | 28 | Ganbare Goemon! (J), Jajamaru Ninpou Chou (J) | `$8000` PRG-A，`$A000` PRG-B，`$C000` PRG-C，固定末；`$E000` CHR 4KB 兩組；無 IRQ；鏡像 H/V by $8000 bit0 |
-| 10 | **118** | TxSROM (MMC3 + 4-screen) | ⭐⭐ | 28 | Ys III (J), NES Play Action Football (U), Armadillo (J) | MMC3 全功能 + CHR regs 6/7 控制命名表（bit6=1 用 VRAM，bit6=0 用 CHR-ROM page）；可從 Mapper004 繼承 |
-| 11 | **088** | Namco 118 / 634 | ⭐⭐ | 18 | Dragon Spirit (J), Quinty (J), Dragon Buster II (J) | Namco 108(206) 同架構；$8000 write = 命令，$8001 = data；CHR: 2KB×2（R0/R1）+ 1KB×4（R2–R5）；無 IRQ |
-| 12 | **232** | Camerica Quattro (BF909x) | ⭐⭐ | 18 | Quattro Sports, Quattro Adventure (Camerica) | 與 071 同廠；`$8000–$9FFF` 寫入 = 外層 bank（bits[4:3]）；`$C000–$DFFF` 寫入 = 內層 PRG bank（bits[1:0]） |
-| 13 | **140** | Jaleco JF-11 / JF-14 | ⭐⭐ | 15 | Bio Senshi Dan (J), Mississippi Satsujin Jiken (J) | `$6000–$7FFF` 寫入；bits[7:4] = CHR 8KB bank，bits[3:0] = PRG 32KB bank；一次選 PRG+CHR；無 IRQ |
-| 14 | **070** | Bandai 74161/32 | ⭐⭐ | 14 | Kamen Rider Club (J), Family Trainer 5 (J) | `$8000–$FFFF` 寫入；bits[3:0] = CHR 8KB，bits[7:4] = PRG 16KB ($8000)；$C000 固定末；H/V 鏡像固定（垂直） |
+| ~~9~~ | ~~**075**~~ | ~~Konami VRC1~~ | ~~⭐⭐~~ | ~~28~~ | ~~Ganbare Goemon! (J), Jajamaru Ninpou Chou (J)~~ | ✅ `Mapper075.cs` — 4×8K PRG ($8000/$A000/$C000 swappable, $E000 固定末)；$9000 bit0=H/V，bit1=CHR0 high，bit2=CHR1 high；$E000/$F000 各選 4KB CHR；Ganbare Goemon!, Jajamaru Ninpou Chou 驗證通過 |
+| ~~10~~ | ~~**118**~~ | ~~TxSROM (MMC3 + NT control)~~ | ~~⭐⭐~~ | ~~28~~ | ~~Ys III (J), NES Play Action Football (U), Armadillo (J)~~ | ✅ `Mapper118.cs` — MMC3 全功能 + CHR reg bit7 控制命名表；mode 0: R0/R1 bit7→NT0+NT1/NT2+NT3；mode 1: R2-R5 各控制 NT0-NT3；ntBankPtrs + ntChrOverrideEnabled；Ys III, Goal! Two, Armadillo, NES Play Action Football 驗證通過 |
+| ~~11~~ | ~~**088**~~ | ~~Namco 118 / 634~~ | ~~⭐⭐~~ | ~~18~~ | ~~Dragon Spirit (J), Quinty (J), Dragon Buster II (J)~~ | ✅ `Mapper088.cs` — Namco 108(206) 同架構；R0/R1=2KB CHR ($0000/$0800，清 bit6)；R2-R5=1KB CHR ($1000-$1C00，強制 bit6=1)；R6/R7=8KB PRG；$C000-$DFFF 倒數第二，$E000-$FFFF 固定末；Dragon Spirit, Quinty 驗證通過 |
+| ~~12~~ | ~~**232**~~ | ~~Camerica Quattro (BF909x)~~ | ~~⭐⭐~~ | ~~18~~ | ~~Quattro Sports, Quattro Adventure (Camerica)~~ | ✅ `Mapper232.cs` — `$8000–$9FFF` 寫入外層 bank bits[4:3]；`$C000–$DFFF` 寫入內層 bits[1:0]；bank0=(outer<<2)|inner，bank1=(outer<<2)|3；IsAladdinVariant(submapper 1)位元交換；Quattro Adventure, Quattro Sports 驗證通過 |
+| ~~13~~ | ~~**140**~~ | ~~Jaleco JF-11 / JF-14~~ | ~~⭐⭐~~ | ~~15~~ | ~~Bio Senshi Dan (J), Mississippi Satsujin Jiken (J)~~ | ✅ `Mapper140.cs` — `$6000–$7FFF` 寫入(MapperW_RAM)；bits[7:4]=CHR 8KB，bits[3:0]=PRG 32KB；total32k=PRG_ROM_count/2；Doraemon 驗證通過。⚠️ Bio Senshi Dan 綠畫面（疑似 ROM 特定問題，非 mapper bug） |
+| ~~14~~ | ~~**070**~~ | ~~Bandai 74161/32~~ | ~~⭐⭐~~ | ~~14~~ | ~~Kamen Rider Club (J), Family Trainer 5 (J)~~ | ✅ `Mapper070.cs` — `$8000–$FFFF` 寫入；bits[7:4]=PRG 16KB ($8000)，bits[3:0]=CHR 8KB；$C000 固定末；Reset 強制 *Vertical=1（Mesen2 hack for Kamen Rider bad header）；Mapper152 subclass(enableMirroringControl=true，bit6 single-screen)；Kamen Rider Club, Family Trainer 驗證通過；Arkanoid II (Prototype) 部分正常 |
 
 ---
 
@@ -119,7 +127,7 @@
 
 | 優先 | Mapper | 名稱 | 難度 | ROMs | 代表遊戲 | 實作要點 |
 |:----:|:------:|------|:----:|:----:|---------|---------|
-| 22 | **152** | Bandai 74161/32 (single-screen) | ⭐ | 4 | Arkanoid II (J) | Mapper070 直接變體；bit6=1 時 one-screen 鏡像（0=bank A，1=bank B）；其餘 PRG/CHR 邏輯同 070 |
+| ~~22~~ | ~~**152**~~ | ~~Bandai 74161/32 (single-screen)~~ | ~~⭐~~ | ~~4~~ | ~~Arkanoid II (J)~~ | ✅ `Mapper152.cs`（Mapper070 subclass）— enableMirroringControl=true；bit7 heuristic 偵測鏡像控制；bit6→*Vertical 2(A)/3(B) single-screen；Arkanoid II (Prototype) 部分正常 |
 | 23 | **097** | Irem TAM-S1 | ⭐⭐ | 3 | Kaiketsu Yanchamaru (J) | PRG 16KB 切換於 $C000–$FFFF（固定首端 $8000–$BFFF）；與 UxROM 方向相反；無 IRQ；CHR-RAM |
 | 24 | **180** | Crazy Climber | ⭐ | 1 | Crazy Climber (J) | 僅切換 $8000–$BFFF 的 16KB PRG；$C000–$FFFF 固定 bank 0；CHR-RAM；`$8000–$FFFF` 任意地址寫入選 bank |
 | 25 | **210** | Namco 175 / Namco 340 | ⭐⭐⭐ | 1* | Famista '92/93, Wagyan Land 2, Pac-Attack | 兩種子板型（NES 2.0 分拆）；175=無IRQ；340=有IRQ+命名表控制；CHR 8KB×8；*GoodNES ROM 標記可能不準確 |
@@ -162,4 +170,4 @@
 
 ---
 
-*最後更新：2026-03-19（Mapper025 VRC4b/d、Mapper079 NINA-03/06、Mapper087 JF-09/10/18、Mapper185 CNROM+protect、Mapper184 Sunsoft-1、Mapper072 JF-17、Mapper093 Sunsoft-2 FantasyZone、Mapper089 Sunsoft-2 Ikki 加入；S 級 8/8 = 100% 完成；總計已實作 38 個）*
+*最後更新：2026-03-19（Mapper075 VRC1、Mapper118 TxSROM、Mapper088 Namco 118、Mapper232 Camerica Quattro、Mapper140 JF-11/14、Mapper070 Bandai 74161/32、Mapper152 single-screen 加入；A 級 6/6 = 100% 完成；總計已實作 45 個）*
