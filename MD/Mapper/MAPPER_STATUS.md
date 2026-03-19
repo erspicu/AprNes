@@ -12,11 +12,14 @@
 |------|------|
 | 實作目標（扣除盜版 + 補充 020/085） | 28 個 |
 | 目標內已實作 | 28 個 |
-| 目標外額外實作（NROM、Namco 108 + S 級 8 個 + A 級 6 個 + Mapper152） | 17 個 |
-| **總計已實作** | **45 個** |
+| 目標外額外實作（NROM、Namco 108 + S 級 8 個 + A 級 6 個 + Mapper152 + B/C/D 級 12 個） | 29 個 |
+| **總計已實作** | **57 個** |
 | 目標涵蓋完成率 | **28 / 28 = 100%** |
 | S 級 TODO 完成率 | **8 / 8 = 100%** |
 | A 級 TODO 完成率 | **6 / 6 = 100%** |
+| B 級 TODO 完成率 | **7 / 7 = 100%** |
+| C 級 TODO 完成率 | **3 / 3 = 100%（含 Mapper152）** |
+| D 級 TODO 完成率 | **2 / 2 = 100%** |
 
 ---
 
@@ -61,6 +64,18 @@
 | **140** | Jaleco JF-11 / JF-14 | `Mapper140.cs` — $6000-$7FFF 寫入選 PRG 32KB + CHR 8KB；Doraemon 驗證通過（文件外額外支援） |
 | **152** | Bandai 74161/32 (single-screen) | `Mapper152.cs`（Mapper070 subclass）— bit6 single-screen 鏡像；Arkanoid II (Prototype)（文件外額外支援） |
 | **232** | Camerica BF9096 Quattro | `Mapper232.cs` — 外層 $8000-$9FFF + 內層 $C000-$DFFF 二段 PRG；Aladdin variant submapper；Quattro Adventure, Quattro Sports 驗證通過（文件外額外支援） |
+| **013** | CPROM | `Mapper013.cs` — 32KB PRG 固定；16KB CHR-RAM；下半 4KB 固定 bank0，上半 4KB switchable bits[1:0] |
+| **067** | Sunsoft-3 | `Mapper067.cs` — 16KB PRG + 4×2KB CHR；16-bit IRQ 下計數(0→0xFFFF)；Fantasy Zone 2, Mito Koumon II 驗證通過 |
+| **076** | Namco 109 | `Mapper076.cs` — Namco108 架構；4×2KB CHR(reg[2-5])；Megami Tensei 驗證通過 |
+| **077** | Napoleon Senki (IremLrog017) | `Mapper077.cs` — 32KB PRG；CHR slot0=ROM 2KB，slots1-3=RAM 6KB；Napoleon Senki 驗證通過 |
+| **080** | Taito X1-005 | `Mapper080.cs` — $7EF0-$7EFF regs；3×8KB PRG；2KB+1KB CHR；RAM unlock；Minelvaton Saga, Fudou Myouou Den 驗證通過 |
+| **082** | Taito X1-017 | `Mapper082.cs` — $7EF0-$7EFF regs；chrMode switch；SRAM unlock seq；SD Keiji Blader, Harikiri Stadium 驗證通過 |
+| **095** | Namco 118 DxROM | `Mapper095.cs` — Namco108 架構；reg[0]/[1] bit5=NT select；Dragon Buster 驗證通過 |
+| **097** | Irem TAM-S1 | `Mapper097.cs` — 首 16KB 固定，末 16KB 切換；CHR-RAM；Kaiketsu Yanchamaru 驗證通過 |
+| **119** | TQROM | `Mapper119.cs` — MMC3 全功能；CHR 0x40-0x7F → 8KB CHR-RAM；High Speed 驗證通過 |
+| **180** | Crazy Climber / UnRom_180 | `Mapper180.cs` — 首 16KB 固定($8000)，末 16KB 切換($C000)；CHR-RAM；Crazy Climber 驗證通過 |
+| **210** | Namco 175/340 | `Mapper210.cs` — SubMapper 1=175(無IRQ)，SubMapper 2=340(IRQ+NT)；4×8KB PRG + 8×1KB CHR |
+| **228** | Action 52 | `Mapper228.cs` — addr+data 編碼 PRG/CHR/mirror；chipSelect 3→2；16KB/32KB mode；Cheetahmen II 驗證通過 |
 
 ---
 
@@ -109,37 +124,37 @@
 
 ---
 
-### 🟡 B 級 — 中等難度或遊戲量適中
+### 🟡 B 級 — 中等難度或遊戲量適中（✅ 全部完成）
 
 | 優先 | Mapper | 名稱 | 難度 | ROMs | 代表遊戲 | 實作要點 |
 |:----:|:------:|------|:----:|:----:|---------|---------|
-| 15 | **119** | TQROM (MMC3 + mixed CHR) | ⭐⭐ | 15 | PinBot (U), High Speed (U) | MMC3 全功能；CHR bank 值 bit6=1 時映射 CHR-RAM（而非 CHR-ROM）；NES-TQROM 板型 |
-| 16 | **080** | Taito X1-005 | ⭐⭐⭐ | 24 | Minelvaton Saga (J), Kyonshiizu 2 (J), Fudou Myouou Den (J) | ASIC；PRG 32KB 固定；`$7EF0–$7EFF` 寫入 CHR；2KB×4 或 1KB×8 切換；有帶 NVRAM 的子版型（NES 2.0 細分）；bus conflict timing |
-| 17 | **067** | Sunsoft-3 | ⭐⭐ | 6 | Fantasy Zone 2 (J), Mito Koumon II (J) | PRG 16KB 切換（$8000–$BFFF）；CHR 2KB×4（R0–R3）；`$C000–$DFFF` = IRQ latch，`$E000` = IRQ 啟停，`$E001` = ACK |
-| 18 | **228** | Action 52 (Active Enterprises) | ⭐⭐ | 10 | Action 52 (U), Cheetahmen II (U) | `$8000–$FFFF` 寫入；bits[9:6]=外層bank，bit5=PRG size(16/32KB)，bits[4:2]=CHR bank，bits[1:0]=鏡像；一次搞定 |
-| 19 | **095** | Namco 118 (DxROM) | ⭐⭐ | 7 | Dragon Buster (J) | Namco 108 同架構；CHR: 2KB×2 + 1KB×4；命名表由 CHR bank 控制（bits[5]）；無 IRQ；可從 206/088 改造 |
-| 20 | **076** | Namco 109 | ⭐⭐ | 7 | Digital Devil Monogatari - Megami Tensei (J) | Namco 108 同架構；CHR: 2KB×2（R0/R1，低 bank 位置）+ 1KB×4（R2–R5，高 bank 位置）；與 088 的差異在 CHR bank 前後配置相反 |
-| 21 | **013** | CPROM (NES-CPROM) | ⭐ | 7 | Videomation (U) | PRG 32KB 固定；`$C000–$FFFF` 寫入 bit1 = 切換 CHR-RAM 上半 4KB（$1000–$1FFF）；下半固定 bank 0 |
+| ~~15~~ | ~~**119**~~ | ~~TQROM (MMC3 + mixed CHR)~~ | ~~⭐⭐~~ | ~~15~~ | ~~PinBot (U), High Speed (U)~~ | ✅ `Mapper119.cs` — MMC3 全功能；CHR bank 值 0x40–0x7F 映射 8KB CHR-RAM（unmanaged Marshal.AllocHGlobal），其他映射 CHR-ROM；High Speed 驗證通過 |
+| ~~16~~ | ~~**080**~~ | ~~Taito X1-005~~ | ~~⭐⭐⭐~~ | ~~24~~ | ~~Minelvaton Saga (J), Kyonshiizu 2 (J), Fudou Myouou Den (J)~~ | ✅ `Mapper080.cs` — $7EF0–$7EFF 寫入(MapperW_RAM)；reg[0]/[1]=2KB CHR(slots 0-3), reg[2-5]=1KB CHR(slots 4-7), reg[6-8]=8KB PRG；ramPermission==0xA3 解鎖 $7F00 工作 RAM；Minelvaton Saga, Fudou Myouou Den 驗證通過 |
+| ~~17~~ | ~~**067**~~ | ~~Sunsoft-3~~ | ~~⭐⭐~~ | ~~6~~ | ~~Fantasy Zone 2 (J), Mito Koumon II (J)~~ | ✅ `Mapper067.cs` — PRG 16KB 切換($8000)；CHR 2KB×4($8800/$9800/$A800/$B800)；$C800=IRQ latch(alt lo/hi)，$D800=IRQ enable/ack；$E800=mirror；Fantasy Zone 2 驗證通過 |
+| ~~18~~ | ~~**228**~~ | ~~Action 52 (Active Enterprises)~~ | ~~⭐⭐~~ | ~~10~~ | ~~Action 52 (U), Cheetahmen II (U)~~ | ✅ `Mapper228.cs` — $8000–$FFFF write；chipSelect=addr bits[12:11](clamp 3→2)；prgPage=((addr>>6)&0x1F)|(chipSelect<<5)；bit5=16KB/32KB mode；chrBank=((addr&0xF)<<2)|(data&3)；Cheetahmen II 驗證通過 |
+| ~~19~~ | ~~**095**~~ | ~~Namco 118 (DxROM)~~ | ~~⭐⭐~~ | ~~7~~ | ~~Dragon Buster (J)~~ | ✅ `Mapper095.cs` — Namco108 架構(addr&0x8001)；reg[0]/[1] bit5=NT select(SetNametables→ntBankPtrs+ntChrOverrideEnabled)；reg[2-5]強制bit6=1(上半)；Dragon Buster 驗證通過 |
+| ~~20~~ | ~~**076**~~ | ~~Namco 109~~ | ~~⭐⭐~~ | ~~7~~ | ~~Digital Devil Monogatari - Megami Tensei (J)~~ | ✅ `Mapper076.cs` — Namco108 架構(addr&0x8001)；reg[2-5]=2KB CHR bank(index*2→1KB)；reg[6]/[7]=8KB PRG；Megami Tensei 驗證通過 |
+| ~~21~~ | ~~**013**~~ | ~~CPROM (NES-CPROM)~~ | ~~⭐~~ | ~~7~~ | ~~Videomation (U)~~ | ✅ `Mapper013.cs` — PRG 32KB 固定；16KB CHR-RAM(unmanaged)；下半 4KB 固定 bank0，上半 4KB 由寫入 bits[1:0] 切換(0-3)；MapperW_CHR 可寫整個 CHR-RAM |
 
 ---
 
-### 🟢 C 級 — 遊戲少或為邊緣案例
+### 🟢 C 級 — 遊戲少或為邊緣案例（✅ 全部完成）
 
 | 優先 | Mapper | 名稱 | 難度 | ROMs | 代表遊戲 | 實作要點 |
 |:----:|:------:|------|:----:|:----:|---------|---------|
 | ~~22~~ | ~~**152**~~ | ~~Bandai 74161/32 (single-screen)~~ | ~~⭐~~ | ~~4~~ | ~~Arkanoid II (J)~~ | ✅ `Mapper152.cs`（Mapper070 subclass）— enableMirroringControl=true；bit7 heuristic 偵測鏡像控制；bit6→*Vertical 2(A)/3(B) single-screen；Arkanoid II (Prototype) 部分正常 |
-| 23 | **097** | Irem TAM-S1 | ⭐⭐ | 3 | Kaiketsu Yanchamaru (J) | PRG 16KB 切換於 $C000–$FFFF（固定首端 $8000–$BFFF）；與 UxROM 方向相反；無 IRQ；CHR-RAM |
-| 24 | **180** | Crazy Climber | ⭐ | 1 | Crazy Climber (J) | 僅切換 $8000–$BFFF 的 16KB PRG；$C000–$FFFF 固定 bank 0；CHR-RAM；`$8000–$FFFF` 任意地址寫入選 bank |
-| 25 | **210** | Namco 175 / Namco 340 | ⭐⭐⭐ | 1* | Famista '92/93, Wagyan Land 2, Pac-Attack | 兩種子板型（NES 2.0 分拆）；175=無IRQ；340=有IRQ+命名表控制；CHR 8KB×8；*GoodNES ROM 標記可能不準確 |
+| ~~23~~ | ~~**097**~~ | ~~Irem TAM-S1~~ | ~~⭐⭐~~ | ~~3~~ | ~~Kaiketsu Yanchamaru (J)~~ | ✅ `Mapper097.cs` — 固定首 16KB($8000)，切換末 16KB($C000)；bits[7:6]=mirror(0=SingleA,1=H,2=V,3=SingleB)；CHR-RAM via ppu_ram；Kaiketsu Yanchamaru 驗證通過 |
+| ~~24~~ | ~~**180**~~ | ~~Crazy Climber~~ | ~~⭐~~ | ~~1~~ | ~~Crazy Climber (J)~~ | ✅ `Mapper180.cs` — 固定首 16KB($8000)，切換末 16KB($C000)；bits[2:0]=bank；CHR-RAM via ppu_ram；Crazy Climber 驗證通過 |
+| ~~25~~ | ~~**210**~~ | ~~Namco 175 / Namco 340~~ | ~~⭐⭐⭐~~ | ~~1*~~ | ~~Famista '92/93, Wagyan Land 2, Pac-Attack~~ | ✅ `Mapper210.cs` — SubMapper 1=175(無IRQ,無NT control)，SubMapper 2=340($E000 bits[7:6]=mirror)；4×8KB PRG + 8×1KB CHR；IRQ 15-bit 上計數(340 only)；傳入 db.Submapper |
 
 ---
 
-### 🔵 D 級 — 困難或意義有限（最後考慮）
+### 🔵 D 級 — 困難或意義有限（✅ 全部完成）
 
 | 優先 | Mapper | 名稱 | 難度 | ROMs | 代表遊戲 | 實作要點 |
 |:----:|:------:|------|:----:|:----:|---------|---------|
-| 26 | **082** | Taito X1-017 | ⭐⭐⭐⭐ | 12 | Kyuukyoku Harikiri Stadium 系列 (J) | CHR 1KB×6 + PRG 8KB×3；NVRAM 需先寫解鎖序列（$7EF8–$7EFA）；$7EFC–$7EFF SRAM protect regs；Taito 最複雜 ASIC |
-| 27 | **077** | Napoleon Senki | ⭐⭐⭐ | 2 | Napoleon Senki (J) | 2KB CHR-RAM（$0000–$07FF + $1000–$17FF）+ 2KB CHR-ROM（其餘）；`$8000` write bit0 切換；特殊 CHR 空間分割，全 NES 唯一 |
+| ~~26~~ | ~~**082**~~ | ~~Taito X1-017~~ | ~~⭐⭐⭐⭐~~ | ~~12~~ | ~~Kyuukyoku Harikiri Stadium 系列 (J)~~ | ✅ `Mapper082.cs` — $7EF0–$7EFF(MapperW_RAM)；$7EF6 bit1=chrMode(2KB/1KB)；$7EFA-$7EFC=prgBank[0-2]>>2；$7EF8-$7EFA=SRAM unlock(CA/69/84)；SD Keiji Blader, Harikiri Stadium 驗證通過 |
+| ~~27~~ | ~~**077**~~ | ~~Napoleon Senki~~ | ~~⭐⭐⭐~~ | ~~2~~ | ~~Napoleon Senki (J)~~ | ✅ `Mapper077.cs` — 32KB PRG switchable；CHR slot0($0000-$07FF)=CHR-ROM 2KB(bits[7:4])，slots1-3($0800-$1FFF)=CHR-RAM 6KB(unmanaged)；Napoleon Senki 驗證通過 |
 
 ---
 
@@ -170,4 +185,4 @@
 
 ---
 
-*最後更新：2026-03-19（Mapper075 VRC1、Mapper118 TxSROM、Mapper088 Namco 118、Mapper232 Camerica Quattro、Mapper140 JF-11/14、Mapper070 Bandai 74161/32、Mapper152 single-screen 加入；A 級 6/6 = 100% 完成；總計已實作 45 個）*
+*最後更新：2026-03-19（Mapper013/067/076/077/080/082/095/097/119/180/210/228 加入；B 級 7/7、C 級 3/3（含 Mapper152）、D 級 2/2 全部完成；總計已實作 57 個）*

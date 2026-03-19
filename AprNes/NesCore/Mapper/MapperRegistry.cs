@@ -7,11 +7,11 @@ namespace AprNes
             switch (id)
             {
                 case  0: case  1: case  2: case  3: case  4: case  5:
-                case  7: case  9: case 10: case 11: case 16: case 18: case 19: case 21: case 22: case 23: case 24: case 26:
+                case  7: case  9: case 10: case 11: case 13: case 16: case 18: case 19: case 21: case 22: case 23: case 24: case 26:
                 case 159: case 153: case 85:
-                case 25: case 72: case 79: case 87: case 89: case 93: case 184: case 185:
+                case 25: case 67: case 72: case 76: case 77: case 79: case 80: case 82: case 87: case 89: case 93: case 95: case 97: case 184: case 185:
                 case 32: case 33: case 34: case 64: case 65: case 66: case 68: case 69: case 71: case 78: case 206:
-                case 70: case 75: case 88: case 118: case 140: case 152: case 232:
+                case 70: case 75: case 88: case 118: case 119: case 140: case 152: case 180: case 210: case 228: case 232:
                     return true;
                 default:
                     return false;
@@ -53,6 +53,18 @@ namespace AprNes
                 case 69: return "FME-7";
                 case 71: return "Camerica";
                 case 78: return "Irem 74HC161/32";
+                case  13: return "CPROM";
+                case  67: return "Sunsoft-3";
+                case  76: return "Namco 109";
+                case  77: return "Napoleon/IremLrog017";
+                case  80: return "Taito X1-005";
+                case  82: return "Taito X1-017";
+                case  95: return "Namco 118 DxROM";
+                case  97: return "Irem TAM-S1";
+                case 119: return "TQROM";
+                case 180: return "Crazy Climber";
+                case 210: return "Namco 175/340";
+                case 228: return "Action 52";
                 case 206: return "Namco 108";
                 case  25: return "VRC4b/d";
                 case  72: return "Jaleco JF-17";
@@ -171,6 +183,58 @@ namespace AprNes
                         m.isHolyDiver = true;
                     }
                     return m;
+                }
+                case  13: {
+                    System.Console.WriteLine("Mapper013: CPROM");
+                    return new Mapper013();
+                }
+                case  67: {
+                    System.Console.WriteLine("Mapper067: Sunsoft-3");
+                    return new Mapper067();
+                }
+                case  76: {
+                    System.Console.WriteLine("Mapper076: Namco 109");
+                    return new Mapper076();
+                }
+                case  77: {
+                    System.Console.WriteLine("Mapper077: Napoleon/IremLrog017");
+                    return new Mapper077();
+                }
+                case  80: {
+                    System.Console.WriteLine("Mapper080: Taito X1-005");
+                    return new Mapper080();
+                }
+                case  82: {
+                    System.Console.WriteLine("Mapper082: Taito X1-017");
+                    return new Mapper082();
+                }
+                case  95: {
+                    System.Console.WriteLine("Mapper095: Namco 118 DxROM");
+                    return new Mapper095();
+                }
+                case  97: {
+                    System.Console.WriteLine("Mapper097: Irem TAM-S1");
+                    return new Mapper097();
+                }
+                case 119: {
+                    System.Console.WriteLine("Mapper119: TQROM");
+                    return new Mapper119();
+                }
+                case 180: {
+                    System.Console.WriteLine("Mapper180: Crazy Climber");
+                    return new Mapper180();
+                }
+                case 210: {
+                    var m = new Mapper210();
+                    m.Submapper = db.Submapper;
+                    if (db.Submapper == 1) System.Console.WriteLine("Mapper210: Namco175");
+                    else if (db.Submapper == 2) System.Console.WriteLine("Mapper210: Namco340");
+                    else System.Console.WriteLine("Mapper210: Namco175/340 (heuristic)");
+                    return m;
+                }
+                case 228: {
+                    System.Console.WriteLine("Mapper228: Action 52");
+                    return new Mapper228();
                 }
                 case 206: return new Mapper206();
                 case 25: {
