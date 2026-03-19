@@ -43,6 +43,7 @@
             this.fullScreeenToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.normalToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this._soundMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this._ultraAnalogMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.fps_count_timer = new System.Windows.Forms.Timer(this.components);
             this.label3 = new System.Windows.Forms.Label();
             this.UIOpenRom = new System.Windows.Forms.Label();
@@ -76,7 +77,8 @@
             this.fun5ToolStripMenuItem,
             this.fun6ToolStripMenuItem,
             this.screenModeToolStripMenuItem,
-            this._soundMenuItem});
+            this._soundMenuItem,
+            this._ultraAnalogMenuItem});
             this.contextMenuStrip1.Name = "contextMenuStrip1";
             this.contextMenuStrip1.Size = new System.Drawing.Size(192, 274);
             // 
@@ -158,6 +160,13 @@
             this._soundMenuItem.Size = new System.Drawing.Size(191, 30);
             this._soundMenuItem.Text = "Sound: ON";
             this._soundMenuItem.Click += new System.EventHandler(this._soundMenuItem_Click);
+            //
+            // _ultraAnalogMenuItem
+            //
+            this._ultraAnalogMenuItem.Name = "_ultraAnalogMenuItem";
+            this._ultraAnalogMenuItem.Size = new System.Drawing.Size(191, 30);
+            this._ultraAnalogMenuItem.Text = "Ultra Analog: OFF";
+            this._ultraAnalogMenuItem.Click += new System.EventHandler(this._ultraAnalogMenuItem_Click);
             // 
             // fps_count_timer
             // 
@@ -310,6 +319,7 @@
         private System.Windows.Forms.ToolStripMenuItem fullScreeenToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem normalToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem _soundMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem _ultraAnalogMenuItem;
     }
 }
 

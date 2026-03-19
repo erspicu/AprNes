@@ -193,6 +193,7 @@ namespace AprNes
                 AppConfigure["Volume"] = "70";
                 AppConfigure["AnalogMode"] = "0";
                 AppConfigure["AnalogOutput"] = "AV";
+                AppConfigure["UltraAnalog"] = "0";
                 Configure_Write();
             }
 
@@ -249,6 +250,9 @@ namespace AprNes
 
             // 讀取類比訊號模擬設定 (預設關閉)
             NesCore.AnalogEnabled = AppConfigure.ContainsKey("AnalogMode") && AppConfigure["AnalogMode"] == "1";
+
+            // 讀取 Ultra 類比設定（預設關閉）
+            NesCore.UltraAnalog = AppConfigure.ContainsKey("UltraAnalog") && AppConfigure["UltraAnalog"] == "1";
 
             // 讀取類比端子模式 (AnalogMode=1 時有效，預設 AV)
             if (AppConfigure.ContainsKey("AnalogOutput"))
@@ -607,6 +611,14 @@ public string GetRomInfo()
                 : LangINI.Get(lang, "SoundOFF", "Sound OFF");
         }
 
+        void UpdateUltraAnalogMenuText()
+        {
+            if (_ultraAnalogMenuItem == null) return;
+            _ultraAnalogMenuItem.Text = NesCore.UltraAnalog
+                ? "Ultra Analog: ON"
+                : "Ultra Analog: OFF";
+        }
+
         public string rom_file_name = "";
         public string nes_name = "";
 
@@ -948,10 +960,19 @@ public string GetRomInfo()
             Configure_Write();
         }
 
+        private void _ultraAnalogMenuItem_Click(object sender, EventArgs e)
+        {
+            NesCore.UltraAnalog = !NesCore.UltraAnalog;
+            UpdateUltraAnalogMenuText();
+            AppConfigure["UltraAnalog"] = NesCore.UltraAnalog ? "1" : "0";
+            Configure_Write();
+        }
+
         private void AprNesUI_Shown(object sender, EventArgs e)
         {
             initUIsize();
             UpdateSoundMenuText();
+            UpdateUltraAnalogMenuText();
 
             _joystick.Init(this.Handle);
             new Thread(polling_listener).Start();

@@ -175,6 +175,10 @@ namespace AprNes
                     case "--analog":
                         NesCore.AnalogEnabled = true;
                         break;
+                    case "--ultra-analog":
+                        NesCore.AnalogEnabled = true;
+                        NesCore.UltraAnalog = true;
+                        break;
                     case "--analog-output":
                         if (i + 1 < args.Length)
                         {

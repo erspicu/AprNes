@@ -56,6 +56,11 @@ namespace AprNes
         // true  = NTSC 電壓波形生成 + YIQ 解碼重採樣
         static public bool AnalogEnabled = false;
 
+        // Ultra 類比模式：開啟後使用完整物理模擬（21.477 MHz 時域波形 + coherent demodulation）
+        // false（預設）= Level 2 簡化路徑（直接 YIQ + LUT dot crawl）
+        // true          = Level 3 物理路徑（Step 1 波形 + Step 2 解調 + Step 3 YIQ→RGB）
+        static public bool UltraAnalog = false;
+
         // 類比輸出端子模式（AnalogEnabled=true 時有效）
         // AV     = Composite：Y+C 混合，標準 IIR 解碼，產生 Dot Crawl / 色彩暈染
         // SVideo = S-Video：Y/C 分離傳輸，較銳利，色彩暈染較少
