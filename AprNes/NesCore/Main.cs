@@ -62,8 +62,85 @@ namespace AprNes
             OnError?.Invoke(msg);
         }
 
+        static void FreeUnmanagedMemory()
+        {
+            if (PRG_ROM      != null) { Marshal.FreeHGlobal((IntPtr)PRG_ROM);      PRG_ROM      = null; }
+            if (CHR_ROM      != null) { Marshal.FreeHGlobal((IntPtr)CHR_ROM);      CHR_ROM      = null; }
+            if (ScreenBuf1x  != null) { Marshal.FreeHGlobal((IntPtr)ScreenBuf1x);  ScreenBuf1x  = null; }
+            if (Buffer_BG_array != null) { Marshal.FreeHGlobal((IntPtr)Buffer_BG_array); Buffer_BG_array = null; }
+            if (NesColors    != null) { Marshal.FreeHGlobal((IntPtr)NesColors);    NesColors    = null; }
+            if (palCacheR    != null) { Marshal.FreeHGlobal((IntPtr)palCacheR);    palCacheR    = null; }
+            if (palCacheN    != null) { Marshal.FreeHGlobal((IntPtr)palCacheN);    palCacheN    = null; }
+            if (spr_ram      != null) { Marshal.FreeHGlobal((IntPtr)spr_ram);      spr_ram      = null; }
+            if (secondaryOAM != null) { Marshal.FreeHGlobal((IntPtr)secondaryOAM); secondaryOAM = null; }
+            if (corruptOamRow!= null) { Marshal.FreeHGlobal((IntPtr)corruptOamRow);corruptOamRow= null; }
+            if (ppu_ram      != null) { Marshal.FreeHGlobal((IntPtr)ppu_ram);      ppu_ram      = null; }
+            if (P1_joypad_status != null) { Marshal.FreeHGlobal((IntPtr)P1_joypad_status); P1_joypad_status = null; }
+            if (NES_MEM      != null) { Marshal.FreeHGlobal((IntPtr)NES_MEM);      NES_MEM      = null; }
+            if (Vertical     != null) { Marshal.FreeHGlobal((IntPtr)Vertical);     Vertical     = null; }
+        }
+
+        static void HardResetState()
+        {
+            // CPU registers (6502 power-up state)
+            r_A = 0; r_X = 0; r_Y = 0; r_SP = 0xFD;
+            flagN = 0; flagV = 0; flagD = 0; flagI = 1; flagZ = 0; flagC = 0;
+            opcode = 0; operationCycle = 0;
+            cpubus = 0; cpuBusAddr = 0; addressBus = 0; dl = 0; ignoreH = false;
+            m2PhaseIsWrite = false;
+
+            // CPU interrupt state
+            nmi_pending = false; nmi_delay_cycle = -1; nmi_output_prev = false;
+            irq_pending = false; irqLinePrev = false; irqLineCurrent = false;
+            statusmapperint = false;
+            doNMI = false; doIRQ = false; doReset = false; doBRK = false; softreset = false;
+
+            // DMA state
+            dmaNeedHalt = false; dmcNeedDummyRead = false; dmcDmaRunning = false;
+            spriteDmaTransfer = false; spriteDmaOffset = 0;
+            dmaPrevReadAddress = 0; dmaReadSkipBusUpdate = false;
+
+            // PPU control registers ($2000/$2001/$2002)
+            BaseNameTableAddr = 0; VramaddrIncrement = 1;
+            SpPatternTableAddr = 0; BgPatternTableAddr = 0;
+            Spritesize8x16 = false; NMIable = false;
+            ShowBackGround = false; ShowSprites = false;
+            ShowBgLeft8 = true; ShowSprLeft8 = true;
+            isSpriteOverflow = false; isSprite0hit = false; isVblank = false;
+            SuppressVbl = false;
+
+            // PPU VRAM address / scroll
+            vram_addr_internal = 0; vram_addr = 0; scrol_y = 0; FineX = 0;
+            vram_latch = false;
+            ppu_2007_buffer = 0; ppu_2007_temp = 0; ppu2007ReadCooldown = 0;
+            openbus = 0; open_bus_decay_timer = 77777;
+
+            // PPU scan position & frame state
+            ppu_cycles_x = 0; scanline = -1; frame_count = 0;
+            oddSwap = false; ppuRenderingEnabled = false; prevRenderingEnabled = false;
+            spr_ram_add = 0;
+
+            // PPU tile pipeline
+            NTVal = 0; ATVal = 0; lowTile = 0; highTile = 0; ioaddr = 0;
+            lowshift = 0; highshift = 0;
+            lowshift_s0 = 0; highshift_s0 = 0;
+            bg_attr_p1 = 0; bg_attr_p2 = 0; bg_attr_p3 = 0;
+
+            // PPU sprite state
+            sprite0_on_line = false; sprite0_line_x = 0;
+            sprite0_tile_low = 0; sprite0_tile_high = 0; sprite0_flip_x = false;
+            prerender_sprite0_valid = false; prerender_sprite0_x = 0;
+            prerender_sprite0_tile_low = 0; prerender_sprite0_tile_high = 0;
+            prerender_sprite0_flip_x = false;
+            spriteOverflowCycle = 0;
+
+            // JoyPad
+            P1_LastWrite = 0; strobeWritePending = 0; strobeWriteValue = 0;
+        }
+
         static public bool init(byte[] rom_bytes) //for Hard Reset effect
         {
+            FreeUnmanagedMemory();
             try
             {
                 //http://nesdev.com/iNES.txt
@@ -215,6 +292,8 @@ namespace AprNes
                 for (int i = 0; i < 32; i++) { secondaryOAM[i] = 0; corruptOamRow[i] = 0; }
                 for (int i = 0; i < 8; i++) P1_joypad_status[i] = 0x40;
                 for (int i = 0; i < 65536; i++) NES_MEM[i] = 0;
+
+                HardResetState();  // reset all CPU/PPU/DMA static state
 
                 initPalette();
 
