@@ -31,6 +31,8 @@ namespace AprNes
     //           + NoiseIntensity 熱雜訊疊加
     //   Step 2  Y/I/Q 分離帶限解調（Hann 視窗）：
     //           Y = kWinY=6（≈4.2 MHz），I = kWinI=18（≈1.3 MHz），Q = kWinQ=54（≈0.4 MHz）
+    //           RF/AV：全部從 waveBuf（混合訊號）解調
+    //           SVideo：Y 從 waveBuf（純亮度），I/Q 從 cBuf（純 C 線，無亮度串擾）
     //   Step 3  YIQ → Linear RGB（blargg -15° 矩陣，無 Gamma）
     // ============================================================
 
@@ -115,7 +117,8 @@ namespace AprNes
         const int kWaveLen = kDots * kSampDot;        // 1024
         const int kLeadPad = 30;                       // ≥ kWinQ_half=27
         const int kBufLen  = kLeadPad * 2 + kWaveLen; // 1084
-        static readonly float[] waveBuf = new float[kBufLen];
+        static readonly float[] waveBuf = new float[kBufLen]; // composite / S-Video Y line
+        static readonly float[] cBuf    = new float[kBufLen]; // S-Video C line（副載波彩度）
 
         // Y/I/Q 分離解調視窗（Hann，物理帶限）
         //   Y ≈ 4.2 MHz → 6 samples（1 副載波週期，精確消色度）
@@ -359,7 +362,10 @@ namespace AprNes
             scanPhaseBase = (scanPhaseBase + 2) % 6; // 1364 mod 6 = 2
 
             if (NesCore.AnalogOutput == NesCore.AnalogOutputMode.SVideo)
-                DecodePhysical_SVideo(sl, palBuf, emphasisBits);
+            {
+                GenerateWaveform_SVideo(palBuf, emphasisBits, sl, phase0);
+                DemodulateRow_SVideo(sl, phase0);
+            }
             else
             {
                 bool isRF = NesCore.AnalogOutput == NesCore.AnalogOutputMode.RF;
@@ -515,10 +521,10 @@ namespace AprNes
                         kOutW * sizeof(uint), kOutW * sizeof(uint));
         }
 
-        // S-Video 物理路徑：直接 YIQ + SlewRate IIR(Y) + ChromaBlur IIR(I/Q)
-        //   CrtEnabled=true  → 寫入 linearBuffer
-        //   CrtEnabled=false → 直接 YIQ→BGRA 寫入 AnalogScreenBuf3x
-        static unsafe void DecodePhysical_SVideo(int sl, byte[] palBuf, byte emphasisBits)
+        // S-Video Step 1：Y 線與 C 線分別生成（物理正確，Y/C 分離傳輸）
+        //   waveBuf = Y line：純亮度，每 dot 固定 DC，SlewRate IIR 模擬 Y 通道帶限
+        //   cBuf    = C line：副載波調幅彩度訊號，無 Y 分量，邊緣填 0（空白期無彩度）
+        static void GenerateWaveform_SVideo(byte[] palBuf, byte emphasisBits, int sl, int phase0)
         {
             float atten = 1.0f;
             if (emphasisBits != 0)
@@ -527,23 +533,14 @@ namespace AprNes
                 atten = (float)Math.Pow(0.746, n);
             }
 
-            bool toCrt = NesCore.CrtEnabled;
-            int rowOff = sl * kOutW * 3;
+            float firstY = 0f;
+            int tMod = phase0;
 
-            int rowStart = sl * CrtScreen.DstH / CrtScreen.SrcH;
-            int rowEnd   = (sl + 1) * CrtScreen.DstH / CrtScreen.SrcH;
-            if (rowEnd > CrtScreen.DstH) rowEnd = CrtScreen.DstH;
-            uint* row0 = NesCore.AnalogScreenBuf3x + rowStart * kOutW;
-
-            float yFilt = 0f, iFilt = 0f, qFilt = 0f;
-            bool first = true;
-
-            for (int p = 0; p < kOutW; p++)
+            for (int d = 0; d < kDots; d++)
             {
-                int d     = p * kDots / kOutW;
-                int pal   = palBuf[d];
-                int luma  = (pal >> 4) & 3;
-                int color = pal & 0xF;
+                int p     = palBuf[d];
+                int luma  = (p >> 4) & 3;
+                int color = p & 0xF;
 
                 float lo = loLevels[luma] * atten;
                 float hi = hiLevels[luma] * atten;
@@ -552,27 +549,105 @@ namespace AprNes
                 else if (color == 0x0D) hi = lo;
                 else if (color > 0x0D)  lo = hi = 0f;
 
-                float Y = (hi + lo) * 0.5f;
-                float I = 0f, Q = 0f;
-                if (color >= 1 && color <= 12)
+                float Y   = (hi + lo) * 0.5f;
+                float sat = (hi - lo) * 0.5f;
+                float ip  = (color >= 1 && color <= 12) ? iPhase[color] * sat : 0f;
+                float qp  = (color >= 1 && color <= 12) ? qPhase[color] * sat : 0f;
+
+                if (d == 0) firstY = Y;
+
+                int baseIdx = kLeadPad + d * kSampDot;
+                for (int s = 0; s < kSampDot; s++)
                 {
-                    float sat = (hi - lo) * 0.5f;
-                    I = iPhase[color] * sat;
-                    Q = qPhase[color] * sat;
+                    waveBuf[baseIdx + s] = Y;
+                    cBuf[baseIdx + s]    = cosTab6[tMod] * ip - sinTab6[tMod] * qp;
+                    tMod = tMod == 5 ? 0 : tMod + 1;
+                }
+            }
+
+            // Y 線邊緣：DC 延伸；C 線邊緣：0（空白期無彩度）
+            float lastY = waveBuf[kLeadPad + kWaveLen - 1];
+            for (int i = 0; i < kLeadPad; i++)            { waveBuf[i] = firstY; cBuf[i] = 0f; }
+            for (int i = kLeadPad + kWaveLen; i < kBufLen; i++) { waveBuf[i] = lastY; cBuf[i] = 0f; }
+
+            // SlewRate IIR：Y 通道帶限（S-Video Y 約 3-4 MHz）
+            if (SlewRate < 1.0f)
+            {
+                float vPrev = waveBuf[0];
+                for (int i = 1; i < kBufLen; i++)
+                {
+                    vPrev += SlewRate * (waveBuf[i] - vPrev);
+                    waveBuf[i] = vPrev;
+                }
+            }
+
+            // 熱雜訊（S-Video 通常 NoiseIntensity=0，但保留路徑）
+            if (NoiseIntensity > 0f)
+            {
+                uint ns = (uint)(NesCore.frame_count * 1664525u + (uint)sl * 1013904223u + 1442695041u);
+                float amp = 2f * NoiseIntensity;
+                for (int i = kLeadPad; i < kLeadPad + kWaveLen; i++)
+                {
+                    ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5;
+                    waveBuf[i] += ((ns & 0xFF) / 255.0f - 0.5f) * amp;
+                }
+            }
+        }
+
+        // S-Video Step 2：Y/C 分離帶限解調
+        //   Y：Hann kWinY 平均 waveBuf（純亮度，無副載波干擾）
+        //   I：Hann kWinI coherent demod × cos 作用於 cBuf
+        //   Q：Hann kWinQ coherent demod × sin 作用於 cBuf
+        //   CrtEnabled=true  → WriteLinear → linearBuffer（供 Stage 2 CrtScreen）
+        //   CrtEnabled=false → 直接 YIQ→BGRA 寫入 AnalogScreenBuf3x
+        static unsafe void DemodulateRow_SVideo(int sl, int phase0)
+        {
+            bool toCrt = NesCore.CrtEnabled;
+            int rowOff = sl * kOutW * 3;
+
+            int rowStart = sl * CrtScreen.DstH / CrtScreen.SrcH;
+            int rowEnd   = (sl + 1) * CrtScreen.DstH / CrtScreen.SrcH;
+            if (rowEnd > CrtScreen.DstH) rowEnd = CrtScreen.DstH;
+            uint* row0 = NesCore.AnalogScreenBuf3x + rowStart * kOutW;
+
+            for (int p = 0; p < kOutW; p++)
+            {
+                int center = kLeadPad + p * kWaveLen / kOutW;
+
+                // ── Y：Hann kWinY，waveBuf（純亮度）────────────────────────
+                int startY = center - kWinY_half;
+                float sumY = 0f;
+                for (int n = 0; n < kWinY; n++)
+                    sumY += hannY[n] * waveBuf[startY + n];
+
+                // ── I：Hann kWinI，cBuf（C line） × cos ─────────────────
+                int startI = center - kWinI_half;
+                int tModI  = ((phase0 + startI - kLeadPad) % 6 + 6) % 6;
+                float sumI = 0f;
+                for (int n = 0; n < kWinI; n++)
+                {
+                    sumI += hannI[n] * cBuf[startI + n] * cosTab6[tModI];
+                    tModI = tModI == 5 ? 0 : tModI + 1;
                 }
 
-                if (first) { yFilt = Y; iFilt = I; qFilt = Q; first = false; }
-                else
+                // ── Q：Hann kWinQ，cBuf（C line） × sin ─────────────────
+                int startQ = center - kWinQ_half;
+                int tModQ  = ((phase0 + startQ - kLeadPad) % 6 + 6) % 6;
+                float sumQ = 0f;
+                for (int n = 0; n < kWinQ; n++)
                 {
-                    yFilt += SlewRate * (Y - yFilt);
-                    iFilt += ChromaBlur * (I - iFilt);
-                    qFilt += ChromaBlur * (Q - qFilt);
+                    sumQ += hannQ[n] * cBuf[startQ + n] * sinTab6[tModQ];
+                    tModQ = tModQ == 5 ? 0 : tModQ + 1;
                 }
+
+                float Y = sumY;
+                float I = 2f * sumI;
+                float Q = -2f * sumQ;
 
                 if (toCrt)
-                    WriteLinear(rowOff + p * 3, yFilt, iFilt, qFilt);
+                    WriteLinear(rowOff + p * 3, Y, I, Q);
                 else
-                    row0[p] = YiqToRgb(yFilt, iFilt, qFilt);
+                    row0[p] = YiqToRgb(Y, I, Q);
             }
 
             if (!toCrt)
