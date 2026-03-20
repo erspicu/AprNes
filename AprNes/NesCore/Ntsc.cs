@@ -1,4 +1,5 @@
 using System;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -53,9 +54,10 @@ namespace AprNes
         static public float RfBuzzPhase  = 0.0f;
 
         // ── 輸出：線性 RGB 緩衝區（768×240×3，Stage 2 輸入）────────────────
-        public const int kOutW = 1024;
-        public const int kSrcH = 240;
-        public static float* linearBuffer;
+        public const int kOutW  = 1024;
+        public const int kSrcH  = 240;
+        public const int kPlane = kOutW * kSrcH; // 245,760 floats per colour plane（R/G/B 各一平面）
+        public static float* linearBuffer;        // planar：[R plane][G plane][B plane]
 
         // ── 端子參數組（INI 讀入，開機時載入一次）──────────────────────────
         // RF 端子
@@ -132,6 +134,12 @@ namespace AprNes
         static float* hannI;
         static float* hannQ;
 
+        // 預計算合併 I/Q 權重（6 相位 × kWinI/kWinQ）
+        // combinedI[ph * kWinI + n] = hannI[n] * cosTab6[(ph + n) % 6]
+        // combinedQ[ph * kWinQ + n] = hannQ[n] * sinTab6[(ph + n) % 6]
+        static float* combinedI;
+        static float* combinedQ;
+
         // 掃描線副載波相位（每 scanline 前進 1364 mod 6 = 2，週期 3 行）
         static int scanPhaseBase = 0;
 
@@ -178,6 +186,17 @@ namespace AprNes
                 ComputeHann(hannY, kWinY);
                 ComputeHann(hannI, kWinI);
                 ComputeHann(hannQ, kWinQ);
+
+                // 預計算合併 I/Q 解調權重（6 個起始相位 × 視窗長度）
+                combinedI = (float*)Marshal.AllocHGlobal(6 * kWinI * sizeof(float));
+                combinedQ = (float*)Marshal.AllocHGlobal(6 * kWinQ * sizeof(float));
+                for (int ph = 0; ph < 6; ph++)
+                {
+                    for (int n = 0; n < kWinI; n++)
+                        combinedI[ph * kWinI + n] = hannI[n] * cosTab6[(ph + n) % 6];
+                    for (int n = 0; n < kWinQ; n++)
+                        combinedQ[ph * kWinQ + n] = hannQ[n] * sinTab6[(ph + n) % 6];
+                }
             }
 
             scanPhase6    = 0;
@@ -480,56 +499,69 @@ namespace AprNes
 
         // Step 2：Y/I/Q 分離帶限解調（Hann 視窗，物理正確）
         //   Y：Hann kWinY=6（≈ 4.2 MHz，1 副載波週期精確消色度）
-        //   I：Hann kWinI=18（≈ 1.3 MHz，coherent demod × cos）
-        //   Q：Hann kWinQ=54（≈ 0.4 MHz，coherent demod × sin）
+        //   I：SIMD dot(combinedI[tModI], waveBuf) — 預計算合併 Hann×cos 消去 per-sample mod
+        //   Q：SIMD dot(combinedQ[tModQ], waveBuf) — 預計算合併 Hann×sin
         //   CrtEnabled=true  → 寫入 linearBuffer（供 Stage 2 CrtScreen 使用）
         //   CrtEnabled=false → 直接 YIQ→BGRA 寫入 AnalogScreenBuf3x
         static unsafe void DemodulateRow(int sl, int phase0)
         {
             bool toCrt = NesCore.CrtEnabled;
-            int rowOff = sl * kOutW * 3;
 
             int rowStart = sl * CrtScreen.DstH / CrtScreen.SrcH;
             int rowEnd   = (sl + 1) * CrtScreen.DstH / CrtScreen.SrcH;
             if (rowEnd > CrtScreen.DstH) rowEnd = CrtScreen.DstH;
             uint* row0 = NesCore.AnalogScreenBuf3x + rowStart * kOutW;
 
+            int VS = Vector<float>.Count; // 4（SSE2）或 8（AVX2）
+
             for (int p = 0; p < kOutW; p++)
             {
                 int center = kLeadPad + p * kWaveLen / kOutW;
 
-                // ── Y：Hann kWinY（1 副載波週期，精確消色度）───────────────
+                // ── Y：Hann kWinY（1 副載波週期，精確消色度，kWinY=6 不做 SIMD）
                 int startY = center - kWinY_half;
                 float sumY = 0f;
                 for (int n = 0; n < kWinY; n++)
                     sumY += hannY[n] * waveBuf[startY + n];
 
-                // ── I：Hann kWinI，coherent demod × cos ─────────────────
+                // ── I：SIMD dot product（combinedI[tModI] × waveBuf[startI]）─
                 int startI = center - kWinI_half;
                 int tModI  = ((phase0 + startI - kLeadPad) % 6 + 6) % 6;
-                float sumI = 0f;
-                for (int n = 0; n < kWinI; n++)
+                float* cwI  = combinedI + tModI * kWinI;
+                float* wvI  = waveBuf   + startI;
+                float  sumI = 0f;
+#pragma warning disable CS8500
                 {
-                    sumI += hannI[n] * waveBuf[startI + n] * cosTab6[tModI];
-                    tModI = tModI == 5 ? 0 : tModI + 1;
+                    int n = 0;
+                    var acc = new Vector<float>(0f);
+                    for (; n <= kWinI - VS; n += VS)
+                        acc += *(Vector<float>*)(cwI + n) * *(Vector<float>*)(wvI + n);
+                    sumI = Vector.Dot(acc, new Vector<float>(1f));
+                    for (; n < kWinI; n++) sumI += cwI[n] * wvI[n];
                 }
 
-                // ── Q：Hann kWinQ，coherent demod × sin ─────────────────
+                // ── Q：SIMD dot product（combinedQ[tModQ] × waveBuf[startQ]）─
                 int startQ = center - kWinQ_half;
                 int tModQ  = ((phase0 + startQ - kLeadPad) % 6 + 6) % 6;
-                float sumQ = 0f;
-                for (int n = 0; n < kWinQ; n++)
+                float* cwQ  = combinedQ + tModQ * kWinQ;
+                float* wvQ  = waveBuf   + startQ;
+                float  sumQ = 0f;
                 {
-                    sumQ += hannQ[n] * waveBuf[startQ + n] * sinTab6[tModQ];
-                    tModQ = tModQ == 5 ? 0 : tModQ + 1;
+                    int n = 0;
+                    var acc = new Vector<float>(0f);
+                    for (; n <= kWinQ - VS; n += VS)
+                        acc += *(Vector<float>*)(cwQ + n) * *(Vector<float>*)(wvQ + n);
+                    sumQ = Vector.Dot(acc, new Vector<float>(1f));
+                    for (; n < kWinQ; n++) sumQ += cwQ[n] * wvQ[n];
                 }
+#pragma warning restore CS8500
 
                 float Y = sumY;
                 float I = 2f * sumI;
                 float Q = -2f * sumQ;
 
                 if (toCrt)
-                    WriteLinear(rowOff + p * 3, Y, I, Q);
+                    WriteLinear(sl, p, Y, I, Q);
                 else
                     row0[p] = YiqToRgb(Y, I, Q);
             }
@@ -614,58 +646,71 @@ namespace AprNes
             }
         }
 
-        // S-Video Step 2：Y/C 分離帶限解調
+        // S-Video Step 2：Y/C 分離帶限解調（SIMD I/Q dot product 版）
         //   Y：Hann kWinY 平均 waveBuf（純亮度，無副載波干擾）
-        //   I：Hann kWinI coherent demod × cos 作用於 cBuf
-        //   Q：Hann kWinQ coherent demod × sin 作用於 cBuf
+        //   I：SIMD dot(combinedI[tModI], cBuf) — 預計算合併 Hann×cos
+        //   Q：SIMD dot(combinedQ[tModQ], cBuf) — 預計算合併 Hann×sin
         //   CrtEnabled=true  → WriteLinear → linearBuffer（供 Stage 2 CrtScreen）
         //   CrtEnabled=false → 直接 YIQ→BGRA 寫入 AnalogScreenBuf3x
         static unsafe void DemodulateRow_SVideo(int sl, int phase0)
         {
             bool toCrt = NesCore.CrtEnabled;
-            int rowOff = sl * kOutW * 3;
 
             int rowStart = sl * CrtScreen.DstH / CrtScreen.SrcH;
             int rowEnd   = (sl + 1) * CrtScreen.DstH / CrtScreen.SrcH;
             if (rowEnd > CrtScreen.DstH) rowEnd = CrtScreen.DstH;
             uint* row0 = NesCore.AnalogScreenBuf3x + rowStart * kOutW;
 
+            int VS = Vector<float>.Count;
+
             for (int p = 0; p < kOutW; p++)
             {
                 int center = kLeadPad + p * kWaveLen / kOutW;
 
-                // ── Y：Hann kWinY，waveBuf（純亮度）────────────────────────
+                // ── Y：Hann kWinY，waveBuf（純亮度，kWinY=6 不做 SIMD）──────
                 int startY = center - kWinY_half;
                 float sumY = 0f;
                 for (int n = 0; n < kWinY; n++)
                     sumY += hannY[n] * waveBuf[startY + n];
 
-                // ── I：Hann kWinI，cBuf（C line） × cos ─────────────────
+                // ── I：SIMD dot product（combinedI[tModI] × cBuf[startI]）──
                 int startI = center - kWinI_half;
                 int tModI  = ((phase0 + startI - kLeadPad) % 6 + 6) % 6;
-                float sumI = 0f;
-                for (int n = 0; n < kWinI; n++)
+                float* cwI  = combinedI + tModI * kWinI;
+                float* wvI  = cBuf      + startI;
+                float  sumI = 0f;
+#pragma warning disable CS8500
                 {
-                    sumI += hannI[n] * cBuf[startI + n] * cosTab6[tModI];
-                    tModI = tModI == 5 ? 0 : tModI + 1;
+                    int n = 0;
+                    var acc = new Vector<float>(0f);
+                    for (; n <= kWinI - VS; n += VS)
+                        acc += *(Vector<float>*)(cwI + n) * *(Vector<float>*)(wvI + n);
+                    sumI = Vector.Dot(acc, new Vector<float>(1f));
+                    for (; n < kWinI; n++) sumI += cwI[n] * wvI[n];
                 }
 
-                // ── Q：Hann kWinQ，cBuf（C line） × sin ─────────────────
+                // ── Q：SIMD dot product（combinedQ[tModQ] × cBuf[startQ]）──
                 int startQ = center - kWinQ_half;
                 int tModQ  = ((phase0 + startQ - kLeadPad) % 6 + 6) % 6;
-                float sumQ = 0f;
-                for (int n = 0; n < kWinQ; n++)
+                float* cwQ  = combinedQ + tModQ * kWinQ;
+                float* wvQ  = cBuf      + startQ;
+                float  sumQ = 0f;
                 {
-                    sumQ += hannQ[n] * cBuf[startQ + n] * sinTab6[tModQ];
-                    tModQ = tModQ == 5 ? 0 : tModQ + 1;
+                    int n = 0;
+                    var acc = new Vector<float>(0f);
+                    for (; n <= kWinQ - VS; n += VS)
+                        acc += *(Vector<float>*)(cwQ + n) * *(Vector<float>*)(wvQ + n);
+                    sumQ = Vector.Dot(acc, new Vector<float>(1f));
+                    for (; n < kWinQ; n++) sumQ += cwQ[n] * wvQ[n];
                 }
+#pragma warning restore CS8500
 
                 float Y = sumY;
                 float I = 2f * sumI;
                 float Q = -2f * sumQ;
 
                 if (toCrt)
-                    WriteLinear(rowOff + p * 3, Y, I, Q);
+                    WriteLinear(sl, p, Y, I, Q);
                 else
                     row0[p] = YiqToRgb(Y, I, Q);
             }
@@ -685,8 +730,13 @@ namespace AprNes
         //   G = Y − 0.4302·I − 0.5547·Q
         //   B = Y − 0.6268·I + 1.9299·Q
         //
+        //  linearBuffer planar layout：[R plane 0..kPlane-1][G plane][B plane]
+        //  R[sl,p] = linearBuffer[sl*kOutW + p]
+        //  G[sl,p] = linearBuffer[kPlane  + sl*kOutW + p]
+        //  B[sl,p] = linearBuffer[2*kPlane + sl*kOutW + p]
+        //
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void WriteLinear(int off, float y, float i, float q)
+        static void WriteLinear(int sl, int p, float y, float i, float q)
         {
             float r = y + 1.0841f * i + 0.3523f * q;
             float g = y - 0.4302f * i - 0.5547f * q;
@@ -696,9 +746,10 @@ namespace AprNes
             if (g < 0f) g = 0f; else if (g > 1f) g = 1f;
             if (b < 0f) b = 0f; else if (b > 1f) b = 1f;
 
-            linearBuffer[off]     = r;
-            linearBuffer[off + 1] = g;
-            linearBuffer[off + 2] = b;
+            int idx = sl * kOutW + p;
+            linearBuffer[idx]            = r;
+            linearBuffer[kPlane  + idx]  = g;
+            linearBuffer[2*kPlane + idx] = b;
         }
 
         // ════════════════════════════════════════════════════════════════════
