@@ -753,10 +753,10 @@ namespace AprNes
 
         static void SaveScreenshot(string path)
         {
-            // Use analog buffer (768×720) when AnalogEnabled, otherwise regular 256×240
+            // Use analog buffer (768×630) when AnalogEnabled, otherwise regular 256×240
             if (NesCore.AnalogEnabled && NesCore.AnalogScreenBuf3x != null)
             {
-                const int W = 768, H = 720;
+                const int W = 768, H = 630;
                 Bitmap bmp = new Bitmap(W, H, PixelFormat.Format32bppArgb);
                 BitmapData data = bmp.LockBits(new Rectangle(0, 0, W, H),
                     ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);

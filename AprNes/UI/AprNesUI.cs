@@ -82,9 +82,9 @@ namespace AprNes
         int ScreenSize = 1;
         public void initUIsize()
         {
-            // AnalogEnabled 時輸出固定 768×720（3x 直接輸出），否則依 ScreenSize
+            // AnalogEnabled 時輸出固定 768×630（CrtScreen Stage 2 輸出），否則依 ScreenSize
             int renderWidth  = NesCore.AnalogEnabled ? 768 : 256 * ScreenSize;
-            int renderHeight = NesCore.AnalogEnabled ? 720 : 240 * ScreenSize;
+            int renderHeight = NesCore.AnalogEnabled ? 630 : 240 * ScreenSize;
 
             panel1.Visible = false;
             panel1.Width  = renderWidth;

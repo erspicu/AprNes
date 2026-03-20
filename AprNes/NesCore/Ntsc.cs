@@ -4,43 +4,34 @@ using System.Runtime.CompilerServices;
 namespace AprNes
 {
     // ============================================================
-    // NES NTSC 類比訊號模擬器
+    // NES NTSC 訊號解碼器（Stage 1）
     // ============================================================
+    //
+    //  輸出：float[] linearBuffer [768 × 240 × 3]  ← 線性 RGB，無 Gamma
+    //  Stage 2 (CrtScreen) 負責垂直擴展 + 高斯掃描線 + Bloom + Gamma → 768×630
     //
     //  Level 2（預設，快速）：直接 YIQ + 9-entry LUT dot crawl
     //  Level 3（UltraAnalog，精確）：21.477 MHz 時域波形 + coherent demodulation
     //
-    // ── Level 2 路徑 ─────────────────────────────────────────────
+    //  三種端子參數組（由 NesCore.AnalogOutput 決定）：
+    //    RF     : NoiseIntensity=0.20, SlewRate=0.30, ChromaBlur=0.05
+    //    AV     : NoiseIntensity=0.02, SlewRate=0.65, ChromaBlur=0.20
+    //    SVideo : NoiseIntensity=0.00, SlewRate=0.90, ChromaBlur=0.45
     //
+    // ── Level 2 路徑 ─────────────────────────────────────────────
     //   · 直接從電壓準位計算 Y、I、Q（blargg 公式）
-    //   · 水平 3-tap FIR 模糊色度（色彩暈染近似）
-    //   · 9-entry LUT 模擬 composite encode/decode → dot crawl
-    //   · 每 scanline 相位前進 3（768 mod 9 = 3），週期 3 行
+    //   · SlewRate IIR 模擬電容遲滯（作用在 Y）
+    //   · ChromaBlur IIR 模擬色彩暈染（取代固定 FIR）
+    //   · NoiseIntensity 熱雜訊
+    //   · 9-entry LUT dot crawl（AV/RF）
     //
     // ── Level 3 路徑（UltraAnalog）──────────────────────────────
-    //
     //   Step 1  生成 21.477 MHz 複合視訊波形（4 samples/dot）
-    //
-    //     composite(t) = Y - sat × cos(2πt/6 − c × π/6)
-    //                  = Y + sat × ( cosTab6[t%6] × iPhase[c]
-    //                              - sinTab6[t%6] × qPhase[c] )
-    //
-    //   Step 2  Coherent demodulation（12-sample boxcar = 2 副載波週期）
-    //
-    //     Y = (1/N) × Σ composite(t)
-    //     I = (2/N) × Σ composite(t) × cos(2πt/6)   [×2 歸一化]
-    //     Q = -(2/N) × Σ composite(t) × sin(2πt/6)
-    //
-    //   Step 3  YIQ → RGB（blargg -15° 解碼矩陣 + fast gamma）
-    //
-    //   Dot crawl 自然浮現：每 scanline 副載波相位前進 1364 mod 6 = 2，
-    //   解調相位對每個輸出像素不同，週期 3 行。
-    //
-    //   RF 音訊干擾：雜訊與 buzz bar 加入波形後再解調（物理正確）
-    //
-    // ── 輸出 ─────────────────────────────────────────────────────
-    //
-    //   768×720 BGRA → NesCore.AnalogScreenBuf3x
+    //           + SlewRate IIR（電容遲滯作用在波形）
+    //           + NoiseIntensity 熱雜訊疊加
+    //   Step 2  12-sample boxcar coherent demodulation
+    //           + ChromaBlur IIR（作用在解調後 I/Q）
+    //   Step 3  YIQ → Linear RGB（blargg -15° 矩陣，無 Gamma）
     // ============================================================
 
     unsafe public static class Ntsc
@@ -58,16 +49,34 @@ namespace AprNes
         static public float RfAudioLevel = 0.0f;
         static public float RfBuzzPhase  = 0.0f;
 
-        // ── 輸出尺寸 ────────────────────────────────────────────────────────
-        const int kOutW = 768;
-        const int kOutH = 720;
+        // ── 輸出：線性 RGB 緩衝區（768×240×3，Stage 2 輸入）────────────────
+        public const int kOutW = 768;
+        public const int kSrcH = 240;
+        public static readonly float[] linearBuffer = new float[kOutW * kSrcH * 3];
+
+        // ── 端子參數組（每幀 sl=0 時更新）───────────────────────────────────
+        static float NoiseIntensity = 0.02f;
+        static float SlewRate       = 0.65f;
+        static float ChromaBlur     = 0.20f;
+
+        static void ApplyProfile()
+        {
+            switch (NesCore.AnalogOutput)
+            {
+                case NesCore.AnalogOutputMode.RF:
+                    NoiseIntensity = 0.20f; SlewRate = 0.30f; ChromaBlur = 0.05f; break;
+                case NesCore.AnalogOutputMode.SVideo:
+                    NoiseIntensity = 0.00f; SlewRate = 0.90f; ChromaBlur = 0.45f; break;
+                default: // AV
+                    NoiseIntensity = 0.02f; SlewRate = 0.65f; ChromaBlur = 0.20f; break;
+            }
+        }
 
         // ════════════════════════════════════════════════════════════════════
         // Level 2 — 簡化路徑（快速）
         // ════════════════════════════════════════════════════════════════════
 
         // 色副載波 9-entry LUT（每格 4π/9 ≈ 80°）
-        // cosLUT[k] = cos(k × 4π/9),  sinLUT[k] = sin(k × 4π/9)
         static readonly float[] cosLUT = new float[9];
         static readonly float[] sinLUT = new float[9];
 
@@ -95,7 +104,7 @@ namespace AprNes
         const int kBufLen  = kLeadPad * 2 + kWaveLen; // 1048
         static readonly float[] waveBuf = new float[kBufLen];
 
-        // 解調視窗（12 samples = 2 副載波週期，chroma BW ≈ 0.9 MHz）
+        // 解調視窗（12 samples = 2 副載波週期）
         const int kWinSize = 12;
         const int kWinHalf = kWinSize / 2;
 
@@ -142,7 +151,10 @@ namespace AprNes
         // ════════════════════════════════════════════════════════════════════
         public static void DecodeScanline(int sl, byte[] palBuf, byte emphasisBits)
         {
-            if (sl < 0 || sl >= 240 || NesCore.AnalogScreenBuf3x == null) return;
+            if (sl < 0 || sl >= kSrcH) return;
+
+            // 每幀第一行時更新端子參數組
+            if (sl == 0) ApplyProfile();
 
             if (NesCore.UltraAnalog)
                 DecodeScanline_Physical(sl, palBuf, emphasisBits);
@@ -159,12 +171,10 @@ namespace AprNes
             GenerateSignal(palBuf, emphasisBits);
             int phase0 = (scanPhaseIdx - 3 + 9) % 9;
 
-            switch (NesCore.AnalogOutput)
-            {
-                case NesCore.AnalogOutputMode.SVideo: DecodeAV_SVideo(sl);           break;
-                case NesCore.AnalogOutputMode.RF:     DecodeAV_RF(sl, phase0);       break;
-                default:                              DecodeAV_Composite(sl, phase0); break;
-            }
+            if (NesCore.AnalogOutput == NesCore.AnalogOutputMode.SVideo)
+                DecodeAV_SVideo(sl);
+            else
+                DecodeAV_Composite(sl, phase0);
         }
 
         // 計算每 dot 的 YIQ（256 dots），並前進 scanPhaseIdx
@@ -211,103 +221,90 @@ namespace AprNes
             scanPhaseIdx = (scanPhaseIdx + 3) % 9;
         }
 
-        // AV（合成視訊）：水平 IQ 模糊 + 9-entry LUT dot crawl
+        // AV / RF：9-entry LUT dot crawl + ChromaBlur IIR + SlewRate IIR + Noise
         static void DecodeAV_Composite(int sl, int phase0)
         {
-            for (int outRow = 0; outRow < 3; outRow++)
+            bool isRF     = NesCore.AnalogOutput == NesCore.AnalogOutputMode.RF;
+            bool addNoise = NoiseIntensity > 0f;
+
+            float buzzRow = 0f;
+            if (isRF)
             {
-                int row = sl * 3 + outRow;
-                if (row >= kOutH) continue;
-                uint* rowPtr = NesCore.AnalogScreenBuf3x + row * kOutW;
+                float buzzAmp = RfAudioLevel * 0.06f;
+                buzzRow = buzzAmp * (float)Math.Sin((sl / 240.0 + RfBuzzPhase) * 2.0 * Math.PI);
+            }
 
-                for (int outX = 0; outX < kOutW; outX++)
+            uint ns = 0u;
+            if (addNoise || isRF)
+                ns = (uint)(NesCore.frame_count * 1664525u + (uint)sl * 1013904223u + 1442695041u);
+
+            // IIR 初始狀態（以第 0 dot 的解碼值初始化，避免啟動暫態）
+            int   d0  = 0;
+            int   ph0 = phase0 % 9;
+            float c0  = cosLUT[ph0], s0 = sinLUT[ph0];
+            float chr0 = dotI[d0] * c0 - dotQ[d0] * s0;
+            float iFilt = chr0 * c0;
+            float qFilt = -chr0 * s0;
+            float yFilt = dotY[d0];
+
+            int rowOff = sl * kOutW * 3;
+
+            for (int outX = 0; outX < kOutW; outX++)
+            {
+                int d  = outX * 256 / kOutW;
+                int ph = (phase0 + outX) % 9;
+
+                // Dot crawl decode
+                float c      = cosLUT[ph];
+                float s      = sinLUT[ph];
+                float chroma = dotI[d] * c - dotQ[d] * s;
+                float iRaw   = chroma * c;
+                float qRaw   = -chroma * s;
+
+                // ChromaBlur IIR
+                iFilt += ChromaBlur * (iRaw - iFilt);
+                qFilt += ChromaBlur * (qRaw - qFilt);
+
+                // SlewRate IIR on Y
+                yFilt += SlewRate * (dotY[d] - yFilt);
+                float y = yFilt;
+
+                // RF buzz
+                if (isRF) y += buzzRow;
+
+                // Thermal noise
+                if (addNoise)
                 {
-                    int d  = outX * 256 / kOutW;
-                    int ph = (phase0 + outX) % 9;
-
-                    float ii, iq;
-                    if (d > 0 && d < 255)
-                    {
-                        ii = dotI[d-1] * 0.25f + dotI[d] * 0.5f + dotI[d+1] * 0.25f;
-                        iq = dotQ[d-1] * 0.25f + dotQ[d] * 0.5f + dotQ[d+1] * 0.25f;
-                    }
-                    else { ii = dotI[d]; iq = dotQ[d]; }
-
-                    float c      = cosLUT[ph];
-                    float s      = sinLUT[ph];
-                    float chroma = ii * c - iq * s;
-                    float iDec   = chroma * c;
-                    float qDec   = -chroma * s;
-
-                    rowPtr[outX] = YiqToRgb(dotY[d], iDec, qDec);
+                    ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5;
+                    y += ((ns & 0xFF) / 255.0f - 0.5f) * 2f * NoiseIntensity;
                 }
+
+                WriteLinear(rowOff + outX * 3, y, iFilt, qFilt);
             }
         }
 
-        // S-Video：輕度 IQ 低通（0.1/0.8/0.1），無 dot crawl
+        // S-Video：無 dot crawl，ChromaBlur IIR + SlewRate IIR
         static void DecodeAV_SVideo(int sl)
         {
-            for (int outRow = 0; outRow < 3; outRow++)
+            // IIR 初始狀態
+            float iFilt = dotI[0];
+            float qFilt = dotQ[0];
+            float yFilt = dotY[0];
+
+            int rowOff = sl * kOutW * 3;
+
+            for (int outX = 0; outX < kOutW; outX++)
             {
-                int row = sl * 3 + outRow;
-                if (row >= kOutH) continue;
-                uint* rowPtr = NesCore.AnalogScreenBuf3x + row * kOutW;
+                int d = outX * 256 / kOutW;
 
-                for (int outX = 0; outX < kOutW; outX++)
-                {
-                    int d = outX * 256 / kOutW;
+                // ChromaBlur IIR（直接 I/Q，無 dot crawl）
+                iFilt += ChromaBlur * (dotI[d] - iFilt);
+                qFilt += ChromaBlur * (dotQ[d] - qFilt);
 
-                    float ii = dotI[d];
-                    float iq = dotQ[d];
-                    if (d > 0 && d < 255)
-                    {
-                        ii = dotI[d-1] * 0.1f + dotI[d] * 0.8f + dotI[d+1] * 0.1f;
-                        iq = dotQ[d-1] * 0.1f + dotQ[d] * 0.8f + dotQ[d+1] * 0.1f;
-                    }
+                // SlewRate IIR on Y
+                yFilt += SlewRate * (dotY[d] - yFilt);
 
-                    rowPtr[outX] = YiqToRgb(dotY[d], ii, iq);
-                }
-            }
-        }
-
-        // RF：AV + AM 白雜訊 + 音訊 buzz bar
-        static void DecodeAV_RF(int sl, int phase0)
-        {
-            float buzzAmp = RfAudioLevel * 0.06f;
-            float buzzRow = buzzAmp * (float)Math.Sin((sl / 240.0 + RfBuzzPhase) * 2.0 * Math.PI);
-            uint  ns      = (uint)(NesCore.frame_count * 1664525 + sl * 1013904223 + 1442695041);
-
-            for (int outRow = 0; outRow < 3; outRow++)
-            {
-                int row = sl * 3 + outRow;
-                if (row >= kOutH) continue;
-                uint* rowPtr = NesCore.AnalogScreenBuf3x + row * kOutW;
-
-                for (int outX = 0; outX < kOutW; outX++)
-                {
-                    int d  = outX * 256 / kOutW;
-                    int ph = (phase0 + outX) % 9;
-
-                    float ii, iq;
-                    if (d > 0 && d < 255)
-                    {
-                        ii = dotI[d-1] * 0.25f + dotI[d] * 0.5f + dotI[d+1] * 0.25f;
-                        iq = dotQ[d-1] * 0.25f + dotQ[d] * 0.5f + dotQ[d+1] * 0.25f;
-                    }
-                    else { ii = dotI[d]; iq = dotQ[d]; }
-
-                    float c      = cosLUT[ph];
-                    float s      = sinLUT[ph];
-                    float chroma = ii * c - iq * s;
-                    float iDec   = chroma * c;
-                    float qDec   = -chroma * s;
-
-                    float y = dotY[d] + buzzRow;
-                    ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5;
-                    y  += ((ns & 0xFF) / 255.0f - 0.5f) * 0.012f;
-
-                    rowPtr[outX] = YiqToRgb(y, iDec, qDec);
-                }
+                WriteLinear(rowOff + outX * 3, yFilt, iFilt, qFilt);
             }
         }
 
@@ -320,33 +317,19 @@ namespace AprNes
             int phase0 = scanPhaseBase;
             scanPhaseBase = (scanPhaseBase + 2) % 6; // 1364 mod 6 = 2
 
-            switch (NesCore.AnalogOutput)
+            if (NesCore.AnalogOutput == NesCore.AnalogOutputMode.SVideo)
+                DecodePhysical_SVideo(sl, palBuf, emphasisBits);
+            else
             {
-                case NesCore.AnalogOutputMode.SVideo:
-                    DecodePhysical_SVideo(sl, palBuf, emphasisBits);
-                    break;
-                default:
-                    bool isRF = NesCore.AnalogOutput == NesCore.AnalogOutputMode.RF;
-                    GenerateWaveform(palBuf, emphasisBits, isRF, sl, phase0);
-                    DecodeComposite(sl, phase0);
-                    break;
+                bool isRF = NesCore.AnalogOutput == NesCore.AnalogOutputMode.RF;
+                GenerateWaveform(palBuf, emphasisBits, isRF, sl, phase0);
+                DemodulateRow(sl, phase0);
             }
         }
 
-        // Step 1：生成 21.477 MHz 複合視訊波形
-        //
-        //   composite(t) = Y - sat × cos(2πt/6 - c×π/6)
-        //                = Y + cosTab6[t%6] × ip - sinTab6[t%6] × qp
-        //
-        //   其中 ip = iPhase[c]×sat = -cos(c×π/6)×sat
-        //        qp = qPhase[c]×sat =  sin(c×π/6)×sat
-        //
-        //   驗證（c=2, luma=1, phase0=0）：
-        //     6 個連續 samples [0.17,0.00,0.17,0.51,0.68,0.51]
-        //     解調後 Y=0.34, I=-0.17, Q=0.295 與 blargg 完全一致
-        //
+        // Step 1：生成 21.477 MHz 複合視訊波形 + SlewRate IIR + Noise
         static void GenerateWaveform(byte[] palBuf, byte emphasisBits,
-                                      bool addRfNoise, int sl, int phase0)
+                                      bool isRF, int sl, int phase0)
         {
             float atten = 1.0f;
             if (emphasisBits != 0)
@@ -356,7 +339,7 @@ namespace AprNes
             }
 
             float firstY = 0f, lastY = 0f;
-            int tMod = phase0; // 從 phase0 開始，逐 sample 遞增
+            int tMod = phase0;
 
             for (int d = 0; d < kDots; d++)
             {
@@ -389,54 +372,52 @@ namespace AprNes
             }
 
             // 邊緣填充（DC 延伸，無色度）
-            for (int i = 0; i < kLeadPad; i++)               waveBuf[i] = firstY;
-            for (int i = kLeadPad + kWaveLen; i < kBufLen; i++) waveBuf[i] = lastY;
+            for (int i = 0; i < kLeadPad; i++)
+                waveBuf[i] = firstY;
+            for (int i = kLeadPad + kWaveLen; i < kBufLen; i++)
+                waveBuf[i] = lastY;
 
-            // RF：干擾加入波形後再解調（物理正確）
-            if (addRfNoise)
+            // RF buzz（音訊干擾，加入波形後解調）
+            if (isRF)
             {
                 float buzzAmp = RfAudioLevel * 0.06f;
                 float buzzRow = buzzAmp * (float)Math.Sin(
                                     (sl / 240.0 + RfBuzzPhase) * 2.0 * Math.PI);
-                uint ns = (uint)(NesCore.frame_count * 1664525 + sl * 1013904223 + 1442695041);
+                for (int i = kLeadPad; i < kLeadPad + kWaveLen; i++)
+                    waveBuf[i] += buzzRow;
+            }
 
+            // 熱雜訊（由 NoiseIntensity 控制）
+            if (NoiseIntensity > 0f)
+            {
+                uint ns = (uint)(NesCore.frame_count * 1664525u + (uint)sl * 1013904223u + 1442695041u);
+                float amp = 2f * NoiseIntensity;
                 for (int i = kLeadPad; i < kLeadPad + kWaveLen; i++)
                 {
                     ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5;
-                    float noise = ((ns & 0xFF) / 255.0f - 0.5f) * 0.012f;
-                    waveBuf[i] += buzzRow + noise;
+                    waveBuf[i] += ((ns & 0xFF) / 255.0f - 0.5f) * amp;
+                }
+            }
+
+            // SlewRate IIR（電容遲滯，作用在波形上）
+            if (SlewRate < 1.0f)
+            {
+                float vPrev = waveBuf[0];
+                for (int i = 1; i < kBufLen; i++)
+                {
+                    vPrev += SlewRate * (waveBuf[i] - vPrev);
+                    waveBuf[i] = vPrev;
                 }
             }
         }
 
-        // Step 2：複合視訊解調
-        static unsafe void DecodeComposite(int sl, int phase0)
+        // Step 2：複合視訊解調 + ChromaBlur IIR → linearBuffer
+        static void DemodulateRow(int sl, int phase0)
         {
-            uint* row0 = NesCore.AnalogScreenBuf3x + sl * 3 * kOutW;
-            DemodulateRow(row0, phase0);
+            int rowOff = sl * kOutW * 3;
+            float iFilt = 0f, qFilt = 0f;
+            bool first = true;
 
-            int row1 = sl * 3 + 1, row2 = sl * 3 + 2;
-            if (row1 < kOutH)
-                Buffer.MemoryCopy(row0,
-                    NesCore.AnalogScreenBuf3x + row1 * kOutW,
-                    kOutW * sizeof(uint), kOutW * sizeof(uint));
-            if (row2 < kOutH)
-                Buffer.MemoryCopy(row0,
-                    NesCore.AnalogScreenBuf3x + row2 * kOutW,
-                    kOutW * sizeof(uint), kOutW * sizeof(uint));
-        }
-
-        // 單行解調（768 output pixels，12-sample boxcar coherent demodulation）
-        //
-        //   輸出像素 p → 波形中心 center = kLeadPad + p × 1024/768
-        //   視窗 [center-6, center+6)，共 12 samples
-        //
-        //   歸一化 ×2：
-        //     mean(composite × cos(ωt)) = -sat/2 × cos(c×π/6)
-        //     ×2 → I = -sat × cos(c×π/6) = iPhase[c] × sat  ✓
-        //
-        static unsafe void DemodulateRow(uint* rowPtr, int phase0)
-        {
             for (int p = 0; p < kOutW; p++)
             {
                 int center = kLeadPad + p * kWaveLen / kOutW;
@@ -446,7 +427,6 @@ namespace AprNes
                 if (start < 0)       start = 0;
                 if (end   > kBufLen) end   = kBufLen;
 
-                // 起始副載波相位（處理負數 mod）
                 int tMod = ((phase0 + start - kLeadPad) % 6 + 6) % 6;
 
                 float sumY = 0f, sumI = 0f, sumQ = 0f;
@@ -464,12 +444,20 @@ namespace AprNes
                 float I = 2f * sumI / N;
                 float Q = -2f * sumQ / N;
 
-                rowPtr[p] = YiqToRgb(Y, I, Q);
+                // ChromaBlur IIR（解調後 I/Q）
+                if (first) { iFilt = I; qFilt = Q; first = false; }
+                else
+                {
+                    iFilt += ChromaBlur * (I - iFilt);
+                    qFilt += ChromaBlur * (Q - qFilt);
+                }
+
+                WriteLinear(rowOff + p * 3, Y, iFilt, qFilt);
             }
         }
 
-        // S-Video 物理路徑：直接 YIQ（Y/C 分離傳輸，無複合信號路徑）
-        static unsafe void DecodePhysical_SVideo(int sl, byte[] palBuf, byte emphasisBits)
+        // S-Video 物理路徑：直接 YIQ + SlewRate IIR(Y) + ChromaBlur IIR(I/Q)
+        static void DecodePhysical_SVideo(int sl, byte[] palBuf, byte emphasisBits)
         {
             float atten = 1.0f;
             if (emphasisBits != 0)
@@ -478,10 +466,13 @@ namespace AprNes
                 atten = (float)Math.Pow(0.746, n);
             }
 
-            uint* row0 = NesCore.AnalogScreenBuf3x + sl * 3 * kOutW;
+            int rowOff = sl * kOutW * 3;
+            float yFilt = 0f, iFilt = 0f, qFilt = 0f;
+            bool first = true;
+
             for (int p = 0; p < kOutW; p++)
             {
-                int d = p * kDots / kOutW;
+                int d     = p * kDots / kOutW;
                 int pal   = palBuf[d];
                 int luma  = (pal >> 4) & 3;
                 int color = pal & 0xF;
@@ -501,49 +492,41 @@ namespace AprNes
                     I = iPhase[color] * sat;
                     Q = qPhase[color] * sat;
                 }
-                row0[p] = YiqToRgb(Y, I, Q);
-            }
 
-            int row1 = sl * 3 + 1, row2 = sl * 3 + 2;
-            if (row1 < kOutH)
-                Buffer.MemoryCopy(row0,
-                    NesCore.AnalogScreenBuf3x + row1 * kOutW,
-                    kOutW * sizeof(uint), kOutW * sizeof(uint));
-            if (row2 < kOutH)
-                Buffer.MemoryCopy(row0,
-                    NesCore.AnalogScreenBuf3x + row2 * kOutW,
-                    kOutW * sizeof(uint), kOutW * sizeof(uint));
+                if (first) { yFilt = Y; iFilt = I; qFilt = Q; first = false; }
+                else
+                {
+                    yFilt += SlewRate * (Y - yFilt);
+                    iFilt += ChromaBlur * (I - iFilt);
+                    qFilt += ChromaBlur * (Q - qFilt);
+                }
+
+                WriteLinear(rowOff + p * 3, yFilt, iFilt, qFilt);
+            }
         }
 
         // ════════════════════════════════════════════════════════════════════
-        // 共用：YIQ → RGB（blargg -15° 解碼矩陣 + fast gamma）
+        // 共用：YIQ → Linear RGB（blargg -15° 矩陣，無 Gamma）
         // ════════════════════════════════════════════════════════════════════
         //
         //   R = Y + 1.0841·I + 0.3523·Q
         //   G = Y − 0.4302·I − 0.5547·Q
         //   B = Y − 0.6268·I + 1.9299·Q
         //
-        //   fast gamma：v' = v + 0.229·v·(v−1)  ≈ pow(v, 1/1.1333)
-        //
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static uint YiqToRgb(float y, float i, float q)
+        static void WriteLinear(int off, float y, float i, float q)
         {
             float r = y + 1.0841f * i + 0.3523f * q;
             float g = y - 0.4302f * i - 0.5547f * q;
             float b = y - 0.6268f * i + 1.9299f * q;
 
-            const float gf = 0.229f;
-            r += gf * r * (r - 1f);
-            g += gf * g * (g - 1f);
-            b += gf * b * (b - 1f);
+            if (r < 0f) r = 0f; else if (r > 1f) r = 1f;
+            if (g < 0f) g = 0f; else if (g > 1f) g = 1f;
+            if (b < 0f) b = 0f; else if (b > 1f) b = 1f;
 
-            int ri = Clamp255((int)(r * 255.5f));
-            int gi = Clamp255((int)(g * 255.5f));
-            int bi = Clamp255((int)(b * 255.5f));
-            return (uint)(bi | (gi << 8) | (ri << 16) | 0xFF000000u);
+            linearBuffer[off]     = r;
+            linearBuffer[off + 1] = g;
+            linearBuffer[off + 2] = b;
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static int Clamp255(int v) => v < 0 ? 0 : v > 255 ? 255 : v;
     }
 }

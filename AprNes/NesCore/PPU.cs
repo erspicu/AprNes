@@ -1066,6 +1066,7 @@ namespace AprNes
         static void RenderScreen()
         {
             screen_lock = true;
+            if (AnalogEnabled) CrtScreen.Render(); // Stage 2：linearBuffer → AnalogScreenBuf3x
             VideoOutput?.Invoke(null, null);
             screen_lock = false;
             _event.WaitOne();

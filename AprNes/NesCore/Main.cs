@@ -69,7 +69,7 @@ namespace AprNes
         public enum AnalogOutputMode { AV, SVideo, RF }
         static public AnalogOutputMode AnalogOutput = AnalogOutputMode.AV;
 
-        // 類比模式 3x 輸出緩衝區（768×720，NTSC.cs 直接寫入，Render_ntsc_3x 讀取）
+        // 類比模式輸出緩衝區（768×630，CrtScreen Stage 2 寫入，Render_ntsc_3x 讀取）
         // 僅在 AnalogEnabled=true 時分配，其他情況為 null
         static public uint* AnalogScreenBuf3x = null;
 
@@ -273,7 +273,7 @@ namespace AprNes
                 //init allocate
                 ScreenBuf1x      = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 61440);
                 if (AnalogEnabled)
-                    AnalogScreenBuf3x = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 768 * 720);
+                    AnalogScreenBuf3x = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 768 * 630);
                 Buffer_BG_array  = (int* )Marshal.AllocHGlobal(sizeof(int)  * 61440);
                 NesColors        = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 64);
                 palCacheR        = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 4);
@@ -320,7 +320,7 @@ namespace AprNes
 
                 HardResetState();  // reset all CPU/PPU/DMA static state
 
-                if (AnalogEnabled) Ntsc.Init(); // reset NTSC signal state
+                if (AnalogEnabled) { Ntsc.Init(); CrtScreen.Init(); } // reset NTSC + CRT state
 
                 initPalette();
 

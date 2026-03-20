@@ -351,22 +351,22 @@ namespace AprNes
         }
     }
 
-    // 類比訊號模擬 3x 輸出渲染器
-    // 直接從 NesCore.AnalogScreenBuf3x（768×720）讀取，無縮放
-    // NTSC.cs 已在 PPU 掃描線結束時直接寫入該緩衝區
+    // 類比訊號模擬輸出渲染器
+    // 直接從 NesCore.AnalogScreenBuf3x（768×630）讀取，無縮放
+    // CrtScreen Stage 2 在 PPU RenderScreen 時已完成寫入
     unsafe public class Render_ntsc_3x : InterfaceGraphic
     {
         public void freeMem() { }  // 緩衝區屬於 NesCore，不在此釋放
 
         public Bitmap GetOutput()
         {
-            return new Bitmap(768, 720, 768 * 4, PixelFormat.Format32bppRgb, (IntPtr)NesCore.AnalogScreenBuf3x);
+            return new Bitmap(768, 630, 768 * 4, PixelFormat.Format32bppRgb, (IntPtr)NesCore.AnalogScreenBuf3x);
         }
 
         public void init(uint* input, Graphics _device)
         {
             // input (ScreenBuf1x) 不使用；直接指向 AnalogScreenBuf3x
-            NativeGDI.initHighSpeed(_device, 768, 720, NesCore.AnalogScreenBuf3x, 0, 0);
+            NativeGDI.initHighSpeed(_device, 768, 630, NesCore.AnalogScreenBuf3x, 0, 0);
         }
 
         public void Render()
