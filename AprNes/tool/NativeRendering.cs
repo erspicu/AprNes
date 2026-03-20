@@ -60,13 +60,14 @@ namespace WINAPIGDI
 
         public unsafe static void freeHighSpeed()
         {
-
-            if (hOldObject != IntPtr.Zero) NativeMethods.SelectObject(hdcSrc, hOldObject);
-            if (hBitmap != IntPtr.Zero) NativeMethods.DeleteObject(hBitmap);
-            if (hdcDest != IntPtr.Zero) grDest.ReleaseHdc(hdcDest);
-            if (hdcSrc != IntPtr.Zero) grSrc.ReleaseHdc(hdcSrc);
-            try { _Bitmap.Dispose(); }
-            catch { }
+            if (hOldObject != IntPtr.Zero) { NativeMethods.SelectObject(hdcSrc, hOldObject); hOldObject = IntPtr.Zero; }
+            if (hBitmap    != IntPtr.Zero) { NativeMethods.DeleteObject(hBitmap);             hBitmap    = IntPtr.Zero; }
+            if (hdcDest    != IntPtr.Zero) { try { grDest?.ReleaseHdc(hdcDest); } catch { }  hdcDest    = IntPtr.Zero; }
+            if (hdcSrc     != IntPtr.Zero) { try { grSrc?.ReleaseHdc(hdcSrc);  } catch { }  hdcSrc     = IntPtr.Zero; }
+            try { _Bitmap?.Dispose(); } catch { }
+            _Bitmap = null;
+            grDest = null;
+            grSrc  = null;
         }
 
         public unsafe static void DrawImageHighSpeedtoDevice()

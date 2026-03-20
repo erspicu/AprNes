@@ -1066,7 +1066,7 @@ namespace AprNes
         static void RenderScreen()
         {
             screen_lock = true;
-            if (AnalogEnabled && NesCore.UltraAnalog && NesCore.CrtEnabled) CrtScreen.Render(); // Stage 2：linearBuffer → AnalogScreenBuf3x（Level 3 + CRT）
+            if (AnalogEnabled && NesCore.UltraAnalog && NesCore.CrtEnabled) CrtScreen.Render(); // Stage 2：linearBuffer → AnalogScreenBuf（Level 3 + CRT）
             VideoOutput?.Invoke(null, null);
             screen_lock = false;
             _event.WaitOne();

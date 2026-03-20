@@ -34,6 +34,12 @@ namespace AprNes
             groupBox3.Text = LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["scanline"];
 
 
+            // 同步 Analog Size 選擇（index 0=2x,1=4x,2=6x,3=8x）
+            int[] analogSizeMap = { 2, 4, 6, 8 };
+            int analogIdx = System.Array.IndexOf(analogSizeMap, NesCore.AnalogSize);
+            if (analogIdx < 0) analogIdx = 2; // 預設 4x
+            comboBox_analogSize.SelectedIndex = analogIdx;
+
             comboBox1.Items.Clear();
 
             int ch = 0;
@@ -143,6 +149,12 @@ namespace AprNes
                 AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "9";
                 AprNesUI.GetInstance().AppConfigure["filter"] = "xbrz";
             }
+            // Analog Size：comboBox index 0=2x,1=4x,2=6x,3=8x
+            int[] analogSizeValues = { 2, 4, 6, 8 };
+            int selIdx = comboBox_analogSize.SelectedIndex;
+            NesCore.AnalogSize = (selIdx >= 0 && selIdx < analogSizeValues.Length) ? analogSizeValues[selIdx] : 4;
+            AprNesUI.GetInstance().AppConfigure["AnalogSize"] = NesCore.AnalogSize.ToString();
+
             AprNesUI.GetInstance().NES_KeyMAP_joypad.Clear();
 
             foreach (string key in NES_KeyMAP_joypad_config.Keys)

@@ -93,9 +93,9 @@ namespace AprNes
         int ScreenSize = 1;
         public void initUIsize()
         {
-            // AnalogEnabled 時輸出固定 1024×840（CrtScreen Stage 2 輸出），否則依 ScreenSize
-            int renderWidth  = NesCore.AnalogEnabled ? 1024 : 256 * ScreenSize;
-            int renderHeight = NesCore.AnalogEnabled ? 840 : 240 * ScreenSize;
+            // AnalogEnabled 時依 AnalogSize 決定（256×N × 210×N，8:7 AR）
+            int renderWidth  = NesCore.AnalogEnabled ? CrtScreen.DstW : 256 * ScreenSize;
+            int renderHeight = NesCore.AnalogEnabled ? CrtScreen.DstH : 240 * ScreenSize;
 
             panel1.Visible = false;
             panel1.Width  = renderWidth;
@@ -266,6 +266,16 @@ namespace AprNes
             // 讀取類比訊號模擬設定 (預設關閉)
             NesCore.AnalogEnabled = AppConfigure.ContainsKey("AnalogMode") && AppConfigure["AnalogMode"] == "1";
 
+            // 讀取類比輸出尺寸（2-6，預設 4）
+            if (AppConfigure.ContainsKey("AnalogSize"))
+            {
+                int sz;
+                int[] valid = { 2, 4, 6, 8 };
+                NesCore.AnalogSize = (int.TryParse(AppConfigure["AnalogSize"], out sz) && System.Array.IndexOf(valid, sz) >= 0) ? sz : 4;
+            }
+            else
+                NesCore.AnalogSize = 4;
+
             // 讀取 Ultra 類比設定（預設關閉）
             NesCore.UltraAnalog = AppConfigure.ContainsKey("UltraAnalog") && AppConfigure["UltraAnalog"] == "1";
 
@@ -365,6 +375,7 @@ namespace AprNes
             AppConfigure["Volume"] = NesCore.Volume.ToString();
             AppConfigure["AccuracyOptA"] = NesCore.AccuracyOptA ? "1" : "0";
             AppConfigure["crt"] = NesCore.CrtEnabled ? "1" : "0";
+            AppConfigure["AnalogSize"] = NesCore.AnalogSize.ToString();
 
             string conf = "";
             foreach (string i in AppConfigure.Keys)
@@ -997,6 +1008,23 @@ public string GetRomInfo()
             NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
             NesCore._event.Reset();
             while (NesCore.screen_lock) Thread.Sleep(1);
+
+            // AnalogEnabled 時：重新分配 AnalogScreenBuf 並重建 CrtScreen 快取
+            if (NesCore.AnalogEnabled)
+            {
+                unsafe
+                {
+                    if (NesCore.AnalogScreenBuf != null)
+                    {
+                        System.Runtime.InteropServices.Marshal.FreeHGlobal((IntPtr)NesCore.AnalogScreenBuf);
+                        NesCore.AnalogScreenBuf = null;
+                    }
+                    NesCore.AnalogScreenBuf = (uint*)System.Runtime.InteropServices.Marshal.AllocHGlobal(
+                        sizeof(uint) * CrtScreen.DstW * CrtScreen.DstH);
+                }
+                CrtScreen.Init();
+            }
+
             if (RenderObj != null) RenderObj.freeMem();
             RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType(NesCore.AnalogEnabled ? "AprNes.Render_ntsc_3x" : "AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
             RenderObj.init(NesCore.ScreenBuf1x, grfx);

@@ -12,7 +12,7 @@ namespace AprNes
     //
     //  輸入：Ntsc.linearBuffer [1024 × 240 × 3]  ← 線性 RGB，無 Gamma
     //         Planar 佈局：R[0..kPlane-1] G[kPlane..2kPlane-1] B[2kPlane..3kPlane-1]
-    //  輸出：NesCore.AnalogScreenBuf3x [1024 × 840 BGRA]
+    //  輸出：NesCore.AnalogScreenBuf [1024 × 840 BGRA]
     //
     //  垂直映射：240 → 840（× 3.5），連續域高斯掃描線
     //  演算法：
@@ -29,10 +29,11 @@ namespace AprNes
 
     unsafe public static class CrtScreen
     {
-        public const int SrcW = 1024;
-        public const int SrcH = 240;
-        public const int DstW = 1024;
-        public const int DstH = 840;
+        public const int SrcW = 1024;  // linearBuffer 列寬（固定）
+        public const int SrcH = 240;   // linearBuffer 列數（固定）
+        // DstW/DstH 依 AnalogSize 動態決定（256×N × 210×N，維持 8:7 AR）
+        public static int DstW => 256 * NesCore.AnalogSize;
+        public static int DstH => 210 * NesCore.AnalogSize;
 
         // ── 端子參數組（INI 讀入，開機時載入一次）──────────────────────────
         // RF 端子
@@ -63,11 +64,11 @@ namespace AprNes
         // ════════════════════════════════════════════════════════════════════
         public static void Init()
         {
-            if (_weights == null)
-            {
-                _weights  = (float*)Marshal.AllocHGlobal(DstH * sizeof(float));
-                _nearestY = (int*)  Marshal.AllocHGlobal(DstH * sizeof(int));
-            }
+            // 每次 Init 都重新分配（AnalogSize 可能已改變）
+            if (_weights  != null) Marshal.FreeHGlobal((IntPtr)_weights);
+            if (_nearestY != null) Marshal.FreeHGlobal((IntPtr)_nearestY);
+            _weights  = (float*)Marshal.AllocHGlobal(DstH * sizeof(float));
+            _nearestY = (int*)  Marshal.AllocHGlobal(DstH * sizeof(int));
             _cachedSigma = -1f; // 強制重新計算掃描線權重
         }
 
@@ -112,7 +113,7 @@ namespace AprNes
         // ════════════════════════════════════════════════════════════════════
         public static unsafe void Render()
         {
-            if (NesCore.AnalogScreenBuf3x == null) return;
+            if (NesCore.AnalogScreenBuf == null) return;
 
             ApplyProfile();
             PrecomputeScanlineWeights();
@@ -120,12 +121,17 @@ namespace AprNes
             float  bloom     = BloomStrength;
             float  boost     = BrightnessBoost;
             float* lb        = Ntsc.linearBuffer;
-            uint*  dst       = NesCore.AnalogScreenBuf3x;
+            uint*  dst       = NesCore.AnalogScreenBuf;
             float* wts       = _weights;
             int*   nyArr     = _nearestY;
             const int kPlane = Ntsc.kPlane; // R/G/B plane stride（245,760 floats）
 
-            int VS = Vector<float>.Count;   // 4（SSE2）或 8（AVX2）
+            int dstW     = DstW;  // 快取，避免 lambda 內重複呼叫 property
+            int dstH     = DstH;
+            bool is1to1  = (dstW == SrcW);      // N=4：1:1 SIMD
+            bool isDouble = (dstW == SrcW * 2); // N=8：每 source 像素 → 2 output，SIMD
+
+            int VS = Vector<float>.Count;  // 4（SSE2）或 8（AVX2）
 
             // 常數向量（frame 層次，Parallel.For 外部建立一次）
             var vBloom = new Vector<float>(bloom);
@@ -137,55 +143,147 @@ namespace AprNes
             var v011   = new Vector<float>(0.11f);
             var vGF    = new Vector<float>(0.229f);
 
-            Parallel.For(0, DstH, ty =>
+            Parallel.For(0, dstH, ty =>
             {
                 float  weight  = wts[ty];
-                float  omw     = 1f - weight;            // (1 − weight)，用於 Bloom
-                var    vWeight = new Vector<float>(weight);
-                var    vOMW    = new Vector<float>(omw);
-                uint*  rowPtr  = dst + ty * DstW;
+                float  omw     = 1f - weight;
+                uint*  rowPtr  = dst + ty * dstW;
                 int    ny      = nyArr[ty];
-                float* lb_r    = lb              + ny * DstW; // R plane，該 scanline 起始
-                float* lb_g    = lb + kPlane     + ny * DstW; // G plane
-                float* lb_b    = lb + 2 * kPlane + ny * DstW; // B plane
+                // linearBuffer 列寬永遠是 SrcW=1024，與 DstW 無關
+                float* lb_r    = lb              + ny * SrcW;
+                float* lb_g    = lb + kPlane     + ny * SrcW;
+                float* lb_b    = lb + 2 * kPlane + ny * SrcW;
 
-                // SIMD 主迴圈：每次處理 VS 個像素
-                // 從 planar buffer 逐一載入連續 float（無跨步），利用指標轉型
-#pragma warning disable CS8500
                 int x = 0;
-                for (; x <= DstW - VS; x += VS)
+
+                if (is1to1)
                 {
-                    var vr = *(Vector<float>*)(lb_r + x);
-                    var vg = *(Vector<float>*)(lb_g + x);
-                    var vb = *(Vector<float>*)(lb_b + x);
+                    // N=4 最佳路徑：1:1 水平映射，SIMD 連續讀取
+                    var vWeight = new Vector<float>(weight);
+                    var vOMW    = new Vector<float>(omw);
 
-                    // Bloom：高亮度像素填補掃描線黑溝
-                    var vBright = vr * v03 + vg * v059 + vb * v011;
-                    var vFw     = (vWeight + vBright * vBloom * vOMW) * vBoost;
-
-                    // 套用亮度係數 + clamp [0,1]
-                    vr = Vector.Min(Vector.Max(vr * vFw, vZero), vOne);
-                    vg = Vector.Min(Vector.Max(vg * vFw, vZero), vOne);
-                    vb = Vector.Min(Vector.Max(vb * vFw, vZero), vOne);
-
-                    // Fast gamma：v' = v + 0.229·v·(v−1)
-                    vr += vGF * vr * (vr - vOne);
-                    vg += vGF * vg * (vg - vOne);
-                    vb += vGF * vb * (vb - vOne);
-
-                    // 逐元素提取 → scale + pack BGRA
-                    for (int k = 0; k < VS; k++)
+#pragma warning disable CS8500
+                    for (; x <= SrcW - VS; x += VS)
                     {
-                        int ri = Math.Min(255, (int)(vr[k] * 255.5f));
-                        int gi = Math.Min(255, (int)(vg[k] * 255.5f));
-                        int bi = Math.Min(255, (int)(vb[k] * 255.5f));
-                        rowPtr[x + k] = (uint)(bi | (gi << 8) | (ri << 16) | 0xFF000000u);
+                        var vr = *(Vector<float>*)(lb_r + x);
+                        var vg = *(Vector<float>*)(lb_g + x);
+                        var vb = *(Vector<float>*)(lb_b + x);
+
+                        var vBright = vr * v03 + vg * v059 + vb * v011;
+                        var vFw     = (vWeight + vBright * vBloom * vOMW) * vBoost;
+
+                        vr = Vector.Min(Vector.Max(vr * vFw, vZero), vOne);
+                        vg = Vector.Min(Vector.Max(vg * vFw, vZero), vOne);
+                        vb = Vector.Min(Vector.Max(vb * vFw, vZero), vOne);
+
+                        vr += vGF * vr * (vr - vOne);
+                        vg += vGF * vg * (vg - vOne);
+                        vb += vGF * vb * (vb - vOne);
+
+                        for (int k = 0; k < VS; k++)
+                        {
+                            int ri = Math.Min(255, (int)(vr[k] * 255.5f));
+                            int gi = Math.Min(255, (int)(vg[k] * 255.5f));
+                            int bi = Math.Min(255, (int)(vb[k] * 255.5f));
+                            rowPtr[x + k] = (uint)(bi | (gi << 8) | (ri << 16) | 0xFF000000u);
+                        }
                     }
+#pragma warning restore CS8500
                 }
+                else if (isDouble)
+                {
+                    // N=8 SIMD 路徑：每 source 像素計算一次，結果寫入兩個相鄰 output
+                    var vWeight = new Vector<float>(weight);
+                    var vOMW    = new Vector<float>(omw);
+                    int srcX = 0;
+
+#pragma warning disable CS8500
+                    for (; srcX <= SrcW - VS; srcX += VS)
+                    {
+                        var vr = *(Vector<float>*)(lb_r + srcX);
+                        var vg = *(Vector<float>*)(lb_g + srcX);
+                        var vb = *(Vector<float>*)(lb_b + srcX);
+
+                        var vBright = vr * v03 + vg * v059 + vb * v011;
+                        var vFw     = (vWeight + vBright * vBloom * vOMW) * vBoost;
+
+                        vr = Vector.Min(Vector.Max(vr * vFw, vZero), vOne);
+                        vg = Vector.Min(Vector.Max(vg * vFw, vZero), vOne);
+                        vb = Vector.Min(Vector.Max(vb * vFw, vZero), vOne);
+
+                        vr += vGF * vr * (vr - vOne);
+                        vg += vGF * vg * (vg - vOne);
+                        vb += vGF * vb * (vb - vOne);
+
+                        for (int k = 0; k < VS; k++)
+                        {
+                            int ri = Math.Min(255, (int)(vr[k] * 255.5f));
+                            int gi = Math.Min(255, (int)(vg[k] * 255.5f));
+                            int bi = Math.Min(255, (int)(vb[k] * 255.5f));
+                            uint pixel = (uint)(bi | (gi << 8) | (ri << 16) | 0xFF000000u);
+                            int outX = (srcX + k) * 2;
+                            rowPtr[outX]     = pixel;
+                            rowPtr[outX + 1] = pixel;
+                        }
+                    }
 #pragma warning restore CS8500
 
-                // 尾端 scalar（DstW=1024 可整除 4/8，實際不執行，保留完整性）
-                for (; x < DstW; x++)
+                    // 尾端 scalar（SrcW=1024 整除 4/8，實際不執行）
+                    for (; srcX < SrcW; srcX++)
+                    {
+                        float r = lb_r[srcX], g = lb_g[srcX], b = lb_b[srcX];
+                        float bright = r * 0.3f + g * 0.59f + b * 0.11f;
+                        float fw = (weight + bright * bloom * omw) * boost;
+                        r *= fw; if (r < 0f) r = 0f; else if (r > 1f) r = 1f;
+                        g *= fw; if (g < 0f) g = 0f; else if (g > 1f) g = 1f;
+                        b *= fw; if (b < 0f) b = 0f; else if (b > 1f) b = 1f;
+                        r += 0.229f * r * (r - 1f);
+                        g += 0.229f * g * (g - 1f);
+                        b += 0.229f * b * (b - 1f);
+                        int ri = (int)(r * 255.5f); if (ri > 255) ri = 255;
+                        int gi = (int)(g * 255.5f); if (gi > 255) gi = 255;
+                        int bi = (int)(b * 255.5f); if (bi > 255) bi = 255;
+                        uint px = (uint)(bi | (gi << 8) | (ri << 16) | 0xFF000000u);
+                        rowPtr[srcX * 2]     = px;
+                        rowPtr[srcX * 2 + 1] = px;
+                    }
+                    return;
+                }
+                else
+                {
+                    // N=2/6 純量路徑：線性插值水平重採樣
+                    // 固定小數點 16-bit fraction，避免浮點除法
+                    int fpScale = (SrcW << 16) / dstW; // 每輸出像素對應的 source 步進（fixed-point）
+                    for (; x < dstW; x++)
+                    {
+                        int fp    = x * fpScale;
+                        int srcX  = fp >> 16;
+                        float t   = (fp & 0xFFFF) * (1f / 65536f); // 小數部分
+                        int srcX1 = srcX + 1 < SrcW ? srcX + 1 : srcX;
+                        float r = lb_r[srcX] + t * (lb_r[srcX1] - lb_r[srcX]);
+                        float g = lb_g[srcX] + t * (lb_g[srcX1] - lb_g[srcX]);
+                        float b = lb_b[srcX] + t * (lb_b[srcX1] - lb_b[srcX]);
+                        float bright = r * 0.3f + g * 0.59f + b * 0.11f;
+                        float fw = (weight + bright * bloom * omw) * boost;
+
+                        r *= fw; if (r < 0f) r = 0f; else if (r > 1f) r = 1f;
+                        g *= fw; if (g < 0f) g = 0f; else if (g > 1f) g = 1f;
+                        b *= fw; if (b < 0f) b = 0f; else if (b > 1f) b = 1f;
+
+                        r += 0.229f * r * (r - 1f);
+                        g += 0.229f * g * (g - 1f);
+                        b += 0.229f * b * (b - 1f);
+
+                        int ri = (int)(r * 255.5f); if (ri > 255) ri = 255;
+                        int gi = (int)(g * 255.5f); if (gi > 255) gi = 255;
+                        int bi = (int)(b * 255.5f); if (bi > 255) bi = 255;
+                        rowPtr[x] = (uint)(bi | (gi << 8) | (ri << 16) | 0xFF000000u);
+                    }
+                    return; // scalar path 已處理所有像素
+                }
+
+                // N=4 尾端 scalar（DstW=1024 整除 4/8，實際不執行）
+                for (; x < dstW; x++)
                 {
                     float r = lb_r[x], g = lb_g[x], b = lb_b[x];
                     float bright = r * 0.3f + g * 0.59f + b * 0.11f;

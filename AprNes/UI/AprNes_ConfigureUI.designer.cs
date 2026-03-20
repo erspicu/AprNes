@@ -78,6 +78,8 @@
             this.radioButtonX1 = new System.Windows.Forms.RadioButton();
             this.comboBox1 = new System.Windows.Forms.ComboBox();
             this.label18 = new System.Windows.Forms.Label();
+            this.label_analogSize = new System.Windows.Forms.Label();
+            this.comboBox_analogSize = new System.Windows.Forms.ComboBox();
             this.groupBox3 = new System.Windows.Forms.GroupBox();
             this.radioButtonX6s = new System.Windows.Forms.RadioButton();
             this.radioButtonX4s = new System.Windows.Forms.RadioButton();
@@ -726,7 +728,32 @@
             this.label18.Size = new System.Drawing.Size(74, 18);
             this.label18.TabIndex = 19;
             this.label18.Text = "Language";
-            // 
+            //
+            // label_analogSize
+            //
+            this.label_analogSize.AutoSize = true;
+            this.label_analogSize.Location = new System.Drawing.Point(700, 210);
+            this.label_analogSize.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.label_analogSize.Name = "label_analogSize";
+            this.label_analogSize.Size = new System.Drawing.Size(80, 18);
+            this.label_analogSize.TabIndex = 30;
+            this.label_analogSize.Text = "Analog Size";
+            //
+            // comboBox_analogSize
+            //
+            this.comboBox_analogSize.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.comboBox_analogSize.FormattingEnabled = true;
+            this.comboBox_analogSize.Items.AddRange(new object[] {
+                "2x  512×420",
+                "4x  1024×840",
+                "6x  1536×1260",
+                "8x  2048×1680" });
+            this.comboBox_analogSize.Location = new System.Drawing.Point(700, 232);
+            this.comboBox_analogSize.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.comboBox_analogSize.Name = "comboBox_analogSize";
+            this.comboBox_analogSize.Size = new System.Drawing.Size(180, 26);
+            this.comboBox_analogSize.TabIndex = 31;
+            //
             // groupBox3
             // 
             this.groupBox3.Controls.Add(this.radioButtonX6s);
@@ -829,6 +856,8 @@
             this.ClientSize = new System.Drawing.Size(951, 440);
             this.Controls.Add(this.groupBox5);
             this.Controls.Add(this.groupBox3);
+            this.Controls.Add(this.label_analogSize);
+            this.Controls.Add(this.comboBox_analogSize);
             this.Controls.Add(this.label18);
             this.Controls.Add(this.comboBox1);
             this.Controls.Add(this.groupBox4);
@@ -924,5 +953,7 @@
         private System.Windows.Forms.GroupBox groupBox5;
         private System.Windows.Forms.CheckBox SoundcheckBox;
         private System.Windows.Forms.CheckBox perdotFSM;
+        private System.Windows.Forms.Label label_analogSize;
+        private System.Windows.Forms.ComboBox comboBox_analogSize;
     }
 }

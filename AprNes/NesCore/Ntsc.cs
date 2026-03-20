@@ -313,19 +313,21 @@ namespace AprNes
             float qFilt = -chr0 * s0;
             float yFilt = dotY[0];
 
+            int dstW     = CrtScreen.DstW;
+            int N        = NesCore.AnalogSize;   // dot index = outX / N
             int rowStart = sl * CrtScreen.DstH / CrtScreen.SrcH;
             int rowEnd   = (sl + 1) * CrtScreen.DstH / CrtScreen.SrcH;
             if (rowEnd > CrtScreen.DstH) rowEnd = CrtScreen.DstH;
-            uint* row0 = NesCore.AnalogScreenBuf3x + rowStart * kOutW;
+            uint* row0 = NesCore.AnalogScreenBuf + rowStart * dstW;
 
             // Phase B：noise scale 移出迴圈
             float noiseScale  = addNoise ? (2f * NoiseIntensity / 255.0f) : 0f;
             float noiseOffset = addNoise ? NoiseIntensity : 0f;
 
             int ph = phase0;
-            for (int outX = 0; outX < kOutW; outX++)
+            for (int outX = 0; outX < dstW; outX++)
             {
-                int   d      = outX >> 2;          // Phase A: >> 2
+                int   d      = outX / N;           // dot index（依 AnalogSize 縮放）
                 float c      = cosTab6[ph];
                 float s      = sinTab6[ph];
                 float chroma = dotI[d] * c - dotQ[d] * s;
@@ -344,29 +346,30 @@ namespace AprNes
 
                 row0[outX] = YiqToRgb(y, iFilt, qFilt);
 
-                if (++ph == 6) ph = 0;             // Phase A: 遞增取代 %6
+                if (++ph == 6) ph = 0;
             }
 
             for (int row = rowStart + 1; row < rowEnd; row++)
-                Buffer.MemoryCopy(row0, NesCore.AnalogScreenBuf3x + row * kOutW,
-                    kOutW * sizeof(uint), kOutW * sizeof(uint));
+                Buffer.MemoryCopy(row0, NesCore.AnalogScreenBuf + row * dstW,
+                    dstW * sizeof(uint), dstW * sizeof(uint));
         }
 
-        // Phase A：outX>>2
         static unsafe void DecodeAV_SVideo(int sl)
         {
             float iFilt = dotI[0];
             float qFilt = dotQ[0];
             float yFilt = dotY[0];
 
+            int dstW     = CrtScreen.DstW;
+            int N        = NesCore.AnalogSize;
             int rowStart = sl * CrtScreen.DstH / CrtScreen.SrcH;
             int rowEnd   = (sl + 1) * CrtScreen.DstH / CrtScreen.SrcH;
             if (rowEnd > CrtScreen.DstH) rowEnd = CrtScreen.DstH;
-            uint* row0 = NesCore.AnalogScreenBuf3x + rowStart * kOutW;
+            uint* row0 = NesCore.AnalogScreenBuf + rowStart * dstW;
 
-            for (int outX = 0; outX < kOutW; outX++)
+            for (int outX = 0; outX < dstW; outX++)
             {
-                int d = outX >> 2;
+                int d = outX / N;
                 iFilt += ChromaBlur * (dotI[d] - iFilt);
                 qFilt += ChromaBlur * (dotQ[d] - qFilt);
                 yFilt += SlewRate   * (dotY[d] - yFilt);
@@ -374,8 +377,8 @@ namespace AprNes
             }
 
             for (int row = rowStart + 1; row < rowEnd; row++)
-                Buffer.MemoryCopy(row0, NesCore.AnalogScreenBuf3x + row * kOutW,
-                    kOutW * sizeof(uint), kOutW * sizeof(uint));
+                Buffer.MemoryCopy(row0, NesCore.AnalogScreenBuf + row * dstW,
+                    dstW * sizeof(uint), dstW * sizeof(uint));
         }
 
         // ════════════════════════════════════════════════════════════════════
@@ -522,21 +525,20 @@ namespace AprNes
         static unsafe void DemodulateRow(int sl, int phase0)
         {
             bool toCrt = NesCore.CrtEnabled;
+            int dstW   = CrtScreen.DstW;
 
             int rowStart = sl * CrtScreen.DstH / CrtScreen.SrcH;
             int rowEnd   = (sl + 1) * CrtScreen.DstH / CrtScreen.SrcH;
             if (rowEnd > CrtScreen.DstH) rowEnd = CrtScreen.DstH;
-            uint* row0 = NesCore.AnalogScreenBuf3x + rowStart * kOutW;
+            uint* row0 = NesCore.AnalogScreenBuf + rowStart * dstW;
 
             int VS = Vector<float>.Count;
 
 #pragma warning disable CS8500
             // Phase D：預計算 Q@dot rate（256 點 × 54 MACs SIMD）
-            // dot d 的中央: center = kLeadPad + d*4 + 2
-            // startQ = kLeadPad + d*4 + 2 - kWinQ_half = kLeadPad + d*4 - 25
             float* dotQDemod = stackalloc float[256];
             {
-                float* wvQ  = waveBuf + kLeadPad - kWinQ_half + 2; // d=0: kLeadPad - 25
+                float* wvQ  = waveBuf + kLeadPad - kWinQ_half + 2;
                 int tModQ = ((phase0 - kWinQ_half + 2) % 6 + 6) % 6;
                 for (int d = 0; d < 256; d++)
                 {
@@ -553,84 +555,11 @@ namespace AprNes
                 }
             }
 
-            // Phase A：滑動指標（wvY/wvI 各自 ++ per pixel）
+            // 計算仍在 kOutW=1024 解析度（物理解調）；!toCrt 時 resample 到 dstW
+            uint* tmpBuf = stackalloc uint[kOutW]; // 4KB，僅 !toCrt && dstW!=kOutW 時有效
+
             float* wvY  = waveBuf + kLeadPad - kWinY_half;
             float* wvI  = waveBuf + kLeadPad - kWinI_half;
-            int tModI = ((phase0 - kWinI_half) % 6 + 6) % 6;
-
-            for (int p = 0; p < kOutW; p++)
-            {
-                // Phase D：Y 6-tap 手動展開（消去迴圈 overhead）
-                float sumY = hannY[0]*wvY[0] + hannY[1]*wvY[1] + hannY[2]*wvY[2]
-                           + hannY[3]*wvY[3] + hannY[4]*wvY[4] + hannY[5]*wvY[5];
-
-                // I：SIMD dot product（combinedI[tModI] × wvI）
-                float* cwI = combinedI + tModI * kWinI;
-                float  sumI;
-                {
-                    int n = 0;
-                    var acc = new Vector<float>(0f);
-                    for (; n <= kWinI - VS; n += VS)
-                        acc += *(Vector<float>*)(cwI + n) * *(Vector<float>*)(wvI + n);
-                    sumI = Vector.Dot(acc, new Vector<float>(1f));
-                    for (; n < kWinI; n++) sumI += cwI[n] * wvI[n];
-                }
-
-                float Y = sumY;
-                float I = 2f * sumI;
-                float Q = dotQDemod[p >> 2]; // Phase D：Q 查表
-
-                if (toCrt)
-                    WriteLinear(sl, p, Y, I, Q);
-                else
-                    row0[p] = YiqToRgb(Y, I, Q);
-
-                wvY++; wvI++;
-                if (++tModI == 6) tModI = 0;
-            }
-#pragma warning restore CS8500
-
-            if (!toCrt)
-                for (int row = rowStart + 1; row < rowEnd; row++)
-                    Buffer.MemoryCopy(row0, NesCore.AnalogScreenBuf3x + row * kOutW,
-                        kOutW * sizeof(uint), kOutW * sizeof(uint));
-        }
-
-        // DemodulateRow_SVideo：同 DemodulateRow，I/Q 來源改為 cBuf
-        static unsafe void DemodulateRow_SVideo(int sl, int phase0)
-        {
-            bool toCrt = NesCore.CrtEnabled;
-
-            int rowStart = sl * CrtScreen.DstH / CrtScreen.SrcH;
-            int rowEnd   = (sl + 1) * CrtScreen.DstH / CrtScreen.SrcH;
-            if (rowEnd > CrtScreen.DstH) rowEnd = CrtScreen.DstH;
-            uint* row0 = NesCore.AnalogScreenBuf3x + rowStart * kOutW;
-
-            int VS = Vector<float>.Count;
-
-#pragma warning disable CS8500
-            // Q@dot rate（cBuf）
-            float* dotQDemod = stackalloc float[256];
-            {
-                float* wvQ  = cBuf + kLeadPad - kWinQ_half + 2;
-                int tModQ = ((phase0 - kWinQ_half + 2) % 6 + 6) % 6;
-                for (int d = 0; d < 256; d++)
-                {
-                    float* cwQ = combinedQ + tModQ * kWinQ;
-                    int n = 0;
-                    var acc = new Vector<float>(0f);
-                    for (; n <= kWinQ - VS; n += VS)
-                        acc += *(Vector<float>*)(cwQ + n) * *(Vector<float>*)(wvQ + n);
-                    float sumQ = Vector.Dot(acc, new Vector<float>(1f));
-                    for (; n < kWinQ; n++) sumQ += cwQ[n] * wvQ[n];
-                    dotQDemod[d] = -2f * sumQ;
-                    wvQ += kSampDot;
-                    tModQ += 4; if (tModQ >= 6) tModQ -= 6;
-                }
-            }
-
-            float* wvY = waveBuf + kLeadPad - kWinY_half; // Y from waveBuf
-            float* wvI = cBuf    + kLeadPad - kWinI_half; // I from cBuf
             int tModI = ((phase0 - kWinI_half) % 6 + 6) % 6;
 
             for (int p = 0; p < kOutW; p++)
@@ -655,8 +584,10 @@ namespace AprNes
 
                 if (toCrt)
                     WriteLinear(sl, p, Y, I, Q);
+                else if (dstW == kOutW)
+                    row0[p] = YiqToRgb(Y, I, Q);       // N=4：直接寫
                 else
-                    row0[p] = YiqToRgb(Y, I, Q);
+                    tmpBuf[p] = YiqToRgb(Y, I, Q);     // 其他：暫存後 resample
 
                 wvY++; wvI++;
                 if (++tModI == 6) tModI = 0;
@@ -664,9 +595,103 @@ namespace AprNes
 #pragma warning restore CS8500
 
             if (!toCrt)
+            {
+                if (dstW != kOutW)
+                {
+                    // nearest-neighbor resample kOutW → dstW
+                    int fpScale = (kOutW << 16) / dstW;
+                    for (int x = 0; x < dstW; x++)
+                        row0[x] = tmpBuf[(x * fpScale) >> 16];
+                }
                 for (int row = rowStart + 1; row < rowEnd; row++)
-                    Buffer.MemoryCopy(row0, NesCore.AnalogScreenBuf3x + row * kOutW,
-                        kOutW * sizeof(uint), kOutW * sizeof(uint));
+                    Buffer.MemoryCopy(row0, NesCore.AnalogScreenBuf + row * dstW,
+                        dstW * sizeof(uint), dstW * sizeof(uint));
+            }
+        }
+
+        // DemodulateRow_SVideo：同 DemodulateRow，I/Q 來源改為 cBuf
+        static unsafe void DemodulateRow_SVideo(int sl, int phase0)
+        {
+            bool toCrt = NesCore.CrtEnabled;
+            int dstW   = CrtScreen.DstW;
+
+            int rowStart = sl * CrtScreen.DstH / CrtScreen.SrcH;
+            int rowEnd   = (sl + 1) * CrtScreen.DstH / CrtScreen.SrcH;
+            if (rowEnd > CrtScreen.DstH) rowEnd = CrtScreen.DstH;
+            uint* row0 = NesCore.AnalogScreenBuf + rowStart * dstW;
+
+            int VS = Vector<float>.Count;
+
+#pragma warning disable CS8500
+            float* dotQDemod = stackalloc float[256];
+            {
+                float* wvQ  = cBuf + kLeadPad - kWinQ_half + 2;
+                int tModQ = ((phase0 - kWinQ_half + 2) % 6 + 6) % 6;
+                for (int d = 0; d < 256; d++)
+                {
+                    float* cwQ = combinedQ + tModQ * kWinQ;
+                    int n = 0;
+                    var acc = new Vector<float>(0f);
+                    for (; n <= kWinQ - VS; n += VS)
+                        acc += *(Vector<float>*)(cwQ + n) * *(Vector<float>*)(wvQ + n);
+                    float sumQ = Vector.Dot(acc, new Vector<float>(1f));
+                    for (; n < kWinQ; n++) sumQ += cwQ[n] * wvQ[n];
+                    dotQDemod[d] = -2f * sumQ;
+                    wvQ += kSampDot;
+                    tModQ += 4; if (tModQ >= 6) tModQ -= 6;
+                }
+            }
+
+            uint* tmpBuf = stackalloc uint[kOutW];
+
+            float* wvY = waveBuf + kLeadPad - kWinY_half;
+            float* wvI = cBuf    + kLeadPad - kWinI_half;
+            int tModI = ((phase0 - kWinI_half) % 6 + 6) % 6;
+
+            for (int p = 0; p < kOutW; p++)
+            {
+                float sumY = hannY[0]*wvY[0] + hannY[1]*wvY[1] + hannY[2]*wvY[2]
+                           + hannY[3]*wvY[3] + hannY[4]*wvY[4] + hannY[5]*wvY[5];
+
+                float* cwI = combinedI + tModI * kWinI;
+                float  sumI;
+                {
+                    int n = 0;
+                    var acc = new Vector<float>(0f);
+                    for (; n <= kWinI - VS; n += VS)
+                        acc += *(Vector<float>*)(cwI + n) * *(Vector<float>*)(wvI + n);
+                    sumI = Vector.Dot(acc, new Vector<float>(1f));
+                    for (; n < kWinI; n++) sumI += cwI[n] * wvI[n];
+                }
+
+                float Y = sumY;
+                float I = 2f * sumI;
+                float Q = dotQDemod[p >> 2];
+
+                if (toCrt)
+                    WriteLinear(sl, p, Y, I, Q);
+                else if (dstW == kOutW)
+                    row0[p] = YiqToRgb(Y, I, Q);
+                else
+                    tmpBuf[p] = YiqToRgb(Y, I, Q);
+
+                wvY++; wvI++;
+                if (++tModI == 6) tModI = 0;
+            }
+#pragma warning restore CS8500
+
+            if (!toCrt)
+            {
+                if (dstW != kOutW)
+                {
+                    int fpScale = (kOutW << 16) / dstW;
+                    for (int x = 0; x < dstW; x++)
+                        row0[x] = tmpBuf[(x * fpScale) >> 16];
+                }
+                for (int row = rowStart + 1; row < rowEnd; row++)
+                    Buffer.MemoryCopy(row0, NesCore.AnalogScreenBuf + row * dstW,
+                        dstW * sizeof(uint), dstW * sizeof(uint));
+            }
         }
 
         // ════════════════════════════════════════════════════════════════════
