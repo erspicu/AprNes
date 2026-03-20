@@ -16,7 +16,7 @@ namespace AprNes
     //    1. 高斯掃描線權重：W = exp(−dy² / (2σ²))
     //    2. Bloom（高光溢出）：W_final = W + brightness × BloomStrength × (1−W)
     //    3. BrightnessBoost：補償掃描線黑溝造成的平均亮度損失
-    //    4. Gamma 2.2 查表（LUT 4096 entries，輸入範圍 [0..2.0]）
+    //    4. Fast gamma（≈ pow(v,1/1.13)，與原 YiqToRgb 一致，保留 NES 色調）
     //
     //  三種端子參數組（由 NesCore.AnalogOutput 決定）：
     //    RF     : BeamSigma=1.10, BloomStrength=0.50, BrightnessBoost=1.10
@@ -26,20 +26,29 @@ namespace AprNes
 
     unsafe public static class CrtScreen
     {
-        public const int SrcW = 768;
+        public const int SrcW = 1024;
         public const int SrcH = 240;
-        public const int DstW = 768;
-        public const int DstH = 630;
+        public const int DstW = 1024;
+        public const int DstH = 840;
 
-        // ── 端子參數組 ───────────────────────────────────────────────────────
-        static float BeamSigma      = 0.85f;
-        static float BloomStrength  = 0.25f;
-        static float BrightnessBoost = 1.25f;
+        // ── 端子參數組（INI 讀入，開機時載入一次）──────────────────────────
+        // RF 端子
+        public static float RF_BeamSigma       = 1.10f;
+        public static float RF_BloomStrength   = 0.50f;
+        public static float RF_BrightnessBoost = 1.10f;
+        // AV 端子
+        public static float AV_BeamSigma       = 0.85f;
+        public static float AV_BloomStrength   = 0.25f;
+        public static float AV_BrightnessBoost = 1.25f;
+        // S-Video 端子
+        public static float SV_BeamSigma       = 0.65f;
+        public static float SV_BloomStrength   = 0.10f;
+        public static float SV_BrightnessBoost = 1.40f;
 
-        // ── Gamma 2.2 LUT ────────────────────────────────────────────────────
-        //   索引 i → 線性亮度 i / 2048.0f（範圍 0..2.0）
-        //   輸出：sRGB byte（Gamma 校正後）
-        static readonly byte[] _gammaLUT = new byte[4096];
+        // 當前使用中的參數（由 ApplyProfile 設定）
+        static float BeamSigma;
+        static float BloomStrength;
+        static float BrightnessBoost;
 
         // ── 掃描線預計算快取 ─────────────────────────────────────────────────
         static float   _cachedSigma = -1f;
@@ -51,13 +60,6 @@ namespace AprNes
         // ════════════════════════════════════════════════════════════════════
         public static void Init()
         {
-            // 建立 Gamma 2.2 LUT：線性 [0..2.0] → sRGB byte [0..255]
-            for (int i = 0; i < 4096; i++)
-            {
-                double v = i / 2048.0;
-                double g = Math.Pow(v, 1.0 / 2.2);
-                _gammaLUT[i] = (byte)Math.Min(255, (int)(g * 255.0 + 0.5));
-            }
             _cachedSigma = -1f; // 強制重新計算掃描線權重
         }
 
@@ -67,11 +69,11 @@ namespace AprNes
             switch (NesCore.AnalogOutput)
             {
                 case NesCore.AnalogOutputMode.RF:
-                    BeamSigma = 1.10f; BloomStrength = 0.50f; BrightnessBoost = 1.10f; break;
+                    BeamSigma = RF_BeamSigma; BloomStrength = RF_BloomStrength; BrightnessBoost = RF_BrightnessBoost; break;
                 case NesCore.AnalogOutputMode.SVideo:
-                    BeamSigma = 0.65f; BloomStrength = 0.10f; BrightnessBoost = 1.40f; break;
+                    BeamSigma = SV_BeamSigma; BloomStrength = SV_BloomStrength; BrightnessBoost = SV_BrightnessBoost; break;
                 default: // AV
-                    BeamSigma = 0.85f; BloomStrength = 0.25f; BrightnessBoost = 1.25f; break;
+                    BeamSigma = AV_BeamSigma; BloomStrength = AV_BloomStrength; BrightnessBoost = AV_BrightnessBoost; break;
             }
         }
 
@@ -133,19 +135,32 @@ namespace AprNes
             });
         }
 
-        // ── Gamma 2.2 → BGRA uint ───────────────────────────────────────────
+        // ── Fast gamma → BGRA uint ──────────────────────────────────────────
+        //   NES composite 訊號電壓已接近 broadcast gamma 編碼，
+        //   使用與原 YiqToRgb 相同的 fast gamma（≈ pow(v, 1/1.13)）
+        //   而非 sRGB gamma 2.2，避免中暗色過度提亮。
+        //   公式：v' = v + 0.229·v·(v−1)
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static uint GammaBgra(float r, float g, float b)
         {
-            int ri = (int)(r * 2048f);
-            int gi = (int)(g * 2048f);
-            int bi = (int)(b * 2048f);
+            // clamp to [0,1] before gamma（Bloom 可能超過 1.0，超出範圍直接夾至 255）
+            if (r < 0f) r = 0f; else if (r > 1f) r = 1f;
+            if (g < 0f) g = 0f; else if (g > 1f) g = 1f;
+            if (b < 0f) b = 0f; else if (b > 1f) b = 1f;
 
-            byte rb = ri <= 0 ? (byte)0 : ri >= 4096 ? (byte)255 : _gammaLUT[ri];
-            byte gb = gi <= 0 ? (byte)0 : gi >= 4096 ? (byte)255 : _gammaLUT[gi];
-            byte bb = bi <= 0 ? (byte)0 : bi >= 4096 ? (byte)255 : _gammaLUT[bi];
+            const float gf = 0.229f;
+            r += gf * r * (r - 1f);
+            g += gf * g * (g - 1f);
+            b += gf * b * (b - 1f);
 
-            return (uint)(bb | (gb << 8) | (rb << 16) | 0xFF000000u);
+            int ri = (int)(r * 255.5f);
+            int gi = (int)(g * 255.5f);
+            int bi = (int)(b * 255.5f);
+            if (ri > 255) ri = 255;
+            if (gi > 255) gi = 255;
+            if (bi > 255) bi = 255;
+
+            return (uint)(bi | (gi << 8) | (ri << 16) | 0xFF000000u);
         }
     }
 }

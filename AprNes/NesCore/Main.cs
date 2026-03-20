@@ -61,6 +61,11 @@ namespace AprNes
         // true          = Level 3 物理路徑（Step 1 波形 + Step 2 解調 + Step 3 YIQ→RGB）
         static public bool UltraAnalog = false;
 
+        // CRT 電子束光學模擬（UltraAnalog=true 時有效）
+        // false = 跳過 Stage 2（CrtScreen），物理解調後直接輸出至 AnalogScreenBuf3x
+        // true  = 完整兩階段管線：Stage 1 → linearBuffer → Stage 2 CrtScreen → AnalogScreenBuf3x
+        static public bool CrtEnabled = true;
+
         // 類比輸出端子模式（AnalogEnabled=true 時有效）
         // AV     = Composite：Y+C 混合，標準 IIR 解碼，產生 Dot Crawl / 色彩暈染
         // SVideo = S-Video：Y/C 分離傳輸，較銳利，色彩暈染較少
@@ -273,7 +278,7 @@ namespace AprNes
                 //init allocate
                 ScreenBuf1x      = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 61440);
                 if (AnalogEnabled)
-                    AnalogScreenBuf3x = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 768 * 630);
+                    AnalogScreenBuf3x = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 1024 * 840);
                 Buffer_BG_array  = (int* )Marshal.AllocHGlobal(sizeof(int)  * 61440);
                 NesColors        = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 64);
                 palCacheR        = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 4);

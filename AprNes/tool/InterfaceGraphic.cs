@@ -360,13 +360,13 @@ namespace AprNes
 
         public Bitmap GetOutput()
         {
-            return new Bitmap(768, 630, 768 * 4, PixelFormat.Format32bppRgb, (IntPtr)NesCore.AnalogScreenBuf3x);
+            return new Bitmap(1024, 840, 1024 * 4, PixelFormat.Format32bppRgb, (IntPtr)NesCore.AnalogScreenBuf3x);
         }
 
         public void init(uint* input, Graphics _device)
         {
             // input (ScreenBuf1x) 不使用；直接指向 AnalogScreenBuf3x
-            NativeGDI.initHighSpeed(_device, 768, 630, NesCore.AnalogScreenBuf3x, 0, 0);
+            NativeGDI.initHighSpeed(_device, 1024, 840, NesCore.AnalogScreenBuf3x, 0, 0);
         }
 
         public void Render()

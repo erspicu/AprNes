@@ -26,6 +26,17 @@ namespace AprNes
         public Dictionary<string, string> AppConfigure = new Dictionary<string, string>();
         string ConfigureFile = Application.StartupPath + @"\AprNes.ini";
 
+        // 舊版 AprNes.ini 若殘留 analog key 則在 Configure_Write 時過濾掉（避免重複寫入）
+        static readonly System.Collections.Generic.HashSet<string> s_analogKeys =
+            new System.Collections.Generic.HashSet<string>(new[] {
+                "RF_NoiseIntensity", "RF_SlewRate", "RF_ChromaBlur",
+                "AV_NoiseIntensity", "AV_SlewRate", "AV_ChromaBlur",
+                "SV_NoiseIntensity", "SV_SlewRate", "SV_ChromaBlur",
+                "RF_BeamSigma", "RF_BloomStrength", "RF_BrightnessBoost",
+                "AV_BeamSigma", "AV_BloomStrength", "AV_BrightnessBoost",
+                "SV_BeamSigma", "SV_BloomStrength", "SV_BrightnessBoost",
+            });
+
         Dictionary<int, KeyMap> NES_KeyMAP = new Dictionary<int, KeyMap>();
         public Dictionary<string, KeyMap> NES_KeyMAP_joypad = new Dictionary<string, KeyMap>();
 
@@ -82,9 +93,9 @@ namespace AprNes
         int ScreenSize = 1;
         public void initUIsize()
         {
-            // AnalogEnabled 時輸出固定 768×630（CrtScreen Stage 2 輸出），否則依 ScreenSize
-            int renderWidth  = NesCore.AnalogEnabled ? 768 : 256 * ScreenSize;
-            int renderHeight = NesCore.AnalogEnabled ? 630 : 240 * ScreenSize;
+            // AnalogEnabled 時輸出固定 1024×840（CrtScreen Stage 2 輸出），否則依 ScreenSize
+            int renderWidth  = NesCore.AnalogEnabled ? 1024 : 256 * ScreenSize;
+            int renderHeight = NesCore.AnalogEnabled ? 840 : 240 * ScreenSize;
 
             panel1.Visible = false;
             panel1.Width  = renderWidth;
@@ -194,14 +205,18 @@ namespace AprNes
                 AppConfigure["AnalogMode"] = "0";
                 AppConfigure["AnalogOutput"] = "AV";
                 AppConfigure["UltraAnalog"] = "0";
+                AppConfigure["crt"] = "1";
                 Configure_Write();
             }
 
             List<string> lines = File.ReadAllLines(ConfigureFile).ToList();
             foreach (string i in lines)
             {
-                List<string> keyvalue = i.Split(new char[] { '=' }).ToList();
+                // 跳過注解行（; 或 # 開頭）
+                string trimmed = i.TrimStart();
+                if (trimmed.StartsWith(";") || trimmed.StartsWith("#")) continue;
 
+                List<string> keyvalue = i.Split(new char[] { '=' }).ToList();
                 if (keyvalue.Count == 2)
                     AppConfigure[keyvalue[0]] = keyvalue[1];
             }
@@ -254,6 +269,9 @@ namespace AprNes
             // 讀取 Ultra 類比設定（預設關閉）
             NesCore.UltraAnalog = AppConfigure.ContainsKey("UltraAnalog") && AppConfigure["UltraAnalog"] == "1";
 
+            // 讀取 CRT 電子束光學模擬開關（預設開啟，UltraAnalog=1 時有效）
+            NesCore.CrtEnabled = !AppConfigure.ContainsKey("crt") || AppConfigure["crt"] != "0";
+
             // 讀取類比端子模式 (AnalogMode=1 時有效，預設 AV)
             if (AppConfigure.ContainsKey("AnalogOutput"))
             {
@@ -268,6 +286,8 @@ namespace AprNes
             {
                 NesCore.AnalogOutput = NesCore.AnalogOutputMode.AV;
             }
+
+            LoadAnalogConfig(); // 讀取 AprNesAnalog.ini（開機一次）
 
             NES_init_KeyMap();
 
@@ -344,11 +364,102 @@ namespace AprNes
             AppConfigure["Sound"] = NesCore.AudioEnabled ? "1" : "0";
             AppConfigure["Volume"] = NesCore.Volume.ToString();
             AppConfigure["AccuracyOptA"] = NesCore.AccuracyOptA ? "1" : "0";
+            AppConfigure["crt"] = NesCore.CrtEnabled ? "1" : "0";
 
             string conf = "";
             foreach (string i in AppConfigure.Keys)
-                conf += i + "=" + AppConfigure[i] + "\r\n";
+                if (!s_analogKeys.Contains(i))          // 過濾殘留的舊版 analog key
+                    conf += i + "=" + AppConfigure[i] + "\r\n";
+
             FileWriteAllText(ConfigureFile, conf);
+        }
+
+        // ────────────────────────────────────────────────────────────────────
+        // AprNesAnalog.ini — 類比訊號模擬端子參數（開機讀一次，不隨 Configure_Write 重寫）
+        // ────────────────────────────────────────────────────────────────────
+        void LoadAnalogConfig()
+        {
+            string analogFile = Application.StartupPath + @"\AprNesAnalog.ini";
+            string Fmt(float v) => v.ToString("F4", System.Globalization.CultureInfo.InvariantCulture);
+
+            if (!File.Exists(analogFile))
+            {
+                // 首次建立：寫出預設值 + 詳細注解，供使用者手動調整
+                string c = "";
+                c += "; AprNesAnalog.ini  --  類比訊號模擬端子參數\r\n";
+                c += "; 此檔案僅在 AprNes 啟動時讀入一次（修改後需重啟才生效）\r\n";
+                c += "; AprNes.ini 的 AnalogMode=1 啟用類比模擬，AnalogOutput=RF/AV/SVideo 選擇端子\r\n";
+                c += "; UltraAnalog=0：Stage 1 參數有效；UltraAnalog=1：Stage 1 + Stage 2 皆有效\r\n";
+                c += ";\r\n";
+                c += "; ── Stage 1（Ntsc 訊號解碼）────────────────────────────────────────────\r\n";
+                c += "; NoiseIntensity  熱雜訊振幅（0=無雜訊，0.04=輕微 RF 效果，0.10=明顯）\r\n";
+                c += "; SlewRate        電容響應速率 IIR alpha（0=完全模糊，1=完全清晰）\r\n";
+                c += "; ChromaBlur      色彩暈染程度 IIR alpha（0=完全暈染，1=無暈染）\r\n";
+                c += "RF_NoiseIntensity=" + Fmt(Ntsc.RF_NoiseIntensity) + "\r\n";
+                c += "RF_SlewRate="       + Fmt(Ntsc.RF_SlewRate)       + "\r\n";
+                c += "RF_ChromaBlur="     + Fmt(Ntsc.RF_ChromaBlur)     + "\r\n";
+                c += "AV_NoiseIntensity=" + Fmt(Ntsc.AV_NoiseIntensity) + "\r\n";
+                c += "AV_SlewRate="       + Fmt(Ntsc.AV_SlewRate)       + "\r\n";
+                c += "AV_ChromaBlur="     + Fmt(Ntsc.AV_ChromaBlur)     + "\r\n";
+                c += "SV_NoiseIntensity=" + Fmt(Ntsc.SV_NoiseIntensity) + "\r\n";
+                c += "SV_SlewRate="       + Fmt(Ntsc.SV_SlewRate)       + "\r\n";
+                c += "SV_ChromaBlur="     + Fmt(Ntsc.SV_ChromaBlur)     + "\r\n";
+                c += ";\r\n";
+                c += "; ── Stage 2（CrtScreen 電子束光學，UltraAnalog=1 有效）──────────────────\r\n";
+                c += "; BeamSigma       電子束擴散半徑 sigma（值越大掃描線越寬，越模糊）\r\n";
+                c += "; BloomStrength   高光溢出強度（0=無 Bloom，1=強烈溢出）\r\n";
+                c += "; BrightnessBoost 亮度補償倍率（補償掃描線黑溝造成的平均亮度損失）\r\n";
+                c += "RF_BeamSigma="       + Fmt(CrtScreen.RF_BeamSigma)       + "\r\n";
+                c += "RF_BloomStrength="   + Fmt(CrtScreen.RF_BloomStrength)   + "\r\n";
+                c += "RF_BrightnessBoost=" + Fmt(CrtScreen.RF_BrightnessBoost) + "\r\n";
+                c += "AV_BeamSigma="       + Fmt(CrtScreen.AV_BeamSigma)       + "\r\n";
+                c += "AV_BloomStrength="   + Fmt(CrtScreen.AV_BloomStrength)   + "\r\n";
+                c += "AV_BrightnessBoost=" + Fmt(CrtScreen.AV_BrightnessBoost) + "\r\n";
+                c += "SV_BeamSigma="       + Fmt(CrtScreen.SV_BeamSigma)       + "\r\n";
+                c += "SV_BloomStrength="   + Fmt(CrtScreen.SV_BloomStrength)   + "\r\n";
+                c += "SV_BrightnessBoost=" + Fmt(CrtScreen.SV_BrightnessBoost) + "\r\n";
+                FileWriteAllText(analogFile, c);
+                return; // 使用已設定的預設 static 值，不需再解析
+            }
+
+            // 解析既有檔案
+            var dict = new Dictionary<string, string>();
+            foreach (string line in File.ReadAllLines(analogFile))
+            {
+                string t = line.TrimStart();
+                if (t.StartsWith(";") || t.StartsWith("#")) continue;
+                var kv = line.Split(new char[] { '=' }, 2);
+                if (kv.Length == 2) dict[kv[0].Trim()] = kv[1].Trim();
+            }
+
+            float Get(string key, float def)
+            {
+                float v;
+                return dict.ContainsKey(key) &&
+                       float.TryParse(dict[key], System.Globalization.NumberStyles.Float,
+                           System.Globalization.CultureInfo.InvariantCulture, out v) ? v : def;
+            }
+
+            // Stage 1 (Ntsc.cs)
+            Ntsc.RF_NoiseIntensity = Get("RF_NoiseIntensity", 0.04f);
+            Ntsc.RF_SlewRate       = Get("RF_SlewRate",       0.60f);
+            Ntsc.RF_ChromaBlur     = Get("RF_ChromaBlur",     0.10f);
+            Ntsc.AV_NoiseIntensity = Get("AV_NoiseIntensity", 0.003f);
+            Ntsc.AV_SlewRate       = Get("AV_SlewRate",       0.80f);
+            Ntsc.AV_ChromaBlur     = Get("AV_ChromaBlur",     0.35f);
+            Ntsc.SV_NoiseIntensity = Get("SV_NoiseIntensity", 0.00f);
+            Ntsc.SV_SlewRate       = Get("SV_SlewRate",       0.90f);
+            Ntsc.SV_ChromaBlur     = Get("SV_ChromaBlur",     0.45f);
+            // Stage 2 (CrtScreen.cs)
+            CrtScreen.RF_BeamSigma       = Get("RF_BeamSigma",       1.10f);
+            CrtScreen.RF_BloomStrength   = Get("RF_BloomStrength",   0.50f);
+            CrtScreen.RF_BrightnessBoost = Get("RF_BrightnessBoost", 1.10f);
+            CrtScreen.AV_BeamSigma       = Get("AV_BeamSigma",       0.85f);
+            CrtScreen.AV_BloomStrength   = Get("AV_BloomStrength",   0.25f);
+            CrtScreen.AV_BrightnessBoost = Get("AV_BrightnessBoost", 1.25f);
+            CrtScreen.SV_BeamSigma       = Get("SV_BeamSigma",       0.65f);
+            CrtScreen.SV_BloomStrength   = Get("SV_BloomStrength",   0.10f);
+            CrtScreen.SV_BrightnessBoost = Get("SV_BrightnessBoost", 1.40f);
         }
 
         public void FileWriteAllText(string path, string str)

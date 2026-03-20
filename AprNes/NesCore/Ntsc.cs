@@ -50,25 +50,39 @@ namespace AprNes
         static public float RfBuzzPhase  = 0.0f;
 
         // ── 輸出：線性 RGB 緩衝區（768×240×3，Stage 2 輸入）────────────────
-        public const int kOutW = 768;
+        public const int kOutW = 1024;
         public const int kSrcH = 240;
         public static readonly float[] linearBuffer = new float[kOutW * kSrcH * 3];
 
-        // ── 端子參數組（每幀 sl=0 時更新）───────────────────────────────────
-        static float NoiseIntensity = 0.02f;
-        static float SlewRate       = 0.65f;
-        static float ChromaBlur     = 0.20f;
+        // ── 端子參數組（INI 讀入，開機時載入一次）──────────────────────────
+        // RF 端子
+        public static float RF_NoiseIntensity = 0.04f;
+        public static float RF_SlewRate       = 0.60f;
+        public static float RF_ChromaBlur     = 0.10f;
+        // AV 端子
+        public static float AV_NoiseIntensity = 0.003f;
+        public static float AV_SlewRate       = 0.80f;
+        public static float AV_ChromaBlur     = 0.35f;
+        // S-Video 端子
+        public static float SV_NoiseIntensity = 0.00f;
+        public static float SV_SlewRate       = 0.90f;
+        public static float SV_ChromaBlur     = 0.45f;
+
+        // 每 scanline 使用中的參數（由 ApplyProfile 設定）
+        static float NoiseIntensity;
+        static float SlewRate;
+        static float ChromaBlur;
 
         static void ApplyProfile()
         {
             switch (NesCore.AnalogOutput)
             {
                 case NesCore.AnalogOutputMode.RF:
-                    NoiseIntensity = 0.20f; SlewRate = 0.30f; ChromaBlur = 0.05f; break;
+                    NoiseIntensity = RF_NoiseIntensity; SlewRate = RF_SlewRate; ChromaBlur = RF_ChromaBlur; break;
                 case NesCore.AnalogOutputMode.SVideo:
-                    NoiseIntensity = 0.00f; SlewRate = 0.90f; ChromaBlur = 0.45f; break;
+                    NoiseIntensity = SV_NoiseIntensity; SlewRate = SV_SlewRate; ChromaBlur = SV_ChromaBlur; break;
                 default: // AV
-                    NoiseIntensity = 0.02f; SlewRate = 0.65f; ChromaBlur = 0.20f; break;
+                    NoiseIntensity = AV_NoiseIntensity; SlewRate = AV_SlewRate; ChromaBlur = AV_ChromaBlur; break;
             }
         }
 
@@ -222,7 +236,8 @@ namespace AprNes
         }
 
         // AV / RF：9-entry LUT dot crawl + ChromaBlur IIR + SlewRate IIR + Noise
-        static void DecodeAV_Composite(int sl, int phase0)
+        // 直接寫入 AnalogScreenBuf3x（跳過 linearBuffer / CrtScreen）
+        static unsafe void DecodeAV_Composite(int sl, int phase0)
         {
             bool isRF     = NesCore.AnalogOutput == NesCore.AnalogOutputMode.RF;
             bool addNoise = NoiseIntensity > 0f;
@@ -239,73 +254,83 @@ namespace AprNes
                 ns = (uint)(NesCore.frame_count * 1664525u + (uint)sl * 1013904223u + 1442695041u);
 
             // IIR 初始狀態（以第 0 dot 的解碼值初始化，避免啟動暫態）
-            int   d0  = 0;
-            int   ph0 = phase0 % 9;
-            float c0  = cosLUT[ph0], s0 = sinLUT[ph0];
+            int   d0   = 0;
+            int   ph0  = phase0 % 9;
+            float c0   = cosLUT[ph0], s0 = sinLUT[ph0];
             float chr0 = dotI[d0] * c0 - dotQ[d0] * s0;
             float iFilt = chr0 * c0;
             float qFilt = -chr0 * s0;
             float yFilt = dotY[d0];
 
-            int rowOff = sl * kOutW * 3;
+            // 計算此 scanline 對應的輸出行範圍（840/240 = 3.5，交替 3/4 行）
+            int rowStart = sl * CrtScreen.DstH / CrtScreen.SrcH;
+            int rowEnd   = (sl + 1) * CrtScreen.DstH / CrtScreen.SrcH;
+            if (rowEnd > CrtScreen.DstH) rowEnd = CrtScreen.DstH;
+
+            uint* row0 = NesCore.AnalogScreenBuf3x + rowStart * kOutW;
 
             for (int outX = 0; outX < kOutW; outX++)
             {
                 int d  = outX * 256 / kOutW;
                 int ph = (phase0 + outX) % 9;
 
-                // Dot crawl decode
                 float c      = cosLUT[ph];
                 float s      = sinLUT[ph];
                 float chroma = dotI[d] * c - dotQ[d] * s;
                 float iRaw   = chroma * c;
                 float qRaw   = -chroma * s;
 
-                // ChromaBlur IIR
                 iFilt += ChromaBlur * (iRaw - iFilt);
                 qFilt += ChromaBlur * (qRaw - qFilt);
-
-                // SlewRate IIR on Y
-                yFilt += SlewRate * (dotY[d] - yFilt);
+                yFilt += SlewRate   * (dotY[d] - yFilt);
                 float y = yFilt;
 
-                // RF buzz
                 if (isRF) y += buzzRow;
 
-                // Thermal noise
                 if (addNoise)
                 {
                     ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5;
                     y += ((ns & 0xFF) / 255.0f - 0.5f) * 2f * NoiseIntensity;
                 }
 
-                WriteLinear(rowOff + outX * 3, y, iFilt, qFilt);
+                row0[outX] = YiqToRgb(y, iFilt, qFilt);
             }
+
+            // 複製到相同 scanline 的其餘輸出行
+            for (int row = rowStart + 1; row < rowEnd; row++)
+                Buffer.MemoryCopy(row0,
+                    NesCore.AnalogScreenBuf3x + row * kOutW,
+                    kOutW * sizeof(uint), kOutW * sizeof(uint));
         }
 
-        // S-Video：無 dot crawl，ChromaBlur IIR + SlewRate IIR
-        static void DecodeAV_SVideo(int sl)
+        // S-Video：無 dot crawl，直接寫入 AnalogScreenBuf3x
+        static unsafe void DecodeAV_SVideo(int sl)
         {
-            // IIR 初始狀態
             float iFilt = dotI[0];
             float qFilt = dotQ[0];
             float yFilt = dotY[0];
 
-            int rowOff = sl * kOutW * 3;
+            int rowStart = sl * CrtScreen.DstH / CrtScreen.SrcH;
+            int rowEnd   = (sl + 1) * CrtScreen.DstH / CrtScreen.SrcH;
+            if (rowEnd > CrtScreen.DstH) rowEnd = CrtScreen.DstH;
+
+            uint* row0 = NesCore.AnalogScreenBuf3x + rowStart * kOutW;
 
             for (int outX = 0; outX < kOutW; outX++)
             {
                 int d = outX * 256 / kOutW;
 
-                // ChromaBlur IIR（直接 I/Q，無 dot crawl）
                 iFilt += ChromaBlur * (dotI[d] - iFilt);
                 qFilt += ChromaBlur * (dotQ[d] - qFilt);
+                yFilt += SlewRate   * (dotY[d] - yFilt);
 
-                // SlewRate IIR on Y
-                yFilt += SlewRate * (dotY[d] - yFilt);
-
-                WriteLinear(rowOff + outX * 3, yFilt, iFilt, qFilt);
+                row0[outX] = YiqToRgb(yFilt, iFilt, qFilt);
             }
+
+            for (int row = rowStart + 1; row < rowEnd; row++)
+                Buffer.MemoryCopy(row0,
+                    NesCore.AnalogScreenBuf3x + row * kOutW,
+                    kOutW * sizeof(uint), kOutW * sizeof(uint));
         }
 
         // ════════════════════════════════════════════════════════════════════
@@ -411,10 +436,20 @@ namespace AprNes
             }
         }
 
-        // Step 2：複合視訊解調 + ChromaBlur IIR → linearBuffer
-        static void DemodulateRow(int sl, int phase0)
+        // Step 2：複合視訊解調 + ChromaBlur IIR
+        //   CrtEnabled=true  → 寫入 linearBuffer（供 Stage 2 CrtScreen 使用）
+        //   CrtEnabled=false → 直接 YIQ→BGRA 寫入 AnalogScreenBuf3x
+        static unsafe void DemodulateRow(int sl, int phase0)
         {
-            int rowOff = sl * kOutW * 3;
+            bool toCrt = NesCore.CrtEnabled;
+            int rowOff = sl * kOutW * 3;  // linearBuffer 偏移（toCrt=true 時使用）
+
+            // 直寫路徑：計算此 scanline 對應的輸出行範圍
+            int rowStart = sl * CrtScreen.DstH / CrtScreen.SrcH;
+            int rowEnd   = (sl + 1) * CrtScreen.DstH / CrtScreen.SrcH;
+            if (rowEnd > CrtScreen.DstH) rowEnd = CrtScreen.DstH;
+            uint* row0 = NesCore.AnalogScreenBuf3x + rowStart * kOutW;
+
             float iFilt = 0f, qFilt = 0f;
             bool first = true;
 
@@ -452,12 +487,24 @@ namespace AprNes
                     qFilt += ChromaBlur * (Q - qFilt);
                 }
 
-                WriteLinear(rowOff + p * 3, Y, iFilt, qFilt);
+                if (toCrt)
+                    WriteLinear(rowOff + p * 3, Y, iFilt, qFilt);
+                else
+                    row0[p] = YiqToRgb(Y, iFilt, qFilt);
             }
+
+            // 直寫路徑：複製到此 scanline 的其餘輸出行
+            if (!toCrt)
+                for (int row = rowStart + 1; row < rowEnd; row++)
+                    Buffer.MemoryCopy(row0,
+                        NesCore.AnalogScreenBuf3x + row * kOutW,
+                        kOutW * sizeof(uint), kOutW * sizeof(uint));
         }
 
         // S-Video 物理路徑：直接 YIQ + SlewRate IIR(Y) + ChromaBlur IIR(I/Q)
-        static void DecodePhysical_SVideo(int sl, byte[] palBuf, byte emphasisBits)
+        //   CrtEnabled=true  → 寫入 linearBuffer
+        //   CrtEnabled=false → 直接 YIQ→BGRA 寫入 AnalogScreenBuf3x
+        static unsafe void DecodePhysical_SVideo(int sl, byte[] palBuf, byte emphasisBits)
         {
             float atten = 1.0f;
             if (emphasisBits != 0)
@@ -466,7 +513,14 @@ namespace AprNes
                 atten = (float)Math.Pow(0.746, n);
             }
 
+            bool toCrt = NesCore.CrtEnabled;
             int rowOff = sl * kOutW * 3;
+
+            int rowStart = sl * CrtScreen.DstH / CrtScreen.SrcH;
+            int rowEnd   = (sl + 1) * CrtScreen.DstH / CrtScreen.SrcH;
+            if (rowEnd > CrtScreen.DstH) rowEnd = CrtScreen.DstH;
+            uint* row0 = NesCore.AnalogScreenBuf3x + rowStart * kOutW;
+
             float yFilt = 0f, iFilt = 0f, qFilt = 0f;
             bool first = true;
 
@@ -501,8 +555,17 @@ namespace AprNes
                     qFilt += ChromaBlur * (Q - qFilt);
                 }
 
-                WriteLinear(rowOff + p * 3, yFilt, iFilt, qFilt);
+                if (toCrt)
+                    WriteLinear(rowOff + p * 3, yFilt, iFilt, qFilt);
+                else
+                    row0[p] = YiqToRgb(yFilt, iFilt, qFilt);
             }
+
+            if (!toCrt)
+                for (int row = rowStart + 1; row < rowEnd; row++)
+                    Buffer.MemoryCopy(row0,
+                        NesCore.AnalogScreenBuf3x + row * kOutW,
+                        kOutW * sizeof(uint), kOutW * sizeof(uint));
         }
 
         // ════════════════════════════════════════════════════════════════════
@@ -527,6 +590,35 @@ namespace AprNes
             linearBuffer[off]     = r;
             linearBuffer[off + 1] = g;
             linearBuffer[off + 2] = b;
+        }
+
+        // ════════════════════════════════════════════════════════════════════
+        // Level 2 直接輸出：YIQ → BGRA uint（Fast Gamma ≈ pow(v,1/1.13)）
+        // ════════════════════════════════════════════════════════════════════
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static uint YiqToRgb(float y, float i, float q)
+        {
+            float r = y + 1.0841f * i + 0.3523f * q;
+            float g = y - 0.4302f * i - 0.5547f * q;
+            float b = y - 0.6268f * i + 1.9299f * q;
+
+            if (r < 0f) r = 0f; else if (r > 1f) r = 1f;
+            if (g < 0f) g = 0f; else if (g > 1f) g = 1f;
+            if (b < 0f) b = 0f; else if (b > 1f) b = 1f;
+
+            const float gf = 0.229f;
+            r += gf * r * (r - 1f);
+            g += gf * g * (g - 1f);
+            b += gf * b * (b - 1f);
+
+            int ri = (int)(r * 255.5f);
+            int gi = (int)(g * 255.5f);
+            int bi = (int)(b * 255.5f);
+            if (ri > 255) ri = 255;
+            if (gi > 255) gi = 255;
+            if (bi > 255) bi = 255;
+
+            return (uint)(bi | (gi << 8) | (ri << 16) | 0xFF000000u);
         }
     }
 }
