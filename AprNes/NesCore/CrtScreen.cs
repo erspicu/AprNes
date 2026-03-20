@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace AprNes
 {
@@ -51,15 +52,20 @@ namespace AprNes
         static float BrightnessBoost;
 
         // ── 掃描線預計算快取 ─────────────────────────────────────────────────
-        static float   _cachedSigma = -1f;
-        static readonly float[] _weights  = new float[DstH];
-        static readonly int[]   _nearestY = new int[DstH];
+        static float  _cachedSigma = -1f;
+        static float* _weights;
+        static int*   _nearestY;
 
         // ════════════════════════════════════════════════════════════════════
         // Init
         // ════════════════════════════════════════════════════════════════════
         public static void Init()
         {
+            if (_weights == null)
+            {
+                _weights  = (float*)Marshal.AllocHGlobal(DstH * sizeof(float));
+                _nearestY = (int*)  Marshal.AllocHGlobal(DstH * sizeof(int));
+            }
             _cachedSigma = -1f; // 強制重新計算掃描線權重
         }
 
@@ -105,12 +111,12 @@ namespace AprNes
             ApplyProfile();
             PrecomputeScanlineWeights();
 
-            float   bloom  = BloomStrength;
-            float   boost  = BrightnessBoost;
-            float[] lb     = Ntsc.linearBuffer;
-            uint*   dst    = NesCore.AnalogScreenBuf3x;
-            float[] wts    = _weights;
-            int[]   nyArr  = _nearestY;
+            float  bloom = BloomStrength;
+            float  boost = BrightnessBoost;
+            float* lb    = Ntsc.linearBuffer;
+            uint*  dst   = NesCore.AnalogScreenBuf3x;
+            float* wts   = _weights;
+            int*   nyArr = _nearestY;
 
             Parallel.For(0, DstH, ty =>
             {

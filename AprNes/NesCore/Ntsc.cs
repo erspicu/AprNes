@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace AprNes
 {
@@ -39,13 +40,13 @@ namespace AprNes
     unsafe public static class Ntsc
     {
         // ── 共用：blargg 電壓準位 ────────────────────────────────────────────
-        static readonly float[] loLevels = { -0.12f, 0.00f, 0.31f, 0.72f };
-        static readonly float[] hiLevels = {  0.40f, 0.68f, 1.00f, 1.00f };
+        static float* loLevels;
+        static float* hiLevels;
 
         // ── 共用：色相查表 ───────────────────────────────────────────────────
         //   iPhase[c] = -cos(c × π/6),  qPhase[c] = sin(c × π/6)
-        static readonly float[] iPhase = new float[16];
-        static readonly float[] qPhase = new float[16];
+        static float* iPhase;
+        static float* qPhase;
 
         // ── 共用：RF 音訊干擾（由 APU.generateSample() 更新）────────────────
         static public float RfAudioLevel = 0.0f;
@@ -54,7 +55,7 @@ namespace AprNes
         // ── 輸出：線性 RGB 緩衝區（768×240×3，Stage 2 輸入）────────────────
         public const int kOutW = 1024;
         public const int kSrcH = 240;
-        public static readonly float[] linearBuffer = new float[kOutW * kSrcH * 3];
+        public static float* linearBuffer;
 
         // ── 端子參數組（INI 讀入，開機時載入一次）──────────────────────────
         // RF 端子
@@ -93,9 +94,9 @@ namespace AprNes
         // ════════════════════════════════════════════════════════════════════
 
         // 每 dot 的 YIQ（256 dots/scanline）
-        static readonly float[] dotY = new float[256];
-        static readonly float[] dotI = new float[256];
-        static readonly float[] dotQ = new float[256];
+        static float* dotY;
+        static float* dotI;
+        static float* dotQ;
 
         // Level 2 副載波相位（6-entry，共用 cosTab6/sinTab6）
         // ─ 物理根據：副載波 / PPU 像素時脈 = (master/6)/(master/4) = 2/3 cycle/dot
@@ -108,8 +109,8 @@ namespace AprNes
         // ════════════════════════════════════════════════════════════════════
 
         // 副載波 LUT（週期 6 master clocks = 3.579545 MHz）
-        static readonly float[] cosTab6 = new float[6];
-        static readonly float[] sinTab6 = new float[6];
+        static float* cosTab6;
+        static float* sinTab6;
 
         // 波形緩衝區：[kLeadPad] [256×4 = 1024 samples] [kLeadPad]
         const int kDots    = 256;
@@ -117,8 +118,8 @@ namespace AprNes
         const int kWaveLen = kDots * kSampDot;        // 1024
         const int kLeadPad = 30;                       // ≥ kWinQ_half=27
         const int kBufLen  = kLeadPad * 2 + kWaveLen; // 1084
-        static readonly float[] waveBuf = new float[kBufLen]; // composite / S-Video Y line
-        static readonly float[] cBuf    = new float[kBufLen]; // S-Video C line（副載波彩度）
+        static float* waveBuf; // composite / S-Video Y line
+        static float* cBuf;   // S-Video C line（副載波彩度）
 
         // Y/I/Q 分離解調視窗（Hann，物理帶限）
         //   Y ≈ 4.2 MHz → 6 samples（1 副載波週期，精確消色度）
@@ -127,9 +128,9 @@ namespace AprNes
         const int kWinY      = 6;  const int kWinY_half = kWinY / 2;
         const int kWinI      = 18; const int kWinI_half = kWinI / 2;
         const int kWinQ      = 54; const int kWinQ_half = kWinQ / 2;
-        static readonly float[] hannY = new float[kWinY];
-        static readonly float[] hannI = new float[kWinI];
-        static readonly float[] hannQ = new float[kWinQ];
+        static float* hannY;
+        static float* hannI;
+        static float* hannQ;
 
         // 掃描線副載波相位（每 scanline 前進 1364 mod 6 = 2，週期 3 行）
         static int scanPhaseBase = 0;
@@ -139,26 +140,45 @@ namespace AprNes
         // ════════════════════════════════════════════════════════════════════
         public static void Init()
         {
-            // 共用：色相查表
-            for (int c = 0; c < 16; c++)
+            // 首次呼叫時配置 unmanaged 記憶體（hard reset 後不重配）
+            if (loLevels == null)
             {
-                double a = c * Math.PI / 6.0;
-                iPhase[c] = -(float)Math.Cos(a);
-                qPhase[c] =  (float)Math.Sin(a);
-            }
+                loLevels = (float*)Marshal.AllocHGlobal(4 * sizeof(float));
+                loLevels[0] = -0.12f; loLevels[1] = 0.00f; loLevels[2] = 0.31f; loLevels[3] = 0.72f;
+                hiLevels = (float*)Marshal.AllocHGlobal(4 * sizeof(float));
+                hiLevels[0] = 0.40f; hiLevels[1] = 0.68f; hiLevels[2] = 1.00f; hiLevels[3] = 1.00f;
 
-            // Level 2 / Level 3 共用：6-entry 副載波 LUT（每格 60° = π/3）
-            for (int k = 0; k < 6; k++)
-            {
-                double a = k * 2.0 * Math.PI / 6.0;
-                cosTab6[k] = (float)Math.Cos(a);
-                sinTab6[k] = (float)Math.Sin(a);
-            }
+                iPhase       = (float*)Marshal.AllocHGlobal(16 * sizeof(float));
+                qPhase       = (float*)Marshal.AllocHGlobal(16 * sizeof(float));
+                linearBuffer = (float*)Marshal.AllocHGlobal(kOutW * kSrcH * 3 * sizeof(float));
+                dotY         = (float*)Marshal.AllocHGlobal(256 * sizeof(float));
+                dotI         = (float*)Marshal.AllocHGlobal(256 * sizeof(float));
+                dotQ         = (float*)Marshal.AllocHGlobal(256 * sizeof(float));
+                cosTab6      = (float*)Marshal.AllocHGlobal(6 * sizeof(float));
+                sinTab6      = (float*)Marshal.AllocHGlobal(6 * sizeof(float));
+                waveBuf      = (float*)Marshal.AllocHGlobal(kBufLen * sizeof(float));
+                cBuf         = (float*)Marshal.AllocHGlobal(kBufLen * sizeof(float));
+                hannY        = (float*)Marshal.AllocHGlobal(kWinY * sizeof(float));
+                hannI        = (float*)Marshal.AllocHGlobal(kWinI * sizeof(float));
+                hannQ        = (float*)Marshal.AllocHGlobal(kWinQ * sizeof(float));
 
-            // Level 3：Y/I/Q 分離解調 Hann 視窗（預計算，歸一化使 Σw = 1）
-            ComputeHann(hannY, kWinY);
-            ComputeHann(hannI, kWinI);
-            ComputeHann(hannQ, kWinQ);
+                // 固定常數查表（只需初始化一次）
+                for (int c = 0; c < 16; c++)
+                {
+                    double a = c * Math.PI / 6.0;
+                    iPhase[c] = -(float)Math.Cos(a);
+                    qPhase[c] =  (float)Math.Sin(a);
+                }
+                for (int k = 0; k < 6; k++)
+                {
+                    double a = k * 2.0 * Math.PI / 6.0;
+                    cosTab6[k] = (float)Math.Cos(a);
+                    sinTab6[k] = (float)Math.Sin(a);
+                }
+                ComputeHann(hannY, kWinY);
+                ComputeHann(hannI, kWinI);
+                ComputeHann(hannQ, kWinQ);
+            }
 
             scanPhase6    = 0;
             scanPhaseBase = 0;
@@ -167,7 +187,7 @@ namespace AprNes
         }
 
         // Hann 視窗計算並歸一化（Σw = 1）
-        static void ComputeHann(float[] w, int N)
+        static void ComputeHann(float* w, int N)
         {
             double sum = 0.0;
             for (int n = 0; n < N; n++)
