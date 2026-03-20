@@ -29,8 +29,8 @@ namespace AprNes
     //   Step 1  生成 21.477 MHz 複合視訊波形（4 samples/dot）
     //           + SlewRate IIR（電容遲滯作用在波形）
     //           + NoiseIntensity 熱雜訊疊加
-    //   Step 2  12-sample boxcar coherent demodulation
-    //           + ChromaBlur IIR（作用在解調後 I/Q）
+    //   Step 2  Y/I/Q 分離帶限解調（Hann 視窗）：
+    //           Y = kWinY=6（≈4.2 MHz），I = kWinI=18（≈1.3 MHz），Q = kWinQ=54（≈0.4 MHz）
     //   Step 3  YIQ → Linear RGB（blargg -15° 矩陣，無 Gamma）
     // ============================================================
 
@@ -112,14 +112,21 @@ namespace AprNes
         // 波形緩衝區：[kLeadPad] [256×4 = 1024 samples] [kLeadPad]
         const int kDots    = 256;
         const int kSampDot = 4;
-        const int kWaveLen = kDots * kSampDot;     // 1024
-        const int kLeadPad = 12;
-        const int kBufLen  = kLeadPad * 2 + kWaveLen; // 1048
+        const int kWaveLen = kDots * kSampDot;        // 1024
+        const int kLeadPad = 30;                       // ≥ kWinQ_half=27
+        const int kBufLen  = kLeadPad * 2 + kWaveLen; // 1084
         static readonly float[] waveBuf = new float[kBufLen];
 
-        // 解調視窗（12 samples = 2 副載波週期）
-        const int kWinSize = 12;
-        const int kWinHalf = kWinSize / 2;
+        // Y/I/Q 分離解調視窗（Hann，物理帶限）
+        //   Y ≈ 4.2 MHz → 6 samples（1 副載波週期，精確消色度）
+        //   I ≈ 1.3 MHz → 18 samples（3 副載波週期）
+        //   Q ≈ 0.4 MHz → 54 samples（9 副載波週期）
+        const int kWinY      = 6;  const int kWinY_half = kWinY / 2;
+        const int kWinI      = 18; const int kWinI_half = kWinI / 2;
+        const int kWinQ      = 54; const int kWinQ_half = kWinQ / 2;
+        static readonly float[] hannY = new float[kWinY];
+        static readonly float[] hannI = new float[kWinI];
+        static readonly float[] hannQ = new float[kWinQ];
 
         // 掃描線副載波相位（每 scanline 前進 1364 mod 6 = 2，週期 3 行）
         static int scanPhaseBase = 0;
@@ -145,10 +152,28 @@ namespace AprNes
                 sinTab6[k] = (float)Math.Sin(a);
             }
 
+            // Level 3：Y/I/Q 分離解調 Hann 視窗（預計算，歸一化使 Σw = 1）
+            ComputeHann(hannY, kWinY);
+            ComputeHann(hannI, kWinI);
+            ComputeHann(hannQ, kWinQ);
+
             scanPhase6    = 0;
             scanPhaseBase = 0;
             RfAudioLevel  = 0f;
             RfBuzzPhase   = 0f;
+        }
+
+        // Hann 視窗計算並歸一化（Σw = 1）
+        static void ComputeHann(float[] w, int N)
+        {
+            double sum = 0.0;
+            for (int n = 0; n < N; n++)
+            {
+                w[n] = (float)(0.5 * (1.0 - Math.Cos(2.0 * Math.PI * n / (N - 1))));
+                sum += w[n];
+            }
+            float inv = (float)(1.0 / sum);
+            for (int n = 0; n < N; n++) w[n] *= inv;
         }
 
         // ════════════════════════════════════════════════════════════════════
@@ -427,64 +452,62 @@ namespace AprNes
             }
         }
 
-        // Step 2：複合視訊解調 + ChromaBlur IIR
+        // Step 2：Y/I/Q 分離帶限解調（Hann 視窗，物理正確）
+        //   Y：Hann kWinY=6（≈ 4.2 MHz，1 副載波週期精確消色度）
+        //   I：Hann kWinI=18（≈ 1.3 MHz，coherent demod × cos）
+        //   Q：Hann kWinQ=54（≈ 0.4 MHz，coherent demod × sin）
         //   CrtEnabled=true  → 寫入 linearBuffer（供 Stage 2 CrtScreen 使用）
         //   CrtEnabled=false → 直接 YIQ→BGRA 寫入 AnalogScreenBuf3x
         static unsafe void DemodulateRow(int sl, int phase0)
         {
             bool toCrt = NesCore.CrtEnabled;
-            int rowOff = sl * kOutW * 3;  // linearBuffer 偏移（toCrt=true 時使用）
+            int rowOff = sl * kOutW * 3;
 
-            // 直寫路徑：計算此 scanline 對應的輸出行範圍
             int rowStart = sl * CrtScreen.DstH / CrtScreen.SrcH;
             int rowEnd   = (sl + 1) * CrtScreen.DstH / CrtScreen.SrcH;
             if (rowEnd > CrtScreen.DstH) rowEnd = CrtScreen.DstH;
             uint* row0 = NesCore.AnalogScreenBuf3x + rowStart * kOutW;
 
-            float iFilt = 0f, qFilt = 0f;
-            bool first = true;
-
             for (int p = 0; p < kOutW; p++)
             {
                 int center = kLeadPad + p * kWaveLen / kOutW;
-                int start  = center - kWinHalf;
-                int end    = center + kWinHalf;
 
-                if (start < 0)       start = 0;
-                if (end   > kBufLen) end   = kBufLen;
+                // ── Y：Hann kWinY（1 副載波週期，精確消色度）───────────────
+                int startY = center - kWinY_half;
+                float sumY = 0f;
+                for (int n = 0; n < kWinY; n++)
+                    sumY += hannY[n] * waveBuf[startY + n];
 
-                int tMod = ((phase0 + start - kLeadPad) % 6 + 6) % 6;
-
-                float sumY = 0f, sumI = 0f, sumQ = 0f;
-                for (int t = start; t < end; t++)
+                // ── I：Hann kWinI，coherent demod × cos ─────────────────
+                int startI = center - kWinI_half;
+                int tModI  = ((phase0 + startI - kLeadPad) % 6 + 6) % 6;
+                float sumI = 0f;
+                for (int n = 0; n < kWinI; n++)
                 {
-                    float w = waveBuf[t];
-                    sumY += w;
-                    sumI += w * cosTab6[tMod];
-                    sumQ += w * sinTab6[tMod];
-                    tMod = tMod == 5 ? 0 : tMod + 1;
+                    sumI += hannI[n] * waveBuf[startI + n] * cosTab6[tModI];
+                    tModI = tModI == 5 ? 0 : tModI + 1;
                 }
 
-                int   N = end - start;
-                float Y = sumY / N;
-                float I = 2f * sumI / N;
-                float Q = -2f * sumQ / N;
-
-                // ChromaBlur IIR（解調後 I/Q）
-                if (first) { iFilt = I; qFilt = Q; first = false; }
-                else
+                // ── Q：Hann kWinQ，coherent demod × sin ─────────────────
+                int startQ = center - kWinQ_half;
+                int tModQ  = ((phase0 + startQ - kLeadPad) % 6 + 6) % 6;
+                float sumQ = 0f;
+                for (int n = 0; n < kWinQ; n++)
                 {
-                    iFilt += ChromaBlur * (I - iFilt);
-                    qFilt += ChromaBlur * (Q - qFilt);
+                    sumQ += hannQ[n] * waveBuf[startQ + n] * sinTab6[tModQ];
+                    tModQ = tModQ == 5 ? 0 : tModQ + 1;
                 }
+
+                float Y = sumY;
+                float I = 2f * sumI;
+                float Q = -2f * sumQ;
 
                 if (toCrt)
-                    WriteLinear(rowOff + p * 3, Y, iFilt, qFilt);
+                    WriteLinear(rowOff + p * 3, Y, I, Q);
                 else
-                    row0[p] = YiqToRgb(Y, iFilt, qFilt);
+                    row0[p] = YiqToRgb(Y, I, Q);
             }
 
-            // 直寫路徑：複製到此 scanline 的其餘輸出行
             if (!toCrt)
                 for (int row = rowStart + 1; row < rowEnd; row++)
                     Buffer.MemoryCopy(row0,
