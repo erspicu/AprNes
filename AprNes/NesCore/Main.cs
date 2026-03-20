@@ -62,8 +62,8 @@ namespace AprNes
         static public bool UltraAnalog = false;
 
         // CRT 電子束光學模擬（UltraAnalog=true 時有效）
-        // false = 跳過 Stage 2（CrtScreen），物理解調後直接輸出至 AnalogScreenBuf3x
-        // true  = 完整兩階段管線：Stage 1 → linearBuffer → Stage 2 CrtScreen → AnalogScreenBuf3x
+        // false = 跳過 Stage 2（CrtScreen），物理解調後直接輸出至 AnalogScreenBuf
+        // true  = 完整兩階段管線：Stage 1 → linearBuffer → Stage 2 CrtScreen → AnalogScreenBuf
         static public bool CrtEnabled = true;
 
         // 類比輸出端子模式（AnalogEnabled=true 時有效）
@@ -74,9 +74,13 @@ namespace AprNes
         public enum AnalogOutputMode { AV, SVideo, RF }
         static public AnalogOutputMode AnalogOutput = AnalogOutputMode.AV;
 
-        // 類比模式輸出緩衝區（768×630，CrtScreen Stage 2 寫入，Render_ntsc_3x 讀取）
+        // 類比輸出尺寸（2/4/6/8，預設 4）。對應像素：256×N × 210×N（8:7 AR）
+        // 2→512×420, 4→1024×840, 6→1536×1260, 8→2048×1680
+        static public int AnalogSize = 4;
+
+        // 類比模式輸出緩衝區（CrtScreen Stage 2 寫入，Render_ntsc_3x 讀取）
         // 僅在 AnalogEnabled=true 時分配，其他情況為 null
-        static public uint* AnalogScreenBuf3x = null;
+        static public uint* AnalogScreenBuf = null;
 
         static int* Vertical; //  Vertical = false,
 
@@ -105,7 +109,7 @@ namespace AprNes
             if (P1_joypad_status != null) { Marshal.FreeHGlobal((IntPtr)P1_joypad_status); P1_joypad_status = null; }
             if (NES_MEM      != null) { Marshal.FreeHGlobal((IntPtr)NES_MEM);      NES_MEM      = null; }
             if (Vertical           != null) { Marshal.FreeHGlobal((IntPtr)Vertical);           Vertical           = null; }
-            if (AnalogScreenBuf3x  != null) { Marshal.FreeHGlobal((IntPtr)AnalogScreenBuf3x);  AnalogScreenBuf3x  = null; }
+            if (AnalogScreenBuf  != null) { Marshal.FreeHGlobal((IntPtr)AnalogScreenBuf);  AnalogScreenBuf  = null; }
         }
 
         static void HardResetState()
@@ -278,7 +282,7 @@ namespace AprNes
                 //init allocate
                 ScreenBuf1x      = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 61440);
                 if (AnalogEnabled)
-                    AnalogScreenBuf3x = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 1024 * 840);
+                    AnalogScreenBuf = (uint*)Marshal.AllocHGlobal(sizeof(uint) * CrtScreen.DstW * CrtScreen.DstH);
                 Buffer_BG_array  = (int* )Marshal.AllocHGlobal(sizeof(int)  * 61440);
                 NesColors        = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 64);
                 palCacheR        = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 4);
