@@ -90,17 +90,16 @@ namespace AprNes
         // Level 2 — 簡化路徑（快速）
         // ════════════════════════════════════════════════════════════════════
 
-        // 色副載波 9-entry LUT（每格 4π/9 ≈ 80°）
-        static readonly float[] cosLUT = new float[9];
-        static readonly float[] sinLUT = new float[9];
-
         // 每 dot 的 YIQ（256 dots/scanline）
         static readonly float[] dotY = new float[256];
         static readonly float[] dotI = new float[256];
         static readonly float[] dotQ = new float[256];
 
-        // 掃描線相位索引（0-8），每 scanline 前進 3（768 mod 9 = 3），週期 9
-        static int scanPhaseIdx = 0;
+        // Level 2 副載波相位（6-entry，共用 cosTab6/sinTab6）
+        // ─ 物理根據：副載波 / PPU 像素時脈 = (master/6)/(master/4) = 2/3 cycle/dot
+        //             = 240°/dot，4 output pixels/dot → 60°/pixel = 1 step（6-entry）
+        // ─ 每 scanline 推進 2 steps（1364 dots × 240° mod 360° = 120° = 2 steps）
+        static int scanPhase6 = 0;
 
         // ════════════════════════════════════════════════════════════════════
         // Level 3 — 物理路徑（UltraAnalog）
@@ -138,15 +137,7 @@ namespace AprNes
                 qPhase[c] =  (float)Math.Sin(a);
             }
 
-            // Level 2：9-entry dot crawl LUT（每格 4π/9）
-            for (int k = 0; k < 9; k++)
-            {
-                double a = k * 4.0 * Math.PI / 9.0;
-                cosLUT[k] = (float)Math.Cos(a);
-                sinLUT[k] = (float)Math.Sin(a);
-            }
-
-            // Level 3：6-entry 副載波 LUT（每格 2π/6）
+            // Level 2 / Level 3 共用：6-entry 副載波 LUT（每格 60° = π/3）
             for (int k = 0; k < 6; k++)
             {
                 double a = k * 2.0 * Math.PI / 6.0;
@@ -154,7 +145,7 @@ namespace AprNes
                 sinTab6[k] = (float)Math.Sin(a);
             }
 
-            scanPhaseIdx  = 0;
+            scanPhase6    = 0;
             scanPhaseBase = 0;
             RfAudioLevel  = 0f;
             RfBuzzPhase   = 0f;
@@ -182,8 +173,9 @@ namespace AprNes
 
         static void DecodeScanline_Fast(int sl, byte[] palBuf, byte emphasisBits)
         {
+            int phase0 = scanPhase6;               // 本行起始相位（6-entry index）
+            scanPhase6 = (scanPhase6 + 2) % 6;     // 推進 120°（= 2 steps）供下一 scanline
             GenerateSignal(palBuf, emphasisBits);
-            int phase0 = (scanPhaseIdx - 3 + 9) % 9;
 
             if (NesCore.AnalogOutput == NesCore.AnalogOutputMode.SVideo)
                 DecodeAV_SVideo(sl);
@@ -232,10 +224,9 @@ namespace AprNes
                 }
             }
 
-            scanPhaseIdx = (scanPhaseIdx + 3) % 9;
         }
 
-        // AV / RF：9-entry LUT dot crawl + ChromaBlur IIR + SlewRate IIR + Noise
+        // AV / RF：6-entry LUT dot crawl（60°/pixel，物理正確） + ChromaBlur IIR + SlewRate IIR + Noise
         // 直接寫入 AnalogScreenBuf3x（跳過 linearBuffer / CrtScreen）
         static unsafe void DecodeAV_Composite(int sl, int phase0)
         {
@@ -255,8 +246,8 @@ namespace AprNes
 
             // IIR 初始狀態（以第 0 dot 的解碼值初始化，避免啟動暫態）
             int   d0   = 0;
-            int   ph0  = phase0 % 9;
-            float c0   = cosLUT[ph0], s0 = sinLUT[ph0];
+            int   ph0  = phase0 % 6;
+            float c0   = cosTab6[ph0], s0 = sinTab6[ph0];
             float chr0 = dotI[d0] * c0 - dotQ[d0] * s0;
             float iFilt = chr0 * c0;
             float qFilt = -chr0 * s0;
@@ -272,10 +263,10 @@ namespace AprNes
             for (int outX = 0; outX < kOutW; outX++)
             {
                 int d  = outX * 256 / kOutW;
-                int ph = (phase0 + outX) % 9;
+                int ph = (phase0 + outX) % 6;
 
-                float c      = cosLUT[ph];
-                float s      = sinLUT[ph];
+                float c      = cosTab6[ph];
+                float s      = sinTab6[ph];
                 float chroma = dotI[d] * c - dotQ[d] * s;
                 float iRaw   = chroma * c;
                 float qRaw   = -chroma * s;
