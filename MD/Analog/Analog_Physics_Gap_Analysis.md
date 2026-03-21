@@ -21,6 +21,7 @@
 - ✅ Color burst 相位抖動（RF 模式，~3% scanlines）
 - ✅ 可調色溫（ColorTempR/G/B，YIQ→RGB 矩陣偏移）
 - ✅ 可調 Gamma 係數（GammaCoeff）
+- ✅ RF herringbone（4.5MHz per-sample 正弦振盪器，取代 per-line buzzRow）
 
 ### 簡化或缺少的部分
 
@@ -32,7 +33,6 @@
 | 6 | **垂直色度濾波 (Comb filter)** | 純單行 1H 解調 | 較好的 CRT TV 用 2-line 或 3-line 梳狀濾波分離亮度/色度，減少 dot crawl 但引入垂直色度模糊 | 中 — 取決於模擬哪種等級的 TV |
 | 7 | **RF 調諧/IF 鏈** | noise + buzz 直接加在複合訊號 | 真實 RF: 天線 → 調諧器 → IF 放大 → 包絡檢波 → 複合視訊，每級加入特定頻響和噪聲特性 | 低 — 視覺差異小 |
 | 8 | **多路徑 / 鬼影 (Ghosting)** | 無 | RF 反射造成延遲副本疊加，出現「鬼影」和水平偏移的半透明副像 | 低 — 屬於接收環境瑕疵 |
-| 9 | **RF 音訊干擾細節** | `buzzRow` = 每行一個常數值 | 真實 4.5 MHz 音訊載波與視訊載波拍差，在行內產生逐 sample 的 herringbone 干擾紋路 | 中 — 目前只有行級條紋，缺少行內紋理 |
 
 ---
 
@@ -47,22 +47,22 @@
 - 三種端子參數組（BeamSigma / BloomStrength / BrightnessBoost）
 - ✅ 邊緣暗角 Vignette（VignetteStrength，拋物線垂直衰減）
 - ✅ 隔行抖動 Interlace Jitter（±0.25px/frame，可開關）
+- ✅ Shadow mask / Aperture grille（3px RGB 磷光條紋/點陣，Parallel.For 後處理）
+- ✅ 螢幕曲率（barrel distortion，預計算 remap table + Parallel.For 後處理）
 
 ### 簡化或缺少的部分
 
 | # | 項目 | 現況 | 真實 CRT 行為 | 影響程度 |
 |:-:|------|------|--------------|:--------:|
 | 10 | **磷光體餘輝 (Phosphor persistence)** | 無 — 每幀獨立 | P22 磷光體衰減 ~數 ms，快速移動物體有尾跡殘影 | **高** — 快速動作場景的最大視覺差異 |
-| 11 | **蔭罩 / 光柵孔 (Shadow mask / Aperture grille)** | 無 | Shadow mask: 六角磷光點三元組可見；Trinitron: 垂直磷光條紋可見。近距離觀看有明顯 subpixel 結構 | **高** — CRT「質感」的最大來源 |
 | 12 | **水平 beam 擴散** | 僅有垂直高斯 profile | 電子束在水平方向也有寬度，造成水平像素間模糊（尤其高亮度下 spot size 增大） | 中 |
 | 13 | **Beam convergence 偏差** | 無 | R/G/B 三槍 convergence 不完美 → 邊緣出現彩色邊紋 (color fringing)，螢幕中心最佳、四角最差 | 中 |
-| 14 | **螢幕曲率 / 幾何畸變** | 無 — 完美平面 | CRT 為曲面，有桶形/枕形畸變、角落較暗、曲面反光特性 | 低～中 |
 
 ---
 
-## ✅ 已完成項目（零成本）
+## ✅ 已完成項目
 
-以下 6 項已於 2026-03-21 實作完成，效能影響為零：
+### 零成本（2026-03-21）
 
 | # | 項目 | 實作方式 | 所在檔案 |
 |:-:|------|----------|----------|
@@ -73,33 +73,33 @@
 | 17 | **Gamma 精確性** | GammaCoeff 可調，預設 0.229 ≈ pow(v,1/1.13) | Ntsc.cs + CrtScreen.cs |
 | 18 | **隔行 / 場抖動** | InterlaceJitter ±0.25px/frame（需 Phosphor persistence 配套才適合預設開啟） | CrtScreen.cs |
 
+### 低成本（2026-03-21）
+
+| # | 項目 | 實作方式 | 所在檔案 |
+|:-:|------|----------|----------|
+| 11 | **Shadow mask / Aperture grille** | 3px RGB 磷光條紋（ApertureGrille）或偏移點陣（ShadowMask），Parallel.For 後處理，預設強度 0.3 | CrtScreen.cs |
+| 9 | **RF herringbone** | 4.5MHz per-sample 正弦振盪器（recursive oscillator），60Hz 包絡調制，Level 2 + Level 3 | Ntsc.cs |
+| 14 | **螢幕曲率** | Barrel distortion，預計算 remap table，Parallel.For 後處理，預設強度 0.12 | CrtScreen.cs |
+
 ---
 
 ## 未完成項目 — 依效能成本分群
-
-### 🟢 低成本（預估 ≤5 FPS）
-
-| 優先 | 項目 | 預估難度 | 預估消耗 | 說明 |
-|:----:|------|:--------:|:--------:|------|
-| 1 | **Shadow mask / Aperture grille** (#11) | 中 | ~5 FPS | 預計算遮罩紋理，CrtScreen 後處理乘上。最能提升「CRT 質感」 |
-| 2 | **RF herringbone** (#9) | 低 | ~2-3 FPS | 將 buzzRow 改為 per-sample `sin(4.5MHz * t)`，產生行內斜紋干擾 |
-| 3 | **螢幕曲率** (#14) | 中 | ~3-5 FPS | UV distortion map 後處理（barrel distortion） |
 
 ### 🟡 中成本（預估 5~10 FPS）
 
 | 優先 | 項目 | 預估難度 | 預估消耗 | 說明 |
 |:----:|------|:--------:|:--------:|------|
-| 4 | **Phosphor persistence** (#10) | 中 | ~5-10 FPS | 前一幀緩衝區 + 指數衰減混合 `max(current, prev * decay)`。快速動作真實感 |
-| 5 | **水平 beam 擴散** (#12) | 低 | ~5-10 FPS | linearBuffer 每行水平高斯模糊（σ≈0.5-1.0），配合垂直 beam |
-| 6 | **Ringing / 振鈴** (#5) | 中 | ~5-10 FPS | 一階 IIR → 二階（或 4-tap FIR with overshoot），模擬 Gibbs 效應 |
-| 7 | **HBI 模擬** (#4) | 中 | ~5-10 FPS | 擴展 waveBuf 到 341 dot，加入 sync/burst 區段 IIR 狀態 |
-| 8 | **Beam convergence** (#13) | 高 | ~5-10 FPS | R/G/B 通道各自 sub-pixel 偏移，需 per-channel rendering |
+| 1 | **Phosphor persistence** (#10) | 中 | ~5-10 FPS | 前一幀緩衝區 + 指數衰減混合 `max(current, prev * decay)`。快速動作真實感 |
+| 2 | **水平 beam 擴散** (#12) | 低 | ~5-10 FPS | linearBuffer 每行水平高斯模糊（σ≈0.5-1.0），配合垂直 beam |
+| 3 | **Ringing / 振鈴** (#5) | 中 | ~5-10 FPS | 一階 IIR → 二階（或 4-tap FIR with overshoot），模擬 Gibbs 效應 |
+| 4 | **HBI 模擬** (#4) | 中 | ~5-10 FPS | 擴展 waveBuf 到 341 dot，加入 sync/burst 區段 IIR 狀態 |
+| 5 | **Beam convergence** (#13) | 高 | ~5-10 FPS | R/G/B 通道各自 sub-pixel 偏移，需 per-channel rendering |
 
 ### 🔴 高成本（預估 >15 FPS）
 
 | 優先 | 項目 | 預估難度 | 預估消耗 | 說明 |
 |:----:|------|:--------:|:--------:|------|
-| 9 | **Comb filter** (#6) | 高 | ~15-20 FPS | 需跨行緩衝，改變單行獨立的解調架構 |
+| 6 | **Comb filter** (#6) | 高 | ~15-20 FPS | 需跨行緩衝，改變單行獨立的解調架構 |
 
 ### ⚪ 不建議實作
 
@@ -114,6 +114,6 @@
 ## 備註
 
 - **效能預算**: 目前 4x 解析度 107 FPS (1.79x 即時)，有約 44 FPS 餘裕
-- **低成本群全部實作**: ~10-13 FPS，仍有 >30 FPS 餘裕
-- **中成本群全部實作**: 再加 ~25-50 FPS，可能超出預算，需依優先級取捨
-- **Shadow mask + Phosphor** 為視覺影響最大的兩項，合計 ~10-15 FPS，優先實作
+- **低成本群已全部實作**: 實際消耗待測
+- **中成本群全部實作**: 預估 ~25-50 FPS，可能超出預算，需依優先級取捨
+- **Phosphor persistence** 為剩餘項目中視覺影響最大的，預估 ~5-10 FPS，優先實作
