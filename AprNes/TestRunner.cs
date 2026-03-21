@@ -186,9 +186,9 @@ namespace AprNes
                         if (i + 1 < args.Length)
                         {
                             var mode = args[++i].ToUpperInvariant();
-                            if (mode == "RF") NesCore.AnalogOutput = NesCore.AnalogOutputMode.RF;
-                            else if (mode == "SVIDEO") NesCore.AnalogOutput = NesCore.AnalogOutputMode.SVideo;
-                            else NesCore.AnalogOutput = NesCore.AnalogOutputMode.AV;
+                            if (mode == "RF") NesCore.AnalogOutput = AnalogOutputMode.RF;
+                            else if (mode == "SVIDEO") NesCore.AnalogOutput = AnalogOutputMode.SVideo;
+                            else NesCore.AnalogOutput = AnalogOutputMode.AV;
                         }
                         break;
                     case "--accuracy":

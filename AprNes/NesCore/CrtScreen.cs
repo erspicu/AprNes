@@ -12,7 +12,7 @@ namespace AprNes
     //
     //  輸入：Ntsc.linearBuffer [1024 × 240 × 3]  ← 線性 RGB，無 Gamma
     //         Planar 佈局：R[0..kPlane-1] G[kPlane..2kPlane-1] B[2kPlane..3kPlane-1]
-    //  輸出：NesCore.AnalogScreenBuf [1024 × 840 BGRA]
+    //  輸出：AnalogScreenBuf [1024 × 840 BGRA]（透過 ApplyConfig 注入）
     //
     //  垂直映射：240 → 840（× 3.5），連續域高斯掃描線
     //  演算法：
@@ -21,7 +21,7 @@ namespace AprNes
     //    3. BrightnessBoost：補償掃描線黑溝造成的平均亮度損失
     //    4. Fast gamma（≈ pow(v,1/1.13)，與原 YiqToRgb 一致，保留 NES 色調）
     //
-    //  三種端子參數組（由 NesCore.AnalogOutput 決定）：
+    //  三種端子參數組（由 AnalogOutputMode 決定）：
     //    RF     : BeamSigma=1.10, BloomStrength=0.50, BrightnessBoost=1.10
     //    AV     : BeamSigma=0.85, BloomStrength=0.25, BrightnessBoost=1.25
     //    SVideo : BeamSigma=0.65, BloomStrength=0.10, BrightnessBoost=1.40
@@ -29,11 +29,31 @@ namespace AprNes
 
     unsafe public static class CrtScreen
     {
+        // ── 解耦參數（由外部透過 ApplyConfig 注入）────────────────────────
+        static int    _analogOutput;        // AnalogOutputMode as int
+        static int    _analogSize = 4;
+        static uint*  _analogScreenBuf;
+        static int    _frameCount;
+
+        /// <summary>
+        /// 將外部運行時參數注入 CrtScreen 模組（每次設定變更或 Init 時呼叫）
+        /// </summary>
+        public static void ApplyConfig(int analogOutput, int analogSize,
+                                        uint* analogScreenBuf)
+        {
+            _analogOutput    = analogOutput;
+            _analogSize      = analogSize;
+            _analogScreenBuf = analogScreenBuf;
+        }
+
+        /// <summary>每幀更新幀計數器（供 interlace jitter 使用）</summary>
+        public static void SetFrameCount(int fc) => _frameCount = fc;
+
         public const int SrcW = 1024;  // linearBuffer 列寬（固定）
         public const int SrcH = 240;   // linearBuffer 列數（固定）
         // DstW/DstH 依 AnalogSize 動態決定（256×N × 210×N，維持 8:7 AR）
-        public static int DstW => 256 * NesCore.AnalogSize;
-        public static int DstH => 210 * NesCore.AnalogSize;
+        public static int DstW => 256 * _analogSize;
+        public static int DstH => 210 * _analogSize;
 
         // ── 端子參數組（INI 讀入，開機時載入一次）──────────────────────────
         // RF 端子
@@ -121,11 +141,11 @@ namespace AprNes
         // ── 端子參數套用 ─────────────────────────────────────────────────────
         static void ApplyProfile()
         {
-            switch (NesCore.AnalogOutput)
+            switch ((AnalogOutputMode)_analogOutput)
             {
-                case NesCore.AnalogOutputMode.RF:
+                case AnalogOutputMode.RF:
                     BeamSigma = RF_BeamSigma; BloomStrength = RF_BloomStrength; BrightnessBoost = RF_BrightnessBoost; break;
-                case NesCore.AnalogOutputMode.SVideo:
+                case AnalogOutputMode.SVideo:
                     BeamSigma = SV_BeamSigma; BloomStrength = SV_BloomStrength; BrightnessBoost = SV_BrightnessBoost; break;
                 default: // AV
                     BeamSigma = AV_BeamSigma; BloomStrength = AV_BloomStrength; BrightnessBoost = AV_BrightnessBoost; break;
@@ -139,14 +159,14 @@ namespace AprNes
             // #18 Interlace jitter: weights change every frame
             if (InterlaceJitter)
             {
-                int fc = NesCore.frame_count;
+                int fc = _frameCount;
                 if (_cachedFrame != fc) { _cachedFrame = fc; needUpdate = true; }
             }
             if (!needUpdate) return;
             _cachedSigma = BeamSigma;
 
             // #18 Interlace jitter: ±0.25 pixel vertical offset per frame
-            float jitter = InterlaceJitter ? ((NesCore.frame_count & 1) == 0 ? 0.25f : -0.25f) : 0f;
+            float jitter = InterlaceJitter ? ((_frameCount & 1) == 0 ? 0.25f : -0.25f) : 0f;
 
             float inv = 1f / (2f * BeamSigma * BeamSigma);
             for (int ty = 0; ty < DstH; ty++)
@@ -197,7 +217,7 @@ namespace AprNes
             if (ShadowMaskMode == MaskType.None || ShadowMaskStrength <= 0f) return;
 
             int dstW = DstW, dstH = DstH;
-            uint* dst = NesCore.AnalogScreenBuf;
+            uint* dst = _analogScreenBuf;
             int dimI = (int)((1f - ShadowMaskStrength) * 256f);
             bool isSM = ShadowMaskMode == MaskType.ShadowMask;
 
@@ -233,7 +253,7 @@ namespace AprNes
             if (!doMask && !doPhosphor) return;
 
             int dstW = DstW, dstH = DstH;
-            uint* dst = NesCore.AnalogScreenBuf;
+            uint* dst = _analogScreenBuf;
             uint* prev = _prevFrame;
             int dimI = doMask ? (int)((1f - ShadowMaskStrength) * 256f) : 0;
             bool isSM = ShadowMaskMode == MaskType.ShadowMask;
@@ -289,7 +309,7 @@ namespace AprNes
             if (doCurv) PrecomputeCurvature();
 
             int dstW = DstW, dstH = DstH;
-            uint* dst = NesCore.AnalogScreenBuf;
+            uint* dst = _analogScreenBuf;
             uint* tmp = _curvTemp;
             int bytes = dstW * dstH * sizeof(uint);
             int* map = doCurv ? _curvMap : null;
@@ -349,7 +369,7 @@ namespace AprNes
             PrecomputeCurvature();
 
             int dstW = DstW, dstH = DstH;
-            uint* dst = NesCore.AnalogScreenBuf;
+            uint* dst = _analogScreenBuf;
             uint* tmp = _curvTemp;
             int bytes = dstW * dstH * sizeof(uint);
             int* map = _curvMap;
@@ -404,7 +424,7 @@ namespace AprNes
                 return;
             }
 
-            uint* dst  = NesCore.AnalogScreenBuf;
+            uint* dst  = _analogScreenBuf;
             uint* prev = _prevFrame;
             int dstW = DstW, dstH = DstH;
 
@@ -451,7 +471,7 @@ namespace AprNes
             if (ConvergenceStrength <= 0f || _curvTemp == null) return;
 
             int dstW = DstW, dstH = DstH;
-            uint* dst = NesCore.AnalogScreenBuf;
+            uint* dst = _analogScreenBuf;
             uint* tmp = _curvTemp;
             int bytes = dstW * dstH * sizeof(uint);
             float maxOff = ConvergenceStrength;
@@ -495,7 +515,7 @@ namespace AprNes
         // ════════════════════════════════════════════════════════════════════
         public static unsafe void Render()
         {
-            if (NesCore.AnalogScreenBuf == null || Ntsc.linearBuffer == null) return;
+            if (_analogScreenBuf == null || Ntsc.linearBuffer == null) return;
             if (_weights == null || _nearestY == null || _boostRow == null) return;
 
             ApplyProfile();
@@ -506,7 +526,7 @@ namespace AprNes
             float* brow      = _boostRow;          // #15 per-row boost (includes vignette)
             float  gc        = Ntsc.GammaCoeff;    // #17 configurable gamma
             float* lb        = Ntsc.linearBuffer;
-            uint*  dst       = NesCore.AnalogScreenBuf;
+            uint*  dst       = _analogScreenBuf;
             float* wts       = _weights;
             int*   nyArr     = _nearestY;
             const int kPlane = Ntsc.kPlane; // R/G/B plane stride（245,760 floats）
@@ -718,7 +738,7 @@ namespace AprNes
             if (PhosphorDecay > 0f && _prevFrame != null && !_prevFrameValid)
             {
                 int bytes2 = DstW * DstH * sizeof(uint);
-                Buffer.MemoryCopy(NesCore.AnalogScreenBuf, _prevFrame, bytes2, bytes2);
+                Buffer.MemoryCopy(_analogScreenBuf, _prevFrame, bytes2, bytes2);
                 _prevFrameValid = true;
             }
             // B6: Convergence + Curvature merged

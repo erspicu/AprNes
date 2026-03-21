@@ -24,8 +24,35 @@ namespace AprNes
     //               Y window 手動展開 6-tap（消去迴圈 overhead）
     // ============================================================
 
+    // 共用端子模式列舉（獨立於 NesCore，供外部程式使用）
+    public enum AnalogOutputMode { AV = 0, SVideo = 1, RF = 2 }
+
     unsafe public static class Ntsc
     {
+        // ── 解耦參數（由外部透過 ApplyConfig 注入）────────────────────────
+        static int    _analogOutput;        // AnalogOutputMode as int
+        static bool   _ultraAnalog;
+        static int    _analogSize;
+        static bool   _crtEnabled;
+        static uint*  _analogScreenBuf;
+        static int    _frameCount;
+
+        /// <summary>
+        /// 將外部運行時參數注入 Ntsc 模組（每次設定變更或 Init 時呼叫）
+        /// </summary>
+        public static void ApplyConfig(int analogOutput, bool ultraAnalog, int analogSize,
+                                        bool crtEnabled, uint* analogScreenBuf)
+        {
+            _analogOutput    = analogOutput;
+            _ultraAnalog     = ultraAnalog;
+            _analogSize      = analogSize;
+            _crtEnabled      = crtEnabled;
+            _analogScreenBuf = analogScreenBuf;
+        }
+
+        /// <summary>每幀更新幀計數器（供雜訊/jitter 使用）</summary>
+        public static void SetFrameCount(int fc) => _frameCount = fc;
+
         // ── 共用：blargg 電壓準位 ────────────────────────────────────────────
         static float* loLevels;
         static float* hiLevels;
@@ -61,11 +88,11 @@ namespace AprNes
 
         static void ApplyProfile()
         {
-            switch (NesCore.AnalogOutput)
+            switch ((AnalogOutputMode)_analogOutput)
             {
-                case NesCore.AnalogOutputMode.RF:
+                case AnalogOutputMode.RF:
                     NoiseIntensity = RF_NoiseIntensity; SlewRate = RF_SlewRate; ChromaBlur = RF_ChromaBlur; break;
-                case NesCore.AnalogOutputMode.SVideo:
+                case AnalogOutputMode.SVideo:
                     NoiseIntensity = SV_NoiseIntensity; SlewRate = SV_SlewRate; ChromaBlur = SV_ChromaBlur; break;
                 default:
                     NoiseIntensity = AV_NoiseIntensity; SlewRate = AV_SlewRate; ChromaBlur = AV_ChromaBlur; break;
@@ -338,7 +365,7 @@ namespace AprNes
             if (sl < 0 || sl >= kSrcH) return;
             if (sl == 0) ApplyProfile();
 
-            if (NesCore.UltraAnalog)
+            if (_ultraAnalog)
                 DecodeScanline_Physical(sl, palBuf, emphasisBits);
             else
                 DecodeScanline_Fast(sl, palBuf, emphasisBits);
@@ -354,7 +381,7 @@ namespace AprNes
             scanPhase6 = (scanPhase6 + 2) % 6;
             GenerateSignal(palBuf, emphasisBits);
 
-            if (NesCore.AnalogOutput == NesCore.AnalogOutputMode.SVideo)
+            if ((AnalogOutputMode)_analogOutput == AnalogOutputMode.SVideo)
                 DecodeAV_SVideo(sl);
             else
                 DecodeAV_Composite(sl, phase0);
@@ -376,12 +403,12 @@ namespace AprNes
         // Phase A：outX>>2（取代 *256/kOutW），ph 遞增取代 (phase0+outX)%6
         static unsafe void DecodeAV_Composite(int sl, int phase0)
         {
-            bool isRF     = NesCore.AnalogOutput == NesCore.AnalogOutputMode.RF;
+            bool isRF     = (AnalogOutputMode)_analogOutput == AnalogOutputMode.RF;
             bool addNoise = NoiseIntensity > 0f;
 
             uint ns = 0u;
             if (addNoise || isRF)
-                ns = (uint)(NesCore.frame_count * 1664525u + (uint)sl * 1013904223u + 1442695041u);
+                ns = (uint)(_frameCount * 1664525u + (uint)sl * 1013904223u + 1442695041u);
 
             // IIR 初始狀態
             int   ph0   = phase0;
@@ -396,11 +423,11 @@ namespace AprNes
             float yVel     = 0f;
 
             int dstW     = CrtScreen.DstW;
-            int N        = NesCore.AnalogSize;   // dot index = outX / N
+            int N        = _analogSize;   // dot index = outX / N
             int rowStart = sl * CrtScreen.DstH / CrtScreen.SrcH;
             int rowEnd   = (sl + 1) * CrtScreen.DstH / CrtScreen.SrcH;
             if (rowEnd > CrtScreen.DstH) rowEnd = CrtScreen.DstH;
-            uint* row0 = NesCore.AnalogScreenBuf + rowStart * dstW;
+            uint* row0 = _analogScreenBuf + rowStart * dstW;
 
             // Phase B：noise scale 移出迴圈
             float noiseScale  = addNoise ? (2f * NoiseIntensity / 255.0f) : 0f;
@@ -453,7 +480,7 @@ namespace AprNes
             }
 
             for (int row = rowStart + 1; row < rowEnd; row++)
-                Buffer.MemoryCopy(row0, NesCore.AnalogScreenBuf + row * dstW,
+                Buffer.MemoryCopy(row0, _analogScreenBuf + row * dstW,
                     dstW * sizeof(uint), dstW * sizeof(uint));
         }
 
@@ -465,11 +492,11 @@ namespace AprNes
             float yFilt = HbiSimulation ? 0f : dotY[0];
 
             int dstW     = CrtScreen.DstW;
-            int N        = NesCore.AnalogSize;
+            int N        = _analogSize;
             int rowStart = sl * CrtScreen.DstH / CrtScreen.SrcH;
             int rowEnd   = (sl + 1) * CrtScreen.DstH / CrtScreen.SrcH;
             if (rowEnd > CrtScreen.DstH) rowEnd = CrtScreen.DstH;
-            uint* row0 = NesCore.AnalogScreenBuf + rowStart * dstW;
+            uint* row0 = _analogScreenBuf + rowStart * dstW;
 
             for (int outX = 0; outX < dstW; outX++)
             {
@@ -481,7 +508,7 @@ namespace AprNes
             }
 
             for (int row = rowStart + 1; row < rowEnd; row++)
-                Buffer.MemoryCopy(row0, NesCore.AnalogScreenBuf + row * dstW,
+                Buffer.MemoryCopy(row0, _analogScreenBuf + row * dstW,
                     dstW * sizeof(uint), dstW * sizeof(uint));
         }
 
@@ -495,22 +522,22 @@ namespace AprNes
             scanPhaseBase = (scanPhaseBase + 2) % 6;
 
             // #3 Color burst phase jitter (RF only, ~3% of scanlines)
-            if (ColorBurstJitter && NesCore.AnalogOutput == NesCore.AnalogOutputMode.RF)
+            if (ColorBurstJitter && (AnalogOutputMode)_analogOutput == AnalogOutputMode.RF)
             {
-                uint jns = (uint)(NesCore.frame_count * 2654435761u + (uint)sl * 340573321u);
+                uint jns = (uint)(_frameCount * 2654435761u + (uint)sl * 340573321u);
                 jns ^= jns << 13; jns ^= jns >> 17; jns ^= jns << 5;
                 if ((jns & 31) == 0)
                     phase0 = (phase0 + ((jns & 64) != 0 ? 1 : 5)) % 6;
             }
 
-            if (NesCore.AnalogOutput == NesCore.AnalogOutputMode.SVideo)
+            if ((AnalogOutputMode)_analogOutput == AnalogOutputMode.SVideo)
             {
                 GenerateWaveform_SVideo(palBuf, emphasisBits, sl, phase0);
                 DemodulateRow_SVideo(sl, phase0);
             }
             else
             {
-                bool isRF = NesCore.AnalogOutput == NesCore.AnalogOutputMode.RF;
+                bool isRF = (AnalogOutputMode)_analogOutput == AnalogOutputMode.RF;
                 GenerateWaveform(palBuf, emphasisBits, isRF, sl, phase0);
                 DemodulateRow(sl, phase0);
             }
@@ -552,7 +579,7 @@ namespace AprNes
             float noiseScale = 0f, noiseOffset = 0f;
             if (addNoise)
             {
-                ns          = (uint)(NesCore.frame_count * 1664525u + (uint)sl * 1013904223u + 1442695041u);
+                ns          = (uint)(_frameCount * 1664525u + (uint)sl * 1013904223u + 1442695041u);
                 noiseScale  = 2f * NoiseIntensity / 255.0f;
                 noiseOffset = NoiseIntensity;
             }
@@ -610,7 +637,7 @@ namespace AprNes
             float noiseScale = 0f, noiseOffset = 0f;
             if (addNoise)
             {
-                ns          = (uint)(NesCore.frame_count * 1664525u + (uint)sl * 1013904223u + 1442695041u);
+                ns          = (uint)(_frameCount * 1664525u + (uint)sl * 1013904223u + 1442695041u);
                 noiseScale  = 2f * NoiseIntensity / 255.0f;
                 noiseOffset = NoiseIntensity;
             }
@@ -661,13 +688,13 @@ namespace AprNes
         // Phase D：Y 6-tap 手動展開
         static unsafe void DemodulateRow(int sl, int phase0)
         {
-            bool toCrt = NesCore.CrtEnabled;
+            bool toCrt = _crtEnabled;
             int dstW   = CrtScreen.DstW;
 
             int rowStart = sl * CrtScreen.DstH / CrtScreen.SrcH;
             int rowEnd   = (sl + 1) * CrtScreen.DstH / CrtScreen.SrcH;
             if (rowEnd > CrtScreen.DstH) rowEnd = CrtScreen.DstH;
-            uint* row0 = NesCore.AnalogScreenBuf + rowStart * dstW;
+            uint* row0 = _analogScreenBuf + rowStart * dstW;
 
             int VS = Vector<float>.Count;
 
@@ -741,7 +768,7 @@ namespace AprNes
                         row0[x] = tmpBuf[(x * fpScale) >> 16];
                 }
                 for (int row = rowStart + 1; row < rowEnd; row++)
-                    Buffer.MemoryCopy(row0, NesCore.AnalogScreenBuf + row * dstW,
+                    Buffer.MemoryCopy(row0, _analogScreenBuf + row * dstW,
                         dstW * sizeof(uint), dstW * sizeof(uint));
             }
         }
@@ -749,13 +776,13 @@ namespace AprNes
         // DemodulateRow_SVideo：同 DemodulateRow，I/Q 來源改為 cBuf
         static unsafe void DemodulateRow_SVideo(int sl, int phase0)
         {
-            bool toCrt = NesCore.CrtEnabled;
+            bool toCrt = _crtEnabled;
             int dstW   = CrtScreen.DstW;
 
             int rowStart = sl * CrtScreen.DstH / CrtScreen.SrcH;
             int rowEnd   = (sl + 1) * CrtScreen.DstH / CrtScreen.SrcH;
             if (rowEnd > CrtScreen.DstH) rowEnd = CrtScreen.DstH;
-            uint* row0 = NesCore.AnalogScreenBuf + rowStart * dstW;
+            uint* row0 = _analogScreenBuf + rowStart * dstW;
 
             int VS = Vector<float>.Count;
 
@@ -826,7 +853,7 @@ namespace AprNes
                         row0[x] = tmpBuf[(x * fpScale) >> 16];
                 }
                 for (int row = rowStart + 1; row < rowEnd; row++)
-                    Buffer.MemoryCopy(row0, NesCore.AnalogScreenBuf + row * dstW,
+                    Buffer.MemoryCopy(row0, _analogScreenBuf + row * dstW,
                         dstW * sizeof(uint), dstW * sizeof(uint));
             }
         }

@@ -469,6 +469,7 @@ namespace AprNes
             {
                 RenderScreen();
                 frame_count++;
+                if (AnalogEnabled) { Ntsc.SetFrameCount(frame_count); CrtScreen.SetFrameCount(frame_count); }
                 // StopWatch 持續計時，不在此 Restart（供 deadline 絕對計時使用）
             }
 

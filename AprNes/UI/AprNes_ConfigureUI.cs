@@ -602,8 +602,8 @@ namespace AprNes
 
             switch (NesCore.AnalogOutput)
             {
-                case NesCore.AnalogOutputMode.RF:     VideoInput.SelectedIndex = 0; break;
-                case NesCore.AnalogOutputMode.SVideo: VideoInput.SelectedIndex = 1; break;
+                case AnalogOutputMode.RF:     VideoInput.SelectedIndex = 0; break;
+                case AnalogOutputMode.SVideo: VideoInput.SelectedIndex = 1; break;
                 default:                              VideoInput.SelectedIndex = 2; break;
             }
 

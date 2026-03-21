@@ -199,6 +199,7 @@ namespace AprNes.UI
             CrtScreen.SV_BrightnessBoost = trkSvBright.Value / 100f;
 
             // Reinitialize CRT with updated parameters
+            NesCore.SyncAnalogConfig();
             CrtScreen.Init();
         }
 

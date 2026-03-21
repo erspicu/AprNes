@@ -287,17 +287,20 @@ namespace AprNes
             {
                 switch (AppConfigure["AnalogOutput"].ToUpper())
                 {
-                    case "RF":     NesCore.AnalogOutput = NesCore.AnalogOutputMode.RF;     break;
-                    case "SVIDEO": NesCore.AnalogOutput = NesCore.AnalogOutputMode.SVideo; break;
-                    default:       NesCore.AnalogOutput = NesCore.AnalogOutputMode.AV;     break;
+                    case "RF":     NesCore.AnalogOutput = AnalogOutputMode.RF;     break;
+                    case "SVIDEO": NesCore.AnalogOutput = AnalogOutputMode.SVideo; break;
+                    default:       NesCore.AnalogOutput = AnalogOutputMode.AV;     break;
                 }
             }
             else
             {
-                NesCore.AnalogOutput = NesCore.AnalogOutputMode.AV;
+                NesCore.AnalogOutput = AnalogOutputMode.AV;
             }
 
             LoadAnalogConfig(); // 讀取 AprNesAnalog.ini（開機一次）
+
+            // 同步類比參數至 Ntsc/CrtScreen（確保 CrtScreen.DstW/DstH 反映最新 AnalogSize）
+            unsafe { NesCore.SyncAnalogConfig(); }
 
             NES_init_KeyMap();
 
@@ -1052,6 +1055,7 @@ public string GetRomInfo()
             // 若尺寸不變（例如只切換 VideoInput），保留現有 buf，避免渲染執行緒寫入時發生 race condition。
             if (NesCore.AnalogEnabled)
             {
+                NesCore.SyncAnalogConfig();  // 先同步 AnalogSize 等參數，確保 CrtScreen.DstW/DstH 正確
                 int needed = CrtScreen.DstW * CrtScreen.DstH;
                 unsafe
                 {
@@ -1067,7 +1071,8 @@ public string GetRomInfo()
                             sizeof(uint) * needed);
                     }
                 }
-                Ntsc.Init();        // 確保 NTSC 緩衝區已分配（OFF→ON 切換時必要）
+                NesCore.SyncAnalogConfig();  // buffer 重新分配後再同步指標
+                Ntsc.Init();
                 CrtScreen.Init();
             }
 

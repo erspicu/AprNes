@@ -71,7 +71,7 @@ namespace AprNes
         // SVideo = S-Video：Y/C 分離傳輸，較銳利，色彩暈染較少
         // RF     = RF 射頻：額外 AM 調變/解調，雜訊最多，
         //          並包含音訊載波洩漏干擾（Buzz bar、音量振幅調變視訊亮度）
-        public enum AnalogOutputMode { AV, SVideo, RF }
+        // AnalogOutputMode enum 已移至 namespace AprNes 層級（Ntsc.cs），供獨立 library 使用
         static public AnalogOutputMode AnalogOutput = AnalogOutputMode.AV;
 
         // 類比輸出尺寸（2/4/6/8，預設 4）。對應像素：256×N × 210×N（8:7 AR）
@@ -111,6 +111,26 @@ namespace AprNes
             if (NES_MEM      != null) { Marshal.FreeHGlobal((IntPtr)NES_MEM);      NES_MEM      = null; }
             if (Vertical           != null) { Marshal.FreeHGlobal((IntPtr)Vertical);           Vertical           = null; }
             if (AnalogScreenBuf  != null) { Marshal.FreeHGlobal((IntPtr)AnalogScreenBuf);  AnalogScreenBuf  = null; AnalogBufSize = 0; }
+        }
+
+        /// <summary>
+        /// 將 NesCore 的類比參數同步至 Ntsc / CrtScreen 模組（解耦橋接）。
+        /// 在 Init、設定變更、AnalogScreenBuf 重新分配後呼叫。
+        /// </summary>
+        static public void SyncAnalogConfig()
+        {
+            Ntsc.ApplyConfig(
+                analogOutput:    (int)AnalogOutput,
+                ultraAnalog:     UltraAnalog,
+                analogSize:      AnalogSize,
+                crtEnabled:      CrtEnabled,
+                analogScreenBuf: AnalogScreenBuf
+            );
+            CrtScreen.ApplyConfig(
+                analogOutput:    (int)AnalogOutput,
+                analogSize:      AnalogSize,
+                analogScreenBuf: AnalogScreenBuf
+            );
         }
 
         static void HardResetState()
@@ -284,6 +304,7 @@ namespace AprNes
                 ScreenBuf1x      = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 61440);
                 if (AnalogEnabled)
                 {
+                    SyncAnalogConfig();  // 確保 CrtScreen.DstW/DstH 使用正確的 AnalogSize
                     AnalogBufSize   = CrtScreen.DstW * CrtScreen.DstH;
                     AnalogScreenBuf = (uint*)Marshal.AllocHGlobal(sizeof(uint) * AnalogBufSize);
                 }
@@ -333,7 +354,11 @@ namespace AprNes
 
                 HardResetState();  // reset all CPU/PPU/DMA static state
 
-                if (AnalogEnabled) { Ntsc.Init(); CrtScreen.Init(); } // reset NTSC + CRT state
+                if (AnalogEnabled)
+                {
+                    SyncAnalogConfig();  // buffer 已分配，同步完整參數
+                    Ntsc.Init(); CrtScreen.Init();
+                }
 
                 initPalette();
 
