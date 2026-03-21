@@ -50,8 +50,8 @@ fi
 # Build
 if [ $OPT_BUILD -eq 1 ]; then
     echo "=== Building ==="
-    powershell -NoProfile -Command "& 'C:\Program Files (x86)\MSBuild\14.0\Bin\MSBuild.exe' \
-        'C:\ai_project\AprNes\AprNes.sln' /p:Configuration=Debug /t:Rebuild /nologo" 2>&1 | tail -3
+    powershell -NoProfile -Command "& 'C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe' \
+        'C:\ai_project\AprNes\AprNes\AprNes.csproj' /p:Configuration=Debug /p:Platform=x64 /t:Rebuild /nologo /v:minimal" 2>&1 | tail -3
 fi
 
 if [ ! -f "$EXE" ]; then echo "ERROR: $EXE not found."; exit 1; fi

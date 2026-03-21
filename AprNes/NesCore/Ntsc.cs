@@ -370,13 +370,6 @@ namespace AprNes
             bool isRF     = NesCore.AnalogOutput == NesCore.AnalogOutputMode.RF;
             bool addNoise = NoiseIntensity > 0f;
 
-            float buzzRow = 0f;
-            if (isRF)
-            {
-                float buzzAmp = RfAudioLevel * 0.06f;
-                buzzRow = buzzAmp * (float)Math.Sin((sl / 240.0 + RfBuzzPhase) * 2.0 * Math.PI);
-            }
-
             uint ns = 0u;
             if (addNoise || isRF)
                 ns = (uint)(NesCore.frame_count * 1664525u + (uint)sl * 1013904223u + 1442695041u);
@@ -400,6 +393,25 @@ namespace AprNes
             float noiseScale  = addNoise ? (2f * NoiseIntensity / 255.0f) : 0f;
             float noiseOffset = addNoise ? NoiseIntensity : 0f;
 
+            // #9 RF herringbone: per-pixel 4.5MHz oscillator (Level 2)
+            float hR2 = 0f, hI2 = 0f, hC2 = 1f, hS2 = 0f;
+            bool herring2 = false;
+            if (isRF)
+            {
+                float buzzAmp = RfAudioLevel * 0.06f;
+                float envelope = buzzAmp * (float)Math.Sin((sl / 240.0 + RfBuzzPhase) * 2.0 * Math.PI);
+                if (envelope > 0.0001f || envelope < -0.0001f)
+                {
+                    herring2 = true;
+                    float radsPerPx = 1.31683f * 1024f / dstW; // scale to output pixel rate
+                    hC2 = (float)Math.Cos(radsPerPx);
+                    hS2 = (float)Math.Sin(radsPerPx);
+                    float linePhase = sl * 1364f * 1.31683f;
+                    hR2 = envelope * (float)Math.Cos(linePhase);
+                    hI2 = envelope * (float)Math.Sin(linePhase);
+                }
+            }
+
             int ph = phase0;
             for (int outX = 0; outX < dstW; outX++)
             {
@@ -413,7 +425,7 @@ namespace AprNes
                 yFilt += SlewRate   * (dotY[d]     - yFilt);
                 float y = yFilt;
 
-                if (isRF) y += buzzRow;
+                if (herring2) { y += hI2; float t = hR2*hC2 - hI2*hS2; hI2 = hR2*hS2 + hI2*hC2; hR2 = t; }
                 if (addNoise)
                 {
                     ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5;
@@ -500,12 +512,24 @@ namespace AprNes
             float firstY = yBaseE[(palBuf[0]   & 63) * 8 + emph];
             float lastY  = yBaseE[(palBuf[255] & 63) * 8 + emph];
 
-            float buzzRow = 0f;
+            // #9 RF herringbone: per-sample 4.5MHz oscillator (replaces constant buzzRow)
+            const float kHerringRPS = 1.31683f; // 2π × 4.5 / 21.477
+            float hR_buzz = 0f, hI_buzz = 0f, hC_buzz = 1f, hS_buzz = 0f;
+            bool herring = false;
             if (isRF)
             {
                 float buzzAmp = RfAudioLevel * 0.06f;
-                buzzRow = buzzAmp * (float)Math.Sin(
-                              (sl / 240.0 + RfBuzzPhase) * 2.0 * Math.PI);
+                float envelope = buzzAmp * (float)Math.Sin(
+                                     (sl / 240.0 + RfBuzzPhase) * 2.0 * Math.PI);
+                if (envelope > 0.0001f || envelope < -0.0001f)
+                {
+                    herring = true;
+                    hC_buzz = (float)Math.Cos(kHerringRPS);
+                    hS_buzz = (float)Math.Sin(kHerringRPS);
+                    float linePhase = sl * 1364f * kHerringRPS;
+                    hR_buzz = envelope * (float)Math.Cos(linePhase);
+                    hI_buzz = envelope * (float)Math.Sin(linePhase);
+                }
             }
 
             uint  ns         = 0u;
@@ -530,7 +554,7 @@ namespace AprNes
                 for (int s = 0; s < 4; s++)
                 {
                     float x = src[s] * ea[tMod + s];  // #1 per-phase emphasis
-                    if (isRF) x += buzzRow;
+                    if (herring) { x += hI_buzz; float t = hR_buzz*hC_buzz - hI_buzz*hS_buzz; hI_buzz = hR_buzz*hS_buzz + hI_buzz*hC_buzz; hR_buzz = t; }
                     if (addNoise)
                     {
                         ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5;

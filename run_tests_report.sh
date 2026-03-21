@@ -42,7 +42,7 @@ done
 # ─────────────────────────────────────────────
 if [ $OPT_BUILD -eq 1 ]; then
     echo "=== Building project ==="
-    powershell -NoProfile -Command "& 'C:\Program Files (x86)\MSBuild\14.0\Bin\MSBuild.exe' 'C:\ai_project\AprNes\AprNes.sln' /p:Configuration=Debug /t:Rebuild /nologo /v:minimal"
+    powershell -NoProfile -Command "& 'C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe' 'C:\ai_project\AprNes\AprNes\AprNes.csproj' /p:Configuration=Debug /p:Platform=x64 /t:Rebuild /nologo /v:minimal"
     if [ $? -ne 0 ]; then
         echo "BUILD FAILED"
         exit 1

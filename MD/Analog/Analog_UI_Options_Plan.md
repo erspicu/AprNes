@@ -17,16 +17,25 @@
 
 ---
 
+## 低成本項目（已實作，預設開啟）
+
+| # | 效果 | 欄位 | 預設值 | 類型 | 所在檔案 | 說明 |
+|:-:|------|------|:------:|------|----------|------|
+| 6 | **Shadow Mask / Aperture Grille** | `CrtScreen.ShadowMaskMode` | `ApertureGrille` | enum (None/ApertureGrille/ShadowMask) | CrtScreen.cs | 蔭罩類型。ApertureGrille=Trinitron 垂直條紋，ShadowMask=點陣三角排列（偶奇行偏移），None=關閉 |
+|   |  | `CrtScreen.ShadowMaskStrength` | `0.3` | float (0~1) | CrtScreen.cs | 非主色通道衰減比例。0=無效果，0.3=微妙，0.6=明顯 |
+| 7 | **RF Herringbone** | 由 `RfAudioLevel` 控制 | RF only | — | Ntsc.cs | 4.5MHz 音訊載波 per-sample 正弦波（取代原 per-line 常數 buzzRow），產生斜紋干擾。振幅受 60Hz 包絡調制 |
+| 8 | **Screen Curvature** | `CrtScreen.CurvatureStrength` | `0.12` | float (0~0.5) | CrtScreen.cs | 桶形畸變強度。0=平面，0.12=微妙弧度，0.3=明顯彎曲。預計算 remap table，Parallel.For 後處理 |
+
+---
+
 ## 尚未實作、未來完成後也適合選項化的效果
 
 | # | 效果 | Gap Analysis 編號 | 優先級 | 說明 |
 |:-:|------|:-----------------:|:------:|------|
-| 6 | **Shadow Mask / Aperture Grille** | #11 | Tier 1 | 遮罩類型選擇（shadow mask / Trinitron / 無）+ 強度 |
-| 7 | **Phosphor Persistence** | #10 | Tier 1 | 餘輝衰減係數（0=關，0.5~0.8 典型值）。實作後 Interlace Jitter 才有意義 |
-| 8 | **Horizontal Beam Spread** | #12 | Tier 2 | 水平模糊 σ 值（0=關） |
-| 9 | **Ringing / Gibbs** | #5 | Tier 2 | 振鈴強度（0=純 IIR，>0 加入過衝） |
-| 10 | **Screen Curvature** | #14 | Tier 3 | 桶形畸變強度（0=平面） |
-| 11 | **Beam Convergence** | #13 | Tier 3 | RGB 匯聚偏差量 |
+| 9 | **Phosphor Persistence** | #10 | Tier 1 | 餘輝衰減係數（0=關，0.5~0.8 典型值）。實作後 Interlace Jitter 才有意義 |
+| 10 | **Horizontal Beam Spread** | #12 | Tier 2 | 水平模糊 σ 值（0=關） |
+| 11 | **Ringing / Gibbs** | #5 | Tier 2 | 振鈴強度（0=純 IIR，>0 加入過衝） |
+| 12 | **Beam Convergence** | #13 | Tier 3 | RGB 匯聚偏差量 |
 
 ---
 

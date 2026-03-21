@@ -40,7 +40,7 @@ if [ ${#SKIP_SPECS[@]} -gt 0 ]; then HAS_SKIPS=1; fi
 # Build
 if [ $OPT_BUILD -eq 1 ]; then
     echo "=== Building project ==="
-    powershell -NoProfile -Command "& 'C:\Program Files (x86)\MSBuild\14.0\Bin\MSBuild.exe' 'C:\ai_project\AprNes\AprNes.sln' /p:Configuration=Debug /t:Rebuild /nologo" 2>&1 | tail -3
+    powershell -NoProfile -Command "& 'C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe' 'C:\ai_project\AprNes\AprNes\AprNes.csproj' /p:Configuration=Debug /p:Platform=x64 /t:Rebuild /nologo /v:minimal" 2>&1 | tail -3
     if [ $? -ne 0 ]; then echo "BUILD FAILED"; exit 1; fi
 fi
 

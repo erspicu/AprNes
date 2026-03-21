@@ -60,12 +60,25 @@ namespace AprNes
         // #18 Interlace jitter (simulate CRT field alternation, ±0.25 pixel)
         public static bool InterlaceJitter = true;
 
+        // #11 Shadow mask / Aperture grille
+        public enum MaskType { None, ApertureGrille, ShadowMask }
+        public static MaskType ShadowMaskMode = MaskType.ApertureGrille;
+        public static float ShadowMaskStrength = 0.3f;
+
+        // #14 Screen curvature (barrel distortion)
+        public static float CurvatureStrength = 0.12f;
+
         // ── 掃描線預計算快取（unmanaged memory）─────────────────────────────
         static float  _cachedSigma = -1f;
         static int    _cachedFrame = -1;
         static float* _weights;    // DstH floats
         static int*   _nearestY;   // DstH ints
         static float* _boostRow;   // DstH floats: per-row boost (BrightnessBoost × vignette)
+        // #14 Curvature remap
+        static uint*  _curvTemp;   // temp buffer for pre-distortion frame
+        static int*   _curvMap;    // remap table [DstW × DstH]
+        static int    _cachedCurvW, _cachedCurvH;
+        static float  _cachedCurvK = -1f;
 
         // ════════════════════════════════════════════════════════════════════
         // Init
@@ -79,8 +92,14 @@ namespace AprNes
             _weights  = (float*)Marshal.AllocHGlobal(DstH * sizeof(float));
             _nearestY = (int*)  Marshal.AllocHGlobal(DstH * sizeof(int));
             _boostRow = (float*)Marshal.AllocHGlobal(DstH * sizeof(float));
+            // #14 Curvature buffers
+            if (_curvTemp != null) Marshal.FreeHGlobal((IntPtr)_curvTemp);
+            if (_curvMap  != null) Marshal.FreeHGlobal((IntPtr)_curvMap);
+            _curvTemp = (uint*)Marshal.AllocHGlobal(DstW * DstH * sizeof(uint));
+            _curvMap  = (int*) Marshal.AllocHGlobal(DstW * DstH * sizeof(int));
             _cachedSigma = -1f; // 強制重新計算掃描線權重
             _cachedFrame = -1;
+            _cachedCurvK = -1f;
         }
 
         // ── 端子參數套用 ─────────────────────────────────────────────────────
@@ -128,6 +147,91 @@ namespace AprNes
                 float vigFactor = 1f - VignetteStrength * 4f * vy * vy;
                 _boostRow[ty] = BrightnessBoost * vigFactor;
             }
+        }
+
+        // ── #14 螢幕曲率預計算 ──────────────────────────────────────────────
+        static void PrecomputeCurvature()
+        {
+            int dstW = DstW, dstH = DstH;
+            float k = CurvatureStrength;
+            if (_cachedCurvK == k && _cachedCurvW == dstW && _cachedCurvH == dstH) return;
+            _cachedCurvK = k; _cachedCurvW = dstW; _cachedCurvH = dstH;
+
+            float invW = 1f / (dstW - 1);
+            float invH = 1f / (dstH - 1);
+            for (int ty = 0; ty < dstH; ty++)
+            {
+                float cy = ty * invH - 0.5f;
+                for (int tx = 0; tx < dstW; tx++)
+                {
+                    float cx = tx * invW - 0.5f;
+                    float r2 = cx * cx + cy * cy;
+                    float f = 1f + k * r2;
+                    int sx = (int)((0.5f + cx * f) * (dstW - 1) + 0.5f);
+                    int sy = (int)((0.5f + cy * f) * (dstH - 1) + 0.5f);
+                    _curvMap[ty * dstW + tx] = (sx >= 0 && sx < dstW && sy >= 0 && sy < dstH)
+                        ? sy * dstW + sx : -1;
+                }
+            }
+        }
+
+        // ── #11 蔭罩後處理 ──────────────────────────────────────────────────
+        static void ApplyShadowMask()
+        {
+            if (ShadowMaskMode == MaskType.None || ShadowMaskStrength <= 0f) return;
+
+            int dstW = DstW, dstH = DstH;
+            uint* dst = NesCore.AnalogScreenBuf;
+            int dimI = (int)((1f - ShadowMaskStrength) * 256f);
+            bool isSM = ShadowMaskMode == MaskType.ShadowMask;
+
+            Parallel.For(0, dstH, ty =>
+            {
+                uint* row = dst + (long)ty * dstW;
+                int phase = (isSM && (ty & 1) != 0) ? 1 : 0;
+                for (int tx = 0; tx < dstW; tx++)
+                {
+                    uint px = row[tx];
+                    int b = (int)(px & 0xFF);
+                    int g = (int)((px >> 8) & 0xFF);
+                    int r = (int)((px >> 16) & 0xFF);
+
+                    switch (phase)
+                    {
+                        case 0: g = g * dimI >> 8; b = b * dimI >> 8; break;
+                        case 1: r = r * dimI >> 8; b = b * dimI >> 8; break;
+                        default: r = r * dimI >> 8; g = g * dimI >> 8; break;
+                    }
+
+                    row[tx] = (uint)(b | (g << 8) | (r << 16)) | 0xFF000000u;
+                    if (++phase == 3) phase = 0;
+                }
+            });
+        }
+
+        // ── #14 曲率後處理 ──────────────────────────────────────────────────
+        static void ApplyCurvature()
+        {
+            if (CurvatureStrength <= 0f) return;
+            PrecomputeCurvature();
+
+            int dstW = DstW, dstH = DstH;
+            uint* dst = NesCore.AnalogScreenBuf;
+            uint* tmp = _curvTemp;
+            int bytes = dstW * dstH * sizeof(uint);
+            int* map = _curvMap;
+
+            Buffer.MemoryCopy(dst, tmp, bytes, bytes);
+
+            Parallel.For(0, dstH, ty =>
+            {
+                int rowOff = ty * dstW;
+                for (int tx = 0; tx < dstW; tx++)
+                {
+                    int srcIdx = map[rowOff + tx];
+                    dst[rowOff + tx] = srcIdx >= 0 ? tmp[srcIdx] : 0xFF000000u;
+                }
+            });
         }
 
         // ════════════════════════════════════════════════════════════════════
@@ -345,6 +449,10 @@ namespace AprNes
                     rowPtr[x] = (uint)(bi | (gi << 8) | (ri << 16) | 0xFF000000u);
                 }
             });
+
+            // ── 後處理 ─────────────────────────────────────────────────────
+            ApplyShadowMask();
+            ApplyCurvature();
         }
     }
 }
