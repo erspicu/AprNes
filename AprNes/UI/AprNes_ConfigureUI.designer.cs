@@ -94,14 +94,14 @@
             this.VideoInput = new System.Windows.Forms.ComboBox();
             this.crtuse = new System.Windows.Forms.CheckBox();
             this.AnalogSetting = new System.Windows.Forms.Button();
-            this.groupBox6 = new System.Windows.Forms.GroupBox();
+            this.groupBoxAnalog = new System.Windows.Forms.GroupBox();
             this.groupBox1.SuspendLayout();
             this.groupBox2.SuspendLayout();
             this.groupBox4.SuspendLayout();
             this.groupBox3.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.SoundtrackBar)).BeginInit();
             this.groupBox5.SuspendLayout();
-            this.groupBox6.SuspendLayout();
+            this.groupBoxAnalog.SuspendLayout();
             this.SuspendLayout();
             // 
             // groupBox1
@@ -926,29 +926,29 @@
             this.AnalogSetting.UseVisualStyleBackColor = true;
             this.AnalogSetting.Click += new System.EventHandler(this.AnalogSetting_Click);
             // 
-            // groupBox6
+            // groupBoxAnalog
             // 
-            this.groupBox6.Controls.Add(this.useAnalog);
-            this.groupBox6.Controls.Add(this.AnalogSetting);
-            this.groupBox6.Controls.Add(this.ultraAnalog);
-            this.groupBox6.Controls.Add(this.VideoInputLab);
-            this.groupBox6.Controls.Add(this.crtuse);
-            this.groupBox6.Controls.Add(this.VideoInput);
-            this.groupBox6.Controls.Add(this.label_analogSize);
-            this.groupBox6.Controls.Add(this.comboBox_analogSize);
-            this.groupBox6.Location = new System.Drawing.Point(446, 301);
-            this.groupBox6.Name = "groupBox6";
-            this.groupBox6.Size = new System.Drawing.Size(339, 185);
-            this.groupBox6.TabIndex = 38;
-            this.groupBox6.TabStop = false;
-            this.groupBox6.Text = "Analog Setting";
+            this.groupBoxAnalog.Controls.Add(this.useAnalog);
+            this.groupBoxAnalog.Controls.Add(this.AnalogSetting);
+            this.groupBoxAnalog.Controls.Add(this.ultraAnalog);
+            this.groupBoxAnalog.Controls.Add(this.VideoInputLab);
+            this.groupBoxAnalog.Controls.Add(this.crtuse);
+            this.groupBoxAnalog.Controls.Add(this.VideoInput);
+            this.groupBoxAnalog.Controls.Add(this.label_analogSize);
+            this.groupBoxAnalog.Controls.Add(this.comboBox_analogSize);
+            this.groupBoxAnalog.Location = new System.Drawing.Point(446, 301);
+            this.groupBoxAnalog.Name = "groupBoxAnalog";
+            this.groupBoxAnalog.Size = new System.Drawing.Size(339, 185);
+            this.groupBoxAnalog.TabIndex = 38;
+            this.groupBoxAnalog.TabStop = false;
+            this.groupBoxAnalog.Text = "Analog Setting";
             // 
             // AprNes_ConfigureUI
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 18F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1002, 584);
-            this.Controls.Add(this.groupBox6);
+            this.Controls.Add(this.groupBoxAnalog);
             this.Controls.Add(this.groupBox5);
             this.Controls.Add(this.groupBox3);
             this.Controls.Add(this.label18);
@@ -981,8 +981,8 @@
             ((System.ComponentModel.ISupportInitialize)(this.SoundtrackBar)).EndInit();
             this.groupBox5.ResumeLayout(false);
             this.groupBox5.PerformLayout();
-            this.groupBox6.ResumeLayout(false);
-            this.groupBox6.PerformLayout();
+            this.groupBoxAnalog.ResumeLayout(false);
+            this.groupBoxAnalog.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -1056,6 +1056,6 @@
         private System.Windows.Forms.ComboBox VideoInput;
         private System.Windows.Forms.CheckBox crtuse;
         private System.Windows.Forms.Button AnalogSetting;
-        private System.Windows.Forms.GroupBox groupBox6;
+        private System.Windows.Forms.GroupBox groupBoxAnalog;
     }
 }

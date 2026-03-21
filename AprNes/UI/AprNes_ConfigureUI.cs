@@ -41,6 +41,7 @@ namespace AprNes
             groupBox3.Text   = LangStr("scanline");
 
             // Analog 相關控制項語系
+            groupBoxAnalog.Text = LangStr("analog_group");
             useAnalog.Text      = LangStr("analog_mode");
             ultraAnalog.Text    = LangStr("ultra_analog");
             crtuse.Text         = LangStr("crt_effect");
