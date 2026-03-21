@@ -152,7 +152,8 @@ namespace AprNes
             if (isRunning)
             {
                 NesCore._event.Reset();
-                while (NesCore.screen_lock) System.Threading.Thread.Sleep(1);
+                // 等待模擬執行緒完成當前整幀並阻塞於 _event.WaitOne()
+                while (!NesCore.emuWaiting) System.Threading.Thread.Sleep(1);
             }
 
             if (radioButtonX2s.Checked)

@@ -94,8 +94,9 @@ namespace AprNes
         public void initUIsize()
         {
             // AnalogEnabled 時依 AnalogSize 決定（256×N × 210×N，8:7 AR）
-            int renderWidth  = NesCore.AnalogEnabled ? CrtScreen.DstW : 256 * ScreenSize;
-            int renderHeight = NesCore.AnalogEnabled ? CrtScreen.DstH : 240 * ScreenSize;
+            // 直接從 NesCore.AnalogSize 計算，避免依賴 CrtScreen.DstW/DstH（可能尚未 sync）
+            int renderWidth  = NesCore.AnalogEnabled ? 256 * NesCore.AnalogSize : 256 * ScreenSize;
+            int renderHeight = NesCore.AnalogEnabled ? 210 * NesCore.AnalogSize : 240 * ScreenSize;
 
             panel1.Visible = false;
             panel1.Width  = renderWidth;
@@ -298,9 +299,9 @@ namespace AprNes
             }
 
             LoadAnalogConfig(); // 讀取 AprNesAnalog.ini（開機一次）
-
-            // 同步類比參數至 Ntsc/CrtScreen（確保 CrtScreen.DstW/DstH 反映最新 AnalogSize）
-            unsafe { NesCore.SyncAnalogConfig(); }
+            // 注意：不在此處呼叫 SyncAnalogConfig()，避免在模擬執行緒尚未暫停時
+            // 改變 CrtScreen._analogSize，導致 DemodulateRow 使用新 dstW 存取舊 buffer 而 crash。
+            // 正確的 sync 由 ApplyRenderSettings() 負責（已確保模擬執行緒完全停止）。
 
             NES_init_KeyMap();
 
@@ -1031,7 +1032,7 @@ public string GetRomInfo()
 
             NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
             NesCore._event.Reset();
-            while (NesCore.screen_lock) Thread.Sleep(1);
+            while (!NesCore.emuWaiting) Thread.Sleep(1);
             if (RenderObj != null) RenderObj.freeMem();
             RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType(NesCore.AnalogEnabled ? "AprNes.Render_ntsc_3x" : "AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
             RenderObj.init(NesCore.ScreenBuf1x, grfx);
@@ -1048,7 +1049,9 @@ public string GetRomInfo()
 
             NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
             NesCore._event.Reset();
-            while (NesCore.screen_lock) Thread.Sleep(1);
+            // 等待模擬執行緒完成當前整幀並阻塞於 _event.WaitOne()
+            // screen_lock 僅覆蓋 RenderScreen()，不足以確保 DemodulateRow 等掃描線處理已結束
+            while (!NesCore.emuWaiting) Thread.Sleep(1);
 
             // AnalogEnabled 時：重建 CrtScreen 快取，並在必要時重新分配 AnalogScreenBuf
             // 注意：僅在 buf 尺寸改變（AnalogSize 切換）或 buf 不存在時才重新分配。

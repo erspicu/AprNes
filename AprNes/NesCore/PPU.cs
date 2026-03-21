@@ -1064,13 +1064,16 @@ namespace AprNes
         }
 
         static public bool screen_lock = false;
+        static public volatile bool emuWaiting = false;
         static void RenderScreen()
         {
             screen_lock = true;
             if (AnalogEnabled && NesCore.UltraAnalog && NesCore.CrtEnabled) CrtScreen.Render(); // Stage 2：linearBuffer → AnalogScreenBuf（Level 3 + CRT）
             VideoOutput?.Invoke(null, null);
             screen_lock = false;
+            emuWaiting = true;
             _event.WaitOne();
+            emuWaiting = false;
         }
 
         static bool SuppressVbl = false;
