@@ -17,7 +17,7 @@ namespace AprNes
 
         int prgBank0, prgBank1; // two 16KB PRG slots
         int chrBank;
-        bool prg32Mode;
+
 
         public MapperA12Mode A12NotifyMode => MapperA12Mode.None;
         public void NotifyA12(int addr, int ppuAbsCycle) { }

@@ -16,28 +16,41 @@ namespace AprNes
             init();
         }
 
+        // 安全讀取語系字串（key 不存在時 fallback 為 key 名稱本身）
+        static string LangStr(string key)
+        {
+            var tbl = LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]];
+            return tbl.ContainsKey(key) ? tbl[key] : key;
+        }
+
         public void init()
         {
 
             if (!LangINI.LangLoadOK) return;
 
-            Ok_btn.Text = LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["ok"];
-            this.Text = LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["setting"];
-            choose_dir.Text = LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["selectfolder"];
-            groupBox1.Text = LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["keypad"];
-            groupBox2.Text = LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["joypad"];
-            groupBox4.Text = LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["screen"];
-            LimitFPS_checkBox.Text = LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["limitfps"];
-            perdotFSM.Text = LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["perdotFSM"];
-            label18.Text = LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["langchoose"];
-            label9.Text = "Shift + p " + LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["capture_path"];
-            groupBox3.Text = LangINI.lang_table[AprNesUI.GetInstance().AppConfigure["Lang"]]["scanline"];
+            Ok_btn.Text      = LangStr("ok");
+            this.Text        = LangStr("setting");
+            choose_dir.Text  = LangStr("selectfolder");
+            groupBox1.Text   = LangStr("keypad");
+            groupBox2.Text   = LangStr("joypad");
+            groupBox4.Text   = LangStr("screen");
+            LimitFPS_checkBox.Text = LangStr("limitfps");
+            perdotFSM.Text   = LangStr("perdotFSM");
+            label18.Text     = LangStr("langchoose");
+            label9.Text      = "Shift + p " + LangStr("capture_path");
+            groupBox3.Text   = LangStr("scanline");
 
+            // Analog 相關控制項語系
+            useAnalog.Text      = LangStr("analog_mode");
+            ultraAnalog.Text    = LangStr("ultra_analog");
+            crtuse.Text         = LangStr("crt_effect");
+            VideoInputLab.Text  = LangStr("video_input");
+            label_analogSize.Text = LangStr("analog_size");
 
             // 同步 Analog Size 選擇（index 0=2x,1=4x,2=6x,3=8x）
             int[] analogSizeMap = { 2, 4, 6, 8 };
             int analogIdx = System.Array.IndexOf(analogSizeMap, NesCore.AnalogSize);
-            if (analogIdx < 0) analogIdx = 2; // 預設 4x
+            if (analogIdx < 0) analogIdx = 1; // 預設 4x (index=1)
             comboBox_analogSize.SelectedIndex = analogIdx;
 
             comboBox1.Items.Clear();
@@ -72,6 +85,37 @@ namespace AprNes
                 captured.Click += (s, e) => _activeJoyControl = captured;
                 captured.Enter += (s, e) => _activeJoyControl = captured;
             }
+        }
+
+        // Analog 模式切換：決定哪些 UI 啟用 / 停用
+        void UpdateAnalogEnableState()
+        {
+            bool analogOn = useAnalog.Checked;
+            bool ultraOn  = analogOn && ultraAnalog.Checked;
+
+            // Analog 開啟時，停用原有 Screen / Scanline 設定
+            groupBox3.Enabled = !analogOn;
+            groupBox4.Enabled = !analogOn;
+
+            // Analog 子選項只在 AnalogMode 啟用時才可操作
+            ultraAnalog.Enabled         = analogOn;
+            VideoInput.Enabled          = analogOn;
+            VideoInputLab.Enabled       = analogOn;
+            label_analogSize.Enabled    = analogOn;
+            comboBox_analogSize.Enabled = analogOn;
+
+            // CRT 效果需要 UltraAnalog 才有效
+            crtuse.Enabled = ultraOn;
+        }
+
+        private void useAnalog_CheckedChanged(object sender, EventArgs e)
+        {
+            UpdateAnalogEnableState();
+        }
+
+        private void ultraAnalog_CheckedChanged(object sender, EventArgs e)
+        {
+            UpdateAnalogEnableState();
         }
 
         void UpdateSoundUI()
@@ -149,6 +193,22 @@ namespace AprNes
                 AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "9";
                 AprNesUI.GetInstance().AppConfigure["filter"] = "xbrz";
             }
+            // ── Analog 相關設定寫回 AppConfigure ──────────────────────────────
+            bool prevAnalogEnabled = NesCore.AnalogEnabled;
+
+            AprNesUI.GetInstance().AppConfigure["AnalogMode"]   = useAnalog.Checked ? "1" : "0";
+            AprNesUI.GetInstance().AppConfigure["UltraAnalog"]  = ultraAnalog.Checked ? "1" : "0";
+            AprNesUI.GetInstance().AppConfigure["crt"]          = crtuse.Checked ? "1" : "0";
+            // Configure_Write() 從 NesCore.CrtEnabled 讀值寫入 ini，必須先同步
+            NesCore.CrtEnabled = crtuse.Checked;
+
+            switch (VideoInput.SelectedIndex)
+            {
+                case 0: AprNesUI.GetInstance().AppConfigure["AnalogOutput"] = "RF";     break;
+                case 1: AprNesUI.GetInstance().AppConfigure["AnalogOutput"] = "SVideo"; break;
+                default: AprNesUI.GetInstance().AppConfigure["AnalogOutput"] = "AV";    break;
+            }
+
             // Analog Size：comboBox index 0=2x,1=4x,2=6x,3=8x
             int[] analogSizeValues = { 2, 4, 6, 8 };
             int selIdx = comboBox_analogSize.SelectedIndex;
@@ -187,6 +247,22 @@ namespace AprNes
             AprNesUI.GetInstance().initUIsize();
 
             AprNesUI.GetInstance().ApplyRenderSettings();
+
+            // AnalogMode 切換（OFF→ON 或 ON→OFF）時，若 AnalogScreenBuf 狀態與新設定不符
+            // 則主動補齊：OFF→ON 已由 ApplyRenderSettings 處理；ON→OFF 需手動釋放緩衝區
+            bool newAnalogEnabled = NesCore.AnalogEnabled; // LoadConfig 已更新
+            if (prevAnalogEnabled && !newAnalogEnabled)
+            {
+                unsafe
+                {
+                    if (NesCore.AnalogScreenBuf != null)
+                    {
+                        System.Runtime.InteropServices.Marshal.FreeHGlobal((IntPtr)NesCore.AnalogScreenBuf);
+                        NesCore.AnalogScreenBuf = null;
+                        NesCore.AnalogBufSize   = 0;
+                    }
+                }
+            }
 
             // Sync WaveOutPlayer to the new AudioEnabled state
             WaveOutPlayer.CloseAudio();
@@ -500,6 +576,26 @@ namespace AprNes
 
             // Accuracy 設定載入
             perdotFSM.Checked = NesCore.AccuracyOptA;
+
+            // ── Analog 設定載入 ──────────────────────────────────────────────
+            useAnalog.Checked   = NesCore.AnalogEnabled;
+            ultraAnalog.Checked = NesCore.UltraAnalog;
+            crtuse.Checked      = NesCore.CrtEnabled;
+
+            switch (NesCore.AnalogOutput)
+            {
+                case NesCore.AnalogOutputMode.RF:     VideoInput.SelectedIndex = 0; break;
+                case NesCore.AnalogOutputMode.SVideo: VideoInput.SelectedIndex = 1; break;
+                default:                              VideoInput.SelectedIndex = 2; break;
+            }
+
+            // Analog Size
+            int[] sizeMap = { 2, 4, 6, 8 };
+            int aidx = System.Array.IndexOf(sizeMap, NesCore.AnalogSize);
+            comboBox_analogSize.SelectedIndex = aidx >= 0 ? aidx : 1;
+
+            // 根據 AnalogMode 決定哪些控制項啟用
+            UpdateAnalogEnableState();
         }
 
         private void choose_dir_Click(object sender, EventArgs e)

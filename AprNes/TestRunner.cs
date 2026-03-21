@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
@@ -129,6 +130,8 @@ namespace AprNes
             string timedScreenshotsSpec = null; // --timed-screenshots "path1:t1,path2:t2,..."
             bool dumpAcResults = false; // --dump-ac-results: print AC_RESULTS_HEX after run
             bool dumpDebug = false; // --dump-debug: print debug memory ranges ($50-$6F, $500-$5FF)
+            bool benchmarkMode = false; // --benchmark <sec>: measure FPS for wall-clock duration
+            double benchmarkSec = 20;
 
             // Parse arguments
             for (int i = 0; i < args.Length; i++)
@@ -190,6 +193,20 @@ namespace AprNes
                         break;
                     case "--accuracy":
                         if (i + 1 < args.Length) i++; // already pre-parsed
+                        break;
+                    case "--benchmark":
+                        benchmarkMode = true;
+                        if (i + 1 < args.Length) double.TryParse(args[++i], out benchmarkSec);
+                        break;
+                    case "--analog-size":
+                        if (i + 1 < args.Length)
+                        {
+                            int sz;
+                            if (int.TryParse(args[++i], out sz)) NesCore.AnalogSize = sz;
+                        }
+                        break;
+                    case "--crt":
+                        NesCore.CrtEnabled = true;
                         break;
                     case "--expected-crc":
                         if (i + 1 < args.Length)
@@ -260,11 +277,27 @@ namespace AprNes
             uint prevHash = 0;
             int stableFrameCount = 0;
 
+            // Benchmark stopwatch
+            Stopwatch benchSw = benchmarkMode ? new Stopwatch() : null;
+
             // Wire up VideoOutput handler
             EventHandler handler = null;
             handler = (sender, e) =>
             {
                 frameCount++;
+
+                // Benchmark mode: just count frames for wall-clock duration
+                if (benchmarkMode)
+                {
+                    if (!benchSw.IsRunning) benchSw.Start();
+                    if (benchSw.Elapsed.TotalSeconds >= benchmarkSec)
+                    {
+                        benchSw.Stop();
+                        done = true;
+                        NesCore.exit = true;
+                    }
+                    return;
+                }
 
                 // --- 模擬手把輸入 ---
                 for (int ie = 0; ie < inputEvents.Count; ie++)
@@ -505,6 +538,15 @@ namespace AprNes
             emuThread.Join();
 
             NesCore.VideoOutput -= handler;
+
+            // Benchmark mode: print FPS and exit
+            if (benchmarkMode)
+            {
+                double elapsed = benchSw.Elapsed.TotalSeconds;
+                double fps = frameCount / elapsed;
+                Console.WriteLine(string.Format("BENCHMARK: {0} frames in {1:F2}s = {2:F2} FPS", frameCount, elapsed, fps));
+                return 0;
+            }
 
             // Read blargg test text from $6004+
             string resultText = ReadBlarggText();

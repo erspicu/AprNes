@@ -1009,18 +1009,25 @@ public string GetRomInfo()
             NesCore._event.Reset();
             while (NesCore.screen_lock) Thread.Sleep(1);
 
-            // AnalogEnabled 時：重新分配 AnalogScreenBuf 並重建 CrtScreen 快取
+            // AnalogEnabled 時：重建 CrtScreen 快取，並在必要時重新分配 AnalogScreenBuf
+            // 注意：僅在 buf 尺寸改變（AnalogSize 切換）或 buf 不存在時才重新分配。
+            // 若尺寸不變（例如只切換 VideoInput），保留現有 buf，避免渲染執行緒寫入時發生 race condition。
             if (NesCore.AnalogEnabled)
             {
+                int needed = CrtScreen.DstW * CrtScreen.DstH;
                 unsafe
                 {
-                    if (NesCore.AnalogScreenBuf != null)
+                    if (NesCore.AnalogScreenBuf == null || NesCore.AnalogBufSize != needed)
                     {
-                        System.Runtime.InteropServices.Marshal.FreeHGlobal((IntPtr)NesCore.AnalogScreenBuf);
-                        NesCore.AnalogScreenBuf = null;
+                        if (NesCore.AnalogScreenBuf != null)
+                        {
+                            System.Runtime.InteropServices.Marshal.FreeHGlobal((IntPtr)NesCore.AnalogScreenBuf);
+                            NesCore.AnalogScreenBuf = null;
+                        }
+                        NesCore.AnalogBufSize   = needed;
+                        NesCore.AnalogScreenBuf = (uint*)System.Runtime.InteropServices.Marshal.AllocHGlobal(
+                            sizeof(uint) * needed);
                     }
-                    NesCore.AnalogScreenBuf = (uint*)System.Runtime.InteropServices.Marshal.AllocHGlobal(
-                        sizeof(uint) * CrtScreen.DstW * CrtScreen.DstH);
                 }
                 CrtScreen.Init();
             }

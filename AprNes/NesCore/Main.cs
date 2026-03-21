@@ -81,6 +81,7 @@ namespace AprNes
         // 類比模式輸出緩衝區（CrtScreen Stage 2 寫入，Render_ntsc_3x 讀取）
         // 僅在 AnalogEnabled=true 時分配，其他情況為 null
         static public uint* AnalogScreenBuf = null;
+        static public int   AnalogBufSize   = 0;  // 目前已分配的 pixel 數（DstW×DstH）
 
         static int* Vertical; //  Vertical = false,
 
@@ -109,7 +110,7 @@ namespace AprNes
             if (P1_joypad_status != null) { Marshal.FreeHGlobal((IntPtr)P1_joypad_status); P1_joypad_status = null; }
             if (NES_MEM      != null) { Marshal.FreeHGlobal((IntPtr)NES_MEM);      NES_MEM      = null; }
             if (Vertical           != null) { Marshal.FreeHGlobal((IntPtr)Vertical);           Vertical           = null; }
-            if (AnalogScreenBuf  != null) { Marshal.FreeHGlobal((IntPtr)AnalogScreenBuf);  AnalogScreenBuf  = null; }
+            if (AnalogScreenBuf  != null) { Marshal.FreeHGlobal((IntPtr)AnalogScreenBuf);  AnalogScreenBuf  = null; AnalogBufSize = 0; }
         }
 
         static void HardResetState()
@@ -282,7 +283,10 @@ namespace AprNes
                 //init allocate
                 ScreenBuf1x      = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 61440);
                 if (AnalogEnabled)
-                    AnalogScreenBuf = (uint*)Marshal.AllocHGlobal(sizeof(uint) * CrtScreen.DstW * CrtScreen.DstH);
+                {
+                    AnalogBufSize   = CrtScreen.DstW * CrtScreen.DstH;
+                    AnalogScreenBuf = (uint*)Marshal.AllocHGlobal(sizeof(uint) * AnalogBufSize);
+                }
                 Buffer_BG_array  = (int* )Marshal.AllocHGlobal(sizeof(int)  * 61440);
                 NesColors        = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 64);
                 palCacheR        = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 4);
