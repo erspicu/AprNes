@@ -40,6 +40,10 @@ namespace AprNes
             label9.Text      = "Shift + p " + LangStr("capture_path");
             groupBox3.Text   = LangStr("scanline");
 
+            // 音效
+            groupBox5.Text      = LangStr("sound_group");
+            UpdateSoundUI(); // 套用語系至 SoundcheckBox.Text
+
             // Analog 相關控制項語系
             groupBoxAnalog.Text = LangStr("analog_group");
             useAnalog.Text      = LangStr("analog_mode");
@@ -131,7 +135,9 @@ namespace AprNes
         void UpdateSoundUI()
         {
             SoundtrackBar.Enabled = SoundcheckBox.Checked;
-            SoundcheckBox.Text = "音效 - " + (SoundcheckBox.Checked ? SoundtrackBar.Value + "%" : "關閉");
+            string prefix = LangStr("sound_prefix");   // "音效 - " / "Sound - "
+            string off    = LangStr("sound_off");       // "關閉" / "OFF"
+            SoundcheckBox.Text = prefix + (SoundcheckBox.Checked ? SoundtrackBar.Value + "%" : off);
         }
 
         private void SoundcheckBox_CheckedChanged(object sender, EventArgs e)

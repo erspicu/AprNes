@@ -160,40 +160,39 @@ python run_tests.py -j 10
 | Generic USB gamepad / joystick | DirectInput8 (raw vtable) | Auto-enumerated, excludes XInput devices |
 | Xbox 360 / One / Series | XInput (xinput1_4.dll) | Auto-detects players 0–3 |
 
-## Supported Mappers
+## Supported Mappers (29 verified)
 
 | Mapper | Representative Games |
 |--------|---------------------|
 | 0 (NROM) | Super Mario Bros., Donkey Kong |
 | 1 (MMC1) | The Legend of Zelda, Metroid, Mega Man 2 |
 | 2 (UxROM) | Mega Man, Castlevania, Ghosts 'n Goblins |
-| 3 (CNROM) | Ninja Gaiden, Solomon's Key |
+| 3 (CNROM) | Solomon's Key, Gradius |
 | 4 (MMC3) | Super Mario Bros. 2/3, Mega Man 3–6 |
-| 5 (MMC5) | Castlevania III (US) |
 | 7 (AxROM) | Battletoads, Wizards & Warriors |
-| 9 (MMC2) | Punch-Out!! |
 | 10 (MMC4) | Fire Emblem, Famicom Wars |
-| 11 (Color Dreams) | Crystal Mines |
-| 16/159 (Bandai FCG/LZ93D50) | Dragon Ball: Daimaou Fukkatsu (J), Famicom Jump (J), Magical Taruruuto-kun (J) |
+| 11 (Color Dreams) | Crystal Mines, Pesterminator |
 | 18 (Jaleco SS8806) | Ninja Jajamaru (J), Pizza Pop! (J), Magic John (J) |
 | 21 (VRC4) | Wai Wai World 2 (J), Ganbare Goemon Gaiden 2 (J) |
 | 22 (VRC2a) | TwinBee 3 (J) |
 | 23 (VRC2b) | Contra (J), Getsufuu Maden (J) |
 | 32 (Irem G-101) | Image Fight (J), Major League (J) |
 | 33 (Taito TC0190) | Akira (J), Don Doko Don (J) |
-| 34 (Nina-1) | Deadly Towers, Impossible Mission II |
-| 64 (Tengen RAMBO-1) | Shinobi (Tengen), Klax (Tengen) |
-| 65 (Irem H-3001) | Daiku no Gen San 2 (J) |
-| 66 (GxROM) | Dragon Ball, Gumshoe |
 | 68 (Sunsoft #4) | After Burner II (J), Maharaja (J) |
 | 69 (FME-7) | Batman (J), Gimmick! (J) |
-| 71 (Camerica) | Firehawk, Linus Spacehead |
-| 19 (Namco 163) | Splatterhouse (J), Rolling Thunder 2 (J) |
-| 24/26 (VRC6a/VRC6b) | Akumajo Dracula 3 (J) |
-| 78 (Irem 74HC161/32) | Holy Diver (J) |
-| 85 (VRC7) | Lagrange Point (J) |
-| 153 (Bandai LZ93D50+WRAM) | Dragon Ball 3 (J) |
-| 206 (Namco 108) | Karnov |
+| 72 (Jaleco JF-17) | Pinball Quest (J), Moero!! Juudou Warriors (J) |
+| 75 (VRC1) | Ganbare Goemon! (J), Jajamaru Ninpou Chou (J) |
+| 77 (Napoleon Senki) | Napoleon Senki (J) |
+| 79 (NINA-03/06) | Blackjack (AVE), Deathbots (AVE) |
+| 87 (Jaleco JF-09) | Argus (J), City Connection (J), The Goonies (J) |
+| 93 (Sunsoft-2) | Fantasy Zone (J), Shanghai (J) |
+| 97 (Irem TAM-S1) | Kaiketsu Yanchamaru (J) |
+| 119 (TQROM) | High Speed (U) |
+| 180 (Crazy Climber) | Crazy Climber (J) |
+| 184 (Sunsoft-1) | Wing of Madoola (J), Atlantis no Nazo (J) |
+| 185 (CNROM+protect) | B-Wings (J), Bird Week (J), Mighty Bomb Jack (J) |
+| 228 (Action 52) | Cheetahmen II (U) |
+| 232 (Camerica Quattro) | Quattro Adventure (U), Quattro Sports (U) |
 
 ---
 
@@ -357,37 +356,36 @@ python run_tests.py -j 10
 | 一般 USB 手把 / 老式搖桿 | DirectInput8（raw vtable） | 自動列舉，排除 XInput 裝置 |
 | Xbox 360 / Xbox One / Xbox Series | XInput（xinput1_4.dll） | 自動偵測 player 0–3 |
 
-## 支援的 Mapper
+## 支援的 Mapper（29 個通過人工驗證）
 
 | Mapper | 代表遊戲 |
 |--------|---------|
 | 0 (NROM) | 超級瑪利歐兄弟、大金剛 |
 | 1 (MMC1) | 薩爾達傳說、銀河戰士、洛克人 2 |
 | 2 (UxROM) | 洛克人、惡魔城、鬼屋魔域 |
-| 3 (CNROM) | 忍者龍劍傳、所羅門的鑰匙 |
+| 3 (CNROM) | 所羅門的鑰匙、乃木坂 |
 | 4 (MMC3) | 超級瑪利歐兄弟 2/3、洛克人 3–6 |
-| 5 (MMC5) | 惡魔城 III（美版） |
 | 7 (AxROM) | 熱血格鬥、騎士精英 |
-| 9 (MMC2) | 泰森拳擊 |
 | 10 (MMC4) | 火焰紋章、FC 大戰 |
-| 11 (Color Dreams) | Crystal Mines |
-| 16/159 (Bandai FCG/LZ93D50) | 七龍珠（FCG-1/2）、ファミコンジャンプ、魔法のタルルートくん |
+| 11 (Color Dreams) | Crystal Mines、Pesterminator |
 | 18 (Jaleco SS8806) | 忍者じゃじゃ丸（日）、Pizza Pop!（日）、Magic John（日） |
 | 21 (VRC4) | Wai Wai World 2（日）、がんばれゴエモン外伝 2（日） |
 | 22 (VRC2a) | TwinBee 3（日） |
 | 23 (VRC2b) | 魂斗羅（日）、月風魔傳（日） |
 | 32 (Irem G-101) | Image Fight（日）、Major League（日） |
 | 33 (Taito TC0190) | Akira（日）、Don Doko Don（日） |
-| 34 (Nina-1) | 魔神英雄傳、不可能的任務 II |
-| 64 (Tengen RAMBO-1) | Shinobi (Tengen)、Klax (Tengen) |
-| 65 (Irem H-3001) | 大工の源さん 2（日） |
-| 66 (GxROM) | 七龍珠、彈弓 |
 | 68 (Sunsoft #4) | After Burner II（日）、Maharaja（日） |
-| 69 (FME-7) | 蝙蝠俠（日）、奇妙小子（日） |
-| 71 (Camerica) | Firehawk、Linus Spacehead |
-| 19 (Namco 163) | Splatterhouse（日）、滾動霹靂 2（日） |
-| 24/26 (VRC6a/VRC6b) | 惡魔城傳說（日） |
-| 78 (Irem 74HC161/32) | 聖鬥士（Holy Diver 日版） |
-| 85 (VRC7) | 拉格朗日點（日） |
-| 153 (Bandai LZ93D50+WRAM) | 七龍珠 3（日） |
-| 206 (Namco 108) | Karnov |
+| 69 (FME-7) | 蝙蝠俠（日）、Gimmick!（日） |
+| 72 (Jaleco JF-17) | Pinball Quest（日）、Moero!! 柔道戰士（日） |
+| 75 (VRC1) | がんばれゴエモン!（日）、じゃじゃ丸忍法帳（日） |
+| 77 (Napoleon Senki) | Napoleon 戰記（日） |
+| 79 (NINA-03/06) | Blackjack (AVE)、Deathbots (AVE) |
+| 87 (Jaleco JF-09) | Argus（日）、City Connection（日）、The Goonies（日） |
+| 93 (Sunsoft-2) | Fantasy Zone（日）、上海（日） |
+| 97 (Irem TAM-S1) | 快傑やんちゃ丸（日） |
+| 119 (TQROM) | High Speed (U) |
+| 180 (Crazy Climber) | Crazy Climber（日） |
+| 184 (Sunsoft-1) | 魔導拉之翼（日）、アトランチスの謎（日） |
+| 185 (CNROM+protect) | B-Wings（日）、Bird Week（日）、Mighty Bomb Jack（日） |
+| 228 (Action 52) | Cheetahmen II (U) |
+| 232 (Camerica Quattro) | Quattro Adventure (U)、Quattro Sports (U) |
