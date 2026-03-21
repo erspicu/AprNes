@@ -44,6 +44,7 @@ namespace AprNes
             _analogOutput    = analogOutput;
             _analogSize      = analogSize;
             _analogScreenBuf = analogScreenBuf;
+            ApplyProfile();  // 端子參數只在設定變更時需要套用
         }
 
         /// <summary>每幀更新幀計數器（供 interlace jitter 使用）</summary>
@@ -97,6 +98,22 @@ namespace AprNes
         // #13 Beam convergence (max sub-pixel offset at screen edge, 0=off)
         public static float ConvergenceStrength = 2.0f;
 
+        // ── SIMD 常數向量（static，避免每幀 new）────────────────────────────
+        static readonly Vector<float> vOne   = new Vector<float>(1f);
+        static readonly Vector<float> vZero  = new Vector<float>(0f);
+        static readonly Vector<float> v03    = new Vector<float>(0.3f);
+        static readonly Vector<float> v059   = new Vector<float>(0.59f);
+        static readonly Vector<float> v011   = new Vector<float>(0.11f);
+        static readonly Vector<float> v255_5f = new Vector<float>(255.5f);
+        static readonly Vector<int>   v255i   = new Vector<int>(255);
+        static readonly Vector<int>   vZeroi  = new Vector<int>(0);
+        static readonly Vector<int>   v256i   = new Vector<int>(256);
+        static readonly Vector<int>   v65536i = new Vector<int>(65536);
+        static readonly Vector<int>   vAlphai = new Vector<int>(unchecked((int)0xFF000000));
+        // 依設定變動的向量（ApplyProfile 時更新）
+        static Vector<float> vBloom = new Vector<float>(0f);
+        static Vector<float> vGF    = new Vector<float>(0.229f);
+
         // ── 掃描線預計算快取（unmanaged memory）─────────────────────────────
         static float  _cachedSigma = -1f;
         static int    _cachedFrame = -1;
@@ -141,15 +158,14 @@ namespace AprNes
         // ── 端子參數套用 ─────────────────────────────────────────────────────
         static void ApplyProfile()
         {
-            switch ((AnalogOutputMode)_analogOutput)
-            {
-                case AnalogOutputMode.RF:
-                    BeamSigma = RF_BeamSigma; BloomStrength = RF_BloomStrength; BrightnessBoost = RF_BrightnessBoost; break;
-                case AnalogOutputMode.SVideo:
-                    BeamSigma = SV_BeamSigma; BloomStrength = SV_BloomStrength; BrightnessBoost = SV_BrightnessBoost; break;
-                default: // AV
-                    BeamSigma = AV_BeamSigma; BloomStrength = AV_BloomStrength; BrightnessBoost = AV_BrightnessBoost; break;
-            }
+            if (_analogOutput == (int)AnalogOutputMode.RF)
+            { BeamSigma = RF_BeamSigma; BloomStrength = RF_BloomStrength; BrightnessBoost = RF_BrightnessBoost; }
+            else if (_analogOutput == (int)AnalogOutputMode.SVideo)
+            { BeamSigma = SV_BeamSigma; BloomStrength = SV_BloomStrength; BrightnessBoost = SV_BrightnessBoost; }
+            else
+            { BeamSigma = AV_BeamSigma; BloomStrength = AV_BloomStrength; BrightnessBoost = AV_BrightnessBoost; }
+            vBloom = new Vector<float>(BloomStrength);
+            vGF    = new Vector<float>(Ntsc.GammaCoeff);
         }
 
         // ── 掃描線高斯權重預計算（BeamSigma 改變 / 每幀隔行時重算）──────────
@@ -169,9 +185,12 @@ namespace AprNes
             float jitter = InterlaceJitter ? ((_frameCount & 1) == 0 ? 0.25f : -0.25f) : 0f;
 
             float inv = 1f / (2f * BeamSigma * BeamSigma);
-            for (int ty = 0; ty < DstH; ty++)
+            int dstH = DstH;
+            float bb = BrightnessBoost;
+            float vs = VignetteStrength;
+            Parallel.For(0, dstH, ty =>
             {
-                float sy = ((float)ty + jitter) / DstH * SrcH;
+                float sy = ((float)ty + jitter) / dstH * SrcH;
                 int   ny = (int)(sy + 0.5f);
                 if (ny >= SrcH) ny = SrcH - 1;
                 _nearestY[ty] = ny;
@@ -179,10 +198,10 @@ namespace AprNes
                 _weights[ty] = (float)Math.Exp(-(dy * dy) * inv);
 
                 // #15 Vignette: parabolic vertical falloff
-                float vy = (float)ty / DstH - 0.5f;
-                float vigFactor = 1f - VignetteStrength * 4f * vy * vy;
-                _boostRow[ty] = BrightnessBoost * vigFactor;
-            }
+                float vy = (float)ty / dstH - 0.5f;
+                float vigFactor = 1f - vs * 4f * vy * vy;
+                _boostRow[ty] = bb * vigFactor;
+            });
         }
 
         // ── #14 螢幕曲率預計算 ──────────────────────────────────────────────
@@ -195,9 +214,11 @@ namespace AprNes
 
             float invW = 1f / (dstW - 1);
             float invH = 1f / (dstH - 1);
-            for (int ty = 0; ty < dstH; ty++)
+            int* cm = _curvMap;
+            Parallel.For(0, dstH, ty =>
             {
                 float cy = ty * invH - 0.5f;
+                int rowOff = ty * dstW;
                 for (int tx = 0; tx < dstW; tx++)
                 {
                     float cx = tx * invW - 0.5f;
@@ -205,10 +226,10 @@ namespace AprNes
                     float f = 1f + k * r2;
                     int sx = (int)((0.5f + cx * f) * (dstW - 1) + 0.5f);
                     int sy = (int)((0.5f + cy * f) * (dstH - 1) + 0.5f);
-                    _curvMap[ty * dstW + tx] = (sx >= 0 && sx < dstW && sy >= 0 && sy < dstH)
+                    cm[rowOff + tx] = (sx >= 0 && sx < dstW && sy >= 0 && sy < dstH)
                         ? sy * dstW + sx : -1;
                 }
-            }
+            });
         }
 
         // ── #11 蔭罩後處理 ──────────────────────────────────────────────────
@@ -232,12 +253,9 @@ namespace AprNes
                     int g = (int)((px >> 8) & 0xFF);
                     int r = (int)((px >> 16) & 0xFF);
 
-                    switch (phase)
-                    {
-                        case 0: g = g * dimI >> 8; b = b * dimI >> 8; break;
-                        case 1: r = r * dimI >> 8; b = b * dimI >> 8; break;
-                        default: r = r * dimI >> 8; g = g * dimI >> 8; break;
-                    }
+                    if (phase == 0)      { g = g * dimI >> 8; b = b * dimI >> 8; }
+                    else if (phase == 1) { r = r * dimI >> 8; b = b * dimI >> 8; }
+                    else                 { r = r * dimI >> 8; g = g * dimI >> 8; }
 
                     row[tx] = (uint)(b | (g << 8) | (r << 16)) | 0xFF000000u;
                     if (++phase == 3) phase = 0;
@@ -273,12 +291,9 @@ namespace AprNes
 
                     if (doMask)
                     {
-                        switch (phase)
-                        {
-                            case 0: g = g * dimI >> 8; b = b * dimI >> 8; break;
-                            case 1: r = r * dimI >> 8; b = b * dimI >> 8; break;
-                            default: r = r * dimI >> 8; g = g * dimI >> 8; break;
-                        }
+                        if (phase == 0)      { g = g * dimI >> 8; b = b * dimI >> 8; }
+                        else if (phase == 1) { r = r * dimI >> 8; b = b * dimI >> 8; }
+                        else                 { r = r * dimI >> 8; g = g * dimI >> 8; }
                         if (++phase == 3) phase = 0;
                     }
 
@@ -397,22 +412,20 @@ namespace AprNes
             float center = 1f - HBeamSpread;
             const int kPlane = Ntsc.kPlane;
 
-            for (int plane = 0; plane < 3; plane++)
+            Parallel.For(0, 3 * SrcH, i =>
             {
-                float* pBase = lb + plane * kPlane;
-                Parallel.For(0, SrcH, row =>
+                int plane = i / SrcH;
+                int row   = i - plane * SrcH;
+                float* p = lb + plane * kPlane + row * SrcW;
+                float prev = p[0];
+                for (int x = 0; x < SrcW; x++)
                 {
-                    float* p = pBase + row * SrcW;
-                    float prev = p[0];
-                    for (int x = 0; x < SrcW; x++)
-                    {
-                        float cur  = p[x];
-                        float next = (x + 1 < SrcW) ? p[x + 1] : cur;
-                        p[x] = prev * alpha + cur * center + next * alpha;
-                        prev = cur;
-                    }
-                });
-            }
+                    float cur  = p[x];
+                    float next = (x + 1 < SrcW) ? p[x + 1] : cur;
+                    p[x] = prev * alpha + cur * center + next * alpha;
+                    prev = cur;
+                }
+            });
         }
 
         // ── #10 磷光體餘輝（per-channel max of current vs decayed previous）──
@@ -518,7 +531,6 @@ namespace AprNes
             if (_analogScreenBuf == null || Ntsc.linearBuffer == null) return;
             if (_weights == null || _nearestY == null || _boostRow == null) return;
 
-            ApplyProfile();
             PrecomputeScanlineWeights();
             ApplyHorizontalBlur();   // #12 on linearBuffer before scanline render
 
@@ -537,23 +549,6 @@ namespace AprNes
             bool isDouble = (dstW == SrcW * 2); // N=8：每 source 像素 → 2 output，SIMD
 
             int VS = Vector<float>.Count;  // 4（SSE2）或 8（AVX2）
-
-            // 常數向量（frame 層次，Parallel.For 外部建立一次）
-            var vBloom = new Vector<float>(bloom);
-            var vOne   = new Vector<float>(1f);
-            var vZero  = new Vector<float>(0f);
-            var v03    = new Vector<float>(0.3f);
-            var v059   = new Vector<float>(0.59f);
-            var v011   = new Vector<float>(0.11f);
-            var vGF    = new Vector<float>(gc);  // #17 configurable gamma
-
-            // S02: SIMD 像素打包常數
-            var v255_5f = new Vector<float>(255.5f);
-            var v255i   = new Vector<int>(255);
-            var vZeroi  = new Vector<int>(0);
-            var v256i   = new Vector<int>(256);
-            var v65536i = new Vector<int>(65536);
-            var vAlphai = new Vector<int>(unchecked((int)0xFF000000));
 
             Parallel.For(0, dstH, ty =>
             {
