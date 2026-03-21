@@ -135,6 +135,12 @@ namespace AprNes
         // #17 Configurable gamma coefficient (default 0.229f ≈ pow(v, 1/1.13))
         public static float GammaCoeff = 0.229f;
 
+        // #5 Ringing / Gibbs effect (0=off, 0.3=default)
+        public static float RingStrength = 0.3f;
+
+        // #4 HBI simulation (blanking level at line start)
+        public static bool HbiSimulation = true;
+
         // ════════════════════════════════════════════════════════════════════
         // Init
         // ════════════════════════════════════════════════════════════════════
@@ -374,13 +380,17 @@ namespace AprNes
             if (addNoise || isRF)
                 ns = (uint)(NesCore.frame_count * 1664525u + (uint)sl * 1013904223u + 1442695041u);
 
-            // IIR 初始狀態（以第 0 dot 初始化）
+            // IIR 初始狀態
             int   ph0   = phase0;
             float c0    = cosTab6[ph0], s0 = sinTab6[ph0];
             float chr0  = dotI[0] * c0 - dotQ[0] * s0;
-            float iFilt = chr0 * c0;
-            float qFilt = -chr0 * s0;
-            float yFilt = dotY[0];
+            // #4 HBI: start from blanking level (0) instead of first pixel
+            float iFilt = HbiSimulation ? 0f : chr0 * c0;
+            float qFilt = HbiSimulation ? 0f : -chr0 * s0;
+            float yFilt = HbiSimulation ? 0f : dotY[0];
+            // #5 Ringing: damped spring velocity
+            float ringDamp = RingStrength * 0.5f;
+            float yVel     = 0f;
 
             int dstW     = CrtScreen.DstW;
             int N        = NesCore.AnalogSize;   // dot index = outX / N
@@ -422,7 +432,9 @@ namespace AprNes
 
                 iFilt += ChromaBlur * (chroma * c  - iFilt);
                 qFilt += ChromaBlur * (-chroma * s - qFilt);
-                yFilt += SlewRate   * (dotY[d]     - yFilt);
+                // #5 Ringing: damped spring on Y channel
+                yVel = yVel * ringDamp + (dotY[d] - yFilt) * SlewRate;
+                yFilt += yVel;
                 float y = yFilt;
 
                 if (herring2) { y += hI2; float t = hR2*hC2 - hI2*hS2; hI2 = hR2*hS2 + hI2*hC2; hR2 = t; }
@@ -444,9 +456,10 @@ namespace AprNes
 
         static unsafe void DecodeAV_SVideo(int sl)
         {
-            float iFilt = dotI[0];
-            float qFilt = dotQ[0];
-            float yFilt = dotY[0];
+            // #4 HBI: start from blanking level (0)
+            float iFilt = HbiSimulation ? 0f : dotI[0];
+            float qFilt = HbiSimulation ? 0f : dotQ[0];
+            float yFilt = HbiSimulation ? 0f : dotY[0];
 
             int dstW     = CrtScreen.DstW;
             int N        = NesCore.AnalogSize;
@@ -541,12 +554,16 @@ namespace AprNes
                 noiseOffset = NoiseIntensity;
             }
 
-            // 左邊填充
-            for (int i = 0; i < kLeadPad; i++) waveBuf[i] = firstY;
+            // #4 HBI: left padding uses blanking level (0) instead of first pixel
+            float leftPad = HbiSimulation ? 0.0f : firstY;
+            for (int i = 0; i < kLeadPad; i++) waveBuf[i] = leftPad;
 
             // Phase C：waveTable 查表 + Phase C：IIR 折疊 + buzz + noise 合併
-            float vPrev = firstY;
-            int   tMod  = phase0;
+            // #5 Ringing: damped spring model (vVel has memory → overshoot)
+            float vPrev    = leftPad;
+            float ringDamp = RingStrength * 0.5f;
+            float vVel     = 0f;
+            int   tMod     = phase0;
             for (int d = 0; d < kDots; d++)
             {
                 float* src     = waveTable + ((palBuf[d] & 63) * 6 + tMod) * 4;
@@ -560,7 +577,8 @@ namespace AprNes
                         ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5;
                         x += (ns & 0xFF) * noiseScale - noiseOffset;
                     }
-                    vPrev += SlewRate * (x - vPrev);
+                    vVel = vVel * ringDamp + (x - vPrev) * SlewRate;
+                    vPrev += vVel;
                     waveBuf[baseIdx + s] = vPrev;
                 }
                 tMod += 4; if (tMod >= 6) tMod -= 6;
@@ -569,7 +587,8 @@ namespace AprNes
             // 右邊填充（IIR 繼續收斂至 lastY）
             for (int i = kLeadPad + kWaveLen; i < kBufLen; i++)
             {
-                vPrev += SlewRate * (lastY - vPrev);
+                vVel = vVel * ringDamp + (lastY - vPrev) * SlewRate;
+                vPrev += vVel;
                 waveBuf[i] = vPrev;
             }
         }
@@ -593,12 +612,16 @@ namespace AprNes
                 noiseOffset = NoiseIntensity;
             }
 
-            // 左邊填充
-            for (int i = 0; i < kLeadPad; i++) { waveBuf[i] = firstY; cBuf[i] = 0f; }
+            // #4 HBI: left padding uses blanking level (0) instead of first pixel
+            float leftPad = HbiSimulation ? 0.0f : firstY;
+            for (int i = 0; i < kLeadPad; i++) { waveBuf[i] = leftPad; cBuf[i] = 0f; }
 
             // Phase C：Y line（SlewRate IIR 折疊）+ C line（cTable LUT，per-phase emphasis）
-            float vPrev = firstY;
-            int   tMod  = phase0;
+            // #5 Ringing: damped spring model
+            float vPrev    = leftPad;
+            float ringDamp = RingStrength * 0.5f;
+            float vVel     = 0f;
+            int   tMod     = phase0;
             for (int d = 0; d < kDots; d++)
             {
                 float  Ytgt    = yBaseE[(palBuf[d] & 63) * 8 + emph];  // #1
@@ -612,7 +635,8 @@ namespace AprNes
                         ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5;
                         y += (ns & 0xFF) * noiseScale - noiseOffset;
                     }
-                    vPrev += SlewRate * (y - vPrev);
+                    vVel = vVel * ringDamp + (y - vPrev) * SlewRate;
+                    vPrev += vVel;
                     waveBuf[baseIdx + s] = vPrev;
                     cBuf  [baseIdx + s] = csrc[s] * ea[tMod + s];  // #1 per-phase emphasis
                 }
@@ -622,7 +646,8 @@ namespace AprNes
             // 右邊填充
             for (int i = kLeadPad + kWaveLen; i < kBufLen; i++)
             {
-                vPrev += SlewRate * (lastY - vPrev);
+                vVel = vVel * ringDamp + (lastY - vPrev) * SlewRate;
+                vPrev += vVel;
                 waveBuf[i] = vPrev;
                 cBuf[i]    = 0f;
             }

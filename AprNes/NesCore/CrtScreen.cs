@@ -68,6 +68,15 @@ namespace AprNes
         // #14 Screen curvature (barrel distortion)
         public static float CurvatureStrength = 0.12f;
 
+        // #10 Phosphor persistence (decay per frame, 0=off, 0.6=default)
+        public static float PhosphorDecay = 0.6f;
+
+        // #12 Horizontal beam spread (blur strength, 0=off, 0.4=default)
+        public static float HBeamSpread = 0.4f;
+
+        // #13 Beam convergence (max sub-pixel offset at screen edge, 0=off)
+        public static float ConvergenceStrength = 2.0f;
+
         // ── 掃描線預計算快取（unmanaged memory）─────────────────────────────
         static float  _cachedSigma = -1f;
         static int    _cachedFrame = -1;
@@ -79,6 +88,9 @@ namespace AprNes
         static int*   _curvMap;    // remap table [DstW × DstH]
         static int    _cachedCurvW, _cachedCurvH;
         static float  _cachedCurvK = -1f;
+        // #10 Phosphor persistence
+        static uint*  _prevFrame;
+        static bool   _prevFrameValid;
 
         // ════════════════════════════════════════════════════════════════════
         // Init
@@ -97,6 +109,10 @@ namespace AprNes
             if (_curvMap  != null) Marshal.FreeHGlobal((IntPtr)_curvMap);
             _curvTemp = (uint*)Marshal.AllocHGlobal(DstW * DstH * sizeof(uint));
             _curvMap  = (int*) Marshal.AllocHGlobal(DstW * DstH * sizeof(int));
+            // #10 Phosphor persistence buffer
+            if (_prevFrame != null) Marshal.FreeHGlobal((IntPtr)_prevFrame);
+            _prevFrame = (uint*)Marshal.AllocHGlobal(DstW * DstH * sizeof(uint));
+            _prevFrameValid = false;
             _cachedSigma = -1f; // 強制重新計算掃描線權重
             _cachedFrame = -1;
             _cachedCurvK = -1f;
@@ -234,6 +250,124 @@ namespace AprNes
             });
         }
 
+        // ── #12 水平 beam 擴散（在 linearBuffer 上做 3-tap 模糊）──────────
+        static void ApplyHorizontalBlur()
+        {
+            if (HBeamSpread <= 0f) return;
+            float alpha  = HBeamSpread * 0.5f;
+            float center = 1f - HBeamSpread;
+            float* lb = Ntsc.linearBuffer;
+            const int kPlane = Ntsc.kPlane;
+
+            for (int plane = 0; plane < 3; plane++)
+            {
+                float* pBase = lb + plane * kPlane;
+                Parallel.For(0, SrcH, row =>
+                {
+                    float* p = pBase + row * SrcW;
+                    float prev = p[0];
+                    for (int x = 0; x < SrcW; x++)
+                    {
+                        float cur  = p[x];
+                        float next = (x + 1 < SrcW) ? p[x + 1] : cur;
+                        p[x] = prev * alpha + cur * center + next * alpha;
+                        prev = cur;
+                    }
+                });
+            }
+        }
+
+        // ── #10 磷光體餘輝（per-channel max of current vs decayed previous）──
+        static void ApplyPhosphorPersistence()
+        {
+            if (PhosphorDecay <= 0f)
+            {
+                _prevFrameValid = false;
+                return;
+            }
+
+            uint* dst  = NesCore.AnalogScreenBuf;
+            uint* prev = _prevFrame;
+            int dstW = DstW, dstH = DstH;
+
+            if (!_prevFrameValid)
+            {
+                int bytes = dstW * dstH * sizeof(uint);
+                Buffer.MemoryCopy(dst, prev, bytes, bytes);
+                _prevFrameValid = true;
+                return;
+            }
+
+            float decay = PhosphorDecay;
+            Parallel.For(0, dstH, ty =>
+            {
+                int rowOff = ty * dstW;
+                for (int x = 0; x < dstW; x++)
+                {
+                    int idx = rowOff + x;
+                    uint cur = dst[idx];
+                    uint prv = prev[idx];
+
+                    int cb = (int)(cur & 0xFF);
+                    int cg = (int)((cur >> 8) & 0xFF);
+                    int cr = (int)((cur >> 16) & 0xFF);
+
+                    int pb = (int)((prv & 0xFF) * decay);
+                    int pg = (int)(((prv >> 8) & 0xFF) * decay);
+                    int pr = (int)(((prv >> 16) & 0xFF) * decay);
+
+                    int rb = cb > pb ? cb : pb;
+                    int rg = cg > pg ? cg : pg;
+                    int rr = cr > pr ? cr : pr;
+
+                    uint result = (uint)(rb | (rg << 8) | (rr << 16)) | 0xFF000000u;
+                    dst[idx]  = result;
+                    prev[idx] = result;
+                }
+            });
+        }
+
+        // ── #13 Beam convergence（R/B 水平偏移，邊緣遞增）────────────────
+        static void ApplyBeamConvergence()
+        {
+            if (ConvergenceStrength <= 0f) return;
+
+            int dstW = DstW, dstH = DstH;
+            uint* dst = NesCore.AnalogScreenBuf;
+            uint* tmp = _curvTemp;
+            int bytes = dstW * dstH * sizeof(uint);
+            float maxOff = ConvergenceStrength;
+            float halfW  = dstW * 0.5f;
+            float invHW  = 1f / halfW;
+
+            Buffer.MemoryCopy(dst, tmp, bytes, bytes);
+
+            Parallel.For(0, dstH, ty =>
+            {
+                int rowOff = ty * dstW;
+                for (int tx = 0; tx < dstW; tx++)
+                {
+                    float cx = (tx - halfW) * invHW;
+                    int ioff = (int)(cx * maxOff + (cx >= 0 ? 0.5f : -0.5f));
+
+                    int rxR = tx + ioff;
+                    if (rxR < 0) rxR = 0; else if (rxR >= dstW) rxR = dstW - 1;
+                    int rxB = tx - ioff;
+                    if (rxB < 0) rxB = 0; else if (rxB >= dstW) rxB = dstW - 1;
+
+                    uint srcR = tmp[rowOff + rxR];
+                    uint srcG = tmp[rowOff + tx];
+                    uint srcB = tmp[rowOff + rxB];
+
+                    int r = (int)((srcR >> 16) & 0xFF);
+                    int g = (int)((srcG >> 8)  & 0xFF);
+                    int b = (int)(srcB & 0xFF);
+
+                    dst[rowOff + tx] = (uint)(b | (g << 8) | (r << 16)) | 0xFF000000u;
+                }
+            });
+        }
+
         // ════════════════════════════════════════════════════════════════════
         // 主渲染（由 PPU.RenderScreen 在 VideoOutput 前呼叫）
         //
@@ -247,6 +381,7 @@ namespace AprNes
 
             ApplyProfile();
             PrecomputeScanlineWeights();
+            ApplyHorizontalBlur();   // #12 on linearBuffer before scanline render
 
             float  bloom     = BloomStrength;
             float* brow      = _boostRow;          // #15 per-row boost (includes vignette)
@@ -452,6 +587,8 @@ namespace AprNes
 
             // ── 後處理 ─────────────────────────────────────────────────────
             ApplyShadowMask();
+            ApplyPhosphorPersistence();  // #10
+            ApplyBeamConvergence();      // #13
             ApplyCurvature();
         }
     }

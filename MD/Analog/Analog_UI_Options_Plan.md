@@ -28,14 +28,15 @@
 
 ---
 
-## 尚未實作、未來完成後也適合選項化的效果
+## 中成本項目（已實作，預設開啟）
 
-| # | 效果 | Gap Analysis 編號 | 優先級 | 說明 |
-|:-:|------|:-----------------:|:------:|------|
-| 9 | **Phosphor Persistence** | #10 | Tier 1 | 餘輝衰減係數（0=關，0.5~0.8 典型值）。實作後 Interlace Jitter 才有意義 |
-| 10 | **Horizontal Beam Spread** | #12 | Tier 2 | 水平模糊 σ 值（0=關） |
-| 11 | **Ringing / Gibbs** | #5 | Tier 2 | 振鈴強度（0=純 IIR，>0 加入過衝） |
-| 12 | **Beam Convergence** | #13 | Tier 3 | RGB 匯聚偏差量 |
+| # | 效果 | 欄位 | 預設值 | 類型 | 所在檔案 | 說明 |
+|:-:|------|------|:------:|------|----------|------|
+| 9 | **Phosphor Persistence** | `CrtScreen.PhosphorDecay` | `0.6` | float (0~1) | CrtScreen.cs | 磷光體餘輝衰減係數。0=關閉（每幀獨立），0.6=預設（溫和殘影），0.8=明顯拖尾。per-channel max(current, prev×decay) |
+| 10 | **Horizontal Beam Spread** | `CrtScreen.HBeamSpread` | `0.4` | float (0~1) | CrtScreen.cs | 水平 beam 擴散模糊強度。0=關閉，0.4=微妙柔化。linearBuffer 3-tap FIR [α, 1-2α, α] |
+| 11 | **Ringing / Gibbs** | `Ntsc.RingStrength` | `0.3` | float (0~1) | Ntsc.cs | 振鈴強度。0=純一階 IIR（無過衝），0.3=溫和振鈴。Damped spring 二階 IIR（vVel 記憶→過衝→阻尼振盪） |
+| 12 | **HBI Simulation** | `Ntsc.HbiSimulation` | `true` | bool | Ntsc.cs | 水平消隱區模擬。true=IIR 從 blanking level 0 起步（行首微暗），false=從首像素值起步 |
+| 13 | **Beam Convergence** | `CrtScreen.ConvergenceStrength` | `2.0` | float (0~10) | CrtScreen.cs | RGB 匯聚偏差（像素單位）。0=完美匯聚，2.0=邊緣微妙色邊。R/B 通道水平偏移，中心為零、邊緣遞增 |
 
 ---
 
@@ -45,6 +46,4 @@
 - bool 型用 CheckBox，float 型用 TrackBar + 數值顯示
 - 色溫建議提供下拉預設組合 + 自訂 RGB 滑桿
 - 所有參數存入 AprNes.ini，啟動時讀取
-- **Interlace Jitter 需等 Phosphor Persistence (#10) 實作後再決定預設值**
-  - 有餘輝配套 → 預設 true 合理
-  - 無餘輝配套 → 預設 false（跳動感太強）
+- **Interlace Jitter + Phosphor Persistence 已配套實作**：PhosphorDecay=0.6 可平滑隔行抖動的跳動感
