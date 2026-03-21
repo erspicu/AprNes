@@ -114,8 +114,26 @@ namespace AprNes
         static float* waveTable;
         // cTable：palette×phase→純色度 C（S-Video 用，64×6×4 entries）
         static float* cTable;
-        // attenTab：emphasis bit count → attenuation（4 entries）
+        // attenTab：emphasis bit count → attenuation（4 entries, legacy）
         static float* attenTab;
+        // #1 Emphasis per-phase attenuation (8 combos × 12 phases, 12 avoids mod)
+        static float* emphAtten;
+        // #1 Emphasis-adjusted YIQ (64 palette × 8 emphasis combos)
+        static float* yBaseE;
+        static float* iBaseE;
+        static float* qBaseE;
+
+        // #16 Color temperature RGB multipliers (default neutral)
+        public static float ColorTempR = 1.0f;
+        public static float ColorTempG = 1.0f;
+        public static float ColorTempB = 1.0f;
+        // #16 Pre-computed YIQ→RGB matrix (blargg -15° × color temperature)
+        static float yiq_rY = 1.0f,   yiq_rI =  1.0841f, yiq_rQ =  0.3523f;
+        static float yiq_gY = 1.0f,   yiq_gI = -0.4302f, yiq_gQ = -0.5547f;
+        static float yiq_bY = 1.0f,   yiq_bI = -0.6268f, yiq_bQ =  1.9299f;
+
+        // #17 Configurable gamma coefficient (default 0.229f ≈ pow(v, 1/1.13))
+        public static float GammaCoeff = 0.229f;
 
         // ════════════════════════════════════════════════════════════════════
         // Init
@@ -151,6 +169,10 @@ namespace AprNes
                 qBase        = (float*)Marshal.AllocHGlobal(64 * sizeof(float));
                 waveTable    = (float*)Marshal.AllocHGlobal(64 * 6 * 4 * sizeof(float));
                 cTable       = (float*)Marshal.AllocHGlobal(64 * 6 * 4 * sizeof(float));
+                emphAtten    = (float*)Marshal.AllocHGlobal(8 * 12 * sizeof(float));
+                yBaseE       = (float*)Marshal.AllocHGlobal(64 * 8 * sizeof(float));
+                iBaseE       = (float*)Marshal.AllocHGlobal(64 * 8 * sizeof(float));
+                qBaseE       = (float*)Marshal.AllocHGlobal(64 * 8 * sizeof(float));
 
                 // 色相、副載波
                 for (int c = 0; c < 16; c++)
@@ -180,14 +202,7 @@ namespace AprNes
                         combinedQ[ph * kWinQ + n] = hannQ[n] * sinTab6[(ph + n) % 6];
                 }
 
-                // Phase B：Gamma LUT（256 bytes）
-                for (int v = 0; v < 256; v++)
-                {
-                    float fv = v / 255.0f;
-                    fv += 0.229f * fv * (fv - 1f);
-                    int vi = (int)(fv * 255.5f);
-                    gammaLUT[v] = (byte)(vi < 0 ? 0 : vi > 255 ? 255 : vi);
-                }
+                // Phase B：Gamma LUT — computed by UpdateGammaLUT() after if block
 
                 // Phase B：Emphasis attenuation table
                 attenTab[0] = 1.0f;
@@ -224,12 +239,74 @@ namespace AprNes
                         }
                     }
                 }
+
+                // #1 Emphasis per-phase attenuation (8 combos × 12 phases)
+                // R(bit0) attenuates phases {1,2,3}, G(bit1) {3,4,5}, B(bit2) {5,0,1}
+                for (int e = 0; e < 8; e++)
+                {
+                    for (int p = 0; p < 6; p++)
+                    {
+                        int cnt = 0;
+                        if ((e & 1) != 0 && p >= 1 && p <= 3) cnt++;
+                        if ((e & 2) != 0 && p >= 3 && p <= 5) cnt++;
+                        if ((e & 4) != 0 && (p >= 5 || p <= 1)) cnt++;
+                        emphAtten[e * 12 + p] = (float)Math.Pow(0.746, cnt);
+                    }
+                    for (int p = 0; p < 6; p++)
+                        emphAtten[e * 12 + 6 + p] = emphAtten[e * 12 + p];
+                }
+
+                // #1 Emphasis-adjusted YIQ (Fourier decomposition of per-phase emphasized waveform)
+                for (int p = 0; p < 64; p++)
+                {
+                    for (int e = 0; e < 8; e++)
+                    {
+                        float sumY = 0f, sumI = 0f, sumQ = 0f;
+                        for (int ph = 0; ph < 6; ph++)
+                        {
+                            float V = yBase[p] + iBase[p] * cosTab6[ph] - qBase[p] * sinTab6[ph];
+                            V *= emphAtten[e * 12 + ph];
+                            sumY += V;
+                            sumI += V * cosTab6[ph];
+                            sumQ -= V * sinTab6[ph];
+                        }
+                        yBaseE[p * 8 + e] = sumY / 6f;
+                        iBaseE[p * 8 + e] = sumI / 3f;
+                        qBaseE[p * 8 + e] = sumQ / 3f;
+                    }
+                }
             }
+
+            // #16 #17 Recompute derived constants (color temp / gamma may change between ROM loads)
+            UpdateColorTemp();
+            UpdateGammaLUT();
 
             scanPhase6    = 0;
             scanPhaseBase = 0;
             RfAudioLevel  = 0f;
             RfBuzzPhase   = 0f;
+        }
+
+        // #16 Recompute YIQ→RGB matrix with current color temperature
+        public static void UpdateColorTemp()
+        {
+            yiq_rY =  1.0f    * ColorTempR; yiq_rI =  1.0841f * ColorTempR; yiq_rQ =  0.3523f * ColorTempR;
+            yiq_gY =  1.0f    * ColorTempG; yiq_gI = -0.4302f * ColorTempG; yiq_gQ = -0.5547f * ColorTempG;
+            yiq_bY =  1.0f    * ColorTempB; yiq_bI = -0.6268f * ColorTempB; yiq_bQ =  1.9299f * ColorTempB;
+        }
+
+        // #17 Recompute gamma LUT with current GammaCoeff
+        public static void UpdateGammaLUT()
+        {
+            if (gammaLUT == null) return;
+            float gc = GammaCoeff;
+            for (int v = 0; v < 256; v++)
+            {
+                float fv = v / 255.0f;
+                fv += gc * fv * (fv - 1f);
+                int vi = (int)(fv * 255.5f);
+                gammaLUT[v] = (byte)(vi < 0 ? 0 : vi > 255 ? 255 : vi);
+            }
         }
 
         static void ComputeHann(float* w, int N)
@@ -274,17 +351,16 @@ namespace AprNes
                 DecodeAV_Composite(sl, phase0);
         }
 
-        // Phase C：64-entry YIQ LUT + attenTab（取代分支+浮點計算）
+        // Phase C：64×8 YIQ LUT（#1 per-phase emphasis-adjusted，取代 uniform attenTab）
         static void GenerateSignal(byte[] palBuf, byte emphasisBits)
         {
-            int en = (emphasisBits & 1) + ((emphasisBits >> 1) & 1) + ((emphasisBits >> 2) & 1);
-            float atten = attenTab[en];
+            int emph = emphasisBits & 7;
             for (int d = 0; d < 256; d++)
             {
-                int idx  = palBuf[d] & 63;
-                dotY[d] = yBase[idx] * atten;
-                dotI[d] = iBase[idx] * atten;
-                dotQ[d] = qBase[idx] * atten;
+                int k = (palBuf[d] & 63) * 8 + emph;
+                dotY[d] = yBaseE[k];
+                dotI[d] = iBaseE[k];
+                dotQ[d] = qBaseE[k];
             }
         }
 
@@ -390,6 +466,15 @@ namespace AprNes
             int phase0 = scanPhaseBase;
             scanPhaseBase = (scanPhaseBase + 2) % 6;
 
+            // #3 Color burst phase jitter (RF only, ~3% of scanlines)
+            if (NesCore.AnalogOutput == NesCore.AnalogOutputMode.RF)
+            {
+                uint jns = (uint)(NesCore.frame_count * 2654435761u + (uint)sl * 340573321u);
+                jns ^= jns << 13; jns ^= jns >> 17; jns ^= jns << 5;
+                if ((jns & 31) == 0)
+                    phase0 = (phase0 + ((jns & 64) != 0 ? 1 : 5)) % 6;
+            }
+
             if (NesCore.AnalogOutput == NesCore.AnalogOutputMode.SVideo)
             {
                 GenerateWaveform_SVideo(palBuf, emphasisBits, sl, phase0);
@@ -408,12 +493,12 @@ namespace AprNes
         static void GenerateWaveform(byte[] palBuf, byte emphasisBits,
                                       bool isRF, int sl, int phase0)
         {
-            int   en       = (emphasisBits & 1) + ((emphasisBits >> 1) & 1) + ((emphasisBits >> 2) & 1);
-            float atten    = attenTab[en];
-            bool  addNoise = NoiseIntensity > 0f;
+            int    emph    = emphasisBits & 7;
+            float* ea      = emphAtten + emph * 12;  // #1 per-phase attenuation
+            bool   addNoise = NoiseIntensity > 0f;
 
-            float firstY = yBase[palBuf[0]   & 63] * atten;
-            float lastY  = yBase[palBuf[255] & 63] * atten;
+            float firstY = yBaseE[(palBuf[0]   & 63) * 8 + emph];
+            float lastY  = yBaseE[(palBuf[255] & 63) * 8 + emph];
 
             float buzzRow = 0f;
             if (isRF)
@@ -444,7 +529,7 @@ namespace AprNes
                 int    baseIdx = kLeadPad + d * 4;
                 for (int s = 0; s < 4; s++)
                 {
-                    float x = src[s] * atten;
+                    float x = src[s] * ea[tMod + s];  // #1 per-phase emphasis
                     if (isRF) x += buzzRow;
                     if (addNoise)
                     {
@@ -468,12 +553,12 @@ namespace AprNes
         // Phase C：yBase + cTable LUT + IIR 折疊
         static void GenerateWaveform_SVideo(byte[] palBuf, byte emphasisBits, int sl, int phase0)
         {
-            int   en       = (emphasisBits & 1) + ((emphasisBits >> 1) & 1) + ((emphasisBits >> 2) & 1);
-            float atten    = attenTab[en];
-            bool  addNoise = NoiseIntensity > 0f;
+            int    emph    = emphasisBits & 7;
+            float* ea      = emphAtten + emph * 12;  // #1 per-phase attenuation
+            bool   addNoise = NoiseIntensity > 0f;
 
-            float firstY = yBase[palBuf[0] & 63] * atten;
-            float lastY  = yBase[palBuf[255] & 63] * atten;
+            float firstY = yBaseE[(palBuf[0]   & 63) * 8 + emph];
+            float lastY  = yBaseE[(palBuf[255] & 63) * 8 + emph];
 
             uint  ns         = 0u;
             float noiseScale = 0f, noiseOffset = 0f;
@@ -487,12 +572,12 @@ namespace AprNes
             // 左邊填充
             for (int i = 0; i < kLeadPad; i++) { waveBuf[i] = firstY; cBuf[i] = 0f; }
 
-            // Phase C：Y line（SlewRate IIR 折疊）+ C line（cTable LUT，無 IIR）
+            // Phase C：Y line（SlewRate IIR 折疊）+ C line（cTable LUT，per-phase emphasis）
             float vPrev = firstY;
             int   tMod  = phase0;
             for (int d = 0; d < kDots; d++)
             {
-                float  Ytgt    = yBase[palBuf[d] & 63] * atten;
+                float  Ytgt    = yBaseE[(palBuf[d] & 63) * 8 + emph];  // #1
                 float* csrc    = cTable + ((palBuf[d] & 63) * 6 + tMod) * 4;
                 int    baseIdx = kLeadPad + d * 4;
                 for (int s = 0; s < 4; s++)
@@ -505,7 +590,7 @@ namespace AprNes
                     }
                     vPrev += SlewRate * (y - vPrev);
                     waveBuf[baseIdx + s] = vPrev;
-                    cBuf  [baseIdx + s] = csrc[s] * atten;
+                    cBuf  [baseIdx + s] = csrc[s] * ea[tMod + s];  // #1 per-phase emphasis
                 }
                 tMod += 4; if (tMod >= 6) tMod -= 6;
             }
@@ -700,9 +785,9 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void WriteLinear(int sl, int p, float y, float i, float q)
         {
-            float r = y + 1.0841f * i + 0.3523f * q;
-            float g = y - 0.4302f * i - 0.5547f * q;
-            float b = y - 0.6268f * i + 1.9299f * q;
+            float r = yiq_rY * y + yiq_rI * i + yiq_rQ * q;  // #16 color temp
+            float g = yiq_gY * y + yiq_gI * i + yiq_gQ * q;
+            float b = yiq_bY * y + yiq_bI * i + yiq_bQ * q;
 
             if (r < 0f) r = 0f; else if (r > 1f) r = 1f;
             if (g < 0f) g = 0f; else if (g > 1f) g = 1f;
@@ -718,9 +803,9 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static uint YiqToRgb(float y, float i, float q)
         {
-            float r = y + 1.0841f * i + 0.3523f * q;
-            float g = y - 0.4302f * i - 0.5547f * q;
-            float b = y - 0.6268f * i + 1.9299f * q;
+            float r = yiq_rY * y + yiq_rI * i + yiq_rQ * q;  // #16 color temp
+            float g = yiq_gY * y + yiq_gI * i + yiq_gQ * q;
+            float b = yiq_bY * y + yiq_bI * i + yiq_bQ * q;
 
             int ri = (int)(r * 255.5f); if (ri < 0) ri = 0; else if (ri > 255) ri = 255;
             int gi = (int)(g * 255.5f); if (gi < 0) gi = 0; else if (gi > 255) gi = 255;

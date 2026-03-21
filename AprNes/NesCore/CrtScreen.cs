@@ -54,10 +54,18 @@ namespace AprNes
         static float BloomStrength;
         static float BrightnessBoost;
 
+        // #15 Vertical vignette strength (0=off, 0.15=subtle, 0.3=visible)
+        public static float VignetteStrength = 0.15f;
+
+        // #18 Interlace jitter (simulate CRT field alternation, ±0.25 pixel)
+        public static bool InterlaceJitter = true;
+
         // ── 掃描線預計算快取（unmanaged memory）─────────────────────────────
         static float  _cachedSigma = -1f;
+        static int    _cachedFrame = -1;
         static float* _weights;    // DstH floats
         static int*   _nearestY;   // DstH ints
+        static float* _boostRow;   // DstH floats: per-row boost (BrightnessBoost × vignette)
 
         // ════════════════════════════════════════════════════════════════════
         // Init
@@ -67,9 +75,12 @@ namespace AprNes
             // 每次 Init 都重新分配（AnalogSize 可能已改變）
             if (_weights  != null) Marshal.FreeHGlobal((IntPtr)_weights);
             if (_nearestY != null) Marshal.FreeHGlobal((IntPtr)_nearestY);
+            if (_boostRow != null) Marshal.FreeHGlobal((IntPtr)_boostRow);
             _weights  = (float*)Marshal.AllocHGlobal(DstH * sizeof(float));
             _nearestY = (int*)  Marshal.AllocHGlobal(DstH * sizeof(int));
+            _boostRow = (float*)Marshal.AllocHGlobal(DstH * sizeof(float));
             _cachedSigma = -1f; // 強制重新計算掃描線權重
+            _cachedFrame = -1;
         }
 
         // ── 端子參數套用 ─────────────────────────────────────────────────────
@@ -86,21 +97,36 @@ namespace AprNes
             }
         }
 
-        // ── 掃描線高斯權重預計算（BeamSigma 改變時才重算）───────────────────
+        // ── 掃描線高斯權重預計算（BeamSigma 改變 / 每幀隔行時重算）──────────
         static void PrecomputeScanlineWeights()
         {
-            if (_cachedSigma == BeamSigma) return;
+            bool needUpdate = (_cachedSigma != BeamSigma);
+            // #18 Interlace jitter: weights change every frame
+            if (InterlaceJitter)
+            {
+                int fc = NesCore.frame_count;
+                if (_cachedFrame != fc) { _cachedFrame = fc; needUpdate = true; }
+            }
+            if (!needUpdate) return;
             _cachedSigma = BeamSigma;
+
+            // #18 Interlace jitter: ±0.25 pixel vertical offset per frame
+            float jitter = InterlaceJitter ? ((NesCore.frame_count & 1) == 0 ? 0.25f : -0.25f) : 0f;
 
             float inv = 1f / (2f * BeamSigma * BeamSigma);
             for (int ty = 0; ty < DstH; ty++)
             {
-                float sy = (float)ty / DstH * SrcH;
+                float sy = ((float)ty + jitter) / DstH * SrcH;
                 int   ny = (int)(sy + 0.5f);
                 if (ny >= SrcH) ny = SrcH - 1;
                 _nearestY[ty] = ny;
                 float dy = sy - ny;
                 _weights[ty] = (float)Math.Exp(-(dy * dy) * inv);
+
+                // #15 Vignette: parabolic vertical falloff
+                float vy = (float)ty / DstH - 0.5f;
+                float vigFactor = 1f - VignetteStrength * 4f * vy * vy;
+                _boostRow[ty] = BrightnessBoost * vigFactor;
             }
         }
 
@@ -119,7 +145,8 @@ namespace AprNes
             PrecomputeScanlineWeights();
 
             float  bloom     = BloomStrength;
-            float  boost     = BrightnessBoost;
+            float* brow      = _boostRow;          // #15 per-row boost (includes vignette)
+            float  gc        = Ntsc.GammaCoeff;    // #17 configurable gamma
             float* lb        = Ntsc.linearBuffer;
             uint*  dst       = NesCore.AnalogScreenBuf;
             float* wts       = _weights;
@@ -135,13 +162,12 @@ namespace AprNes
 
             // 常數向量（frame 層次，Parallel.For 外部建立一次）
             var vBloom = new Vector<float>(bloom);
-            var vBoost = new Vector<float>(boost);
             var vOne   = new Vector<float>(1f);
             var vZero  = new Vector<float>(0f);
             var v03    = new Vector<float>(0.3f);
             var v059   = new Vector<float>(0.59f);
             var v011   = new Vector<float>(0.11f);
-            var vGF    = new Vector<float>(0.229f);
+            var vGF    = new Vector<float>(gc);  // #17 configurable gamma
 
             // S02: SIMD 像素打包常數
             var v255_5f = new Vector<float>(255.5f);
@@ -155,6 +181,7 @@ namespace AprNes
             {
                 float  weight  = wts[ty];
                 float  omw     = 1f - weight;
+                float  boost   = brow[ty];         // #15 per-row boost with vignette
                 uint*  rowPtr  = dst + ty * dstW;
                 int    ny      = nyArr[ty];
                 // linearBuffer 列寬永遠是 SrcW=1024，與 DstW 無關
@@ -252,9 +279,9 @@ namespace AprNes
                         r *= fw; if (r < 0f) r = 0f; else if (r > 1f) r = 1f;
                         g *= fw; if (g < 0f) g = 0f; else if (g > 1f) g = 1f;
                         b *= fw; if (b < 0f) b = 0f; else if (b > 1f) b = 1f;
-                        r += 0.229f * r * (r - 1f);
-                        g += 0.229f * g * (g - 1f);
-                        b += 0.229f * b * (b - 1f);
+                        r += gc * r * (r - 1f);
+                        g += gc * g * (g - 1f);
+                        b += gc * b * (b - 1f);
                         int ri = (int)(r * 255.5f); if (ri > 255) ri = 255;
                         int gi = (int)(g * 255.5f); if (gi > 255) gi = 255;
                         int bi = (int)(b * 255.5f); if (bi > 255) bi = 255;
@@ -285,9 +312,9 @@ namespace AprNes
                         g *= fw; if (g < 0f) g = 0f; else if (g > 1f) g = 1f;
                         b *= fw; if (b < 0f) b = 0f; else if (b > 1f) b = 1f;
 
-                        r += 0.229f * r * (r - 1f);
-                        g += 0.229f * g * (g - 1f);
-                        b += 0.229f * b * (b - 1f);
+                        r += gc * r * (r - 1f);
+                        g += gc * g * (g - 1f);
+                        b += gc * b * (b - 1f);
 
                         int ri = (int)(r * 255.5f); if (ri > 255) ri = 255;
                         int gi = (int)(g * 255.5f); if (gi > 255) gi = 255;
@@ -308,9 +335,9 @@ namespace AprNes
                     g *= fw; if (g < 0f) g = 0f; else if (g > 1f) g = 1f;
                     b *= fw; if (b < 0f) b = 0f; else if (b > 1f) b = 1f;
 
-                    r += 0.229f * r * (r - 1f);
-                    g += 0.229f * g * (g - 1f);
-                    b += 0.229f * b * (b - 1f);
+                    r += gc * r * (r - 1f);
+                    g += gc * g * (g - 1f);
+                    b += gc * b * (b - 1f);
 
                     int ri = (int)(r * 255.5f); if (ri > 255) ri = 255;
                     int gi = (int)(g * 255.5f); if (gi > 255) gi = 255;
