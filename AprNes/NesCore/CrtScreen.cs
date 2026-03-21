@@ -225,6 +225,123 @@ namespace AprNes
             });
         }
 
+        // ── B8: ShadowMask + Phosphor 合併 pass ─────────────────────────────
+        static void ApplyShadowMaskAndPhosphor()
+        {
+            bool doMask = ShadowMaskMode != MaskType.None && ShadowMaskStrength > 0f;
+            bool doPhosphor = PhosphorDecay > 0f && _prevFrame != null && _prevFrameValid;
+            if (!doMask && !doPhosphor) return;
+
+            int dstW = DstW, dstH = DstH;
+            uint* dst = NesCore.AnalogScreenBuf;
+            uint* prev = _prevFrame;
+            int dimI = doMask ? (int)((1f - ShadowMaskStrength) * 256f) : 0;
+            bool isSM = ShadowMaskMode == MaskType.ShadowMask;
+            float decay = PhosphorDecay;
+
+            Parallel.For(0, dstH, ty =>
+            {
+                int rowOff = ty * dstW;
+                int phase = (doMask && isSM && (ty & 1) != 0) ? 1 : 0;
+                for (int tx = 0; tx < dstW; tx++)
+                {
+                    int idx = rowOff + tx;
+                    uint px = dst[idx];
+                    int b = (int)(px & 0xFF);
+                    int g = (int)((px >> 8) & 0xFF);
+                    int r = (int)((px >> 16) & 0xFF);
+
+                    if (doMask)
+                    {
+                        switch (phase)
+                        {
+                            case 0: g = g * dimI >> 8; b = b * dimI >> 8; break;
+                            case 1: r = r * dimI >> 8; b = b * dimI >> 8; break;
+                            default: r = r * dimI >> 8; g = g * dimI >> 8; break;
+                        }
+                        if (++phase == 3) phase = 0;
+                    }
+
+                    if (doPhosphor)
+                    {
+                        uint prv = prev[idx];
+                        int pb = (int)((prv & 0xFF) * decay);
+                        int pg = (int)(((prv >> 8) & 0xFF) * decay);
+                        int pr = (int)(((prv >> 16) & 0xFF) * decay);
+                        if (pb > b) b = pb;
+                        if (pg > g) g = pg;
+                        if (pr > r) r = pr;
+                    }
+
+                    uint result = (uint)(b | (g << 8) | (r << 16)) | 0xFF000000u;
+                    dst[idx] = result;
+                    if (doPhosphor) prev[idx] = result;
+                }
+            });
+        }
+
+        // ── B6: Convergence + Curvature 合併 pass ───────────────────────────
+        static void ApplyConvergenceAndCurvature()
+        {
+            bool doConv = ConvergenceStrength > 0f;
+            bool doCurv = CurvatureStrength > 0f && _curvMap != null;
+            if (!doConv && !doCurv) return;
+            if (doCurv) PrecomputeCurvature();
+
+            int dstW = DstW, dstH = DstH;
+            uint* dst = NesCore.AnalogScreenBuf;
+            uint* tmp = _curvTemp;
+            int bytes = dstW * dstH * sizeof(uint);
+            int* map = doCurv ? _curvMap : null;
+            float maxOff = ConvergenceStrength;
+            float halfW  = dstW * 0.5f;
+            float invHW  = halfW > 0f ? 1f / halfW : 0f;
+
+            Buffer.MemoryCopy(dst, tmp, bytes, bytes);
+
+            Parallel.For(0, dstH, ty =>
+            {
+                int rowOff = ty * dstW;
+                for (int tx = 0; tx < dstW; tx++)
+                {
+                    int dstIdx = rowOff + tx;
+                    int srcRowOff, srcTx;
+                    if (doCurv)
+                    {
+                        int srcIdx = map[dstIdx];
+                        if (srcIdx < 0) { dst[dstIdx] = 0xFF000000u; continue; }
+                        srcRowOff = srcIdx - srcIdx % dstW;
+                        srcTx = srcIdx % dstW;
+                    }
+                    else
+                    {
+                        srcRowOff = rowOff;
+                        srcTx = tx;
+                    }
+
+                    if (doConv)
+                    {
+                        float cx = (srcTx - halfW) * invHW;
+                        int ioff = (int)(cx * maxOff + (cx >= 0 ? 0.5f : -0.5f));
+                        int rxR = srcTx + ioff;
+                        if (rxR < 0) rxR = 0; else if (rxR >= dstW) rxR = dstW - 1;
+                        int rxB = srcTx - ioff;
+                        if (rxB < 0) rxB = 0; else if (rxB >= dstW) rxB = dstW - 1;
+
+                        uint srcR = tmp[srcRowOff + rxR];
+                        uint srcG = tmp[srcRowOff + srcTx];
+                        uint srcB = tmp[srcRowOff + rxB];
+
+                        dst[dstIdx] = (uint)((int)(srcB & 0xFF) | ((int)((srcG >> 8) & 0xFF) << 8) | ((int)((srcR >> 16) & 0xFF) << 16)) | 0xFF000000u;
+                    }
+                    else
+                    {
+                        dst[dstIdx] = tmp[srcRowOff + srcTx];
+                    }
+                }
+            });
+        }
+
         // ── #14 曲率後處理 ──────────────────────────────────────────────────
         static void ApplyCurvature()
         {
@@ -588,10 +705,30 @@ namespace AprNes
             });
 
             // ── 後處理 ─────────────────────────────────────────────────────
-            ApplyShadowMask();
-            ApplyPhosphorPersistence();  // #10
-            ApplyBeamConvergence();      // #13
-            ApplyCurvature();
+            // B8: ShadowMask + Phosphor merged
+            bool canMerge = (ShadowMaskMode != MaskType.None && ShadowMaskStrength > 0f)
+                          || (PhosphorDecay > 0f && _prevFrame != null && _prevFrameValid);
+            if (canMerge)
+                ApplyShadowMaskAndPhosphor();
+            else
+            {
+                ApplyShadowMask();
+                ApplyPhosphorPersistence();
+            }
+            if (PhosphorDecay > 0f && _prevFrame != null && !_prevFrameValid)
+            {
+                int bytes2 = DstW * DstH * sizeof(uint);
+                Buffer.MemoryCopy(NesCore.AnalogScreenBuf, _prevFrame, bytes2, bytes2);
+                _prevFrameValid = true;
+            }
+            // B6: Convergence + Curvature merged
+            if (ConvergenceStrength > 0f || (CurvatureStrength > 0f && _curvMap != null))
+                ApplyConvergenceAndCurvature();
+            else
+            {
+                ApplyBeamConvergence();
+                ApplyCurvature();
+            }
         }
     }
 }
