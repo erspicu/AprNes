@@ -1029,6 +1029,7 @@ public string GetRomInfo()
                             sizeof(uint) * needed);
                     }
                 }
+                Ntsc.Init();        // 確保 NTSC 緩衝區已分配（OFF→ON 切換時必要）
                 CrtScreen.Init();
             }
 

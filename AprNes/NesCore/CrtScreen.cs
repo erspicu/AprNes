@@ -228,7 +228,7 @@ namespace AprNes
         // ── #14 曲率後處理 ──────────────────────────────────────────────────
         static void ApplyCurvature()
         {
-            if (CurvatureStrength <= 0f) return;
+            if (CurvatureStrength <= 0f || _curvTemp == null || _curvMap == null) return;
             PrecomputeCurvature();
 
             int dstW = DstW, dstH = DstH;
@@ -254,9 +254,10 @@ namespace AprNes
         static void ApplyHorizontalBlur()
         {
             if (HBeamSpread <= 0f) return;
+            float* lb = Ntsc.linearBuffer;
+            if (lb == null) return;
             float alpha  = HBeamSpread * 0.5f;
             float center = 1f - HBeamSpread;
-            float* lb = Ntsc.linearBuffer;
             const int kPlane = Ntsc.kPlane;
 
             for (int plane = 0; plane < 3; plane++)
@@ -280,7 +281,7 @@ namespace AprNes
         // ── #10 磷光體餘輝（per-channel max of current vs decayed previous）──
         static void ApplyPhosphorPersistence()
         {
-            if (PhosphorDecay <= 0f)
+            if (PhosphorDecay <= 0f || _prevFrame == null)
             {
                 _prevFrameValid = false;
                 return;
@@ -330,7 +331,7 @@ namespace AprNes
         // ── #13 Beam convergence（R/B 水平偏移，邊緣遞增）────────────────
         static void ApplyBeamConvergence()
         {
-            if (ConvergenceStrength <= 0f) return;
+            if (ConvergenceStrength <= 0f || _curvTemp == null) return;
 
             int dstW = DstW, dstH = DstH;
             uint* dst = NesCore.AnalogScreenBuf;
@@ -377,7 +378,8 @@ namespace AprNes
         // ════════════════════════════════════════════════════════════════════
         public static unsafe void Render()
         {
-            if (NesCore.AnalogScreenBuf == null) return;
+            if (NesCore.AnalogScreenBuf == null || Ntsc.linearBuffer == null) return;
+            if (_weights == null || _nearestY == null || _boostRow == null) return;
 
             ApplyProfile();
             PrecomputeScanlineWeights();

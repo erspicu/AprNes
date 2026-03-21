@@ -136,6 +136,14 @@ namespace AprNes
 
         public void BeforClose()
         {
+            // ── 先暫停模擬執行緒，再修改任何 NesCore 欄位 ──────────────────
+            // 防止 CrtScreen.Render() 在欄位已改、緩衝區未重建時存取越界記憶體
+            bool isRunning = AprNesUI.GetInstance().IsRunning;
+            if (isRunning)
+            {
+                NesCore._event.Reset();
+                while (NesCore.screen_lock) System.Threading.Thread.Sleep(1);
+            }
 
             if (radioButtonX2s.Checked)
             {
