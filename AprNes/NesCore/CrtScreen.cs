@@ -143,6 +143,14 @@ namespace AprNes
             var v011   = new Vector<float>(0.11f);
             var vGF    = new Vector<float>(0.229f);
 
+            // S02: SIMD 像素打包常數
+            var v255_5f = new Vector<float>(255.5f);
+            var v255i   = new Vector<int>(255);
+            var vZeroi  = new Vector<int>(0);
+            var v256i   = new Vector<int>(256);
+            var v65536i = new Vector<int>(65536);
+            var vAlphai = new Vector<int>(unchecked((int)0xFF000000));
+
             Parallel.For(0, dstH, ty =>
             {
                 float  weight  = wts[ty];
@@ -159,8 +167,9 @@ namespace AprNes
                 if (is1to1)
                 {
                     // N=4 最佳路徑：1:1 水平映射，SIMD 連續讀取
-                    var vWeight = new Vector<float>(weight);
-                    var vOMW    = new Vector<float>(omw);
+                    // S01: 常數提升 — vFw = constA + vBright * constB
+                    var vConstA = new Vector<float>(weight * boost);
+                    var vConstB = new Vector<float>(bloom * omw * boost);
 
 #pragma warning disable CS8500
                     for (; x <= SrcW - VS; x += VS)
@@ -170,7 +179,7 @@ namespace AprNes
                         var vb = *(Vector<float>*)(lb_b + x);
 
                         var vBright = vr * v03 + vg * v059 + vb * v011;
-                        var vFw     = (vWeight + vBright * vBloom * vOMW) * vBoost;
+                        var vFw     = vConstA + vBright * vConstB;
 
                         vr = Vector.Min(Vector.Max(vr * vFw, vZero), vOne);
                         vg = Vector.Min(Vector.Max(vg * vFw, vZero), vOne);
@@ -180,21 +189,22 @@ namespace AprNes
                         vg += vGF * vg * (vg - vOne);
                         vb += vGF * vb * (vb - vOne);
 
-                        for (int k = 0; k < VS; k++)
-                        {
-                            int ri = Math.Min(255, (int)(vr[k] * 255.5f));
-                            int gi = Math.Min(255, (int)(vg[k] * 255.5f));
-                            int bi = Math.Min(255, (int)(vb[k] * 255.5f));
-                            rowPtr[x + k] = (uint)(bi | (gi << 8) | (ri << 16) | 0xFF000000u);
-                        }
+                        // S02: SIMD 像素打包（消除 scalar extraction loop）
+                        var viR = Vector.Max(vZeroi, Vector.Min(Vector.ConvertToInt32(vr * v255_5f), v255i));
+                        var viG = Vector.Max(vZeroi, Vector.Min(Vector.ConvertToInt32(vg * v255_5f), v255i));
+                        var viB = Vector.Max(vZeroi, Vector.Min(Vector.ConvertToInt32(vb * v255_5f), v255i));
+                        *(Vector<int>*)(rowPtr + x) = Vector.BitwiseOr(
+                            Vector.BitwiseOr(viB, viG * v256i),
+                            Vector.BitwiseOr(viR * v65536i, vAlphai));
                     }
 #pragma warning restore CS8500
                 }
                 else if (isDouble)
                 {
                     // N=8 SIMD 路徑：每 source 像素計算一次，結果寫入兩個相鄰 output
-                    var vWeight = new Vector<float>(weight);
-                    var vOMW    = new Vector<float>(omw);
+                    // S01: 常數提升 — vFw = constA + vBright * constB
+                    var vConstA = new Vector<float>(weight * boost);
+                    var vConstB = new Vector<float>(bloom * omw * boost);
                     int srcX = 0;
 
 #pragma warning disable CS8500
@@ -205,7 +215,7 @@ namespace AprNes
                         var vb = *(Vector<float>*)(lb_b + srcX);
 
                         var vBright = vr * v03 + vg * v059 + vb * v011;
-                        var vFw     = (vWeight + vBright * vBloom * vOMW) * vBoost;
+                        var vFw     = vConstA + vBright * vConstB;
 
                         vr = Vector.Min(Vector.Max(vr * vFw, vZero), vOne);
                         vg = Vector.Min(Vector.Max(vg * vFw, vZero), vOne);
@@ -215,15 +225,20 @@ namespace AprNes
                         vg += vGF * vg * (vg - vOne);
                         vb += vGF * vb * (vb - vOne);
 
+                        // S02: SIMD 像素打包
+                        var viR = Vector.Max(vZeroi, Vector.Min(Vector.ConvertToInt32(vr * v255_5f), v255i));
+                        var viG = Vector.Max(vZeroi, Vector.Min(Vector.ConvertToInt32(vg * v255_5f), v255i));
+                        var viB = Vector.Max(vZeroi, Vector.Min(Vector.ConvertToInt32(vb * v255_5f), v255i));
+                        var packed = Vector.BitwiseOr(
+                            Vector.BitwiseOr(viB, viG * v256i),
+                            Vector.BitwiseOr(viR * v65536i, vAlphai));
+                        // 每 source pixel → 2 output pixels（雙倍寫入）
                         for (int k = 0; k < VS; k++)
                         {
-                            int ri = Math.Min(255, (int)(vr[k] * 255.5f));
-                            int gi = Math.Min(255, (int)(vg[k] * 255.5f));
-                            int bi = Math.Min(255, (int)(vb[k] * 255.5f));
-                            uint pixel = (uint)(bi | (gi << 8) | (ri << 16) | 0xFF000000u);
+                            uint px = ((uint*)&packed)[k];
                             int outX = (srcX + k) * 2;
-                            rowPtr[outX]     = pixel;
-                            rowPtr[outX + 1] = pixel;
+                            rowPtr[outX]     = px;
+                            rowPtr[outX + 1] = px;
                         }
                     }
 #pragma warning restore CS8500
@@ -233,7 +248,7 @@ namespace AprNes
                     {
                         float r = lb_r[srcX], g = lb_g[srcX], b = lb_b[srcX];
                         float bright = r * 0.3f + g * 0.59f + b * 0.11f;
-                        float fw = (weight + bright * bloom * omw) * boost;
+                        float fw = weight * boost + bright * bloom * omw * boost;
                         r *= fw; if (r < 0f) r = 0f; else if (r > 1f) r = 1f;
                         g *= fw; if (g < 0f) g = 0f; else if (g > 1f) g = 1f;
                         b *= fw; if (b < 0f) b = 0f; else if (b > 1f) b = 1f;
@@ -264,7 +279,7 @@ namespace AprNes
                         float g = lb_g[srcX] + t * (lb_g[srcX1] - lb_g[srcX]);
                         float b = lb_b[srcX] + t * (lb_b[srcX1] - lb_b[srcX]);
                         float bright = r * 0.3f + g * 0.59f + b * 0.11f;
-                        float fw = (weight + bright * bloom * omw) * boost;
+                        float fw = weight * boost + bright * bloom * omw * boost;
 
                         r *= fw; if (r < 0f) r = 0f; else if (r > 1f) r = 1f;
                         g *= fw; if (g < 0f) g = 0f; else if (g > 1f) g = 1f;
