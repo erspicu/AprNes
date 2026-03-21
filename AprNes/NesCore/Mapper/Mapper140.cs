@@ -34,7 +34,7 @@ namespace AprNes
             UpdateCHRBanks();
         }
 
-        public byte MapperR_ExpansionROM(ushort address) { return 0; }
+        public byte MapperR_ExpansionROM(ushort address) { return NesCore.cpubus; }
         public void MapperW_ExpansionROM(ushort address, byte value) { }
 
         // RAM area ($6000-$7FFF) acts as register for this mapper

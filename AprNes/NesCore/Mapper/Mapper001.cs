@@ -31,7 +31,7 @@ namespace AprNes
 
         public byte MapperR_ExpansionROM(ushort address)
         {
-            return 0;
+            return NesCore.cpubus;
         }
 
         public void MapperW_ExpansionROM(ushort address, byte value)

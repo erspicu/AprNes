@@ -50,7 +50,7 @@ namespace AprNes
             irqCounter = 0;
         }
 
-        public byte MapperR_ExpansionROM(ushort address) { return 0; }
+        public byte MapperR_ExpansionROM(ushort address) { return NesCore.cpubus; }
         public void MapperW_ExpansionROM(ushort address, byte value) { }
 
         public void MapperW_RAM(ushort address, byte value)

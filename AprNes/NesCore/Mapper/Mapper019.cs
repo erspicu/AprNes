@@ -85,7 +85,7 @@ namespace AprNes
                 }
                 case 0x5000: return (byte)(irqCounter & 0xFF);
                 case 0x5800: return (byte)(irqCounter >> 8);
-                default:     return 0;
+                default:     return NesCore.cpubus;
             }
         }
 

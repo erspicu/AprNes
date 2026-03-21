@@ -1107,7 +1107,7 @@ namespace AprNes
         }
 
         static byte openbus;
-        static byte cpubus;  // CPU data bus value (last byte read/written by CPU)
+        static public byte cpubus;  // CPU data bus value (last byte read/written by CPU)
 
         static void ppu_w_2000(byte value) //ok
         {

@@ -83,7 +83,7 @@ namespace AprNes
             return (addr & 0xFF00) | (a1 << 1) | a0;
         }
 
-        public byte MapperR_ExpansionROM(ushort address) { return 0; }
+        public byte MapperR_ExpansionROM(ushort address) { return NesCore.cpubus; }
         public void MapperW_ExpansionROM(ushort address, byte value) { }
         public byte MapperR_RAM(ushort address) { return NesCore.NES_MEM[address]; }
         public void MapperW_RAM(ushort address, byte value) { NesCore.NES_MEM[address] = value; }

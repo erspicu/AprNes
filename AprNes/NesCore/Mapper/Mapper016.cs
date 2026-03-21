@@ -61,7 +61,7 @@ namespace AprNes
             UpdateCHRBanks();
         }
 
-        public byte MapperR_ExpansionROM(ushort address) { return 0; }
+        public byte MapperR_ExpansionROM(ushort address) { return NesCore.cpubus; }
         public void MapperW_ExpansionROM(ushort address, byte value) { }
 
         // $6000-$7FFF: active for submapper 0 (heuristic) and submapper 4 (FCG-1/2)
