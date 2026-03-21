@@ -451,7 +451,42 @@ namespace AprNes
                            System.Globalization.CultureInfo.InvariantCulture, out v) ? v : def;
             }
 
-            // Stage 1 (Ntsc.cs)
+            bool GetBool(string key, bool def)
+            {
+                if (!dict.ContainsKey(key)) return def;
+                string s = dict[key];
+                return s == "1" || s.Equals("true", StringComparison.OrdinalIgnoreCase);
+            }
+
+            // Effect toggles
+            Ntsc.HbiSimulation     = GetBool("HbiSimulation", true);
+            Ntsc.ColorBurstJitter  = GetBool("ColorBurstJitter", true);
+            CrtScreen.InterlaceJitter = GetBool("InterlaceJitter", true);
+            bool ringingOn     = GetBool("RingingEnabled", true);
+            bool vignetteOn    = GetBool("VignetteEnabled", true);
+            bool shadowMaskOn  = GetBool("ShadowMaskEnabled", true);
+            bool curvatureOn   = GetBool("CurvatureEnabled", true);
+            bool phosphorOn    = GetBool("PhosphorEnabled", true);
+            bool hbeamOn       = GetBool("HBeamEnabled", true);
+            bool convergenceOn = GetBool("ConvergenceEnabled", true);
+
+            // Effect values
+            Ntsc.RingStrength  = ringingOn ? Get("RingStrength", 0.3f) : 0f;
+            Ntsc.GammaCoeff    = Get("GammaCoeff", 0.229f);
+            Ntsc.ColorTempR    = Get("ColorTempR", 1.0f);
+            Ntsc.ColorTempG    = Get("ColorTempG", 1.0f);
+            Ntsc.ColorTempB    = Get("ColorTempB", 1.0f);
+            CrtScreen.VignetteStrength   = vignetteOn ? Get("VignetteStrength", 0.15f) : 0f;
+            CrtScreen.ShadowMaskMode     = shadowMaskOn
+                ? (CrtScreen.MaskType)(int)Get("ShadowMaskMode", 1f)
+                : CrtScreen.MaskType.None;
+            CrtScreen.ShadowMaskStrength = Get("ShadowMaskStrength", 0.3f);
+            CrtScreen.CurvatureStrength  = curvatureOn ? Get("CurvatureStrength", 0.12f) : 0f;
+            CrtScreen.PhosphorDecay      = phosphorOn ? Get("PhosphorDecay", 0.6f) : 0f;
+            CrtScreen.HBeamSpread        = hbeamOn ? Get("HBeamSpread", 0.4f) : 0f;
+            CrtScreen.ConvergenceStrength = convergenceOn ? Get("ConvergenceStrength", 2.0f) : 0f;
+
+            // Stage 1 connector (Ntsc.cs)
             Ntsc.RF_NoiseIntensity = Get("RF_NoiseIntensity", 0.04f);
             Ntsc.RF_SlewRate       = Get("RF_SlewRate",       0.60f);
             Ntsc.RF_ChromaBlur     = Get("RF_ChromaBlur",     0.10f);
@@ -461,7 +496,7 @@ namespace AprNes
             Ntsc.SV_NoiseIntensity = Get("SV_NoiseIntensity", 0.00f);
             Ntsc.SV_SlewRate       = Get("SV_SlewRate",       0.90f);
             Ntsc.SV_ChromaBlur     = Get("SV_ChromaBlur",     0.45f);
-            // Stage 2 (CrtScreen.cs)
+            // Stage 2 connector (CrtScreen.cs)
             CrtScreen.RF_BeamSigma       = Get("RF_BeamSigma",       1.10f);
             CrtScreen.RF_BloomStrength   = Get("RF_BloomStrength",   0.50f);
             CrtScreen.RF_BrightnessBoost = Get("RF_BrightnessBoost", 1.10f);
@@ -471,6 +506,9 @@ namespace AprNes
             CrtScreen.SV_BeamSigma       = Get("SV_BeamSigma",       0.65f);
             CrtScreen.SV_BloomStrength   = Get("SV_BloomStrength",   0.10f);
             CrtScreen.SV_BrightnessBoost = Get("SV_BrightnessBoost", 1.40f);
+
+            // Update gamma LUT with loaded GammaCoeff
+            Ntsc.UpdateGammaLUT();
         }
 
         public void FileWriteAllText(string path, string str)

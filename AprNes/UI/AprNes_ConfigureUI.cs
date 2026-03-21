@@ -46,6 +46,7 @@ namespace AprNes
             crtuse.Text         = LangStr("crt_effect");
             VideoInputLab.Text  = LangStr("video_input");
             label_analogSize.Text = LangStr("analog_size");
+            AnalogSetting.Text   = LangStr("analog_advance_setting");
 
             // 同步 Analog Size 選擇（index 0=2x,1=4x,2=6x,3=8x）
             int[] analogSizeMap = { 2, 4, 6, 8 };
@@ -106,6 +107,14 @@ namespace AprNes
 
             // CRT 效果需要 UltraAnalog 才有效
             crtuse.Enabled = ultraOn;
+        }
+
+        private void AnalogSetting_Click(object sender, EventArgs e)
+        {
+            using (var dlg = new UI.AprNes_AnalogConfigureUI())
+            {
+                dlg.ShowDialog(this);
+            }
         }
 
         private void useAnalog_CheckedChanged(object sender, EventArgs e)

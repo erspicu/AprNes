@@ -141,6 +141,9 @@ namespace AprNes
         // #4 HBI simulation (blanking level at line start)
         public static bool HbiSimulation = true;
 
+        // #3 Color burst phase jitter enable (RF only, ~3% of scanlines)
+        public static bool ColorBurstJitter = true;
+
         // ════════════════════════════════════════════════════════════════════
         // Init
         // ════════════════════════════════════════════════════════════════════
@@ -492,7 +495,7 @@ namespace AprNes
             scanPhaseBase = (scanPhaseBase + 2) % 6;
 
             // #3 Color burst phase jitter (RF only, ~3% of scanlines)
-            if (NesCore.AnalogOutput == NesCore.AnalogOutputMode.RF)
+            if (ColorBurstJitter && NesCore.AnalogOutput == NesCore.AnalogOutputMode.RF)
             {
                 uint jns = (uint)(NesCore.frame_count * 2654435761u + (uint)sl * 340573321u);
                 jns ^= jns << 13; jns ^= jns >> 17; jns ^= jns << 5;

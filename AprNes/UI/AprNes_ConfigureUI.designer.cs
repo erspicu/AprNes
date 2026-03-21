@@ -93,12 +93,15 @@
             this.VideoInputLab = new System.Windows.Forms.Label();
             this.VideoInput = new System.Windows.Forms.ComboBox();
             this.crtuse = new System.Windows.Forms.CheckBox();
+            this.AnalogSetting = new System.Windows.Forms.Button();
+            this.groupBox6 = new System.Windows.Forms.GroupBox();
             this.groupBox1.SuspendLayout();
             this.groupBox2.SuspendLayout();
             this.groupBox4.SuspendLayout();
             this.groupBox3.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.SoundtrackBar)).BeginInit();
             this.groupBox5.SuspendLayout();
+            this.groupBox6.SuspendLayout();
             this.SuspendLayout();
             // 
             // groupBox1
@@ -737,7 +740,7 @@
             // label_analogSize
             // 
             this.label_analogSize.AutoSize = true;
-            this.label_analogSize.Location = new System.Drawing.Point(597, 327);
+            this.label_analogSize.Location = new System.Drawing.Point(147, 25);
             this.label_analogSize.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label_analogSize.Name = "label_analogSize";
             this.label_analogSize.Size = new System.Drawing.Size(92, 18);
@@ -753,7 +756,7 @@
             "4x  1024×840",
             "6x  1536×1260",
             "8x  2048×1680"});
-            this.comboBox_analogSize.Location = new System.Drawing.Point(597, 349);
+            this.comboBox_analogSize.Location = new System.Drawing.Point(147, 47);
             this.comboBox_analogSize.Margin = new System.Windows.Forms.Padding(4);
             this.comboBox_analogSize.Name = "comboBox_analogSize";
             this.comboBox_analogSize.Size = new System.Drawing.Size(180, 26);
@@ -855,9 +858,9 @@
             this.perdotFSM.UseVisualStyleBackColor = true;
             // 
             // useAnalog
-            //
+            // 
             this.useAnalog.AutoSize = true;
-            this.useAnalog.Location = new System.Drawing.Point(450, 349);
+            this.useAnalog.Location = new System.Drawing.Point(11, 28);
             this.useAnalog.Name = "useAnalog";
             this.useAnalog.Size = new System.Drawing.Size(125, 22);
             this.useAnalog.TabIndex = 32;
@@ -868,7 +871,7 @@
             // ultraAnalog
             // 
             this.ultraAnalog.AutoSize = true;
-            this.ultraAnalog.Location = new System.Drawing.Point(450, 378);
+            this.ultraAnalog.Location = new System.Drawing.Point(11, 57);
             this.ultraAnalog.Name = "ultraAnalog";
             this.ultraAnalog.Size = new System.Drawing.Size(124, 22);
             this.ultraAnalog.TabIndex = 33;
@@ -879,7 +882,7 @@
             // VideoInputLab
             // 
             this.VideoInputLab.AutoSize = true;
-            this.VideoInputLab.Location = new System.Drawing.Point(597, 385);
+            this.VideoInputLab.Location = new System.Drawing.Point(147, 83);
             this.VideoInputLab.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.VideoInputLab.Name = "VideoInputLab";
             this.VideoInputLab.Size = new System.Drawing.Size(89, 18);
@@ -894,7 +897,7 @@
             "RF",
             "SVideo",
             "AV"});
-            this.VideoInput.Location = new System.Drawing.Point(597, 407);
+            this.VideoInput.Location = new System.Drawing.Point(147, 105);
             this.VideoInput.Margin = new System.Windows.Forms.Padding(4);
             this.VideoInput.Name = "VideoInput";
             this.VideoInput.Size = new System.Drawing.Size(180, 26);
@@ -903,27 +906,51 @@
             // crtuse
             // 
             this.crtuse.AutoSize = true;
-            this.crtuse.Location = new System.Drawing.Point(450, 407);
+            this.crtuse.Location = new System.Drawing.Point(11, 86);
             this.crtuse.Name = "crtuse";
             this.crtuse.Size = new System.Drawing.Size(112, 22);
             this.crtuse.TabIndex = 36;
             this.crtuse.Text = "CRT effect";
             this.crtuse.UseVisualStyleBackColor = true;
             // 
+            // AnalogSetting
+            // 
+            this.AnalogSetting.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.AnalogSetting.Font = new System.Drawing.Font("新細明體", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
+            this.AnalogSetting.Location = new System.Drawing.Point(147, 139);
+            this.AnalogSetting.Margin = new System.Windows.Forms.Padding(4);
+            this.AnalogSetting.Name = "AnalogSetting";
+            this.AnalogSetting.Size = new System.Drawing.Size(147, 34);
+            this.AnalogSetting.TabIndex = 37;
+            this.AnalogSetting.Text = "Advance Setting";
+            this.AnalogSetting.UseVisualStyleBackColor = true;
+            this.AnalogSetting.Click += new System.EventHandler(this.AnalogSetting_Click);
+            // 
+            // groupBox6
+            // 
+            this.groupBox6.Controls.Add(this.useAnalog);
+            this.groupBox6.Controls.Add(this.AnalogSetting);
+            this.groupBox6.Controls.Add(this.ultraAnalog);
+            this.groupBox6.Controls.Add(this.VideoInputLab);
+            this.groupBox6.Controls.Add(this.crtuse);
+            this.groupBox6.Controls.Add(this.VideoInput);
+            this.groupBox6.Controls.Add(this.label_analogSize);
+            this.groupBox6.Controls.Add(this.comboBox_analogSize);
+            this.groupBox6.Location = new System.Drawing.Point(446, 301);
+            this.groupBox6.Name = "groupBox6";
+            this.groupBox6.Size = new System.Drawing.Size(339, 185);
+            this.groupBox6.TabIndex = 38;
+            this.groupBox6.TabStop = false;
+            this.groupBox6.Text = "Analog Setting";
+            // 
             // AprNes_ConfigureUI
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 18F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1002, 584);
-            this.Controls.Add(this.crtuse);
-            this.Controls.Add(this.VideoInputLab);
-            this.Controls.Add(this.VideoInput);
-            this.Controls.Add(this.ultraAnalog);
-            this.Controls.Add(this.useAnalog);
+            this.Controls.Add(this.groupBox6);
             this.Controls.Add(this.groupBox5);
             this.Controls.Add(this.groupBox3);
-            this.Controls.Add(this.label_analogSize);
-            this.Controls.Add(this.comboBox_analogSize);
             this.Controls.Add(this.label18);
             this.Controls.Add(this.comboBox1);
             this.Controls.Add(this.groupBox4);
@@ -954,6 +981,8 @@
             ((System.ComponentModel.ISupportInitialize)(this.SoundtrackBar)).EndInit();
             this.groupBox5.ResumeLayout(false);
             this.groupBox5.PerformLayout();
+            this.groupBox6.ResumeLayout(false);
+            this.groupBox6.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -1026,5 +1055,7 @@
         private System.Windows.Forms.Label VideoInputLab;
         private System.Windows.Forms.ComboBox VideoInput;
         private System.Windows.Forms.CheckBox crtuse;
+        private System.Windows.Forms.Button AnalogSetting;
+        private System.Windows.Forms.GroupBox groupBox6;
     }
 }
