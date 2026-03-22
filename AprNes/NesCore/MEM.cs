@@ -434,7 +434,7 @@ namespace AprNes
                         {
 
                             ppu_2007_temp = ppu_ram[val & ((val & 0x03) == 0 ? 0x0C : 0x1F) + 0x3f00];
-                            ppu_2007_buffer = ppu_ram[val & 0x2FFF];
+                            ppu_2007_buffer = ppu_ram[CIRAMAddr(val & 0x2FFF)];
 
                             ppu_2007_temp = (byte)((openbus & 0xC0) | (ppu_2007_temp & 0x3F));//add openbus fix
 
@@ -470,7 +470,7 @@ namespace AprNes
 
 
                             ppu_2007_temp = ppu_2007_buffer; //need read from buffer
-                            ppu_2007_buffer = ppu_ram[val & 0x2FFF]; //Name Table & Attribute Table ($3000-$3EFF mirrors $2000-$2EFF)
+                            ppu_2007_buffer = ppu_ram[CIRAMAddr(val & 0x2FFF)]; //Name Table & Attribute Table ($3000-$3EFF mirrors $2000-$2EFF)
                             Increment2007();
                             openbus = ppu_2007_temp;
                             open_bus_decay_timer = 77777;//fixed add
@@ -519,27 +519,8 @@ namespace AprNes
                     ppu_write_fun[address] = new Action<byte>((val) =>
                    {
                        int _vram_addr_wrap = vram_addr & 0x2FFF; // $3000-$3EFF mirrors $2000-$2EFF
-                       int _addr_range = _vram_addr_wrap & 0xc00;
                        openbus = val;
-                       int mirror = *Vertical;
-                       if (mirror >= 2)
-                       {
-                           // One-screen mirroring: all 4 nametables map to same 1KB
-                           int rel = _vram_addr_wrap & 0x3FF;
-                           ppu_ram[0x2000 + rel] = ppu_ram[0x2400 + rel] = ppu_ram[0x2800 + rel] = ppu_ram[0x2C00 + rel] = val;
-                       }
-                       else if (mirror == 1)
-                       {
-                           if (_addr_range < 0x800) ppu_ram[_vram_addr_wrap] = ppu_ram[_vram_addr_wrap | 0x800] = val;
-                           else ppu_ram[_vram_addr_wrap] = ppu_ram[_vram_addr_wrap & 0x37ff] = val;
-                       }
-                       else
-                       {
-                           if (_addr_range < 0x400) ppu_ram[_vram_addr_wrap] = ppu_ram[_vram_addr_wrap | 0x400] = val;
-                           else if (_addr_range < 0x800) ppu_ram[_vram_addr_wrap] = ppu_ram[_vram_addr_wrap & 0x3bff] = val;
-                           else if (_addr_range < 0xc00) ppu_ram[_vram_addr_wrap] = ppu_ram[_vram_addr_wrap | 0x400] = val;
-                           else ppu_ram[_vram_addr_wrap] = ppu_ram[_vram_addr_wrap & 0x3bff] = val;
-                       }
+                       ppu_ram[CIRAMAddr(_vram_addr_wrap)] = val;
                        Increment2007();
                    });
                 }

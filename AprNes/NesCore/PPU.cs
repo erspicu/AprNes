@@ -147,6 +147,23 @@ namespace AprNes
             vram_addr = (vram_addr & ~0x041F) | (vram_addr_internal & 0x041F);
         }
 
+        // CIRAM address translation: maps nametable address ($2000-$2FFF) to one of
+        // two physical CIRAM pages ($2000-$23FF = page 0, $2400-$27FF = page 1)
+        // based on current mirroring mode.  Real hardware has only 2 KB CIRAM;
+        // mirroring is done at the address-decode level, not by data duplication.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static int CIRAMAddr(int addr)
+        {
+            int mirror = *Vertical;
+            if (mirror == 0) // H-mirror: $2000=$2400(p0), $2800=$2C00(p1)
+                return (addr & 0x23FF) | ((addr & 0x0800) >> 1);
+            if (mirror == 1) // V-mirror: $2000=$2800(p0), $2400=$2C00(p1)
+                return addr & 0x27FF;
+            if (mirror == 2) // 1-screen A: all → page 0
+                return addr & 0x23FF;
+            return (addr & 0x23FF) | 0x0400; // 1-screen B: all → page 1
+        }
+
         // ---- Tile fetch state ----
         static byte NTVal = 0, ATVal = 0, lowTile = 0, highTile = 0;
         static int ioaddr = 0;
@@ -228,14 +245,14 @@ namespace AprNes
                     if (ntChrOverrideEnabled)
                         NTVal = ntBankPtrs[(ioaddr >> 10) & 3][ioaddr & 0x3FF];
                     else
-                        NTVal = ppu_ram[ioaddr];
+                        NTVal = ppu_ram[CIRAMAddr(ioaddr)];
                 } else if (phase == 2) {
                     ioaddr = 0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07);
                 } else if (phase == 3) {
                     if (ntChrOverrideEnabled)
                         ATVal = (byte)((ntBankPtrs[(ioaddr >> 10) & 3][ioaddr & 0x3FF] >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
                     else
-                        ATVal = (byte)((ppu_ram[ioaddr] >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
+                        ATVal = (byte)((ppu_ram[CIRAMAddr(ioaddr)] >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
                     bg_attr_p3 = bg_attr_p2; bg_attr_p2 = bg_attr_p1; bg_attr_p1 = ATVal;
                 } else if (phase == 4) {
                     ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
