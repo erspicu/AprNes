@@ -30,6 +30,9 @@ namespace AprNes
 
     unsafe public static class Ntsc
     {
+        // ── Upscale 模式（0=nearest-neighbor, 1=bilinear）────────────────
+        public static int UpscaleMode = 1;  // 預設 bilinear
+
         // ── 解耦參數（由外部透過 ApplyConfig 注入）────────────────────────
         static int    _analogOutput;        // AnalogOutputMode as int
         static bool   _ultraAnalog;
@@ -96,6 +99,67 @@ namespace AprNes
             { NoiseIntensity = SV_NoiseIntensity; SlewRate = SV_SlewRate; ChromaBlur = SV_ChromaBlur; }
             else
             { NoiseIntensity = AV_NoiseIntensity; SlewRate = AV_SlewRate; ChromaBlur = AV_ChromaBlur; }
+        }
+
+        // ── Upscale helpers ─────────────────────────────────────────────────
+
+        /// <summary>水平 bilinear resample（uint ARGB, fixed-point 8-bit fraction）</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void ResampleH_Bilinear(uint* src, int srcW, uint* dst, int dstW)
+        {
+            int fpScale = (srcW << 16) / dstW;
+            for (int x = 0; x < dstW; x++)
+            {
+                int fp   = x * fpScale;
+                int sx   = fp >> 16;
+                int frac = (fp >> 8) & 0xFF; // 0-255
+                if (frac == 0 || sx + 1 >= srcW)
+                {
+                    dst[x] = src[sx];
+                }
+                else
+                {
+                    int nf = 256 - frac;
+                    uint c0 = src[sx], c1 = src[sx + 1];
+                    uint r = (uint)(((c0 >> 16 & 0xFF) * nf + (c1 >> 16 & 0xFF) * frac) >> 8);
+                    uint g = (uint)(((c0 >>  8 & 0xFF) * nf + (c1 >>  8 & 0xFF) * frac) >> 8);
+                    uint b = (uint)(((c0       & 0xFF) * nf + (c1       & 0xFF) * frac) >> 8);
+                    dst[x] = 0xFF000000u | (r << 16) | (g << 8) | b;
+                }
+            }
+        }
+
+        /// <summary>垂直 bilinear 填充：在前一掃描線與當前掃描線的 row0 之間插值</summary>
+        static void VerticalFillRows(int sl, int dstW, uint* row0, int rowStart, int rowEnd)
+        {
+            if (UpscaleMode == 1 && sl > 0)
+            {
+                // 回填前一掃描線 → 當前掃描線之間的 gap rows
+                int prevRowStart = (sl - 1) * CrtScreen.DstH / CrtScreen.SrcH;
+                int span = rowStart - prevRowStart;
+                if (span > 1)
+                {
+                    uint* prevRow = _analogScreenBuf + (long)prevRowStart * dstW;
+                    for (int r = prevRowStart + 1; r < rowStart; r++)
+                    {
+                        int t256 = (r - prevRowStart) * 256 / span;
+                        int nt   = 256 - t256;
+                        uint* dstRow = _analogScreenBuf + (long)r * dstW;
+                        for (int x = 0; x < dstW; x++)
+                        {
+                            uint c0 = prevRow[x], c1 = row0[x];
+                            uint cr = (uint)(((c0 >> 16 & 0xFF) * nt + (c1 >> 16 & 0xFF) * t256) >> 8);
+                            uint cg = (uint)(((c0 >>  8 & 0xFF) * nt + (c1 >>  8 & 0xFF) * t256) >> 8);
+                            uint cb = (uint)(((c0       & 0xFF) * nt + (c1       & 0xFF) * t256) >> 8);
+                            dstRow[x] = 0xFF000000u | (cr << 16) | (cg << 8) | cb;
+                        }
+                    }
+                }
+            }
+            // 當前掃描線 row0 之後的行：複製（最後一條掃描線的尾行 or nearest 模式）
+            for (int row = rowStart + 1; row < rowEnd; row++)
+                Buffer.MemoryCopy(row0, _analogScreenBuf + (long)row * dstW,
+                    dstW * sizeof(uint), dstW * sizeof(uint));
         }
 
         // ── Level 2 ─────────────────────────────────────────────────────────
@@ -506,9 +570,7 @@ namespace AprNes
                 if (++ph == 6) ph = 0;
             }
 
-            for (int row = rowStart + 1; row < rowEnd; row++)
-                Buffer.MemoryCopy(row0, _analogScreenBuf + row * dstW,
-                    dstW * sizeof(uint), dstW * sizeof(uint));
+            VerticalFillRows(sl, dstW, row0, rowStart, rowEnd);
         }
 
         static unsafe void DecodeAV_SVideo(int sl)
@@ -534,9 +596,7 @@ namespace AprNes
                 row0[outX] = YiqToRgb(yFilt, iFilt, qFilt);
             }
 
-            for (int row = rowStart + 1; row < rowEnd; row++)
-                Buffer.MemoryCopy(row0, _analogScreenBuf + row * dstW,
-                    dstW * sizeof(uint), dstW * sizeof(uint));
+            VerticalFillRows(sl, dstW, row0, rowStart, rowEnd);
         }
 
         // ════════════════════════════════════════════════════════════════════
@@ -831,14 +891,16 @@ namespace AprNes
 
                 if (dstW != kOutW)
                 {
-                    // nearest-neighbor resample kOutW → dstW
-                    int fpScale = (kOutW << 16) / dstW;
-                    for (int x = 0; x < dstW; x++)
-                        row0[x] = demodTmpBuf[(x * fpScale) >> 16];
+                    if (UpscaleMode == 1)
+                        ResampleH_Bilinear(demodTmpBuf, kOutW, row0, dstW);
+                    else
+                    {
+                        int fpScale = (kOutW << 16) / dstW;
+                        for (int x = 0; x < dstW; x++)
+                            row0[x] = demodTmpBuf[(x * fpScale) >> 16];
+                    }
                 }
-                for (int row = rowStart + 1; row < rowEnd; row++)
-                    Buffer.MemoryCopy(row0, _analogScreenBuf + row * dstW,
-                        dstW * sizeof(uint), dstW * sizeof(uint));
+                VerticalFillRows(sl, dstW, row0, rowStart, rowEnd);
             }
 #pragma warning restore CS8500
         }
@@ -961,13 +1023,16 @@ namespace AprNes
 
                 if (dstW != kOutW)
                 {
-                    int fpScale = (kOutW << 16) / dstW;
-                    for (int x = 0; x < dstW; x++)
-                        row0[x] = demodTmpBuf[(x * fpScale) >> 16];
+                    if (UpscaleMode == 1)
+                        ResampleH_Bilinear(demodTmpBuf, kOutW, row0, dstW);
+                    else
+                    {
+                        int fpScale = (kOutW << 16) / dstW;
+                        for (int x = 0; x < dstW; x++)
+                            row0[x] = demodTmpBuf[(x * fpScale) >> 16];
+                    }
                 }
-                for (int row = rowStart + 1; row < rowEnd; row++)
-                    Buffer.MemoryCopy(row0, _analogScreenBuf + row * dstW,
-                        dstW * sizeof(uint), dstW * sizeof(uint));
+                VerticalFillRows(sl, dstW, row0, rowStart, rowEnd);
             }
 #pragma warning restore CS8500
         }

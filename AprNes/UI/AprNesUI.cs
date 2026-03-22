@@ -40,6 +40,10 @@ namespace AprNes
         Dictionary<int, KeyMap> NES_KeyMAP = new Dictionary<int, KeyMap>();
         public Dictionary<string, KeyMap> NES_KeyMAP_joypad = new Dictionary<string, KeyMap>();
 
+        // 最近開啟的 ROM 清單（最新在前，最多 10 筆）
+        List<string> _recentROMs = new List<string>();
+        const int MaxRecentROMs = 10;
+        ToolStripMenuItem _recentROMsMenuItem;
 
         joystick _joystick = new joystick();
 
@@ -58,6 +62,7 @@ namespace AprNes
                                 "Language file missing", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             LoadConfig();
             initUILang();
+            InitRecentROMsMenu();
             grfx = panel1.CreateGraphics();
 
         }
@@ -85,6 +90,8 @@ namespace AprNes
             normalToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["normal"];
             screenModeToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["screenmode"];
             RomInf.Text = fun4ToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["rominfo"]; //rominfo
+            if (_recentROMsMenuItem != null)
+                _recentROMsMenuItem.Text = LangINI.Get(AppConfigure["Lang"], "recent", "Recent");
         }
 
         int ScreenSize = 1;
@@ -179,6 +186,20 @@ namespace AprNes
         string joypad_LEFT = "";
         string joypad_RIGHT = "";
 
+        static string GetDefaultLang()
+        {
+            var culture = System.Globalization.CultureInfo.CurrentUICulture;
+            string name = culture.Name.ToLowerInvariant(); // e.g. "zh-tw", "zh-cn", "zh-hant", "en-us"
+            if (name.StartsWith("zh"))
+            {
+                // zh-TW, zh-Hant → 繁體; zh-CN, zh-Hans, zh-SG → 簡體
+                if (name.Contains("tw") || name.Contains("hk") || name.Contains("mo") || name.Contains("hant"))
+                    return "zh-tw";
+                return "zh-cn";
+            }
+            return "en-us";
+        }
+
         public void LoadConfig()
         {
             if (!File.Exists(ConfigureFile))
@@ -203,7 +224,7 @@ namespace AprNes
                 AppConfigure["joypad_DOWN"] = "";
                 AppConfigure["joypad_LEFT"] = "";
                 AppConfigure["joypad_RIGHT"] = "";
-                AppConfigure["Lang"] = "en-us";
+                AppConfigure["Lang"] = GetDefaultLang();
                 AppConfigure["filter"] = "xbrz";
                 AppConfigure["Sound"] = "1";
                 AppConfigure["Volume"] = "70";
@@ -221,8 +242,8 @@ namespace AprNes
                 string trimmed = i.TrimStart();
                 if (trimmed.StartsWith(";") || trimmed.StartsWith("#")) continue;
 
-                List<string> keyvalue = i.Split(new char[] { '=' }).ToList();
-                if (keyvalue.Count == 2)
+                string[] keyvalue = i.Split(new char[] { '=' }, 2);
+                if (keyvalue.Length == 2)
                     AppConfigure[keyvalue[0]] = keyvalue[1];
             }
 
@@ -391,6 +412,92 @@ namespace AprNes
                     conf += i + "=" + AppConfigure[i] + "\r\n";
 
             FileWriteAllText(ConfigureFile, conf);
+        }
+
+        // ────────────────────────────────────────────────────────────────────
+        // Recent ROMs — 最近開啟的 ROM 紀錄（最多 10 筆，存在 AprNes.ini）
+        // ────────────────────────────────────────────────────────────────────
+
+        void InitRecentROMsMenu()
+        {
+            string langKey = AppConfigure.ContainsKey("Lang") ? AppConfigure["Lang"] : "en-us";
+            string text = LangINI.Get(langKey, "recent", "Recent");
+            _recentROMsMenuItem = new ToolStripMenuItem(text);
+
+            // 插入到 fun1（Open）的下方（index 1）
+            int idx = contextMenuStrip1.Items.IndexOf(fun1ToolStripMenuItem);
+            contextMenuStrip1.Items.Insert(idx + 1, _recentROMsMenuItem);
+
+            // 從 INI 讀取
+            if (AppConfigure.ContainsKey("RecentROMs") && !string.IsNullOrEmpty(AppConfigure["RecentROMs"]))
+            {
+                string[] paths = AppConfigure["RecentROMs"].Split('|');
+                foreach (string p in paths)
+                    if (!string.IsNullOrEmpty(p))
+                        _recentROMs.Add(p);
+            }
+            BuildRecentROMsMenu();
+        }
+
+        void BuildRecentROMsMenu()
+        {
+            _recentROMsMenuItem.DropDownItems.Clear();
+            if (_recentROMs.Count == 0)
+            {
+                _recentROMsMenuItem.Enabled = false;
+                return;
+            }
+            _recentROMsMenuItem.Enabled = true;
+            foreach (string path in _recentROMs)
+            {
+                var item = new ToolStripMenuItem(Path.GetFileName(path));
+                item.ToolTipText = path;
+                item.Tag = path;
+                item.Click += RecentROM_Click;
+                _recentROMsMenuItem.DropDownItems.Add(item);
+            }
+        }
+
+        void AddRecentROM(string fullPath)
+        {
+            // 移除重複（不區分大小寫）
+            _recentROMs.RemoveAll(p => string.Equals(p, fullPath, StringComparison.OrdinalIgnoreCase));
+            // 插入最前
+            _recentROMs.Insert(0, fullPath);
+            // 限制數量
+            if (_recentROMs.Count > MaxRecentROMs)
+                _recentROMs.RemoveRange(MaxRecentROMs, _recentROMs.Count - MaxRecentROMs);
+            // 更新選單
+            BuildRecentROMsMenu();
+            // 寫入 INI
+            AppConfigure["RecentROMs"] = string.Join("|", _recentROMs);
+            Configure_Write();
+        }
+
+        void RemoveRecentROM(string fullPath)
+        {
+            _recentROMs.RemoveAll(p => string.Equals(p, fullPath, StringComparison.OrdinalIgnoreCase));
+            BuildRecentROMsMenu();
+            AppConfigure["RecentROMs"] = string.Join("|", _recentROMs);
+            Configure_Write();
+        }
+
+        unsafe void RecentROM_Click(object sender, EventArgs e)
+        {
+            var item = sender as ToolStripMenuItem;
+            if (item == null) return;
+            string path = item.Tag as string;
+            if (string.IsNullOrEmpty(path)) return;
+
+            if (!File.Exists(path))
+            {
+                string langKey = AppConfigure.ContainsKey("Lang") ? AppConfigure["Lang"] : "en-us";
+                string msg = LangINI.Get(langKey, "file_not_found", "File not found, removed from list.");
+                MessageBox.Show(msg, "AprNes", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                RemoveRecentROM(path);
+                return;
+            }
+            LoadRomFromPath(path);
         }
 
         // ────────────────────────────────────────────────────────────────────
@@ -812,20 +919,20 @@ public string GetRomInfo()
 
         unsafe private void button1_Click(object sender, EventArgs e)
         {
-
             OpenFileDialog fd = new OpenFileDialog();
             fd.Filter = "nes file (*.nes *.zip)|*.nes;*.zip";
             if (fd.ShowDialog() != DialogResult.OK) return;
+            LoadRomFromPath(fd.FileName);
+        }
 
-            FileInfo fi = new FileInfo(fd.FileName);
+        unsafe void LoadRomFromPath(string filePath)
+        {
+            FileInfo fi = new FileInfo(filePath);
             if (fi.Extension.ToLower() == ".zip")
             {
-                // tks!! https://github.com/yallie/unzip good!
-                // replace with .net use framework 4.6 https://msdn.microsoft.com/zh-tw/library/system.io.compression.zipfile(v=vs.110).aspx
                 ZipArchive archive = ZipFile.OpenRead(fi.FullName);
                 foreach (ZipArchiveEntry entry in archive.Entries)
                 {
-
                     if (entry.FullName.ToLower().EndsWith(".nes"))
                     {
                         nes_name = entry.Name;
@@ -839,12 +946,12 @@ public string GetRomInfo()
             }
             else
             {
-                nes_name = new FileInfo(fd.FileName).Name;
-                rom_bytes = File.ReadAllBytes(fd.FileName);
+                nes_name = fi.Name;
+                rom_bytes = File.ReadAllBytes(filePath);
             }
 
-            rom_file_name = fd.FileName.Remove(fd.FileName.Length - 4, 4);
-            current_rom_bytes = rom_bytes;  // 保存供 Hard Reset 使用
+            rom_file_name = filePath.Remove(filePath.Length - 4, 4);
+            current_rom_bytes = rom_bytes;
 
             if (nes_t != null)
             {
@@ -874,8 +981,6 @@ public string GetRomInfo()
             NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
             NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
 
-            Console.WriteLine("init finsih");
-
             if (!init_result)
             {
                 fps_count_timer.Enabled = false;
@@ -894,6 +999,9 @@ public string GetRomInfo()
             nes_t.Start();
             fps_count_timer.Enabled = true;
             running = true;
+
+            // 記錄到最近開啟清單
+            AddRecentROM(filePath);
         }
         int fps = 0;
         readonly Stopwatch _fpsSw = Stopwatch.StartNew();
@@ -923,14 +1031,35 @@ public string GetRomInfo()
         //http://stackoverflow.com/questions/11754874/keydown-not-firing-for-up-down-left-and-right
         protected override bool ProcessCmdKey(ref System.Windows.Forms.Message msg, System.Windows.Forms.Keys keyData)
         {
-            //for KeyDown check  
+            // ── 全域快捷鍵（不需要 ROM 在執行） ──
+            switch (keyData)
+            {
+                case Keys.Control | Keys.O:
+                    button1_Click(null, null);
+                    return true;
+                case Keys.F11:
+                    if (ScreenCenterFull || analogFullScreen)
+                        fun8ToolStripMenuItem_Click(null, null);
+                    else
+                        fullScreeenToolStripMenuItem_Click(null, null);
+                    return true;
+                case Keys.Escape:
+                    if (ScreenCenterFull || analogFullScreen)
+                        fun8ToolStripMenuItem_Click(null, null);
+                    return true;
+                case Keys.Control | Keys.R:
+                    if (running) label4_Click(null, null); // Reset
+                    return true;
+            }
+
+            //for KeyDown check
             if (!running) return true;
             int keyboard_key = (int)keyData;
 
             if (keyboard_key == 65616)
             {
                 NESCaptureScreen();
-                return true; ;
+                return true;
             }
             if (NES_KeyMAP.ContainsKey(keyboard_key))
                 NesCore.P1_ButtonPress((byte)NES_KeyMAP[keyboard_key]);
@@ -1224,9 +1353,171 @@ public string GetRomInfo()
         }
 
         bool ScreenCenterFull = false;
+        bool analogFullScreen = false;
+
+        // 類比全螢幕進入前保存的狀態，退出時還原
+        int savedPanelW, savedPanelH, savedPanelX, savedPanelY;
+        int savedFormW, savedFormH;
+
+        // 8:7 PAR content aspect ratio: (256 × 8/7) / 210 ≈ 1.3933
+        const double AnalogContentAR = (256.0 * 8.0 / 7.0) / 210.0;
+
+        unsafe void EnterAnalogFullScreen()
+        {
+            if (this.WindowState != FormWindowState.Maximized) Opacity = 0;
+
+            // 保存原始狀態
+            savedPanelW = panel1.Width;
+            savedPanelH = panel1.Height;
+            savedPanelX = panel1.Left;
+            savedPanelY = panel1.Top;
+            savedFormW  = this.Width;
+            savedFormH  = this.Height;
+
+            // 動態計算顯示區域（8:7 PAR，適應任何螢幕比例）
+            int screenW = Screen.PrimaryScreen.Bounds.Width;
+            int screenH = Screen.PrimaryScreen.Bounds.Height;
+            double screenAR = (double)screenW / screenH;
+
+            int displayW, displayH;
+            if (screenAR > AnalogContentAR)
+            {
+                displayH = screenH;
+                displayW = (int)(screenH * AnalogContentAR);
+            }
+            else
+            {
+                displayW = screenW;
+                displayH = (int)(screenW / AnalogContentAR);
+            }
+            int padX = (screenW - displayW) / 2;
+            int padY = (screenH - displayH) / 2;
+
+            // 暫停模擬執行緒，安全重新分配 buffer
+            if (running)
+            {
+                NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
+                NesCore._event.Reset();
+                while (!NesCore.emuWaiting) Thread.Sleep(1);
+            }
+
+            // 設定全螢幕覆寫解析度
+            CrtScreen.SetFullscreenSize(displayW, displayH);
+
+            // 重新分配 AnalogScreenBuf
+            if (NesCore.AnalogEnabled)
+            {
+                NesCore.SyncAnalogConfig();
+                int needed = CrtScreen.DstW * CrtScreen.DstH;
+                if (NesCore.AnalogScreenBuf == null || NesCore.AnalogBufSize != needed)
+                {
+                    if (NesCore.AnalogScreenBuf != null)
+                    {
+                        System.Runtime.InteropServices.Marshal.FreeHGlobal((IntPtr)NesCore.AnalogScreenBuf);
+                        NesCore.AnalogScreenBuf = null;
+                    }
+                    NesCore.AnalogBufSize   = needed;
+                    NesCore.AnalogScreenBuf = (uint*)System.Runtime.InteropServices.Marshal.AllocHGlobal(
+                        sizeof(uint) * needed);
+                }
+                NesCore.SyncAnalogConfig();
+                Ntsc.Init();
+                CrtScreen.Init();
+            }
+
+            // UI 全螢幕
+            panel1.Visible = false;
+            UIAbout.Visible = RomInf.Visible = UIOpenRom.Visible = UIReset.Visible = UIConfig.Visible = label3.Visible = false;
+            this.BackColor = Color.Black;
+            this.FormBorderStyle = FormBorderStyle.None;
+            this.WindowState = FormWindowState.Maximized;
+
+            panel1.Size = new Size(displayW, displayH);
+            panel1.Location = new Point(padX, padY);
+
+            // 重建 Graphics + RenderObj
+            grfx?.Dispose();
+            grfx = panel1.CreateGraphics();
+            if (RenderObj != null) RenderObj.freeMem();
+            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType("AprNes.Render_ntsc_3x"));
+            RenderObj.init(NesCore.ScreenBuf1x, grfx);
+
+            label3.Location = new Point(0, 0);
+            panel1.Visible = true;
+            label3.Visible = true;
+            this.Refresh();
+            Opacity = 100;
+            ScreenCenterFull = true;
+            analogFullScreen = true;
+
+            // 恢復模擬執行緒
+            if (running)
+            {
+                NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
+                NesCore._event.Set();
+            }
+
+            Configure_Write();
+        }
+
+        unsafe void ExitAnalogFullScreen()
+        {
+            // 暫停模擬執行緒
+            if (running)
+            {
+                NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
+                NesCore._event.Reset();
+                while (!NesCore.emuWaiting) Thread.Sleep(1);
+            }
+
+            // 清除全螢幕覆寫，恢復 AnalogSize 驅動的 DstW/DstH
+            CrtScreen.ClearFullscreenSize();
+
+            // 重新分配 AnalogScreenBuf 回原始大小
+            if (NesCore.AnalogEnabled)
+            {
+                NesCore.SyncAnalogConfig();
+                int needed = CrtScreen.DstW * CrtScreen.DstH;
+                if (NesCore.AnalogScreenBuf == null || NesCore.AnalogBufSize != needed)
+                {
+                    if (NesCore.AnalogScreenBuf != null)
+                    {
+                        System.Runtime.InteropServices.Marshal.FreeHGlobal((IntPtr)NesCore.AnalogScreenBuf);
+                        NesCore.AnalogScreenBuf = null;
+                    }
+                    NesCore.AnalogBufSize   = needed;
+                    NesCore.AnalogScreenBuf = (uint*)System.Runtime.InteropServices.Marshal.AllocHGlobal(
+                        sizeof(uint) * needed);
+                }
+                NesCore.SyncAnalogConfig();
+                Ntsc.Init();
+                CrtScreen.Init();
+            }
+
+            // 還原 UI 狀態
+            this.BackColor = SystemColors.Menu;
+            this.WindowState = FormWindowState.Normal;
+            this.FormBorderStyle = FormBorderStyle.FixedSingle;
+            ScreenCenterFull = false;
+            analogFullScreen = false;
+
+            // 透過 initUIsize() 統一處理排版、grfx/RenderObj 重建
+            label3.Location = new Point(208, 8);
+            initUIsize();
+
+            // 恢復模擬執行緒
+            if (running)
+            {
+                NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
+                NesCore._event.Set();
+            }
+
+            Configure_Write();
+        }
 
         private void fun8ToolStripMenuItem_Click(object sender, EventArgs e)
         {
+            if (analogFullScreen) { ExitAnalogFullScreen(); return; }
             this.BackColor = SystemColors.Menu;
             this.WindowState = FormWindowState.Normal;
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -1236,6 +1527,8 @@ public string GetRomInfo()
 
         private void fullScreeenToolStripMenuItem_Click(object sender, EventArgs e)
         {
+            if (NesCore.AnalogEnabled) { EnterAnalogFullScreen(); return; }
+
             if (this.WindowState != FormWindowState.Maximized) Opacity = 0;
             panel1.Visible = false;
             UIAbout.Visible = RomInf.Visible = UIOpenRom.Visible = UIReset.Visible = UIConfig.Visible = label3.Visible = false;
@@ -1256,6 +1549,7 @@ public string GetRomInfo()
 
         private void normalToolStripMenuItem_Click(object sender, EventArgs e)
         {
+            if (analogFullScreen) { ExitAnalogFullScreen(); return; }
             this.BackColor = SystemColors.Menu;
             this.WindowState = FormWindowState.Normal;
             this.FormBorderStyle = FormBorderStyle.FixedSingle;

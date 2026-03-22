@@ -53,8 +53,13 @@ namespace AprNes
         public const int SrcW = 1024;  // linearBuffer 列寬（固定）
         public const int SrcH = 240;   // linearBuffer 列數（固定）
         // DstW/DstH 依 AnalogSize 動態決定（256×N × 210×N，維持 8:7 AR）
-        public static int DstW => 256 * _analogSize;
-        public static int DstH => 210 * _analogSize;
+        // 全螢幕時可由外部覆寫為任意解析度
+        static int? _fullscreenW = null, _fullscreenH = null;
+        public static int DstW => _fullscreenW ?? 256 * _analogSize;
+        public static int DstH => _fullscreenH ?? 210 * _analogSize;
+
+        public static void SetFullscreenSize(int w, int h) { _fullscreenW = w; _fullscreenH = h; }
+        public static void ClearFullscreenSize() { _fullscreenW = null; _fullscreenH = null; }
 
         // ── 端子參數組（INI 讀入，開機時載入一次）──────────────────────────
         // RF 端子
