@@ -269,6 +269,23 @@ namespace AprNes
         }
 
         // ── B8: ShadowMask + Phosphor 合併 pass ─────────────────────────────
+        // 優化：float→uint 整數乘法、3x 展開消除 phase 分支、特化路徑消除 per-pixel if
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void MaskPhosphorPixel(uint* row, uint* prw, int tx, int phase, uint udim, uint udec)
+        {
+            uint px = row[tx], prv = prw[tx];
+            uint r = (px >> 16) & 0xFFu, g = (px >> 8) & 0xFFu, b = px & 0xFFu;
+            if (phase == 0)      { g = (g * udim) >> 8; b = (b * udim) >> 8; }
+            else if (phase == 1) { r = (r * udim) >> 8; b = (b * udim) >> 8; }
+            else                 { r = (r * udim) >> 8; g = (g * udim) >> 8; }
+            uint pr = ((prv >> 16 & 0xFFu) * udec) >> 8;
+            uint pg = ((prv >>  8 & 0xFFu) * udec) >> 8;
+            uint pb = ((prv       & 0xFFu) * udec) >> 8;
+            if (pr > r) r = pr; if (pg > g) g = pg; if (pb > b) b = pb;
+            uint res = 0xFF000000u | (r << 16) | (g << 8) | b;
+            row[tx] = res; prw[tx] = res;
+        }
+
         static void ApplyShadowMaskAndPhosphor()
         {
             bool doMask = ShadowMaskMode != MaskType.None && ShadowMaskStrength > 0f;
@@ -278,46 +295,135 @@ namespace AprNes
             int dstW = DstW, dstH = DstH;
             uint* dst = _analogScreenBuf;
             uint* prev = _prevFrame;
-            int dimI = doMask ? (int)((1f - ShadowMaskStrength) * 256f) : 0;
+            uint udim = doMask ? (uint)((1f - ShadowMaskStrength) * 256f) : 0u;
             bool isSM = ShadowMaskMode == MaskType.ShadowMask;
-            float decay = PhosphorDecay;
+            uint udec = doPhosphor ? (uint)(PhosphorDecay * 256f) : 0u;
 
-            Parallel.For(0, dstH, ty =>
+            if (doMask && doPhosphor)
             {
-                int rowOff = ty * dstW;
-                int phase = (doMask && isSM && (ty & 1) != 0) ? 1 : 0;
-                for (int tx = 0; tx < dstW; tx++)
+                // ── Mask + Phosphor: 3x 展開 + 整數 decay ──
+                Parallel.For(0, dstH, ty =>
                 {
-                    int idx = rowOff + tx;
-                    uint px = dst[idx];
-                    int b = (int)(px & 0xFF);
-                    int g = (int)((px >> 8) & 0xFF);
-                    int r = (int)((px >> 16) & 0xFF);
+                    uint* row = dst + (long)ty * dstW;
+                    uint* prw = prev + (long)ty * dstW;
+                    int phase = (isSM && (ty & 1) != 0) ? 1 : 0;
+                    int tx = 0;
 
-                    if (doMask)
+                    // Preamble: align phase to 0
+                    for (; tx < dstW && phase != 0; tx++)
                     {
-                        if (phase == 0)      { g = g * dimI >> 8; b = b * dimI >> 8; }
-                        else if (phase == 1) { r = r * dimI >> 8; b = b * dimI >> 8; }
-                        else                 { r = r * dimI >> 8; g = g * dimI >> 8; }
+                        MaskPhosphorPixel(row, prw, tx, phase, udim, udec);
                         if (++phase == 3) phase = 0;
                     }
 
-                    if (doPhosphor)
+                    // Main 3x unrolled (phase 0→1→2, branchless)
+                    for (; tx + 2 < dstW; tx += 3)
                     {
-                        uint prv = prev[idx];
-                        int pb = (int)((prv & 0xFF) * decay);
-                        int pg = (int)(((prv >> 8) & 0xFF) * decay);
-                        int pr = (int)(((prv >> 16) & 0xFF) * decay);
-                        if (pb > b) b = pb;
-                        if (pg > g) g = pg;
-                        if (pr > r) r = pr;
+                        // Phase 0: keep R, dim G+B
+                        {
+                            uint px = row[tx], prv = prw[tx];
+                            uint r = (px >> 16) & 0xFFu;
+                            uint g = ((px >> 8 & 0xFFu) * udim) >> 8;
+                            uint b = ((px & 0xFFu) * udim) >> 8;
+                            uint pr = ((prv >> 16 & 0xFFu) * udec) >> 8;
+                            uint pg = ((prv >> 8 & 0xFFu) * udec) >> 8;
+                            uint pb = ((prv & 0xFFu) * udec) >> 8;
+                            if (pr > r) r = pr; if (pg > g) g = pg; if (pb > b) b = pb;
+                            uint res = 0xFF000000u | (r << 16) | (g << 8) | b;
+                            row[tx] = res; prw[tx] = res;
+                        }
+                        // Phase 1: keep G, dim R+B
+                        {
+                            uint px = row[tx + 1], prv = prw[tx + 1];
+                            uint r = ((px >> 16 & 0xFFu) * udim) >> 8;
+                            uint g = (px >> 8) & 0xFFu;
+                            uint b = ((px & 0xFFu) * udim) >> 8;
+                            uint pr = ((prv >> 16 & 0xFFu) * udec) >> 8;
+                            uint pg = ((prv >> 8 & 0xFFu) * udec) >> 8;
+                            uint pb = ((prv & 0xFFu) * udec) >> 8;
+                            if (pr > r) r = pr; if (pg > g) g = pg; if (pb > b) b = pb;
+                            uint res = 0xFF000000u | (r << 16) | (g << 8) | b;
+                            row[tx + 1] = res; prw[tx + 1] = res;
+                        }
+                        // Phase 2: keep B, dim R+G
+                        {
+                            uint px = row[tx + 2], prv = prw[tx + 2];
+                            uint r = ((px >> 16 & 0xFFu) * udim) >> 8;
+                            uint g = ((px >> 8 & 0xFFu) * udim) >> 8;
+                            uint b = px & 0xFFu;
+                            uint pr = ((prv >> 16 & 0xFFu) * udec) >> 8;
+                            uint pg = ((prv >> 8 & 0xFFu) * udec) >> 8;
+                            uint pb = ((prv & 0xFFu) * udec) >> 8;
+                            if (pr > r) r = pr; if (pg > g) g = pg; if (pb > b) b = pb;
+                            uint res = 0xFF000000u | (r << 16) | (g << 8) | b;
+                            row[tx + 2] = res; prw[tx + 2] = res;
+                        }
                     }
 
-                    uint result = (uint)(b | (g << 8) | (r << 16)) | 0xFF000000u;
-                    dst[idx] = result;
-                    if (doPhosphor) prev[idx] = result;
-                }
-            });
+                    // Tail (≤2 pixels)
+                    for (int p = 0; tx < dstW; tx++, p++)
+                        MaskPhosphorPixel(row, prw, tx, p, udim, udec);
+                });
+            }
+            else if (doMask)
+            {
+                // ── Mask only: 3x 展開 ──
+                Parallel.For(0, dstH, ty =>
+                {
+                    uint* row = dst + (long)ty * dstW;
+                    int phase = (isSM && (ty & 1) != 0) ? 1 : 0;
+                    int tx = 0;
+
+                    for (; tx < dstW && phase != 0; tx++)
+                    {
+                        uint px = row[tx];
+                        uint r = (px >> 16) & 0xFFu, g = (px >> 8) & 0xFFu, b = px & 0xFFu;
+                        if (phase == 1) { r = (r * udim) >> 8; b = (b * udim) >> 8; }
+                        else            { r = (r * udim) >> 8; g = (g * udim) >> 8; }
+                        row[tx] = 0xFF000000u | (r << 16) | (g << 8) | b;
+                        if (++phase == 3) phase = 0;
+                    }
+
+                    for (; tx + 2 < dstW; tx += 3)
+                    {
+                        { uint px = row[tx]; uint r = (px >> 16) & 0xFFu; uint g = ((px >> 8 & 0xFFu) * udim) >> 8; uint b = ((px & 0xFFu) * udim) >> 8; row[tx] = 0xFF000000u | (r << 16) | (g << 8) | b; }
+                        { uint px = row[tx + 1]; uint r = ((px >> 16 & 0xFFu) * udim) >> 8; uint g = (px >> 8) & 0xFFu; uint b = ((px & 0xFFu) * udim) >> 8; row[tx + 1] = 0xFF000000u | (r << 16) | (g << 8) | b; }
+                        { uint px = row[tx + 2]; uint r = ((px >> 16 & 0xFFu) * udim) >> 8; uint g = ((px >> 8 & 0xFFu) * udim) >> 8; uint b = px & 0xFFu; row[tx + 2] = 0xFF000000u | (r << 16) | (g << 8) | b; }
+                    }
+
+                    int ph = 0;
+                    for (; tx < dstW; tx++)
+                    {
+                        uint px = row[tx];
+                        uint r = (px >> 16) & 0xFFu, g = (px >> 8) & 0xFFu, b = px & 0xFFu;
+                        if (ph == 0)      { g = (g * udim) >> 8; b = (b * udim) >> 8; }
+                        else if (ph == 1) { r = (r * udim) >> 8; b = (b * udim) >> 8; }
+                        else              { r = (r * udim) >> 8; g = (g * udim) >> 8; }
+                        row[tx] = 0xFF000000u | (r << 16) | (g << 8) | b;
+                        if (++ph == 3) ph = 0;
+                    }
+                });
+            }
+            else
+            {
+                // ── Phosphor only: SWAR R+B decay（3→2 乘法）+ 整數 decay ──
+                Parallel.For(0, dstH, ty =>
+                {
+                    uint* row = dst + (long)ty * dstW;
+                    uint* prw = prev + (long)ty * dstW;
+                    for (int tx = 0; tx < dstW; tx++)
+                    {
+                        uint px = row[tx], prv = prw[tx];
+                        uint dec_rb = ((prv & 0x00FF00FFu) * udec >> 8) & 0x00FF00FFu;
+                        uint dec_g  = ((prv & 0x0000FF00u) * udec >> 8) & 0x0000FF00u;
+                        uint b = px & 0xFFu, r = (px >> 16) & 0xFFu, g = (px >> 8) & 0xFFu;
+                        uint bd = dec_rb & 0xFFu, rd = dec_rb >> 16, gd = dec_g >> 8;
+                        if (rd > r) r = rd; if (gd > g) g = gd; if (bd > b) b = bd;
+                        uint res = 0xFF000000u | (r << 16) | (g << 8) | b;
+                        row[tx] = res; prw[tx] = res;
+                    }
+                });
+            }
         }
 
         // ── B6: Convergence + Curvature 合併 pass ───────────────────────────
