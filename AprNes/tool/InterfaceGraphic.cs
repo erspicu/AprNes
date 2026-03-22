@@ -354,7 +354,7 @@ namespace AprNes
     // 類比訊號模擬輸出渲染器
     // 直接從 NesCore.AnalogScreenBuf（768×630）讀取，無縮放
     // CrtScreen Stage 2 在 PPU RenderScreen 時已完成寫入
-    unsafe public class Render_ntsc_3x : InterfaceGraphic
+    unsafe public class Render_Analog : InterfaceGraphic
     {
         public void freeMem() { }  // 緩衝區屬於 NesCore，不在此釋放
 

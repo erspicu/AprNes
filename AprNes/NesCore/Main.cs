@@ -78,7 +78,7 @@ namespace AprNes
         // 2→512×420, 4→1024×840, 6→1536×1260, 8→2048×1680
         static public int AnalogSize = 4;
 
-        // 類比模式輸出緩衝區（CrtScreen Stage 2 寫入，Render_ntsc_3x 讀取）
+        // 類比模式輸出緩衝區（CrtScreen Stage 2 寫入，Render_Analog 讀取）
         // 僅在 AnalogEnabled=true 時分配，其他情況為 null
         static public uint* AnalogScreenBuf = null;
         static public int   AnalogBufSize   = 0;  // 目前已分配的 pixel 數（DstW×DstH）

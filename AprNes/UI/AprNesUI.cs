@@ -975,7 +975,7 @@ public string GetRomInfo()
             bool init_result = NesCore.init(rom_bytes);
 
             if (RenderObj != null) RenderObj.freeMem();
-            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType(NesCore.AnalogEnabled ? "AprNes.Render_ntsc_3x" : "AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
+            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType(NesCore.AnalogEnabled ? "AprNes.Render_Analog" : "AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
             RenderObj.init(NesCore.ScreenBuf1x, grfx);
 
             NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
@@ -1167,7 +1167,7 @@ public string GetRomInfo()
             NesCore._event.Reset();
             while (!NesCore.emuWaiting) Thread.Sleep(1);
             if (RenderObj != null) RenderObj.freeMem();
-            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType(NesCore.AnalogEnabled ? "AprNes.Render_ntsc_3x" : "AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
+            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType(NesCore.AnalogEnabled ? "AprNes.Render_Analog" : "AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
             RenderObj.init(NesCore.ScreenBuf1x, grfx);
             NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
 
@@ -1213,7 +1213,7 @@ public string GetRomInfo()
             }
 
             if (RenderObj != null) RenderObj.freeMem();
-            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType(NesCore.AnalogEnabled ? "AprNes.Render_ntsc_3x" : "AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
+            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType(NesCore.AnalogEnabled ? "AprNes.Render_Analog" : "AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
             RenderObj.init(NesCore.ScreenBuf1x, grfx);
             NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
             NesCore._event.Set();
@@ -1243,7 +1243,7 @@ public string GetRomInfo()
             bool init_result = NesCore.init(current_rom_bytes);
 
             if (RenderObj != null) RenderObj.freeMem();
-            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType(NesCore.AnalogEnabled ? "AprNes.Render_ntsc_3x" : "AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
+            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType(NesCore.AnalogEnabled ? "AprNes.Render_Analog" : "AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
             RenderObj.init(NesCore.ScreenBuf1x, grfx);
 
             NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
@@ -1439,7 +1439,7 @@ public string GetRomInfo()
             grfx?.Dispose();
             grfx = panel1.CreateGraphics();
             if (RenderObj != null) RenderObj.freeMem();
-            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType("AprNes.Render_ntsc_3x"));
+            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType("AprNes.Render_Analog"));
             RenderObj.init(NesCore.ScreenBuf1x, grfx);
 
             label3.Location = new Point(0, 0);

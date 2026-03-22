@@ -8,7 +8,10 @@ set -e
 EXE="C:/ai_project/AprNes/AprNes/bin/Release/AprNes.exe"
 ROM="C:/ai_project/AprNes/etc/Mega Man 5 (USA).nes"
 DURATION=20
+JIT_DURATION=10
 COOLDOWN=30
+TOTAL_RUNS=$((4 * 3))  # 4 resolutions × 3 runs each
+RUN_NUM=0
 DATE=$(date +%Y-%m-%d)
 OUTFILE="C:/ai_project/AprNes/MD/Analog/Analog_Resolution_Benchmark_${DATE}.md"
 
@@ -38,18 +41,17 @@ for SZ in 2 4 6 8; do
     echo "  AnalogSize=${SZ}x  (${W}x${H})"
     echo "============================================================"
 
-    # Run 1: JIT warmup (discard)
-    echo "--- Run 1 (JIT warmup, discard) ---"
-    OUT1=$("$EXE" --rom "$ROM" --benchmark $DURATION --ultra-analog --analog-output RF --analog-size $SZ --crt --accuracy A 2>&1)
+    # Run 1: JIT warmup (discard, no cooldown after)
+    RUN_NUM=$((RUN_NUM + 1))
+    echo "--- [${RUN_NUM}/${TOTAL_RUNS}] Run 1 (JIT warmup ${JIT_DURATION}s, discard) ---"
+    OUT1=$("$EXE" --rom "$ROM" --benchmark $JIT_DURATION --ultra-analog --analog-output RF --analog-size $SZ --crt --accuracy A 2>&1)
     FPS1=$(extract_fps "$OUT1")
     echo "  Run 1: ${FPS1} FPS (discarded)"
     R1[$IDX]="$FPS1"
 
-    echo "--- Cooling ${COOLDOWN}s ---"
-    sleep $COOLDOWN
-
     # Run 2: effective
-    echo "--- Run 2 (effective) ---"
+    RUN_NUM=$((RUN_NUM + 1))
+    echo "--- [${RUN_NUM}/${TOTAL_RUNS}] Run 2 (effective ${DURATION}s) ---"
     OUT2=$("$EXE" --rom "$ROM" --benchmark $DURATION --ultra-analog --analog-output RF --analog-size $SZ --crt --accuracy A 2>&1)
     FPS2=$(extract_fps "$OUT2")
     echo "  Run 2: ${FPS2} FPS"
@@ -59,7 +61,8 @@ for SZ in 2 4 6 8; do
     sleep $COOLDOWN
 
     # Run 3: effective
-    echo "--- Run 3 (effective) ---"
+    RUN_NUM=$((RUN_NUM + 1))
+    echo "--- [${RUN_NUM}/${TOTAL_RUNS}] Run 3 (effective ${DURATION}s) ---"
     OUT3=$("$EXE" --rom "$ROM" --benchmark $DURATION --ultra-analog --analog-output RF --analog-size $SZ --crt --accuracy A 2>&1)
     FPS3=$(extract_fps "$OUT3")
     echo "  Run 3: ${FPS3} FPS"
