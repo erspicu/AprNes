@@ -10,8 +10,8 @@
 
 | 結果 | 數量 | Mapper 列表 |
 |:----:|:----:|------------|
-| ✅ 正常 | 30 | 000, 001, 002, 003, 004, 007, 010, 011, 018, 021, 022, 023, 032, 033, 034, 068, 069, 072, 075, 077, 079, 087, 093, 097, 119, 180, 184, 185, 228, 232 |
-| ⚠️ 部分問題 | 16 | 009, 016, 024, 025, 026, 064, 066, 078, 080, 082, 088, 089, 118, 140, 152, 206 |
+| ✅ 正常 | 31 | 000, 001, 002, 003, 004, 007, 010, 011, 016, 018, 021, 022, 023, 032, 033, 034, 068, 069, 072, 075, 077, 079, 087, 093, 097, 119, 180, 184, 185, 228, 232 |
+| ⚠️ 部分問題 | 15 | 009, 024, 025, 026, 064, 066, 078, 080, 082, 088, 089, 118, 140, 152, 206 |
 | ❌ 有問題 | 10 | 005, 013, 019, 065, 067, 070, 071, 076, 085, 210 |
 | ❓ 待確認 | 2 | 095, 153 |
 | **合計校驗** | **58** | |
@@ -35,7 +35,7 @@
 | **010** | ✅ | |
 | **011** | ✅ | |
 | **013** | ❌ | 有問題 |
-| **016** | ⚠️ | Dragon Ball Z - Kyoushuu Saiya Jin (J) 畫面有問題 |
+| **016** | ✅ | 人工驗證通過（含 Dragon Ball Z - Kyoushuu Saiya Jin） |
 | **018** | ✅ | |
 | **019** | ❌ | 畫面有問題 |
 | **021** | ✅ | |
@@ -102,7 +102,7 @@
 | **013** | CPROM | 固定 32KB PRG；16KB CHR-RAM（上半 4KB 切換） | Videomation | ✅ |
 | **016** | Bandai FCG-1/2 | 16KB PRG，1KB×8 CHR；$6000 regs；CPU cycle IRQ | Dragon Ball (J), Famicom Jump (J) | ✅ |
 | **016** | Bandai LZ93D50 | 同上；$8000 regs；latch IRQ；EEPROM stub | Magical Taruruuto-kun (J) | ✅ |
-| **016** | Dragon Ball Z - Kyoushuu Saiya Jin | CHR bank 交換時序異常（garbled terrain） | Dragon Ball Z - Kyoushuu Saiya Jin (J) | ⚠️ |
+| **016** | Dragon Ball Z - Kyoushuu Saiya Jin | CIRAM read-time mirroring 修復後正常 | Dragon Ball Z - Kyoushuu Saiya Jin (J) | ✅ |
 | **018** | Jaleco SS8806 | 3×8KB PRG + 8×1KB CHR；nibble 寫入；可變寬度 IRQ | Ninja Jajamaru, Pizza Pop!, Magic John, Saiyuuki World 2 | ✅ |
 | **019** | Namco 163 | 3×8KB PRG；8×1KB CHR（≥0xE0 映射 CIRAM）；15-bit 上計數 IRQ；8ch 波形音效 | Splatterhouse (J), Rolling Thunder 2 (J) | ✅ |
 | **020** | FDS 磁碟機 | BIOS + 磁碟流模擬 | — | ❌ |
