@@ -40,7 +40,6 @@ namespace AprNes
         Dictionary<int, KeyMap> NES_KeyMAP = new Dictionary<int, KeyMap>();
         public Dictionary<string, KeyMap> NES_KeyMAP_joypad = new Dictionary<string, KeyMap>();
 
-        List<string> background_pics = new List<string>();
 
         joystick _joystick = new joystick();
 
@@ -52,8 +51,6 @@ namespace AprNes
             InitializeComponent();
             NesCore.OnError = msg => MessageBox.Show(msg);
 
-            if (Directory.Exists(Application.StartupPath + "/Background"))
-                background_pics = Directory.GetFiles(Application.StartupPath + "/Background").Where(s => s.ToLower().EndsWith(".jpg") || s.ToLower().EndsWith(".png")).ToList();
 
             LangINI.init();
             if (LangINI.LangFileMissing)
@@ -115,6 +112,13 @@ namespace AprNes
             // panel 改變大小後重建 Graphics context
             grfx?.Dispose();
             grfx = panel1.CreateGraphics();
+
+            // grfx 重建後，RenderObj 持有的舊 Graphics 已失效，需重新 init
+            unsafe
+            {
+                if (RenderObj != null)
+                    RenderObj.init(NesCore.ScreenBuf1x, grfx);
+            }
 
             if (ScreenCenterFull)
             {
@@ -1223,7 +1227,7 @@ public string GetRomInfo()
 
         private void fun8ToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            this.BackgroundImage = null;
+            this.BackColor = SystemColors.Menu;
             this.WindowState = FormWindowState.Normal;
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             ScreenCenterFull = false;
@@ -1235,8 +1239,7 @@ public string GetRomInfo()
             if (this.WindowState != FormWindowState.Maximized) Opacity = 0;
             panel1.Visible = false;
             UIAbout.Visible = RomInf.Visible = UIOpenRom.Visible = UIReset.Visible = UIConfig.Visible = label3.Visible = false;
-            if (background_pics.Count != 0)
-                this.BackgroundImage = Image.FromFile(background_pics[new Random().Next(0, background_pics.Count)]);
+            this.BackColor = Color.Black;
             this.FormBorderStyle = FormBorderStyle.None;
             this.WindowState = FormWindowState.Maximized;
             this.CenterToScreen();
@@ -1253,7 +1256,7 @@ public string GetRomInfo()
 
         private void normalToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            this.BackgroundImage = null;
+            this.BackColor = SystemColors.Menu;
             this.WindowState = FormWindowState.Normal;
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             label3.Location = new Point(208, 8);

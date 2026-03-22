@@ -1,0 +1,22 @@
+Good follow-ups.
+
+**How I derive Y and C signal levels**
+
+The 2C02's color generation circuit has been thoroughly reverse-engineered. Each of the 64 palette entries is defined by two voltage levels -- "hi" and "lo" -- selected by the luma bits (bits 4-5) and the color phase (bits 0-3). On real hardware, the PPU outputs one of these two voltages on each of the 12 half-phases of the colorburst cycle, producing the composite waveform directly.
+
+This is well-documented: https://www.nesdev.org/wiki/PPU_palettes
+
+Since composite = Y + C by definition, the decomposition is straightforward math, not guesswork:
+
+- Y (luminance) = (hi + lo) / 2 -- the DC component, i.e., the average voltage
+- C (chrominance) = the AC component modulated onto the subcarrier, with amplitude (hi - lo) / 2 and phase determined by palette color index
+
+In my code, for each palette entry I compute yBase[] = (hi+lo)/2 and build cTable[] as the per-phase chroma values: cos(phase)*I - sin(phase)*Q. In composite mode, waveTable[] = yBase + cTable (mixed). In S-Video mode, I simply never add them together -- waveBuf[] gets yBase, cBuf[] gets cTable. The underlying voltage levels are identical either way; the only difference is whether they travel on one wire or two.
+
+So I'm not inventing signal levels the PPU "can't generate" -- I'm decomposing the exact same signal it does generate into its constituent parts, which is precisely what an external Y/C separator (or an NESRGB mod) does, just with perfect separation that analog circuits can only approximate.
+
+**On "historically accurate" I/Q decoding**
+
+Fair point -- the majority of NES players watched on consumer sets that used symmetric (U/V-style) decoding, not true I/Q. In practice, the visual difference is subtle: slightly more color detail along the skin-tone axis with I/Q, slightly different fringing patterns. For most NES content it's hard to spot.
+
+That said, my goal was to model the signal path correctly from spec, then let the user choose what matters to them. I offer RF, Composite, and S-Video modes to cover the range from "noisy living room TV" to "clean studio monitor." Adding a symmetric-decoder option would be straightforward if there's demand -- it's just a matter of using equal-width filters for both axes. But I started with the spec-correct version as the baseline.

@@ -1,0 +1,28 @@
+Great questions -- let me address both.
+
+**S-Video and the NES PPU**
+
+You're right that the 2C02 PPU generates composite on-die -- there's no Y/C separation point on the original silicon, so you can't get true S-Video from the PPU's analog output pin alone. But the common hardware mod (NESRGB by Tim Worthington) doesn't actually replace the PPU. It taps the PPU's digital palette index bus before the internal DAC/encoder, then an FPGA generates clean RGB or S-Video externally. The PPU stays in place; you're just bypassing its analog composite encoder.
+
+Our S-Video simulation does conceptually the same thing: since we already have the palette index (the digital color value), we generate Y and C as two separate signal paths from the start -- waveBuf[] carries pure luminance (with slew rate and ringing simulation), and cBuf[] carries pure chrominance (from a phase-indexed lookup table). The demodulator then reads I/Q from the chrominance-only buffer instead of trying to extract them from a composite signal.
+
+In composite mode, luma and chroma share one wire, so the luma lowpass filter can never perfectly reject chroma residuals -- you get dot crawl and rainbow fringing. In S-Video mode, they were never mixed, so those artifacts simply don't exist. You still get analog-domain effects like bandwidth-limited chroma, slew rate limiting, and ringing on the Y channel -- just without the cross-contamination. So "hardware mod" in the original post was shorthand for mods like NESRGB -- I should have been more precise.
+
+**Why asymmetric I/Q filters instead of identical U/V filters**
+
+This comes down to the difference between NTSC I/Q and PAL-style symmetric U/V decoding. The NTSC standard (SMPTE 170M / FCC 73.682) intentionally specifies asymmetric bandwidths:
+
+- I channel: 1.3 MHz (our implementation: 18-tap Hann window at 21.477 MHz)
+- Q channel: 0.4 MHz (54-tap Hann window)
+
+The I axis was deliberately rotated 33 degrees from (R-Y) to align with the orange-cyan range -- skin tones and earth tones -- where human vision has higher chroma acuity. The Q axis (magenta-green) covers colors the eye is less sensitive to, so it gets a narrower bandwidth.
+
+You're correct that most consumer TVs took a shortcut: demodulate at 0 and 90 degrees (recovering B-Y and R-Y, essentially U and V) with two identical ~0.5 MHz filters. Cheaper to build, no 33-degree phase offset needed, and good enough for living room viewing. Sometimes called "wideband I" or "symmetric decoding."
+
+Since we're simulating in software with no hardware cost constraint, we went with spec-correct I/Q. The practical results:
+
+1. More color detail along the I axis -- 1.3 MHz of chroma resolution in the skin-tone direction vs. ~0.5 MHz with symmetric decoding
+2. Correct asymmetric chroma fringing that differs from what a symmetric decoder produces
+3. Historically accurate for higher-end NTSC monitors and professional equipment that did implement true I/Q
+
+We're already running a 21.477 MHz time-domain simulation with per-sample FIR convolution, so using two different kernel widths (18 vs 54 taps) costs essentially nothing. No reason to compromise to the symmetric shortcut that only existed because of analog component costs.

@@ -1,0 +1,33 @@
+Thanks for the detailed feedback -- really appreciate you going through the site that carefully.
+
+**Chinese fragments in the English version**
+
+Yeah, I know some slipped through. The site uses a JS-based i18n switcher with data-i18n attributes, and a few strings were missed during translation passes. I'll do another cleanup.
+
+**"Release build" confusion**
+
+I was using "Release build" in the literal .NET/MSBuild sense -- Debug configuration vs Release configuration. The performance page documents a chronological optimization journey: optimizations #1-12 were all done while AprNes was compiled in Debug configuration (which is how it historically shipped -- long story). Then I switched to Release configuration, re-benchmarked everything, and continued with optimizations #13-17 in Release.
+
+So "Switched to Release build" means exactly what it normally means -- I changed MSBuild from /p:Configuration=Debug to /p:Configuration=Release. And "catchUp loop unroll (Release)" means that specific loop unrolling was done after the switch to Release config. The "(Release)" tag is just marking which build configuration that optimization was measured under.
+
+The reason this matters enough to call out: .NET Framework Debug JIT basically skips most optimizations -- no loop unrolling, poor register allocation, minimal inlining. So many of the manual optimizations in #1-12 (local shadows for static fields, hand-unrolled loops, manual inlining) were necessary specifically because Debug JIT wouldn't do them. After switching to Release, some of those manual optimizations became redundant (the JIT does them automatically), while others still helped on top of what RyuJIT already does.
+
+**"JIT AggressiveInlining"**
+
+AprNes does use a JIT -- it's .NET Framework running on CLR's RyuJIT. C# is JIT-compiled, not AOT (at least in .NET Framework). The [MethodImpl(MethodImplOptions.AggressiveInlining)] attribute is a hint telling RyuJIT to inline a method even if it exceeds the default size threshold. In this case, applying it to the sprite evaluation hot-path methods (SpriteEvalTick/Init/End/Yinc) gave a measurable +2.2% speedup. Interestingly, applying it to the larger RenderBGTile method backfired (-1.5%) because the inlined body bloated the caller to ~115 lines, causing I-cache pressure.
+
+**AVX-512 / SIMD**
+
+Correct -- my Ryzen 7 3700X (Zen2) tops out at AVX2 / 256-bit vectors. AVX-512 would need a Zen4+ upgrade. The current UltraAnalog SIMD code uses System.Numerics.Vector<float> which maps to whatever the hardware supports (SSE2/AVX2), so it would automatically widen to 512-bit on capable hardware without code changes.
+
+**SWAR for PPU**
+
+Interesting idea. The PPU hot path (ppu_rendering_tick) is heavily sequential -- each dot depends on the previous dot's state (shift registers, sprite evaluation FSM, A12 edge detection for MMC3 IRQ). The per-dot data dependencies make it hard to parallelize within a scanline. But there might be opportunities for SWAR in the tile fetch / shift register logic -- I'll look into it.
+
+**Multi-core for UltraAnalog+CRT**
+
+I'm already using Parallel.For for the DemodulateRow pass (each scanline is independent once the waveform is generated). The CRT post-processing pipeline (bloom, phosphor persistence, vignette) also processes scanlines independently. There's definitely room to push this further -- right now the waveform generation is still single-threaded because it runs interleaved with PPU rendering.
+
+**Compute shaders**
+
+Noted. The current plan is CPU+SIMD first for maximum hardware compatibility (VMs, remote desktop, old integrated GPUs, some ARM devices -- not all environments have usable GPU compute). Once the algorithms are locked down, porting the UltraAnalog+CRT pipeline to compute shaders is a natural next step. Thanks for the tip about compute vs vertex/fragment -- that matches my thinking.

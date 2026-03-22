@@ -1,0 +1,7 @@
+You're right that the 2C02 PPU generates composite on-die -- there's no Y/C separation point on the original silicon. But the common hardware mod (NESRGB by Tim Worthington) doesn't replace the PPU. It taps the PPU's digital palette index bus before the internal DAC/encoder, then an FPGA generates clean RGB or S-Video externally. The PPU stays in place; you're just bypassing its analog composite encoder.
+
+Our S-Video simulation does conceptually the same thing: since we already have the palette index (the digital color value), we generate Y and C as two separate signal paths from the start -- waveBuf[] carries pure luminance (with slew rate and ringing simulation), and cBuf[] carries pure chrominance (from a phase-indexed lookup table). The demodulator then reads I/Q from the chrominance-only buffer instead of trying to extract them from a composite signal.
+
+The difference in practice: in composite mode, luma and chroma share one wire, so the luma lowpass filter can never perfectly reject chroma residuals -- resulting in dot crawl and rainbow fringing. In S-Video mode, they were never mixed, so those artifacts simply don't exist. You still get analog-domain effects like bandwidth-limited chroma, slew rate limiting, and ringing on the Y channel -- but without the cross-contamination.
+
+So "hardware mod" was shorthand for mods like NESRGB that tap the digital side of the PPU. I should have been more precise -- you're right that you can't get S-Video from the PPU's analog output pin alone.
