@@ -45,7 +45,8 @@ namespace AprNes
 
         //ppu ctrl 0x2000
         static int BaseNameTableAddr = 0, VramaddrIncrement = 1, SpPatternTableAddr = 0, BgPatternTableAddr = 0;
-        static bool Spritesize8x16 = false, NMIable = false;
+        static public bool Spritesize8x16 = false;
+        static bool NMIable = false;
 
         //ppu mask 0x2001
         public static bool ShowBackGround = false, ShowSprites = false;
@@ -55,6 +56,10 @@ namespace AprNes
         // NTSC 類比模式：每條掃描線的原始調色盤索引緩衝區（256 bytes，0x00-0x3F）
         // 由 RenderBGTile 和 RenderSpritesLine 在 AnalogEnabled=true 時填入
         static byte[] ntscScanBuf = new byte[256];
+
+        // MMC5 extended attribute mode (per-tile palette + CHR bank from ExRAM)
+        static ushort extAttrNTOffset;  // nametable offset saved at phase 1
+        static int extAttrChrBank;      // 4KB CHR bank computed at phase 3
 
         //ppu status 0x2002.
         static bool isSpriteOverflow = false, isSprite0hit = false, isVblank = false;
@@ -252,24 +257,42 @@ namespace AprNes
                         NTVal = ntBankPtrs[(ioaddr >> 10) & 3][ioaddr & 0x3FF];
                     else
                         NTVal = ppu_ram[CIRAMAddr(ioaddr)];
+                    if (extAttrEnabled) extAttrNTOffset = (ushort)(ioaddr & 0x3FF);
                 } else if (phase == 2) {
                     ioaddr = 0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07);
                 } else if (phase == 3) {
-                    if (ntChrOverrideEnabled)
+                    if (extAttrEnabled && extAttrNTOffset < 960) {
+                        byte exVal = extAttrRAM[extAttrNTOffset];
+                        extAttrChrBank = (exVal & 0x3F) | (extAttrChrUpperBits << 6);
+                        ATVal = (byte)((exVal >> 6) & 3);
+                    } else if (ntChrOverrideEnabled) {
                         ATVal = (byte)((ntBankPtrs[(ioaddr >> 10) & 3][ioaddr & 0x3FF] >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
-                    else
+                    } else {
                         ATVal = (byte)((ppu_ram[CIRAMAddr(ioaddr)] >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
+                    }
                     bg_attr_p3 = bg_attr_p2; bg_attr_p2 = bg_attr_p1; bg_attr_p1 = ATVal;
                 } else if (phase == 4) {
-                    ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
+                    if (extAttrEnabled && extAttrChrSize > 0)
+                        ioaddr = (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7);
+                    else
+                        ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
                     if (mapperNeedsA12) NotifyMapperA12(ioaddr);  // CHR low addr
                 } else if (phase == 5) {
-                    lowTile = chrBankPtrs[(ioaddr >> 10) & 7][ioaddr & 0x3FF];
+                    if (extAttrEnabled && extAttrChrSize > 0)
+                        lowTile = extAttrCHR[ioaddr % extAttrChrSize];
+                    else
+                        lowTile = chrBankPtrs[(ioaddr >> 10) & 7][ioaddr & 0x3FF];
                 } else if (phase == 6) {
-                    ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
+                    if (extAttrEnabled && extAttrChrSize > 0)
+                        ioaddr = (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
+                    else
+                        ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
                     if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(ioaddr);  // MMC2/MMC4: CHR high triggers latch
                 } else {
-                    highTile = chrBankPtrs[(ioaddr >> 10) & 7][ioaddr & 0x3FF];
+                    if (extAttrEnabled && extAttrChrSize > 0)
+                        highTile = extAttrCHR[ioaddr % extAttrChrSize];
+                    else
+                        highTile = chrBankPtrs[(ioaddr >> 10) & 7][ioaddr & 0x3FF];
                     // Render 8 pixels using shift registers BEFORE reload (visible only, BG on)
                     if (scanline < 240 && cx < 256 && ShowBackGround)
                         RenderBGTile(cx);
