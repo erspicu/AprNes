@@ -63,6 +63,12 @@ namespace AprNes
         static bool vram_latch = false;
         static byte ppu_2007_buffer = 0, ppu_2007_temp = 0;
         static int ppu2007ReadCooldown = 0; // 6 PPU dots cooldown after $2007 read (Mesen2: _ignoreVramRead)
+
+        // $2006 delayed t→v copy (TriCNES model: 3 PPU dots after CPU write)
+        // Real hardware doesn't update vram_addr immediately on the second $2006 write;
+        // there's a ~4-5 PPU dot delay depending on CPU/PPU alignment.
+        static int ppu2006UpdateDelay = 0;
+        static int ppu2006PendingAddr = 0;
         static byte* spr_ram;
         static public byte* ppu_ram;
 
@@ -337,6 +343,13 @@ namespace AprNes
         {
             // $2007 read cooldown (suppresses rapid consecutive reads)
             if (ppu2007ReadCooldown > 0) ppu2007ReadCooldown--;
+
+            // $2006 delayed t→v copy
+            if (ppu2006UpdateDelay > 0 && --ppu2006UpdateDelay == 0)
+            {
+                vram_addr = ppu2006PendingAddr;
+                if (mapperNeedsA12) NotifyMapperA12(vram_addr);
+            }
 
             // Open bus decay
             if (--open_bus_decay_timer == 0)
@@ -1270,7 +1283,7 @@ namespace AprNes
             }
             vram_latch = !vram_latch;
         }
-        static void ppu_w_2006(byte value)//ok
+        static void ppu_w_2006(byte value)
         {
             openbus = value;
             if (!vram_latch) //first
@@ -1278,8 +1291,11 @@ namespace AprNes
             else
             {
                 vram_addr_internal = (vram_addr_internal & 0x7F00) | value;
-                vram_addr = vram_addr_internal;
-                if (mapperNeedsA12) NotifyMapperA12(vram_addr);
+                // Delayed t→v copy: real hardware takes ~4-5 PPU dots after the CPU write.
+                // In AprNes's tick-before-write model, 3 PPU dots of the current CPU cycle
+                // have already executed, so a delay of 3 more gives ~5-6 total from cycle start.
+                ppu2006PendingAddr = vram_addr_internal;
+                ppu2006UpdateDelay = 3;
             }
             vram_latch = !vram_latch;
         }
