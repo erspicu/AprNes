@@ -1,6 +1,6 @@
 # AprNes Mapper 實作狀態
 
-**總計已實作：57 個　　最後更新：2026-03-23**
+**總計已實作：57 個　　最後更新：2026-03-24**
 
 結果說明：✅ 正常　⚠️ 部分問題　❌ 有問題　❓ 待確認／不明
 
@@ -10,8 +10,8 @@
 
 | 結果 | 數量 | Mapper 列表 |
 |:----:|:----:|------------|
-| ✅ 正常 | 31 | 000, 001, 002, 003, 004, 007, 010, 011, 016, 018, 021, 022, 023, 032, 033, 034, 068, 069, 072, 075, 077, 079, 087, 093, 097, 119, 180, 184, 185, 228, 232 |
-| ⚠️ 部分問題 | 15 | 009, 024, 025, 026, 064, 066, 078, 080, 082, 088, 089, 118, 140, 152, 206 |
+| ✅ 正常 | 33 | 000, 001, 002, 003, 004, 007, 010, 011, 016, 018, 021, 022, 023, 026, 032, 033, 034, 068, 069, 072, 075, 077, 078, 079, 087, 093, 097, 119, 180, 184, 185, 228, 232 |
+| ⚠️ 部分問題 | 13 | 009, 024, 025, 064, 066, 080, 082, 088, 089, 118, 140, 152, 206 |
 | ❌ 有問題 | 10 | 005, 013, 019, 065, 067, 070, 071, 076, 085, 210 |
 | ❓ 待確認 | 2 | 095, 153 |
 | **合計校驗** | **58** | |
@@ -43,7 +43,7 @@
 | **023** | ✅ | |
 | **024** | ⚠️ | Akumajou Densetsu (J) 正常；其他遊戲待確認 |
 | **025** | ⚠️ | 部分遊戲有問題 |
-| **026** | ⚠️ | Esper Dream 2 - Aratanaru Tatakai (J) 畫面怪怪的 |
+| **026** | ✅ | Esper Dream 2 - Aratanaru Tatakai (J) 已修復（2026-03-24） |
 | **032** | ✅ | |
 | **033** | ✅ | |
 | **034** | ✅ | 人工驗證通過 |
@@ -59,7 +59,7 @@
 | **075** | ✅ | |
 | **076** | ❌ | Battle City - Zen Ge Hack V4 遊戲運行問題（hack ROM） |
 | **077** | ✅ | |
-| **078** | ⚠️ | Uchuusen - Cosmo Carrier (J) 畫面有問題 |
+| **078** | ✅ | Uchuusen - Cosmo Carrier (J) 已修復（2026-03-24） |
 | **079** | ✅ | |
 | **080** | ⚠️ | 畫面怪怪的 |
 | **082** | ⚠️ | 畫面怪怪的 |
@@ -119,7 +119,7 @@
 | **064** | Klax | 進入遊戲後畫面異常（停留標題循環） | Klax (Tengen) | ⚠️ |
 | **065** | Irem H-3001 | 3×8KB PRG switchable；16-bit CPU cycle IRQ | Daiku no Gen San 2 — intro 捲軸條紋 | ⚠️ |
 | **066** | GxROM | 32KB PRG × 8KB CHR 一次寫入 | DragonBall (J), Gumshoe (U) | ✅ |
-| **067** | Sunsoft-3 | 16KB PRG；4×2KB CHR；16-bit 下計數 IRQ | Fantasy Zone 2 (J), Mito Koumon II (J) | ✅ |
+| **067** | Sunsoft-3 | 16KB PRG；4×2KB CHR；16-bit 下計數 IRQ | Fantasy Zone 2 (J), Mito Koumon II (J) | ❌ |
 | **068** | Sunsoft #4 | 16KB PRG（固定末）；4×2KB CHR；CHR-as-nametable | AfterBurner II (J), Maharaja (J) | ✅ |
 | **069** | Sunsoft FME-7 | CPU cycle IRQ；PRG-RAM 分頁；4種鏡像 | Batman (J), Gimmick! (J) | ✅ |
 | **069** | Sunsoft 5B 擴充音效 | YM2149 3ch 音效未實作 | — | ⚠️ |
@@ -130,7 +130,7 @@
 | **076** | Namco 109 | Namco108 架構；reg[2-5]=2KB CHR | Digital Devil Monogatari - Megami Tensei (J) | ✅ |
 | **077** | Napoleon Senki / IremLrog017 | 32KB PRG；slot0=CHR-ROM 2KB，slots1-3=CHR-RAM 6KB | Napoleon Senki (J) | ✅ |
 | **078** | Irem 74HC161/32 | 16KB PRG 切換；4KB×2 CHR；subMapper 鏡像差異 | Holy Diver (J) | ✅ |
-| **078** | Uchuusen Cosmo Carrier | intro 黑畫面（submapper 鏡像異常） | Uchuusen Cosmo Carrier (J) | ⚠️ |
+| **078** | Uchuusen Cosmo Carrier | submapper 鏡像修復，正常運作 | Uchuusen Cosmo Carrier (J) | ✅ |
 | **079** | NINA-03 / NINA-06 (AVE) | (addr&0xE100)==0x4100；32KB PRG + 8KB CHR | Blackjack (AVE), Deathbots (AVE) | ✅ |
 | **080** | Taito X1-005 | $7EF0–$7EFF regs；3×8KB PRG；2KB+1KB×4 CHR；RAM unlock | Minelvaton Saga (J), Fudou Myouou Den (J) | ✅ |
 | **082** | Taito X1-017 | $7EF0–$7EFF regs；chrMode 1KB/2KB；SRAM unlock seq | SD Keiji Blader (J), Harikiri Stadium (J) | ✅ |
