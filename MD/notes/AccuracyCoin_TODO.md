@@ -1,7 +1,7 @@
 # AccuracyCoin 修復追蹤
 
 **基線**: 136/136 PASS, 0 FAIL, 0 SKIP ✓ PERFECT
-**最後更新**: 2026-03-14
+**最後更新**: 2026-03-23
 **分支**: master
 
 ---
@@ -74,6 +74,13 @@
 ## 全部完成
 
 所有 136 項 AccuracyCoin 測試全數通過。blargg 174/174 無回歸。
+
+---
+
+## 後續精度改進（非 AC 回歸，遊戲相容性）
+
+- [x] **BUGFIX57**: PPU $2006 delayed t→v copy — 修復洛克人5 垂直平台震動 (2026-03-23)
+- [x] **CIRAM Read-Time Mirroring** — 修復洛克人5 電梯場景重複平台 (2026-03-23)
 
 ---
 
