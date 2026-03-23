@@ -1,5 +1,16 @@
 # AprNes CRT Television Simulation
 
+> **Last revised**: 2026-03-23 19:27
+>
+> **Revision notes** (2026-03-23): Corrected 5 documentation errors based on NESdev forum feedback:
+> 1. **BrightnessBoost**: Removed incorrect claim that "CRT circuits compensate by increasing drive voltage"; replaced with Gaussian beam overlap naturally filling gaps, boost compensating for discrete simulation brightness loss
+> 2. **I/Q bandwidth asymmetry**: Added note that implementation follows the 1953 NTSC spec, but consumer TVs since the 1960s switched to symmetric quadrature demodulation (citing Poynton)
+> 3. **Interlace Jitter**: Labeled as aesthetic effect — NES outputs 240p progressive; no physical mechanism for inter-field jitter exists
+> 4. **Phosphor Persistence**: Labeled as artistic enhancement; added real P22 phosphor decay time data (far faster than simulated values)
+> 5. **Beam Convergence**: Added nuance about variation by TV quality and age; cited SMPTE RP 167 acceptable tolerances
+>
+> The above are documentation corrections. Where the implementation itself is incorrect, code fixes will follow as appropriate.
+
 ## Introduction
 
 Before LCD screens became ubiquitous, every home game console connected to a CRT (cathode-ray tube) television via analog signals. The NES did not output the crisp digital pixels we're familiar with today — it produced an **NTSC composite video** waveform, using the same standard as broadcast television of the era.
@@ -226,7 +237,7 @@ After generating the composite waveform, the emulator plays the role of a "telev
 - **I channel**: 18-tap Hann-windowed FIR bandpass, with in-phase subcarrier multiplication demodulation
 - **Q channel**: 54-tap Hann-windowed FIR bandpass, with quadrature subcarrier multiplication demodulation
 
-I and Q have different bandwidths (I is wider, Q is narrower) — this is by NTSC standard design. The human eye has higher color resolution in the orange-cyan direction than the purple-green direction, so more bandwidth is allocated to I. The emulator faithfully reproduces this asymmetry.
+I and Q have different bandwidths (I is wider, Q is narrower) — this follows the original 1953 NTSC standard (FCC Title 47 §73.682), which specified I: 0–1.3 MHz and Q: 0–0.5 MHz. However, as Charles Poynton documents in "Digital Video and HD: Algorithms and Interfaces" (2nd ed., §22.5), by the early 1960s virtually all consumer TV sets switched to symmetric quadrature demodulation with ~0.5 MHz bandwidth for both chroma axes (B-Y/R-Y rather than I/Q), as asymmetric demodulation was more expensive to implement with minimal perceptual benefit. The emulator currently faithfully reproduces the 1953 standard's asymmetry (kWinI=18, kWinQ=54), but this does not match what NES-era (1985–1995) consumer TVs actually did. Blargg's widely-used NES NTSC filter also uses symmetric bandwidth.
 
 ### IIR Analog Circuit Simulation
 
@@ -259,7 +270,7 @@ The more energy in the electron beam, the larger the spot. The emulator calculat
 
 ### BrightnessBoost (Brightness Compensation)
 
-The dark gaps between scanlines make the overall picture appear darker than the original signal. Real CRT circuits compensate for this loss by increasing drive voltage. The emulator uses a BrightnessBoost coefficient to achieve the same effect, ensuring analog mode's overall brightness matches non-analog mode.
+The dark gaps between scanlines make the overall picture appear darker than the original signal. On a real CRT, the Gaussian beam profile's tails spread beyond the intended scanline, causing adjacent scanlines to physically overlap — so the dark gaps are less pronounced than in a discrete digital simulation. The emulator uses a BrightnessBoost coefficient to compensate for the inherent brightness loss of discrete simulation, a standard practice in CRT shaders (CRT-Royale, CRT-Geom, etc. all use a similar brightness compensation factor), ensuring analog mode's overall brightness matches non-analog mode.
 
 ### Multi-Resolution Rendering
 
@@ -319,11 +330,11 @@ The principles of scanlines and bloom were explained in the "Core Analog Engine"
 #### Horizontal Beam Spread
 The electron beam has width not only vertically but horizontally as well. This causes light from adjacent pixels to bleed into each other, producing a subtle horizontal softening effect. At higher brightness, the beam spot is larger and blur more pronounced.
 
-#### Phosphor Persistence
-After being excited by the electron beam, CRT screen phosphors don't extinguish immediately — they gradually decay over several milliseconds. This means fast-moving objects leave brief afterimage trails. This effect also smooths interlace jitter — the previous frame's afterglow fills in the current frame's displacement, so the eye perceives a stable image rather than jumping.
+#### Phosphor Persistence [Artistic Enhancement]
+P22 phosphor (standard for color CRT TVs) has approximate persistence times to 10% brightness: Red (Y₂O₂S:Eu) ~1–3 ms, Green (ZnS:Cu,Al) ~1 ms, Blue (ZnS:Ag) ~20–60 μs. At 60 Hz NTSC, the frame period is 16.7 ms — after one full frame, even the slowest P22 component has decayed to well below 1%, essentially invisible. The emulator's PhosphorDecay = 0.6 (60% carryover per frame) is vastly exaggerated compared to real P22 physics. This feature is an artistic enhancement, similar to the "ghosting" option in many CRT shaders, providing a visual style some users enjoy, but it is not a faithful reproduction of real P22 phosphor behavior.
 
-#### Interlace Field Jitter
-Real CRTs have a slight vertical offset in scanline positions between alternating fields. Although the NES outputs a 240p progressive signal, CRT deflection circuits still exhibit this slight inter-field jitter. Combined with phosphor persistence, this jitter is smoothed into a gentle "breathing" quality.
+#### Interlace Field Jitter [Aesthetic Effect]
+The NES outputs 240p progressive video (262 lines/frame, non-interlaced). Every frame starts at the same vertical position — there are no alternating fields with half-scanline offsets. The CRT vertical deflection circuit simply follows the sync pulses, which are identical every frame for 240p. There is no physical mechanism for "inter-field jitter" on a progressive signal. This feature is a purely aesthetic/artistic effect, not a faithful simulation of hardware behavior. For authentic slow visual oscillation, one should simulate the beat frequency between mains power (60 Hz) and NES vsync (60.0988 Hz), which produces a ~17-second beat pattern known as the "hum bar" effect.
 
 #### Shadow Mask / Aperture Grille
 Each "pixel" on a CRT screen actually consists of red, green, and blue phosphor dots separated by a metal mask. The emulator provides two types:
@@ -337,7 +348,7 @@ CRT television screens are not flat — they bulge slightly outward. This produc
 CRT screen edges and corners are darker than the center. This is because the electron beam must deflect at greater angles to reach the screen edges — longer path, more dispersed energy. The effect is brightest at center, gradually darkening toward the periphery.
 
 #### Beam Convergence
-CRT televisions have three electron guns responsible for red, green, and blue respectively. Ideally, all three beams should hit exactly the same spot. In practice, edge convergence is never perfect — red and blue shift slightly to either side, causing colored fringing on objects near the screen edges. Convergence is best at the screen center and worsens toward the edges.
+CRT televisions have three electron guns responsible for red, green, and blue respectively. Ideally, all three beams should hit exactly the same spot. Quality CRT TVs had static and dynamic convergence adjustments, and a well-calibrated set would show minimal convergence error. However, many cheap consumer TVs (the kind most NES players used) had mediocre convergence, especially at edges/corners; convergence also degraded over time as components aged. Even well-adjusted TVs typically showed 0.5–2mm misconvergence at screen edges (per SMPTE RP 167 acceptable tolerances). The default ConvergenceStrength = 2.0 pixels is on the high side for a well-maintained TV but reasonable for an aged or cheap set. Convergence is best at the screen center and worsens toward the edges; this parameter is adjustable (including 0 = off).
 
 ---
 
