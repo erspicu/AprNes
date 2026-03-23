@@ -445,17 +445,21 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ProcessRowMask_SWAR(uint* row, int ty, int dstW, uint udim, bool isSM)
         {
+            // ★ 正確的 SWAR 寫法：均勻衰減全通道 → mask 還原保留通道
+            // R+B 用 SWAR 一次乘法處理兩通道，G 單獨處理，再用位元遮罩還原要保留的通道
             int phase = (isSM && (ty & 1) != 0) ? 1 : 0;
             int tx = 0;
 
             // Prologue: align to phase 0
             if (phase == 1 && tx < dstW)
             {
-                { uint px = row[tx]; uint r = ((px >> 16 & 0xFFu) * udim) >> 8; uint g = (px >> 8) & 0xFFu; uint b = ((px & 0xFFu) * udim) >> 8; row[tx] = 0xFF000000u | (r << 16) | (g << 8) | b; }
+                // Phase 1: keep G, dim R+B
+                { uint px = row[tx]; uint dimRB = ((px & 0x00FF00FFu) * udim >> 8) & 0x00FF00FFu; uint dimG = (((px >> 8) & 0xFFu) * udim >> 8) << 8; row[tx] = 0xFF000000u | (px & 0x0000FF00u) | dimRB; }
                 tx++;
                 if (tx < dstW)
                 {
-                    { uint px = row[tx]; uint r = ((px >> 16 & 0xFFu) * udim) >> 8; uint g = ((px >> 8 & 0xFFu) * udim) >> 8; uint b = px & 0xFFu; row[tx] = 0xFF000000u | (r << 16) | (g << 8) | b; }
+                    // Phase 2: keep B, dim R+G
+                    uint px = row[tx]; uint dimRB = ((px & 0x00FF00FFu) * udim >> 8) & 0x00FF00FFu; uint dimG = (((px >> 8) & 0xFFu) * udim >> 8) << 8; row[tx] = 0xFF000000u | (px & 0x000000FFu) | (dimRB & 0x00FF0000u) | dimG;
                     tx++;
                 }
             }
@@ -464,47 +468,57 @@ namespace AprNes
             int limit = dstW - 2;
             for (; tx < limit; tx += 3)
             {
-                { uint px = row[tx]; uint r = (px >> 16) & 0xFFu; uint g = ((px >> 8 & 0xFFu) * udim) >> 8; uint b = ((px & 0xFFu) * udim) >> 8; row[tx] = 0xFF000000u | (r << 16) | (g << 8) | b; }
-                { uint px = row[tx + 1]; uint r = ((px >> 16 & 0xFFu) * udim) >> 8; uint g = (px >> 8) & 0xFFu; uint b = ((px & 0xFFu) * udim) >> 8; row[tx + 1] = 0xFF000000u | (r << 16) | (g << 8) | b; }
-                { uint px = row[tx + 2]; uint r = ((px >> 16 & 0xFFu) * udim) >> 8; uint g = ((px >> 8 & 0xFFu) * udim) >> 8; uint b = px & 0xFFu; row[tx + 2] = 0xFF000000u | (r << 16) | (g << 8) | b; }
+                // Phase 0: keep R, dim G+B — SWAR 均勻衰減 R+B，還原 R 從原始值
+                { uint px = row[tx]; uint dimRB = ((px & 0x00FF00FFu) * udim >> 8) & 0x00FF00FFu; uint dimG = (((px >> 8) & 0xFFu) * udim >> 8) << 8; row[tx] = 0xFF000000u | (px & 0x00FF0000u) | dimG | (dimRB & 0xFFu); }
+                // Phase 1: keep G, dim R+B — SWAR 均勻衰減 R+B，還原 G 從原始值
+                { uint px = row[tx + 1]; uint dimRB = ((px & 0x00FF00FFu) * udim >> 8) & 0x00FF00FFu; row[tx + 1] = 0xFF000000u | (px & 0x0000FF00u) | dimRB; }
+                // Phase 2: keep B, dim R+G — SWAR 均勻衰減 R+B，還原 B 從原始值
+                { uint px = row[tx + 2]; uint dimRB = ((px & 0x00FF00FFu) * udim >> 8) & 0x00FF00FFu; uint dimG = (((px >> 8) & 0xFFu) * udim >> 8) << 8; row[tx + 2] = 0xFF000000u | (px & 0x000000FFu) | (dimRB & 0x00FF0000u) | dimG; }
             }
 
             // Epilogue
             if (tx < dstW)
             {
-                { uint px = row[tx]; uint r = (px >> 16) & 0xFFu; uint g = ((px >> 8 & 0xFFu) * udim) >> 8; uint b = ((px & 0xFFu) * udim) >> 8; row[tx] = 0xFF000000u | (r << 16) | (g << 8) | b; }
+                { uint px = row[tx]; uint dimRB = ((px & 0x00FF00FFu) * udim >> 8) & 0x00FF00FFu; uint dimG = (((px >> 8) & 0xFFu) * udim >> 8) << 8; row[tx] = 0xFF000000u | (px & 0x00FF0000u) | dimG | (dimRB & 0xFFu); }
                 tx++;
                 if (tx < dstW)
-                { uint px = row[tx]; uint r = ((px >> 16 & 0xFFu) * udim) >> 8; uint g = (px >> 8) & 0xFFu; uint b = ((px & 0xFFu) * udim) >> 8; row[tx] = 0xFF000000u | (r << 16) | (g << 8) | b; }
+                { uint px = row[tx]; uint dimRB = ((px & 0x00FF00FFu) * udim >> 8) & 0x00FF00FFu; row[tx] = 0xFF000000u | (px & 0x0000FF00u) | dimRB; }
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ProcessRowMaskPhosphor_SWAR(uint* row, uint* prw, int ty, int dstW, uint udim, uint udec, bool isSM)
         {
+            // ★ 正確的 SWAR 寫法：均勻衰減 + mask 還原 + SWAR 磷光衰減
+            // 蔭罩：SWAR 均勻 udim 衰減 R+B → mask 還原保留通道
+            // 磷光：SWAR 均勻 udec 衰減（已正確，保持不變）
+            // ★ Positional Math.Max：通道留在原始位元位置直接比較，JIT 編譯為 CMOV（無分支）
+            //   省掉 6 次 shift-extract + 6 次 local + 3 次 branch + 3 次 shift-reassemble
             int phase = (isSM && (ty & 1) != 0) ? 1 : 0;
             int tx = 0;
 
             // Prologue: align to phase 0
             if (phase == 1 && tx < dstW)
             {
+                // Phase 1: keep G, dim R+B
                 {
                     uint px = row[tx], prv = prw[tx];
-                    uint r = ((px >> 16 & 0xFFu) * udim) >> 8; uint g = (px >> 8) & 0xFFu; uint b = ((px & 0xFFu) * udim) >> 8;
-                    uint dec_rb = ((prv & 0x00FF00FFu) * udec >> 8) & 0x00FF00FFu; uint dec_g = ((prv >> 8 & 0xFFu) * udec) >> 8;
-                    uint pr = dec_rb >> 16, pb = dec_rb & 0xFFu, pg = dec_g;
-                    if (pr > r) r = pr; if (pg > g) g = pg; if (pb > b) b = pb;
-                    uint res = 0xFF000000u | (r << 16) | (g << 8) | b; row[tx] = res; prw[tx] = res;
+                    uint dimRB = ((px & 0x00FF00FFu) * udim >> 8) & 0x00FF00FFu;
+                    uint masked = (px & 0x0000FF00u) | dimRB;
+                    uint dec_rb = ((prv & 0x00FF00FFu) * udec >> 8) & 0x00FF00FFu; uint dec_g = (((prv >> 8) & 0xFFu) * udec >> 8) << 8;
+                    uint res = 0xFF000000u | Math.Max(masked & 0x00FF0000u, dec_rb & 0x00FF0000u) | Math.Max(masked & 0x0000FF00u, dec_g) | Math.Max(masked & 0x000000FFu, dec_rb & 0x000000FFu);
+                    row[tx] = res; prw[tx] = res;
                 }
                 tx++;
                 if (tx < dstW)
                 {
+                    // Phase 2: keep B, dim R+G
                     uint px = row[tx], prv = prw[tx];
-                    uint r = ((px >> 16 & 0xFFu) * udim) >> 8; uint g = ((px >> 8 & 0xFFu) * udim) >> 8; uint b = px & 0xFFu;
-                    uint dec_rb = ((prv & 0x00FF00FFu) * udec >> 8) & 0x00FF00FFu; uint dec_g = ((prv >> 8 & 0xFFu) * udec) >> 8;
-                    uint pr = dec_rb >> 16, pb = dec_rb & 0xFFu, pg = dec_g;
-                    if (pr > r) r = pr; if (pg > g) g = pg; if (pb > b) b = pb;
-                    uint res = 0xFF000000u | (r << 16) | (g << 8) | b; row[tx] = res; prw[tx] = res;
+                    uint dimRB = ((px & 0x00FF00FFu) * udim >> 8) & 0x00FF00FFu; uint dimG = (((px >> 8) & 0xFFu) * udim >> 8) << 8;
+                    uint masked = (px & 0x000000FFu) | (dimRB & 0x00FF0000u) | dimG;
+                    uint dec_rb = ((prv & 0x00FF00FFu) * udec >> 8) & 0x00FF00FFu; uint dec_g2 = (((prv >> 8) & 0xFFu) * udec >> 8) << 8;
+                    uint res = 0xFF000000u | Math.Max(masked & 0x00FF0000u, dec_rb & 0x00FF0000u) | Math.Max(masked & 0x0000FF00u, dec_g2) | Math.Max(masked & 0x000000FFu, dec_rb & 0x000000FFu);
+                    row[tx] = res; prw[tx] = res;
                     tx++;
                 }
             }
@@ -516,50 +530,52 @@ namespace AprNes
                 // Phase 0: keep R, dim G+B
                 {
                     uint px = row[tx], prv = prw[tx];
-                    uint r = (px >> 16) & 0xFFu; uint g = ((px >> 8 & 0xFFu) * udim) >> 8; uint b = ((px & 0xFFu) * udim) >> 8;
-                    uint dec_rb = ((prv & 0x00FF00FFu) * udec >> 8) & 0x00FF00FFu; uint dec_g = ((prv >> 8 & 0xFFu) * udec) >> 8;
-                    uint pr = dec_rb >> 16, pb = dec_rb & 0xFFu, pg = dec_g;
-                    if (pr > r) r = pr; if (pg > g) g = pg; if (pb > b) b = pb;
-                    uint res = 0xFF000000u | (r << 16) | (g << 8) | b; row[tx] = res; prw[tx] = res;
+                    uint dimRB = ((px & 0x00FF00FFu) * udim >> 8) & 0x00FF00FFu; uint dimG = (((px >> 8) & 0xFFu) * udim >> 8) << 8;
+                    uint masked = (px & 0x00FF0000u) | dimG | (dimRB & 0xFFu);
+                    uint dec_rb = ((prv & 0x00FF00FFu) * udec >> 8) & 0x00FF00FFu; uint dec_g = (((prv >> 8) & 0xFFu) * udec >> 8) << 8;
+                    uint res = 0xFF000000u | Math.Max(masked & 0x00FF0000u, dec_rb & 0x00FF0000u) | Math.Max(dimG, dec_g) | Math.Max(masked & 0x000000FFu, dec_rb & 0x000000FFu);
+                    row[tx] = res; prw[tx] = res;
                 }
                 // Phase 1: keep G, dim R+B
                 {
                     uint px = row[tx + 1], prv = prw[tx + 1];
-                    uint r = ((px >> 16 & 0xFFu) * udim) >> 8; uint g = (px >> 8) & 0xFFu; uint b = ((px & 0xFFu) * udim) >> 8;
-                    uint dec_rb = ((prv & 0x00FF00FFu) * udec >> 8) & 0x00FF00FFu; uint dec_g = ((prv >> 8 & 0xFFu) * udec) >> 8;
-                    uint pr = dec_rb >> 16, pb = dec_rb & 0xFFu, pg = dec_g;
-                    if (pr > r) r = pr; if (pg > g) g = pg; if (pb > b) b = pb;
-                    uint res = 0xFF000000u | (r << 16) | (g << 8) | b; row[tx + 1] = res; prw[tx + 1] = res;
+                    uint dimRB = ((px & 0x00FF00FFu) * udim >> 8) & 0x00FF00FFu;
+                    uint masked = (px & 0x0000FF00u) | dimRB;
+                    uint dec_rb = ((prv & 0x00FF00FFu) * udec >> 8) & 0x00FF00FFu; uint dec_g = (((prv >> 8) & 0xFFu) * udec >> 8) << 8;
+                    uint res = 0xFF000000u | Math.Max(masked & 0x00FF0000u, dec_rb & 0x00FF0000u) | Math.Max(masked & 0x0000FF00u, dec_g) | Math.Max(masked & 0x000000FFu, dec_rb & 0x000000FFu);
+                    row[tx + 1] = res; prw[tx + 1] = res;
                 }
                 // Phase 2: keep B, dim R+G
                 {
                     uint px = row[tx + 2], prv = prw[tx + 2];
-                    uint r = ((px >> 16 & 0xFFu) * udim) >> 8; uint g = ((px >> 8 & 0xFFu) * udim) >> 8; uint b = px & 0xFFu;
-                    uint dec_rb = ((prv & 0x00FF00FFu) * udec >> 8) & 0x00FF00FFu; uint dec_g = ((prv >> 8 & 0xFFu) * udec) >> 8;
-                    uint pr = dec_rb >> 16, pb = dec_rb & 0xFFu, pg = dec_g;
-                    if (pr > r) r = pr; if (pg > g) g = pg; if (pb > b) b = pb;
-                    uint res = 0xFF000000u | (r << 16) | (g << 8) | b; row[tx + 2] = res; prw[tx + 2] = res;
+                    uint dimRB = ((px & 0x00FF00FFu) * udim >> 8) & 0x00FF00FFu; uint dimG = (((px >> 8) & 0xFFu) * udim >> 8) << 8;
+                    uint masked = (px & 0x000000FFu) | (dimRB & 0x00FF0000u) | dimG;
+                    uint dec_rb = ((prv & 0x00FF00FFu) * udec >> 8) & 0x00FF00FFu; uint dec_g = (((prv >> 8) & 0xFFu) * udec >> 8) << 8;
+                    uint res = 0xFF000000u | Math.Max(masked & 0x00FF0000u, dec_rb & 0x00FF0000u) | Math.Max(dimG, dec_g) | Math.Max(masked & 0x000000FFu, dec_rb & 0x000000FFu);
+                    row[tx + 2] = res; prw[tx + 2] = res;
                 }
             }
 
             // Epilogue
             if (tx < dstW)
             {
+                // Phase 0: keep R, dim G+B
                 uint px = row[tx], prv = prw[tx];
-                uint r = (px >> 16) & 0xFFu; uint g = ((px >> 8 & 0xFFu) * udim) >> 8; uint b = ((px & 0xFFu) * udim) >> 8;
-                uint dec_rb = ((prv & 0x00FF00FFu) * udec >> 8) & 0x00FF00FFu; uint dec_g = ((prv >> 8 & 0xFFu) * udec) >> 8;
-                uint pr = dec_rb >> 16, pb = dec_rb & 0xFFu, pg = dec_g;
-                if (pr > r) r = pr; if (pg > g) g = pg; if (pb > b) b = pb;
-                uint res = 0xFF000000u | (r << 16) | (g << 8) | b; row[tx] = res; prw[tx] = res;
+                uint dimRB = ((px & 0x00FF00FFu) * udim >> 8) & 0x00FF00FFu; uint dimG = (((px >> 8) & 0xFFu) * udim >> 8) << 8;
+                uint masked = (px & 0x00FF0000u) | dimG | (dimRB & 0xFFu);
+                uint dec_rb = ((prv & 0x00FF00FFu) * udec >> 8) & 0x00FF00FFu; uint dec_g = (((prv >> 8) & 0xFFu) * udec >> 8) << 8;
+                uint res = 0xFF000000u | Math.Max(masked & 0x00FF0000u, dec_rb & 0x00FF0000u) | Math.Max(dimG, dec_g) | Math.Max(masked & 0x000000FFu, dec_rb & 0x000000FFu);
+                row[tx] = res; prw[tx] = res;
                 tx++;
                 if (tx < dstW)
                 {
+                    // Phase 1: keep G, dim R+B
                     px = row[tx]; prv = prw[tx];
-                    r = ((px >> 16 & 0xFFu) * udim) >> 8; g = (px >> 8) & 0xFFu; b = ((px & 0xFFu) * udim) >> 8;
-                    dec_rb = ((prv & 0x00FF00FFu) * udec >> 8) & 0x00FF00FFu; dec_g = ((prv >> 8 & 0xFFu) * udec) >> 8;
-                    pr = dec_rb >> 16; pb = dec_rb & 0xFFu; pg = dec_g;
-                    if (pr > r) r = pr; if (pg > g) g = pg; if (pb > b) b = pb;
-                    res = 0xFF000000u | (r << 16) | (g << 8) | b; row[tx] = res; prw[tx] = res;
+                    dimRB = ((px & 0x00FF00FFu) * udim >> 8) & 0x00FF00FFu;
+                    masked = (px & 0x0000FF00u) | dimRB;
+                    dec_rb = ((prv & 0x00FF00FFu) * udec >> 8) & 0x00FF00FFu; dec_g = (((prv >> 8) & 0xFFu) * udec >> 8) << 8;
+                    res = 0xFF000000u | Math.Max(masked & 0x00FF0000u, dec_rb & 0x00FF0000u) | Math.Max(masked & 0x0000FF00u, dec_g) | Math.Max(masked & 0x000000FFu, dec_rb & 0x000000FFu);
+                    row[tx] = res; prw[tx] = res;
                 }
             }
         }
