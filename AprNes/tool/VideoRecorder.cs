@@ -2,43 +2,71 @@ using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Pipes;
 using System.Threading;
 
 namespace AprNes
 {
     /// <summary>
-    /// Two-process architecture: separate ffmpeg for video and audio (each with its own stdin).
-    /// On stop, mux both into final MP4. No named pipes — eliminates deadlock.
+    /// Single FFmpeg process with dual named pipes (video + audio).
+    /// Separate video/audio writer threads — neither can block the other.
     /// </summary>
     static class VideoRecorder
     {
-        static Process _videoProc, _audioProc;
-        static Stream _videoIn, _audioIn;
+        static Process _ffmpeg;
+        static NamedPipeServerStream _videoPipe, _audioPipe;
         static volatile bool _recording;
+        static volatile bool _videoPipeConnected;
+        static volatile bool _audioPipeConnected;
         static int _frameW, _frameH, _frameSize;
-        static string _ffmpegPath, _outputPath, _tempVideoPath, _tempAudioPath;
 
-        // Video: triple-buffered frame pool (emulation thread never blocks on pipe)
+        // Video: triple-buffered frame pool + dedicated writer thread
         static byte[][] _frameBufs;
         static readonly ConcurrentQueue<int> _freeFrames = new ConcurrentQueue<int>();
         static readonly ConcurrentQueue<int> _readyFrames = new ConcurrentQueue<int>();
-        static readonly AutoResetEvent _writerSignal = new AutoResetEvent(false);
-        static Thread _writerThread;
+        static readonly AutoResetEvent _videoSignal = new AutoResetEvent(false);
+        static Thread _videoWriterThread;
 
-        // Audio: lock-guarded accumulation buffer
+        // Audio: lock-guarded accumulation buffer + dedicated writer thread
         static short[] _audioBuf;
         static int _audioPos;
         static readonly object _audioLock = new object();
+        static Thread _audioWriterThread;
+
+        // FFmpeg stderr capture
+        static readonly object _stderrLock = new object();
+        static string _stderrBuf;
+
+        static string _logPath;
 
         public static bool IsRecording => _recording;
         public static string LastOutputPath { get; private set; }
         public static string DetectedEncoder { get; private set; }
+        public static string LastError { get; private set; }
 
-        /// <summary>
-        /// Detect best available H.264 encoder: prefer GPU hardware, fallback to libx264.
-        /// </summary>
+        static void Log(string msg)
+        {
+            try
+            {
+                if (_logPath == null)
+                {
+                    string dir = Path.Combine(Path.GetDirectoryName(
+                        System.Reflection.Assembly.GetExecutingAssembly().Location), "Captures");
+                    if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                    _logPath = Path.Combine(dir, "VideoRecorder.log");
+                }
+                File.AppendAllText(_logPath,
+                    DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff") + "  " + msg + "\r\n");
+            }
+            catch { }
+        }
+
+        static string _cachedEncoder;
+
         static string DetectEncoder(string ffmpegPath)
         {
+            if (_cachedEncoder != null) return _cachedEncoder;
+            Log("DetectEncoder: probing HW encoders...");
             string[] candidates = { "h264_nvenc", "h264_amf", "h264_qsv", "h264_d3d12va" };
             foreach (var enc in candidates)
             {
@@ -59,11 +87,19 @@ namespace AprNes
                     p.Start();
                     p.StandardError.ReadToEnd();
                     p.WaitForExit(5000);
-                    if (p.ExitCode == 0) return enc;
+                    if (p.ExitCode == 0)
+                    {
+                        Log("DetectEncoder: selected " + enc);
+                        _cachedEncoder = enc; return enc;
+                    }
+                    else
+                        Log("DetectEncoder: " + enc + " exit=" + p.ExitCode);
                 }
-                catch { }
+                catch (Exception ex) { Log("DetectEncoder: " + enc + " exception: " + ex.Message); }
             }
-            return "libx264";
+            Log("DetectEncoder: fallback to libx264");
+            _cachedEncoder = "libx264";
+            return _cachedEncoder;
         }
 
         static string GetEncoderArgs(string encoder)
@@ -83,43 +119,27 @@ namespace AprNes
             }
         }
 
-        static Process StartFfmpeg(string ffmpegPath, string args)
-        {
-            var p = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = ffmpegPath,
-                    Arguments = args,
-                    UseShellExecute = false,
-                    RedirectStandardInput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
-                }
-            };
-            p.Start();
-            // Drain stderr in background to prevent pipe buffer deadlock
-            p.BeginErrorReadLine();
-            return p;
-        }
-
         public static unsafe bool Start(string ffmpegPath, string outputDir, int width, int height)
         {
-            if (_recording) return false;
-            if (string.IsNullOrEmpty(ffmpegPath) || !File.Exists(ffmpegPath)) return false;
+            LastError = null;
+            Log("========== Start() called ==========");
+            Log("ffmpegPath=" + (ffmpegPath ?? "(null)") + "  exists=" + (!string.IsNullOrEmpty(ffmpegPath) && File.Exists(ffmpegPath)));
+            Log("outputDir=" + outputDir + "  size=" + width + "x" + height);
+            if (_recording) { LastError = "Already recording"; Log("ABORT: " + LastError); return false; }
+            if (string.IsNullOrEmpty(ffmpegPath) || !File.Exists(ffmpegPath))
+            { LastError = "ffmpeg.exe not found: " + (ffmpegPath ?? "(null)"); Log("ABORT: " + LastError); return false; }
 
             if (!Directory.Exists(outputDir))
                 Directory.CreateDirectory(outputDir);
 
-            _ffmpegPath = ffmpegPath;
-            string fileName = DateTime.Now.ToString("yyyyMMddHHmmss");
-            _outputPath = Path.Combine(outputDir, fileName + ".mp4");
-            _tempVideoPath = Path.Combine(outputDir, fileName + ".tmp_v.mkv");
-            _tempAudioPath = Path.Combine(outputDir, fileName + ".tmp_a.m4a");
+            string fileName = DateTime.Now.ToString("yyyyMMddHHmmss") + ".mp4";
+            string outputPath = Path.Combine(outputDir, fileName);
 
             _frameW = width;
             _frameH = height;
             _frameSize = width * height * 4;
+            _videoPipeConnected = false;
+            _audioPipeConnected = false;
 
             // Init triple-buffer frame pool
             _frameBufs = new byte[3][];
@@ -131,58 +151,132 @@ namespace AprNes
                 _freeFrames.Enqueue(i);
             }
 
-            _audioBuf = new short[8192];
+            _audioBuf = new short[441000]; // 10 seconds at 44100 Hz
             _audioPos = 0;
 
-            // Detect best H.264 encoder
             string encoder = DetectEncoder(ffmpegPath);
             DetectedEncoder = encoder;
             string encoderArgs = GetEncoderArgs(encoder);
 
+            string pid = Process.GetCurrentProcess().Id.ToString();
+            string videoPipeName = "aprnes_video_" + pid;
+            string audioPipeName = "aprnes_audio_" + pid;
+
+            // Pipe buffer: video = 2 frames, audio = 64KB
+            int videoBufSize = _frameSize * 2;
+            int audioBufSize = 65536;
+
             try
             {
-                // Process 1: video (rawvideo stdin → H.264 temp mkv)
-                string videoArgs = string.Format(
-                    "-y -f rawvideo -pix_fmt bgra -s {0}x{1} -r 60.0988 -i - " +
-                    "{2} \"{3}\"",
-                    width, height, encoderArgs, _tempVideoPath);
-                _videoProc = StartFfmpeg(ffmpegPath, videoArgs);
-                _videoIn = _videoProc.StandardInput.BaseStream;
+                // Step 1: Create both pipe servers with large buffers
+                _videoPipe = new NamedPipeServerStream(videoPipeName, PipeDirection.Out, 1,
+                    PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 0, videoBufSize);
+                _audioPipe = new NamedPipeServerStream(audioPipeName, PipeDirection.Out, 1,
+                    PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 0, audioBufSize);
 
-                // Process 2: audio (s16le stdin → AAC temp m4a)
-                string audioArgs = string.Format(
-                    "-y -f s16le -ar 44100 -ac 1 -i - " +
-                    "-c:a aac -b:a 128k -ac 2 \"{0}\"",
-                    _tempAudioPath);
-                _audioProc = StartFfmpeg(ffmpegPath, audioArgs);
-                _audioIn = _audioProc.StandardInput.BaseStream;
+                Log("Pipes created: " + videoPipeName + " (buf=" + videoBufSize + "), " +
+                    audioPipeName + " (buf=" + audioBufSize + ")");
+
+                // Step 2: Begin waiting for FFmpeg to connect (async)
+                var videoConnectResult = _videoPipe.BeginWaitForConnection(null, null);
+                var audioConnectResult = _audioPipe.BeginWaitForConnection(null, null);
+
+                // Step 3: Start FFmpeg
+                string args = string.Format(
+                    "-y " +
+                    "-thread_queue_size 2048 -analyzeduration 0 -probesize 32 -f rawvideo -pix_fmt bgra -s {0}x{1} -r 60.0988 -i \\\\.\\pipe\\{2} " +
+                    "-thread_queue_size 2048 -analyzeduration 0 -probesize 32 -f s16le -ar 44100 -ac 1 -i \\\\.\\pipe\\{3} " +
+                    "{4} " +
+                    "-c:a aac -b:a 128k -ac 2 " +
+                    "-movflags +faststart " +
+                    "-shortest \"{5}\"",
+                    width, height, videoPipeName, audioPipeName, encoderArgs, outputPath);
+
+                _stderrBuf = "";
+                _ffmpeg = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = ffmpegPath,
+                        Arguments = args,
+                        UseShellExecute = false,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true
+                    }
+                };
+                _ffmpeg.ErrorDataReceived += (s, ev) =>
+                {
+                    if (ev.Data != null)
+                        lock (_stderrLock) _stderrBuf += ev.Data + "\n";
+                };
+                _ffmpeg.Start();
+                _ffmpeg.BeginErrorReadLine();
+                Log("FFmpeg started PID=" + _ffmpeg.Id + "  args=" + args);
+
+                // Step 4: Wait for video pipe
+                Log("Waiting for video pipe connection...");
+                if (!videoConnectResult.AsyncWaitHandle.WaitOne(10000))
+                    throw new TimeoutException("FFmpeg did not connect to video pipe within 10s");
+                _videoPipe.EndWaitForConnection(videoConnectResult);
+                Log("Video pipe connected");
+
+                // Step 5: Feed dummy frame to satisfy FFmpeg probe (needs ≥32 bytes)
+                _videoPipeConnected = true;
+                byte[] dummyFrame = new byte[_frameSize];
+                _videoPipe.Write(dummyFrame, 0, _frameSize);
+                Log("Dummy frame sent to satisfy FFmpeg probe");
+
+                // Step 6: Wait for audio pipe (FFmpeg opens it after probing video)
+                Log("Waiting for audio pipe connection...");
+                if (!audioConnectResult.AsyncWaitHandle.WaitOne(15000))
+                    throw new TimeoutException("FFmpeg did not connect to audio pipe within 15s");
+                _audioPipe.EndWaitForConnection(audioConnectResult);
+                _audioPipeConnected = true;
+                Log("Audio pipe connected");
+
+                // Step 7: Both pipes ready — set recording flag, then start both threads
+                LastOutputPath = outputPath;
+                _recording = true;
+                NesCore.AudioSampleReady += OnAudioSample;
+
+                _videoWriterThread = new Thread(VideoWriterLoop) { IsBackground = true, Name = "VR_Video" };
+                _videoWriterThread.Start();
+                Log("Video writer thread started");
+
+                _audioWriterThread = new Thread(AudioWriterLoop) { IsBackground = true, Name = "VR_Audio" };
+                _audioWriterThread.Start();
+                Log("Audio writer thread started");
             }
-            catch
+            catch (Exception ex)
             {
-                Cleanup(false);
+                string stderr;
+                lock (_stderrLock) stderr = _stderrBuf ?? "";
+                LastError = ex.Message;
+                if (stderr.Length > 0)
+                    LastError += "\n\nFFmpeg stderr:\n" + stderr;
+                Log("START FAILED: " + ex.GetType().Name + ": " + ex.Message);
+                if (stderr.Length > 0) Log("FFmpeg stderr:\n" + stderr);
+                if (_recording) { _recording = false; _videoSignal.Set(); }
+                try { _videoWriterThread?.Join(3000); } catch { }
+                try { _audioWriterThread?.Join(3000); } catch { }
+                NesCore.AudioSampleReady -= OnAudioSample;
+                Cleanup();
                 return false;
             }
 
-            _recording = true;
-            LastOutputPath = _outputPath;
-
-            // Start dedicated writer thread
-            _writerThread = new Thread(WriterLoop) { IsBackground = true, Name = "VideoRecorderWriter" };
-            _writerThread.Start();
-
-            NesCore.AudioSampleReady += OnAudioSample;
+            Log("Recording started → " + outputPath);
             return true;
         }
 
         public static unsafe void PushFrame(uint* screenBuf)
         {
-            if (!_recording) return;
+            if (!_recording || !_videoPipeConnected) return;
             int idx;
             if (!_freeFrames.TryDequeue(out idx)) return;
             fixed (byte* dst = _frameBufs[idx])
                 Buffer.MemoryCopy(screenBuf, dst, _frameSize, _frameSize);
             _readyFrames.Enqueue(idx);
-            _writerSignal.Set();
+            _videoSignal.Set();
         }
 
         static void OnAudioSample(short sample)
@@ -195,44 +289,62 @@ namespace AprNes
             }
         }
 
-        static void WriterLoop()
+        // Dedicated video writer — only writes to _videoPipe
+        static void VideoWriterLoop()
         {
             while (_recording)
             {
-                _writerSignal.WaitOne(50);
+                _videoSignal.WaitOne(50);
                 if (!_recording) break;
 
-                // Write all pending video frames
                 int idx;
                 while (_readyFrames.TryDequeue(out idx))
                 {
                     try
                     {
-                        if (_videoIn != null)
-                            _videoIn.Write(_frameBufs[idx], 0, _frameSize);
+                        if (_videoPipeConnected && _videoPipe != null)
+                            _videoPipe.Write(_frameBufs[idx], 0, _frameSize);
                     }
-                    catch { _recording = false; }
+                    catch (IOException ex)
+                    {
+                        Log("[Warning] Video pipe IOException: " + ex.Message);
+                        // Drop frame, continue recording
+                    }
+                    catch (Exception ex)
+                    {
+                        Log("[Error] Video pipe fatal: " + ex.Message);
+                        _recording = false;
+                    }
                     finally { _freeFrames.Enqueue(idx); }
                 }
-
-                // Flush buffered audio
-                FlushAudio();
             }
 
-            // Drain remaining frames after _recording set to false
+            // Drain remaining
             int rem;
             while (_readyFrames.TryDequeue(out rem))
             {
-                try { _videoIn?.Write(_frameBufs[rem], 0, _frameSize); }
+                try { _videoPipe?.Write(_frameBufs[rem], 0, _frameSize); }
                 catch { }
                 finally { _freeFrames.Enqueue(rem); }
             }
+        }
+
+        // Dedicated audio writer — runs independently, never blocked by video
+        static void AudioWriterLoop()
+        {
+            while (_recording)
+            {
+                Thread.Sleep(20); // ~50 flushes/sec, well above audio rate
+                if (!_recording) break;
+                FlushAudio();
+            }
+            // Final flush
             FlushAudio();
         }
 
         static void FlushAudio()
         {
-            if (_audioIn == null) return;
+            if (!_audioPipeConnected || _audioPipe == null) return;
             int count;
             byte[] bytes;
             lock (_audioLock)
@@ -243,90 +355,75 @@ namespace AprNes
                 Buffer.BlockCopy(_audioBuf, 0, bytes, 0, bytes.Length);
                 _audioPos = 0;
             }
-            try { _audioIn.Write(bytes, 0, bytes.Length); }
-            catch { }
+            try
+            {
+                _audioPipe.Write(bytes, 0, bytes.Length);
+            }
+            catch (IOException ex)
+            {
+                Log("[Warning] Audio pipe IOException: " + ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Log("[Error] Audio pipe fatal: " + ex.Message);
+            }
         }
 
         public static void Stop()
         {
             if (!_recording) return;
+            Log("Stop() called");
             _recording = false;
 
             NesCore.AudioSampleReady -= OnAudioSample;
-            _writerSignal.Set();
+            _videoSignal.Set();
 
-            // Wait for writer thread to drain and exit
-            try { _writerThread?.Join(5000); } catch { }
+            // Wait for both writer threads to drain
+            try { _videoWriterThread?.Join(5000); } catch { }
+            try { _audioWriterThread?.Join(3000); } catch { }
+            Log("Writer threads joined");
 
-            // Close stdin pipes → ffmpeg sees EOF → finalizes output
-            try { _videoIn?.Close(); } catch { }
-            try { _audioIn?.Close(); } catch { }
+            // Close pipes → FFmpeg receives EOF → finalizes MP4
+            try { _videoPipe?.Close(); } catch { }
+            try { _audioPipe?.Close(); } catch { }
+            Log("Pipes closed (EOF sent)");
 
-            // Wait for both ffmpeg processes to finish (with timeout)
-            WaitOrKill(_videoProc, 15000);
-            WaitOrKill(_audioProc, 10000);
-
-            // Mux video + audio into final MP4
-            bool muxOk = MuxFinal();
-
-            Cleanup(muxOk);
-        }
-
-        static void WaitOrKill(Process p, int timeoutMs)
-        {
-            if (p == null) return;
-            try
+            // Wait for FFmpeg to finish
+            if (_ffmpeg != null)
             {
-                if (!p.WaitForExit(timeoutMs))
-                    p.Kill();
-            }
-            catch { }
-            try { p.Dispose(); } catch { }
-        }
-
-        static bool MuxFinal()
-        {
-            if (!File.Exists(_tempVideoPath)) return false;
-
-            try
-            {
-                string muxArgs;
-                if (File.Exists(_tempAudioPath))
+                try
                 {
-                    muxArgs = string.Format(
-                        "-y -i \"{0}\" -i \"{1}\" -c copy -movflags +faststart -shortest \"{2}\"",
-                        _tempVideoPath, _tempAudioPath, _outputPath);
+                    if (!_ffmpeg.WaitForExit(15000))
+                    {
+                        Log("FFmpeg did not exit in 15s, killing");
+                        _ffmpeg.Kill();
+                    }
+                    else
+                        Log("FFmpeg exited normally, code=" + _ffmpeg.ExitCode);
                 }
-                else
-                {
-                    // Audio-only fallback (no audio temp)
-                    muxArgs = string.Format(
-                        "-y -i \"{0}\" -c copy -movflags +faststart \"{1}\"",
-                        _tempVideoPath, _outputPath);
-                }
-
-                var mux = StartFfmpeg(_ffmpegPath, muxArgs);
-                mux.WaitForExit(30000);
-                bool ok = mux.ExitCode == 0;
-                mux.Dispose();
-                return ok;
+                catch (Exception ex) { Log("Stop WaitForExit error: " + ex.Message); }
             }
-            catch { return false; }
+
+            string stderr;
+            lock (_stderrLock) stderr = _stderrBuf ?? "";
+            if (stderr.Length > 0) Log("FFmpeg stderr (final):\n" + stderr);
+
+            Cleanup();
+            Log("Stop() done");
         }
 
-        static void Cleanup(bool deleteTempFiles)
+        static void Cleanup()
         {
-            _videoProc = null;
-            _audioProc = null;
-            _videoIn = null;
-            _audioIn = null;
-            _writerThread = null;
-
-            if (deleteTempFiles)
-            {
-                try { if (File.Exists(_tempVideoPath)) File.Delete(_tempVideoPath); } catch { }
-                try { if (File.Exists(_tempAudioPath)) File.Delete(_tempAudioPath); } catch { }
-            }
+            try { _videoPipe?.Dispose(); } catch { }
+            try { _audioPipe?.Dispose(); } catch { }
+            try { _ffmpeg?.Dispose(); } catch { }
+            _videoPipe = null;
+            _audioPipe = null;
+            _ffmpeg = null;
+            _videoWriterThread = null;
+            _audioWriterThread = null;
+            _videoPipeConnected = false;
+            _audioPipeConnected = false;
         }
     }
 }

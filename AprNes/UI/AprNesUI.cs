@@ -1353,7 +1353,8 @@ public string GetRomInfo()
             }
             else
             {
-                MessageBox.Show("Failed to start recording.\nCheck that tools\\ffmpeg\\ffmpeg.exe exists.",
+                string err = VideoRecorder.LastError ?? "Unknown error";
+                MessageBox.Show("Failed to start recording.\n\n" + err,
                     "Recording Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }

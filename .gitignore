@@ -190,3 +190,7 @@ ClientBin/
 __pycache__/
 *.pyc
 etc/
+
+# FFmpeg tools & recording output (large binaries)
+**/tools/ffmpeg/
+**/Captures/
