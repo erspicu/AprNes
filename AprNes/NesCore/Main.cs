@@ -36,13 +36,17 @@ namespace AprNes
         // Mapper 68 (Sunsoft #4): CHR ROM pages used as nametable tiles
         static public byte*[] ntBankPtrs = new byte*[4]; // 4×1KB NT pointers (one per nametable slot)
         static public bool ntChrOverrideEnabled = false; // when true PPU reads NT from ntBankPtrs instead of ppu_ram
+        // MMC5 CHR A/B auto-switch (for 8x16 sprites: A=sprites, B=background)
+        static public bool chrABAutoSwitch = false;
+        static public byte*[] chrBankPtrsA = new byte*[8]; // A set (sprites, $5120-$5127)
+        static public byte*[] chrBankPtrsB = new byte*[8]; // B set (background, $5128-$512B)
+        static public bool chrBGUseASet = false;           // MMC5 lastChrReg: true=use A set for BG
         // MMC5 Extended Attribute Mode (ExRAM mode 1)
         static public bool extAttrEnabled = false;
         static public byte* extAttrRAM = null;       // ExRAM pointer (1KB)
         static public byte extAttrChrUpperBits = 0;  // $5130 upper bits
         static public byte* extAttrCHR = null;       // CHR-ROM base pointer
         static public int extAttrChrSize = 0;        // CHR-ROM size for wrapping
-
 
         // ROM info accessors (read-only, set during init)
         static public int  RomMapper   => mapper;
@@ -346,6 +350,8 @@ namespace AprNes
                 mapperNeedsA12  = a12mode != MapperA12Mode.None;
                 mapperA12IsMmc3 = a12mode == MapperA12Mode.MMC3;
                 ntChrOverrideEnabled = false;
+                chrABAutoSwitch = false;
+                chrBGUseASet = false;
                 extAttrEnabled = false;
                 MapperObj.MapperInit(PRG_ROM, CHR_ROM, ppu_ram, PRG_ROM_count, CHR_ROM_count, Vertical);
                 MapperObj.Reset();

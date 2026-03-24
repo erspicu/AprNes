@@ -248,6 +248,14 @@ namespace AprNes
         {
             if (cx < 256 || (cx >= 320 && cx < 336))
             {
+                // MMC5 CHR A/B: ensure correct set at BG tile boundaries.
+                // Dot 0: initialize for this scanline (handles vblank→render transition).
+                // Dot 320: switch back to BG after sprite fetches.
+                if ((cx == 0 || cx == 320) && chrABAutoSwitch)
+                {
+                    byte*[] src = Spritesize8x16 ? (chrBGUseASet ? chrBankPtrsA : chrBankPtrsB) : chrBankPtrsA;
+                    for (int i = 0; i < 8; i++) chrBankPtrs[i] = src[i];
+                }
                 int phase = cx & 7;
                 if (phase == 0) {
                     ioaddr = 0x2000 | (vram_addr & 0x0FFF);
@@ -312,7 +320,13 @@ namespace AprNes
             }
             else if (cx >= 257 && cx < 320)
             {
-                if (cx == 257) { CopyHoriV(); spr_ram_add = 0; }
+                if (cx == 257)
+                {
+                    CopyHoriV(); spr_ram_add = 0;
+                    // MMC5 CHR A/B: switch to A set (sprites) at dot 257 (only in 8x16 mode)
+                    if (chrABAutoSwitch && Spritesize8x16)
+                        for (int i = 0; i < 8; i++) chrBankPtrs[i] = chrBankPtrsA[i];
+                }
 
                 // Latch sprite size at dot 261 (sprite 0 CHR low fetch address).
                 // On real hardware, the Spritesize8x16 value at CHR fetch time determines

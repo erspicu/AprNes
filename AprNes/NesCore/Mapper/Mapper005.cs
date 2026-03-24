@@ -11,7 +11,7 @@ namespace AprNes
         //   - PRG banking (4 modes), PRG-RAM (64KB), $6000-$7FFF banking
         //   - CHR banking (4 modes), A/B set switching for 8x16 sprites
         //   - Nametable mapping ($5105): CIRAM / ExRAM / Fill-mode
-        //   - Scanline IRQ via A12 notification-based detection
+        //   - Scanline IRQ via direct PPU scanline tracking
         //   - 8×8 hardware multiplier ($5205/$5206)
         //   - Expansion RAM ($5C00-$5FFF, modes 0-3)
         //   - NMI vector read ($FFFA-$FFFB) resets frame state
@@ -34,8 +34,7 @@ namespace AprNes
         int chrMode;
         ushort[] chrBanks = new ushort[12]; // [0-7]=A set ($5120-$5127), [8-11]=B set ($5128-$512B)
         byte chrUpperBits;
-        ushort lastChrReg;   // address of last CHR register written
-        bool chrBankIsA = true;
+        ushort lastChrReg;  // last CHR register written ($5120-$512B); determines A/B set for BG
 
         // ── PRG-RAM (64KB) ─────────────────────────────────────────────
         byte[] prgRam = new byte[0x10000];
@@ -59,11 +58,11 @@ namespace AprNes
         // ── Scanline IRQ ($5203/$5204) ─────────────────────────────────
         byte irqCounterTarget;
         bool irqEnabled;
-        byte scanlineCounter;
+        int scanlineCounter;
         bool irqPending;
         bool ppuInFrame;
-        int lastNotifiedScanline;
-        byte ppuIdleCounter;
+        int lastTrackedScanline;   // last scanline counted by CpuCycle-based tracking
+        byte ppuIdleCounter;       // kept for ppuInFrame detection (read by $5204)
 
         // ================================================================
         //  Init
@@ -94,7 +93,6 @@ namespace AprNes
             chrMode = 0;
             chrUpperBits = 0;
             lastChrReg = 0;
-            chrBankIsA = true;
             extendedRamMode = 0;
             nametableMapping = 0;
             fillModeTile = 0;
@@ -108,13 +106,17 @@ namespace AprNes
             scanlineCounter = 0;
             irqPending = false;
             ppuInFrame = false;
-            lastNotifiedScanline = -1;
+            lastTrackedScanline = -1;
             ppuIdleCounter = 0;
 
             NesCore.extAttrEnabled = false;
+            NesCore.chrABAutoSwitch = true; // MMC5 always supports A/B switching
 
             UpdateNametableMapping();
-            ApplyCHRBanks(true);
+            UpdateCHRBankPtrsAB();
+            // Init: apply A set to chrBankPtrs (8x8 default at power-on)
+            for (int i = 0; i < 8; i++)
+                NesCore.chrBankPtrs[i] = NesCore.chrBankPtrsA[i];
         }
 
         // ================================================================
@@ -150,11 +152,12 @@ namespace AprNes
             if (address >= 0xFFFA && address <= 0xFFFB)
             {
                 ppuInFrame = false;
-                lastNotifiedScanline = -1;
+                lastTrackedScanline = -1;
                 scanlineCounter = 0;
                 irqPending = false;
                 NesCore.statusmapperint = false;
                 NesCore.UpdateIRQLine();
+                ApplyCHRBanksDynamic(); // Mesen2: UpdateChrBanks(true) on NMI vector read
             }
 
             int offset;
@@ -356,7 +359,7 @@ namespace AprNes
 
                 // ── Control ──
                 case 0x5100: prgMode = value & 3; break;
-                case 0x5101: chrMode = value & 3; ApplyCHRBanks(chrBankIsA); break;
+                case 0x5101: chrMode = value & 3; ApplyCHRBanksDynamic(); break;
                 case 0x5102: prgRamProtect1 = (byte)(value & 3); break;
                 case 0x5103: prgRamProtect2 = (byte)(value & 3); break;
                 case 0x5104:
@@ -382,20 +385,20 @@ namespace AprNes
                 case 0x5117: prgBanks[4] = value; break;
 
                 // ── CHR bank registers (A set: $5120-$5127) ──
-                case 0x5120: chrBanks[0] = (ushort)(value | (chrUpperBits << 8)); lastChrReg = 0x5120; ApplyCHRBanks(chrBankIsA); break;
-                case 0x5121: chrBanks[1] = (ushort)(value | (chrUpperBits << 8)); lastChrReg = 0x5121; ApplyCHRBanks(chrBankIsA); break;
-                case 0x5122: chrBanks[2] = (ushort)(value | (chrUpperBits << 8)); lastChrReg = 0x5122; ApplyCHRBanks(chrBankIsA); break;
-                case 0x5123: chrBanks[3] = (ushort)(value | (chrUpperBits << 8)); lastChrReg = 0x5123; ApplyCHRBanks(chrBankIsA); break;
-                case 0x5124: chrBanks[4] = (ushort)(value | (chrUpperBits << 8)); lastChrReg = 0x5124; ApplyCHRBanks(chrBankIsA); break;
-                case 0x5125: chrBanks[5] = (ushort)(value | (chrUpperBits << 8)); lastChrReg = 0x5125; ApplyCHRBanks(chrBankIsA); break;
-                case 0x5126: chrBanks[6] = (ushort)(value | (chrUpperBits << 8)); lastChrReg = 0x5126; ApplyCHRBanks(chrBankIsA); break;
-                case 0x5127: chrBanks[7] = (ushort)(value | (chrUpperBits << 8)); lastChrReg = 0x5127; ApplyCHRBanks(chrBankIsA); break;
+                case 0x5120: chrBanks[0] = (ushort)(value | (chrUpperBits << 8)); lastChrReg = 0x5120; ApplyCHRBanksDynamic(); break;
+                case 0x5121: chrBanks[1] = (ushort)(value | (chrUpperBits << 8)); lastChrReg = 0x5121; ApplyCHRBanksDynamic(); break;
+                case 0x5122: chrBanks[2] = (ushort)(value | (chrUpperBits << 8)); lastChrReg = 0x5122; ApplyCHRBanksDynamic(); break;
+                case 0x5123: chrBanks[3] = (ushort)(value | (chrUpperBits << 8)); lastChrReg = 0x5123; ApplyCHRBanksDynamic(); break;
+                case 0x5124: chrBanks[4] = (ushort)(value | (chrUpperBits << 8)); lastChrReg = 0x5124; ApplyCHRBanksDynamic(); break;
+                case 0x5125: chrBanks[5] = (ushort)(value | (chrUpperBits << 8)); lastChrReg = 0x5125; ApplyCHRBanksDynamic(); break;
+                case 0x5126: chrBanks[6] = (ushort)(value | (chrUpperBits << 8)); lastChrReg = 0x5126; ApplyCHRBanksDynamic(); break;
+                case 0x5127: chrBanks[7] = (ushort)(value | (chrUpperBits << 8)); lastChrReg = 0x5127; ApplyCHRBanksDynamic(); break;
 
                 // ── CHR bank registers (B set: $5128-$512B) ──
-                case 0x5128: chrBanks[8] = (ushort)(value | (chrUpperBits << 8)); lastChrReg = 0x5128; ApplyCHRBanks(chrBankIsA); break;
-                case 0x5129: chrBanks[9] = (ushort)(value | (chrUpperBits << 8)); lastChrReg = 0x5129; ApplyCHRBanks(chrBankIsA); break;
-                case 0x512A: chrBanks[10] = (ushort)(value | (chrUpperBits << 8)); lastChrReg = 0x512A; ApplyCHRBanks(chrBankIsA); break;
-                case 0x512B: chrBanks[11] = (ushort)(value | (chrUpperBits << 8)); lastChrReg = 0x512B; ApplyCHRBanks(chrBankIsA); break;
+                case 0x5128: chrBanks[8] = (ushort)(value | (chrUpperBits << 8)); lastChrReg = 0x5128; ApplyCHRBanksDynamic(); break;
+                case 0x5129: chrBanks[9] = (ushort)(value | (chrUpperBits << 8)); lastChrReg = 0x5129; ApplyCHRBanksDynamic(); break;
+                case 0x512A: chrBanks[10] = (ushort)(value | (chrUpperBits << 8)); lastChrReg = 0x512A; ApplyCHRBanksDynamic(); break;
+                case 0x512B: chrBanks[11] = (ushort)(value | (chrUpperBits << 8)); lastChrReg = 0x512B; ApplyCHRBanksDynamic(); break;
 
                 case 0x5130:
                     chrUpperBits = (byte)(value & 3);
@@ -406,7 +409,9 @@ namespace AprNes
                 case 0x5200: case 0x5201: case 0x5202: break;
 
                 // ── IRQ ──
-                case 0x5203: irqCounterTarget = value; break;
+                case 0x5203:
+                    irqCounterTarget = value;
+                    break;
                 case 0x5204:
                     irqEnabled = (value & 0x80) != 0;
                     if (!irqEnabled)
@@ -477,12 +482,16 @@ namespace AprNes
         //  CHR banking — A/B set switching
         // ================================================================
 
-        void ApplyCHRBanks(bool useA)
+        // Populate both A and B cached CHR bank pointer arrays
+        void UpdateCHRBankPtrsAB()
         {
             if (chrRomSize == 0) return;
+            FillCHRBankPtrs(NesCore.chrBankPtrsA, true);
+            FillCHRBankPtrs(NesCore.chrBankPtrsB, false);
+        }
 
-            // A set: indices 0-7 ($5120-$5127)
-            // B set: indices 8-11 ($5128-$512B), 4 banks repeated to fill 8 slots
+        void FillCHRBankPtrs(byte*[] dst, bool useA)
+        {
             switch (chrMode)
             {
                 case 0: // 8KB
@@ -490,7 +499,7 @@ namespace AprNes
                     int bank = useA ? chrBanks[7] : chrBanks[11];
                     long baseAddr = (long)bank * 8192 % chrRomSize;
                     for (int i = 0; i < 8; i++)
-                        NesCore.chrBankPtrs[i] = CHR_ROM + baseAddr + i * 1024;
+                        dst[i] = CHR_ROM + baseAddr + i * 1024;
                     break;
                 }
                 case 1: // 4KB × 2
@@ -499,23 +508,21 @@ namespace AprNes
                     int bankHi = useA ? chrBanks[7] : chrBanks[11];
                     long baseLo = (long)bankLo * 4096 % chrRomSize;
                     long baseHi = (long)bankHi * 4096 % chrRomSize;
-                    for (int i = 0; i < 4; i++) NesCore.chrBankPtrs[i] = CHR_ROM + baseLo + i * 1024;
-                    for (int i = 0; i < 4; i++) NesCore.chrBankPtrs[i + 4] = CHR_ROM + baseHi + i * 1024;
+                    for (int i = 0; i < 4; i++) dst[i] = CHR_ROM + baseLo + i * 1024;
+                    for (int i = 0; i < 4; i++) dst[i + 4] = CHR_ROM + baseHi + i * 1024;
                     break;
                 }
                 case 2: // 2KB × 4
                 {
-                    int[] banks;
-                    if (useA)
-                        banks = new int[] { chrBanks[1], chrBanks[3], chrBanks[5], chrBanks[7] };
-                    else
-                        banks = new int[] { chrBanks[9], chrBanks[11], chrBanks[9], chrBanks[11] };
-                    for (int j = 0; j < 4; j++)
-                    {
-                        long b = (long)banks[j] * 2048 % chrRomSize;
-                        NesCore.chrBankPtrs[j * 2] = CHR_ROM + b;
-                        NesCore.chrBankPtrs[j * 2 + 1] = CHR_ROM + b + 1024;
-                    }
+                    int b0, b1, b2, b3;
+                    if (useA) { b0 = chrBanks[1]; b1 = chrBanks[3]; b2 = chrBanks[5]; b3 = chrBanks[7]; }
+                    else { b0 = chrBanks[9]; b1 = chrBanks[11]; b2 = chrBanks[9]; b3 = chrBanks[11]; }
+                    long a0 = (long)b0 * 2048 % chrRomSize, a1 = (long)b1 * 2048 % chrRomSize;
+                    long a2 = (long)b2 * 2048 % chrRomSize, a3 = (long)b3 * 2048 % chrRomSize;
+                    dst[0] = CHR_ROM + a0; dst[1] = CHR_ROM + a0 + 1024;
+                    dst[2] = CHR_ROM + a1; dst[3] = CHR_ROM + a1 + 1024;
+                    dst[4] = CHR_ROM + a2; dst[5] = CHR_ROM + a2 + 1024;
+                    dst[6] = CHR_ROM + a3; dst[7] = CHR_ROM + a3 + 1024;
                     break;
                 }
                 default: // 3: 1KB × 8
@@ -523,19 +530,14 @@ namespace AprNes
                     if (useA)
                     {
                         for (int i = 0; i < 8; i++)
-                        {
-                            long b = (long)chrBanks[i] * 1024 % chrRomSize;
-                            NesCore.chrBankPtrs[i] = CHR_ROM + b;
-                        }
+                            dst[i] = CHR_ROM + (long)chrBanks[i] * 1024 % chrRomSize;
                     }
                     else
                     {
-                        // B set: 4 banks ($5128-$512B) repeated for upper 4
                         for (int i = 0; i < 4; i++)
                         {
-                            long b = (long)chrBanks[8 + i] * 1024 % chrRomSize;
-                            NesCore.chrBankPtrs[i] = CHR_ROM + b;
-                            NesCore.chrBankPtrs[i + 4] = CHR_ROM + b;
+                            byte* p = CHR_ROM + (long)chrBanks[8 + i] * 1024 % chrRomSize;
+                            dst[i] = p; dst[i + 4] = p;
                         }
                     }
                     break;
@@ -543,8 +545,37 @@ namespace AprNes
             }
         }
 
+        // Apply CHR banks: update A/B caches AND chrBankPtrs for immediate effect.
+        // Mid-frame writes (scanline IRQ) need chrBankPtrs updated now.
+        // PPU dot-0/257/320 checks handle the per-scanline A/B switching.
+        //
+        // lastChrReg mechanism (Mesen2 _lastChrReg):
+        //   In 8x16 mode, when !ppuInFrame and last CHR write was to A-set ($5120-$5127),
+        //   use A-set for BG. This allows NMI handlers that only write A-set registers
+        //   to control both sprites AND BG CHR during VBlank/early rendering (e.g. CV3 HUD).
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void ApplyCHRBanksDynamic()
+        {
+            if (chrRomSize == 0) return;
+            UpdateCHRBankPtrsAB();
+            bool useA;
+            if (!NesCore.Spritesize8x16)
+            {
+                useA = true;  // 8x8 sprites: always use A set
+            }
+            else
+            {
+                // 8x16: use A set when not in frame AND last CHR write was to A-set registers
+                useA = !ppuInFrame && lastChrReg <= 0x5127;
+            }
+            NesCore.chrBGUseASet = useA;
+            byte*[] src = useA ? NesCore.chrBankPtrsA : NesCore.chrBankPtrsB;
+            for (int i = 0; i < 8; i++)
+                NesCore.chrBankPtrs[i] = src[i];
+        }
+
         // UpdateCHRBanks (IMapper interface) — re-applies current set
-        public void UpdateCHRBanks() { ApplyCHRBanks(chrBankIsA); }
+        public void UpdateCHRBanks() { ApplyCHRBanksDynamic(); }
 
         public byte MapperR_CHR(int address)
         {
@@ -559,56 +590,22 @@ namespace AprNes
         }
 
         // ================================================================
-        //  Scanline IRQ — A12 notification based
+        //  Scanline IRQ — direct PPU scanline tracking
         // ================================================================
 
         public MapperA12Mode A12NotifyMode => MapperA12Mode.MMC3;
 
         public void NotifyA12(int addr, int ppuAbsCycle)
         {
-            ppuIdleCounter = 3; // Reset idle detection
-
-            int currentScanline = ppuAbsCycle / 341;
-
-            // ── Frame detection ──
+            // A12 notifications maintain ppuIdleCounter for ppuInFrame detection ($5204 bit 6).
+            // Scanline IRQ counting is handled by CpuCycle using direct PPU scanline tracking.
+            // Note: ppuInFrame oscillates briefly between scanlines (ppuIdleCounter=3 expires in
+            // the ~4 CPU cycle gap). Do NOT reset scanlineCounter here — it would fire every scanline.
+            ppuIdleCounter = 3;
             if (!ppuInFrame)
             {
                 ppuInFrame = true;
-                scanlineCounter = 0;
-                lastNotifiedScanline = currentScanline;
-                return;
-            }
-
-            // ── Scanline boundary → increment counter + check IRQ ──
-            if (currentScanline != lastNotifiedScanline)
-            {
-                lastNotifiedScanline = currentScanline;
-
-                if (currentScanline >= 1 && currentScanline <= 239)
-                {
-                    scanlineCounter++;
-                    if (scanlineCounter == irqCounterTarget)
-                    {
-                        irqPending = true;
-                        if (irqEnabled)
-                        {
-                            NesCore.statusmapperint = true;
-                            NesCore.UpdateIRQLine();
-                        }
-                    }
-                }
-            }
-
-            // ── CHR A/B switching for 8x16 sprites ──
-            if (NesCore.Spritesize8x16)
-            {
-                int currentDot = ppuAbsCycle % 341;
-                bool wantA = (currentDot >= 257 && currentDot < 320); // sprite fetches → A set
-                if (wantA != chrBankIsA)
-                {
-                    chrBankIsA = wantA;
-                    ApplyCHRBanks(wantA);
-                }
+                ApplyCHRBanksDynamic(); // ppuInFrame changed → recalculate A/B set selection
             }
         }
 
@@ -618,20 +615,47 @@ namespace AprNes
 
         public void CpuCycle()
         {
+            // --- PPU idle detection for ppuInFrame flag ($5204 bit 6) ---
             if (ppuIdleCounter > 0)
             {
                 ppuIdleCounter--;
                 if (ppuIdleCounter == 0)
                 {
                     ppuInFrame = false;
-                    // When leaving frame, restore A set (or decide by lastChrReg)
-                    if (NesCore.Spritesize8x16)
+                    ApplyCHRBanksDynamic(); // ppuInFrame changed → recalculate A/B set selection
+                }
+            }
+
+            // --- Scanline IRQ: direct PPU scanline tracking ---
+            // Use NesCore.scanline directly instead of A12 notifications.
+            // This avoids ppuIdleCounter instability from $2006/$2007 accesses during VBlank.
+            //
+            // Counter resets to 0 at scanline 0 (frame start). Subsequent scanlines increment.
+            // irqCounterTarget==0 is special: comparison is never true (NESdev Wiki).
+            bool rendering = NesCore.ShowBackGround || NesCore.ShowSprites;
+            int sl = NesCore.scanline;
+
+            if (rendering && sl >= 0 && sl < 240)
+            {
+                if (sl != lastTrackedScanline)
+                {
+                    lastTrackedScanline = sl;
+                    if (sl == 0)
                     {
-                        bool wantA = lastChrReg <= 0x5127;
-                        if (wantA != chrBankIsA)
+                        // Frame start: reset counter, don't increment
+                        scanlineCounter = 0;
+                    }
+                    else
+                    {
+                        scanlineCounter++;
+                        if (irqCounterTarget != 0 && scanlineCounter == irqCounterTarget)
                         {
-                            chrBankIsA = wantA;
-                            ApplyCHRBanks(wantA);
+                            irqPending = true;
+                            if (irqEnabled)
+                            {
+                                NesCore.statusmapperint = true;
+                                NesCore.UpdateIRQLine();
+                            }
                         }
                     }
                 }
