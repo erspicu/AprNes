@@ -44,6 +44,10 @@
             this.normalToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this._soundMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this._ultraAnalogMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this._recordMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this._recordVideoMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this._recordAudioMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this._recordSettingsMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.fps_count_timer = new System.Windows.Forms.Timer(this.components);
             this.label3 = new System.Windows.Forms.Label();
             this.UIOpenRom = new System.Windows.Forms.Label();
@@ -78,7 +82,8 @@
             this.fun6ToolStripMenuItem,
             this.screenModeToolStripMenuItem,
             this._soundMenuItem,
-            this._ultraAnalogMenuItem});
+            this._ultraAnalogMenuItem,
+            this._recordMenuItem});
             this.contextMenuStrip1.Name = "contextMenuStrip1";
             this.contextMenuStrip1.Size = new System.Drawing.Size(192, 274);
             // 
@@ -167,7 +172,38 @@
             this._ultraAnalogMenuItem.Size = new System.Drawing.Size(191, 30);
             this._ultraAnalogMenuItem.Text = "Ultra Analog: OFF";
             this._ultraAnalogMenuItem.Click += new System.EventHandler(this._ultraAnalogMenuItem_Click);
-            // 
+            //
+            // _recordMenuItem
+            //
+            this._recordMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this._recordVideoMenuItem,
+            this._recordAudioMenuItem,
+            this._recordSettingsMenuItem});
+            this._recordMenuItem.Name = "_recordMenuItem";
+            this._recordMenuItem.Size = new System.Drawing.Size(191, 30);
+            this._recordMenuItem.Text = "Record";
+            //
+            // _recordVideoMenuItem
+            //
+            this._recordVideoMenuItem.Name = "_recordVideoMenuItem";
+            this._recordVideoMenuItem.Size = new System.Drawing.Size(207, 34);
+            this._recordVideoMenuItem.Text = "Record Video";
+            this._recordVideoMenuItem.Click += new System.EventHandler(this._recordVideoMenuItem_Click);
+            //
+            // _recordAudioMenuItem
+            //
+            this._recordAudioMenuItem.Name = "_recordAudioMenuItem";
+            this._recordAudioMenuItem.Size = new System.Drawing.Size(207, 34);
+            this._recordAudioMenuItem.Text = "Record Audio";
+            this._recordAudioMenuItem.Enabled = false;
+            //
+            // _recordSettingsMenuItem
+            //
+            this._recordSettingsMenuItem.Name = "_recordSettingsMenuItem";
+            this._recordSettingsMenuItem.Size = new System.Drawing.Size(207, 34);
+            this._recordSettingsMenuItem.Text = "Settings";
+            this._recordSettingsMenuItem.Enabled = false;
+            //
             // fps_count_timer
             // 
             this.fps_count_timer.Interval = 1000;
@@ -320,6 +356,10 @@
         private System.Windows.Forms.ToolStripMenuItem normalToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem _soundMenuItem;
         private System.Windows.Forms.ToolStripMenuItem _ultraAnalogMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem _recordMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem _recordVideoMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem _recordAudioMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem _recordSettingsMenuItem;
     }
 }
 

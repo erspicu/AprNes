@@ -180,6 +180,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="TestRunner.cs" />
     <Compile Include="tool\WaveOutPlayer.cs" />
+    <Compile Include="tool\VideoRecorder.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="UI\AprNes_RomInfoUI.cs">
       <SubType>Form</SubType>

@@ -953,6 +953,8 @@ public string GetRomInfo()
             rom_file_name = filePath.Remove(filePath.Length - 4, 4);
             current_rom_bytes = rom_bytes;
 
+            StopRecordingIfActive();
+
             if (nes_t != null)
             {
                 try
@@ -1020,6 +1022,7 @@ public string GetRomInfo()
 
         private void AprNesUI_FormClosing(object sender, FormClosingEventArgs e)
         {
+            StopRecordingIfActive();
             app_running = false;
             EndHighResPeriod();
             NesCore.exit = true;
@@ -1107,9 +1110,18 @@ public string GetRomInfo()
         readonly Stopwatch _fpsStopWatch = new Stopwatch();
         double _fpsDeadline = 0;
 
-        void VideoOutputDeal(object sender, EventArgs e)
+        unsafe void VideoOutputDeal(object sender, EventArgs e)
         {
             RenderObj.Render();
+            if (VideoRecorder.IsRecording)
+            {
+                // Analog mode: always use fresh AnalogScreenBuf pointer (can be reallocated)
+                // Non-analog: use cached RenderOutputPtr (stable, owned by RenderObj)
+                uint* capturePtr = NesCore.AnalogEnabled && NesCore.AnalogScreenBuf != null
+                    ? NesCore.AnalogScreenBuf : NesCore.RenderOutputPtr;
+                if (capturePtr != null)
+                    VideoRecorder.PushFrame(capturePtr);
+            }
             if (LimitFPS)
             {
                 if (!_fpsStopWatch.IsRunning) _fpsStopWatch.Restart();
@@ -1294,11 +1306,74 @@ public string GetRomInfo()
             Configure_Write();
         }
 
+        // ── Recording ──
+        static string _ffmpegPath;
+
+        static string GetFfmpegPath()
+        {
+            if (_ffmpegPath != null) return _ffmpegPath;
+            string path = Path.Combine(Application.StartupPath, "tools", "ffmpeg", "ffmpeg.exe");
+            _ffmpegPath = File.Exists(path) ? path : "";
+            return _ffmpegPath;
+        }
+
+        void UpdateRecordMenuVisibility()
+        {
+            bool hasFfmpeg = !string.IsNullOrEmpty(GetFfmpegPath());
+            _recordMenuItem.Visible = hasFfmpeg;
+            if (hasFfmpeg)
+            {
+                _recordVideoMenuItem.Text = VideoRecorder.IsRecording
+                    ? "■ Stop Recording" : "● Record Video";
+                _recordVideoMenuItem.Enabled = running || VideoRecorder.IsRecording;
+            }
+        }
+
+        unsafe void _recordVideoMenuItem_Click(object sender, EventArgs e)
+        {
+            if (VideoRecorder.IsRecording)
+            {
+                VideoRecorder.Stop();
+                UpdateRecordMenuVisibility();
+                this.Text = "AprNes";
+                return;
+            }
+
+            if (!running) return;
+
+            string capturesDir = Path.Combine(Application.StartupPath, "Captures");
+            // Analog mode: read dimensions fresh from CrtScreen (buffer can be reallocated)
+            int recW = NesCore.AnalogEnabled ? CrtScreen.DstW : NesCore.RenderOutputW;
+            int recH = NesCore.AnalogEnabled ? CrtScreen.DstH : NesCore.RenderOutputH;
+            bool ok = VideoRecorder.Start(GetFfmpegPath(), capturesDir, recW, recH);
+            if (ok)
+            {
+                UpdateRecordMenuVisibility();
+                this.Text = "AprNes [REC]";
+            }
+            else
+            {
+                MessageBox.Show("Failed to start recording.\nCheck that tools\\ffmpeg\\ffmpeg.exe exists.",
+                    "Recording Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        void StopRecordingIfActive()
+        {
+            if (VideoRecorder.IsRecording)
+            {
+                VideoRecorder.Stop();
+                try { this.Text = "AprNes"; } catch { }
+            }
+        }
+
         private void AprNesUI_Shown(object sender, EventArgs e)
         {
             initUIsize();
             UpdateSoundMenuText();
             UpdateUltraAnalogMenuText();
+            UpdateRecordMenuVisibility();
+            contextMenuStrip1.Opening += (s, ev) => UpdateRecordMenuVisibility();
 
             _joystick.Init(this.Handle);
             new Thread(polling_listener).Start();

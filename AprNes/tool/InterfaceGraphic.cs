@@ -34,6 +34,7 @@ namespace AprNes
             _input = input;
             NativeGDI.initHighSpeed(_device, 256 * 1, 240 * 1, _input, 0, 0);
             HS_XBRz.initTable(256, 240);
+            NesCore.RenderOutputPtr = _input; NesCore.RenderOutputW = 256; NesCore.RenderOutputH = 240;
         }
 
         public void Render()
@@ -62,6 +63,7 @@ namespace AprNes
             _output = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 245760);
             NativeGDI.initHighSpeed(_device, 256 * 2, 240 * 2, _output, 0, 0);
             HS_XBRz.initTable(256, 240);
+            NesCore.RenderOutputPtr = _output; NesCore.RenderOutputW = 512; NesCore.RenderOutputH = 480;
         }
 
         public void Render()
@@ -92,6 +94,7 @@ namespace AprNes
             _output = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 256 * 3 * 240 * 3);
             NativeGDI.initHighSpeed(_device, 256 * 3, 240 * 3, _output, 0, 0);
             HS_XBRz.initTable(256, 240);
+            NesCore.RenderOutputPtr = _output; NesCore.RenderOutputW = 768; NesCore.RenderOutputH = 720;
         }
 
         public void Render()
@@ -121,6 +124,7 @@ namespace AprNes
             _output = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 256 * 4 * 240 * 4);
             NativeGDI.initHighSpeed(_device, 256 * 4, 240 * 4, _output, 0, 0);
             HS_XBRz.initTable(256, 240);
+            NesCore.RenderOutputPtr = _output; NesCore.RenderOutputW = 1024; NesCore.RenderOutputH = 960;
         }
 
         public void Render()
@@ -150,6 +154,7 @@ namespace AprNes
             _output = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 256 * 5 * 240 * 5);
             NativeGDI.initHighSpeed(_device, 256 * 5, 240 * 5, _output, 0, 0);
             HS_XBRz.initTable(256, 240);
+            NesCore.RenderOutputPtr = _output; NesCore.RenderOutputW = 1280; NesCore.RenderOutputH = 1200;
         }
 
         public void Render()
@@ -179,6 +184,7 @@ namespace AprNes
             _output = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 256 * 6 * 240 * 6);
             NativeGDI.initHighSpeed(_device, 256 * 6, 240 * 6, _output, 0, 0);
             HS_XBRz.initTable(256, 240);
+            NesCore.RenderOutputPtr = _output; NesCore.RenderOutputW = 1536; NesCore.RenderOutputH = 1440;
         }
 
         public void Render()
@@ -211,6 +217,7 @@ namespace AprNes
             _output = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 256 * 8 * 240 * 8);
             NativeGDI.initHighSpeed(_device, 256 * 8, 240 * 8, _output, 0, 0);
             HS_XBRz.initTable(256, 240);
+            NesCore.RenderOutputPtr = _output; NesCore.RenderOutputW = 2048; NesCore.RenderOutputH = 1920;
         }
 
         public void Render()
@@ -244,6 +251,7 @@ namespace AprNes
             _output = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 256 * 9 * 240 * 9);
             NativeGDI.initHighSpeed(_device, 256 * 9, 240 * 9, _output, 0, 0);
             HS_XBRz.initTable(256, 240);
+            NesCore.RenderOutputPtr = _output; NesCore.RenderOutputW = 2304; NesCore.RenderOutputH = 2160;
         }
 
         public void Render()
@@ -274,6 +282,7 @@ namespace AprNes
             _output = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 600 * 480);
             NativeGDI.initHighSpeed(_device, 600, 480, _output, 0, 0);
             LibScanline.init(_input, _output);
+            NesCore.RenderOutputPtr = _output; NesCore.RenderOutputW = 600; NesCore.RenderOutputH = 480;
         }
 
         public void Render()
@@ -307,6 +316,7 @@ namespace AprNes
             NativeGDI.initHighSpeed(_device, 1196, 960, _output, 0, 0);
             HS_XBRz.initTable(256, 240);
             LibScanline.init(_output_tmp, _output);
+            NesCore.RenderOutputPtr = _output; NesCore.RenderOutputW = 1196; NesCore.RenderOutputH = 960;
         }
 
         public void Render()
@@ -341,6 +351,7 @@ namespace AprNes
             NativeGDI.initHighSpeed(_device, 1792, 1440, _output, 0, 0);
             HS_XBRz.initTable(256, 240);
             LibScanline.init(_output_tmp, _output);
+            NesCore.RenderOutputPtr = _output; NesCore.RenderOutputW = 1792; NesCore.RenderOutputH = 1440;
         }
 
         public void Render()
@@ -368,6 +379,9 @@ namespace AprNes
         {
             // input (ScreenBuf1x) 不使用；直接指向 AnalogScreenBuf
             NativeGDI.initHighSpeed(_device, CrtScreen.DstW, CrtScreen.DstH, NesCore.AnalogScreenBuf, 0, 0);
+            NesCore.RenderOutputPtr = NesCore.AnalogScreenBuf;
+            NesCore.RenderOutputW = CrtScreen.DstW;
+            NesCore.RenderOutputH = CrtScreen.DstH;
         }
 
         public void Render()

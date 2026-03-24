@@ -93,6 +93,11 @@ namespace AprNes
         static public uint* AnalogScreenBuf = null;
         static public int   AnalogBufSize   = 0;  // 目前已分配的 pixel 數（DstW×DstH）
 
+        // 錄影用：目前 RenderObj 的最終輸出緩衝區指標與尺寸（由各 Render class init() 設定）
+        static public uint* RenderOutputPtr = null;
+        static public int   RenderOutputW   = 256;
+        static public int   RenderOutputH   = 240;
+
         static int* Vertical; //  Vertical = false,
 
         static public ManualResetEvent _event = new ManualResetEvent(true);
