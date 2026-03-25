@@ -160,7 +160,7 @@ python run_tests.py -j 10
 | Generic USB gamepad / joystick | DirectInput8 (raw vtable) | Auto-enumerated, excludes XInput devices |
 | Xbox 360 / One / Series | XInput (xinput1_4.dll) | Auto-detects players 0–3 |
 
-## Supported Mappers (30 verified)
+## Supported Mappers (31 verified)
 
 | Mapper | Representative Games |
 |--------|---------------------|
@@ -174,6 +174,7 @@ python run_tests.py -j 10
 | 10 (MMC4) | Fire Emblem, Famicom Wars |
 | 11 (Color Dreams) | Crystal Mines, Pesterminator |
 | 18 (Jaleco SS8806) | Ninja Jajamaru (J), Pizza Pop! (J), Magic John (J) |
+| 24 (VRC6) | Akumajou Densetsu (J) — with VRC6 expansion audio |
 | 21 (VRC4) | Wai Wai World 2 (J), Ganbare Goemon Gaiden 2 (J) |
 | 22 (VRC2a) | TwinBee 3 (J) |
 | 23 (VRC2b) | Contra (J), Getsufuu Maden (J) |
@@ -357,7 +358,7 @@ python run_tests.py -j 10
 | 一般 USB 手把 / 老式搖桿 | DirectInput8（raw vtable） | 自動列舉，排除 XInput 裝置 |
 | Xbox 360 / Xbox One / Xbox Series | XInput（xinput1_4.dll） | 自動偵測 player 0–3 |
 
-## 支援的 Mapper（30 個通過人工驗證）
+## 支援的 Mapper（31 個通過人工驗證）
 
 | Mapper | 代表遊戲 |
 |--------|---------|
@@ -371,6 +372,7 @@ python run_tests.py -j 10
 | 10 (MMC4) | 火焰紋章、FC 大戰 |
 | 11 (Color Dreams) | Crystal Mines、Pesterminator |
 | 18 (Jaleco SS8806) | 忍者じゃじゃ丸（日）、Pizza Pop!（日）、Magic John（日） |
+| 24 (VRC6) | 悪魔城伝説（日）— 含 VRC6 擴展音效 |
 | 21 (VRC4) | Wai Wai World 2（日）、がんばれゴエモン外伝 2（日） |
 | 22 (VRC2a) | TwinBee 3（日） |
 | 23 (VRC2b) | 魂斗羅（日）、月風魔傳（日） |
