@@ -52,7 +52,7 @@
 | **066** | ⚠️ | 部分遊戲運作問題 |
 | **067** | ❌ | Mito Koumon II - Sekai Manyuu Ki (J) 畫面有問題 |
 | **068** | ✅ | |
-| **069** | ✅ | |
+| **069** | ✅ | 人工驗證通過（2026-03-25）：含 Sunsoft 5B (YM2149) 3ch 擴展音效 |
 | **070** | ❌ | 畫面有問題 |
 | **071** | ❌ | 綠屏 |
 | **072** | ✅ | |
@@ -121,8 +121,7 @@
 | **066** | GxROM | 32KB PRG × 8KB CHR 一次寫入 | DragonBall (J), Gumshoe (U) | ✅ |
 | **067** | Sunsoft-3 | 16KB PRG；4×2KB CHR；16-bit 下計數 IRQ | Fantasy Zone 2 (J), Mito Koumon II (J) | ❌ |
 | **068** | Sunsoft #4 | 16KB PRG（固定末）；4×2KB CHR；CHR-as-nametable | AfterBurner II (J), Maharaja (J) | ✅ |
-| **069** | Sunsoft FME-7 | CPU cycle IRQ；PRG-RAM 分頁；4種鏡像 | Batman (J), Gimmick! (J) | ✅ |
-| **069** | Sunsoft 5B 擴充音效 | YM2149 3ch 音效未實作 | — | ⚠️ |
+| **069** | Sunsoft FME-7 / 5B | CPU cycle IRQ；PRG-RAM 分頁；4種鏡像；YM2149 3ch 擴展音效（對數音量 LUT、CPU/2 時脈） | Batman (J), Gimmick! (J) | ✅ |
 | **070** | Bandai 74161/32 | 16KB PRG + 8KB CHR 一次寫入；$C000 固定末 | Kamen Rider Club (J), Family Trainer 5 (J) | ✅ |
 | **071** | Camerica | 16KB PRG 切換（單暫存器）；CHR-RAM | Firehawk (U), Linus Spacehead (U) | ✅ |
 | **072** | Jaleco JF-17 | Latch 機制（prgFlag/chrFlag）；16KB PRG + 8KB CHR | Pinball Quest (J), Moero!! Juudou Warriors (J) | ✅ |

@@ -181,7 +181,7 @@ python run_tests.py -j 10
 | 32 (Irem G-101) | Image Fight (J), Major League (J) |
 | 33 (Taito TC0190) | Akira (J), Don Doko Don (J) |
 | 68 (Sunsoft #4) | After Burner II (J), Maharaja (J) |
-| 69 (FME-7) | Batman (J), Gimmick! (J) |
+| 69 (FME-7/5B) | Batman (J), Gimmick! (J) — with Sunsoft 5B expansion audio |
 | 72 (Jaleco JF-17) | Pinball Quest (J), Moero!! Juudou Warriors (J) |
 | 75 (VRC1) | Ganbare Goemon! (J), Jajamaru Ninpou Chou (J) |
 | 77 (Napoleon Senki) | Napoleon Senki (J) |
@@ -379,7 +379,7 @@ python run_tests.py -j 10
 | 32 (Irem G-101) | Image Fight（日）、Major League（日） |
 | 33 (Taito TC0190) | Akira（日）、Don Doko Don（日） |
 | 68 (Sunsoft #4) | After Burner II（日）、Maharaja（日） |
-| 69 (FME-7) | 蝙蝠俠（日）、Gimmick!（日） |
+| 69 (FME-7/5B) | 蝙蝠俠（日）、Gimmick!（日） — 含 Sunsoft 5B 擴展音效 |
 | 72 (Jaleco JF-17) | Pinball Quest（日）、Moero!! 柔道戰士（日） |
 | 75 (VRC1) | がんばれゴエモン!（日）、じゃじゃ丸忍法帳（日） |
 | 77 (Napoleon Senki) | Napoleon 戰記（日） |

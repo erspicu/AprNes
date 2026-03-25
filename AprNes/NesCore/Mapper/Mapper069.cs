@@ -13,6 +13,17 @@ namespace AprNes
     //   14:   IRQ counter low byte
     //   15:   IRQ counter high byte
     // Last 8K PRG fixed at $E000. CPU-cycle counter IRQ.
+    //
+    // Audio: Sunsoft 5B (YM2149-compatible, 3 tone channels)
+    //   $C000: audio register select
+    //   $E000: audio register write
+    //   Registers 0-5: channel A/B/C period (12-bit, low/high pairs)
+    //   Register 6: noise period (unused by most games)
+    //   Register 7: enable flags (bit0-2=tone disable, bit3-5=noise disable)
+    //   Registers 8-10: channel A/B/C volume (4-bit, +1.5dB×2 per step)
+    //   Registers 11-12: envelope period (not emulated)
+    //   Register 13: envelope shape (not emulated)
+    //   Clocked at CPU/2 (every other CPU cycle)
     unsafe public class Mapper069 : IMapper
     {
         byte* PRG_ROM, CHR_ROM, ppu_ram;
@@ -27,6 +38,29 @@ namespace AprNes
         bool irqEnabled;        // bit0 of cmd 13
         bool counterEnabled;    // bit7 of cmd 13
         ushort irqCounter;
+
+        // ── Sunsoft 5B audio (YM2149-compatible) ──────────────────────────
+        byte audioRegSelect;
+        byte[] audioRegs = new byte[16];
+        short[] audioTimer = new short[3];
+        byte[] toneStep = new byte[3];
+        bool audioProcessTick;     // CPU/2 divider
+        static byte[] volumeLut;   // logarithmic volume lookup (+1.5dB×2 per step)
+
+        static Mapper069()
+        {
+            // Build logarithmic volume LUT: +1.5dB per step (×2 per step = ×1.1885^2)
+            // Matches Mesen2 Sunsoft5bAudio constructor
+            volumeLut = new byte[16];
+            volumeLut[0] = 0;
+            double output = 1.0;
+            for (int i = 1; i < 16; i++)
+            {
+                output *= 1.1885022274370184377301224648922;
+                output *= 1.1885022274370184377301224648922;
+                volumeLut[i] = (byte)output;
+            }
+        }
 
         public void MapperInit(byte* _PRG_ROM, byte* _CHR_ROM, byte* _ppu_ram,
             int _PRG_ROM_count, int _CHR_ROM_count, int* _Vertical)
@@ -48,6 +82,13 @@ namespace AprNes
             irqEnabled = false;
             counterEnabled = false;
             irqCounter = 0;
+
+            // Audio reset
+            audioRegSelect = 0;
+            for (int i = 0; i < 16; i++) audioRegs[i] = 0;
+            for (int i = 0; i < 3; i++) { audioTimer[i] = 0; toneStep[i] = 0; }
+            audioProcessTick = false;
+            NesCore.mapperExpansionAudio = 0;
         }
 
         public byte MapperR_ExpansionROM(ushort address) { return NesCore.cpubus; }
@@ -76,11 +117,16 @@ namespace AprNes
 
         public void MapperW_PRG(ushort address, byte value)
         {
-            if ((address & 0xE000) == 0x8000)       // $8000-$9FFF: command
-                cmdReg = value & 0x0F;
-            else if ((address & 0xE000) == 0xA000)  // $A000-$BFFF: data
-                ExecuteCommand(value);
-            // $C000-$FFFF: Sunsoft 5B audio (not implemented, ignore)
+            switch (address & 0xE000)
+            {
+                case 0x8000: cmdReg = value & 0x0F; break;        // command select
+                case 0xA000: ExecuteCommand(value); break;          // command data
+                case 0xC000: audioRegSelect = value; break;         // 5B audio register select
+                case 0xE000:                                        // 5B audio register write
+                    if (audioRegSelect <= 0x0F)
+                        audioRegs[audioRegSelect] = value;
+                    break;
+            }
         }
 
         void ExecuteCommand(byte value)
@@ -139,13 +185,39 @@ namespace AprNes
 
         public void CpuCycle()
         {
-            if (!counterEnabled) return;
-            irqCounter--;
-            if (irqCounter == 0xFFFF && irqEnabled)
+            // IRQ
+            if (counterEnabled)
             {
-                NesCore.statusmapperint = true;
-                NesCore.UpdateIRQLine();
+                irqCounter--;
+                if (irqCounter == 0xFFFF && irqEnabled)
+                {
+                    NesCore.statusmapperint = true;
+                    NesCore.UpdateIRQLine();
+                }
             }
+
+            // Sunsoft 5B audio — clocked at CPU/2
+            if (audioProcessTick)
+            {
+                short summedOutput = 0;
+                for (int ch = 0; ch < 3; ch++)
+                {
+                    audioTimer[ch]--;
+                    if (audioTimer[ch] <= 0)
+                    {
+                        audioTimer[ch] = (short)(audioRegs[ch * 2] | (audioRegs[ch * 2 + 1] << 8));
+                        toneStep[ch] = (byte)((toneStep[ch] + 1) & 0x0F);
+                    }
+                    // Tone enabled (bit=0 means enabled) and in high half of 16-step cycle
+                    bool toneEnabled = ((audioRegs[7] >> ch) & 1) == 0;
+                    if (toneEnabled && toneStep[ch] < 8)
+                        summedOutput += (short)volumeLut[audioRegs[8 + ch] & 0x0F];
+                }
+                // Gain calibrated per mixing guide: 5B max (531) × 120 ≈ 63,720
+                // Comparable to VRC6 max (~48,800), matching 2.0-2.5× APU pulse recommendation
+                NesCore.mapperExpansionAudio = summedOutput * 120;
+            }
+            audioProcessTick = !audioProcessTick;
         }
 
         public void MapperW_CHR(int addr, byte val) { if (CHR_ROM_count == 0) ppu_ram[addr] = val; }
