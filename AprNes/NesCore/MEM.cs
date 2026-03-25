@@ -432,9 +432,12 @@ namespace AprNes
 
                         ppu_read_fun[address] = new Func<int, byte>((val) =>
                         {
-
+                            int nt_addr = val & 0x2FFF;
                             ppu_2007_temp = ppu_ram[val & ((val & 0x03) == 0 ? 0x0C : 0x1F) + 0x3f00];
-                            ppu_2007_buffer = ppu_ram[CIRAMAddr(val & 0x2FFF)];
+                            if (ntChrOverrideEnabled)
+                                ppu_2007_buffer = ntBankPtrs[(nt_addr >> 10) & 3][nt_addr & 0x3FF];
+                            else
+                                ppu_2007_buffer = ppu_ram[CIRAMAddr(nt_addr)];
 
                             ppu_2007_temp = (byte)((openbus & 0xC0) | (ppu_2007_temp & 0x3F));//add openbus fix
 
@@ -467,10 +470,12 @@ namespace AprNes
                     {
                         ppu_read_fun[address] = new Func<int, byte>((val) =>
                         {
-
-
+                            int nt_addr = val & 0x2FFF;
                             ppu_2007_temp = ppu_2007_buffer; //need read from buffer
-                            ppu_2007_buffer = ppu_ram[CIRAMAddr(val & 0x2FFF)]; //Name Table & Attribute Table ($3000-$3EFF mirrors $2000-$2EFF)
+                            if (ntChrOverrideEnabled)
+                                ppu_2007_buffer = ntBankPtrs[(nt_addr >> 10) & 3][nt_addr & 0x3FF];
+                            else
+                                ppu_2007_buffer = ppu_ram[CIRAMAddr(nt_addr)]; //Name Table & Attribute Table ($3000-$3EFF mirrors $2000-$2EFF)
                             Increment2007();
                             openbus = ppu_2007_temp;
                             open_bus_decay_timer = 77777;//fixed add
@@ -520,7 +525,10 @@ namespace AprNes
                    {
                        int _vram_addr_wrap = vram_addr & 0x2FFF; // $3000-$3EFF mirrors $2000-$2EFF
                        openbus = val;
-                       ppu_ram[CIRAMAddr(_vram_addr_wrap)] = val;
+                       if (ntChrOverrideEnabled)
+                           ntBankPtrs[(_vram_addr_wrap >> 10) & 3][_vram_addr_wrap & 0x3FF] = val;
+                       else
+                           ppu_ram[CIRAMAddr(_vram_addr_wrap)] = val;
                        Increment2007();
                    });
                 }

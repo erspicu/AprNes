@@ -47,6 +47,8 @@ namespace AprNes
         static public byte extAttrChrUpperBits = 0;  // $5130 upper bits
         static public byte* extAttrCHR = null;       // CHR-ROM base pointer
         static public int extAttrChrSize = 0;        // CHR-ROM size for wrapping
+        // MMC5 direct reference for PPU → mapper VRAM read notifications
+        static public Mapper005 mmc5Ref = null;
 
         // ROM info accessors (read-only, set during init)
         static public int  RomMapper   => mapper;
@@ -358,6 +360,7 @@ namespace AprNes
                 chrABAutoSwitch = false;
                 chrBGUseASet = false;
                 extAttrEnabled = false;
+                mmc5Ref = null;
                 MapperObj.MapperInit(PRG_ROM, CHR_ROM, ppu_ram, PRG_ROM_count, CHR_ROM_count, Vertical);
                 MapperObj.Reset();
                 if (!dbEntry.IsNone && dbEntry.MirrorOverride >= 0)

@@ -266,6 +266,7 @@ namespace AprNes
                     else
                         NTVal = ppu_ram[CIRAMAddr(ioaddr)];
                     if (extAttrEnabled) extAttrNTOffset = (ushort)(ioaddr & 0x3FF);
+                    if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ioaddr);
                 } else if (phase == 2) {
                     ioaddr = 0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07);
                 } else if (phase == 3) {
@@ -279,6 +280,7 @@ namespace AprNes
                         ATVal = (byte)((ppu_ram[CIRAMAddr(ioaddr)] >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
                     }
                     bg_attr_p3 = bg_attr_p2; bg_attr_p2 = bg_attr_p1; bg_attr_p1 = ATVal;
+                    if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ioaddr);
                 } else if (phase == 4) {
                     if (extAttrEnabled && extAttrChrSize > 0)
                         ioaddr = (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7);
@@ -290,6 +292,7 @@ namespace AprNes
                         lowTile = extAttrCHR[ioaddr % extAttrChrSize];
                     else
                         lowTile = chrBankPtrs[(ioaddr >> 10) & 7][ioaddr & 0x3FF];
+                    if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ioaddr);
                 } else if (phase == 6) {
                     if (extAttrEnabled && extAttrChrSize > 0)
                         ioaddr = (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
@@ -301,6 +304,7 @@ namespace AprNes
                         highTile = extAttrCHR[ioaddr % extAttrChrSize];
                     else
                         highTile = chrBankPtrs[(ioaddr >> 10) & 7][ioaddr & 0x3FF];
+                    if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ioaddr);
                     // Render 8 pixels using shift registers BEFORE reload (visible only, BG on)
                     if (scanline < 240 && cx < 256 && ShowBackGround)
                         RenderBGTile(cx);
@@ -352,6 +356,15 @@ namespace AprNes
                         NotifyMapperA12(SpPatternTableAddr | (tileNum << 4) | 8);
                     }
                 }
+                // MMC5: per-fetch VRAM read notifications for sprite phase
+                if (mmc5Ref != null)
+                {
+                    int phaseM5 = (cx - 257) & 7;
+                    if (phaseM5 == 1) mmc5Ref.NotifyVramRead(0x2000);        // garbage NT
+                    else if (phaseM5 == 3) mmc5Ref.NotifyVramRead(0x23C0);   // garbage AT
+                    else if (phaseM5 == 5) mmc5Ref.NotifyVramRead(SpPatternTableAddr);       // CHR low
+                    else if (phaseM5 == 7) mmc5Ref.NotifyVramRead(SpPatternTableAddr | 8);   // CHR high
+                }
             }
 
             // Dot 321: latch secondary OAM[0] into oamCopyBuffer for dots 321-340
@@ -368,6 +381,11 @@ namespace AprNes
             // after BG prefetch CHR (A12=1 for BG=$1000), needed for scanline-boundary timing
             if (mapperNeedsA12 && cx == 336)
                 NotifyMapperA12(0x2000);
+
+            // MMC5: garbage NT fetches at dots 337 and 339 (same NT address as first tile)
+            // These create the 3-consecutive-identical-read pattern for scanline detection
+            if (mmc5Ref != null && (cx == 337 || cx == 339))
+                mmc5Ref.NotifyVramRead(0x2000 | (vram_addr & 0x0FFF));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -568,7 +586,14 @@ namespace AprNes
             if (scanline == 261 && cx == 339)
             {
                 oddSwap = !oddSwap;
-                if (!oddSwap && (ShowBackGround || ShowSprites)) ppu_cycles_x = ++cx;
+                if (!oddSwap && (ShowBackGround || ShowSprites))
+                {
+                    // Dot 339 is being skipped, but MMC5 needs the garbage NT fetch notification
+                    // for 3-consecutive-NT-read scanline detection to work on odd frames.
+                    if (mmc5Ref != null)
+                        mmc5Ref.NotifyVramRead(0x2000 | (vram_addr & 0x0FFF));
+                    ppu_cycles_x = ++cx;
+                }
             }
 
             // Advance scanline
