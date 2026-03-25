@@ -13,7 +13,7 @@ namespace AprNes
         // =====================================================================
         // 音效樣本輸出介面 (由外部訂閱，例如 WaveOutPlayer)
         // =====================================================================
-        static public Action<short> AudioSampleReady;
+        static public Action<short, short> AudioSampleReady; // (L, R) stereo pair
 
         // =====================================================================
         // APU 基本常數
@@ -57,17 +57,8 @@ namespace AprNes
         static int* SQUARELOOKUP;
         static int* TNDLOOKUP;
 
-        // DC 消除狀態 (high-pass filter ~90 Hz)
+        // DC 消除狀態 (high-pass filter ~90 Hz) — Pure Digital 基線濾波
         static int _dckiller = 0;
-
-        // 440 Hz 高通濾波器（NES 類比輸出第二個 HPF，讓低頻 bass 略薄，更接近硬體音色）
-        // y[n] = alpha × (y[n-1] + x[n] - x[n-1]), alpha = exp(-2π×440/44100) ≈ 0.9392 ≈ 962/1024
-        static int _hpf440State = 0;
-        static int _hpf440Prev  = 0;
-
-        // 類比輸出低通濾波器狀態 (low-pass filter ~14 kHz)
-        // alpha = 1 - exp(-2π × 14000 / 44100) ≈ 0.864 ≈ 221/256
-        static int _lpfState = 0;
 
         // Expansion audio (VRC6, Namco163, VRC7 etc.) — set by mapper each CPU cycle
         static public int mapperExpansionAudio = 0;
@@ -193,8 +184,8 @@ namespace AprNes
             _noiseMode = false; _noiseOut = 0;
             _sampleAccum = 0.0;
             _dckiller    = 0;
-            _hpf440State = 0; _hpf440Prev = 0;
-            _lpfState    = 0;
+
+            AudioDispatcher.Reset();
         }
 
         // =====================================================================
@@ -286,8 +277,7 @@ namespace AprNes
             _noiseMode = false; _noiseOut = 0;
             _sampleAccum = 0.0;
             _dckiller    = 0;
-            _hpf440State = 0; _hpf440Prev = 0;
-            _lpfState    = 0;
+            AudioDispatcher.Reset();
 
             // Power-on 狀態 (模擬 $4015=$00, $4017=$00)
             for (int i = 0; i < 4; i++)
@@ -433,11 +423,26 @@ namespace AprNes
             clockdmc();
 
             // 生成音效樣本
-            _sampleAccum += 1.0;
-            if (_sampleAccum >= _cycPerSample)
+            if (AudioMode > 0)
             {
-                _sampleAccum -= _cycPerSample;
-                generateSample();
+                // Authentic / Modern: 每 APU cycle 推入 AudioDispatcher
+                AudioDispatcher.PushApuCycle(
+                    volume[0] * _pulseOut[0],   // sq1: 0-15
+                    volume[1] * _pulseOut[1],   // sq2: 0-15
+                    _triOut,                     // tri: 0-15
+                    volume[3] * _noiseOut,       // noise: 0-15
+                    dmcvalue,                    // dmc: 0-127
+                    mapperExpansionAudio);
+            }
+            else
+            {
+                // Pure Digital: 原有 ~40.58 cycle 降頻 + DC killer
+                _sampleAccum += 1.0;
+                if (_sampleAccum >= _cycPerSample)
+                {
+                    _sampleAccum -= _cycPerSample;
+                    generateSample();
+                }
             }
         }
 
@@ -459,29 +464,17 @@ namespace AprNes
             int mixed = SQUARELOOKUP[sqIdx] + TNDLOOKUP[tndIdx]; // 0..~98302
             mixed += mapperExpansionAudio; // expansion audio (VRC6, Namco163, VRC7...)
 
-            // High-pass filter ~90 Hz — 消除 DC 偏移
+            // High-pass filter ~90 Hz — DC 偏移消除（Pure Digital 基線）
             mixed += _dckiller;
             _dckiller -= mixed >> 8;
             _dckiller += (mixed > 0 ? -1 : 1);
-
-            // High-pass filter ~440 Hz — NES 類比輸出第二個 RC HPF
-            // y[n] = alpha × (y[n-1] + x[n] - x[n-1]), alpha ≈ 962/1024 ≈ 0.9392
-            int hpf440Diff = mixed - _hpf440Prev;
-            _hpf440Prev  = mixed;
-            _hpf440State = ((_hpf440State + hpf440Diff) * 962) >> 10;
-            mixed = _hpf440State;
-
-            // Low-pass filter ~14 kHz（NES 類比輸出 RC 濾波，消除高頻混疊）
-            // y[n] = y[n-1] + alpha * (x[n] - y[n-1]), alpha ≈ 221/256 ≈ 0.864
-            _lpfState += ((mixed - _lpfState) * 221) >> 8;
-            mixed = _lpfState;
 
             // 縮放至 16-bit signed，套用使用者音量
             int clamped = mixed * Volume / 100;
             if (clamped >  32767) clamped =  32767;
             if (clamped < -32768) clamped = -32768;
 
-            AudioSampleReady?.Invoke((short)clamped);
+            AudioSampleReady?.Invoke((short)clamped, (short)clamped); // dual mono
 
             // RF 音訊干擾：將實際音訊電平饋入 NTSC RF 模擬
             // RfAudioLevel = |sample| 指數平滑 → buzz bar 振幅

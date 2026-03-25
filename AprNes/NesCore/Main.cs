@@ -63,6 +63,30 @@ namespace AprNes
         // true = full hardware accuracy; false = skip FSM for ~13% performance gain (no test failures)
         static public bool AccuracyOptA = false;
 
+        // ── AudioPlus 音訊引擎設定 ──────────────────────────────────
+        // AudioMode: 0=Pure Digital, 1=Authentic, 2=Modern
+        static public int AudioMode = 0;
+
+        // ── Authentic 模式設定 ──
+        // ConsoleModel: 0=Famicom, 1=Front-Loader, 2=Top-Loader, 3=AV Famicom, 4=Sharp Twin, 5=Sharp Titler, 6=Custom
+        static public int ConsoleModel = 0;
+        static public bool RfCrosstalk = false;         // RF 音訊洩漏干擾
+        static public int CustomLpfCutoff = 14000;      // Custom 模式 LPF 截止頻率 (Hz, 1000-22000)
+        static public bool CustomBuzz = false;           // Custom 模式 60Hz buzz 開關
+        static public int BuzzAmplitude = 30;            // Buzz 振幅 (0-100, 映射 0.000~0.010)
+        static public int BuzzFreq = 60;                 // Buzz 頻率 (50 或 60 Hz)
+        static public int RfVolume = 50;                 // RF 串擾音量 (0-200, 映射 0.00~0.20)
+
+        // ── Modern 模式設定 ──
+        static public int StereoWidth = 50;              // 立體聲寬度 (0-100%)
+        static public int HaasDelay = 20;                // Haas 延遲 (10-30 ms)
+        static public int HaasCrossfeed = 40;            // Haas crossfeed 比例 (0-80%)
+        static public int ReverbWet = 0;                 // 殘響濕度 (0-30%)
+        static public int CombFeedback = 70;             // Comb 回饋增益 (30-90%)
+        static public int CombDamp = 30;                 // Comb 高頻阻尼 (10-70%)
+        static public int BassBoostDb = 0;               // Triangle 低音增強 (0-12 dB)
+        static public int BassBoostFreq = 150;           // 低音增強中心頻率 (80-300 Hz)
+
         // 類比訊號模擬模式 (Level 2 NTSC signal simulation)
         // false = 傳統調色盤查表（預設）
         // true  = NTSC 電壓波形生成 + YIQ 解碼重採樣
@@ -390,6 +414,9 @@ namespace AprNes
 
                 //init APU & audio output (must be before reset vector read so tick() can run)
                 initAPU();
+
+                // AudioPlus 管線初始化
+                AudioDispatcher.Init();
 
                 //init cpu pc (read reset vector — no tick needed, boot cycles already counted)
                 r_PC = (ushort)(mem_read_fun[0xfffc](0xfffc) | (mem_read_fun[0xfffd](0xfffd) << 8));

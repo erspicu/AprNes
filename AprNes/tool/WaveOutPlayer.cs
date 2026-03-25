@@ -5,8 +5,8 @@ using System.Threading;
 namespace AprNes
 {
     // =========================================================================
-    // WaveOutPlayer — 系統層音效輸出
-    // 訂閱 NesCore.AudioSampleReady 接收 PCM 樣本，
+    // WaveOutPlayer — 系統層音效輸出 (Stereo)
+    // 訂閱 NesCore.AudioSampleReady(L, R) 接收 PCM stereo 樣本，
     // 透過 WinMM WaveOut API 輸出音效，不依賴第三方套件。
     // =========================================================================
     static class WaveOutPlayer
@@ -53,13 +53,15 @@ namespace AprNes
         const int  CALLBACK_NULL  = 0;
         const uint WHDR_INQUEUE   = 0x00000010u;
 
-        const int SAMPLE_RATE    = 44100;
-        const int BUFFER_SAMPLES = 735;  // ~1 frame @ 60fps
-        const int NUM_BUFFERS    = 4;
+        const int SAMPLE_RATE      = 44100;
+        const int CHANNELS         = 2;     // stereo
+        const int FRAME_SAMPLES    = 735;   // ~1 frame @ 60fps (per channel)
+        const int BUFFER_SHORTS    = FRAME_SAMPLES * CHANNELS; // L,R interleaved = 1470 shorts
+        const int NUM_BUFFERS      = 4;
 
         static IntPtr    _hWaveOut  = IntPtr.Zero;
         static volatile bool _audioReady = false;
-        static volatile int  _submitInProgress = 0;  // tracks SubmitBuffer in-flight count
+        static volatile int  _submitInProgress = 0;
         static short[][] _audioBufs  = new short[NUM_BUFFERS][];
         static GCHandle[] _bufPins   = new GCHandle[NUM_BUFFERS];
         static GCHandle   _hdrPin;
@@ -74,11 +76,11 @@ namespace AprNes
 
             WAVEFORMATEX fmt = new WAVEFORMATEX {
                 wFormatTag      = WAVE_FORMAT_PCM,
-                nChannels       = 1,
+                nChannels       = CHANNELS,
                 nSamplesPerSec  = SAMPLE_RATE,
                 wBitsPerSample  = 16,
-                nBlockAlign     = 2,
-                nAvgBytesPerSec = SAMPLE_RATE * 2,
+                nBlockAlign     = (ushort)(CHANNELS * 2),         // 4 bytes per frame
+                nAvgBytesPerSec = (uint)(SAMPLE_RATE * CHANNELS * 2),
                 cbSize          = 0
             };
 
@@ -91,7 +93,7 @@ namespace AprNes
 
             for (int i = 0; i < NUM_BUFFERS; i++)
             {
-                _audioBufs[i] = new short[BUFFER_SAMPLES];
+                _audioBufs[i] = new short[BUFFER_SHORTS];
                 _bufPins[i]   = GCHandle.Alloc(_audioBufs[i], GCHandleType.Pinned);
             }
 
@@ -102,7 +104,7 @@ namespace AprNes
             {
                 _waveHdrs[i] = new WAVEHDR {
                     lpData         = _bufPins[i].AddrOfPinnedObject(),
-                    dwBufferLength = (uint)(BUFFER_SAMPLES * 2),
+                    dwBufferLength = (uint)(BUFFER_SHORTS * 2), // bytes
                     dwFlags        = 0
                 };
                 IntPtr ptr = Marshal.UnsafeAddrOfPinnedArrayElement(_waveHdrs, i);
@@ -121,10 +123,8 @@ namespace AprNes
             NesCore.AudioSampleReady -= OnSampleReady;
             if (_hWaveOut == IntPtr.Zero) return;
 
-            // Signal SubmitBuffer to abort its while-loop and stop
             _audioReady = false;
 
-            // Wait for any in-flight SubmitBuffer to exit (max ~100ms)
             int timeout = 0;
             while (_submitInProgress > 0 && timeout++ < 100)
                 System.Threading.Thread.Sleep(1);
@@ -147,13 +147,14 @@ namespace AprNes
             _hWaveOut = IntPtr.Zero;
         }
 
-        static void OnSampleReady(short sample)
+        static void OnSampleReady(short left, short right)
         {
             if (!_audioReady || _hWaveOut == IntPtr.Zero) return;
 
-            _audioBufs[_curBuf][_curPos++] = sample;
+            _audioBufs[_curBuf][_curPos++] = left;
+            _audioBufs[_curBuf][_curPos++] = right;
 
-            if (_curPos >= BUFFER_SAMPLES)
+            if (_curPos >= BUFFER_SHORTS)
             {
                 _curPos = 0;
                 SubmitBuffer(_curBuf);
@@ -171,16 +172,14 @@ namespace AprNes
                 int hdrSz = Marshal.SizeOf(typeof(WAVEHDR));
                 IntPtr ptr = Marshal.UnsafeAddrOfPinnedArrayElement(_waveHdrs, idx);
 
-                // 等待此緩衝區播放完畢 (最多等 50ms)；若 CloseAudio 中途呼叫則提前退出
                 int waited = 0;
                 while ((_waveHdrs[idx].dwFlags & WHDR_INQUEUE) != 0)
                 {
-                    if (!_audioReady) return;  // CloseAudio called, abort
+                    if (!_audioReady) return;
                     Thread.Sleep(1);
                     if (++waited > 50) return;
                 }
 
-                // Final check before touching WaveOut resources
                 if (!_audioReady || _hWaveOut == IntPtr.Zero) return;
 
                 waveOutUnprepareHeader(_hWaveOut, ptr, hdrSz);

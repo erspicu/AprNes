@@ -24,7 +24,9 @@ namespace AprNes
 
         Graphics grfx;
         public Dictionary<string, string> AppConfigure = new Dictionary<string, string>();
-        string ConfigureFile = Application.StartupPath + @"\AprNes.ini";
+        public static string ConfigureDir = Application.StartupPath + @"\configure";
+        string ConfigureFile = Application.StartupPath + @"\configure\AprNes.ini";
+        string AudioPlusIniFile = Application.StartupPath + @"\configure\AprNesAudioPlus.ini";
 
         // 舊版 AprNes.ini 若殘留 analog key 則在 Configure_Write 時過濾掉（避免重複寫入）
         static readonly System.Collections.Generic.HashSet<string> s_analogKeys =
@@ -37,6 +39,18 @@ namespace AprNes
                 "SV_BeamSigma", "SV_BloomStrength", "SV_BrightnessBoost",
             });
 
+        // AudioPlus 效果參數已移至 AprNesAudioPlus.ini，從主 ini 過濾掉
+        static readonly System.Collections.Generic.HashSet<string> s_audioPlusKeys =
+            new System.Collections.Generic.HashSet<string>(new[] {
+                "ConsoleModel", "RfCrosstalk", "CustomLpfCutoff", "CustomBuzz",
+                "BuzzAmplitude", "BuzzFreq", "RfVolume",
+                "StereoWidth", "HaasDelay", "HaasCrossfeed",
+                "ReverbWet", "CombFeedback", "CombDamp",
+                "BassBoostDb", "BassBoostFreq",
+                // 舊版相容（從 AprNes.ini 遷移過來的舊 key）
+                "Reverb", "BassBoost",
+            });
+
         Dictionary<int, KeyMap> NES_KeyMAP = new Dictionary<int, KeyMap>();
         public Dictionary<string, KeyMap> NES_KeyMAP_joypad = new Dictionary<string, KeyMap>();
 
@@ -47,6 +61,15 @@ namespace AprNes
 
         joystick _joystick = new joystick();
 
+        /// <summary>舊版相容：若舊位置有 ini 而新位置沒有，自動搬移</summary>
+        static void MigrateOldIni(string fileName)
+        {
+            string oldPath = System.IO.Path.Combine(Application.StartupPath, fileName);
+            string newPath = System.IO.Path.Combine(ConfigureDir, fileName);
+            if (System.IO.File.Exists(oldPath) && !System.IO.File.Exists(newPath))
+                System.IO.File.Move(oldPath, newPath);
+        }
+
         Stopwatch st = new Stopwatch();//test UI finish time
 
         public AprNesUI()
@@ -55,6 +78,15 @@ namespace AprNes
             InitializeComponent();
             NesCore.OnError = msg => MessageBox.Show(msg);
 
+            // 確保 configure 目錄存在
+            if (!System.IO.Directory.Exists(ConfigureDir))
+                System.IO.Directory.CreateDirectory(ConfigureDir);
+
+            // 舊版相容：自動搬移舊位置的 ini 到 configure/
+            MigrateOldIni("AprNes.ini");
+            MigrateOldIni("AprNesLang.ini");
+            MigrateOldIni("AprNesAnalog.ini");
+            MigrateOldIni("AprNesAudioPlus.ini");
 
             LangINI.init();
             if (LangINI.LangFileMissing)
@@ -215,7 +247,7 @@ namespace AprNes
                 AppConfigure["key_RIGHT"] = key_RIGHT.ToString();
                 AppConfigure["LimitFPS"] = "1";
                 AppConfigure["ScreenSize"] = "1";
-                AppConfigure["CaptureScreenPath"] = Application.StartupPath+ @"\Screenshot";
+                AppConfigure["CaptureScreenPath"] = Application.StartupPath+ @"\Captures\Screenshots";
                 AppConfigure["joypad_A"] = "";
                 AppConfigure["joypad_B"] = "";
                 AppConfigure["joypad_SELECT"] = "";
@@ -285,6 +317,11 @@ namespace AprNes
                 NesCore.Volume = Math.Max(0, Math.Min(100, vol));
             else
                 NesCore.Volume = 70;
+
+            // ── AudioPlus 設定（AudioMode 留在主 ini，其餘效果參數在 AprNesAudioPlus.ini）──
+            int am;
+            NesCore.AudioMode = (AppConfigure.ContainsKey("AudioMode") && int.TryParse(AppConfigure["AudioMode"], out am) && am >= 0 && am <= 2) ? am : 0;
+            LoadAudioPlusIni();
 
             // 讀取 Accuracy 選項設定 (預設全開)
             NesCore.AccuracyOptA = !AppConfigure.ContainsKey("AccuracyOptA") || AppConfigure["AccuracyOptA"] != "0";
@@ -403,13 +440,22 @@ namespace AprNes
             AppConfigure["Sound"] = NesCore.AudioEnabled ? "1" : "0";
             AppConfigure["Volume"] = NesCore.Volume.ToString();
             AppConfigure["AccuracyOptA"] = NesCore.AccuracyOptA ? "1" : "0";
+            AppConfigure["AudioMode"] = NesCore.AudioMode.ToString();
+            SaveAudioPlusIni();
             AppConfigure["crt"] = NesCore.CrtEnabled ? "1" : "0";
             AppConfigure["AnalogSize"] = NesCore.AnalogSize.ToString();
 
             string conf = "";
             foreach (string i in AppConfigure.Keys)
-                if (!s_analogKeys.Contains(i))          // 過濾殘留的舊版 analog key
-                    conf += i + "=" + AppConfigure[i] + "\r\n";
+            {
+                if (s_analogKeys.Contains(i)) continue;          // 過濾殘留的舊版 analog key
+                if (s_audioPlusKeys.Contains(i)) continue;       // 已移至 AprNesAudioPlus.ini
+                if (string.IsNullOrWhiteSpace(i)) continue;      // 防呆：跳過空白 key
+                if (i.Contains("=") || i.Contains("\n")) continue; // 防呆：key 不得含 = 或換行
+                string val = AppConfigure[i] ?? "";
+                if (val.Contains("\n")) val = val.Replace("\n", "").Replace("\r", ""); // 防呆：value 去換行
+                conf += i + "=" + val + "\r\n";
+            }
 
             FileWriteAllText(ConfigureFile, conf);
         }
@@ -505,7 +551,7 @@ namespace AprNes
         // ────────────────────────────────────────────────────────────────────
         void LoadAnalogConfig()
         {
-            string analogFile = Application.StartupPath + @"\AprNesAnalog.ini";
+            string analogFile = ConfigureDir + @"\AprNesAnalog.ini";
             string Fmt(float v) => v.ToString("F4", System.Globalization.CultureInfo.InvariantCulture);
 
             if (!File.Exists(analogFile))
@@ -633,6 +679,129 @@ namespace AprNes
             StreamWriter sw = new StreamWriter(s);
             sw.WriteLine(str);
             sw.Close();
+        }
+
+        // ────────────────────────────────────────────────────────────────────
+        // AprNesAudioPlus.ini — 音效處理參數獨立設定檔
+        // ────────────────────────────────────────────────────────────────────
+
+        void LoadAudioPlusIni()
+        {
+            var cfg = new Dictionary<string, string>();
+
+            if (File.Exists(AudioPlusIniFile))
+            {
+                foreach (string line in File.ReadAllLines(AudioPlusIniFile))
+                {
+                    string trimmed = line.TrimStart();
+                    if (trimmed.StartsWith(";") || trimmed.StartsWith("#")) continue;
+                    string[] kv = line.Split(new char[] { '=' }, 2);
+                    if (kv.Length == 2) cfg[kv[0].Trim()] = kv[1].Trim();
+                }
+            }
+
+            // 輔助：讀取整數，帶預設值和 clamp
+            int ReadInt(string key, int def, int min, int max)
+            {
+                int v;
+                return (cfg.ContainsKey(key) && int.TryParse(cfg[key], out v)) ? Math.Max(min, Math.Min(max, v)) : def;
+            }
+
+            // ── Authentic ──
+            NesCore.ConsoleModel = ReadInt("ConsoleModel", 0, 0, 6);
+            NesCore.RfCrosstalk = cfg.ContainsKey("RfCrosstalk") && cfg["RfCrosstalk"] == "1";
+            NesCore.CustomLpfCutoff = ReadInt("CustomLpfCutoff", 14000, 1000, 22000);
+            NesCore.CustomBuzz = cfg.ContainsKey("CustomBuzz") && cfg["CustomBuzz"] == "1";
+            NesCore.BuzzAmplitude = ReadInt("BuzzAmplitude", 30, 0, 100);
+            NesCore.BuzzFreq = ReadInt("BuzzFreq", 60, 50, 60);
+            NesCore.RfVolume = ReadInt("RfVolume", 50, 0, 200);
+
+            // ── Modern ──
+            NesCore.StereoWidth = ReadInt("StereoWidth", 50, 0, 100);
+            NesCore.HaasDelay = ReadInt("HaasDelay", 20, 10, 30);
+            NesCore.HaasCrossfeed = ReadInt("HaasCrossfeed", 40, 0, 80);
+            NesCore.ReverbWet = ReadInt("ReverbWet", 0, 0, 30);
+            NesCore.CombFeedback = ReadInt("CombFeedback", 70, 30, 90);
+            NesCore.CombDamp = ReadInt("CombDamp", 30, 10, 70);
+            NesCore.BassBoostDb = ReadInt("BassBoostDb", 0, 0, 12);
+            NesCore.BassBoostFreq = ReadInt("BassBoostFreq", 150, 80, 300);
+        }
+
+        public void SaveAudioPlusIniPublic() { SaveAudioPlusIni(); }
+
+        void SaveAudioPlusIni()
+        {
+            string content =
+                "; ═══════════════════════════════════════════════════════════════\r\n" +
+                "; AprNesAudioPlus.ini — AudioPlus 音效處理設定\r\n" +
+                "; ═══════════════════════════════════════════════════════════════\r\n" +
+                ";\r\n" +
+                "; ══════════════════════════════════════════════════════════════\r\n" +
+                ";  Authentic 模式 (AudioMode=1) — 主機型號 + 類比特性\r\n" +
+                "; ══════════════════════════════════════════════════════════════\r\n" +
+                ";\r\n" +
+                "; ConsoleModel    主機型號 (0-6)\r\n" +
+                ";                 0 = Famicom (HVC-001)        ~14kHz 明亮清晰\r\n" +
+                ";                 1 = Front-Loader (NES-001)    ~4.7kHz 溫暖厚實\r\n" +
+                ";                 2 = Top-Loader (NES-101)     ~20kHz + 60Hz buzz\r\n" +
+                ";                 3 = AV Famicom (HVC-101)     ~19kHz 乾淨 AV 直出\r\n" +
+                ";                 4 = Sharp Twin Famicom        ~12kHz 略暗\r\n" +
+                ";                 5 = Sharp Famicom Titler      ~16kHz S-Video\r\n" +
+                ";                 6 = Custom                   自訂所有參數\r\n" +
+                ";\r\n" +
+                "; RfCrosstalk     RF 音視串擾 (0=Off, 1=On)\r\n" +
+                ";\r\n" +
+                "; ── Custom 模式專用 (ConsoleModel=6) ──\r\n" +
+                "; CustomLpfCutoff 自訂 LPF 截止頻率 (1000-22000 Hz)\r\n" +
+                "; CustomBuzz      自訂 buzz 開關 (0=Off, 1=On)\r\n" +
+                ";\r\n" +
+                "; ── 通用微調（所有主機型號皆適用）──\r\n" +
+                "; BuzzAmplitude   Buzz 振幅 (0-100, 0=無聲 30=預設 100=最大)\r\n" +
+                "; BuzzFreq        Buzz 頻率 (50=歐規, 60=美規)\r\n" +
+                "; RfVolume        RF 串擾音量 (0-200, 0=無聲 50=預設 200=最大)\r\n" +
+                ";\r\n" +
+                "; ══════════════════════════════════════════════════════════════\r\n" +
+                ";  Modern 模式 (AudioMode=2) — 立體聲 + 空間效果\r\n" +
+                "; ══════════════════════════════════════════════════════════════\r\n" +
+                ";\r\n" +
+                "; ── 立體聲混音 ──\r\n" +
+                "; StereoWidth     立體聲寬度 (0-100, 0=mono 50=預設 100=最大分離)\r\n" +
+                ";\r\n" +
+                "; ── Haas Effect（空間感）──\r\n" +
+                "; HaasDelay       右聲道延遲 (10-30 ms, 20=預設)\r\n" +
+                "; HaasCrossfeed   延遲信號回饋比例 (0-80%, 40=預設)\r\n" +
+                ";\r\n" +
+                "; ── Reverb（殘響）──\r\n" +
+                "; ReverbWet       殘響濕度 (0-30%, 0=Off 10=Light 15=Medium)\r\n" +
+                "; CombFeedback    殘響長度 (30-90%, 70=預設, 越高越長)\r\n" +
+                "; CombDamp        高頻阻尼 (10-70%, 30=預設, 越高越暗)\r\n" +
+                ";\r\n" +
+                "; ── Bass Boost（Triangle 低音增強）──\r\n" +
+                "; BassBoostDb     增強量 (0-12 dB, 0=Off)\r\n" +
+                "; BassBoostFreq   中心頻率 (80-300 Hz, 150=預設)\r\n" +
+                ";\r\n" +
+                "; ═══════════════════════════════════════════════════════════════\r\n" +
+                "\r\n" +
+                "; ── Authentic ──\r\n" +
+                "ConsoleModel=" + NesCore.ConsoleModel + "\r\n" +
+                "RfCrosstalk=" + (NesCore.RfCrosstalk ? "1" : "0") + "\r\n" +
+                "CustomLpfCutoff=" + NesCore.CustomLpfCutoff + "\r\n" +
+                "CustomBuzz=" + (NesCore.CustomBuzz ? "1" : "0") + "\r\n" +
+                "BuzzAmplitude=" + NesCore.BuzzAmplitude + "\r\n" +
+                "BuzzFreq=" + NesCore.BuzzFreq + "\r\n" +
+                "RfVolume=" + NesCore.RfVolume + "\r\n" +
+                "\r\n" +
+                "; ── Modern ──\r\n" +
+                "StereoWidth=" + NesCore.StereoWidth + "\r\n" +
+                "HaasDelay=" + NesCore.HaasDelay + "\r\n" +
+                "HaasCrossfeed=" + NesCore.HaasCrossfeed + "\r\n" +
+                "ReverbWet=" + NesCore.ReverbWet + "\r\n" +
+                "CombFeedback=" + NesCore.CombFeedback + "\r\n" +
+                "CombDamp=" + NesCore.CombDamp + "\r\n" +
+                "BassBoostDb=" + NesCore.BassBoostDb + "\r\n" +
+                "BassBoostFreq=" + NesCore.BassBoostFreq + "\r\n";
+
+            FileWriteAllText(AudioPlusIniFile, content);
         }
 
         string JoyPadWayName(string xy_name, int value)
@@ -1086,6 +1255,8 @@ public string GetRomInfo()
             string stamp = (dt.ToLongDateString() + " " + dt.ToLongTimeString()).Replace(":", "-");
             try
             {
+                if (!System.IO.Directory.Exists(AppConfigure["CaptureScreenPath"]))
+                    System.IO.Directory.CreateDirectory(AppConfigure["CaptureScreenPath"]);
                 RenderObj.GetOutput().Save(AppConfigure["CaptureScreenPath"] + @"\Screen-" + stamp + ".png", System.Drawing.Imaging.ImageFormat.Png);
             }
             catch (Exception e) { Console.WriteLine("i:" + e.Message); }
@@ -1186,6 +1357,34 @@ public string GetRomInfo()
             NesCore.SoftReset();   // 設 flag（模擬線程暫停中，無 race condition）
             NesCore._event.Set();  // 恢復模擬線程，cpu_step 中偵測 softreset flag
         }
+
+        /// <summary>
+        /// 全螢幕中 AnalogMode 切換時的安全過渡：
+        /// 先退出目前全螢幕 → 套用設定 → 重新進入正確的全螢幕模式
+        /// </summary>
+        public void FullScreenModeTransition(bool prevAnalog)
+        {
+            bool wasAnalogFS = analogFullScreen;
+            bool wasNormalFS = ScreenCenterFull && !analogFullScreen;
+            bool nowAnalog   = NesCore.AnalogEnabled;
+
+            if (!wasAnalogFS && !wasNormalFS) return; // 不在全螢幕中，不需處理
+
+            // 1. 先退出目前全螢幕（回到 windowed）
+            if (wasAnalogFS)
+                ExitAnalogFullScreen();
+            else
+                fun8ToolStripMenuItem_Click(null, null); // 退出一般全螢幕
+
+            // 2. 在 windowed 模式下套用設定
+            initUIsize();
+            ApplyRenderSettings();
+
+            // 3. 重新進入正確的全螢幕
+            fullScreeenToolStripMenuItem_Click(null, null);
+        }
+
+        public bool IsInFullScreen => ScreenCenterFull || analogFullScreen;
 
         // 僅重建 RenderObj（filter/尺寸變更），不重置遊戲狀態
         unsafe public void ApplyRenderSettings()
@@ -1298,12 +1497,27 @@ public string GetRomInfo()
             Configure_Write();
         }
 
-        private void _ultraAnalogMenuItem_Click(object sender, EventArgs e)
+        private unsafe void _ultraAnalogMenuItem_Click(object sender, EventArgs e)
         {
             NesCore.UltraAnalog = !NesCore.UltraAnalog;
             UpdateUltraAnalogMenuText();
             AppConfigure["UltraAnalog"] = NesCore.UltraAnalog ? "1" : "0";
             Configure_Write();
+
+            // 同步渲染管線（Ntsc._ultraAnalog 需要與 NesCore.UltraAnalog 一致）
+            if (running && NesCore.AnalogEnabled)
+            {
+                NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
+                NesCore._event.Reset();
+                while (!NesCore.emuWaiting) Thread.Sleep(1);
+
+                NesCore.SyncAnalogConfig();
+                Ntsc.Init();
+                CrtScreen.Init();
+
+                NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
+                NesCore._event.Set();
+            }
         }
 
         // ── Recording ──
@@ -1341,7 +1555,7 @@ public string GetRomInfo()
 
             if (!running) return;
 
-            string capturesDir = Path.Combine(Application.StartupPath, "Captures");
+            string capturesDir = Path.Combine(Application.StartupPath, "Captures", "Video");
             // Analog mode: read dimensions fresh from CrtScreen (buffer can be reallocated)
             int recW = NesCore.AnalogEnabled ? CrtScreen.DstW : NesCore.RenderOutputW;
             int recH = NesCore.AnalogEnabled ? CrtScreen.DstH : NesCore.RenderOutputH;
@@ -1374,7 +1588,13 @@ public string GetRomInfo()
             UpdateSoundMenuText();
             UpdateUltraAnalogMenuText();
             UpdateRecordMenuVisibility();
-            contextMenuStrip1.Opening += (s, ev) => UpdateRecordMenuVisibility();
+            contextMenuStrip1.Opening += (s, ev) =>
+            {
+                UpdateRecordMenuVisibility();
+                bool inFS = ScreenCenterFull || analogFullScreen;
+                _ultraAnalogMenuItem.Enabled = !inFS;
+                fun3ToolStripMenuItem.Enabled = !inFS;  // Config
+            };
 
             _joystick.Init(this.Handle);
             new Thread(polling_listener).Start();
@@ -1503,6 +1723,7 @@ public string GetRomInfo()
 
             // UI 全螢幕
             panel1.Visible = false;
+            panel1.BorderStyle = System.Windows.Forms.BorderStyle.None;
             UIAbout.Visible = RomInf.Visible = UIOpenRom.Visible = UIReset.Visible = UIConfig.Visible = label3.Visible = false;
             this.BackColor = Color.Black;
             this.FormBorderStyle = FormBorderStyle.None;
@@ -1571,6 +1792,7 @@ public string GetRomInfo()
             }
 
             // 還原 UI 狀態
+            panel1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.BackColor = SystemColors.Menu;
             this.WindowState = FormWindowState.Normal;
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -1594,6 +1816,7 @@ public string GetRomInfo()
         private void fun8ToolStripMenuItem_Click(object sender, EventArgs e)
         {
             if (analogFullScreen) { ExitAnalogFullScreen(); return; }
+            panel1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.BackColor = SystemColors.Menu;
             this.WindowState = FormWindowState.Normal;
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -1607,6 +1830,7 @@ public string GetRomInfo()
 
             if (this.WindowState != FormWindowState.Maximized) Opacity = 0;
             panel1.Visible = false;
+            panel1.BorderStyle = System.Windows.Forms.BorderStyle.None;
             UIAbout.Visible = RomInf.Visible = UIOpenRom.Visible = UIReset.Visible = UIConfig.Visible = label3.Visible = false;
             this.BackColor = Color.Black;
             this.FormBorderStyle = FormBorderStyle.None;
@@ -1626,6 +1850,7 @@ public string GetRomInfo()
         private void normalToolStripMenuItem_Click(object sender, EventArgs e)
         {
             if (analogFullScreen) { ExitAnalogFullScreen(); return; }
+            panel1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.BackColor = SystemColors.Menu;
             this.WindowState = FormWindowState.Normal;
             this.FormBorderStyle = FormBorderStyle.FixedSingle;

@@ -44,6 +44,19 @@ namespace AprNes
             groupBox5.Text      = LangStr("sound_group");
             UpdateSoundUI(); // 套用語系至 SoundcheckBox.Text
 
+            // AudioMode ComboBox 初始化
+            AudioMode.Items.Clear();
+            AudioMode.Items.AddRange(new object[] {
+                LangStr("audio_mode_pure"),
+                LangStr("audio_mode_authentic"),
+                LangStr("audio_mode_modern")
+            });
+            AudioMode.SelectedIndex = Math.Max(0, Math.Min(2, NesCore.AudioMode));
+            AudioModeLab.Text = LangStr("audio_mode");
+            AudioAdvanceSetting.Text = LangStr("audio_advance_setting");
+            AudioAdvanceSetting.Click -= AudioAdvanceSetting_Click;
+            AudioAdvanceSetting.Click += AudioAdvanceSetting_Click;
+
             // Analog 相關控制項語系
             groupBoxAnalog.Text = LangStr("analog_group");
             useAnalog.Text      = LangStr("analog_mode");
@@ -59,6 +72,7 @@ namespace AprNes
             if (analogIdx < 0) analogIdx = 1; // 預設 4x (index=1)
             comboBox_analogSize.SelectedIndex = analogIdx;
 
+            comboBox1.SelectedIndexChanged -= comboBox1_LangChanged;
             comboBox1.Items.Clear();
 
             int ch = 0;
@@ -69,6 +83,23 @@ namespace AprNes
                     comboBox1.SelectedIndex = ch;
                 ch++;
             }
+
+            comboBox1.SelectedIndexChanged += comboBox1_LangChanged;
+        }
+
+        // ─────────────────────────────────────────────────────────
+        // 語系選擇立即生效 — 切換後即時重新套用所有 UI 字串
+        // ─────────────────────────────────────────────────────────
+        bool _langChanging;
+        void comboBox1_LangChanged(object sender, EventArgs e)
+        {
+            if (_langChanging || comboBox1.SelectedItem == null) return;
+            _langChanging = true;
+            string newLang = (comboBox1.SelectedItem as string).Split(new char[] { ' ' })[0];
+            AprNesUI.GetInstance().AppConfigure["Lang"] = newLang;
+            AprNesUI.GetInstance().initUILang();
+            init();
+            _langChanging = false;
         }
 
         protected static AprNes_ConfigureUI instance;
@@ -117,6 +148,14 @@ namespace AprNes
         private void AnalogSetting_Click(object sender, EventArgs e)
         {
             using (var dlg = new UI.AprNes_AnalogConfigureUI())
+            {
+                dlg.ShowDialog(this);
+            }
+        }
+
+        private void AudioAdvanceSetting_Click(object sender, EventArgs e)
+        {
+            using (var dlg = new UI.AprNes_AudioPlusConfigureUI())
             {
                 dlg.ShowDialog(this);
             }
@@ -251,6 +290,7 @@ namespace AprNes
             // 音效設定寫入並立即生效
             NesCore.AudioEnabled = SoundcheckBox.Checked;
             NesCore.Volume = SoundtrackBar.Value;
+            NesCore.AudioMode = AudioMode.SelectedIndex;
 
             // Accuracy 設定寫入並立即生效
             NesCore.AccuracyOptA = perdotFSM.Checked;
@@ -269,13 +309,22 @@ namespace AprNes
 
             AprNesUI.GetInstance().LoadConfig();
             AprNesUI.GetInstance().initUILang();
-            AprNesUI.GetInstance().initUIsize();
 
-            AprNesUI.GetInstance().ApplyRenderSettings();
+            bool newAnalogEnabled = NesCore.AnalogEnabled; // LoadConfig 已更新
+
+            // 全螢幕中切換 AnalogMode 時，需安全過渡（退出→套用→重新進入）
+            if (AprNesUI.GetInstance().IsInFullScreen && prevAnalogEnabled != newAnalogEnabled)
+            {
+                AprNesUI.GetInstance().FullScreenModeTransition(prevAnalogEnabled);
+            }
+            else
+            {
+                AprNesUI.GetInstance().initUIsize();
+                AprNesUI.GetInstance().ApplyRenderSettings();
+            }
 
             // AnalogMode 切換（OFF→ON 或 ON→OFF）時，若 AnalogScreenBuf 狀態與新設定不符
             // 則主動補齊：OFF→ON 已由 ApplyRenderSettings 處理；ON→OFF 需手動釋放緩衝區
-            bool newAnalogEnabled = NesCore.AnalogEnabled; // LoadConfig 已更新
             if (prevAnalogEnabled && !newAnalogEnabled)
             {
                 unsafe
@@ -632,6 +681,10 @@ namespace AprNes
 
         int key_A = 0, key_B = 0, key_SELECT = 0, key_START = 0, key_RIGHT = 0, key_LEFT = 0, key_UP = 0, key_DOWN = 0;
 
+        private void AprNes_ConfigureUI_Load(object sender, EventArgs e)
+        {
+
+        }
 
         private void radioButtonX_CheckedChanged(object sender, EventArgs e)
         {

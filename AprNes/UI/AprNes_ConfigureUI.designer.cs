@@ -86,6 +86,9 @@
             this.radioButtonX2s = new System.Windows.Forms.RadioButton();
             this.SoundtrackBar = new System.Windows.Forms.TrackBar();
             this.groupBox5 = new System.Windows.Forms.GroupBox();
+            this.AudioAdvanceSetting = new System.Windows.Forms.Button();
+            this.AudioModeLab = new System.Windows.Forms.Label();
+            this.AudioMode = new System.Windows.Forms.ComboBox();
             this.SoundcheckBox = new System.Windows.Forms.CheckBox();
             this.perdotFSM = new System.Windows.Forms.CheckBox();
             this.useAnalog = new System.Windows.Forms.CheckBox();
@@ -382,7 +385,7 @@
             // 
             this.Ok_btn.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.Ok_btn.Font = new System.Drawing.Font("新細明體", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
-            this.Ok_btn.Location = new System.Drawing.Point(789, 524);
+            this.Ok_btn.Location = new System.Drawing.Point(789, 593);
             this.Ok_btn.Margin = new System.Windows.Forms.Padding(4);
             this.Ok_btn.Name = "Ok_btn";
             this.Ok_btn.Size = new System.Drawing.Size(147, 34);
@@ -817,24 +820,56 @@
             // 
             // SoundtrackBar
             // 
-            this.SoundtrackBar.Location = new System.Drawing.Point(6, 26);
+            this.SoundtrackBar.Location = new System.Drawing.Point(10, 26);
             this.SoundtrackBar.Maximum = 100;
             this.SoundtrackBar.Name = "SoundtrackBar";
-            this.SoundtrackBar.Size = new System.Drawing.Size(299, 69);
+            this.SoundtrackBar.Size = new System.Drawing.Size(412, 69);
             this.SoundtrackBar.TabIndex = 21;
             this.SoundtrackBar.Value = 70;
             this.SoundtrackBar.Scroll += new System.EventHandler(this.SoundtrackBar_Scroll);
             // 
             // groupBox5
             // 
+            this.groupBox5.Controls.Add(this.AudioAdvanceSetting);
+            this.groupBox5.Controls.Add(this.AudioModeLab);
+            this.groupBox5.Controls.Add(this.AudioMode);
             this.groupBox5.Controls.Add(this.SoundcheckBox);
             this.groupBox5.Controls.Add(this.SoundtrackBar);
-            this.groupBox5.Location = new System.Drawing.Point(5, 439);
+            this.groupBox5.Location = new System.Drawing.Point(5, 440);
             this.groupBox5.Name = "groupBox5";
-            this.groupBox5.Size = new System.Drawing.Size(311, 125);
+            this.groupBox5.Size = new System.Drawing.Size(433, 187);
             this.groupBox5.TabIndex = 22;
             this.groupBox5.TabStop = false;
             this.groupBox5.Text = "音效";
+            // 
+            // AudioAdvanceSetting
+            // 
+            this.AudioAdvanceSetting.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.AudioAdvanceSetting.Font = new System.Drawing.Font("新細明體", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
+            this.AudioAdvanceSetting.Location = new System.Drawing.Point(143, 137);
+            this.AudioAdvanceSetting.Margin = new System.Windows.Forms.Padding(4);
+            this.AudioAdvanceSetting.Name = "AudioAdvanceSetting";
+            this.AudioAdvanceSetting.Size = new System.Drawing.Size(147, 34);
+            this.AudioAdvanceSetting.TabIndex = 39;
+            this.AudioAdvanceSetting.Text = "Advance Setting";
+            this.AudioAdvanceSetting.UseVisualStyleBackColor = true;
+            // 
+            // AudioModeLab
+            // 
+            this.AudioModeLab.AutoSize = true;
+            this.AudioModeLab.Location = new System.Drawing.Point(144, 78);
+            this.AudioModeLab.Name = "AudioModeLab";
+            this.AudioModeLab.Size = new System.Drawing.Size(93, 18);
+            this.AudioModeLab.TabIndex = 24;
+            this.AudioModeLab.Text = "Audio Mode";
+            // 
+            // AudioMode
+            // 
+            this.AudioMode.FormattingEnabled = true;
+            this.AudioMode.Location = new System.Drawing.Point(143, 104);
+            this.AudioMode.Name = "AudioMode";
+            this.AudioMode.Size = new System.Drawing.Size(180, 26);
+            this.AudioMode.TabIndex = 23;
             // 
             // SoundcheckBox
             // 
@@ -947,7 +982,7 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 18F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1002, 584);
+            this.ClientSize = new System.Drawing.Size(1002, 653);
             this.Controls.Add(this.groupBoxAnalog);
             this.Controls.Add(this.groupBox5);
             this.Controls.Add(this.groupBox3);
@@ -969,6 +1004,7 @@
             this.Name = "AprNes_ConfigureUI";
             this.Text = "Configure";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.GBEMU_ConfigureUI_FormClosing);
+            this.Load += new System.EventHandler(this.AprNes_ConfigureUI_Load);
             this.Shown += new System.EventHandler(this.GBEMU_ConfigureUI_Shown);
             this.groupBox1.ResumeLayout(false);
             this.groupBox1.PerformLayout();
@@ -1057,5 +1093,8 @@
         private System.Windows.Forms.CheckBox crtuse;
         private System.Windows.Forms.Button AnalogSetting;
         private System.Windows.Forms.GroupBox groupBoxAnalog;
+        private System.Windows.Forms.Button AudioAdvanceSetting;
+        private System.Windows.Forms.Label AudioModeLab;
+        private System.Windows.Forms.ComboBox AudioMode;
     }
 }

@@ -205,7 +205,7 @@ namespace AprNes.UI
 
         void SaveIni()
         {
-            string path = Application.StartupPath + @"\AprNesAnalog.ini";
+            string path = AprNesUI.ConfigureDir + @"\AprNesAnalog.ini";
             string F(float v) => v.ToString("F4", Inv);
             string B(bool v) => v ? "1" : "0";
 

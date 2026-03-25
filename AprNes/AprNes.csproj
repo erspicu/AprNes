@@ -75,6 +75,13 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="NesCore\APU.cs" />
+    <Compile Include="NesCore\AudioPlus\AudioDispatcher.cs" />
+    <Compile Include="NesCore\AudioPlus\OversamplingEngine.cs" />
+    <Compile Include="NesCore\AudioPlus\AuthenticAudioMixer.cs" />
+    <Compile Include="NesCore\AudioPlus\ModernAudioMixer.cs" />
+    <Compile Include="NesCore\AudioPlus\ModernAudioFX.cs" />
+    <Compile Include="NesCore\AudioPlus\ConsoleModelFilter.cs" />
+    <Compile Include="NesCore\AudioPlus\BlipSynthesizer.cs" />
     <Compile Include="tool\InterfaceGraphic.cs" />
     <Compile Include="NesCore\Mapper\Mapper001.cs" />
     <Compile Include="NesCore\Mapper\Mapper003.cs" />
@@ -147,6 +154,12 @@
     <Compile Include="UI\AprNes_AnalogConfigureUI.Designer.cs">
       <DependentUpon>AprNes_AnalogConfigureUI.cs</DependentUpon>
     </Compile>
+    <Compile Include="UI\AprNes_AudioPlusConfigureUI.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\AprNes_AudioPlusConfigureUI.Designer.cs">
+      <DependentUpon>AprNes_AudioPlusConfigureUI.cs</DependentUpon>
+    </Compile>
     <Compile Include="UI\AprNes_Info.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -194,6 +207,9 @@
     <EmbeddedResource Include="UI\AprNes_AnalogConfigureUI.resx">
       <DependentUpon>AprNes_AnalogConfigureUI.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="UI\AprNes_AudioPlusConfigureUI.resx">
+      <DependentUpon>AprNes_AudioPlusConfigureUI.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="UI\AprNes_ConfigureUI.resx">
       <DependentUpon>AprNes_ConfigureUI.cs</DependentUpon>
     </EmbeddedResource>
@@ -216,9 +232,6 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="gamepad.ico" />
-    <Content Include="lib\System.Numerics.Vectors.dll">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include=".NETFramework,Version=v4.0">

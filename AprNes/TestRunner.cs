@@ -91,7 +91,7 @@ namespace AprNes
             // Load accuracy settings from INI (same file as GUI uses)
             string iniPath = Path.Combine(
                 Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location),
-                "AprNes.ini");
+                "configure", "AprNes.ini");
             if (File.Exists(iniPath))
             {
                 foreach (string line in File.ReadAllLines(iniPath))

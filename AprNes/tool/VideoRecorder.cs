@@ -51,7 +51,7 @@ namespace AprNes
                 if (_logPath == null)
                 {
                     string dir = Path.Combine(Path.GetDirectoryName(
-                        System.Reflection.Assembly.GetExecutingAssembly().Location), "Captures");
+                        System.Reflection.Assembly.GetExecutingAssembly().Location), "Captures", "Video");
                     if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
                     _logPath = Path.Combine(dir, "VideoRecorder.log");
                 }
@@ -151,7 +151,7 @@ namespace AprNes
                 _freeFrames.Enqueue(i);
             }
 
-            _audioBuf = new short[441000]; // 10 seconds at 44100 Hz
+            _audioBuf = new short[882000]; // 10 seconds at 44100 Hz stereo (L,R interleaved)
             _audioPos = 0;
 
             string encoder = DetectEncoder(ffmpegPath);
@@ -185,7 +185,7 @@ namespace AprNes
                 string args = string.Format(
                     "-y " +
                     "-thread_queue_size 2048 -analyzeduration 0 -probesize 32 -f rawvideo -pix_fmt bgra -s {0}x{1} -r 60.0988 -i \\\\.\\pipe\\{2} " +
-                    "-thread_queue_size 2048 -analyzeduration 0 -probesize 32 -f s16le -ar 44100 -ac 1 -i \\\\.\\pipe\\{3} " +
+                    "-thread_queue_size 2048 -analyzeduration 0 -probesize 32 -f s16le -ar 44100 -ac 2 -i \\\\.\\pipe\\{3} " +
                     "{4} " +
                     "-c:a aac -b:a 128k -ac 2 " +
                     "-movflags +faststart " +
@@ -279,13 +279,16 @@ namespace AprNes
             _videoSignal.Set();
         }
 
-        static void OnAudioSample(short sample)
+        static void OnAudioSample(short left, short right)
         {
             if (!_recording) return;
             lock (_audioLock)
             {
-                if (_audioPos < _audioBuf.Length)
-                    _audioBuf[_audioPos++] = sample;
+                if (_audioPos + 1 < _audioBuf.Length)
+                {
+                    _audioBuf[_audioPos++] = left;
+                    _audioBuf[_audioPos++] = right;
+                }
             }
         }
 

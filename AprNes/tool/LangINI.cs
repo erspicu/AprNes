@@ -7,7 +7,7 @@ namespace LangTool
 {
     public class LangINI
     {
-        static string LangFile = System.IO.Path.Combine(AppContext.BaseDirectory, "AprNesLang.ini");
+        static string LangFile = System.IO.Path.Combine(AppContext.BaseDirectory, "configure", "AprNesLang.ini");
         static List<string> lines;
         static List<string> langs = new List<string>();
         public static Dictionary<string, string> lang_map = new Dictionary<string, string>();
