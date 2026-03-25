@@ -539,7 +539,12 @@ namespace AprNes
 
                     // Sprite evaluation + rendering at cycle 257 (after BG tiles complete at cycle 255)
                     if (cx == 257)
+                    {
+                        // MMC5: force A set (sprite) CHR banks before sprite rendering
+                        // NotifyVramRead-based switch doesn't fire until cx=258
+                        if (mmc5Ref != null) mmc5Ref.PreSpriteRender();
                         RenderSpritesLine();
+                    }
 
                 }
 

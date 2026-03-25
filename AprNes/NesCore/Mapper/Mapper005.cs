@@ -593,6 +593,24 @@ namespace AprNes
         public void NotifyA12(int addr, int ppuAbsCycle) { } // unused — all logic in NotifyVramRead
 
         // ================================================================
+        //  Pre-sprite render CHR switch — called by PPU at dot 257 before RenderSpritesLine
+        // ================================================================
+        //
+        // When chrABAutoSwitch is false (MMC5 handles CHR A/B via NotifyVramRead),
+        // RenderSpritesLine at cx=257 runs before any sprite-phase NotifyVramRead calls.
+        // Force chrBankPtrs to A set (sprites) here so sprite rendering uses correct tiles.
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void PreSpriteRender()
+        {
+            if (NesCore.Spritesize8x16 && chrRomSize > 0)
+            {
+                prevChrA = true;
+                FillCHRBankPtrs(NesCore.chrBankPtrs, true);
+            }
+        }
+
+        // ================================================================
         //  PPU VRAM read notification — called by PPU on every fetch during rendering
         // ================================================================
         //

@@ -1,6 +1,6 @@
 # AprNes Mapper 實作狀態
 
-**總計已實作：57 個　　最後更新：2026-03-24**
+**總計已實作：57 個　　最後更新：2026-03-25**
 
 結果說明：✅ 正常　⚠️ 部分問題　❌ 有問題　❓ 待確認／不明
 
@@ -10,8 +10,8 @@
 
 | 結果 | 數量 | Mapper 列表 |
 |:----:|:----:|------------|
-| ✅ 正常 | 33 | 000, 001, 002, 003, 004, 007, 010, 011, 016, 018, 021, 022, 023, 026, 032, 033, 034, 068, 069, 072, 075, 077, 078, 079, 087, 093, 097, 119, 180, 184, 185, 228, 232 |
-| ⚠️ 部分問題 | 14 | 005, 009, 024, 025, 064, 066, 080, 082, 088, 089, 118, 140, 152, 206 |
+| ✅ 正常 | 34 | 000, 001, 002, 003, 004, 005, 007, 010, 011, 016, 018, 021, 022, 023, 026, 032, 033, 034, 068, 069, 072, 075, 077, 078, 079, 087, 093, 097, 119, 180, 184, 185, 228, 232 |
+| ⚠️ 部分問題 | 13 | 009, 024, 025, 064, 066, 080, 082, 088, 089, 118, 140, 152, 206 |
 | ❌ 有問題 | 9 | 013, 019, 065, 067, 070, 071, 076, 085, 210 |
 | ❓ 待確認 | 2 | 095, 153 |
 | **合計校驗** | **58** | |
@@ -29,7 +29,7 @@
 | **002** | ✅ | |
 | **003** | ✅ | |
 | **004** | ✅ | |
-| **005** | ⚠️ | 完整重寫：PRG/CHR banking、nametable mapping、scanline IRQ、extended attribute mode。CV3/Gemfire/L'Empereur/ROTK/Laser Invasion 正常，Bandit Kings 部分問題 |
+| **005** | ✅ | 完整重寫：PRG/CHR banking、nametable mapping、scanline IRQ、extended attribute mode、Mesen2 風格 VRAM read notification。人工驗證通過（2026-03-25）：CV3 標題/遊戲正常、mmc5test split screen 正確 |
 | **007** | ✅ | |
 | **009** | ⚠️ | 部分遊戲綠屏 |
 | **010** | ✅ | |
@@ -94,7 +94,7 @@
 | **004** | MMC3 | 8KB×4 PRG，1KB×8 CHR；A12 掃描線 IRQ | SMB2, SMB3, MegaMan 3–6 | ✅ |
 | **004** | MMC3 RevA | MMC3 變體（RevA 行為差異） | — | ✅ |
 | **004** | MMC6 | MMC3 + 1KB PRG-RAM | — | ✅ |
-| **005** | MMC5 | 8KB×4 PRG，1KB×8 CHR；PRG/CHR banking(4 modes)、scanline IRQ、extended attribute mode、nametable mapping。缺：vertical split、MMC5 audio | Castlevania III, Gemfire, L'Empereur, ROTK | ⚠️ |
+| **005** | MMC5 | 8KB×4 PRG，1KB×8 CHR；PRG/CHR banking(4 modes)、scanline IRQ、extended attribute mode、nametable mapping、Mesen2 風格 VRAM read notification。缺：vertical split、MMC5 audio | Castlevania III, Gemfire, L'Empereur, ROTK | ✅ |
 | **007** | AxROM | 32KB PRG 切換，CHR-RAM，single-screen | Battletoads, Wizards & Warriors | ✅ |
 | **009** | MMC2 | PPU Latch 自動換頁；16KB×2 PRG，4KB×2 CHR | 泰森拳擊 (Punch-Out!!) | ✅ |
 | **010** | MMC4 | MMC2 演進版；16KB PRG；PPU Latch 延遲更新 | Fire Emblem, Famicom Wars | ✅ |

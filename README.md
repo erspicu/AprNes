@@ -1,6 +1,6 @@
 # AprNes - C# NES Emulator
 
-> 🇺🇸 English | [🇹🇼 繁體中文](#aprnes---c-nes-模擬器) | Last updated: 2026-03-22
+> 🇺🇸 English | [🇹🇼 繁體中文](#aprnes---c-nes-模擬器) | Last updated: 2026-03-25
 
 A cycle-accurate NES (Nintendo Entertainment System) emulator written in C#, developed in collaboration with AI (GitHub Copilot / Claude). The project achieves **perfect scores** on both the blargg and AccuracyCoin test suites.
 
@@ -160,7 +160,7 @@ python run_tests.py -j 10
 | Generic USB gamepad / joystick | DirectInput8 (raw vtable) | Auto-enumerated, excludes XInput devices |
 | Xbox 360 / One / Series | XInput (xinput1_4.dll) | Auto-detects players 0–3 |
 
-## Supported Mappers (29 verified)
+## Supported Mappers (30 verified)
 
 | Mapper | Representative Games |
 |--------|---------------------|
@@ -169,6 +169,7 @@ python run_tests.py -j 10
 | 2 (UxROM) | Mega Man, Castlevania, Ghosts 'n Goblins |
 | 3 (CNROM) | Solomon's Key, Gradius |
 | 4 (MMC3) | Super Mario Bros. 2/3, Mega Man 3–6 |
+| 5 (MMC5) | Castlevania III, Gemfire, L'Empereur |
 | 7 (AxROM) | Battletoads, Wizards & Warriors |
 | 10 (MMC4) | Fire Emblem, Famicom Wars |
 | 11 (Color Dreams) | Crystal Mines, Pesterminator |
@@ -198,7 +199,7 @@ python run_tests.py -j 10
 
 # AprNes - C# NES 模擬器
 
-> [🇺🇸 English](#aprnes---c-nes-emulator) | 🇹🇼 繁體中文 | 最後編修：2026-03-22
+> [🇺🇸 English](#aprnes---c-nes-emulator) | 🇹🇼 繁體中文 | 最後編修：2026-03-25
 
 使用 C# 開發的 NES（任天堂娛樂系統）cycle-accurate 模擬器，與 AI（GitHub Copilot / Claude）協作開發完成。在 blargg 與 AccuracyCoin 兩大測試套件上均達到**滿分**。
 
@@ -356,7 +357,7 @@ python run_tests.py -j 10
 | 一般 USB 手把 / 老式搖桿 | DirectInput8（raw vtable） | 自動列舉，排除 XInput 裝置 |
 | Xbox 360 / Xbox One / Xbox Series | XInput（xinput1_4.dll） | 自動偵測 player 0–3 |
 
-## 支援的 Mapper（29 個通過人工驗證）
+## 支援的 Mapper（30 個通過人工驗證）
 
 | Mapper | 代表遊戲 |
 |--------|---------|
@@ -365,6 +366,7 @@ python run_tests.py -j 10
 | 2 (UxROM) | 洛克人、惡魔城、鬼屋魔域 |
 | 3 (CNROM) | 所羅門的鑰匙、乃木坂 |
 | 4 (MMC3) | 超級瑪利歐兄弟 2/3、洛克人 3–6 |
+| 5 (MMC5) | 惡魔城傳說、Gemfire、L'Empereur |
 | 7 (AxROM) | 熱血格鬥、騎士精英 |
 | 10 (MMC4) | 火焰紋章、FC 大戰 |
 | 11 (Color Dreams) | Crystal Mines、Pesterminator |
