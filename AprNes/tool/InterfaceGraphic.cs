@@ -68,7 +68,7 @@ namespace AprNes
 
         public void Render()
         {
-            HS_XBRz.ScaleImage2X(_input, _output);
+            HS_XBRz.ScaleImage(_input, _output, 2);
             NativeGDI.DrawImageHighSpeedtoDevice();
         }
     }
@@ -99,7 +99,7 @@ namespace AprNes
 
         public void Render()
         {
-            HS_XBRz.ScaleImage3X(_input, _output);
+            HS_XBRz.ScaleImage(_input, _output, 3);
             NativeGDI.DrawImageHighSpeedtoDevice();
         }
     }
@@ -129,7 +129,7 @@ namespace AprNes
 
         public void Render()
         {
-            HS_XBRz.ScaleImage4X(_input, _output);
+            HS_XBRz.ScaleImage(_input, _output, 4);
             NativeGDI.DrawImageHighSpeedtoDevice();
         }
     }
@@ -159,7 +159,7 @@ namespace AprNes
 
         public void Render()
         {
-            HS_XBRz.ScaleImage5X(_input, _output);
+            HS_XBRz.ScaleImage(_input, _output, 5);
             NativeGDI.DrawImageHighSpeedtoDevice();
         }
     }
@@ -189,7 +189,7 @@ namespace AprNes
 
         public void Render()
         {
-            HS_XBRz.ScaleImage6X(_input, _output);
+            HS_XBRz.ScaleImage(_input, _output, 6);
             NativeGDI.DrawImageHighSpeedtoDevice();
         }
     }
@@ -222,7 +222,7 @@ namespace AprNes
 
         public void Render()
         {
-            HS_XBRz.ScaleImage4X(_input, _output_tmp);
+            HS_XBRz.ScaleImage(_input, _output_tmp, 4);
             ScalexTool.toScale2x_dx(_output_tmp, 1024, 960, _output);
             NativeGDI.DrawImageHighSpeedtoDevice();
         }
@@ -256,7 +256,7 @@ namespace AprNes
 
         public void Render()
         {
-            HS_XBRz.ScaleImage3X(_input, _output_tmp);
+            HS_XBRz.ScaleImage(_input, _output_tmp, 3);
             ScalexTool.toScale3x_dx(_output_tmp, 768, 720, _output);
             NativeGDI.DrawImageHighSpeedtoDevice();
         }
@@ -321,7 +321,7 @@ namespace AprNes
 
         public void Render()
         {
-            HS_XBRz.ScaleImage2X(_input, _output_tmp);
+            HS_XBRz.ScaleImage(_input, _output_tmp, 2);
             LibScanline.ScanlineFor2x();
             NativeGDI.DrawImageHighSpeedtoDevice();
         }
@@ -356,7 +356,7 @@ namespace AprNes
 
         public void Render()
         {
-            HS_XBRz.ScaleImage3X(_input, _output_tmp);
+            HS_XBRz.ScaleImage(_input, _output_tmp, 3);
             LibScanline.ScanlineFor3x();
             NativeGDI.DrawImageHighSpeedtoDevice();
         }
