@@ -622,6 +622,7 @@ namespace AprNes
             // Effect toggles
             NesCore.HbiSimulation     = GetBool("HbiSimulation", true);
             NesCore.ColorBurstJitter  = GetBool("ColorBurstJitter", true);
+            NesCore.SymmetricIQ       = GetBool("SymmetricIQ", true);
             NesCore.InterlaceJitter = GetBool("InterlaceJitter", true);
             bool ringingOn     = GetBool("RingingEnabled", true);
             bool vignetteOn    = GetBool("VignetteEnabled", true);

@@ -104,6 +104,7 @@ namespace AprNes
         const int kWinY = 6; const int kWinY_half = kWinY / 2;
         const int kWinI = 18; const int kWinI_half = kWinI / 2;
         const int kWinQ = 54; const int kWinQ_half = kWinQ / 2;
+        static int winQ = 54, winQ_half = 27; // runtime: 54 (asymmetric 1953) or 18 (symmetric 1960s)
 
         public static float ColorTempR = 1.0f;
         public static float ColorTempG = 1.0f;
@@ -121,6 +122,7 @@ namespace AprNes
         public static float RingStrength = 0.3f;
         public static bool HbiSimulation = true;
         public static bool ColorBurstJitter = true;
+        public static bool SymmetricIQ = true; // true=1960s symmetric quadrature, false=1953 asymmetric I/Q
 
         public static void Ntsc_Init()
         {
@@ -209,6 +211,7 @@ namespace AprNes
 
             UpdateColorTemp();
             UpdateGammaLUT();
+            UpdateIQMode();
             scanPhase6 = 0;
             scanPhaseBase = 0;
             RfAudioLevel = 0f;
@@ -249,6 +252,18 @@ namespace AprNes
             GammaCoeffInv = 1f - gc;
             vGC = new Vector<float>(gc);
             v1_minus_GC = new Vector<float>(1f - gc);
+        }
+
+        public static void UpdateIQMode()
+        {
+            int newQ = SymmetricIQ ? kWinI : kWinQ;
+            winQ = newQ;
+            winQ_half = newQ / 2;
+            if (hannQ == null) return; // not yet initialized
+            ComputeHann(hannQ, winQ);
+            for (int ph = 0; ph < 6; ph++)
+                for (int n = 0; n < winQ; n++)
+                    combinedQ[ph * kWinQ + n] = hannQ[n] * sinTab6[(ph + n) % 6];
         }
 
         static void ComputeHann(float* w, int N)
@@ -614,15 +629,16 @@ namespace AprNes
 
             float* qDotBuf = stackalloc float[256];
             {
-                float* wvQ = waveBuf + kLeadPad - kWinQ_half + 2;
-                int tModQ = ((phase0 - kWinQ_half + 2) % 6 + 6) % 6;
+                int wQ = winQ, wQ_half = winQ_half;
+                float* wvQ = waveBuf + kLeadPad - wQ_half + 2;
+                int tModQ = ((phase0 - wQ_half + 2) % 6 + 6) % 6;
                 for (int d = 0; d < 256; d++)
                 {
                     float* cwQ = combinedQ + tModQ * kWinQ; int n = 0;
                     var accQ0 = new Vector<float>(0f); var accQ1 = new Vector<float>(0f); int stride2Q = VS * 2;
-                    for (; n <= kWinQ - stride2Q; n += stride2Q) { accQ0 += *(Vector<float>*)(cwQ + n) * *(Vector<float>*)(wvQ + n); accQ1 += *(Vector<float>*)(cwQ + n + VS) * *(Vector<float>*)(wvQ + n + VS); }
-                    for (; n <= kWinQ - VS; n += VS) accQ0 += *(Vector<float>*)(cwQ + n) * *(Vector<float>*)(wvQ + n);
-                    float sumQ = Vector.Dot(accQ0 + accQ1, new Vector<float>(1f)); for (; n < kWinQ; n++) sumQ += cwQ[n] * wvQ[n];
+                    for (; n <= wQ - stride2Q; n += stride2Q) { accQ0 += *(Vector<float>*)(cwQ + n) * *(Vector<float>*)(wvQ + n); accQ1 += *(Vector<float>*)(cwQ + n + VS) * *(Vector<float>*)(wvQ + n + VS); }
+                    for (; n <= wQ - VS; n += VS) accQ0 += *(Vector<float>*)(cwQ + n) * *(Vector<float>*)(wvQ + n);
+                    float sumQ = Vector.Dot(accQ0 + accQ1, new Vector<float>(1f)); for (; n < wQ; n++) sumQ += cwQ[n] * wvQ[n];
                     qDotBuf[d] = -2f * sumQ; wvQ += kSampDot;
 
                     // ★ 符號位元擴展黑魔法
@@ -706,15 +722,16 @@ namespace AprNes
             uint* row0 = ntsc_analogScreenBuf + (long)rowStart * dstW; int VS = Vector<float>.Count;
             float* qDotBuf = stackalloc float[256];
             {
-                float* wvQ = cBuf + kLeadPad - kWinQ_half + 2;
-                int tModQ = ((phase0 - kWinQ_half + 2) % 6 + 6) % 6;
+                int wQ = winQ, wQ_half = winQ_half;
+                float* wvQ = cBuf + kLeadPad - wQ_half + 2;
+                int tModQ = ((phase0 - wQ_half + 2) % 6 + 6) % 6;
                 for (int d = 0; d < 256; d++)
                 {
                     float* cwQ = combinedQ + tModQ * kWinQ; int n = 0;
                     var accQ0 = new Vector<float>(0f); var accQ1 = new Vector<float>(0f); int stride2Q = VS * 2;
-                    for (; n <= kWinQ - stride2Q; n += stride2Q) { accQ0 += *(Vector<float>*)(cwQ + n) * *(Vector<float>*)(wvQ + n); accQ1 += *(Vector<float>*)(cwQ + n + VS) * *(Vector<float>*)(wvQ + n + VS); }
-                    for (; n <= kWinQ - VS; n += VS) accQ0 += *(Vector<float>*)(cwQ + n) * *(Vector<float>*)(wvQ + n);
-                    float sumQ = Vector.Dot(accQ0 + accQ1, new Vector<float>(1f)); for (; n < kWinQ; n++) sumQ += cwQ[n] * wvQ[n];
+                    for (; n <= wQ - stride2Q; n += stride2Q) { accQ0 += *(Vector<float>*)(cwQ + n) * *(Vector<float>*)(wvQ + n); accQ1 += *(Vector<float>*)(cwQ + n + VS) * *(Vector<float>*)(wvQ + n + VS); }
+                    for (; n <= wQ - VS; n += VS) accQ0 += *(Vector<float>*)(cwQ + n) * *(Vector<float>*)(wvQ + n);
+                    float sumQ = Vector.Dot(accQ0 + accQ1, new Vector<float>(1f)); for (; n < wQ; n++) sumQ += cwQ[n] * wvQ[n];
                     qDotBuf[d] = -2f * sumQ; wvQ += kSampDot;
 
                     // ★ 符號位元擴展黑魔法

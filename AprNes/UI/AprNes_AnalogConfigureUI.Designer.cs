@@ -51,6 +51,8 @@ namespace AprNes.UI
             this.trkRinging = new System.Windows.Forms.TrackBar();
             this.chkRinging = new System.Windows.Forms.CheckBox();
             this.lblColorBurstJitterDesc = new System.Windows.Forms.Label();
+            this.chkSymmetricIQ = new System.Windows.Forms.CheckBox();
+            this.lblSymmetricIQDesc = new System.Windows.Forms.Label();
             this.chkColorBurstJitter = new System.Windows.Forms.CheckBox();
             this.lblHBIDesc = new System.Windows.Forms.Label();
             this.chkHBI = new System.Windows.Forms.CheckBox();
@@ -201,6 +203,8 @@ namespace AprNes.UI
             // 
             // grpNtsc
             // 
+            this.grpNtsc.Controls.Add(this.lblSymmetricIQDesc);
+            this.grpNtsc.Controls.Add(this.chkSymmetricIQ);
             this.grpNtsc.Controls.Add(this.lblCTBVal);
             this.grpNtsc.Controls.Add(this.trkCTB);
             this.grpNtsc.Controls.Add(this.lblCTB);
@@ -226,7 +230,7 @@ namespace AprNes.UI
             this.grpNtsc.Controls.Add(this.chkHBI);
             this.grpNtsc.Location = new System.Drawing.Point(12, 50);
             this.grpNtsc.Name = "grpNtsc";
-            this.grpNtsc.Size = new System.Drawing.Size(380, 380);
+            this.grpNtsc.Size = new System.Drawing.Size(380, 410);
             this.grpNtsc.TabIndex = 2;
             this.grpNtsc.TabStop = false;
             this.grpNtsc.Text = "NTSC Signal Effects";
@@ -260,7 +264,30 @@ namespace AprNes.UI
             this.lblCTB.Size = new System.Drawing.Size(22, 25);
             this.lblCTB.TabIndex = 20;
             this.lblCTB.Text = "B";
-            // 
+            //
+            // chkSymmetricIQ
+            //
+            this.chkSymmetricIQ.AutoSize = true;
+            this.chkSymmetricIQ.Checked = true;
+            this.chkSymmetricIQ.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.chkSymmetricIQ.Location = new System.Drawing.Point(10, 340);
+            this.chkSymmetricIQ.Name = "chkSymmetricIQ";
+            this.chkSymmetricIQ.Size = new System.Drawing.Size(170, 29);
+            this.chkSymmetricIQ.TabIndex = 23;
+            this.chkSymmetricIQ.Text = "Symmetric I/Q";
+            this.chkSymmetricIQ.UseVisualStyleBackColor = true;
+            //
+            // lblSymmetricIQDesc
+            //
+            this.lblSymmetricIQDesc.AutoSize = true;
+            this.lblSymmetricIQDesc.Font = new System.Drawing.Font("Segoe UI", 7.5F);
+            this.lblSymmetricIQDesc.ForeColor = System.Drawing.Color.Gray;
+            this.lblSymmetricIQDesc.Location = new System.Drawing.Point(170, 344);
+            this.lblSymmetricIQDesc.Name = "lblSymmetricIQDesc";
+            this.lblSymmetricIQDesc.Size = new System.Drawing.Size(200, 20);
+            this.lblSymmetricIQDesc.TabIndex = 24;
+            this.lblSymmetricIQDesc.Text = "1960s symmetric quadrature demod";
+            //
             // lblCTGVal
             // 
             this.lblCTGVal.AutoSize = true;
@@ -1455,7 +1482,7 @@ namespace AprNes.UI
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(10F, 25F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(800, 720);
+            this.ClientSize = new System.Drawing.Size(800, 750);
             this.Controls.Add(this.Analog_Ok_btn);
             this.Controls.Add(this.grpConnector);
             this.Controls.Add(this.grpCrt);
@@ -1535,6 +1562,8 @@ namespace AprNes.UI
         private System.Windows.Forms.Label lblCTB;
         private System.Windows.Forms.TrackBar trkCTB;
         private System.Windows.Forms.Label lblCTBVal;
+        private System.Windows.Forms.CheckBox chkSymmetricIQ;
+        private System.Windows.Forms.Label lblSymmetricIQDesc;
         private System.Windows.Forms.GroupBox grpCrt;
         private System.Windows.Forms.CheckBox chkInterlaceJitter;
         private System.Windows.Forms.Label lblInterlaceJitterDesc;

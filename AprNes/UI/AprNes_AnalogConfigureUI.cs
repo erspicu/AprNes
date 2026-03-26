@@ -51,6 +51,8 @@ namespace AprNes.UI
             lblHBIDesc.Text = L("analog_hbi_desc");
             chkColorBurstJitter.Text = L("analog_colorburst");
             lblColorBurstJitterDesc.Text = L("analog_colorburst_desc");
+            chkSymmetricIQ.Text = L("analog_symmetric_iq");
+            lblSymmetricIQDesc.Text = L("analog_symmetric_iq_desc");
             chkRinging.Text = L("analog_ringing");
             lblRingingDesc.Text = L("analog_ringing_desc");
             lblGamma.Text = L("analog_gamma");
@@ -83,6 +85,7 @@ namespace AprNes.UI
             chkHBI.Checked = NesCore.HbiSimulation;
             chkColorBurstJitter.Checked = NesCore.ColorBurstJitter;
             chkRinging.Checked = NesCore.RingStrength > 0f;
+            chkSymmetricIQ.Checked = NesCore.SymmetricIQ;
 
             // NTSC sliders
             trkRinging.Value = Clamp((int)(NesCore.RingStrength * 100f), trkRinging.Minimum, trkRinging.Maximum);
@@ -150,6 +153,9 @@ namespace AprNes.UI
             NesCore.HbiSimulation = chkHBI.Checked;
             NesCore.ColorBurstJitter = chkColorBurstJitter.Checked;
 
+            NesCore.SymmetricIQ = chkSymmetricIQ.Checked;
+            NesCore.UpdateIQMode();
+
             // NTSC values (checkbox controls whether effect is active)
             NesCore.RingStrength = chkRinging.Checked ? trkRinging.Value / 100f : 0f;
             NesCore.GammaCoeff = trkGamma.Value / 100f;
@@ -215,6 +221,7 @@ namespace AprNes.UI
             c += "; ── Effect Toggles ─────────────────────────────────────────────────\r\n";
             c += "HbiSimulation=" + B(chkHBI.Checked) + "\r\n";
             c += "ColorBurstJitter=" + B(chkColorBurstJitter.Checked) + "\r\n";
+            c += "SymmetricIQ=" + B(chkSymmetricIQ.Checked) + "\r\n";
             c += "RingingEnabled=" + B(chkRinging.Checked) + "\r\n";
             c += "InterlaceJitter=" + B(chkInterlaceJitter.Checked) + "\r\n";
             c += "VignetteEnabled=" + B(chkVignette.Checked) + "\r\n";

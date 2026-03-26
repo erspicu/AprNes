@@ -1,10 +1,12 @@
 # AprNes CRT Television Simulation
 
-> **Last revised**: 2026-03-23 19:27
+> **Last revised**: 2026-03-26
+>
+> **Revision notes** (2026-03-26): Added Symmetric I/Q demodulation mode toggle — defaults to 1960s consumer TV symmetric quadrature (both I/Q at 18-tap, ~0.5 MHz), with option to switch to 1953 original NTSC asymmetric I/Q (I=18-tap, Q=54-tap) via the Analog Settings UI.
 >
 > **Revision notes** (2026-03-23): Corrected 5 documentation errors based on NESdev forum feedback:
 > 1. **BrightnessBoost**: Removed incorrect claim that "CRT circuits compensate by increasing drive voltage"; replaced with Gaussian beam overlap naturally filling gaps, boost compensating for discrete simulation brightness loss
-> 2. **I/Q bandwidth asymmetry**: Added note that implementation follows the 1953 NTSC spec, but consumer TVs since the 1960s switched to symmetric quadrature demodulation (citing Poynton)
+> 2. **I/Q bandwidth asymmetry**: ~~Added note that implementation follows the 1953 NTSC spec~~ (now implemented as switchable mode, defaulting to 1960s symmetric)
 > 3. **Interlace Jitter**: Labeled as aesthetic effect — NES outputs 240p progressive; no physical mechanism for inter-field jitter exists
 > 4. **Phosphor Persistence**: Labeled as artistic enhancement; added real P22 phosphor decay time data (far faster than simulated values)
 > 5. **Beam Convergence**: Added nuance about variation by TV quality and age; cited SMPTE RP 167 acceptable tolerances
@@ -37,7 +39,7 @@ AprNes takes a fundamentally different approach: **simulating the actual physica
 
 AprNes doesn't "paint" analog effects onto digital pixels — it genuinely converts NES palette data into a **21.477 MHz NTSC composite waveform**, producing 4 samples per pixel. Each scanline is a continuous time-domain waveform of 1024 floating-point values. It then "decodes" this waveform the way a real television would:
 
-- **Hann-windowed FIR coherent demodulation**: Luminance (Y) uses a 6-tap window, chrominance I uses 18-tap, Q uses 54-tap — doing exactly what the bandpass filters inside real TV chips do
+- **Hann-windowed FIR coherent demodulation**: Luminance (Y) uses a 6-tap window, chrominance I uses 18-tap, Q defaults to 18-tap (1960s symmetric mode) with option to switch to 54-tap (1953 asymmetric mode) — doing exactly what the bandpass filters inside real TV chips do
 - **IIR low-pass filtering**: SlewRate and ChromaBlur simulate the frequency response of analog circuits built from capacitors and inductors
 
 This means dot crawl, color bleeding, and luminance blur are not effects that are "added on" — they are physical results that **naturally emerge** from the signal processing. If you change signal parameters (such as switching between RF / AV / S-Video), all these phenomena shift in intensity accordingly — because they are all different facets of the same set of physical equations.
@@ -237,7 +239,13 @@ After generating the composite waveform, the emulator plays the role of a "telev
 - **I channel**: 18-tap Hann-windowed FIR bandpass, with in-phase subcarrier multiplication demodulation
 - **Q channel**: 54-tap Hann-windowed FIR bandpass, with quadrature subcarrier multiplication demodulation
 
-I and Q have different bandwidths (I is wider, Q is narrower) — this follows the original 1953 NTSC standard (FCC Title 47 §73.682), which specified I: 0–1.3 MHz and Q: 0–0.5 MHz. However, as Charles Poynton documents in "Digital Video and HD: Algorithms and Interfaces" (2nd ed., §22.5), by the early 1960s virtually all consumer TV sets switched to symmetric quadrature demodulation with ~0.5 MHz bandwidth for both chroma axes (B-Y/R-Y rather than I/Q), as asymmetric demodulation was more expensive to implement with minimal perceptual benefit. The emulator currently faithfully reproduces the 1953 standard's asymmetry (kWinI=18, kWinQ=54), but this does not match what NES-era (1985–1995) consumer TVs actually did. Blargg's widely-used NES NTSC filter also uses symmetric bandwidth.
+The original 1953 NTSC standard (FCC Title 47 §73.682) specified different bandwidths for I and Q — I: 0–1.3 MHz, Q: 0–0.5 MHz. However, as Charles Poynton documents in "Digital Video and HD: Algorithms and Interfaces" (2nd ed., §22.5), by the early 1960s virtually all consumer TV sets switched to symmetric quadrature demodulation with ~0.5 MHz bandwidth for both chroma axes (B-Y/R-Y rather than I/Q), as asymmetric demodulation was more expensive to implement with minimal perceptual benefit.
+
+The emulator provides a **Symmetric I/Q** toggle (in the NTSC section of the Analog Settings UI):
+- **Default ON (1960s symmetric mode)**: Both I and Q use 18-tap FIR (~0.5 MHz), matching what NES-era (1985–1995) consumer TVs actually did, and consistent with Blargg's widely-used NES NTSC filter
+- **OFF (1953 asymmetric mode)**: I uses 18-tap, Q uses 54-tap (~0.5 MHz vs ~0.19 MHz), faithfully reproducing the original NTSC standard's asymmetry
+
+The 1960s mode is the default because NES players' TVs were almost exclusively post-1960s consumer models — symmetric demodulation better matches the real gameplay experience. The symmetric mode's shorter Q filter (18-tap vs 54-tap) also provides a ~2–3% performance advantage at higher resolutions.
 
 ### IIR Analog Circuit Simulation
 
