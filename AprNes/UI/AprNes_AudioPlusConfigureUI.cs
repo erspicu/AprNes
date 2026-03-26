@@ -165,7 +165,7 @@ namespace AprNes.UI
             AprNesUI.GetInstance().SaveAudioPlusIniPublic();
 
             // 立即套用到音訊管線
-            AudioDispatcher.ApplySettings();
+            NesCore.AudioPlus_ApplySettings();
 
             DialogResult = DialogResult.OK;
             Close();

@@ -572,8 +572,8 @@ namespace AprNes
             // Initialize audio DSP pipeline (no AudioSampleReady handler → samples discarded)
             if (audioDsp && NesCore.AudioMode > 0)
             {
-                AudioDispatcher.Init();
-                AudioDispatcher.ApplySettings();
+                NesCore.AudioPlus_Init();
+                NesCore.AudioPlus_ApplySettings();
             }
 
             // Run emulation on a background thread

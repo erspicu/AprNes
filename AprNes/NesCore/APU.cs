@@ -185,7 +185,7 @@ namespace AprNes
             _sampleAccum = 0.0;
             _dckiller    = 0;
 
-            AudioDispatcher.Reset();
+            AudioPlus_Reset();
         }
 
         // =====================================================================
@@ -277,7 +277,7 @@ namespace AprNes
             _noiseMode = false; _noiseOut = 0;
             _sampleAccum = 0.0;
             _dckiller    = 0;
-            AudioDispatcher.Reset();
+            AudioPlus_Reset();
 
             // Power-on 狀態 (模擬 $4015=$00, $4017=$00)
             for (int i = 0; i < 4; i++)
@@ -425,8 +425,8 @@ namespace AprNes
             // 生成音效樣本
             if (AudioMode > 0)
             {
-                // Authentic / Modern: 每 APU cycle 推入 AudioDispatcher
-                AudioDispatcher.PushApuCycle(
+                // Authentic / Modern: 每 APU cycle 推入 AudioPlus
+                AudioPlus_PushApuCycle(
                     volume[0] * _pulseOut[0],   // sq1: 0-15
                     volume[1] * _pulseOut[1],   // sq2: 0-15
                     _triOut,                     // tri: 0-15

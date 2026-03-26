@@ -416,7 +416,7 @@ namespace AprNes
                 initAPU();
 
                 // AudioPlus 管線初始化
-                AudioDispatcher.Init();
+                AudioPlus_Init();
 
                 //init cpu pc (read reset vector — no tick needed, boot cycles already counted)
                 r_PC = (ushort)(mem_read_fun[0xfffc](0xfffc) | (mem_read_fun[0xfffd](0xfffd) << 8));
