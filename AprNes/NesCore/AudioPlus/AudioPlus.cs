@@ -506,29 +506,62 @@ namespace AprNes
             if (mfx_reverbWet > 0f)
             {
                 float mono = (L + R) * 0.5f;
-                float reverbOut = 0f;
+                float fb = mfx_combFeedback;
+                float damp = mfx_combDamp;
+                float reverbOut;
 
-                for (int c = 0; c < MFX_COMB_COUNT; c++)
+                // Comb 0
                 {
-                    float* comb = mfx_combBuf[c];
-                    int pos = mfx_combPos[c];
-
-                    float delayed = comb[pos];
-                    float lpf = delayed + mfx_combDamp * (mfx_combLpfState[c] - delayed);
-                    mfx_combLpfState[c] = lpf;
-                    comb[pos] = mono + lpf * mfx_combFeedback;
-
-                    pos++;
-                    if (pos >= mfx_combLengths[c]) pos = 0;
-                    mfx_combPos[c] = pos;
-
-                    reverbOut += delayed;
+                    float* cb = mfx_combBuf[0];
+                    int p = mfx_combPos[0];
+                    float d = cb[p];
+                    float lp = d + damp * (mfx_combLpfState[0] - d);
+                    mfx_combLpfState[0] = lp;
+                    cb[p] = mono + lp * fb;
+                    if (++p >= mfx_combLengths[0]) p = 0;
+                    mfx_combPos[0] = p;
+                    reverbOut = d;
+                }
+                // Comb 1
+                {
+                    float* cb = mfx_combBuf[1];
+                    int p = mfx_combPos[1];
+                    float d = cb[p];
+                    float lp = d + damp * (mfx_combLpfState[1] - d);
+                    mfx_combLpfState[1] = lp;
+                    cb[p] = mono + lp * fb;
+                    if (++p >= mfx_combLengths[1]) p = 0;
+                    mfx_combPos[1] = p;
+                    reverbOut += d;
+                }
+                // Comb 2
+                {
+                    float* cb = mfx_combBuf[2];
+                    int p = mfx_combPos[2];
+                    float d = cb[p];
+                    float lp = d + damp * (mfx_combLpfState[2] - d);
+                    mfx_combLpfState[2] = lp;
+                    cb[p] = mono + lp * fb;
+                    if (++p >= mfx_combLengths[2]) p = 0;
+                    mfx_combPos[2] = p;
+                    reverbOut += d;
+                }
+                // Comb 3
+                {
+                    float* cb = mfx_combBuf[3];
+                    int p = mfx_combPos[3];
+                    float d = cb[p];
+                    float lp = d + damp * (mfx_combLpfState[3] - d);
+                    mfx_combLpfState[3] = lp;
+                    cb[p] = mono + lp * fb;
+                    if (++p >= mfx_combLengths[3]) p = 0;
+                    mfx_combPos[3] = p;
+                    reverbOut += d;
                 }
 
-                reverbOut *= (1f / MFX_COMB_COUNT);
-                float wet = mfx_reverbWet;
-                L += reverbOut * wet;
-                R += reverbOut * wet;
+                reverbOut *= (0.25f * mfx_reverbWet);
+                L += reverbOut;
+                R += reverbOut;
             }
 
             mfx_haasDelayBuf[mfx_haasWritePos] = R;
@@ -537,8 +570,7 @@ namespace AprNes
             if (readPos < 0) readPos += MFX_MAX_DELAY;
             float delayedR = mfx_haasDelayBuf[readPos];
 
-            mfx_haasWritePos++;
-            if (mfx_haasWritePos >= MFX_MAX_DELAY) mfx_haasWritePos = 0;
+            if (++mfx_haasWritePos >= MFX_MAX_DELAY) mfx_haasWritePos = 0;
 
             L += delayedR * mfx_haasCrossfeed;
             R = delayedR;
@@ -584,7 +616,7 @@ namespace AprNes
         static float* mmix_panR;
         static float* mmix_normScale;
         static double mmix_bq_b0, mmix_bq_b1, mmix_bq_b2, mmix_bq_a1, mmix_bq_a2;
-        static double mmix_bq_x1, mmix_bq_x2, mmix_bq_y1, mmix_bq_y2;
+        static double mmix_bq_s1, mmix_bq_s2; // Transposed Direct Form II state
         static int mmix_cachedBoostDb;
         static int mmix_cachedBoostFreq;
 
@@ -657,7 +689,7 @@ namespace AprNes
             mmix_bq_a1 = (-2.0 * ((A - 1) + (A + 1) * cosW0)) / a0;
             mmix_bq_a2 = ((A + 1) + (A - 1) * cosW0 - sqrtA2alpha) / a0;
 
-            mmix_bq_x1 = mmix_bq_x2 = mmix_bq_y1 = mmix_bq_y2 = 0;
+            mmix_bq_s1 = mmix_bq_s2 = 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -684,11 +716,11 @@ namespace AprNes
             ose_TryGetSample(4, out s3);
             ose_TryGetSample(5, out s4);
 
+            // Transposed Direct Form II: 5 mul + 2 state update (fewer memory ops)
             double triIn = s2;
-            double triOut = mmix_bq_b0 * triIn + mmix_bq_b1 * mmix_bq_x1 + mmix_bq_b2 * mmix_bq_x2
-                          - mmix_bq_a1 * mmix_bq_y1 - mmix_bq_a2 * mmix_bq_y2;
-            mmix_bq_x2 = mmix_bq_x1; mmix_bq_x1 = triIn;
-            mmix_bq_y2 = mmix_bq_y1; mmix_bq_y1 = triOut;
+            double triOut = mmix_bq_b0 * triIn + mmix_bq_s1;
+            mmix_bq_s1 = mmix_bq_b1 * triIn - mmix_bq_a1 * triOut + mmix_bq_s2;
+            mmix_bq_s2 = mmix_bq_b2 * triIn - mmix_bq_a2 * triOut;
             float triMixed = (float)triOut;
 
             L += s0 * mmix_panL[0]; R += s0 * mmix_panR[0];
@@ -719,13 +751,13 @@ namespace AprNes
             // Pass 1: 純量處理 IIR 濾波器 (解決狀態相依問題)
             // 直接原地覆寫 ch2 陣列，準備給下一個階段無縫讀取
             // ==============================================================
+            // Transposed Direct Form II: fewer state shuffles per sample
             for (int i = 0; i < outCount; i++)
             {
                 double triSample = p2[i];
-                double triOut = mmix_bq_b0 * triSample + mmix_bq_b1 * mmix_bq_x1 + mmix_bq_b2 * mmix_bq_x2
-                              - mmix_bq_a1 * mmix_bq_y1 - mmix_bq_a2 * mmix_bq_y2;
-                mmix_bq_x2 = mmix_bq_x1; mmix_bq_x1 = triSample;
-                mmix_bq_y2 = mmix_bq_y1; mmix_bq_y1 = triOut;
+                double triOut = mmix_bq_b0 * triSample + mmix_bq_s1;
+                mmix_bq_s1 = mmix_bq_b1 * triSample - mmix_bq_a1 * triOut + mmix_bq_s2;
+                mmix_bq_s2 = mmix_bq_b2 * triSample - mmix_bq_a2 * triOut;
                 p2[i] = (float)triOut;
             }
 
@@ -776,7 +808,7 @@ namespace AprNes
 
         static void mmix_ResetBiquad()
         {
-            mmix_bq_x1 = mmix_bq_x2 = mmix_bq_y1 = mmix_bq_y2 = 0;
+            mmix_bq_s1 = mmix_bq_s2 = 0;
         }
 
         // ==================================================================
@@ -904,17 +936,23 @@ namespace AprNes
 
             if (Vector.IsHardwareAccelerated)
             {
-                Vector<float> vSum = Vector<float>.Zero;
+                Vector<float> vSum0 = Vector<float>.Zero;
+                Vector<float> vSum1 = Vector<float>.Zero;
+                int stride2 = vecLen * 2;
                 int i = 0;
 
-                for (; i <= OSE_TAPS - vecLen; i += vecLen)
+                // Unroll 2×: 雙累加器隱藏 load latency，提升 ILP
+                for (; i <= OSE_TAPS - stride2; i += stride2)
                 {
-                    var vSample = *(Vector<float>*)(pRingBuf + i);
-                    var vKernelVec = *(Vector<float>*)(pKernel + i);
-                    vSum += vSample * vKernelVec;
+                    vSum0 += *(Vector<float>*)(pRingBuf + i) * *(Vector<float>*)(pKernel + i);
+                    vSum1 += *(Vector<float>*)(pRingBuf + i + vecLen) * *(Vector<float>*)(pKernel + i + vecLen);
                 }
 
-                float acc = Vector.Dot(vSum, Vector<float>.One);
+                // 處理剩餘的完整 vector
+                for (; i <= OSE_TAPS - vecLen; i += vecLen)
+                    vSum0 += *(Vector<float>*)(pRingBuf + i) * *(Vector<float>*)(pKernel + i);
+
+                float acc = Vector.Dot(vSum0 + vSum1, Vector<float>.One);
 
                 for (; i < OSE_TAPS; i++)
                     acc += pRingBuf[i] * pKernel[i];
