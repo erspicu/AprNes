@@ -75,13 +75,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="NesCore\APU.cs" />
-    <Compile Include="NesCore\AudioPlus\AudioDispatcher.cs" />
-    <Compile Include="NesCore\AudioPlus\OversamplingEngine.cs" />
-    <Compile Include="NesCore\AudioPlus\AuthenticAudioMixer.cs" />
-    <Compile Include="NesCore\AudioPlus\ModernAudioMixer.cs" />
-    <Compile Include="NesCore\AudioPlus\ModernAudioFX.cs" />
-    <Compile Include="NesCore\AudioPlus\ConsoleModelFilter.cs" />
-    <Compile Include="NesCore\AudioPlus\BlipSynthesizer.cs" />
+    <Compile Include="NesCore\AudioPlus\AudioPlus.cs" />
     <Compile Include="tool\InterfaceGraphic.cs" />
     <Compile Include="NesCore\Mapper\Mapper001.cs" />
     <Compile Include="NesCore\Mapper\Mapper003.cs" />

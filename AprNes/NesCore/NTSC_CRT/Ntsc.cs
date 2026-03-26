@@ -10,30 +10,30 @@ namespace AprNes
     // ============================================================
     public enum AnalogOutputMode { AV = 0, SVideo = 1, RF = 2 }
 
-    unsafe public static class Ntsc
+    unsafe public partial class NesCore
     {
         public static int UpscaleMode = 1;
 
         // ── 解耦參數 ────────────────────────
-        static int _analogOutput;
-        static bool _ultraAnalog;
-        static int _analogSize;
-        static bool _crtEnabled;
-        static uint* _analogScreenBuf;
-        static int _frameCount;
+        static int ntsc_analogOutput;
+        static bool ntsc_ultraAnalog;
+        static int ntsc_analogSize;
+        static bool ntsc_crtEnabled;
+        static uint* ntsc_analogScreenBuf;
+        static int ntsc_frameCount;
 
-        public static void ApplyConfig(int analogOutput, bool ultraAnalog, int analogSize,
+        public static void Ntsc_ApplyConfig(int analogOutput, bool ultraAnalog, int analogSize,
                                         bool crtEnabled, uint* analogScreenBuf)
         {
-            _analogOutput = analogOutput;
-            _ultraAnalog = ultraAnalog;
-            _analogSize = analogSize;
-            _crtEnabled = crtEnabled;
-            _analogScreenBuf = analogScreenBuf;
-            ApplyProfile();
+            ntsc_analogOutput = analogOutput;
+            ntsc_ultraAnalog = ultraAnalog;
+            ntsc_analogSize = analogSize;
+            ntsc_crtEnabled = crtEnabled;
+            ntsc_analogScreenBuf = analogScreenBuf;
+            Ntsc_ApplyProfile();
         }
 
-        public static void SetFrameCount(int fc) => _frameCount = fc;
+        public static void Ntsc_SetFrameCount(int fc) => ntsc_frameCount = fc;
 
         // ── 共用唯讀查表與參數 (Thread-Safe) ─────────────────
         static float* loLevels; static float* hiLevels;
@@ -67,11 +67,11 @@ namespace AprNes
 
         static float NoiseIntensity; static float SlewRate; static float ChromaBlur;
 
-        static void ApplyProfile()
+        static void Ntsc_ApplyProfile()
         {
-            if (_analogOutput == (int)AnalogOutputMode.RF)
+            if (ntsc_analogOutput == (int)AnalogOutputMode.RF)
             { NoiseIntensity = RF_NoiseIntensity; SlewRate = RF_SlewRate; ChromaBlur = RF_ChromaBlur; }
-            else if (_analogOutput == (int)AnalogOutputMode.SVideo)
+            else if (ntsc_analogOutput == (int)AnalogOutputMode.SVideo)
             { NoiseIntensity = SV_NoiseIntensity; SlewRate = SV_SlewRate; ChromaBlur = SV_ChromaBlur; }
             else
             { NoiseIntensity = AV_NoiseIntensity; SlewRate = AV_SlewRate; ChromaBlur = AV_ChromaBlur; }
@@ -91,9 +91,10 @@ namespace AprNes
         static Vector<float> vGY, vGI, vGQ;
         static Vector<float> vBY, vBI, vBQ;
         static Vector<float> vGC;
+        static Vector<float> v1_minus_GC;
         static readonly Vector<float> vOneN = new Vector<float>(1f);
         static readonly Vector<float> vZeroN = new Vector<float>(0f);
-        static readonly Vector<float> v255_5N = new Vector<float>(255.5f);
+        static readonly Vector<float> v255_0N = new Vector<float>(255.0f);
         static readonly Vector<int> v255iN = new Vector<int>(255);
         static readonly Vector<int> vZeroiN = new Vector<int>(0);
         static readonly Vector<int> v256iN = new Vector<int>(256);
@@ -110,13 +111,18 @@ namespace AprNes
         static float yiq_rY = 1.0f, yiq_rI = 1.0841f, yiq_rQ = 0.3523f;
         static float yiq_gY = 1.0f, yiq_gI = -0.4302f, yiq_gQ = -0.5547f;
         static float yiq_bY = 1.0f, yiq_bI = -0.6268f, yiq_bQ = 1.9299f;
+        // YiqToRgb 專用：預乘 255.5 倍，省去每次呼叫的 3 次乘法
+        static float yiq_rY_255, yiq_rI_255, yiq_rQ_255;
+        static float yiq_gY_255, yiq_gI_255, yiq_gQ_255;
+        static float yiq_bY_255, yiq_bI_255, yiq_bQ_255;
 
         public static float GammaCoeff = 0.229f;
+        public static float GammaCoeffInv = 1f - 0.229f; // 1 - GC，Gamma 代數提取用
         public static float RingStrength = 0.3f;
         public static bool HbiSimulation = true;
         public static bool ColorBurstJitter = true;
 
-        public static void Init()
+        public static void Ntsc_Init()
         {
             if (loLevels == null)
             {
@@ -217,6 +223,10 @@ namespace AprNes
             vRY = new Vector<float>(yiq_rY); vRI = new Vector<float>(yiq_rI); vRQ = new Vector<float>(yiq_rQ);
             vGY = new Vector<float>(yiq_gY); vGI = new Vector<float>(yiq_gI); vGQ = new Vector<float>(yiq_gQ);
             vBY = new Vector<float>(yiq_bY); vBI = new Vector<float>(yiq_bI); vBQ = new Vector<float>(yiq_bQ);
+            // YiqToRgb 專用：預乘 255.5
+            yiq_rY_255 = yiq_rY * 255.5f; yiq_rI_255 = yiq_rI * 255.5f; yiq_rQ_255 = yiq_rQ * 255.5f;
+            yiq_gY_255 = yiq_gY * 255.5f; yiq_gI_255 = yiq_gI * 255.5f; yiq_gQ_255 = yiq_gQ * 255.5f;
+            yiq_bY_255 = yiq_bY * 255.5f; yiq_bI_255 = yiq_bI * 255.5f; yiq_bQ_255 = yiq_bQ * 255.5f;
         }
 
         public static void UpdateGammaLUT()
@@ -236,7 +246,9 @@ namespace AprNes
                     gammaLUT[i] = (byte)(vi < 0 ? 0 : (vi > 255 ? 255 : vi));
                 }
             }
+            GammaCoeffInv = 1f - gc;
             vGC = new Vector<float>(gc);
+            v1_minus_GC = new Vector<float>(1f - gc);
         }
 
         static void ComputeHann(float* w, int N)
@@ -278,12 +290,12 @@ namespace AprNes
         {
             if (UpscaleMode == 1 && sl > 0)
             {
-                int prevRowStart = (sl - 1) * CrtScreen.DstH / CrtScreen.SrcH;
+                int prevRowStart = (sl - 1) * Crt_DstH / Crt_SrcH;
                 int span = rowStart - prevRowStart;
                 if (span > 1)
                 {
-                    uint* prevRow = _analogScreenBuf + (long)prevRowStart * dstW;
-                    uint* dstRowBase = _analogScreenBuf + (long)(prevRowStart + 1) * dstW;
+                    uint* prevRow = ntsc_analogScreenBuf + (long)prevRowStart * dstW;
+                    uint* dstRowBase = ntsc_analogScreenBuf + (long)(prevRowStart + 1) * dstW;
                     uint tStepFixed = 16777216u / (uint)span; uint tFixed = tStepFixed;
                     for (int r = prevRowStart + 1; r < rowStart; r++)
                     {
@@ -305,7 +317,7 @@ namespace AprNes
             if (rowCount > 0)
             {
                 long bpr = (long)dstW * sizeof(uint);
-                uint* target = _analogScreenBuf + (long)(rowStart + 1) * dstW;
+                uint* target = ntsc_analogScreenBuf + (long)(rowStart + 1) * dstW;
                 for (int i = 0; i < rowCount; i++) { Buffer.MemoryCopy(row0, target, bpr, bpr); target += dstW; }
             }
         }
@@ -313,7 +325,7 @@ namespace AprNes
         public static void DecodeScanline(int sl, byte[] palBuf, byte emphasisBits)
         {
             if (sl < 0 || sl >= kSrcH) return;
-            if (_ultraAnalog)
+            if (ntsc_ultraAnalog)
             {
                 float* waveBuf = stackalloc float[kBufLen]; float* cBuf = stackalloc float[kBufLen];
                 DecodeScanline_Physical(sl, palBuf, emphasisBits, waveBuf, cBuf);
@@ -334,7 +346,7 @@ namespace AprNes
             scanPhase6 += ((5 - scanPhase6) >> 31) & -6;
 
             GenerateSignal(palBuf, emphasisBits, dotY, dotI, dotQ);
-            if ((AnalogOutputMode)_analogOutput == AnalogOutputMode.SVideo) DecodeAV_SVideo(sl, dotY, dotI, dotQ);
+            if ((AnalogOutputMode)ntsc_analogOutput == AnalogOutputMode.SVideo) DecodeAV_SVideo(sl, dotY, dotI, dotQ);
             else DecodeAV_Composite(sl, phase0, dotY, dotI, dotQ);
         }
 
@@ -350,13 +362,13 @@ namespace AprNes
 
         static void DecodeAV_Composite(int sl, int phase0, float* dotY, float* dotI, float* dotQ)
         {
-            bool isRF = (AnalogOutputMode)_analogOutput == AnalogOutputMode.RF;
+            bool isRF = (AnalogOutputMode)ntsc_analogOutput == AnalogOutputMode.RF;
             bool addNoise = NoiseIntensity > 0f; float ringDamp = RingStrength * 0.5f;
             float nScale = NoiseIntensity * (2f / 255.0f); float nOff = NoiseIntensity;
-            int dstW = CrtScreen.DstW; int N = _analogSize;
-            int rowStart = sl * CrtScreen.DstH / CrtScreen.SrcH;
-            int rowEnd = Math.Min((sl + 1) * CrtScreen.DstH / CrtScreen.SrcH, CrtScreen.DstH);
-            uint* row0 = _analogScreenBuf + (long)rowStart * dstW;
+            int dstW = Crt_DstW; int N = ntsc_analogSize;
+            int rowStart = sl * Crt_DstH / Crt_SrcH;
+            int rowEnd = Math.Min((sl + 1) * Crt_DstH / Crt_SrcH, Crt_DstH);
+            uint* row0 = ntsc_analogScreenBuf + (long)rowStart * dstW;
 
             float c0 = cosTab6[phase0], s0 = sinTab6[phase0]; float chr0 = dotI[0] * c0 - dotQ[0] * s0;
             float iFilt = HbiSimulation ? 0f : chr0 * c0; float qFilt = HbiSimulation ? 0f : -chr0 * s0;
@@ -373,7 +385,7 @@ namespace AprNes
                     float lPh = sl * 1364f * 1.31683f; hR = env * (float)Math.Cos(lPh); hI = env * (float)Math.Sin(lPh);
                 }
             }
-            uint ns = (addNoise || herring) ? (uint)(_frameCount * 1664525u + (uint)sl * 1013904223u + 1442695041u) : 0u;
+            uint ns = (addNoise || herring) ? (uint)(ntsc_frameCount * 1664525u + (uint)sl * 1013904223u + 1442695041u) : 0u;
 
             // ★ Code Splitting: 分支外提
             if (!addNoise && !herring) RunDecodeLoop(dstW, N, row0, dotY, dotI, dotQ, phase0, ref iFilt, ref qFilt, ref yFilt, ref yVel, ringDamp, false, false, 0, 0, 0, 0, 0, 0, 0);
@@ -412,9 +424,9 @@ namespace AprNes
         static void DecodeAV_SVideo(int sl, float* dotY, float* dotI, float* dotQ)
         {
             float iFilt = HbiSimulation ? 0f : dotI[0]; float qFilt = HbiSimulation ? 0f : dotQ[0]; float yFilt = HbiSimulation ? 0f : dotY[0];
-            int dstW = CrtScreen.DstW; int N = _analogSize;
-            int rowStart = sl * CrtScreen.DstH / CrtScreen.SrcH; int rowEnd = Math.Min((sl + 1) * CrtScreen.DstH / CrtScreen.SrcH, CrtScreen.DstH);
-            uint* row0 = _analogScreenBuf + (long)rowStart * dstW;
+            int dstW = Crt_DstW; int N = ntsc_analogSize;
+            int rowStart = sl * Crt_DstH / Crt_SrcH; int rowEnd = Math.Min((sl + 1) * Crt_DstH / Crt_SrcH, Crt_DstH);
+            uint* row0 = ntsc_analogScreenBuf + (long)rowStart * dstW;
 
             for (int outX = 0; outX < dstW; outX++)
             {
@@ -433,20 +445,20 @@ namespace AprNes
             scanPhaseBase += 2;
             scanPhaseBase += ((5 - scanPhaseBase) >> 31) & -6;
 
-            if (ColorBurstJitter && (AnalogOutputMode)_analogOutput == AnalogOutputMode.RF)
+            if (ColorBurstJitter && (AnalogOutputMode)ntsc_analogOutput == AnalogOutputMode.RF)
             {
-                uint jns = (uint)(_frameCount * 2654435761u + (uint)sl * 340573321u);
+                uint jns = (uint)(ntsc_frameCount * 2654435761u + (uint)sl * 340573321u);
                 jns ^= jns << 13; jns ^= jns >> 17; jns ^= jns << 5;
                 if ((jns & 31) == 0) phase0 = (phase0 + ((jns & 64) != 0 ? 1 : 5)) % 6;
             }
-            if ((AnalogOutputMode)_analogOutput == AnalogOutputMode.SVideo)
+            if ((AnalogOutputMode)ntsc_analogOutput == AnalogOutputMode.SVideo)
             {
                 GenerateWaveform_SVideo(palBuf, emphasisBits, sl, phase0, waveBuf, cBuf);
                 DemodulateRow_SVideo(sl, phase0, waveBuf, cBuf);
             }
             else
             {
-                bool isRF = (AnalogOutputMode)_analogOutput == AnalogOutputMode.RF;
+                bool isRF = (AnalogOutputMode)ntsc_analogOutput == AnalogOutputMode.RF;
                 GenerateWaveform(palBuf, emphasisBits, isRF, sl, phase0, waveBuf);
                 DemodulateRow(sl, phase0, waveBuf);
             }
@@ -468,7 +480,7 @@ namespace AprNes
                     float lPh = sl * 1364f * 1.31683f; hR_buzz = env * (float)Math.Cos(lPh); hI_buzz = env * (float)Math.Sin(lPh);
                 }
             }
-            uint ns = addNoise ? (uint)(_frameCount * 1664525u + (uint)sl * 1013904223u + 1442695041u) : 0u;
+            uint ns = addNoise ? (uint)(ntsc_frameCount * 1664525u + (uint)sl * 1013904223u + 1442695041u) : 0u;
             float nScale = 2f * NoiseIntensity / 255.0f, nOff = NoiseIntensity;
 
             float leftPad = HbiSimulation ? 0.0f : firstY;
@@ -541,7 +553,7 @@ namespace AprNes
         {
             int emph = emphasisBits & 7; float* ea = emphAtten + emph * 12;
             bool addNoise = NoiseIntensity > 0f; float firstY = yBaseE[(palBuf[0] & 63) * 8 + emph]; float lastY = yBaseE[(palBuf[255] & 63) * 8 + emph];
-            uint ns = addNoise ? (uint)(_frameCount * 1664525u + (uint)sl * 1013904223u + 1442695041u) : 0u;
+            uint ns = addNoise ? (uint)(ntsc_frameCount * 1664525u + (uint)sl * 1013904223u + 1442695041u) : 0u;
             float nScale = 2f * NoiseIntensity / 255.0f, nOff = NoiseIntensity;
 
             float leftPad = HbiSimulation ? 0.0f : firstY;
@@ -596,9 +608,9 @@ namespace AprNes
 
         static void DemodulateRow(int sl, int phase0, float* waveBuf)
         {
-            bool toCrt = _crtEnabled; int dstW = CrtScreen.DstW;
-            int rowStart = sl * CrtScreen.DstH / CrtScreen.SrcH; int rowEnd = Math.Min((sl + 1) * CrtScreen.DstH / CrtScreen.SrcH, CrtScreen.DstH);
-            uint* row0 = _analogScreenBuf + (long)rowStart * dstW; int VS = Vector<float>.Count;
+            bool toCrt = ntsc_crtEnabled; int dstW = Crt_DstW;
+            int rowStart = sl * Crt_DstH / Crt_SrcH; int rowEnd = Math.Min((sl + 1) * Crt_DstH / Crt_SrcH, Crt_DstH);
+            uint* row0 = ntsc_analogScreenBuf + (long)rowStart * dstW; int VS = Vector<float>.Count;
 
             float* qDotBuf = stackalloc float[256];
             {
@@ -672,10 +684,10 @@ namespace AprNes
                     var R = Vector.Min(Vector.Max(vRY * Y + vRI * I + vRQ * Q, vZeroN), vOneN);
                     var G = Vector.Min(Vector.Max(vGY * Y + vGI * I + vGQ * Q, vZeroN), vOneN);
                     var B = Vector.Min(Vector.Max(vBY * Y + vBI * I + vBQ * Q, vZeroN), vOneN);
-                    R += vGC * R * (R - vOneN); G += vGC * G * (G - vOneN); B += vGC * B * (B - vOneN);
-                    var ri = Vector.Max(vZeroiN, Vector.Min(Vector.ConvertToInt32(R * v255_5N), v255iN));
-                    var gi = Vector.Max(vZeroiN, Vector.Min(Vector.ConvertToInt32(G * v255_5N), v255iN));
-                    var bi = Vector.Max(vZeroiN, Vector.Min(Vector.ConvertToInt32(B * v255_5N), v255iN));
+                    R *= (v1_minus_GC + vGC * R); G *= (v1_minus_GC + vGC * G); B *= (v1_minus_GC + vGC * B);
+                    var ri = Vector.ConvertToInt32(R * v255_0N);
+                    var gi = Vector.ConvertToInt32(G * v255_0N);
+                    var bi = Vector.ConvertToInt32(B * v255_0N);
                     *(Vector<int>*)(tmpOutBuf + p) = Vector.BitwiseOr(Vector.BitwiseOr(bi, gi * v256iN), Vector.BitwiseOr(ri * v65536iN, vAlphaiN));
                 }
 
@@ -687,9 +699,9 @@ namespace AprNes
 
         static void DemodulateRow_SVideo(int sl, int phase0, float* waveBuf, float* cBuf)
         {
-            bool toCrt = _crtEnabled; int dstW = CrtScreen.DstW;
-            int rowStart = sl * CrtScreen.DstH / CrtScreen.SrcH; int rowEnd = Math.Min((sl + 1) * CrtScreen.DstH / CrtScreen.SrcH, CrtScreen.DstH);
-            uint* row0 = _analogScreenBuf + (long)rowStart * dstW; int VS = Vector<float>.Count;
+            bool toCrt = ntsc_crtEnabled; int dstW = Crt_DstW;
+            int rowStart = sl * Crt_DstH / Crt_SrcH; int rowEnd = Math.Min((sl + 1) * Crt_DstH / Crt_SrcH, Crt_DstH);
+            uint* row0 = ntsc_analogScreenBuf + (long)rowStart * dstW; int VS = Vector<float>.Count;
             float* qDotBuf = stackalloc float[256];
             {
                 float* wvQ = cBuf + kLeadPad - kWinQ_half + 2;
@@ -759,10 +771,10 @@ namespace AprNes
                     var R = Vector.Min(Vector.Max(vRY * Y + vRI * I + vRQ * Q, vZeroN), vOneN);
                     var G = Vector.Min(Vector.Max(vGY * Y + vGI * I + vGQ * Q, vZeroN), vOneN);
                     var B = Vector.Min(Vector.Max(vBY * Y + vBI * I + vBQ * Q, vZeroN), vOneN);
-                    R += vGC * R * (R - vOneN); G += vGC * G * (G - vOneN); B += vGC * B * (B - vOneN);
-                    var ri = Vector.Max(vZeroiN, Vector.Min(Vector.ConvertToInt32(R * v255_5N), v255iN));
-                    var gi = Vector.Max(vZeroiN, Vector.Min(Vector.ConvertToInt32(G * v255_5N), v255iN));
-                    var bi = Vector.Max(vZeroiN, Vector.Min(Vector.ConvertToInt32(B * v255_5N), v255iN));
+                    R *= (v1_minus_GC + vGC * R); G *= (v1_minus_GC + vGC * G); B *= (v1_minus_GC + vGC * B);
+                    var ri = Vector.ConvertToInt32(R * v255_0N);
+                    var gi = Vector.ConvertToInt32(G * v255_0N);
+                    var bi = Vector.ConvertToInt32(B * v255_0N);
                     *(Vector<int>*)(tmpOutBuf + p) = Vector.BitwiseOr(Vector.BitwiseOr(bi, gi * v256iN), Vector.BitwiseOr(ri * v65536iN, vAlphaiN));
                 }
 
@@ -776,12 +788,9 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static uint YiqToRgb(float y, float i, float q)
         {
-            float r = yiq_rY * y + yiq_rI * i + yiq_rQ * q;
-            float g = yiq_gY * y + yiq_gI * i + yiq_gQ * q;
-            float b = yiq_bY * y + yiq_bI * i + yiq_bQ * q;
-            int ri = (int)(r * 255.5f) & 4095;
-            int gi = (int)(g * 255.5f) & 4095;
-            int bi = (int)(b * 255.5f) & 4095;
+            int ri = (int)(yiq_rY_255 * y + yiq_rI_255 * i + yiq_rQ_255 * q) & 4095;
+            int gi = (int)(yiq_gY_255 * y + yiq_gI_255 * i + yiq_gQ_255 * q) & 4095;
+            int bi = (int)(yiq_bY_255 * y + yiq_bI_255 * i + yiq_bQ_255 * q) & 4095;
             return (uint)(gammaLUT[bi] | ((uint)gammaLUT[gi] << 8) | ((uint)gammaLUT[ri] << 16) | 0xFF000000u);
         }
     }

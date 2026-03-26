@@ -482,8 +482,8 @@ namespace AprNes
             if (AnalogEnabled && AnalogOutput == AnalogOutputMode.RF)
             {
                 float absS = clamped < 0 ? -clamped / 32767f : clamped / 32767f;
-                Ntsc.RfAudioLevel = Ntsc.RfAudioLevel * 0.95f + absS * 0.05f;
-                Ntsc.RfBuzzPhase  = (Ntsc.RfBuzzPhase + absS * 0.0001f) % 1.0f;
+                RfAudioLevel = RfAudioLevel * 0.95f + absS * 0.05f;
+                RfBuzzPhase  = (RfBuzzPhase + absS * 0.0001f) % 1.0f;
             }
         }
 

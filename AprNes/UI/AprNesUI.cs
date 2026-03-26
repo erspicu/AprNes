@@ -130,7 +130,7 @@ namespace AprNes
         public void initUIsize()
         {
             // AnalogEnabled 時依 AnalogSize 決定（256×N × 210×N，8:7 AR）
-            // 直接從 NesCore.AnalogSize 計算，避免依賴 CrtScreen.DstW/DstH（可能尚未 sync）
+            // 直接從 NesCore.AnalogSize 計算，避免依賴 NesCore.Crt_DstW/DstH（可能尚未 sync）
             int renderWidth  = NesCore.AnalogEnabled ? 256 * NesCore.AnalogSize : 256 * ScreenSize;
             int renderHeight = NesCore.AnalogEnabled ? 210 * NesCore.AnalogSize : 240 * ScreenSize;
 
@@ -567,29 +567,29 @@ namespace AprNes
                 c += "; NoiseIntensity  熱雜訊振幅（0=無雜訊，0.04=輕微 RF 效果，0.10=明顯）\r\n";
                 c += "; SlewRate        電容響應速率 IIR alpha（0=完全模糊，1=完全清晰）\r\n";
                 c += "; ChromaBlur      色彩暈染程度 IIR alpha（0=完全暈染，1=無暈染）\r\n";
-                c += "RF_NoiseIntensity=" + Fmt(Ntsc.RF_NoiseIntensity) + "\r\n";
-                c += "RF_SlewRate="       + Fmt(Ntsc.RF_SlewRate)       + "\r\n";
-                c += "RF_ChromaBlur="     + Fmt(Ntsc.RF_ChromaBlur)     + "\r\n";
-                c += "AV_NoiseIntensity=" + Fmt(Ntsc.AV_NoiseIntensity) + "\r\n";
-                c += "AV_SlewRate="       + Fmt(Ntsc.AV_SlewRate)       + "\r\n";
-                c += "AV_ChromaBlur="     + Fmt(Ntsc.AV_ChromaBlur)     + "\r\n";
-                c += "SV_NoiseIntensity=" + Fmt(Ntsc.SV_NoiseIntensity) + "\r\n";
-                c += "SV_SlewRate="       + Fmt(Ntsc.SV_SlewRate)       + "\r\n";
-                c += "SV_ChromaBlur="     + Fmt(Ntsc.SV_ChromaBlur)     + "\r\n";
+                c += "RF_NoiseIntensity=" + Fmt(NesCore.RF_NoiseIntensity) + "\r\n";
+                c += "RF_SlewRate="       + Fmt(NesCore.RF_SlewRate)       + "\r\n";
+                c += "RF_ChromaBlur="     + Fmt(NesCore.RF_ChromaBlur)     + "\r\n";
+                c += "AV_NoiseIntensity=" + Fmt(NesCore.AV_NoiseIntensity) + "\r\n";
+                c += "AV_SlewRate="       + Fmt(NesCore.AV_SlewRate)       + "\r\n";
+                c += "AV_ChromaBlur="     + Fmt(NesCore.AV_ChromaBlur)     + "\r\n";
+                c += "SV_NoiseIntensity=" + Fmt(NesCore.SV_NoiseIntensity) + "\r\n";
+                c += "SV_SlewRate="       + Fmt(NesCore.SV_SlewRate)       + "\r\n";
+                c += "SV_ChromaBlur="     + Fmt(NesCore.SV_ChromaBlur)     + "\r\n";
                 c += ";\r\n";
                 c += "; ── Stage 2（CrtScreen 電子束光學，UltraAnalog=1 有效）──────────────────\r\n";
                 c += "; BeamSigma       電子束擴散半徑 sigma（值越大掃描線越寬，越模糊）\r\n";
                 c += "; BloomStrength   高光溢出強度（0=無 Bloom，1=強烈溢出）\r\n";
                 c += "; BrightnessBoost 亮度補償倍率（補償掃描線黑溝造成的平均亮度損失）\r\n";
-                c += "RF_BeamSigma="       + Fmt(CrtScreen.RF_BeamSigma)       + "\r\n";
-                c += "RF_BloomStrength="   + Fmt(CrtScreen.RF_BloomStrength)   + "\r\n";
-                c += "RF_BrightnessBoost=" + Fmt(CrtScreen.RF_BrightnessBoost) + "\r\n";
-                c += "AV_BeamSigma="       + Fmt(CrtScreen.AV_BeamSigma)       + "\r\n";
-                c += "AV_BloomStrength="   + Fmt(CrtScreen.AV_BloomStrength)   + "\r\n";
-                c += "AV_BrightnessBoost=" + Fmt(CrtScreen.AV_BrightnessBoost) + "\r\n";
-                c += "SV_BeamSigma="       + Fmt(CrtScreen.SV_BeamSigma)       + "\r\n";
-                c += "SV_BloomStrength="   + Fmt(CrtScreen.SV_BloomStrength)   + "\r\n";
-                c += "SV_BrightnessBoost=" + Fmt(CrtScreen.SV_BrightnessBoost) + "\r\n";
+                c += "RF_BeamSigma="       + Fmt(NesCore.RF_BeamSigma)       + "\r\n";
+                c += "RF_BloomStrength="   + Fmt(NesCore.RF_BloomStrength)   + "\r\n";
+                c += "RF_BrightnessBoost=" + Fmt(NesCore.RF_BrightnessBoost) + "\r\n";
+                c += "AV_BeamSigma="       + Fmt(NesCore.AV_BeamSigma)       + "\r\n";
+                c += "AV_BloomStrength="   + Fmt(NesCore.AV_BloomStrength)   + "\r\n";
+                c += "AV_BrightnessBoost=" + Fmt(NesCore.AV_BrightnessBoost) + "\r\n";
+                c += "SV_BeamSigma="       + Fmt(NesCore.SV_BeamSigma)       + "\r\n";
+                c += "SV_BloomStrength="   + Fmt(NesCore.SV_BloomStrength)   + "\r\n";
+                c += "SV_BrightnessBoost=" + Fmt(NesCore.SV_BrightnessBoost) + "\r\n";
                 FileWriteAllText(analogFile, c);
                 return; // 使用已設定的預設 static 值，不需再解析
             }
@@ -620,9 +620,9 @@ namespace AprNes
             }
 
             // Effect toggles
-            Ntsc.HbiSimulation     = GetBool("HbiSimulation", true);
-            Ntsc.ColorBurstJitter  = GetBool("ColorBurstJitter", true);
-            CrtScreen.InterlaceJitter = GetBool("InterlaceJitter", true);
+            NesCore.HbiSimulation     = GetBool("HbiSimulation", true);
+            NesCore.ColorBurstJitter  = GetBool("ColorBurstJitter", true);
+            NesCore.InterlaceJitter = GetBool("InterlaceJitter", true);
             bool ringingOn     = GetBool("RingingEnabled", true);
             bool vignetteOn    = GetBool("VignetteEnabled", true);
             bool shadowMaskOn  = GetBool("ShadowMaskEnabled", true);
@@ -632,44 +632,44 @@ namespace AprNes
             bool convergenceOn = GetBool("ConvergenceEnabled", true);
 
             // Effect values
-            Ntsc.RingStrength  = ringingOn ? Get("RingStrength", 0.3f) : 0f;
-            Ntsc.GammaCoeff    = Get("GammaCoeff", 0.229f);
-            Ntsc.ColorTempR    = Get("ColorTempR", 1.0f);
-            Ntsc.ColorTempG    = Get("ColorTempG", 1.0f);
-            Ntsc.ColorTempB    = Get("ColorTempB", 1.0f);
-            CrtScreen.VignetteStrength   = vignetteOn ? Get("VignetteStrength", 0.15f) : 0f;
-            CrtScreen.ShadowMaskMode     = shadowMaskOn
-                ? (CrtScreen.MaskType)(int)Get("ShadowMaskMode", 1f)
-                : CrtScreen.MaskType.None;
-            CrtScreen.ShadowMaskStrength = Get("ShadowMaskStrength", 0.3f);
-            CrtScreen.CurvatureStrength  = curvatureOn ? Get("CurvatureStrength", 0.12f) : 0f;
-            CrtScreen.PhosphorDecay      = phosphorOn ? Get("PhosphorDecay", 0.6f) : 0f;
-            CrtScreen.HBeamSpread        = hbeamOn ? Get("HBeamSpread", 0.4f) : 0f;
-            CrtScreen.ConvergenceStrength = convergenceOn ? Get("ConvergenceStrength", 2.0f) : 0f;
+            NesCore.RingStrength  = ringingOn ? Get("RingStrength", 0.3f) : 0f;
+            NesCore.GammaCoeff    = Get("GammaCoeff", 0.229f);
+            NesCore.ColorTempR    = Get("ColorTempR", 1.0f);
+            NesCore.ColorTempG    = Get("ColorTempG", 1.0f);
+            NesCore.ColorTempB    = Get("ColorTempB", 1.0f);
+            NesCore.VignetteStrength   = vignetteOn ? Get("VignetteStrength", 0.15f) : 0f;
+            NesCore.ShadowMaskMode     = shadowMaskOn
+                ? (NesCore.CrtMaskType)(int)Get("ShadowMaskMode", 1f)
+                : NesCore.CrtMaskType.None;
+            NesCore.ShadowMaskStrength = Get("ShadowMaskStrength", 0.3f);
+            NesCore.CurvatureStrength  = curvatureOn ? Get("CurvatureStrength", 0.12f) : 0f;
+            NesCore.PhosphorDecay      = phosphorOn ? Get("PhosphorDecay", 0.6f) : 0f;
+            NesCore.HBeamSpread        = hbeamOn ? Get("HBeamSpread", 0.4f) : 0f;
+            NesCore.ConvergenceStrength = convergenceOn ? Get("ConvergenceStrength", 2.0f) : 0f;
 
             // Stage 1 connector (Ntsc.cs)
-            Ntsc.RF_NoiseIntensity = Get("RF_NoiseIntensity", 0.04f);
-            Ntsc.RF_SlewRate       = Get("RF_SlewRate",       0.60f);
-            Ntsc.RF_ChromaBlur     = Get("RF_ChromaBlur",     0.10f);
-            Ntsc.AV_NoiseIntensity = Get("AV_NoiseIntensity", 0.003f);
-            Ntsc.AV_SlewRate       = Get("AV_SlewRate",       0.80f);
-            Ntsc.AV_ChromaBlur     = Get("AV_ChromaBlur",     0.35f);
-            Ntsc.SV_NoiseIntensity = Get("SV_NoiseIntensity", 0.00f);
-            Ntsc.SV_SlewRate       = Get("SV_SlewRate",       0.90f);
-            Ntsc.SV_ChromaBlur     = Get("SV_ChromaBlur",     0.45f);
+            NesCore.RF_NoiseIntensity = Get("RF_NoiseIntensity", 0.04f);
+            NesCore.RF_SlewRate       = Get("RF_SlewRate",       0.60f);
+            NesCore.RF_ChromaBlur     = Get("RF_ChromaBlur",     0.10f);
+            NesCore.AV_NoiseIntensity = Get("AV_NoiseIntensity", 0.003f);
+            NesCore.AV_SlewRate       = Get("AV_SlewRate",       0.80f);
+            NesCore.AV_ChromaBlur     = Get("AV_ChromaBlur",     0.35f);
+            NesCore.SV_NoiseIntensity = Get("SV_NoiseIntensity", 0.00f);
+            NesCore.SV_SlewRate       = Get("SV_SlewRate",       0.90f);
+            NesCore.SV_ChromaBlur     = Get("SV_ChromaBlur",     0.45f);
             // Stage 2 connector (CrtScreen.cs)
-            CrtScreen.RF_BeamSigma       = Get("RF_BeamSigma",       1.10f);
-            CrtScreen.RF_BloomStrength   = Get("RF_BloomStrength",   0.50f);
-            CrtScreen.RF_BrightnessBoost = Get("RF_BrightnessBoost", 1.10f);
-            CrtScreen.AV_BeamSigma       = Get("AV_BeamSigma",       0.85f);
-            CrtScreen.AV_BloomStrength   = Get("AV_BloomStrength",   0.25f);
-            CrtScreen.AV_BrightnessBoost = Get("AV_BrightnessBoost", 1.25f);
-            CrtScreen.SV_BeamSigma       = Get("SV_BeamSigma",       0.65f);
-            CrtScreen.SV_BloomStrength   = Get("SV_BloomStrength",   0.10f);
-            CrtScreen.SV_BrightnessBoost = Get("SV_BrightnessBoost", 1.40f);
+            NesCore.RF_BeamSigma       = Get("RF_BeamSigma",       1.10f);
+            NesCore.RF_BloomStrength   = Get("RF_BloomStrength",   0.50f);
+            NesCore.RF_BrightnessBoost = Get("RF_BrightnessBoost", 1.10f);
+            NesCore.AV_BeamSigma       = Get("AV_BeamSigma",       0.85f);
+            NesCore.AV_BloomStrength   = Get("AV_BloomStrength",   0.25f);
+            NesCore.AV_BrightnessBoost = Get("AV_BrightnessBoost", 1.25f);
+            NesCore.SV_BeamSigma       = Get("SV_BeamSigma",       0.65f);
+            NesCore.SV_BloomStrength   = Get("SV_BloomStrength",   0.10f);
+            NesCore.SV_BrightnessBoost = Get("SV_BrightnessBoost", 1.40f);
 
             // Update gamma LUT with loaded GammaCoeff
-            Ntsc.UpdateGammaLUT();
+            NesCore.UpdateGammaLUT();
         }
 
         public void FileWriteAllText(string path, string str)
@@ -1402,8 +1402,8 @@ public string GetRomInfo()
             // 若尺寸不變（例如只切換 VideoInput），保留現有 buf，避免渲染執行緒寫入時發生 race condition。
             if (NesCore.AnalogEnabled)
             {
-                NesCore.SyncAnalogConfig();  // 先同步 AnalogSize 等參數，確保 CrtScreen.DstW/DstH 正確
-                int needed = CrtScreen.DstW * CrtScreen.DstH;
+                NesCore.SyncAnalogConfig();  // 先同步 AnalogSize 等參數，確保 NesCore.Crt_DstW/DstH 正確
+                int needed = NesCore.Crt_DstW * NesCore.Crt_DstH;
                 unsafe
                 {
                     if (NesCore.AnalogScreenBuf == null || NesCore.AnalogBufSize != needed)
@@ -1419,8 +1419,8 @@ public string GetRomInfo()
                     }
                 }
                 NesCore.SyncAnalogConfig();  // buffer 重新分配後再同步指標
-                Ntsc.Init();
-                CrtScreen.Init();
+                NesCore.Ntsc_Init();
+                NesCore.Crt_Init();
             }
 
             if (RenderObj != null) RenderObj.freeMem();
@@ -1512,8 +1512,8 @@ public string GetRomInfo()
                 while (!NesCore.emuWaiting) Thread.Sleep(1);
 
                 NesCore.SyncAnalogConfig();
-                Ntsc.Init();
-                CrtScreen.Init();
+                NesCore.Ntsc_Init();
+                NesCore.Crt_Init();
 
                 NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
                 NesCore._event.Set();
@@ -1557,8 +1557,8 @@ public string GetRomInfo()
 
             string capturesDir = Path.Combine(Application.StartupPath, "Captures", "Video");
             // Analog mode: read dimensions fresh from CrtScreen (buffer can be reallocated)
-            int recW = NesCore.AnalogEnabled ? CrtScreen.DstW : NesCore.RenderOutputW;
-            int recH = NesCore.AnalogEnabled ? CrtScreen.DstH : NesCore.RenderOutputH;
+            int recW = NesCore.AnalogEnabled ? NesCore.Crt_DstW : NesCore.RenderOutputW;
+            int recH = NesCore.AnalogEnabled ? NesCore.Crt_DstH : NesCore.RenderOutputH;
             bool ok = VideoRecorder.Start(GetFfmpegPath(), capturesDir, recW, recH);
             if (ok)
             {
@@ -1698,13 +1698,13 @@ public string GetRomInfo()
             }
 
             // 設定全螢幕覆寫解析度
-            CrtScreen.SetFullscreenSize(displayW, displayH);
+            NesCore.Crt_SetFullscreenSize(displayW, displayH);
 
             // 重新分配 AnalogScreenBuf
             if (NesCore.AnalogEnabled)
             {
                 NesCore.SyncAnalogConfig();
-                int needed = CrtScreen.DstW * CrtScreen.DstH;
+                int needed = NesCore.Crt_DstW * NesCore.Crt_DstH;
                 if (NesCore.AnalogScreenBuf == null || NesCore.AnalogBufSize != needed)
                 {
                     if (NesCore.AnalogScreenBuf != null)
@@ -1717,8 +1717,8 @@ public string GetRomInfo()
                         sizeof(uint) * needed);
                 }
                 NesCore.SyncAnalogConfig();
-                Ntsc.Init();
-                CrtScreen.Init();
+                NesCore.Ntsc_Init();
+                NesCore.Crt_Init();
             }
 
             // UI 全螢幕
@@ -1768,13 +1768,13 @@ public string GetRomInfo()
             }
 
             // 清除全螢幕覆寫，恢復 AnalogSize 驅動的 DstW/DstH
-            CrtScreen.ClearFullscreenSize();
+            NesCore.Crt_ClearFullscreenSize();
 
             // 重新分配 AnalogScreenBuf 回原始大小
             if (NesCore.AnalogEnabled)
             {
                 NesCore.SyncAnalogConfig();
-                int needed = CrtScreen.DstW * CrtScreen.DstH;
+                int needed = NesCore.Crt_DstW * NesCore.Crt_DstH;
                 if (NesCore.AnalogScreenBuf == null || NesCore.AnalogBufSize != needed)
                 {
                     if (NesCore.AnalogScreenBuf != null)
@@ -1787,8 +1787,8 @@ public string GetRomInfo()
                         sizeof(uint) * needed);
                 }
                 NesCore.SyncAnalogConfig();
-                Ntsc.Init();
-                CrtScreen.Init();
+                NesCore.Ntsc_Init();
+                NesCore.Crt_Init();
             }
 
             // 還原 UI 狀態

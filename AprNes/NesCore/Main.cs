@@ -160,14 +160,14 @@ namespace AprNes
         /// </summary>
         static public void SyncAnalogConfig()
         {
-            Ntsc.ApplyConfig(
+            Ntsc_ApplyConfig(
                 analogOutput:    (int)AnalogOutput,
                 ultraAnalog:     UltraAnalog,
                 analogSize:      AnalogSize,
                 crtEnabled:      CrtEnabled,
                 analogScreenBuf: AnalogScreenBuf
             );
-            CrtScreen.ApplyConfig(
+            Crt_ApplyConfig(
                 analogOutput:    (int)AnalogOutput,
                 analogSize:      AnalogSize,
                 analogScreenBuf: AnalogScreenBuf
@@ -346,8 +346,8 @@ namespace AprNes
                 ScreenBuf1x      = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 61440);
                 if (AnalogEnabled)
                 {
-                    SyncAnalogConfig();  // 確保 CrtScreen.DstW/DstH 使用正確的 AnalogSize
-                    AnalogBufSize   = CrtScreen.DstW * CrtScreen.DstH;
+                    SyncAnalogConfig();  // 確保 Crt_DstW/DstH 使用正確的 AnalogSize
+                    AnalogBufSize   = Crt_DstW * Crt_DstH;
                     AnalogScreenBuf = (uint*)Marshal.AllocHGlobal(sizeof(uint) * AnalogBufSize);
                 }
                 Buffer_BG_array  = (int* )Marshal.AllocHGlobal(sizeof(int)  * 61440);
@@ -403,7 +403,7 @@ namespace AprNes
                 if (AnalogEnabled)
                 {
                     SyncAnalogConfig();  // buffer 已分配，同步完整參數
-                    Ntsc.Init(); CrtScreen.Init();
+                    Ntsc_Init(); Crt_Init();
                 }
 
                 initPalette();

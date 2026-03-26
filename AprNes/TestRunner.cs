@@ -132,6 +132,8 @@ namespace AprNes
             bool dumpDebug = false; // --dump-debug: print debug memory ranges ($50-$6F, $500-$5FF)
             bool benchmarkMode = false; // --benchmark <sec>: measure FPS for wall-clock duration
             double benchmarkSec = 20;
+            bool audioDsp = false;     // --audio-dsp: enable audio DSP pipeline (no playback)
+            int audioDspMode = -1;     // --audio-mode <0|1|2>: audio mode for DSP benchmark
 
             // Parse arguments
             for (int i = 0; i < args.Length; i++)
@@ -219,6 +221,17 @@ namespace AprNes
                             }
                         }
                         break;
+                    case "--audio-dsp":
+                        audioDsp = true;
+                        break;
+                    case "--audio-mode":
+                        if (i + 1 < args.Length)
+                        {
+                            int m;
+                            if (int.TryParse(args[++i], out m) && m >= 0 && m <= 2)
+                                audioDspMode = m;
+                        }
+                        break;
                 }
             }
 
@@ -239,7 +252,32 @@ namespace AprNes
             // Headless init
             NesCore.HeadlessMode = true;
             NesCore.OnError = msg => Console.Error.WriteLine("ERROR: " + msg);
-            NesCore.AudioEnabled = false;
+            NesCore.AudioEnabled = audioDsp; // false unless --audio-dsp enables DSP pipeline
+
+            // Audio DSP benchmark: set mode and max-cost parameters (no playback)
+            if (audioDsp)
+            {
+                NesCore.AudioMode = (audioDspMode >= 0) ? audioDspMode : 0;
+
+                if (NesCore.AudioMode == 1)
+                {
+                    // Authentic: force RF + Buzz for max DSP cost
+                    NesCore.RfCrosstalk = true;
+                    NesCore.CustomBuzz = true;
+                    NesCore.BuzzAmplitude = 30;
+                }
+                else if (NesCore.AudioMode == 2)
+                {
+                    // Modern: all effects at max for max DSP cost
+                    NesCore.StereoWidth = 100;
+                    NesCore.BassBoostDb = 12;
+                    NesCore.HaasDelay = 20;
+                    NesCore.HaasCrossfeed = 40;
+                    NesCore.ReverbWet = 15;
+                    NesCore.CombFeedback = 70;
+                    NesCore.CombDamp = 30;
+                }
+            }
 
 
             // Compute max frames
@@ -529,6 +567,13 @@ namespace AprNes
                 Console.Error.WriteLine("Failed to init ROM: " + romName);
                 NesCore.VideoOutput -= handler;
                 return 2;
+            }
+
+            // Initialize audio DSP pipeline (no AudioSampleReady handler → samples discarded)
+            if (audioDsp && NesCore.AudioMode > 0)
+            {
+                AudioDispatcher.Init();
+                AudioDispatcher.ApplySettings();
             }
 
             // Run emulation on a background thread

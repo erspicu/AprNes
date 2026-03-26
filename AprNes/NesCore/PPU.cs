@@ -559,7 +559,7 @@ namespace AprNes
             {
                 RenderScreen();
                 frame_count++;
-                if (AnalogEnabled) { Ntsc.SetFrameCount(frame_count); CrtScreen.SetFrameCount(frame_count); }
+                if (AnalogEnabled) { Ntsc_SetFrameCount(frame_count); Crt_SetFrameCount(frame_count); }
                 // StopWatch 持續計時，不在此 Restart（供 deadline 絕對計時使用）
             }
 
@@ -1157,7 +1157,7 @@ namespace AprNes
 
             // NTSC: 訊號解碼（使用已填好的 ntscScanBuf 原始調色盤索引）
             if (AnalogEnabled)
-                Ntsc.DecodeScanline(scanline, ntscScanBuf, ppuEmphasis);
+                DecodeScanline(scanline, ntscScanBuf, ppuEmphasis);
         }
 
         static public bool screen_lock = false;
@@ -1165,7 +1165,7 @@ namespace AprNes
         static void RenderScreen()
         {
             screen_lock = true;
-            if (AnalogEnabled && NesCore.UltraAnalog && NesCore.CrtEnabled) CrtScreen.Render(); // Stage 2：linearBuffer → AnalogScreenBuf（Level 3 + CRT）
+            if (AnalogEnabled && NesCore.UltraAnalog && NesCore.CrtEnabled) Crt_Render(); // Stage 2：linearBuffer → AnalogScreenBuf（Level 3 + CRT）
             VideoOutput?.Invoke(null, null);
             screen_lock = false;
             emuWaiting = true;

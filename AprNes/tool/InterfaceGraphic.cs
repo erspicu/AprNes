@@ -371,17 +371,17 @@ namespace AprNes
 
         public Bitmap GetOutput()
         {
-            int dw = CrtScreen.DstW, dh = CrtScreen.DstH;
+            int dw = NesCore.Crt_DstW, dh = NesCore.Crt_DstH;
             return new Bitmap(dw, dh, dw * 4, PixelFormat.Format32bppRgb, (IntPtr)NesCore.AnalogScreenBuf);
         }
 
         public void init(uint* input, Graphics _device)
         {
             // input (ScreenBuf1x) 不使用；直接指向 AnalogScreenBuf
-            NativeGDI.initHighSpeed(_device, CrtScreen.DstW, CrtScreen.DstH, NesCore.AnalogScreenBuf, 0, 0);
+            NativeGDI.initHighSpeed(_device, NesCore.Crt_DstW, NesCore.Crt_DstH, NesCore.AnalogScreenBuf, 0, 0);
             NesCore.RenderOutputPtr = NesCore.AnalogScreenBuf;
-            NesCore.RenderOutputW = CrtScreen.DstW;
-            NesCore.RenderOutputH = CrtScreen.DstH;
+            NesCore.RenderOutputW = NesCore.Crt_DstW;
+            NesCore.RenderOutputH = NesCore.Crt_DstH;
         }
 
         public void Render()

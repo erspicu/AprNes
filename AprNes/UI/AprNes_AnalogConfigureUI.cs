@@ -80,61 +80,61 @@ namespace AprNes.UI
         void LoadFromFields()
         {
             // NTSC checkboxes
-            chkHBI.Checked = Ntsc.HbiSimulation;
-            chkColorBurstJitter.Checked = Ntsc.ColorBurstJitter;
-            chkRinging.Checked = Ntsc.RingStrength > 0f;
+            chkHBI.Checked = NesCore.HbiSimulation;
+            chkColorBurstJitter.Checked = NesCore.ColorBurstJitter;
+            chkRinging.Checked = NesCore.RingStrength > 0f;
 
             // NTSC sliders
-            trkRinging.Value = Clamp((int)(Ntsc.RingStrength * 100f), trkRinging.Minimum, trkRinging.Maximum);
-            trkGamma.Value = Clamp((int)(Ntsc.GammaCoeff * 100f), trkGamma.Minimum, trkGamma.Maximum);
-            trkCTR.Value = Clamp((int)(Ntsc.ColorTempR * 100f), trkCTR.Minimum, trkCTR.Maximum);
-            trkCTG.Value = Clamp((int)(Ntsc.ColorTempG * 100f), trkCTG.Minimum, trkCTG.Maximum);
-            trkCTB.Value = Clamp((int)(Ntsc.ColorTempB * 100f), trkCTB.Minimum, trkCTB.Maximum);
+            trkRinging.Value = Clamp((int)(NesCore.RingStrength * 100f), trkRinging.Minimum, trkRinging.Maximum);
+            trkGamma.Value = Clamp((int)(NesCore.GammaCoeff * 100f), trkGamma.Minimum, trkGamma.Maximum);
+            trkCTR.Value = Clamp((int)(NesCore.ColorTempR * 100f), trkCTR.Minimum, trkCTR.Maximum);
+            trkCTG.Value = Clamp((int)(NesCore.ColorTempG * 100f), trkCTG.Minimum, trkCTG.Maximum);
+            trkCTB.Value = Clamp((int)(NesCore.ColorTempB * 100f), trkCTB.Minimum, trkCTB.Maximum);
 
             // CRT checkboxes
-            chkInterlaceJitter.Checked = CrtScreen.InterlaceJitter;
-            chkVignette.Checked = CrtScreen.VignetteStrength > 0f;
-            chkShadowMask.Checked = CrtScreen.ShadowMaskMode != CrtScreen.MaskType.None;
-            chkCurvature.Checked = CrtScreen.CurvatureStrength > 0f;
-            chkPhosphor.Checked = CrtScreen.PhosphorDecay > 0f;
-            chkHBeam.Checked = CrtScreen.HBeamSpread > 0f;
-            chkConvergence.Checked = CrtScreen.ConvergenceStrength > 0f;
+            chkInterlaceJitter.Checked = NesCore.InterlaceJitter;
+            chkVignette.Checked = NesCore.VignetteStrength > 0f;
+            chkShadowMask.Checked = NesCore.ShadowMaskMode != NesCore.CrtMaskType.None;
+            chkCurvature.Checked = NesCore.CurvatureStrength > 0f;
+            chkPhosphor.Checked = NesCore.PhosphorDecay > 0f;
+            chkHBeam.Checked = NesCore.HBeamSpread > 0f;
+            chkConvergence.Checked = NesCore.ConvergenceStrength > 0f;
 
             // CRT sliders
-            trkVignette.Value = Clamp((int)(CrtScreen.VignetteStrength * 100f), trkVignette.Minimum, trkVignette.Maximum);
-            cmbShadowMask.SelectedIndex = (int)CrtScreen.ShadowMaskMode;
-            trkMaskStrength.Value = Clamp((int)(CrtScreen.ShadowMaskStrength * 100f), trkMaskStrength.Minimum, trkMaskStrength.Maximum);
-            trkCurvature.Value = Clamp((int)(CrtScreen.CurvatureStrength * 100f), trkCurvature.Minimum, trkCurvature.Maximum);
-            trkPhosphor.Value = Clamp((int)(CrtScreen.PhosphorDecay * 100f), trkPhosphor.Minimum, trkPhosphor.Maximum);
-            trkHBeam.Value = Clamp((int)(CrtScreen.HBeamSpread * 100f), trkHBeam.Minimum, trkHBeam.Maximum);
-            trkConvergence.Value = Clamp((int)(CrtScreen.ConvergenceStrength * 10f), trkConvergence.Minimum, trkConvergence.Maximum);
+            trkVignette.Value = Clamp((int)(NesCore.VignetteStrength * 100f), trkVignette.Minimum, trkVignette.Maximum);
+            cmbShadowMask.SelectedIndex = (int)NesCore.ShadowMaskMode;
+            trkMaskStrength.Value = Clamp((int)(NesCore.ShadowMaskStrength * 100f), trkMaskStrength.Minimum, trkMaskStrength.Maximum);
+            trkCurvature.Value = Clamp((int)(NesCore.CurvatureStrength * 100f), trkCurvature.Minimum, trkCurvature.Maximum);
+            trkPhosphor.Value = Clamp((int)(NesCore.PhosphorDecay * 100f), trkPhosphor.Minimum, trkPhosphor.Maximum);
+            trkHBeam.Value = Clamp((int)(NesCore.HBeamSpread * 100f), trkHBeam.Minimum, trkHBeam.Maximum);
+            trkConvergence.Value = Clamp((int)(NesCore.ConvergenceStrength * 10f), trkConvergence.Minimum, trkConvergence.Maximum);
 
             // Connector — RF (Stage 1)
-            trkRfNoise.Value = Clamp((int)(Ntsc.RF_NoiseIntensity * 100f), trkRfNoise.Minimum, trkRfNoise.Maximum);
-            trkRfSlew.Value = Clamp((int)(Ntsc.RF_SlewRate * 100f), trkRfSlew.Minimum, trkRfSlew.Maximum);
-            trkRfChroma.Value = Clamp((int)(Ntsc.RF_ChromaBlur * 100f), trkRfChroma.Minimum, trkRfChroma.Maximum);
+            trkRfNoise.Value = Clamp((int)(NesCore.RF_NoiseIntensity * 100f), trkRfNoise.Minimum, trkRfNoise.Maximum);
+            trkRfSlew.Value = Clamp((int)(NesCore.RF_SlewRate * 100f), trkRfSlew.Minimum, trkRfSlew.Maximum);
+            trkRfChroma.Value = Clamp((int)(NesCore.RF_ChromaBlur * 100f), trkRfChroma.Minimum, trkRfChroma.Maximum);
             // Connector — RF (Stage 2)
-            trkRfBeam.Value = Clamp((int)(CrtScreen.RF_BeamSigma * 100f), trkRfBeam.Minimum, trkRfBeam.Maximum);
-            trkRfBloom.Value = Clamp((int)(CrtScreen.RF_BloomStrength * 100f), trkRfBloom.Minimum, trkRfBloom.Maximum);
-            trkRfBright.Value = Clamp((int)(CrtScreen.RF_BrightnessBoost * 100f), trkRfBright.Minimum, trkRfBright.Maximum);
+            trkRfBeam.Value = Clamp((int)(NesCore.RF_BeamSigma * 100f), trkRfBeam.Minimum, trkRfBeam.Maximum);
+            trkRfBloom.Value = Clamp((int)(NesCore.RF_BloomStrength * 100f), trkRfBloom.Minimum, trkRfBloom.Maximum);
+            trkRfBright.Value = Clamp((int)(NesCore.RF_BrightnessBoost * 100f), trkRfBright.Minimum, trkRfBright.Maximum);
 
             // Connector — AV (Stage 1)
-            trkAvNoise.Value = Clamp((int)(Ntsc.AV_NoiseIntensity * 100f), trkAvNoise.Minimum, trkAvNoise.Maximum);
-            trkAvSlew.Value = Clamp((int)(Ntsc.AV_SlewRate * 100f), trkAvSlew.Minimum, trkAvSlew.Maximum);
-            trkAvChroma.Value = Clamp((int)(Ntsc.AV_ChromaBlur * 100f), trkAvChroma.Minimum, trkAvChroma.Maximum);
+            trkAvNoise.Value = Clamp((int)(NesCore.AV_NoiseIntensity * 100f), trkAvNoise.Minimum, trkAvNoise.Maximum);
+            trkAvSlew.Value = Clamp((int)(NesCore.AV_SlewRate * 100f), trkAvSlew.Minimum, trkAvSlew.Maximum);
+            trkAvChroma.Value = Clamp((int)(NesCore.AV_ChromaBlur * 100f), trkAvChroma.Minimum, trkAvChroma.Maximum);
             // Connector — AV (Stage 2)
-            trkAvBeam.Value = Clamp((int)(CrtScreen.AV_BeamSigma * 100f), trkAvBeam.Minimum, trkAvBeam.Maximum);
-            trkAvBloom.Value = Clamp((int)(CrtScreen.AV_BloomStrength * 100f), trkAvBloom.Minimum, trkAvBloom.Maximum);
-            trkAvBright.Value = Clamp((int)(CrtScreen.AV_BrightnessBoost * 100f), trkAvBright.Minimum, trkAvBright.Maximum);
+            trkAvBeam.Value = Clamp((int)(NesCore.AV_BeamSigma * 100f), trkAvBeam.Minimum, trkAvBeam.Maximum);
+            trkAvBloom.Value = Clamp((int)(NesCore.AV_BloomStrength * 100f), trkAvBloom.Minimum, trkAvBloom.Maximum);
+            trkAvBright.Value = Clamp((int)(NesCore.AV_BrightnessBoost * 100f), trkAvBright.Minimum, trkAvBright.Maximum);
 
             // Connector — S-Video (Stage 1)
-            trkSvNoise.Value = Clamp((int)(Ntsc.SV_NoiseIntensity * 100f), trkSvNoise.Minimum, trkSvNoise.Maximum);
-            trkSvSlew.Value = Clamp((int)(Ntsc.SV_SlewRate * 100f), trkSvSlew.Minimum, trkSvSlew.Maximum);
-            trkSvChroma.Value = Clamp((int)(Ntsc.SV_ChromaBlur * 100f), trkSvChroma.Minimum, trkSvChroma.Maximum);
+            trkSvNoise.Value = Clamp((int)(NesCore.SV_NoiseIntensity * 100f), trkSvNoise.Minimum, trkSvNoise.Maximum);
+            trkSvSlew.Value = Clamp((int)(NesCore.SV_SlewRate * 100f), trkSvSlew.Minimum, trkSvSlew.Maximum);
+            trkSvChroma.Value = Clamp((int)(NesCore.SV_ChromaBlur * 100f), trkSvChroma.Minimum, trkSvChroma.Maximum);
             // Connector — S-Video (Stage 2)
-            trkSvBeam.Value = Clamp((int)(CrtScreen.SV_BeamSigma * 100f), trkSvBeam.Minimum, trkSvBeam.Maximum);
-            trkSvBloom.Value = Clamp((int)(CrtScreen.SV_BloomStrength * 100f), trkSvBloom.Minimum, trkSvBloom.Maximum);
-            trkSvBright.Value = Clamp((int)(CrtScreen.SV_BrightnessBoost * 100f), trkSvBright.Minimum, trkSvBright.Maximum);
+            trkSvBeam.Value = Clamp((int)(NesCore.SV_BeamSigma * 100f), trkSvBeam.Minimum, trkSvBeam.Maximum);
+            trkSvBloom.Value = Clamp((int)(NesCore.SV_BloomStrength * 100f), trkSvBloom.Minimum, trkSvBloom.Maximum);
+            trkSvBright.Value = Clamp((int)(NesCore.SV_BrightnessBoost * 100f), trkSvBright.Minimum, trkSvBright.Maximum);
 
             // Preset combo
             comboPreset.SelectedIndex = 0;
@@ -147,60 +147,60 @@ namespace AprNes.UI
         void ApplyToFields()
         {
             // NTSC booleans
-            Ntsc.HbiSimulation = chkHBI.Checked;
-            Ntsc.ColorBurstJitter = chkColorBurstJitter.Checked;
+            NesCore.HbiSimulation = chkHBI.Checked;
+            NesCore.ColorBurstJitter = chkColorBurstJitter.Checked;
 
             // NTSC values (checkbox controls whether effect is active)
-            Ntsc.RingStrength = chkRinging.Checked ? trkRinging.Value / 100f : 0f;
-            Ntsc.GammaCoeff = trkGamma.Value / 100f;
-            Ntsc.ColorTempR = trkCTR.Value / 100f;
-            Ntsc.ColorTempG = trkCTG.Value / 100f;
-            Ntsc.ColorTempB = trkCTB.Value / 100f;
+            NesCore.RingStrength = chkRinging.Checked ? trkRinging.Value / 100f : 0f;
+            NesCore.GammaCoeff = trkGamma.Value / 100f;
+            NesCore.ColorTempR = trkCTR.Value / 100f;
+            NesCore.ColorTempG = trkCTG.Value / 100f;
+            NesCore.ColorTempB = trkCTB.Value / 100f;
 
             // Rebuild gamma LUT after changing GammaCoeff
-            Ntsc.UpdateGammaLUT();
+            NesCore.UpdateGammaLUT();
 
             // CRT booleans
-            CrtScreen.InterlaceJitter = chkInterlaceJitter.Checked;
+            NesCore.InterlaceJitter = chkInterlaceJitter.Checked;
 
             // CRT values (checkbox controls whether effect is active)
-            CrtScreen.VignetteStrength = chkVignette.Checked ? trkVignette.Value / 100f : 0f;
-            CrtScreen.ShadowMaskMode = chkShadowMask.Checked
-                ? (CrtScreen.MaskType)cmbShadowMask.SelectedIndex
-                : CrtScreen.MaskType.None;
-            CrtScreen.ShadowMaskStrength = trkMaskStrength.Value / 100f;
-            CrtScreen.CurvatureStrength = chkCurvature.Checked ? trkCurvature.Value / 100f : 0f;
-            CrtScreen.PhosphorDecay = chkPhosphor.Checked ? trkPhosphor.Value / 100f : 0f;
-            CrtScreen.HBeamSpread = chkHBeam.Checked ? trkHBeam.Value / 100f : 0f;
-            CrtScreen.ConvergenceStrength = chkConvergence.Checked ? trkConvergence.Value / 10f : 0f;
+            NesCore.VignetteStrength = chkVignette.Checked ? trkVignette.Value / 100f : 0f;
+            NesCore.ShadowMaskMode = chkShadowMask.Checked
+                ? (NesCore.CrtMaskType)cmbShadowMask.SelectedIndex
+                : NesCore.CrtMaskType.None;
+            NesCore.ShadowMaskStrength = trkMaskStrength.Value / 100f;
+            NesCore.CurvatureStrength = chkCurvature.Checked ? trkCurvature.Value / 100f : 0f;
+            NesCore.PhosphorDecay = chkPhosphor.Checked ? trkPhosphor.Value / 100f : 0f;
+            NesCore.HBeamSpread = chkHBeam.Checked ? trkHBeam.Value / 100f : 0f;
+            NesCore.ConvergenceStrength = chkConvergence.Checked ? trkConvergence.Value / 10f : 0f;
 
             // Connector — RF
-            Ntsc.RF_NoiseIntensity = trkRfNoise.Value / 100f;
-            Ntsc.RF_SlewRate = trkRfSlew.Value / 100f;
-            Ntsc.RF_ChromaBlur = trkRfChroma.Value / 100f;
-            CrtScreen.RF_BeamSigma = trkRfBeam.Value / 100f;
-            CrtScreen.RF_BloomStrength = trkRfBloom.Value / 100f;
-            CrtScreen.RF_BrightnessBoost = trkRfBright.Value / 100f;
+            NesCore.RF_NoiseIntensity = trkRfNoise.Value / 100f;
+            NesCore.RF_SlewRate = trkRfSlew.Value / 100f;
+            NesCore.RF_ChromaBlur = trkRfChroma.Value / 100f;
+            NesCore.RF_BeamSigma = trkRfBeam.Value / 100f;
+            NesCore.RF_BloomStrength = trkRfBloom.Value / 100f;
+            NesCore.RF_BrightnessBoost = trkRfBright.Value / 100f;
 
             // Connector — AV
-            Ntsc.AV_NoiseIntensity = trkAvNoise.Value / 100f;
-            Ntsc.AV_SlewRate = trkAvSlew.Value / 100f;
-            Ntsc.AV_ChromaBlur = trkAvChroma.Value / 100f;
-            CrtScreen.AV_BeamSigma = trkAvBeam.Value / 100f;
-            CrtScreen.AV_BloomStrength = trkAvBloom.Value / 100f;
-            CrtScreen.AV_BrightnessBoost = trkAvBright.Value / 100f;
+            NesCore.AV_NoiseIntensity = trkAvNoise.Value / 100f;
+            NesCore.AV_SlewRate = trkAvSlew.Value / 100f;
+            NesCore.AV_ChromaBlur = trkAvChroma.Value / 100f;
+            NesCore.AV_BeamSigma = trkAvBeam.Value / 100f;
+            NesCore.AV_BloomStrength = trkAvBloom.Value / 100f;
+            NesCore.AV_BrightnessBoost = trkAvBright.Value / 100f;
 
             // Connector — S-Video
-            Ntsc.SV_NoiseIntensity = trkSvNoise.Value / 100f;
-            Ntsc.SV_SlewRate = trkSvSlew.Value / 100f;
-            Ntsc.SV_ChromaBlur = trkSvChroma.Value / 100f;
-            CrtScreen.SV_BeamSigma = trkSvBeam.Value / 100f;
-            CrtScreen.SV_BloomStrength = trkSvBloom.Value / 100f;
-            CrtScreen.SV_BrightnessBoost = trkSvBright.Value / 100f;
+            NesCore.SV_NoiseIntensity = trkSvNoise.Value / 100f;
+            NesCore.SV_SlewRate = trkSvSlew.Value / 100f;
+            NesCore.SV_ChromaBlur = trkSvChroma.Value / 100f;
+            NesCore.SV_BeamSigma = trkSvBeam.Value / 100f;
+            NesCore.SV_BloomStrength = trkSvBloom.Value / 100f;
+            NesCore.SV_BrightnessBoost = trkSvBright.Value / 100f;
 
             // Reinitialize CRT with updated parameters
             NesCore.SyncAnalogConfig();
-            CrtScreen.Init();
+            NesCore.Crt_Init();
         }
 
         void SaveIni()
