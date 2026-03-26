@@ -57,7 +57,7 @@ namespace AprNes
         public static CrtMaskType ShadowMaskMode = CrtMaskType.ApertureGrille;
         public static float ShadowMaskStrength = 0.3f;
         public static float CurvatureStrength = 0.12f;
-        public static float PhosphorDecay = 0.6f;
+        public static float PhosphorDecay = 0.15f;
         public static float HBeamSpread = 0.4f;
         public static float ConvergenceStrength = 2.0f;
 

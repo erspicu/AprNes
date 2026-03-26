@@ -644,7 +644,7 @@ namespace AprNes
                 : NesCore.CrtMaskType.None;
             NesCore.ShadowMaskStrength = Get("ShadowMaskStrength", 0.3f);
             NesCore.CurvatureStrength  = curvatureOn ? Get("CurvatureStrength", 0.12f) : 0f;
-            NesCore.PhosphorDecay      = phosphorOn ? Get("PhosphorDecay", 0.6f) : 0f;
+            NesCore.PhosphorDecay      = phosphorOn ? Get("PhosphorDecay", 0.15f) : 0f;
             NesCore.HBeamSpread        = hbeamOn ? Get("HBeamSpread", 0.4f) : 0f;
             NesCore.ConvergenceStrength = convergenceOn ? Get("ConvergenceStrength", 2.0f) : 0f;
 

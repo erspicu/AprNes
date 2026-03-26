@@ -8,7 +8,7 @@
 > 1. **BrightnessBoost**: Removed incorrect claim that "CRT circuits compensate by increasing drive voltage"; replaced with Gaussian beam overlap naturally filling gaps, boost compensating for discrete simulation brightness loss
 > 2. **I/Q bandwidth asymmetry**: ~~Added note that implementation follows the 1953 NTSC spec~~ (now implemented as switchable mode, defaulting to 1960s symmetric)
 > 3. **Interlace Jitter**: Labeled as aesthetic effect — NES outputs 240p progressive; no physical mechanism for inter-field jitter exists
-> 4. **Phosphor Persistence**: Labeled as artistic enhancement; added real P22 phosphor decay time data (far faster than simulated values)
+> 4. **Phosphor Persistence**: Default reduced from 0.6 to 0.15 to approximate real P22 phosphor characteristics (faint afterglow); added decay time data
 > 5. **Beam Convergence**: Added nuance about variation by TV quality and age; cited SMPTE RP 167 acceptable tolerances
 >
 > The above are documentation corrections. Where the implementation itself is incorrect, code fixes will follow as appropriate.
@@ -338,8 +338,8 @@ The principles of scanlines and bloom were explained in the "Core Analog Engine"
 #### Horizontal Beam Spread
 The electron beam has width not only vertically but horizontally as well. This causes light from adjacent pixels to bleed into each other, producing a subtle horizontal softening effect. At higher brightness, the beam spot is larger and blur more pronounced.
 
-#### Phosphor Persistence [Artistic Enhancement]
-P22 phosphor (standard for color CRT TVs) has approximate persistence times to 10% brightness: Red (Y₂O₂S:Eu) ~1–3 ms, Green (ZnS:Cu,Al) ~1 ms, Blue (ZnS:Ag) ~20–60 μs. At 60 Hz NTSC, the frame period is 16.7 ms — after one full frame, even the slowest P22 component has decayed to well below 1%, essentially invisible. The emulator's PhosphorDecay = 0.6 (60% carryover per frame) is vastly exaggerated compared to real P22 physics. This feature is an artistic enhancement, similar to the "ghosting" option in many CRT shaders, providing a visual style some users enjoy, but it is not a faithful reproduction of real P22 phosphor behavior.
+#### Phosphor Persistence
+P22 phosphor (standard for color CRT TVs) has approximate persistence times to 10% brightness: Red (Y₂O₂S:Eu) ~1–3 ms, Green (ZnS:Cu,Al) ~1 ms, Blue (ZnS:Ag) ~20–60 μs. At 60 Hz NTSC, the frame period is 16.7 ms — after one full frame, even the slowest P22 component has decayed to well below 1%, essentially invisible. The emulator defaults to PhosphorDecay = 0.15 (15% carryover per frame), producing only a very faint afterglow on fast-moving objects — close to the real phosphor characteristic of "barely perceptible to the eye but physically present." Users can increase this value for more pronounced trailing (e.g., 0.4–0.6), but should note that high values are artistic exaggeration rather than physical fidelity.
 
 #### Interlace Field Jitter [Aesthetic Effect]
 The NES outputs 240p progressive video (262 lines/frame, non-interlaced). Every frame starts at the same vertical position — there are no alternating fields with half-scanline offsets. The CRT vertical deflection circuit simply follows the sync pulses, which are identical every frame for 240p. There is no physical mechanism for "inter-field jitter" on a progressive signal. This feature is a purely aesthetic/artistic effect, not a faithful simulation of hardware behavior. For authentic slow visual oscillation, one should simulate the beat frequency between mains power (60 Hz) and NES vsync (60.0988 Hz), which produces a ~17-second beat pattern known as the "hum bar" effect.
