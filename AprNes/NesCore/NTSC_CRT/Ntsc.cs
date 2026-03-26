@@ -618,9 +618,11 @@ namespace AprNes
                 int tModQ = ((phase0 - kWinQ_half + 2) % 6 + 6) % 6;
                 for (int d = 0; d < 256; d++)
                 {
-                    float* cwQ = combinedQ + tModQ * kWinQ; int n = 0; var acc = new Vector<float>(0f);
-                    for (; n <= kWinQ - VS; n += VS) acc += *(Vector<float>*)(cwQ + n) * *(Vector<float>*)(wvQ + n);
-                    float sumQ = Vector.Dot(acc, new Vector<float>(1f)); for (; n < kWinQ; n++) sumQ += cwQ[n] * wvQ[n];
+                    float* cwQ = combinedQ + tModQ * kWinQ; int n = 0;
+                    var accQ0 = new Vector<float>(0f); var accQ1 = new Vector<float>(0f); int stride2Q = VS * 2;
+                    for (; n <= kWinQ - stride2Q; n += stride2Q) { accQ0 += *(Vector<float>*)(cwQ + n) * *(Vector<float>*)(wvQ + n); accQ1 += *(Vector<float>*)(cwQ + n + VS) * *(Vector<float>*)(wvQ + n + VS); }
+                    for (; n <= kWinQ - VS; n += VS) accQ0 += *(Vector<float>*)(cwQ + n) * *(Vector<float>*)(wvQ + n);
+                    float sumQ = Vector.Dot(accQ0 + accQ1, new Vector<float>(1f)); for (; n < kWinQ; n++) sumQ += cwQ[n] * wvQ[n];
                     qDotBuf[d] = -2f * sumQ; wvQ += kSampDot;
 
                     // ★ 符號位元擴展黑魔法
@@ -708,9 +710,11 @@ namespace AprNes
                 int tModQ = ((phase0 - kWinQ_half + 2) % 6 + 6) % 6;
                 for (int d = 0; d < 256; d++)
                 {
-                    float* cwQ = combinedQ + tModQ * kWinQ; int n = 0; var acc = new Vector<float>(0f);
-                    for (; n <= kWinQ - VS; n += VS) acc += *(Vector<float>*)(cwQ + n) * *(Vector<float>*)(wvQ + n);
-                    float sumQ = Vector.Dot(acc, new Vector<float>(1f)); for (; n < kWinQ; n++) sumQ += cwQ[n] * wvQ[n];
+                    float* cwQ = combinedQ + tModQ * kWinQ; int n = 0;
+                    var accQ0 = new Vector<float>(0f); var accQ1 = new Vector<float>(0f); int stride2Q = VS * 2;
+                    for (; n <= kWinQ - stride2Q; n += stride2Q) { accQ0 += *(Vector<float>*)(cwQ + n) * *(Vector<float>*)(wvQ + n); accQ1 += *(Vector<float>*)(cwQ + n + VS) * *(Vector<float>*)(wvQ + n + VS); }
+                    for (; n <= kWinQ - VS; n += VS) accQ0 += *(Vector<float>*)(cwQ + n) * *(Vector<float>*)(wvQ + n);
+                    float sumQ = Vector.Dot(accQ0 + accQ1, new Vector<float>(1f)); for (; n < kWinQ; n++) sumQ += cwQ[n] * wvQ[n];
                     qDotBuf[d] = -2f * sumQ; wvQ += kSampDot;
 
                     // ★ 符號位元擴展黑魔法

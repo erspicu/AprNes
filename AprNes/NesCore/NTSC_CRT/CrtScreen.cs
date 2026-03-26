@@ -84,6 +84,7 @@ namespace AprNes
         static float* _boostRow;
         static uint* _curvTemp;
         static int* _curvMap;
+        static int* _curvMapCol;
         static int _cachedCurvW, _cachedCurvH;
         static float _cachedCurvK = -1f;
         static uint* _prevFrame;
@@ -100,8 +101,10 @@ namespace AprNes
 
             if (_curvTemp != null) Marshal.FreeHGlobal((IntPtr)_curvTemp);
             if (_curvMap != null) Marshal.FreeHGlobal((IntPtr)_curvMap);
+            if (_curvMapCol != null) Marshal.FreeHGlobal((IntPtr)_curvMapCol);
             _curvTemp = (uint*)Marshal.AllocHGlobal(Crt_DstW * Crt_DstH * sizeof(uint));
             _curvMap = (int*)Marshal.AllocHGlobal(Crt_DstW * Crt_DstH * sizeof(int));
+            _curvMapCol = (int*)Marshal.AllocHGlobal(Crt_DstW * Crt_DstH * sizeof(int));
 
             if (_prevFrame != null) Marshal.FreeHGlobal((IntPtr)_prevFrame);
             _prevFrame = (uint*)Marshal.AllocHGlobal(Crt_DstW * Crt_DstH * sizeof(uint));
@@ -179,6 +182,7 @@ namespace AprNes
             _cachedCurvK = k; _cachedCurvW = dstW; _cachedCurvH = dstH;
 
             int* cm = _curvMap;
+            int* cmCol = _curvMapCol;
 
             // ★ 技巧 1：代數展開與常數外提
             float maxW = dstW - 1;
@@ -219,6 +223,7 @@ namespace AprNes
                     // 如果安全：(validVal & ~0) | 0   => validVal
                     // 如果越界：(validVal &  0) | -1  => -1
                     cm[rowOff + tx] = (validVal & ~outMask) | outMask;
+                    cmCol[rowOff + tx] = (sx & ~outMask) | outMask;
                 }
             });
         }
@@ -360,18 +365,36 @@ namespace AprNes
                 }
                 else
                 {
-                    // 任意比例縮放 (Bilinear)
+                    // 任意比例縮放 (Bilinear) + batch SIMD
                     int fpScale = (Crt_SrcW << 16) / dstW;
                     int maxSrcX = Crt_SrcW - 1;
+#pragma warning disable CS8500
+                    float* rBatch = stackalloc float[VS];
+                    float* gBatch = stackalloc float[VS];
+                    float* bBatch = stackalloc float[VS];
+                    for (; x <= dstW - VS; x += VS)
+                    {
+                        for (int k = 0; k < VS; k++)
+                        {
+                            int fp = (x + k) * fpScale; int srcX = fp >> 16;
+                            float t = (fp & 0xFFFF) * (1f / 65536f);
+                            int srcX1 = Math.Min(srcX + 1, maxSrcX);
+                            rBatch[k] = lb_r[srcX] + t * (lb_r[srcX1] - lb_r[srcX]);
+                            gBatch[k] = lb_g[srcX] + t * (lb_g[srcX1] - lb_g[srcX]);
+                            bBatch[k] = lb_b[srcX] + t * (lb_b[srcX1] - lb_b[srcX]);
+                        }
+                        *(Vector<int>*)(rowPtr + x) = ProcessPixelVector(
+                            *(Vector<float>*)rBatch, *(Vector<float>*)gBatch, *(Vector<float>*)bBatch,
+                            vConstA, vConstB);
+                    }
+#pragma warning restore CS8500
                     for (; x < dstW; x++)
                     {
                         int fp = x * fpScale; int srcX = fp >> 16; float t = (fp & 0xFFFF) * (1f / 65536f);
                         int srcX1 = Math.Min(srcX + 1, maxSrcX);
-
                         float r = lb_r[srcX] + t * (lb_r[srcX1] - lb_r[srcX]);
                         float g = lb_g[srcX] + t * (lb_g[srcX1] - lb_g[srcX]);
                         float b = lb_b[srcX] + t * (lb_b[srcX1] - lb_b[srcX]);
-
                         rowPtr[x] = ProcessPixelScalar(r, g, b, constA, constB);
                     }
                 }
@@ -548,6 +571,7 @@ namespace AprNes
             uint* dst = crt_analogScreenBuf;
             uint* tmp = _curvTemp;
             int* map = _curvMap;
+            int* col = _curvMapCol;
 
             bool doConv = ConvergenceStrength > 0f;
 
@@ -574,8 +598,8 @@ namespace AprNes
                         // 這個分支必須留著，用來保護記憶體越界 (Out-of-bounds Guard)
                         if (srcIdx < 0) { dst[dstIdx] = 0xFF000000u; continue; }
 
-                        // 利用整數除法的特性，快速算出列首位址與行座標
-                        int srcTx = srcIdx % dstW;
+                        // 預計算 column index 消除整數除法
+                        int srcTx = col[dstIdx];
                         int srcRowOff = srcIdx - srcTx;
 
                         // ★ 技巧 3：融合乘加 (FMA) 與無分支四捨五入 (錯誤)
