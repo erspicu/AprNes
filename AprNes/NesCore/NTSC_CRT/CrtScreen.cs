@@ -153,18 +153,13 @@ namespace AprNes
 
             Parallel.For(0, dstH, ty =>
             {
-                // ★ 技巧 2：完美契合 FMA (融合乘加) 
-                // 原始寫法：((float)ty + jitter) / dstH * Crt_SrcH
-                // 優化寫法：純粹的 A * B + C，只需 1 個 CPU 指令週期
-                float sy = ty * scaleY + jitterOffset;
-
-                // ★ 技巧 3：RyuJIT CMOV 無分支邊界限制
-                // 絕對安全的 Clamping，消滅 if 判斷
+                // 源行映射（不含 jitter，確保 _nearestY 幀間穩定，不會整行跳動）
+                float sy = ty * scaleY;
                 int ny = Math.Max(0, Math.Min((int)(sy + 0.5f), maxNy));
                 _nearestY[ty] = ny;
 
-                // 高斯分佈權重 (這行的 Math.Exp 是最重的運算，但在平行化下效能尚可)
-                float dy = sy - ny;
+                // Jitter 僅影響光束權重（sub-pixel 亮度偏移，模擬隔行掃描）
+                float dy = sy + jitterOffset - ny;
                 _weights[ty] = (float)Math.Exp(-(dy * dy) * inv);
 
                 // ★ 技巧 4：代數簡化暗角計算

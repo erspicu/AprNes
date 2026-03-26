@@ -406,7 +406,7 @@ namespace AprNes
             // 1. 在 44.1kHz 進行完美無損的 DC Offset 消除 (90Hz HPF)
             float diff = input - cmf_hpfPrev;
             cmf_hpfPrev = input;
-            cmf_hpfState = CMF_HPF_ALPHA_44K * (cmf_hpfState + diff);
+            cmf_hpfState = diff + CMF_HPF_ALPHA_44K * cmf_hpfState;
             float cleanInput = cmf_hpfState;
 
             // 2. 進行主機型號 LPF 濾波
