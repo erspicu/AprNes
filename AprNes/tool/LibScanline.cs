@@ -138,9 +138,72 @@ namespace ScanLineBuilder
             });
         }
 
-        // ── Public API (unchanged signatures) ────────────────────────────
+        // ── Public API (unchanged signatures for backward compat) ────────
         public static void ScanlineFor1x() => ScanlineCore(indexTable1x, 600, 480, 1);
         public static void ScanlineFor2x() => ScanlineCore(indexTable2x, 1196, 960, 2);
         public static void ScanlineFor3x() => ScanlineCore(indexTable3x, 1792, 1440, 2);
+
+        // ── New: initialize rates table only (for Render_resize) ────────
+        static bool ratesInited = false;
+        public static void InitRates()
+        {
+            if (ratesInited) return;
+            rates = (byte*)Marshal.AllocHGlobal(256);
+            const float scanStr = 0.35f;
+            const float bloom   = 0.70f;
+            for (int i = 0; i < 256; i++)
+            {
+                float luma = i / 255f;
+                float darken = scanStr * (1f - luma * bloom);
+                rates[i] = (byte)(i * (1f - darken));
+            }
+            ratesInited = true;
+        }
+
+        // ── New: in-place scanline post-process for any resolution ──────
+        // Brightness-dependent darkening on odd lines + 3-tap horizontal blur
+        public static void ApplyInPlace(uint* buffer, int width, int height)
+        {
+            byte* rt = rates;
+
+            Parallel.For(0, height, y =>
+            {
+                uint* row = buffer + y * width;
+                bool isDark = (y & 1) == 1;
+
+                int* line = EnsureLineBuffer(width);
+
+                for (int x = 0; x < width; x++)
+                {
+                    uint px = row[x] & 0xFFFFFFu;
+
+                    if (isDark)
+                    {
+                        int R = (int)((px >> 16) & 0xFF);
+                        int G = (int)((px >> 8) & 0xFF);
+                        int B = (int)(px & 0xFF);
+                        R = rt[R]; G = rt[G]; B = rt[B];
+                        line[x] = (R << 16) | (G << 8) | B;
+                    }
+                    else
+                    {
+                        line[x] = (int)px;
+                    }
+                }
+
+                // 3-tap horizontal blur → write back
+                row[0] = (uint)line[0];
+                int last = width - 1;
+                for (int x = 1; x < last; x++)
+                {
+                    int L = line[x - 1], C = line[x], Ri = line[x + 1];
+                    row[x] = (uint)(
+                        (((((L & 0xFF0000) + (Ri & 0xFF0000)) << 1) + ((C & 0xFF0000) << 2)) >> 3 & 0xFF0000) |
+                        (((((L & 0x00FF00) + (Ri & 0x00FF00)) << 1) + ((C & 0x00FF00) << 2)) >> 3 & 0x00FF00) |
+                        (((((L & 0x0000FF) + (Ri & 0x0000FF)) << 1) + ((C & 0x0000FF) << 2)) >> 3 & 0x0000FF));
+                }
+                row[last] = (uint)line[last];
+            });
+        }
     }
 }

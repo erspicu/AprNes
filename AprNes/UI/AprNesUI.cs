@@ -127,6 +127,44 @@ namespace AprNes
         }
 
         int ScreenSize = 1;
+
+        // Parse scale multiplier from INI value like "xbrz_4" → 4, "none" → 1
+        static int GetResizeScale(string iniVal)
+        {
+            if (string.IsNullOrEmpty(iniVal) || iniVal == "none") return 1;
+            string[] parts = iniVal.Split('_');
+            int s;
+            return (parts.Length == 2 && int.TryParse(parts[1], out s)) ? s : 1;
+        }
+
+        // Parse filter type from INI value like "xbrz_4" → XBRz, "nn_3" → NN
+        static ResizeFilter GetResizeFilter(string iniVal)
+        {
+            if (string.IsNullOrEmpty(iniVal) || iniVal == "none") return ResizeFilter.None;
+            string prefix = iniVal.Split('_')[0];
+            switch (prefix)
+            {
+                case "xbrz":   return ResizeFilter.XBRz;
+                case "scalex": return ResizeFilter.ScaleX;
+                case "nn":     return ResizeFilter.NN;
+                default:       return ResizeFilter.None;
+            }
+        }
+
+        // Create and configure a Render_resize from current AppConfigure
+        unsafe Render_resize CreateRenderResize()
+        {
+            string s1Val = AppConfigure.ContainsKey("ResizeStage1") ? AppConfigure["ResizeStage1"] : "none";
+            string s2Val = AppConfigure.ContainsKey("ResizeStage2") ? AppConfigure["ResizeStage2"] : "none";
+            bool scanline = AppConfigure.ContainsKey("Scanline") && AppConfigure["Scanline"] == "1";
+
+            var r = new Render_resize();
+            r.Configure(GetResizeFilter(s1Val), GetResizeScale(s1Val),
+                         GetResizeFilter(s2Val), GetResizeScale(s2Val),
+                         scanline);
+            return r;
+        }
+
         public void initUIsize()
         {
             // AnalogEnabled 時依 AnalogSize 決定（256×N × 210×N，8:7 AR）
@@ -138,25 +176,18 @@ namespace AprNes
             panel1.Width  = renderWidth;
             panel1.Height = renderHeight;
 
-            if (!NesCore.AnalogEnabled && AppConfigure["filter"] == "scanline")
-            {
-                switch (ScreenSize)
-                {
-                    case 2: panel1.Width = 600; break;
-                    case 4: panel1.Width = 1196; break;
-                    case 6: panel1.Width = 1792; break;
-                }
-            }
-
             // panel 改變大小後重建 Graphics context
             grfx?.Dispose();
             grfx = panel1.CreateGraphics();
 
-            // grfx 重建後，RenderObj 持有的舊 Graphics 已失效，需重新 init
+            // grfx 重建後，RenderObj 持有的舊 Graphics 已失效，需釋放舊 buffer 再重新 init
             unsafe
             {
                 if (RenderObj != null)
+                {
+                    RenderObj.freeMem();
                     RenderObj.init(NesCore.ScreenBuf1x, grfx);
+                }
             }
 
             if (ScreenCenterFull)
@@ -173,16 +204,6 @@ namespace AprNes
             this.Width  = renderWidth  + 26;   // panel + 左右邊框
             this.Height = renderHeight + 92;   // panel + 上工具列(35) + 下按鈕列(57)
 
-            if (!NesCore.AnalogEnabled && AppConfigure["filter"] == "scanline")
-            {
-                switch (ScreenSize)
-                {
-                    case 2: Width = 600; break;
-                    case 4: Width = 1196; break;
-                    case 6: Width = 1792; break;
-                }
-                Width += 26;
-            }
             UIAbout.Location = new Point(Width - 82, renderHeight + 37);
             RomInf.Location  = new Point(5,          renderHeight + 37);
             panel1.Visible = true;
@@ -247,6 +268,9 @@ namespace AprNes
                 AppConfigure["key_RIGHT"] = key_RIGHT.ToString();
                 AppConfigure["LimitFPS"] = "1";
                 AppConfigure["ScreenSize"] = "1";
+                AppConfigure["ResizeStage1"] = "none";
+                AppConfigure["ResizeStage2"] = "none";
+                AppConfigure["Scanline"] = "0";
                 AppConfigure["CaptureScreenPath"] = Application.StartupPath+ @"\Captures\Screenshots";
                 AppConfigure["joypad_A"] = "";
                 AppConfigure["joypad_B"] = "";
@@ -257,7 +281,7 @@ namespace AprNes
                 AppConfigure["joypad_LEFT"] = "";
                 AppConfigure["joypad_RIGHT"] = "";
                 AppConfigure["Lang"] = GetDefaultLang();
-                AppConfigure["filter"] = "xbrz";
+                AppConfigure["filter"] = "resize";
                 AppConfigure["Sound"] = "1";
                 AppConfigure["Volume"] = "70";
                 AppConfigure["AnalogMode"] = "0";
@@ -301,7 +325,47 @@ namespace AprNes
             joypad_LEFT = AppConfigure["joypad_LEFT"];
             joypad_RIGHT = AppConfigure["joypad_RIGHT"];
 
-            ScreenSize = int.Parse(AppConfigure["ScreenSize"]);
+            // ── Resize pipeline: compute ScreenSize from stage multipliers ──
+            if (!AppConfigure.ContainsKey("ResizeStage1")) AppConfigure["ResizeStage1"] = "none";
+            if (!AppConfigure.ContainsKey("ResizeStage2")) AppConfigure["ResizeStage2"] = "none";
+            if (!AppConfigure.ContainsKey("Scanline"))     AppConfigure["Scanline"]     = "0";
+            if (!AppConfigure.ContainsKey("filter"))       AppConfigure["filter"]       = "resize";
+
+            // Migrate old INI: convert old filter+ScreenSize to new ResizeStage system
+            if (AppConfigure["filter"] == "xbrz" || AppConfigure["filter"] == "scanline")
+            {
+                int oldSize = 1;
+                int.TryParse(AppConfigure["ScreenSize"], out oldSize);
+                if (oldSize <= 1)
+                {
+                    AppConfigure["ResizeStage1"] = "none";
+                    AppConfigure["ResizeStage2"] = "none";
+                }
+                else if (oldSize <= 6)
+                {
+                    AppConfigure["ResizeStage1"] = "xbrz_" + oldSize;
+                    AppConfigure["ResizeStage2"] = "none";
+                }
+                else if (oldSize == 8)
+                {
+                    AppConfigure["ResizeStage1"] = "xbrz_4";
+                    AppConfigure["ResizeStage2"] = "nn_2";
+                }
+                else if (oldSize == 9)
+                {
+                    AppConfigure["ResizeStage1"] = "xbrz_3";
+                    AppConfigure["ResizeStage2"] = "nn_3";
+                }
+                if (AppConfigure["filter"] == "scanline")
+                    AppConfigure["Scanline"] = "1";
+                AppConfigure["filter"] = "resize";
+            }
+
+            int s1 = GetResizeScale(AppConfigure["ResizeStage1"]);
+            int s2 = GetResizeScale(AppConfigure["ResizeStage2"]);
+            ScreenSize = s1 * s2;
+            if (ScreenSize < 1) ScreenSize = 1;
+            AppConfigure["ScreenSize"] = ScreenSize.ToString();
             Console.WriteLine("UI size : " + ScreenSize);
             ScreenCenterFull = bool.Parse(AppConfigure["ScreenFull"]);
 
@@ -1147,7 +1211,7 @@ public string GetRomInfo()
             bool init_result = NesCore.init(rom_bytes);
 
             if (RenderObj != null) RenderObj.freeMem();
-            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType(NesCore.AnalogEnabled ? "AprNes.Render_Analog" : "AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
+            RenderObj = NesCore.AnalogEnabled ? (InterfaceGraphic)new Render_Analog() : CreateRenderResize();
             RenderObj.init(NesCore.ScreenBuf1x, grfx);
 
             NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
@@ -1258,7 +1322,8 @@ public string GetRomInfo()
             {
                 if (!System.IO.Directory.Exists(AppConfigure["CaptureScreenPath"]))
                     System.IO.Directory.CreateDirectory(AppConfigure["CaptureScreenPath"]);
-                RenderObj.GetOutput().Save(AppConfigure["CaptureScreenPath"] + @"\Screen-" + stamp + ".png", System.Drawing.Imaging.ImageFormat.Png);
+                using (var bmp = RenderObj.GetOutput())
+                    bmp.Save(AppConfigure["CaptureScreenPath"] + @"\Screen-" + stamp + ".png", System.Drawing.Imaging.ImageFormat.Png);
             }
             catch (Exception e) { Console.WriteLine("i:" + e.Message); }
 
@@ -1351,7 +1416,7 @@ public string GetRomInfo()
             NesCore._event.Reset();
             while (!NesCore.emuWaiting) Thread.Sleep(1);
             if (RenderObj != null) RenderObj.freeMem();
-            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType(NesCore.AnalogEnabled ? "AprNes.Render_Analog" : "AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
+            RenderObj = NesCore.AnalogEnabled ? (InterfaceGraphic)new Render_Analog() : CreateRenderResize();
             RenderObj.init(NesCore.ScreenBuf1x, grfx);
             NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
 
@@ -1425,7 +1490,7 @@ public string GetRomInfo()
             }
 
             if (RenderObj != null) RenderObj.freeMem();
-            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType(NesCore.AnalogEnabled ? "AprNes.Render_Analog" : "AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
+            RenderObj = NesCore.AnalogEnabled ? (InterfaceGraphic)new Render_Analog() : CreateRenderResize();
             RenderObj.init(NesCore.ScreenBuf1x, grfx);
             NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
             NesCore._event.Set();
@@ -1455,7 +1520,7 @@ public string GetRomInfo()
             bool init_result = NesCore.init(current_rom_bytes);
 
             if (RenderObj != null) RenderObj.freeMem();
-            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType(NesCore.AnalogEnabled ? "AprNes.Render_Analog" : "AprNes.Render_" + AppConfigure["filter"] + "_" + ScreenSize + "x"));
+            RenderObj = NesCore.AnalogEnabled ? (InterfaceGraphic)new Render_Analog() : CreateRenderResize();
             RenderObj.init(NesCore.ScreenBuf1x, grfx);
 
             NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
@@ -1737,7 +1802,7 @@ public string GetRomInfo()
             grfx?.Dispose();
             grfx = panel1.CreateGraphics();
             if (RenderObj != null) RenderObj.freeMem();
-            RenderObj = (InterfaceGraphic)Activator.CreateInstance(Type.GetType("AprNes.Render_Analog"));
+            RenderObj = new Render_Analog();
             RenderObj.init(NesCore.ScreenBuf1x, grfx);
 
             label3.Location = new Point(0, 0);

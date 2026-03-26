@@ -23,6 +23,97 @@ namespace AprNes
             return tbl.ContainsKey(key) ? tbl[key] : key;
         }
 
+        // ── Resize filter combobox items ──────────────────────────────────
+        // Display text → INI value mapping
+        // Stage 1: all filters (xBRZ works on fixed 256×240 NES input)
+        static readonly string[][] filterItemsS1 = {
+            new[] { "無",          "none" },
+            new[] { "xBRZ 2x",    "xbrz_2" },
+            new[] { "xBRZ 3x",    "xbrz_3" },
+            new[] { "xBRZ 4x",    "xbrz_4" },
+            new[] { "xBRZ 5x",    "xbrz_5" },
+            new[] { "xBRZ 6x",    "xbrz_6" },
+            new[] { "ScaleX 2x",  "scalex_2" },
+            new[] { "ScaleX 3x",  "scalex_3" },
+            new[] { "NN 2x",      "nn_2" },
+            new[] { "NN 3x",      "nn_3" },
+            new[] { "NN 4x",      "nn_4" },
+        };
+        // Stage 2: no xBRZ (internal buffers hardcoded to 256×240)
+        static readonly string[][] filterItemsS2 = {
+            new[] { "無",          "none" },
+            new[] { "ScaleX 2x",  "scalex_2" },
+            new[] { "ScaleX 3x",  "scalex_3" },
+            new[] { "NN 2x",      "nn_2" },
+            new[] { "NN 3x",      "nn_3" },
+            new[] { "NN 4x",      "nn_4" },
+        };
+
+        static int GetFilterScale(string iniVal)
+        {
+            if (iniVal == "none") return 1;
+            string[] parts = iniVal.Split('_');
+            return parts.Length == 2 ? int.Parse(parts[1]) : 1;
+        }
+
+        void InitResizeComboBoxes()
+        {
+            sizelevel1.SelectedIndexChanged -= sizelevel_Changed;
+            sizelevel2.SelectedIndexChanged -= sizelevel_Changed;
+
+            sizelevel1.Items.Clear();
+            sizelevel2.Items.Clear();
+            foreach (var item in filterItemsS1)
+                sizelevel1.Items.Add(item[0]);
+            foreach (var item in filterItemsS2)
+                sizelevel2.Items.Add(item[0]);
+
+            // Restore from INI
+            string s1 = AprNesUI.GetInstance().AppConfigure.ContainsKey("ResizeStage1")
+                       ? AprNesUI.GetInstance().AppConfigure["ResizeStage1"] : "none";
+            string s2 = AprNesUI.GetInstance().AppConfigure.ContainsKey("ResizeStage2")
+                       ? AprNesUI.GetInstance().AppConfigure["ResizeStage2"] : "none";
+
+            sizelevel1.SelectedIndex = FindFilterIndex(filterItemsS1, s1);
+            sizelevel2.SelectedIndex = FindFilterIndex(filterItemsS2, s2);
+
+            bool s1None = (sizelevel1.SelectedIndex == 0);
+            sizelevel2.Enabled = !s1None;
+            if (s1None) sizelevel2.SelectedIndex = 0;
+
+            UpdateResolutionLabel();
+
+            sizelevel1.SelectedIndexChanged += sizelevel_Changed;
+            sizelevel2.SelectedIndexChanged += sizelevel_Changed;
+        }
+
+        int FindFilterIndex(string[][] items, string iniVal)
+        {
+            for (int i = 0; i < items.Length; i++)
+                if (items[i][1] == iniVal) return i;
+            return 0; // default to "無"
+        }
+
+        void sizelevel_Changed(object sender, EventArgs e)
+        {
+            if (sender == sizelevel1)
+            {
+                bool s1None = (sizelevel1.SelectedIndex == 0);
+                sizelevel2.Enabled = !s1None;
+                if (s1None) sizelevel2.SelectedIndex = 0;
+            }
+            UpdateResolutionLabel();
+        }
+
+        void UpdateResolutionLabel()
+        {
+            int s1 = GetFilterScale(filterItemsS1[sizelevel1.SelectedIndex][1]);
+            int s2 = GetFilterScale(filterItemsS2[Math.Max(0, sizelevel2.SelectedIndex)][1]);
+            int w = 256 * s1 * s2;
+            int h = 240 * s1 * s2;
+            label19.Text = w + " × " + h;
+        }
+
         public void init()
         {
 
@@ -33,12 +124,16 @@ namespace AprNes
             choose_dir.Text  = LangStr("selectfolder");
             groupBox1.Text   = LangStr("keypad");
             groupBox2.Text   = LangStr("joypad");
-            groupBox4.Text   = LangStr("screen");
             LimitFPS_checkBox.Text = LangStr("limitfps");
             perdotFSM.Text   = LangStr("perdotFSM");
             label18.Text     = LangStr("langchoose");
             label9.Text      = "Shift + p " + LangStr("capture_path");
-            groupBox3.Text   = LangStr("scanline");
+
+            // 畫面輸出
+            resize.Text      = LangStr("resize_group");
+            sizel1lab.Text   = LangStr("resize_stage1");
+            sizel2lab.Text   = LangStr("resize_stage2");
+            saneline.Text    = LangStr("resize_scanline");
 
             // 音效
             groupBox5.Text      = LangStr("sound_group");
@@ -130,9 +225,9 @@ namespace AprNes
             bool analogOn = useAnalog.Checked;
             bool ultraOn  = analogOn && ultraAnalog.Checked;
 
-            // Analog 開啟時，停用原有 Screen / Scanline 設定
-            groupBox3.Enabled = !analogOn;
-            groupBox4.Enabled = !analogOn;
+            // Analog 開啟時，停用畫面輸出設定
+            resize.Enabled  = !analogOn;
+            saneline.Enabled = !analogOn;
 
             // Analog 子選項只在 AnalogMode 啟用時才可操作
             ultraAnalog.Enabled         = analogOn;
@@ -201,62 +296,16 @@ namespace AprNes
                 while (!NesCore.emuWaiting) System.Threading.Thread.Sleep(1);
             }
 
-            if (radioButtonX2s.Checked)
-            {
-                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "2";
-                AprNesUI.GetInstance().AppConfigure["filter"] = "scanline";
-            }
-            else if (radioButtonX4s.Checked)
-            {
-                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "4";
-                AprNesUI.GetInstance().AppConfigure["filter"] = "scanline";
-            }
-            else if (radioButtonX6s.Checked)
-            {
-                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "6";
-                AprNesUI.GetInstance().AppConfigure["filter"] = "scanline";
-            }
+            // ── Resize stage settings ──────────────────────────────────────
+            AprNesUI.GetInstance().AppConfigure["ResizeStage1"] = filterItemsS1[sizelevel1.SelectedIndex][1];
+            AprNesUI.GetInstance().AppConfigure["ResizeStage2"] = filterItemsS2[Math.Max(0, sizelevel2.SelectedIndex)][1];
+            AprNesUI.GetInstance().AppConfigure["Scanline"] = saneline.Checked ? "1" : "0";
 
-            if (radioButtonX1.Checked)
-            {
-                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "1";
-                AprNesUI.GetInstance().AppConfigure["filter"] = "xbrz";
-            }
-            else if (radioButtonX2.Checked)
-            {
-                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "2";
-                AprNesUI.GetInstance().AppConfigure["filter"] = "xbrz";
-            }
-            else if (radioButtonX3.Checked)
-            {
-                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "3";
-                AprNesUI.GetInstance().AppConfigure["filter"] = "xbrz";
-            }
-            else if (radioButtonX4.Checked)
-            {
-                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "4";
-                AprNesUI.GetInstance().AppConfigure["filter"] = "xbrz";
-            }
-            else if (radioButtonX5.Checked)
-            {
-                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "5";
-                AprNesUI.GetInstance().AppConfigure["filter"] = "xbrz";
-            }
-            else if (radioButtonX6.Checked)
-            {
-                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "6";
-                AprNesUI.GetInstance().AppConfigure["filter"] = "xbrz";
-            }
-            else if (radioButtonX8.Checked)
-            {
-                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "8";
-                AprNesUI.GetInstance().AppConfigure["filter"] = "xbrz";
-            }
-            else if (radioButtonX9.Checked)
-            {
-                AprNesUI.GetInstance().AppConfigure["ScreenSize"] = "9";
-                AprNesUI.GetInstance().AppConfigure["filter"] = "xbrz";
-            }
+            // Compute ScreenSize from stage multipliers (for initUIsize)
+            int s1scale = GetFilterScale(filterItemsS1[sizelevel1.SelectedIndex][1]);
+            int s2scale = GetFilterScale(filterItemsS2[Math.Max(0, sizelevel2.SelectedIndex)][1]);
+            AprNesUI.GetInstance().AppConfigure["ScreenSize"] = (s1scale * s2scale).ToString();
+            AprNesUI.GetInstance().AppConfigure["filter"] = "resize";
             // ── Analog 相關設定寫回 AppConfigure ──────────────────────────────
             bool prevAnalogEnabled = NesCore.AnalogEnabled;
 
@@ -605,16 +654,10 @@ namespace AprNes
             }
 
 
-            switch (AprNesUI.GetInstance().AppConfigure["filter"])
-            {
-                case "xbrz":
-                    (groupBox4.Controls.Find("radioButtonX" + AprNesUI.GetInstance().AppConfigure["ScreenSize"] , true)[0] as RadioButton).Checked = true;
-                    break;
-
-                case "scanline":
-                    (groupBox3.Controls.Find("radioButtonX" + AprNesUI.GetInstance().AppConfigure["ScreenSize"] + "s", true)[0] as RadioButton).Checked = true;
-                    break;
-            }
+            // ── Resize combobox + scanline checkbox 載入 ──────────────────
+            InitResizeComboBoxes();
+            saneline.Checked = AprNesUI.GetInstance().AppConfigure.ContainsKey("Scanline")
+                             && AprNesUI.GetInstance().AppConfigure["Scanline"] == "1";
 
 
 
@@ -686,59 +729,7 @@ namespace AprNes
 
         }
 
-        private void radioButtonX_CheckedChanged(object sender, EventArgs e)
-        {
-
-            if ((sender as RadioButton).Checked == false) return;
-
-            radioButtonX2s.CheckedChanged += null;
-            radioButtonX4s.CheckedChanged += null;
-            radioButtonX6s.CheckedChanged += null;
-
-            radioButtonX2s.Checked = false;
-            radioButtonX4s.Checked = false;
-            radioButtonX6s.Checked = false;
-
-            radioButtonX2s.CheckedChanged += new System.EventHandler(this.radioButtonXs_CheckedChanged);
-            radioButtonX4s.CheckedChanged += new System.EventHandler(this.radioButtonXs_CheckedChanged);
-            radioButtonX6s.CheckedChanged += new System.EventHandler(this.radioButtonXs_CheckedChanged);
-        }
-
-        private void radioButtonXs_CheckedChanged(object sender, EventArgs e)
-        {
-
-            if ((sender as RadioButton).Checked == false) return;
-
-            radioButtonX1.CheckedChanged += null;
-            radioButtonX2.CheckedChanged += null;
-            radioButtonX3.CheckedChanged += null;
-            radioButtonX4.CheckedChanged += null;
-            radioButtonX5.CheckedChanged += null;
-            radioButtonX6.CheckedChanged += null;
-            radioButtonX8.CheckedChanged += null;
-            radioButtonX9.CheckedChanged += null;
-
-
-            radioButtonX1.Checked = false;
-            radioButtonX2.Checked = false;
-            radioButtonX3.Checked = false;
-            radioButtonX4.Checked = false;
-            radioButtonX5.Checked = false;
-            radioButtonX6.Checked = false;
-            radioButtonX8.Checked = false;
-            radioButtonX9.Checked = false;
-
-
-            radioButtonX1.CheckedChanged += new System.EventHandler(this.radioButtonX_CheckedChanged);
-            radioButtonX2.CheckedChanged += new System.EventHandler(this.radioButtonX_CheckedChanged);
-            radioButtonX3.CheckedChanged += new System.EventHandler(this.radioButtonX_CheckedChanged);
-            radioButtonX4.CheckedChanged += new System.EventHandler(this.radioButtonX_CheckedChanged);
-            radioButtonX5.CheckedChanged += new System.EventHandler(this.radioButtonX_CheckedChanged);
-            radioButtonX6.CheckedChanged += new System.EventHandler(this.radioButtonX_CheckedChanged);
-            radioButtonX8.CheckedChanged += new System.EventHandler(this.radioButtonX_CheckedChanged);
-            radioButtonX9.CheckedChanged += new System.EventHandler(this.radioButtonX_CheckedChanged);
-
-        }
+        // Old radio button handlers removed — replaced by combobox logic
 
         private void textBox_KeyConfig_KeyUp(object sender, KeyEventArgs e)
         {

@@ -67,23 +67,10 @@
             this.label16 = new System.Windows.Forms.Label();
             this.label17 = new System.Windows.Forms.Label();
             this.joypad_A = new System.Windows.Forms.TextBox();
-            this.groupBox4 = new System.Windows.Forms.GroupBox();
-            this.radioButtonX9 = new System.Windows.Forms.RadioButton();
-            this.radioButtonX8 = new System.Windows.Forms.RadioButton();
-            this.radioButtonX6 = new System.Windows.Forms.RadioButton();
-            this.radioButtonX5 = new System.Windows.Forms.RadioButton();
-            this.radioButtonX4 = new System.Windows.Forms.RadioButton();
-            this.radioButtonX3 = new System.Windows.Forms.RadioButton();
-            this.radioButtonX2 = new System.Windows.Forms.RadioButton();
-            this.radioButtonX1 = new System.Windows.Forms.RadioButton();
             this.comboBox1 = new System.Windows.Forms.ComboBox();
             this.label18 = new System.Windows.Forms.Label();
             this.label_analogSize = new System.Windows.Forms.Label();
             this.comboBox_analogSize = new System.Windows.Forms.ComboBox();
-            this.groupBox3 = new System.Windows.Forms.GroupBox();
-            this.radioButtonX6s = new System.Windows.Forms.RadioButton();
-            this.radioButtonX4s = new System.Windows.Forms.RadioButton();
-            this.radioButtonX2s = new System.Windows.Forms.RadioButton();
             this.SoundtrackBar = new System.Windows.Forms.TrackBar();
             this.groupBox5 = new System.Windows.Forms.GroupBox();
             this.AudioAdvanceSetting = new System.Windows.Forms.Button();
@@ -98,13 +85,19 @@
             this.crtuse = new System.Windows.Forms.CheckBox();
             this.AnalogSetting = new System.Windows.Forms.Button();
             this.groupBoxAnalog = new System.Windows.Forms.GroupBox();
+            this.resize = new System.Windows.Forms.GroupBox();
+            this.label19 = new System.Windows.Forms.Label();
+            this.sizel2lab = new System.Windows.Forms.Label();
+            this.sizel1lab = new System.Windows.Forms.Label();
+            this.sizelevel2 = new System.Windows.Forms.ComboBox();
+            this.sizelevel1 = new System.Windows.Forms.ComboBox();
+            this.saneline = new System.Windows.Forms.CheckBox();
             this.groupBox1.SuspendLayout();
             this.groupBox2.SuspendLayout();
-            this.groupBox4.SuspendLayout();
-            this.groupBox3.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.SoundtrackBar)).BeginInit();
             this.groupBox5.SuspendLayout();
             this.groupBoxAnalog.SuspendLayout();
+            this.resize.SuspendLayout();
             this.SuspendLayout();
             // 
             // groupBox1
@@ -339,7 +332,7 @@
             // 
             this.LimitFPS_checkBox.AutoSize = true;
             this.LimitFPS_checkBox.Font = new System.Drawing.Font("新細明體", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
-            this.LimitFPS_checkBox.Location = new System.Drawing.Point(447, 18);
+            this.LimitFPS_checkBox.Location = new System.Drawing.Point(446, 18);
             this.LimitFPS_checkBox.Margin = new System.Windows.Forms.Padding(4);
             this.LimitFPS_checkBox.Name = "LimitFPS_checkBox";
             this.LimitFPS_checkBox.Size = new System.Drawing.Size(104, 22);
@@ -350,7 +343,7 @@
             // screen_path
             // 
             this.screen_path.BackColor = System.Drawing.SystemColors.ControlLight;
-            this.screen_path.Location = new System.Drawing.Point(447, 84);
+            this.screen_path.Location = new System.Drawing.Point(446, 84);
             this.screen_path.Margin = new System.Windows.Forms.Padding(4);
             this.screen_path.Name = "screen_path";
             this.screen_path.ReadOnly = true;
@@ -361,7 +354,7 @@
             // 
             this.label9.AutoSize = true;
             this.label9.Font = new System.Drawing.Font("新細明體", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
-            this.label9.Location = new System.Drawing.Point(447, 56);
+            this.label9.Location = new System.Drawing.Point(446, 56);
             this.label9.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label9.Name = "label9";
             this.label9.Size = new System.Drawing.Size(300, 18);
@@ -385,7 +378,7 @@
             // 
             this.Ok_btn.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.Ok_btn.Font = new System.Drawing.Font("新細明體", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
-            this.Ok_btn.Location = new System.Drawing.Point(789, 593);
+            this.Ok_btn.Location = new System.Drawing.Point(789, 577);
             this.Ok_btn.Margin = new System.Windows.Forms.Padding(4);
             this.Ok_btn.Name = "Ok_btn";
             this.Ok_btn.Size = new System.Drawing.Size(147, 34);
@@ -598,133 +591,10 @@
             this.joypad_A.TabIndex = 0;
             this.joypad_A.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             // 
-            // groupBox4
-            // 
-            this.groupBox4.Controls.Add(this.radioButtonX9);
-            this.groupBox4.Controls.Add(this.radioButtonX8);
-            this.groupBox4.Controls.Add(this.radioButtonX6);
-            this.groupBox4.Controls.Add(this.radioButtonX5);
-            this.groupBox4.Controls.Add(this.radioButtonX4);
-            this.groupBox4.Controls.Add(this.radioButtonX3);
-            this.groupBox4.Controls.Add(this.radioButtonX2);
-            this.groupBox4.Controls.Add(this.radioButtonX1);
-            this.groupBox4.Location = new System.Drawing.Point(447, 135);
-            this.groupBox4.Margin = new System.Windows.Forms.Padding(4);
-            this.groupBox4.Name = "groupBox4";
-            this.groupBox4.Padding = new System.Windows.Forms.Padding(4);
-            this.groupBox4.Size = new System.Drawing.Size(135, 158);
-            this.groupBox4.TabIndex = 14;
-            this.groupBox4.TabStop = false;
-            this.groupBox4.Text = "Screen";
-            // 
-            // radioButtonX9
-            // 
-            this.radioButtonX9.AutoSize = true;
-            this.radioButtonX9.Location = new System.Drawing.Point(69, 124);
-            this.radioButtonX9.Margin = new System.Windows.Forms.Padding(4);
-            this.radioButtonX9.Name = "radioButtonX9";
-            this.radioButtonX9.Size = new System.Drawing.Size(54, 22);
-            this.radioButtonX9.TabIndex = 19;
-            this.radioButtonX9.TabStop = true;
-            this.radioButtonX9.Text = "x 9";
-            this.radioButtonX9.UseVisualStyleBackColor = true;
-            this.radioButtonX9.CheckedChanged += new System.EventHandler(this.radioButtonX_CheckedChanged);
-            // 
-            // radioButtonX8
-            // 
-            this.radioButtonX8.AutoSize = true;
-            this.radioButtonX8.Location = new System.Drawing.Point(69, 92);
-            this.radioButtonX8.Margin = new System.Windows.Forms.Padding(4);
-            this.radioButtonX8.Name = "radioButtonX8";
-            this.radioButtonX8.Size = new System.Drawing.Size(54, 22);
-            this.radioButtonX8.TabIndex = 18;
-            this.radioButtonX8.TabStop = true;
-            this.radioButtonX8.Text = "x 8";
-            this.radioButtonX8.UseVisualStyleBackColor = true;
-            this.radioButtonX8.CheckedChanged += new System.EventHandler(this.radioButtonX_CheckedChanged);
-            // 
-            // radioButtonX6
-            // 
-            this.radioButtonX6.AutoSize = true;
-            this.radioButtonX6.Location = new System.Drawing.Point(69, 58);
-            this.radioButtonX6.Margin = new System.Windows.Forms.Padding(4);
-            this.radioButtonX6.Name = "radioButtonX6";
-            this.radioButtonX6.Size = new System.Drawing.Size(54, 22);
-            this.radioButtonX6.TabIndex = 17;
-            this.radioButtonX6.TabStop = true;
-            this.radioButtonX6.Text = "x 6";
-            this.radioButtonX6.UseVisualStyleBackColor = true;
-            this.radioButtonX6.CheckedChanged += new System.EventHandler(this.radioButtonX_CheckedChanged);
-            // 
-            // radioButtonX5
-            // 
-            this.radioButtonX5.AutoSize = true;
-            this.radioButtonX5.Location = new System.Drawing.Point(69, 26);
-            this.radioButtonX5.Margin = new System.Windows.Forms.Padding(4);
-            this.radioButtonX5.Name = "radioButtonX5";
-            this.radioButtonX5.Size = new System.Drawing.Size(54, 22);
-            this.radioButtonX5.TabIndex = 16;
-            this.radioButtonX5.TabStop = true;
-            this.radioButtonX5.Text = "x 5";
-            this.radioButtonX5.UseVisualStyleBackColor = true;
-            this.radioButtonX5.CheckedChanged += new System.EventHandler(this.radioButtonX_CheckedChanged);
-            // 
-            // radioButtonX4
-            // 
-            this.radioButtonX4.AutoSize = true;
-            this.radioButtonX4.Location = new System.Drawing.Point(9, 124);
-            this.radioButtonX4.Margin = new System.Windows.Forms.Padding(4);
-            this.radioButtonX4.Name = "radioButtonX4";
-            this.radioButtonX4.Size = new System.Drawing.Size(54, 22);
-            this.radioButtonX4.TabIndex = 3;
-            this.radioButtonX4.TabStop = true;
-            this.radioButtonX4.Text = "x 4";
-            this.radioButtonX4.UseVisualStyleBackColor = true;
-            this.radioButtonX4.CheckedChanged += new System.EventHandler(this.radioButtonX_CheckedChanged);
-            // 
-            // radioButtonX3
-            // 
-            this.radioButtonX3.AutoSize = true;
-            this.radioButtonX3.Location = new System.Drawing.Point(9, 92);
-            this.radioButtonX3.Margin = new System.Windows.Forms.Padding(4);
-            this.radioButtonX3.Name = "radioButtonX3";
-            this.radioButtonX3.Size = new System.Drawing.Size(54, 22);
-            this.radioButtonX3.TabIndex = 2;
-            this.radioButtonX3.TabStop = true;
-            this.radioButtonX3.Text = "x 3";
-            this.radioButtonX3.UseVisualStyleBackColor = true;
-            this.radioButtonX3.CheckedChanged += new System.EventHandler(this.radioButtonX_CheckedChanged);
-            // 
-            // radioButtonX2
-            // 
-            this.radioButtonX2.AutoSize = true;
-            this.radioButtonX2.Location = new System.Drawing.Point(9, 58);
-            this.radioButtonX2.Margin = new System.Windows.Forms.Padding(4);
-            this.radioButtonX2.Name = "radioButtonX2";
-            this.radioButtonX2.Size = new System.Drawing.Size(54, 22);
-            this.radioButtonX2.TabIndex = 1;
-            this.radioButtonX2.TabStop = true;
-            this.radioButtonX2.Text = "x 2";
-            this.radioButtonX2.UseVisualStyleBackColor = true;
-            this.radioButtonX2.CheckedChanged += new System.EventHandler(this.radioButtonX_CheckedChanged);
-            // 
-            // radioButtonX1
-            // 
-            this.radioButtonX1.AutoSize = true;
-            this.radioButtonX1.Location = new System.Drawing.Point(10, 26);
-            this.radioButtonX1.Margin = new System.Windows.Forms.Padding(4);
-            this.radioButtonX1.Name = "radioButtonX1";
-            this.radioButtonX1.Size = new System.Drawing.Size(54, 22);
-            this.radioButtonX1.TabIndex = 0;
-            this.radioButtonX1.TabStop = true;
-            this.radioButtonX1.Text = "x 1";
-            this.radioButtonX1.UseVisualStyleBackColor = true;
-            this.radioButtonX1.CheckedChanged += new System.EventHandler(this.radioButtonX_CheckedChanged);
-            // 
             // comboBox1
             // 
             this.comboBox1.FormattingEnabled = true;
-            this.comboBox1.Location = new System.Drawing.Point(700, 164);
+            this.comboBox1.Location = new System.Drawing.Point(446, 530);
             this.comboBox1.Margin = new System.Windows.Forms.Padding(4);
             this.comboBox1.Name = "comboBox1";
             this.comboBox1.Size = new System.Drawing.Size(180, 26);
@@ -733,7 +603,7 @@
             // label18
             // 
             this.label18.AutoSize = true;
-            this.label18.Location = new System.Drawing.Point(700, 138);
+            this.label18.Location = new System.Drawing.Point(446, 507);
             this.label18.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label18.Name = "label18";
             this.label18.Size = new System.Drawing.Size(74, 18);
@@ -764,59 +634,6 @@
             this.comboBox_analogSize.Name = "comboBox_analogSize";
             this.comboBox_analogSize.Size = new System.Drawing.Size(180, 26);
             this.comboBox_analogSize.TabIndex = 31;
-            // 
-            // groupBox3
-            // 
-            this.groupBox3.Controls.Add(this.radioButtonX6s);
-            this.groupBox3.Controls.Add(this.radioButtonX4s);
-            this.groupBox3.Controls.Add(this.radioButtonX2s);
-            this.groupBox3.Location = new System.Drawing.Point(591, 135);
-            this.groupBox3.Margin = new System.Windows.Forms.Padding(4);
-            this.groupBox3.Name = "groupBox3";
-            this.groupBox3.Padding = new System.Windows.Forms.Padding(4);
-            this.groupBox3.Size = new System.Drawing.Size(90, 128);
-            this.groupBox3.TabIndex = 20;
-            this.groupBox3.TabStop = false;
-            this.groupBox3.Text = "Scanline";
-            // 
-            // radioButtonX6s
-            // 
-            this.radioButtonX6s.AutoSize = true;
-            this.radioButtonX6s.Location = new System.Drawing.Point(9, 92);
-            this.radioButtonX6s.Margin = new System.Windows.Forms.Padding(4);
-            this.radioButtonX6s.Name = "radioButtonX6s";
-            this.radioButtonX6s.Size = new System.Drawing.Size(54, 22);
-            this.radioButtonX6s.TabIndex = 2;
-            this.radioButtonX6s.TabStop = true;
-            this.radioButtonX6s.Text = "x 6";
-            this.radioButtonX6s.UseVisualStyleBackColor = true;
-            this.radioButtonX6s.CheckedChanged += new System.EventHandler(this.radioButtonXs_CheckedChanged);
-            // 
-            // radioButtonX4s
-            // 
-            this.radioButtonX4s.AutoSize = true;
-            this.radioButtonX4s.Location = new System.Drawing.Point(9, 58);
-            this.radioButtonX4s.Margin = new System.Windows.Forms.Padding(4);
-            this.radioButtonX4s.Name = "radioButtonX4s";
-            this.radioButtonX4s.Size = new System.Drawing.Size(54, 22);
-            this.radioButtonX4s.TabIndex = 1;
-            this.radioButtonX4s.TabStop = true;
-            this.radioButtonX4s.Text = "x 4";
-            this.radioButtonX4s.UseVisualStyleBackColor = true;
-            this.radioButtonX4s.CheckedChanged += new System.EventHandler(this.radioButtonXs_CheckedChanged);
-            // 
-            // radioButtonX2s
-            // 
-            this.radioButtonX2s.AutoSize = true;
-            this.radioButtonX2s.Location = new System.Drawing.Point(9, 26);
-            this.radioButtonX2s.Margin = new System.Windows.Forms.Padding(4);
-            this.radioButtonX2s.Name = "radioButtonX2s";
-            this.radioButtonX2s.Size = new System.Drawing.Size(54, 22);
-            this.radioButtonX2s.TabIndex = 0;
-            this.radioButtonX2s.TabStop = true;
-            this.radioButtonX2s.Text = "x 2";
-            this.radioButtonX2s.UseVisualStyleBackColor = true;
-            this.radioButtonX2s.CheckedChanged += new System.EventHandler(this.radioButtonXs_CheckedChanged);
             // 
             // SoundtrackBar
             // 
@@ -885,7 +702,7 @@
             // perdotFSM
             // 
             this.perdotFSM.AutoSize = true;
-            this.perdotFSM.Location = new System.Drawing.Point(591, 271);
+            this.perdotFSM.Location = new System.Drawing.Point(446, 271);
             this.perdotFSM.Name = "perdotFSM";
             this.perdotFSM.Size = new System.Drawing.Size(320, 22);
             this.perdotFSM.TabIndex = 23;
@@ -971,24 +788,91 @@
             this.groupBoxAnalog.Controls.Add(this.VideoInput);
             this.groupBoxAnalog.Controls.Add(this.label_analogSize);
             this.groupBoxAnalog.Controls.Add(this.comboBox_analogSize);
-            this.groupBoxAnalog.Location = new System.Drawing.Point(446, 301);
+            this.groupBoxAnalog.Location = new System.Drawing.Point(446, 308);
             this.groupBoxAnalog.Name = "groupBoxAnalog";
             this.groupBoxAnalog.Size = new System.Drawing.Size(339, 185);
             this.groupBoxAnalog.TabIndex = 38;
             this.groupBoxAnalog.TabStop = false;
             this.groupBoxAnalog.Text = "Analog Setting";
             // 
+            // resize
+            // 
+            this.resize.Controls.Add(this.saneline);
+            this.resize.Controls.Add(this.label19);
+            this.resize.Controls.Add(this.sizel2lab);
+            this.resize.Controls.Add(this.sizel1lab);
+            this.resize.Controls.Add(this.sizelevel2);
+            this.resize.Controls.Add(this.sizelevel1);
+            this.resize.Location = new System.Drawing.Point(446, 125);
+            this.resize.Name = "resize";
+            this.resize.Size = new System.Drawing.Size(397, 133);
+            this.resize.TabIndex = 39;
+            this.resize.TabStop = false;
+            this.resize.Text = "畫面輸出";
+            // 
+            // label19
+            // 
+            this.label19.AutoSize = true;
+            this.label19.Location = new System.Drawing.Point(10, 102);
+            this.label19.Name = "label19";
+            this.label19.Size = new System.Drawing.Size(143, 18);
+            this.label19.TabIndex = 4;
+            this.label19.Text = "解析度 : 256 * 240";
+            // 
+            // sizel2lab
+            // 
+            this.sizel2lab.AutoSize = true;
+            this.sizel2lab.Location = new System.Drawing.Point(202, 41);
+            this.sizel2lab.Name = "sizel2lab";
+            this.sizel2lab.Size = new System.Drawing.Size(134, 18);
+            this.sizel2lab.TabIndex = 3;
+            this.sizel2lab.Text = "第二階放大濾鏡";
+            // 
+            // sizel1lab
+            // 
+            this.sizel1lab.AutoSize = true;
+            this.sizel1lab.Location = new System.Drawing.Point(10, 44);
+            this.sizel1lab.Name = "sizel1lab";
+            this.sizel1lab.Size = new System.Drawing.Size(134, 18);
+            this.sizel1lab.TabIndex = 2;
+            this.sizel1lab.Text = "第一階放大濾鏡";
+            // 
+            // sizelevel2
+            // 
+            this.sizelevel2.FormattingEnabled = true;
+            this.sizelevel2.Location = new System.Drawing.Point(202, 68);
+            this.sizelevel2.Name = "sizelevel2";
+            this.sizelevel2.Size = new System.Drawing.Size(180, 26);
+            this.sizelevel2.TabIndex = 1;
+            // 
+            // sizelevel1
+            // 
+            this.sizelevel1.FormattingEnabled = true;
+            this.sizelevel1.Location = new System.Drawing.Point(10, 68);
+            this.sizelevel1.Name = "sizelevel1";
+            this.sizelevel1.Size = new System.Drawing.Size(180, 26);
+            this.sizelevel1.TabIndex = 0;
+            // 
+            // saneline
+            // 
+            this.saneline.AutoSize = true;
+            this.saneline.Location = new System.Drawing.Point(279, 105);
+            this.saneline.Name = "saneline";
+            this.saneline.Size = new System.Drawing.Size(103, 22);
+            this.saneline.TabIndex = 40;
+            this.saneline.Text = "Scan Line";
+            this.saneline.UseVisualStyleBackColor = true;
+            // 
             // AprNes_ConfigureUI
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 18F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1002, 653);
+            this.ClientSize = new System.Drawing.Size(950, 639);
+            this.Controls.Add(this.resize);
             this.Controls.Add(this.groupBoxAnalog);
             this.Controls.Add(this.groupBox5);
-            this.Controls.Add(this.groupBox3);
             this.Controls.Add(this.label18);
             this.Controls.Add(this.comboBox1);
-            this.Controls.Add(this.groupBox4);
             this.Controls.Add(this.groupBox2);
             this.Controls.Add(this.Ok_btn);
             this.Controls.Add(this.choose_dir);
@@ -1010,15 +894,13 @@
             this.groupBox1.PerformLayout();
             this.groupBox2.ResumeLayout(false);
             this.groupBox2.PerformLayout();
-            this.groupBox4.ResumeLayout(false);
-            this.groupBox4.PerformLayout();
-            this.groupBox3.ResumeLayout(false);
-            this.groupBox3.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.SoundtrackBar)).EndInit();
             this.groupBox5.ResumeLayout(false);
             this.groupBox5.PerformLayout();
             this.groupBoxAnalog.ResumeLayout(false);
             this.groupBoxAnalog.PerformLayout();
+            this.resize.ResumeLayout(false);
+            this.resize.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -1065,21 +947,8 @@
         private System.Windows.Forms.Label label16;
         private System.Windows.Forms.Label label17;
         private System.Windows.Forms.TextBox joypad_A;
-        private System.Windows.Forms.GroupBox groupBox4;
-        private System.Windows.Forms.RadioButton radioButtonX4;
-        private System.Windows.Forms.RadioButton radioButtonX3;
-        private System.Windows.Forms.RadioButton radioButtonX2;
-        private System.Windows.Forms.RadioButton radioButtonX1;
-        private System.Windows.Forms.RadioButton radioButtonX5;
         private System.Windows.Forms.ComboBox comboBox1;
         private System.Windows.Forms.Label label18;
-        private System.Windows.Forms.RadioButton radioButtonX6;
-        private System.Windows.Forms.RadioButton radioButtonX9;
-        private System.Windows.Forms.RadioButton radioButtonX8;
-        private System.Windows.Forms.GroupBox groupBox3;
-        private System.Windows.Forms.RadioButton radioButtonX6s;
-        private System.Windows.Forms.RadioButton radioButtonX4s;
-        private System.Windows.Forms.RadioButton radioButtonX2s;
         private System.Windows.Forms.TrackBar SoundtrackBar;
         private System.Windows.Forms.GroupBox groupBox5;
         private System.Windows.Forms.CheckBox SoundcheckBox;
@@ -1096,5 +965,12 @@
         private System.Windows.Forms.Button AudioAdvanceSetting;
         private System.Windows.Forms.Label AudioModeLab;
         private System.Windows.Forms.ComboBox AudioMode;
+        private System.Windows.Forms.GroupBox resize;
+        private System.Windows.Forms.Label sizel2lab;
+        private System.Windows.Forms.Label sizel1lab;
+        private System.Windows.Forms.ComboBox sizelevel2;
+        private System.Windows.Forms.ComboBox sizelevel1;
+        private System.Windows.Forms.Label label19;
+        private System.Windows.Forms.CheckBox saneline;
     }
 }
