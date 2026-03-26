@@ -569,10 +569,10 @@ namespace AprNes
                 return 2;
             }
 
-            // Initialize audio DSP pipeline (no AudioSampleReady handler → samples discarded)
+            // AudioPlus is already initialized by NesCore.init() above;
+            // ApplySettings ensures current config is active for DSP testing.
             if (audioDsp && NesCore.AudioMode > 0)
             {
-                NesCore.AudioPlus_Init();
                 NesCore.AudioPlus_ApplySettings();
             }
 

@@ -69,6 +69,7 @@ namespace AprNes
             mfx_Init();
             mmix_Init();
             ap_initialized = true;
+            AudioPlus_Reset();
             AudioPlus_ApplySettings();
         }
 
@@ -102,6 +103,7 @@ namespace AprNes
         public static void AudioPlus_Reset()
         {
             if (!ap_initialized) return;
+            blip_Reset();
             for (int i = 0; i < OSE_COUNT; i++) ose_Reset(i);
             cmf_Reset();
             mfx_Reset();
@@ -257,12 +259,8 @@ namespace AprNes
 
         static void blip_Init()
         {
-            blip_buffer = apm_AllocFloat(BLIP_BUF_SIZE);
-            blip_readPos = 0;
-            blip_writeBase = 0;
-            blip_clockAccum = 0.0;
-            blip_lastAmplitude = 0f;
-            blip_integrator = 0.0;
+            if (blip_buffer == null)
+                blip_buffer = apm_AllocFloat(BLIP_BUF_SIZE);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -467,26 +465,13 @@ namespace AprNes
 
         static void mfx_Init()
         {
+            if (mfx_haasDelayBuf != null) return; // 已配置，共用記憶體
             mfx_haasDelayBuf = apm_AllocFloat(MFX_MAX_DELAY);
-            mfx_haasWritePos = 0;
-            mfx_haasCrossfeed = 0.4f;
-            mfx_combFeedback = 0.7f;
-            mfx_combDamp = 0.3f;
-            mfx_reverbWet = 0f;
             mfx_combBuf = (float**)Marshal.AllocHGlobal(MFX_COMB_COUNT * sizeof(float*));
             mfx_combPos = apm_AllocInt(MFX_COMB_COUNT);
             mfx_combLpfState = apm_AllocFloat(MFX_COMB_COUNT);
             for (int i = 0; i < MFX_COMB_COUNT; i++)
-            {
                 mfx_combBuf[i] = apm_AllocFloat(mfx_combLengths[i]);
-                mfx_combPos[i] = 0;
-                mfx_combLpfState[i] = 0f;
-            }
-            mfx_SetHaasDelay(20);
-            mfx_SetHaasCrossfeed(40);
-            mfx_SetReverbWet(0);
-            mfx_SetCombFeedback(70);
-            mfx_SetCombDamp(30);
         }
 
         static void mfx_SetHaasDelay(int ms)
@@ -623,15 +608,12 @@ namespace AprNes
 
         static void mmix_Init()
         {
+            if (mmix_chBuf != null) return; // 已配置，共用記憶體
             mmix_chBuf = (float**)Marshal.AllocHGlobal(5 * sizeof(float*));
             for (int i = 0; i < 5; i++)
                 mmix_chBuf[i] = apm_AllocFloat(MMIX_MAX_SAMPLES);
             mmix_panL = apm_AllocFloat(5);
             mmix_panR = apm_AllocFloat(5);
-            mmix_cachedBoostDb = -1;
-            mmix_cachedBoostFreq = -1;
-            mmix_SetStereoWidth(50);
-            mmix_SetBassBoost(0, 150);
         }
 
         static void mmix_SetStereoWidth(int width)
@@ -855,6 +837,7 @@ namespace AprNes
 
         static void ose_InitInstances()
         {
+            if (ose_ringBuf != null) return; // 已配置，共用記憶體
             int ringSize = OSE_BUF_SIZE + OSE_TAPS;
             ose_ringBuf = (float**)Marshal.AllocHGlobal(OSE_COUNT * sizeof(float*));
             ose_writePos = apm_AllocInt(OSE_COUNT);
