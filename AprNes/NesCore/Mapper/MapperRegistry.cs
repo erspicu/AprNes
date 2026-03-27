@@ -137,7 +137,7 @@ namespace AprNes
                     return m;
                 }
                 case 85: {
-                    System.Console.WriteLine("Mapper085: VRC7 (audio silent — OPLL not emulated)");
+                    System.Console.WriteLine("Mapper085: VRC7 (OPLL FM synthesis)");
                     return new Mapper085();
                 }
                 case 153: {

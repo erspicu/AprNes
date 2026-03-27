@@ -1,6 +1,6 @@
 # AprNes Mapper 實作狀態
 
-**總計已實作：60 個　　最後更新：2026-03-25**
+**總計已實作：60 個　　最後更新：2026-03-27**
 
 結果說明：✅ 正常　⚠️ 部分問題　❌ 有問題　❓ 待確認／不明
 
@@ -10,17 +10,18 @@
 
 | 結果 | 數量 | Mapper 列表 |
 |:----:|:----:|------------|
-| ✅ 正常 | 36 | 000, 001, 002, 003, 004, 005, 007, 010, 011, 016, 018, 021, 022, 023, 024, 026, 032, 033, 034, 068, 069, 072, 075, 077, 078, 079, 087, 093, 097, 118, 119, 180, 184, 185, 228, 232 |
+| ✅ 正常 | 38 | 000, 001, 002, 003, 004, 005, 007, 010, 011, 016, 018, 019, 021, 022, 023, 024, 026, 032, 033, 034, 068, 069, 072, 075, 077, 078, 079, 085, 087, 093, 097, 118, 119, 180, 184, 185, 228, 232 |
 | ⚠️ 部分問題 | 11 | 009, 025, 064, 066, 080, 082, 088, 089, 140, 152, 206 |
-| ❌ 有問題 | 9 | 013, 019, 065, 067, 070, 071, 076, 085, 210 |
+| ❌ 有問題 | 7 | 013, 065, 067, 070, 071, 076, 210 |
 | ❓ 待確認 | 2 | 095, 153 |
 | **合計校驗** | **58** | |
+
 
 ---
 
 ## 人工校驗紀錄
 
-校驗日期：**2026-03-20**
+校驗日期：**2026-03-27**
 
 | Mapper | 校驗結果 | 說明 |
 |:------:|:--------:|------|
@@ -37,7 +38,7 @@
 | **013** | ❌ | 有問題 |
 | **016** | ✅ | 人工驗證通過（含 Dragon Ball Z - Kyoushuu Saiya Jin） |
 | **018** | ✅ | |
-| **019** | ❌ | 畫面有問題 |
+| **019** | ✅ | 人工驗證通過（2026-03-27）：Splatterhouse (J) 正常，含 Namco 163 8ch 波形音效 |
 | **021** | ✅ | |
 | **022** | ✅ | |
 | **023** | ✅ | |
@@ -63,7 +64,7 @@
 | **079** | ✅ | |
 | **080** | ⚠️ | 畫面怪怪的 |
 | **082** | ⚠️ | 畫面怪怪的 |
-| **085** | ❌ | Lagrange Point (J) 畫面有問題 |
+| **085** | ✅ | 人工驗證通過（2026-03-27）：Lagrange Point (J) 正常，含 OPLL (YM2413) FM 合成音效、CHR-RAM banking 修復 |
 | **087** | ✅ | |
 | **088** | ⚠️ | Devil Man (J) 畫面怪怪的 |
 | **089** | ⚠️ | Tenka no Goikenban - Mito Koumon (J) 畫面怪怪的 |
@@ -133,7 +134,7 @@
 | **079** | NINA-03 / NINA-06 (AVE) | (addr&0xE100)==0x4100；32KB PRG + 8KB CHR | Blackjack (AVE), Deathbots (AVE) | ✅ |
 | **080** | Taito X1-005 | $7EF0–$7EFF regs；3×8KB PRG；2KB+1KB×4 CHR；RAM unlock | Minelvaton Saga (J), Fudou Myouou Den (J) | ✅ |
 | **082** | Taito X1-017 | $7EF0–$7EFF regs；chrMode 1KB/2KB；SRAM unlock seq | SD Keiji Blader (J), Harikiri Stadium (J) | ✅ |
-| **085** | Konami VRC7 | 3×8KB PRG；8×1KB CHR；prescaler IRQ；OPLL stub | Lagrange Point (J) | ✅ |
+| **085** | Konami VRC7 | 3×8KB PRG；8×1KB CHR；prescaler IRQ；OPLL (YM2413) FM 合成音效 | Lagrange Point (J) | ✅ |
 | **087** | Jaleco JF-09/10/18 | $6000–$7FFF 寫入；D0/D1 bit-swap 選 8KB CHR | Argus (J), City Connection (J), The Goonies (J) | ✅ |
 | **088** | Namco 118 / 634 | Namco108 架構；R0/R1=2KB CHR，R2-R5=1KB CHR | Dragon Spirit (J), Quinty (J) | ✅ |
 | **089** | Sunsoft-2 (Ikki variant) | bits[6:4]=PRG；(v&7)\|((v&0x80)>>4)=CHR；bit3=single-screen | Tenka no Goikenban - Mito Koumon (J) | ✅ |

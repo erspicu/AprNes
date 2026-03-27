@@ -4,8 +4,7 @@ namespace AprNes
     // PRG: 3×8K switchable ($8000/$A000/$C000) + fixed last 8K ($E000-$FFFF)
     // CHR: 8×1K banks
     // IRQ: VRC prescaler (341, -3/cycle, 8-bit counter counts up to 0xFF)
-    // Audio: YM2413/OPLL FM synthesis ($9010/$9030) — NOT emulated (silent)
-    //   Reg $9010: register select; $9030: data write → accepted but discarded
+    // Audio: YM2413/OPLL FM synthesis ($9010/$9030) — 6 FM channels via emu2413
     // Control: $E000 (mirroring bits[1:0], WRAM enable bit7, audio mute bit6)
     //
     // Games: Lagrange Point (J)
@@ -31,6 +30,21 @@ namespace AprNes
         bool irqEnabledAfterAck;
         bool irqCycleMode;
 
+        // OPLL FM synthesis audio
+        Emu2413 opll;
+        byte currentReg;
+        short previousOutput;
+        double clockTimer;
+        bool audioMuted;
+
+        // OPLL clock: 49716 Hz sample rate, clock = 49716 * 72
+        const int OpllSampleRate = 49716;
+        const int OpllClockRate = OpllSampleRate * 72;
+        // NES NTSC master clock = 21477272 Hz, CPU clock = master/12 = 1789772.67 Hz
+        // clockTimer counts down from (masterClock / opllSampleRate) CPU cycles per OPLL sample
+        // = 1789772.67 / 49716 ≈ 36.0 CPU cycles per OPLL sample
+        const double CpuCyclesPerOpllSample = 1789772.667 / OpllSampleRate;
+
         public MapperA12Mode A12NotifyMode => MapperA12Mode.None;
 
         public void MapperInit(byte* _PRG_ROM, byte* _CHR_ROM, byte* _ppu_ram,
@@ -50,6 +64,14 @@ namespace AprNes
             irqEnabled = irqEnabledAfterAck = irqCycleMode = false;
             UpdateCHRBanks();
             UpdateMirroring();
+
+            // Init OPLL
+            opll = new Emu2413((uint)OpllClockRate, (uint)OpllSampleRate);
+            currentReg = 0;
+            previousOutput = 0;
+            clockTimer = 0;
+            audioMuted = false;
+            NesCore.mapperExpansionAudio = 0;
         }
 
         static int TranslateAddr(int addr)
@@ -82,8 +104,14 @@ namespace AprNes
                 case 0x8000: prgBank[0] = value & 0x3F; break;
                 case 0x8008: prgBank[1] = value & 0x3F; break;
                 case 0x9000: prgBank[2] = value & 0x3F; break;
-                // $9010: audio reg select, $9030: audio data — accepted but silent
-                case 0x9010: case 0x9030: break;
+
+                // OPLL audio registers
+                case 0x9010:
+                    if (!audioMuted) currentReg = value;
+                    break;
+                case 0x9030:
+                    if (!audioMuted) opll.WriteReg(currentReg, value);
+                    break;
 
                 case 0xA000: chrRegs[0] = value; UpdateCHRBanks(); break;
                 case 0xA008: chrRegs[1] = value; UpdateCHRBanks(); break;
@@ -94,7 +122,11 @@ namespace AprNes
                 case 0xD000: chrRegs[6] = value; UpdateCHRBanks(); break;
                 case 0xD008: chrRegs[7] = value; UpdateCHRBanks(); break;
 
-                case 0xE000: controlFlags = value; UpdateMirroring(); break;
+                case 0xE000:
+                    controlFlags = value;
+                    audioMuted = (value & 0x40) != 0;
+                    UpdateMirroring();
+                    break;
 
                 case 0xE008:
                     irqReload = value;
@@ -139,7 +171,9 @@ namespace AprNes
         {
             if (CHR_ROM_count == 0)
             {
-                for (int i = 0; i < 8; i++) NesCore.chrBankPtrs[i] = ppu_ram + (i << 10);
+                // CHR-RAM: bank-switch into ppu_ram (8KB = 8 × 1K pages)
+                for (int i = 0; i < 8; i++)
+                    NesCore.chrBankPtrs[i] = ppu_ram + ((chrRegs[i] & 7) << 10);
                 return;
             }
             int total1k = CHR_ROM_count * 8;
@@ -148,22 +182,58 @@ namespace AprNes
         }
 
         public byte MapperR_CHR(int address) { return NesCore.chrBankPtrs[(address >> 10) & 7][address & 0x3FF]; }
-        public void MapperW_CHR(int addr, byte val) { if (CHR_ROM_count == 0) ppu_ram[addr] = val; }
+        public void MapperW_CHR(int addr, byte val)
+        {
+            if (CHR_ROM_count == 0)
+                NesCore.chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF] = val;
+        }
 
         public void CpuCycle()
         {
-            if (!irqEnabled) return;
-            irqPrescaler -= 3;
-            if (irqCycleMode || irqPrescaler <= 0)
+            // IRQ
+            if (irqEnabled)
             {
-                if (irqCounter == 0xFF)
+                if (irqCycleMode)
                 {
-                    irqCounter = irqReload;
-                    NesCore.statusmapperint = true;
-                    NesCore.UpdateIRQLine();
+                    if (irqCounter == 0xFF)
+                    {
+                        irqCounter = irqReload;
+                        NesCore.statusmapperint = true;
+                        NesCore.UpdateIRQLine();
+                    }
+                    else irqCounter++;
                 }
-                else irqCounter++;
-                irqPrescaler += 341;
+                else
+                {
+                    irqPrescaler -= 3;
+                    if (irqPrescaler <= 0)
+                    {
+                        if (irqCounter == 0xFF)
+                        {
+                            irqCounter = irqReload;
+                            NesCore.statusmapperint = true;
+                            NesCore.UpdateIRQLine();
+                        }
+                        else irqCounter++;
+                        irqPrescaler += 341;
+                    }
+                }
+            }
+
+            // OPLL audio: generate samples at ~49716 Hz
+            clockTimer--;
+            if (clockTimer <= 0)
+            {
+                clockTimer += CpuCyclesPerOpllSample;
+                short output = opll.Calc();
+                // Delta-based output like Mesen2, scaled for AprNes mixer
+                // OPLL output range is roughly ±4095*6/2 = ±12285
+                // Scale to match other expansion audio levels
+                // OPLL output range: ~±12285 (6 ch × ~2048)
+                // Scale to match NES APU range (~0..98302) and other expansion audio
+                // VRC6 max ~28000, Namco163 ~15000; use factor 3 for comparable level
+                NesCore.mapperExpansionAudio = audioMuted ? 0 : output * 3;
+                previousOutput = output;
             }
         }
 

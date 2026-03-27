@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 
@@ -86,6 +87,9 @@ namespace AprNes
             chrRomSize = CHR_ROM_count * 0x2000;
 
             // Allocate unmanaged memory for ExRAM (1KB) and fill nametable (1KB)
+            // Free any previous allocation to prevent leak on repeated MapperInit calls
+            if (exRamPtr != null) Marshal.FreeHGlobal((IntPtr)exRamPtr);
+            if (fillNTPtr != null) Marshal.FreeHGlobal((IntPtr)fillNTPtr);
             exRamPtr = (byte*)Marshal.AllocHGlobal(1024);
             fillNTPtr = (byte*)Marshal.AllocHGlobal(1024);
             for (int i = 0; i < 1024; i++) { exRamPtr[i] = 0; fillNTPtr[i] = 0; }

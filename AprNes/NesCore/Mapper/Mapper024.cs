@@ -364,9 +364,9 @@ namespace AprNes
             // IRQ
             if (irqEnabled)
             {
-                irqPrescaler -= 3;
-                if (irqCycleMode || irqPrescaler <= 0)
+                if (irqCycleMode)
                 {
+                    // Cycle mode: tick counter every CPU cycle
                     if (irqCounter == 0xFF)
                     {
                         irqCounter = irqReload;
@@ -374,7 +374,22 @@ namespace AprNes
                         NesCore.UpdateIRQLine();
                     }
                     else irqCounter++;
-                    irqPrescaler += 341;
+                }
+                else
+                {
+                    // Scanline mode: prescaler divides CPU cycles (~341/3 per scanline)
+                    irqPrescaler -= 3;
+                    if (irqPrescaler <= 0)
+                    {
+                        if (irqCounter == 0xFF)
+                        {
+                            irqCounter = irqReload;
+                            NesCore.statusmapperint = true;
+                            NesCore.UpdateIRQLine();
+                        }
+                        else irqCounter++;
+                        irqPrescaler += 341;
+                    }
                 }
             }
 
