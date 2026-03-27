@@ -53,7 +53,7 @@ namespace AprNes
             {
                 case 0x8000: prgBank0 = value; break;
 
-                case 0x9001: *Vertical = (value & 0x80) != 0 ? 1 : 0; break; // bit7: 1=H, 0=V
+                case 0x9001: *Vertical = (value & 0x80) != 0 ? 0 : 1; break; // bit7: 1=H, 0=V
                 case 0x9003:
                     irqEnabled = (value & 0x80) != 0;
                     NesCore.statusmapperint = false;

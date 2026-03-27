@@ -160,7 +160,7 @@ python run_tests.py -j 10
 | Generic USB gamepad / joystick | DirectInput8 (raw vtable) | Auto-enumerated, excludes XInput devices |
 | Xbox 360 / One / Series | XInput (xinput1_4.dll) | Auto-detects players 0–3 |
 
-## Supported Mappers (35 verified)
+## Supported Mappers (36 verified)
 
 | Mapper | Representative Games |
 |--------|---------------------|
@@ -182,6 +182,7 @@ python run_tests.py -j 10
 | 23 (VRC2b) | Contra (J), Getsufuu Maden (J) |
 | 32 (Irem G-101) | Image Fight (J), Major League (J) |
 | 33 (Taito TC0190) | Akira (J), Don Doko Don (J) |
+| 65 (Irem H-3001) | Daiku no Gen San 2 (J) |
 | 68 (Sunsoft #4) | After Burner II (J), Maharaja (J) |
 | 69 (FME-7/5B) | Batman (J), Gimmick! (J) — with Sunsoft 5B expansion audio |
 | 72 (Jaleco JF-17) | Pinball Quest (J), Moero!! Juudou Warriors (J) |
@@ -362,7 +363,7 @@ python run_tests.py -j 10
 | 一般 USB 手把 / 老式搖桿 | DirectInput8（raw vtable） | 自動列舉，排除 XInput 裝置 |
 | Xbox 360 / Xbox One / Xbox Series | XInput（xinput1_4.dll） | 自動偵測 player 0–3 |
 
-## 支援的 Mapper（35 個通過人工驗證）
+## 支援的 Mapper（36 個通過人工驗證）
 
 | Mapper | 代表遊戲 |
 |--------|---------|
@@ -384,6 +385,7 @@ python run_tests.py -j 10
 | 23 (VRC2b) | 魂斗羅（日）、月風魔傳（日） |
 | 32 (Irem G-101) | Image Fight（日）、Major League（日） |
 | 33 (Taito TC0190) | Akira（日）、Don Doko Don（日） |
+| 65 (Irem H-3001) | 大工の源さん 2（日） |
 | 68 (Sunsoft #4) | After Burner II（日）、Maharaja（日） |
 | 69 (FME-7/5B) | 蝙蝠俠（日）、Gimmick!（日） — 含 Sunsoft 5B 擴展音效 |
 | 72 (Jaleco JF-17) | Pinball Quest（日）、Moero!! 柔道戰士（日） |
