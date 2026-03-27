@@ -138,6 +138,7 @@ namespace AprNes
 
         static void FreeUnmanagedMemory()
         {
+            fds_FreeMemory();
             if (MapperObj != null) { MapperObj.Cleanup(); MapperObj = null; }
             if (PRG_ROM      != null) { Marshal.FreeHGlobal((IntPtr)PRG_ROM);      PRG_ROM      = null; }
             if (CHR_ROM      != null) { Marshal.FreeHGlobal((IntPtr)CHR_ROM);      CHR_ROM      = null; }
@@ -239,6 +240,7 @@ namespace AprNes
         static public bool init(byte[] rom_bytes) //for Hard Reset effect
         {
             FreeUnmanagedMemory();
+            isFDS = false; // ensure FDS mode is off when loading normal NES ROMs
             try
             {
                 //http://nesdev.com/iNES.txt

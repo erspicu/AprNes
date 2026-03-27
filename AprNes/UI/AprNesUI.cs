@@ -1129,6 +1129,7 @@ namespace AprNes
         public string rom_file = "";
         public byte[] rom_bytes;
         byte[] current_rom_bytes;  // 保存已解壓的 ROM 資料供 Hard Reset 使用
+        byte[] current_bios_bytes; // FDS BIOS bytes (null for normal NES ROMs)
 
 public string GetRomInfo()
         {
@@ -1234,7 +1235,7 @@ public string GetRomInfo()
         unsafe private void button1_Click(object sender, EventArgs e)
         {
             OpenFileDialog fd = new OpenFileDialog();
-            fd.Filter = "nes file (*.nes *.zip)|*.nes;*.zip";
+            fd.Filter = "NES/FDS ROM (*.nes *.fds *.zip)|*.nes;*.fds;*.zip";
             if (fd.ShowDialog() != DialogResult.OK) return;
             LoadRomFromPath(fd.FileName);
         }
@@ -1247,7 +1248,8 @@ public string GetRomInfo()
                 ZipArchive archive = ZipFile.OpenRead(fi.FullName);
                 foreach (ZipArchiveEntry entry in archive.Entries)
                 {
-                    if (entry.FullName.ToLower().EndsWith(".nes"))
+                    string ext = entry.FullName.ToLower();
+                    if (ext.EndsWith(".nes") || ext.EndsWith(".fds"))
                     {
                         nes_name = entry.Name;
                         Stream fs = entry.Open();
@@ -1288,7 +1290,25 @@ public string GetRomInfo()
             NesCore.exit = false;
             NesCore.rom_file_name = rom_file_name;
 
-            bool init_result = NesCore.init(rom_bytes);
+            bool init_result;
+            if (NesCore.IsFdsFile(rom_bytes))
+            {
+                // FDS mode: load and validate BIOS first
+                byte[] bios = NesCore.LoadAndValidateFdsBios(Application.StartupPath);
+                if (bios == null)
+                {
+                    fps_count_timer.Enabled = false;
+                    running = false;
+                    return;
+                }
+                current_bios_bytes = bios;
+                init_result = NesCore.initFDS(bios, rom_bytes);
+            }
+            else
+            {
+                current_bios_bytes = null;
+                init_result = NesCore.init(rom_bytes);
+            }
 
             if (RenderObj != null) RenderObj.freeMem();
             RenderObj = NesCore.AnalogEnabled ? (InterfaceGraphic)new Render_Analog() : CreateRenderResize();
@@ -1609,7 +1629,11 @@ public string GetRomInfo()
             NesCore.exit = false;
             NesCore.rom_file_name = rom_file_name;
 
-            bool init_result = NesCore.init(current_rom_bytes);
+            bool init_result;
+            if (current_bios_bytes != null && NesCore.IsFdsFile(current_rom_bytes))
+                init_result = NesCore.initFDS(current_bios_bytes, current_rom_bytes);
+            else
+                init_result = NesCore.init(current_rom_bytes);
 
             if (RenderObj != null) RenderObj.freeMem();
             RenderObj = NesCore.AnalogEnabled ? (InterfaceGraphic)new Render_Analog() : CreateRenderResize();

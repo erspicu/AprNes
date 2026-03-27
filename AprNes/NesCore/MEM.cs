@@ -85,7 +85,10 @@ namespace AprNes
         {
             // irqLinePrev saved at start of StartCpuCycle
             // irqLineCurrent maintained by UpdateIRQLine() at every mutation site
-            MapperObj.CpuCycle();
+            if (isFDS)
+                fds_CpuCycle();
+            else
+                MapperObj.CpuCycle();
         }
 
         // Called at every site that changes statusframeint, apuintflag, statusdmcint, or statusmapperint
