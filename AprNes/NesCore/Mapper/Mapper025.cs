@@ -61,15 +61,15 @@ namespace AprNes
             }
             else if (Submapper == 2)
             {
-                // VRC4d: A0=cpu-bit2, A1=cpu-bit3
-                a0 = (addr >> 2) & 1;
-                a1 = (addr >> 3) & 1;
+                // VRC4d: A0=cpu-bit3, A1=cpu-bit2
+                a0 = (addr >> 3) & 1;
+                a1 = (addr >> 2) & 1;
             }
             else
             {
                 // Heuristic: OR VRC4b and VRC4d bits
-                a0 = (((addr >> 1) | (addr >> 2)) & 1);
-                a1 = (((addr >> 0) | (addr >> 3)) & 1);
+                a0 = (((addr >> 1) | (addr >> 3)) & 1);
+                a1 = (((addr >> 0) | (addr >> 2)) & 1);
             }
             return (addr & 0xFF00) | (a1 << 1) | a0;
         }
