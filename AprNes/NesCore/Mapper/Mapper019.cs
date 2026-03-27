@@ -61,7 +61,11 @@ namespace AprNes
         {
             for (int i = 0; i < 3; i++) prgBank[i] = 0;
             for (int i = 0; i < 8; i++) { chrReg[i] = 0; chOutput[i] = 0; }
-            for (int i = 0; i < 4; i++) ntReg[i] = 0;
+            // Default nametable regs to CIRAM (>= 0xE0) based on mirroring
+            // Vertical: NT0=CIRAM0, NT1=CIRAM1, NT2=CIRAM0, NT3=CIRAM1
+            // Horizontal: NT0=CIRAM0, NT1=CIRAM0, NT2=CIRAM1, NT3=CIRAM1
+            if (*Vertical == 1) { ntReg[0] = 0xE0; ntReg[1] = 0xE1; ntReg[2] = 0xE0; ntReg[3] = 0xE1; }
+            else                { ntReg[0] = 0xE0; ntReg[1] = 0xE0; ntReg[2] = 0xE1; ntReg[3] = 0xE1; }
             lowChrNtMode = highChrNtMode = false;
             irqCounter = 0;
             for (int i = 0; i < 128; i++) audioRam[i] = 0;
@@ -182,7 +186,7 @@ namespace AprNes
             for (int i = 0; i < 4; i++)
             {
                 if (!lowChrNtMode && chrReg[i] >= 0xE0 && CHR_ROM_count > 0)
-                    NesCore.chrBankPtrs[i] = ppu_ram + ((chrReg[i] & 0x01) << 10);
+                    NesCore.chrBankPtrs[i] = ppu_ram + 0x2000 + ((chrReg[i] & 0x01) << 10);
                 else if (CHR_ROM_count > 0)
                     NesCore.chrBankPtrs[i] = CHR_ROM + ((chrReg[i] % total1k) << 10);
                 else
@@ -192,7 +196,7 @@ namespace AprNes
             for (int i = 4; i < 8; i++)
             {
                 if (!highChrNtMode && chrReg[i] >= 0xE0 && CHR_ROM_count > 0)
-                    NesCore.chrBankPtrs[i] = ppu_ram + ((chrReg[i] & 0x01) << 10);
+                    NesCore.chrBankPtrs[i] = ppu_ram + 0x2000 + ((chrReg[i] & 0x01) << 10);
                 else if (CHR_ROM_count > 0)
                     NesCore.chrBankPtrs[i] = CHR_ROM + ((chrReg[i] % total1k) << 10);
                 else
@@ -207,11 +211,20 @@ namespace AprNes
             for (int i = 0; i < 4; i++)
             {
                 if (ntReg[i] >= 0xE0)
-                    NesCore.ntBankPtrs[i] = ppu_ram + ((ntReg[i] & 0x01) << 10);
+                {
+                    NesCore.ntBankPtrs[i] = ppu_ram + 0x2000 + ((ntReg[i] & 0x01) << 10);
+                    NesCore.ntBankWritable[i] = true;
+                }
                 else if (CHR_ROM_count > 0)
+                {
                     NesCore.ntBankPtrs[i] = CHR_ROM + ((ntReg[i] % total1k) << 10);
+                    NesCore.ntBankWritable[i] = false; // CHR-ROM is read-only
+                }
                 else
+                {
                     NesCore.ntBankPtrs[i] = ppu_ram + (i << 10);
+                    NesCore.ntBankWritable[i] = true;
+                }
             }
             NesCore.ntChrOverrideEnabled = true;
         }

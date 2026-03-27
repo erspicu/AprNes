@@ -38,7 +38,7 @@
 | **013** | ❌ | 有問題 |
 | **016** | ✅ | 人工驗證通過（含 Dragon Ball Z - Kyoushuu Saiya Jin） |
 | **018** | ✅ | |
-| **019** | ✅ | 人工驗證通過（2026-03-27）：Splatterhouse (J) 正常，含 Namco 163 8ch 波形音效 |
+| **019** | ✅ | 人工驗證通過（2026-03-27）：Splatterhouse (J)、Chibi Maruko-Chan (J) 正常，含 Namco 163 8ch 波形音效、CIRAM nametable/CHR 映射修復 |
 | **021** | ✅ | |
 | **022** | ✅ | |
 | **023** | ✅ | |

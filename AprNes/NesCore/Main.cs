@@ -35,6 +35,7 @@ namespace AprNes
         static public bool mapperA12IsMmc3 = false; // true=MMC3-style, false=MMC2/4-style (only when mapperNeedsA12)
         // Mapper 68 (Sunsoft #4): CHR ROM pages used as nametable tiles
         static public byte*[] ntBankPtrs = new byte*[4]; // 4×1KB NT pointers (one per nametable slot)
+        static public bool[] ntBankWritable = new bool[4]; // per-slot write enable (false = CHR-ROM, true = CIRAM)
         static public bool ntChrOverrideEnabled = false; // when true PPU reads NT from ntBankPtrs instead of ppu_ram
         // MMC5 CHR A/B auto-switch (for 8x16 sprites: A=sprites, B=background)
         static public bool chrABAutoSwitch = false;
@@ -381,6 +382,7 @@ namespace AprNes
                 mapperNeedsA12  = a12mode != MapperA12Mode.None;
                 mapperA12IsMmc3 = a12mode == MapperA12Mode.MMC3;
                 ntChrOverrideEnabled = false;
+                for (int i = 0; i < 4; i++) ntBankWritable[i] = true;
                 chrABAutoSwitch = false;
                 chrBGUseASet = false;
                 extAttrEnabled = false;

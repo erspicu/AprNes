@@ -526,7 +526,11 @@ namespace AprNes
                        int _vram_addr_wrap = vram_addr & 0x2FFF; // $3000-$3EFF mirrors $2000-$2EFF
                        openbus = val;
                        if (ntChrOverrideEnabled)
-                           ntBankPtrs[(_vram_addr_wrap >> 10) & 3][_vram_addr_wrap & 0x3FF] = val;
+                       {
+                           int slot = (_vram_addr_wrap >> 10) & 3;
+                           if (ntBankWritable[slot])
+                               ntBankPtrs[slot][_vram_addr_wrap & 0x3FF] = val;
+                       }
                        else
                            ppu_ram[CIRAMAddr(_vram_addr_wrap)] = val;
                        Increment2007();

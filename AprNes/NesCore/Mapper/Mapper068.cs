@@ -171,6 +171,7 @@ namespace AprNes
                 NesCore.ntBankPtrs[2] = NesCore.ntBankPtrs[3] = base1;
             }
             NesCore.ntChrOverrideEnabled = true;
+            for (int i = 0; i < 4; i++) NesCore.ntBankWritable[i] = false; // CHR-ROM nametables are read-only
         }
 
         public byte MapperR_CHR(int address) { return NesCore.chrBankPtrs[(address >> 10) & 7][address & 0x3FF]; }
