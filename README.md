@@ -160,7 +160,7 @@ python run_tests.py -j 10
 | Generic USB gamepad / joystick | DirectInput8 (raw vtable) | Auto-enumerated, excludes XInput devices |
 | Xbox 360 / One / Series | XInput (xinput1_4.dll) | Auto-detects players 0–3 |
 
-## Supported Mappers (37 verified)
+## Supported Mappers (41 verified)
 
 | Mapper | Representative Games |
 |--------|---------------------|
@@ -183,6 +183,7 @@ python run_tests.py -j 10
 | 23 (VRC2b) | Contra (J), Getsufuu Maden (J) |
 | 32 (Irem G-101) | Image Fight (J), Major League (J) |
 | 33 (Taito TC0190) | Akira (J), Don Doko Don (J) |
+| 66 (GxROM) | Dragon Ball (J), Gumshoe (U) |
 | 65 (Irem H-3001) | Daiku no Gen San 2 (J) |
 | 68 (Sunsoft #4) | After Burner II (J), Maharaja (J) |
 | 69 (FME-7/5B) | Batman (J), Gimmick! (J) — with Sunsoft 5B expansion audio |
@@ -190,6 +191,8 @@ python run_tests.py -j 10
 | 75 (VRC1) | Ganbare Goemon! (J), Jajamaru Ninpou Chou (J) |
 | 77 (Napoleon Senki) | Napoleon Senki (J) |
 | 79 (NINA-03/06) | Blackjack (AVE), Deathbots (AVE) |
+| 80 (Taito X1-005) | Minelvaton Saga (J), Fudou Myouou Den (J) |
+| 82 (Taito X1-017) | SD Keiji Blader (J), Harikiri Stadium (J) |
 | 87 (Jaleco JF-09) | Argus (J), City Connection (J), The Goonies (J) |
 | 89 (Sunsoft-2 Ikki) | Tenka no Goikenban - Mito Koumon (J) |
 | 93 (Sunsoft-2) | Fantasy Zone (J), Shanghai (J) |
@@ -198,7 +201,9 @@ python run_tests.py -j 10
 | 119 (TQROM) | High Speed (U) |
 | 180 (Crazy Climber) | Crazy Climber (J) |
 | 184 (Sunsoft-1) | Wing of Madoola (J), Atlantis no Nazo (J) |
+| 152 (Bandai single-screen) | Arkanoid II (J) |
 | 185 (CNROM+protect) | B-Wings (J), Bird Week (J), Mighty Bomb Jack (J) |
+| 206 (Namco 108) | Karnov (J), Dragon Slayer 4 (J) |
 | 228 (Action 52) | Cheetahmen II (U) |
 | 232 (Camerica Quattro) | Quattro Adventure (U), Quattro Sports (U) |
 
@@ -364,7 +369,7 @@ python run_tests.py -j 10
 | 一般 USB 手把 / 老式搖桿 | DirectInput8（raw vtable） | 自動列舉，排除 XInput 裝置 |
 | Xbox 360 / Xbox One / Xbox Series | XInput（xinput1_4.dll） | 自動偵測 player 0–3 |
 
-## 支援的 Mapper（37 個通過人工驗證）
+## 支援的 Mapper（41 個通過人工驗證）
 
 | Mapper | 代表遊戲 |
 |--------|---------|
@@ -387,6 +392,7 @@ python run_tests.py -j 10
 | 23 (VRC2b) | 魂斗羅（日）、月風魔傳（日） |
 | 32 (Irem G-101) | Image Fight（日）、Major League（日） |
 | 33 (Taito TC0190) | Akira（日）、Don Doko Don（日） |
+| 66 (GxROM) | 七龍珠（日）、Gumshoe (U) |
 | 65 (Irem H-3001) | 大工の源さん 2（日） |
 | 68 (Sunsoft #4) | After Burner II（日）、Maharaja（日） |
 | 69 (FME-7/5B) | 蝙蝠俠（日）、Gimmick!（日） — 含 Sunsoft 5B 擴展音效 |
@@ -394,6 +400,8 @@ python run_tests.py -j 10
 | 75 (VRC1) | がんばれゴエモン!（日）、じゃじゃ丸忍法帳（日） |
 | 77 (Napoleon Senki) | Napoleon 戰記（日） |
 | 79 (NINA-03/06) | Blackjack (AVE)、Deathbots (AVE) |
+| 80 (Taito X1-005) | ミネルバトンサーガ（日）、不動明王伝（日） |
+| 82 (Taito X1-017) | SD 刑事ブレイダー（日）、はりきりスタジアム（日） |
 | 87 (Jaleco JF-09) | Argus（日）、City Connection（日）、The Goonies（日） |
 | 89 (Sunsoft-2 Ikki) | 天下のご意見番 水戸黄門（日） |
 | 93 (Sunsoft-2) | Fantasy Zone（日）、上海（日） |
@@ -402,6 +410,8 @@ python run_tests.py -j 10
 | 119 (TQROM) | High Speed (U) |
 | 180 (Crazy Climber) | Crazy Climber（日） |
 | 184 (Sunsoft-1) | 魔導拉之翼（日）、アトランチスの謎（日） |
+| 152 (Bandai single-screen) | Arkanoid II（日） |
 | 185 (CNROM+protect) | B-Wings（日）、Bird Week（日）、Mighty Bomb Jack（日） |
+| 206 (Namco 108) | Karnov（日）、Dragon Slayer 4（日） |
 | 228 (Action 52) | Cheetahmen II (U) |
 | 232 (Camerica Quattro) | Quattro Adventure (U)、Quattro Sports (U) |

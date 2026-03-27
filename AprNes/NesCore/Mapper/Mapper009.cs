@@ -41,6 +41,7 @@ namespace AprNes
             leftLatch = 1;   // $FE on power-on per spec
             rightLatch = 1;
             needChrUpdate = false;
+            UpdateCHRBanks();
         }
 
         public byte MapperR_ExpansionROM(ushort address) { return NesCore.cpubus; }

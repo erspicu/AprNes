@@ -69,26 +69,32 @@ namespace AprNes
         public byte MapperR_RPG(ushort address)
         {
             int total8k = PRG_ROM_count * 2;
-            if (address < 0xA000) return PRG_ROM[(address - 0x8000) + (prgBank8000 << 13)];
-            if (address < 0xC000) return PRG_ROM[(address - 0xA000) + (prgBankA000 << 13)];
+            if (address < 0xA000) return PRG_ROM[(address - 0x8000) + ((prgBank8000 % total8k) << 13)];
+            if (address < 0xC000) return PRG_ROM[(address - 0xA000) + ((prgBankA000 % total8k) << 13)];
             if (address < 0xE000) return PRG_ROM[(address - 0xC000) + ((total8k - 2) << 13)];
             return               PRG_ROM[(address - 0xE000) + ((total8k - 1) << 13)];
         }
 
         public void UpdateCHRBanks()
         {
-            // cmd 0,1 → 2K each (left half): chrBank[0] selects 2K block (index >> 1 in 1K terms)
-            int b0 = (chrBank[0] & ~1) << 10;  // 2K boundary: clear bit 0, scale to byte offset
-            NesCore.chrBankPtrs[0] = CHR_ROM + b0;
-            NesCore.chrBankPtrs[1] = CHR_ROM + b0 + 1024;
-            int b1 = (chrBank[1] & ~1) << 10;
-            NesCore.chrBankPtrs[2] = CHR_ROM + b1;
-            NesCore.chrBankPtrs[3] = CHR_ROM + b1 + 1024;
+            if (CHR_ROM_count == 0)
+            {
+                for (int i = 0; i < 8; i++) NesCore.chrBankPtrs[i] = ppu_ram + (i << 10);
+                return;
+            }
+            int total1k = CHR_ROM_count * 8;
+            // cmd 0,1 → 2K each (left half): chrBank[0] selects 2K block (clear bit 0)
+            int b0 = (chrBank[0] & ~1) % total1k;
+            NesCore.chrBankPtrs[0] = CHR_ROM + (b0 << 10);
+            NesCore.chrBankPtrs[1] = CHR_ROM + ((b0 + 1) << 10);
+            int b1 = (chrBank[1] & ~1) % total1k;
+            NesCore.chrBankPtrs[2] = CHR_ROM + (b1 << 10);
+            NesCore.chrBankPtrs[3] = CHR_ROM + ((b1 + 1) << 10);
             // cmd 2-5 → 1K each (right half)
-            NesCore.chrBankPtrs[4] = CHR_ROM + (chrBank[2] << 10);
-            NesCore.chrBankPtrs[5] = CHR_ROM + (chrBank[3] << 10);
-            NesCore.chrBankPtrs[6] = CHR_ROM + (chrBank[4] << 10);
-            NesCore.chrBankPtrs[7] = CHR_ROM + (chrBank[5] << 10);
+            NesCore.chrBankPtrs[4] = CHR_ROM + ((chrBank[2] % total1k) << 10);
+            NesCore.chrBankPtrs[5] = CHR_ROM + ((chrBank[3] % total1k) << 10);
+            NesCore.chrBankPtrs[6] = CHR_ROM + ((chrBank[4] % total1k) << 10);
+            NesCore.chrBankPtrs[7] = CHR_ROM + ((chrBank[5] % total1k) << 10);
         }
 
         public byte MapperR_CHR(int address)

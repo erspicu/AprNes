@@ -90,7 +90,7 @@ namespace AprNes
 
                 case 0x7EF6:
                 case 0x7EF7:
-                    *Vertical = (value & 0x01) != 0 ? 0 : 1; // 1=V, 0=H
+                    *Vertical = (value & 0x01) != 0 ? 1 : 0; // 1=V, 0=H
                     break;
 
                 case 0x7EF8:

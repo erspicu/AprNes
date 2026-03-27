@@ -10,8 +10,8 @@
 
 | 結果 | 數量 | Mapper 列表 |
 |:----:|:----:|------------|
-| ✅ 正常 | 41 | 000, 001, 002, 003, 004, 005, 007, 010, 011, 016, 018, 019, 021, 022, 023, 024, 025, 026, 032, 033, 034, 065, 068, 069, 072, 075, 077, 078, 079, 085, 087, 089, 093, 097, 118, 119, 180, 184, 185, 228, 232 |
-| ⚠️ 部分問題 | 9 | 009, 064, 066, 080, 082, 088, 140, 152, 206 |
+| ✅ 正常 | 45 | 000, 001, 002, 003, 004, 005, 007, 010, 011, 016, 018, 019, 021, 022, 023, 024, 025, 026, 032, 033, 034, 065, 066, 068, 069, 072, 075, 077, 078, 079, 080, 082, 085, 087, 089, 093, 097, 118, 119, 152, 180, 184, 185, 206, 228, 232 |
+| ⚠️ 部分問題 | 5 | 009, 064, 088, 140 |
 | ❌ 有問題 | 6 | 013, 067, 070, 071, 076, 210 |
 | ❓ 待確認 | 2 | 095, 153 |
 | **合計校驗** | **58** | |
@@ -50,7 +50,7 @@
 | **034** | ✅ | 人工驗證通過 |
 | **064** | ⚠️ | Klax 畫面有問題 |
 | **065** | ✅ | 人工驗證通過（2026-03-27）：Daiku no Gen San 2 (J) 正常，鏡像邏輯修復 |
-| **066** | ⚠️ | 部分遊戲運作問題 |
+| **066** | ✅ | 人工驗證通過（2026-03-27）：PRG bank modulo 修復 |
 | **067** | ❌ | Mito Koumon II - Sekai Manyuu Ki (J) 畫面有問題 |
 | **068** | ✅ | |
 | **069** | ✅ | 人工驗證通過（2026-03-25）：含 Sunsoft 5B (YM2149) 3ch 擴展音效 |
@@ -62,8 +62,8 @@
 | **077** | ✅ | |
 | **078** | ✅ | Uchuusen - Cosmo Carrier (J) 已修復（2026-03-24） |
 | **079** | ✅ | |
-| **080** | ⚠️ | 畫面怪怪的 |
-| **082** | ⚠️ | 畫面怪怪的 |
+| **080** | ✅ | 人工驗證通過（2026-03-27）：mirroring 反轉修復 |
+| **082** | ✅ | 人工驗證通過（2026-03-27）：mirroring 反轉修復 |
 | **085** | ✅ | 人工驗證通過（2026-03-27）：Lagrange Point (J) 正常，含 OPLL (YM2413) FM 合成音效、CHR-RAM banking 修復 |
 | **087** | ✅ | |
 | **088** | ⚠️ | Devil Man (J) 畫面怪怪的 |
@@ -74,12 +74,12 @@
 | **118** | ✅ | 人工驗證通過（2026-03-25） |
 | **119** | ✅ | |
 | **140** | ⚠️ | 畫面怪怪的 |
-| **152** | ⚠️ | 首頁畫面怪怪的 |
+| **152** | ✅ | 人工驗證通過（2026-03-27）：mirroring bit 修復（bit6→bit7） |
 | **153** | ❓ | 不明 |
 | **180** | ✅ | |
 | **184** | ✅ | |
 | **185** | ✅ | |
-| **206** | ⚠️ | Dragon Slayer 4 MSX2 (Hack) 進入遊戲後畫面有問題 |
+| **206** | ✅ | 人工驗證通過（2026-03-27）：CHR/PRG bank modulo 修復 |
 | **210** | ❌ | 綠屏 |
 | **228** | ✅ | |
 | **232** | ✅ | |
@@ -119,7 +119,7 @@
 | **064** | Tengen RAMBO-1 | 類 MMC3；3×8KB PRG；A12/CPU-cycle IRQ 可切換 | Shinobi (Tengen) | ✅ |
 | **064** | Klax | 進入遊戲後畫面異常（停留標題循環） | Klax (Tengen) | ⚠️ |
 | **065** | Irem H-3001 | 3×8KB PRG switchable；16-bit CPU cycle IRQ | Daiku no Gen San 2 — intro 捲軸條紋 | ⚠️ |
-| **066** | GxROM | 32KB PRG × 8KB CHR 一次寫入 | DragonBall (J), Gumshoe (U) | ✅ |
+| **066** | GxROM | 32KB PRG × 8KB CHR 一次寫入；PRG modulo 修復 | DragonBall (J), Gumshoe (U) | ✅ |
 | **067** | Sunsoft-3 | 16KB PRG；4×2KB CHR；16-bit 下計數 IRQ | Fantasy Zone 2 (J), Mito Koumon II (J) | ❌ |
 | **068** | Sunsoft #4 | 16KB PRG（固定末）；4×2KB CHR；CHR-as-nametable | AfterBurner II (J), Maharaja (J) | ✅ |
 | **069** | Sunsoft FME-7 / 5B | CPU cycle IRQ；PRG-RAM 分頁；4種鏡像；YM2149 3ch 擴展音效（對數音量 LUT、CPU/2 時脈） | Batman (J), Gimmick! (J) | ✅ |
@@ -145,7 +145,7 @@
 | **119** | TQROM | MMC3 全功能；CHR bank 0x40–0x7F 映射 CHR-RAM | High Speed (U) | ✅ |
 | **140** | Jaleco JF-11 / JF-14 | $6000–$7FFF 寫入；bits[7:4]=CHR 8KB，bits[3:0]=PRG 32KB | Doraemon (J) | ✅ |
 | **140** | Bio Senshi Dan | 綠畫面（疑似 ROM 特定問題） | Bio Senshi Dan (J) | ⚠️ |
-| **152** | Bandai 74161/32 single-screen | Mapper070 subclass；bit6→single-screen 鏡像 | Arkanoid II Prototype (J) — 部分正常 | ⚠️ |
+| **152** | Bandai 74161/32 single-screen | Mapper070 subclass；bit7→single-screen 鏡像（bit6→bit7 修復） | Arkanoid II Prototype (J) | ✅ |
 | **153** | Bandai LZ93D50 + WRAM | 5-bit PRG bank；CHR-RAM；8KB WRAM；latch IRQ | Dragon Ball 3 (J) | ✅ |
 | **159** | Bandai LZ93D50 alias | Mapper016 sub5 的別名 | — | ✅ |
 | **180** | Crazy Climber / UnRom-180 | 首 16KB 固定($8000)，末 16KB 切換($C000)；CHR-RAM | Crazy Climber (J) | ✅ |

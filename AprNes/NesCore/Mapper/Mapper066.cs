@@ -35,7 +35,9 @@ namespace AprNes
 
         public byte MapperR_RPG(ushort address)
         {
-            return PRG_ROM[(address - 0x8000) + (PRG_Bankselect << 15)];
+            int total32k = PRG_ROM_count / 2;
+            if (total32k < 1) total32k = 1;
+            return PRG_ROM[(address - 0x8000) + ((PRG_Bankselect % total32k) << 15)];
         }
 
         public byte MapperR_CHR(int address)

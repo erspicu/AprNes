@@ -89,7 +89,7 @@ namespace AprNes
                     break;
 
                 case 0x7EF6:
-                    *Vertical = (value & 0x01) != 0 ? 0 : 1; // 1=V, 0=H
+                    *Vertical = (value & 0x01) != 0 ? 1 : 0; // 1=V, 0=H
                     chrMode = (value >> 1) & 0x01;
                     UpdateCHRBanks();
                     break;

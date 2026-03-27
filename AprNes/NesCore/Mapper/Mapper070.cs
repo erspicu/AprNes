@@ -68,7 +68,7 @@ namespace AprNes
                 // Use *Vertical >= 2 for single-screen (MEM.cs handles writes; PPU reads from ppu_ram directly)
                 // *Vertical = 2: single-screen-A (all writes to page 0 = $2000)
                 // *Vertical = 3: single-screen-B (all writes to page 1 = $2400)
-                *Vertical = ((value & 0x40) != 0) ? 3 : 2;
+                *Vertical = ((value & 0x80) != 0) ? 3 : 2;
                 NesCore.ntChrOverrideEnabled = false;
             }
 
