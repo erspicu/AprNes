@@ -174,7 +174,11 @@ namespace AprNes
                 case 66: return new Mapper066();
                 case 68: return new Mapper068();
                 case 69: return new Mapper069();
-                case 71: return new Mapper071();
+                case 71: {
+                    var m = new Mapper071();
+                    m.Submapper = db.Submapper;
+                    return m;
+                }
                 case 78: {
                     var m = new Mapper078();
                     if (db.Submapper == 3)

@@ -99,8 +99,8 @@ namespace AprNes
                 case 0xE800:
                     switch (value & 0x03)
                     {
-                        case 0: *Vertical = 0; break; // Vertical
-                        case 1: *Vertical = 1; break; // Horizontal
+                        case 0: *Vertical = 1; break; // Vertical
+                        case 1: *Vertical = 0; break; // Horizontal
                         case 2: *Vertical = 2; break; // Single-screen A
                         case 3: *Vertical = 3; break; // Single-screen B
                     }

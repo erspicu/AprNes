@@ -15,6 +15,7 @@ namespace AprNes
         int* Vertical;
 
         public int Submapper = 0; // 1=Namco175, 2=Namco340
+        bool autoDetect;          // true when Submapper==0 or -1 (unknown)
 
         int[] prgBank = new int[3];
         byte[] chrReg = new byte[8];
@@ -34,7 +35,7 @@ namespace AprNes
         {
             for (int i = 0; i < 3; i++) prgBank[i] = 0;
             for (int i = 0; i < 8; i++) chrReg[i] = 0;
-            NesCore.mapperExpansionAudio = 0;
+            autoDetect = (Submapper <= 0); // auto-detect when unknown
             UpdateCHRBanks();
         }
 
@@ -66,14 +67,20 @@ namespace AprNes
                     // Namco175: write-protect reg (we accept but ignore write protection for simplicity)
                     break;
                 case 0xE000:
+                    // Auto-detect Namco340: bit 7 or bit 6 set in $E000 write
+                    if (autoDetect && (value & 0xC0) != 0)
+                    {
+                        Submapper = 2;
+                        autoDetect = false;
+                    }
                     prgBank[0] = value & 0x3F;
                     if (Submapper == 2) // Namco340: mirroring
                     {
                         switch ((value >> 6) & 0x03)
                         {
                             case 0: *Vertical = 2; break; // Single-A
-                            case 1: *Vertical = 0; break; // Vertical
-                            case 2: *Vertical = 1; break; // Horizontal
+                            case 1: *Vertical = 1; break; // Vertical
+                            case 2: *Vertical = 0; break; // Horizontal
                             case 3: *Vertical = 3; break; // Single-B
                         }
                     }

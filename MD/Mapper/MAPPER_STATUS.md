@@ -1,6 +1,6 @@
 # AprNes Mapper 實作狀態
 
-**總計已實作：60 個　　最後更新：2026-03-27**
+**總計已實作：60 個　　最後更新：2026-03-28**
 
 結果說明：✅ 正常　⚠️ 部分問題　❌ 有問題　❓ 待確認／不明
 
@@ -10,9 +10,9 @@
 
 | 結果 | 數量 | Mapper 列表 |
 |:----:|:----:|------------|
-| ✅ 正常 | 45 | 000, 001, 002, 003, 004, 005, 007, 010, 011, 016, 018, 019, 021, 022, 023, 024, 025, 026, 032, 033, 034, 065, 066, 068, 069, 072, 075, 077, 078, 079, 080, 082, 085, 087, 089, 093, 097, 118, 119, 152, 180, 184, 185, 206, 228, 232 |
+| ✅ 正常 | 47 | 000, 001, 002, 003, 004, 005, 007, 010, 011, 016, 018, 019, 021, 022, 023, 024, 025, 026, 032, 033, 034, 065, 066, 068, 069, 070, 071, 072, 075, 077, 078, 079, 080, 082, 085, 087, 089, 093, 097, 118, 119, 152, 180, 184, 185, 206, 228, 232 |
 | ⚠️ 部分問題 | 5 | 009, 064, 088, 140 |
-| ❌ 有問題 | 6 | 013, 067, 070, 071, 076, 210 |
+| ❌ 有問題 | 4 | 013, 067, 076, 210 |
 | ❓ 待確認 | 2 | 095, 153 |
 | **合計校驗** | **58** | |
 
@@ -54,8 +54,8 @@
 | **067** | ❌ | Mito Koumon II - Sekai Manyuu Ki (J) 畫面有問題 |
 | **068** | ✅ | |
 | **069** | ✅ | 人工驗證通過（2026-03-25）：含 Sunsoft 5B (YM2149) 3ch 擴展音效 |
-| **070** | ❌ | 畫面有問題 |
-| **071** | ❌ | 綠屏 |
+| **070** | ✅ | 人工驗證通過（2026-03-28）：bit7 啟發式偵測修復，Arkanoid II 標題正常 |
+| **071** | ✅ | 人工驗證通過（2026-03-28）：基於 Mesen2 BF909x 重寫，PRG banking + BF9097 鏡像控制 |
 | **072** | ✅ | |
 | **075** | ✅ | |
 | **076** | ❌ | Battle City - Zen Ge Hack V4 遊戲運行問題（hack ROM） |
@@ -123,8 +123,8 @@
 | **067** | Sunsoft-3 | 16KB PRG；4×2KB CHR；16-bit 下計數 IRQ | Fantasy Zone 2 (J), Mito Koumon II (J) | ❌ |
 | **068** | Sunsoft #4 | 16KB PRG（固定末）；4×2KB CHR；CHR-as-nametable | AfterBurner II (J), Maharaja (J) | ✅ |
 | **069** | Sunsoft FME-7 / 5B | CPU cycle IRQ；PRG-RAM 分頁；4種鏡像；YM2149 3ch 擴展音效（對數音量 LUT、CPU/2 時脈） | Batman (J), Gimmick! (J) | ✅ |
-| **070** | Bandai 74161/32 | 16KB PRG + 8KB CHR 一次寫入；$C000 固定末 | Kamen Rider Club (J), Family Trainer 5 (J) | ✅ |
-| **071** | Camerica | 16KB PRG 切換（單暫存器）；CHR-RAM | Firehawk (U), Linus Spacehead (U) | ✅ |
+| **070** | Bandai 74161/32 | 16KB PRG + 8KB CHR 一次寫入；$C000 固定末；bit7 啟發式偵測 mislabeled ROM 鏡像 | Kamen Rider Club (J), Arkanoid II (J) | ✅ |
+| **071** | Camerica / BF909x | 16KB PRG 切換；CHR-RAM；BF9097 variant $9000 自動偵測+單屏鏡像 | Firehawk (U), Linus Spacehead (U) | ✅ |
 | **072** | Jaleco JF-17 | Latch 機制（prgFlag/chrFlag）；16KB PRG + 8KB CHR | Pinball Quest (J), Moero!! Juudou Warriors (J) | ✅ |
 | **075** | Konami VRC1 | 4×8KB PRG；2×4KB CHR；$9000 bit0=H/V | Ganbare Goemon! (J), Jajamaru Ninpou Chou (J) | ✅ |
 | **076** | Namco 109 | Namco108 架構；reg[2-5]=2KB CHR | Digital Devil Monogatari - Megami Tensei (J) | ✅ |

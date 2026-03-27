@@ -25,8 +25,6 @@ namespace AprNes
 
         // For Mapper152: mirroring control enabled
         protected bool enableMirroringControl;
-        // Track if mirroring control has been activated
-        private bool mirroringControlActivated;
 
         public MapperA12Mode A12NotifyMode => MapperA12Mode.None;
         public void NotifyA12(int addr, int ppuAbsCycle) { }
@@ -43,10 +41,6 @@ namespace AprNes
         public void Reset()
         {
             prgBank = 0; chrBank = 0;
-            mirroringControlActivated = enableMirroringControl;
-            // Mesen2 hack: force Vertical mirroring initially for Kamen Rider Club (bad header)
-            if (!enableMirroringControl)
-                *Vertical = 1;  // Vertical
             UpdateCHRBanks();
         }
 
@@ -57,17 +51,15 @@ namespace AprNes
 
         public void MapperW_PRG(ushort address, byte value)
         {
-            bool mirrorBit = (value & 0x80) != 0;
+            // Heuristic: bit7 is unused for PRG (only bits 4-6 used) so if any
+            // write has bit7=1, assume this ROM needs single-screen mirroring
+            // (some ROMs are mislabeled as Mapper070 when they're actually 152)
+            if (!enableMirroringControl && (value & 0x80) != 0)
+                enableMirroringControl = true;
 
-            // Mesen2 heuristic: if any write has bit7=1, enable mirroring control
-            if (mirrorBit) mirroringControlActivated = true;
-
-            if (mirroringControlActivated)
+            if (enableMirroringControl)
             {
-                // bit6: 0=ScreenA, 1=ScreenB
-                // Use *Vertical >= 2 for single-screen (MEM.cs handles writes; PPU reads from ppu_ram directly)
-                // *Vertical = 2: single-screen-A (all writes to page 0 = $2000)
-                // *Vertical = 3: single-screen-B (all writes to page 1 = $2400)
+                // bit7: 0=ScreenA, 1=ScreenB
                 *Vertical = ((value & 0x80) != 0) ? 3 : 2;
                 NesCore.ntChrOverrideEnabled = false;
             }
