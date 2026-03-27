@@ -176,6 +176,8 @@
     </Compile>
     <Compile Include="tool\libXBRz.cs" />
     <Compile Include="tool\NativeRendering.cs" />
+    <Compile Include="NesCore\FDS.cs" />
+    <Compile Include="NesCore\Mapper\FdsChrMapper.cs" />
     <Compile Include="NesCore\CPU.cs" />
     <Compile Include="NesCore\JoyPad.cs" />
     <Compile Include="NesCore\IO.cs" />

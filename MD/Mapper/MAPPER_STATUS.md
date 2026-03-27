@@ -1,6 +1,6 @@
 # AprNes Mapper 實作狀態
 
-**總計已實作：60 個　　最後更新：2026-03-28**
+**總計已實作：61 個　　最後更新：2026-03-28**
 
 結果說明：✅ 正常　⚠️ 部分問題　❌ 有問題　❓ 待確認／不明
 
@@ -10,11 +10,11 @@
 
 | 結果 | 數量 | Mapper 列表 |
 |:----:|:----:|------------|
-| ✅ 正常 | 47 | 000, 001, 002, 003, 004, 005, 007, 010, 011, 016, 018, 019, 021, 022, 023, 024, 025, 026, 032, 033, 034, 065, 066, 068, 069, 070, 071, 072, 075, 077, 078, 079, 080, 082, 085, 087, 089, 093, 097, 118, 119, 152, 180, 184, 185, 206, 228, 232 |
+| ✅ 正常 | 48 | 000, 001, 002, 003, 004, 005, 007, 010, 011, 016, 018, 019, 020, 021, 022, 023, 024, 025, 026, 032, 033, 034, 065, 066, 068, 069, 070, 071, 072, 075, 077, 078, 079, 080, 082, 085, 087, 089, 093, 097, 118, 119, 152, 180, 184, 185, 206, 228, 232 |
 | ⚠️ 部分問題 | 5 | 009, 064, 088, 140 |
 | ❌ 有問題 | 4 | 013, 067, 076, 210 |
 | ❓ 待確認 | 2 | 095, 153 |
-| **合計校驗** | **58** | |
+| **合計校驗** | **59** | |
 
 
 ---
@@ -36,6 +36,7 @@
 | **010** | ✅ | |
 | **011** | ✅ | |
 | **013** | ❌ | 有問題 |
+| **020** | ✅ | FDS 磁碟機支援（2026-03-28）：獨立於 IMapper 架構，NesCore partial class。BIOS 驗證（SHA-256）、gap-inserted 磁碟映像、IRQ timer、wavetable + FM 音效。人工驗證 10+ 遊戲（DK, SMB, Bubble Bobble, Dracula II, Galaga, Xevious 等） |
 | **016** | ✅ | 人工驗證通過（含 Dragon Ball Z - Kyoushuu Saiya Jin） |
 | **018** | ✅ | |
 | **019** | ✅ | 人工驗證通過（2026-03-27）：Splatterhouse (J)、Chibi Maruko-Chan (J) 正常，含 Namco 163 8ch 波形音效、CIRAM nametable/CHR 映射修復 |
@@ -106,7 +107,7 @@
 | **016** | Dragon Ball Z - Kyoushuu Saiya Jin | CIRAM read-time mirroring 修復後正常 | Dragon Ball Z - Kyoushuu Saiya Jin (J) | ✅ |
 | **018** | Jaleco SS8806 | 3×8KB PRG + 8×1KB CHR；nibble 寫入；可變寬度 IRQ | Ninja Jajamaru, Pizza Pop!, Magic John, Saiyuuki World 2 | ✅ |
 | **019** | Namco 163 | 3×8KB PRG；8×1KB CHR（≥0xE0 映射 CIRAM）；15-bit 上計數 IRQ；8ch 波形音效 | Splatterhouse (J), Rolling Thunder 2 (J) | ✅ |
-| **020** | FDS 磁碟機 | BIOS + 磁碟流模擬 | — | ❌ |
+| **020** | FDS 磁碟機 | BIOS($E000) + PRG-RAM(32KB) + CHR-RAM；磁碟 I/O 狀態機；IRQ timer；wavetable 音效 + FM 調變 | Donkey Kong, SMB, Bubble Bobble, Dracula II 等 10+ 遊戲 | ✅ |
 | **021** | Konami VRC4a/c | 4×8KB PRG switchable；8×1KB CHR；prescaler IRQ | Wai Wai World 2 (J), Ganbare Goemon Gaiden 2 (J) | ✅ |
 | **022** | Konami VRC2a | 8KB×2 PRG + 8×1KB CHR；CHR index >>1 | TwinBee 3 (J) | ✅ |
 | **023** | Konami VRC2b | 同 VRC2a 但 CHR index 不右移 | Contra (J), Getsufuu Maden (J) | ✅ |

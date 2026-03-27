@@ -562,7 +562,18 @@ namespace AprNes
             NesCore.rom_file_name = romPath;
             NesCore.exit = false;
 
-            if (!NesCore.init(romBytes))
+            bool initOk;
+            if (NesCore.IsFdsFile(romBytes))
+            {
+                string exeDir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+                byte[] bios = NesCore.LoadAndValidateFdsBios(exeDir);
+                initOk = bios != null && NesCore.initFDS(bios, romBytes);
+            }
+            else
+            {
+                initOk = NesCore.init(romBytes);
+            }
+            if (!initOk)
             {
                 Console.Error.WriteLine("Failed to init ROM: " + romName);
                 NesCore.VideoOutput -= handler;
