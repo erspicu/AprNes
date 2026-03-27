@@ -218,7 +218,16 @@ namespace AprNes
             NES_btn_UP = 4,
             NES_btn_DOWN = 5,
             NES_btn_LEFT = 6,
-            NES_btn_RIGHT = 7
+            NES_btn_RIGHT = 7,
+            // P2
+            NES_btn_P2_A = 8,
+            NES_btn_P2_B = 9,
+            NES_btn_P2_SELECT = 10,
+            NES_btn_P2_START = 11,
+            NES_btn_P2_UP = 12,
+            NES_btn_P2_DOWN = 13,
+            NES_btn_P2_LEFT = 14,
+            NES_btn_P2_RIGHT = 15
         }
 
         public int key_A = 90;
@@ -230,6 +239,16 @@ namespace AprNes
         public int key_UP = 38;
         public int key_DOWN = 40;
 
+        // P2 keyboard (default: no binding)
+        public int key_P2_A = 0;
+        public int key_P2_B = 0;
+        public int key_P2_SELECT = 0;
+        public int key_P2_START = 0;
+        public int key_P2_RIGHT = 0;
+        public int key_P2_LEFT = 0;
+        public int key_P2_UP = 0;
+        public int key_P2_DOWN = 0;
+
         string joypad_A = "";
         string joypad_B = "";
         string joypad_SELECT = "";
@@ -238,6 +257,16 @@ namespace AprNes
         string joypad_DOWN = "";
         string joypad_LEFT = "";
         string joypad_RIGHT = "";
+
+        // P2 joypad
+        string joypad_P2_A = "";
+        string joypad_P2_B = "";
+        string joypad_P2_SELECT = "";
+        string joypad_P2_START = "";
+        string joypad_P2_UP = "";
+        string joypad_P2_DOWN = "";
+        string joypad_P2_LEFT = "";
+        string joypad_P2_RIGHT = "";
 
         static string GetDefaultLang()
         {
@@ -280,6 +309,24 @@ namespace AprNes
                 AppConfigure["joypad_DOWN"] = "";
                 AppConfigure["joypad_LEFT"] = "";
                 AppConfigure["joypad_RIGHT"] = "";
+                // P2 keyboard
+                AppConfigure["key_P2_A"] = "0";
+                AppConfigure["key_P2_B"] = "0";
+                AppConfigure["key_P2_SELECT"] = "0";
+                AppConfigure["key_P2_START"] = "0";
+                AppConfigure["key_P2_UP"] = "0";
+                AppConfigure["key_P2_DOWN"] = "0";
+                AppConfigure["key_P2_LEFT"] = "0";
+                AppConfigure["key_P2_RIGHT"] = "0";
+                // P2 joypad
+                AppConfigure["joypad_P2_A"] = "";
+                AppConfigure["joypad_P2_B"] = "";
+                AppConfigure["joypad_P2_SELECT"] = "";
+                AppConfigure["joypad_P2_START"] = "";
+                AppConfigure["joypad_P2_UP"] = "";
+                AppConfigure["joypad_P2_DOWN"] = "";
+                AppConfigure["joypad_P2_LEFT"] = "";
+                AppConfigure["joypad_P2_RIGHT"] = "";
                 AppConfigure["Lang"] = GetDefaultLang();
                 AppConfigure["filter"] = "resize";
                 AppConfigure["Sound"] = "1";
@@ -316,14 +363,34 @@ namespace AprNes
             key_UP = int.Parse(AppConfigure["key_UP"]);
             key_DOWN = int.Parse(AppConfigure["key_DOWN"]);
 
-            joypad_A = AppConfigure["joypad_A"];
-            joypad_B = AppConfigure["joypad_B"];
-            joypad_SELECT = AppConfigure["joypad_SELECT"];
-            joypad_START = AppConfigure["joypad_START"];
-            joypad_UP = AppConfigure["joypad_UP"];
-            joypad_DOWN = AppConfigure["joypad_DOWN"];
-            joypad_LEFT = AppConfigure["joypad_LEFT"];
-            joypad_RIGHT = AppConfigure["joypad_RIGHT"];
+            joypad_A = AppConfigure.ContainsKey("joypad_A") ? AppConfigure["joypad_A"] : "";
+            joypad_B = AppConfigure.ContainsKey("joypad_B") ? AppConfigure["joypad_B"] : "";
+            joypad_SELECT = AppConfigure.ContainsKey("joypad_SELECT") ? AppConfigure["joypad_SELECT"] : "";
+            joypad_START = AppConfigure.ContainsKey("joypad_START") ? AppConfigure["joypad_START"] : "";
+            joypad_UP = AppConfigure.ContainsKey("joypad_UP") ? AppConfigure["joypad_UP"] : "";
+            joypad_DOWN = AppConfigure.ContainsKey("joypad_DOWN") ? AppConfigure["joypad_DOWN"] : "";
+            joypad_LEFT = AppConfigure.ContainsKey("joypad_LEFT") ? AppConfigure["joypad_LEFT"] : "";
+            joypad_RIGHT = AppConfigure.ContainsKey("joypad_RIGHT") ? AppConfigure["joypad_RIGHT"] : "";
+
+            // P2 keyboard
+            key_P2_A = AppConfigure.ContainsKey("key_P2_A") ? int.Parse(AppConfigure["key_P2_A"]) : 0;
+            key_P2_B = AppConfigure.ContainsKey("key_P2_B") ? int.Parse(AppConfigure["key_P2_B"]) : 0;
+            key_P2_SELECT = AppConfigure.ContainsKey("key_P2_SELECT") ? int.Parse(AppConfigure["key_P2_SELECT"]) : 0;
+            key_P2_START = AppConfigure.ContainsKey("key_P2_START") ? int.Parse(AppConfigure["key_P2_START"]) : 0;
+            key_P2_UP = AppConfigure.ContainsKey("key_P2_UP") ? int.Parse(AppConfigure["key_P2_UP"]) : 0;
+            key_P2_DOWN = AppConfigure.ContainsKey("key_P2_DOWN") ? int.Parse(AppConfigure["key_P2_DOWN"]) : 0;
+            key_P2_LEFT = AppConfigure.ContainsKey("key_P2_LEFT") ? int.Parse(AppConfigure["key_P2_LEFT"]) : 0;
+            key_P2_RIGHT = AppConfigure.ContainsKey("key_P2_RIGHT") ? int.Parse(AppConfigure["key_P2_RIGHT"]) : 0;
+
+            // P2 joypad
+            joypad_P2_A = AppConfigure.ContainsKey("joypad_P2_A") ? AppConfigure["joypad_P2_A"] : "";
+            joypad_P2_B = AppConfigure.ContainsKey("joypad_P2_B") ? AppConfigure["joypad_P2_B"] : "";
+            joypad_P2_SELECT = AppConfigure.ContainsKey("joypad_P2_SELECT") ? AppConfigure["joypad_P2_SELECT"] : "";
+            joypad_P2_START = AppConfigure.ContainsKey("joypad_P2_START") ? AppConfigure["joypad_P2_START"] : "";
+            joypad_P2_UP = AppConfigure.ContainsKey("joypad_P2_UP") ? AppConfigure["joypad_P2_UP"] : "";
+            joypad_P2_DOWN = AppConfigure.ContainsKey("joypad_P2_DOWN") ? AppConfigure["joypad_P2_DOWN"] : "";
+            joypad_P2_LEFT = AppConfigure.ContainsKey("joypad_P2_LEFT") ? AppConfigure["joypad_P2_LEFT"] : "";
+            joypad_P2_RIGHT = AppConfigure.ContainsKey("joypad_P2_RIGHT") ? AppConfigure["joypad_P2_RIGHT"] : "";
 
             // ── Resize pipeline: compute ScreenSize from stage multipliers ──
             if (!AppConfigure.ContainsKey("ResizeStage1")) AppConfigure["ResizeStage1"] = "none";
@@ -435,24 +502,45 @@ namespace AprNes
 
         private void NES_init_KeyMap()
         {
-            NES_KeyMAP_joypad[joypad_A] = KeyMap.NES_btn_A;
-            NES_KeyMAP_joypad[joypad_B] = KeyMap.NES_btn_B;
-            NES_KeyMAP_joypad[joypad_SELECT] = KeyMap.NES_btn_SELECT;
-            NES_KeyMAP_joypad[joypad_START] = KeyMap.NES_btn_START;
-            NES_KeyMAP_joypad[joypad_UP] = KeyMap.NES_btn_UP;
-            NES_KeyMAP_joypad[joypad_DOWN] = KeyMap.NES_btn_DOWN;
-            NES_KeyMAP_joypad[joypad_LEFT] = KeyMap.NES_btn_LEFT;
-            NES_KeyMAP_joypad[joypad_RIGHT] = KeyMap.NES_btn_RIGHT;
+            NES_KeyMAP_joypad.Clear();
+            // P1 joypad
+            if (joypad_A != "") NES_KeyMAP_joypad[joypad_A] = KeyMap.NES_btn_A;
+            if (joypad_B != "") NES_KeyMAP_joypad[joypad_B] = KeyMap.NES_btn_B;
+            if (joypad_SELECT != "") NES_KeyMAP_joypad[joypad_SELECT] = KeyMap.NES_btn_SELECT;
+            if (joypad_START != "") NES_KeyMAP_joypad[joypad_START] = KeyMap.NES_btn_START;
+            if (joypad_UP != "") NES_KeyMAP_joypad[joypad_UP] = KeyMap.NES_btn_UP;
+            if (joypad_DOWN != "") NES_KeyMAP_joypad[joypad_DOWN] = KeyMap.NES_btn_DOWN;
+            if (joypad_LEFT != "") NES_KeyMAP_joypad[joypad_LEFT] = KeyMap.NES_btn_LEFT;
+            if (joypad_RIGHT != "") NES_KeyMAP_joypad[joypad_RIGHT] = KeyMap.NES_btn_RIGHT;
+            // P2 joypad
+            if (joypad_P2_A != "") NES_KeyMAP_joypad[joypad_P2_A] = KeyMap.NES_btn_P2_A;
+            if (joypad_P2_B != "") NES_KeyMAP_joypad[joypad_P2_B] = KeyMap.NES_btn_P2_B;
+            if (joypad_P2_SELECT != "") NES_KeyMAP_joypad[joypad_P2_SELECT] = KeyMap.NES_btn_P2_SELECT;
+            if (joypad_P2_START != "") NES_KeyMAP_joypad[joypad_P2_START] = KeyMap.NES_btn_P2_START;
+            if (joypad_P2_UP != "") NES_KeyMAP_joypad[joypad_P2_UP] = KeyMap.NES_btn_P2_UP;
+            if (joypad_P2_DOWN != "") NES_KeyMAP_joypad[joypad_P2_DOWN] = KeyMap.NES_btn_P2_DOWN;
+            if (joypad_P2_LEFT != "") NES_KeyMAP_joypad[joypad_P2_LEFT] = KeyMap.NES_btn_P2_LEFT;
+            if (joypad_P2_RIGHT != "") NES_KeyMAP_joypad[joypad_P2_RIGHT] = KeyMap.NES_btn_P2_RIGHT;
 
+            // P1 keyboard
             NES_KeyMAP.Clear();
-            NES_KeyMAP[key_A] = KeyMap.NES_btn_A;
-            NES_KeyMAP[key_B] = KeyMap.NES_btn_B;
-            NES_KeyMAP[key_SELECT] = KeyMap.NES_btn_SELECT;
-            NES_KeyMAP[key_START] = KeyMap.NES_btn_START;
-            NES_KeyMAP[key_RIGHT] = KeyMap.NES_btn_RIGHT;
-            NES_KeyMAP[key_LEFT] = KeyMap.NES_btn_LEFT;
-            NES_KeyMAP[key_UP] = KeyMap.NES_btn_UP;
-            NES_KeyMAP[key_DOWN] = KeyMap.NES_btn_DOWN;
+            if (key_A != 0) NES_KeyMAP[key_A] = KeyMap.NES_btn_A;
+            if (key_B != 0) NES_KeyMAP[key_B] = KeyMap.NES_btn_B;
+            if (key_SELECT != 0) NES_KeyMAP[key_SELECT] = KeyMap.NES_btn_SELECT;
+            if (key_START != 0) NES_KeyMAP[key_START] = KeyMap.NES_btn_START;
+            if (key_RIGHT != 0) NES_KeyMAP[key_RIGHT] = KeyMap.NES_btn_RIGHT;
+            if (key_LEFT != 0) NES_KeyMAP[key_LEFT] = KeyMap.NES_btn_LEFT;
+            if (key_UP != 0) NES_KeyMAP[key_UP] = KeyMap.NES_btn_UP;
+            if (key_DOWN != 0) NES_KeyMAP[key_DOWN] = KeyMap.NES_btn_DOWN;
+            // P2 keyboard
+            if (key_P2_A != 0) NES_KeyMAP[key_P2_A] = KeyMap.NES_btn_P2_A;
+            if (key_P2_B != 0) NES_KeyMAP[key_P2_B] = KeyMap.NES_btn_P2_B;
+            if (key_P2_SELECT != 0) NES_KeyMAP[key_P2_SELECT] = KeyMap.NES_btn_P2_SELECT;
+            if (key_P2_START != 0) NES_KeyMAP[key_P2_START] = KeyMap.NES_btn_P2_START;
+            if (key_P2_RIGHT != 0) NES_KeyMAP[key_P2_RIGHT] = KeyMap.NES_btn_P2_RIGHT;
+            if (key_P2_LEFT != 0) NES_KeyMAP[key_P2_LEFT] = KeyMap.NES_btn_P2_LEFT;
+            if (key_P2_UP != 0) NES_KeyMAP[key_P2_UP] = KeyMap.NES_btn_P2_UP;
+            if (key_P2_DOWN != 0) NES_KeyMAP[key_P2_DOWN] = KeyMap.NES_btn_P2_DOWN;
         }
 
         public void Configure_Write()
@@ -499,6 +587,42 @@ namespace AprNes
             AppConfigure["joypad_RIGHT"] = "";
             if (NES_KeyMAP_joypad.Values.Contains(KeyMap.NES_btn_RIGHT))
                 AppConfigure["joypad_RIGHT"] = NES_KeyMAP_joypad.FirstOrDefault(x => x.Value == KeyMap.NES_btn_RIGHT).Key;
+
+            // P2 keyboard
+            AppConfigure["key_P2_A"] = key_P2_A.ToString();
+            AppConfigure["key_P2_B"] = key_P2_B.ToString();
+            AppConfigure["key_P2_SELECT"] = key_P2_SELECT.ToString();
+            AppConfigure["key_P2_START"] = key_P2_START.ToString();
+            AppConfigure["key_P2_UP"] = key_P2_UP.ToString();
+            AppConfigure["key_P2_DOWN"] = key_P2_DOWN.ToString();
+            AppConfigure["key_P2_LEFT"] = key_P2_LEFT.ToString();
+            AppConfigure["key_P2_RIGHT"] = key_P2_RIGHT.ToString();
+
+            // P2 joypad
+            AppConfigure["joypad_P2_A"] = "";
+            if (NES_KeyMAP_joypad.Values.Contains(KeyMap.NES_btn_P2_A))
+                AppConfigure["joypad_P2_A"] = NES_KeyMAP_joypad.FirstOrDefault(x => x.Value == KeyMap.NES_btn_P2_A).Key;
+            AppConfigure["joypad_P2_B"] = "";
+            if (NES_KeyMAP_joypad.Values.Contains(KeyMap.NES_btn_P2_B))
+                AppConfigure["joypad_P2_B"] = NES_KeyMAP_joypad.FirstOrDefault(x => x.Value == KeyMap.NES_btn_P2_B).Key;
+            AppConfigure["joypad_P2_SELECT"] = "";
+            if (NES_KeyMAP_joypad.Values.Contains(KeyMap.NES_btn_P2_SELECT))
+                AppConfigure["joypad_P2_SELECT"] = NES_KeyMAP_joypad.FirstOrDefault(x => x.Value == KeyMap.NES_btn_P2_SELECT).Key;
+            AppConfigure["joypad_P2_START"] = "";
+            if (NES_KeyMAP_joypad.Values.Contains(KeyMap.NES_btn_P2_START))
+                AppConfigure["joypad_P2_START"] = NES_KeyMAP_joypad.FirstOrDefault(x => x.Value == KeyMap.NES_btn_P2_START).Key;
+            AppConfigure["joypad_P2_UP"] = "";
+            if (NES_KeyMAP_joypad.Values.Contains(KeyMap.NES_btn_P2_UP))
+                AppConfigure["joypad_P2_UP"] = NES_KeyMAP_joypad.FirstOrDefault(x => x.Value == KeyMap.NES_btn_P2_UP).Key;
+            AppConfigure["joypad_P2_DOWN"] = "";
+            if (NES_KeyMAP_joypad.Values.Contains(KeyMap.NES_btn_P2_DOWN))
+                AppConfigure["joypad_P2_DOWN"] = NES_KeyMAP_joypad.FirstOrDefault(x => x.Value == KeyMap.NES_btn_P2_DOWN).Key;
+            AppConfigure["joypad_P2_LEFT"] = "";
+            if (NES_KeyMAP_joypad.Values.Contains(KeyMap.NES_btn_P2_LEFT))
+                AppConfigure["joypad_P2_LEFT"] = NES_KeyMAP_joypad.FirstOrDefault(x => x.Value == KeyMap.NES_btn_P2_LEFT).Key;
+            AppConfigure["joypad_P2_RIGHT"] = "";
+            if (NES_KeyMAP_joypad.Values.Contains(KeyMap.NES_btn_P2_RIGHT))
+                AppConfigure["joypad_P2_RIGHT"] = NES_KeyMAP_joypad.FirstOrDefault(x => x.Value == KeyMap.NES_btn_P2_RIGHT).Key;
 
             AppConfigure["ScreenFull"] = ScreenCenterFull.ToString();
             AppConfigure["Sound"] = NesCore.AudioEnabled ? "1" : "0";
@@ -957,16 +1081,21 @@ namespace AprNes
 
                                 if (NES_KeyMAP_joypad.ContainsKey(key_a) || (AprNesUI.GetInstance().NES_KeyMAP_joypad.ContainsKey(key_b)))
                                 {
+                                    // Check if this axis is bound to P1 or P2
+                                    KeyMap boundA = KeyMap.NES_btn_LEFT, boundB = KeyMap.NES_btn_RIGHT;
+                                    bool isP2 = false;
+                                    if (NES_KeyMAP_joypad.ContainsKey(key_a)) { boundA = NES_KeyMAP_joypad[key_a]; isP2 = (int)boundA >= 8; }
+                                    else if (NES_KeyMAP_joypad.ContainsKey(key_b)) { boundB = NES_KeyMAP_joypad[key_b]; isP2 = (int)boundB >= 8; }
+
                                     if (XY == "X")
                                     {
-                                        NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_LEFT);
-                                        NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_RIGHT);
+                                        if (isP2) { NesCore.P2_ButtonUnPress((byte)KeyMap.NES_btn_LEFT); NesCore.P2_ButtonUnPress((byte)KeyMap.NES_btn_RIGHT); }
+                                        else { NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_LEFT); NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_RIGHT); }
                                     }
-
                                     if (XY == "Y")
                                     {
-                                        NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_UP);
-                                        NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_DOWN);
+                                        if (isP2) { NesCore.P2_ButtonUnPress((byte)KeyMap.NES_btn_UP); NesCore.P2_ButtonUnPress((byte)KeyMap.NES_btn_DOWN); }
+                                        else { NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_UP); NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_DOWN); }
                                     }
                                 }
                                 continue;
@@ -974,69 +1103,20 @@ namespace AprNes
 
                         }
 
-                        switch (joy)
+                        // Dispatch to P1 or P2 based on KeyMap value
+                        bool isP2btn = (int)joy >= 8;
+                        byte btnIndex = isP2btn ? (byte)((int)joy - 8) : (byte)joy;
+                        bool pressed = (joy_event.event_type == 0) || (joy_event.button_event == 1);
+
+                        if (pressed)
                         {
-                            case KeyMap.NES_btn_A:
-                                {
-                                    if (joy_event.button_event == 1)
-                                        NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_A);
-                                    else
-                                        NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_A);
-
-                                }
-                                break;
-                            case KeyMap.NES_btn_B:
-                                {
-                                    if (joy_event.button_event == 1)
-                                        NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_B);
-                                    else
-                                        NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_B);
-                                }
-                                break;
-
-                            case KeyMap.NES_btn_SELECT:
-                                {
-                                    if (joy_event.button_event == 1)
-                                        NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_SELECT);
-                                    else
-                                        NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_SELECT);
-                                }
-                                break;
-                            case KeyMap.NES_btn_START:
-                                {
-                                    if (joy_event.button_event == 1)
-                                        NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_START);
-                                    else
-                                        NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_START);
-                                }
-                                break;
-
-                            case KeyMap.NES_btn_UP:
-                                if (joy_event.event_type == 0 || joy_event.button_event == 1)
-                                    NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_UP);
-                                else
-                                    NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_UP);
-                                break;
-
-                            case KeyMap.NES_btn_DOWN:
-                                if (joy_event.event_type == 0 || joy_event.button_event == 1)
-                                    NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_DOWN);
-                                else
-                                    NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_DOWN);
-                                break;
-                            case KeyMap.NES_btn_LEFT:
-                                if (joy_event.event_type == 0 || joy_event.button_event == 1)
-                                    NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_LEFT);
-                                else
-                                    NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_LEFT);
-                                break;
-
-                            case KeyMap.NES_btn_RIGHT:
-                                if (joy_event.event_type == 0 || joy_event.button_event == 1)
-                                    NesCore.P1_ButtonPress((byte)KeyMap.NES_btn_RIGHT);
-                                else
-                                    NesCore.P1_ButtonUnPress((byte)KeyMap.NES_btn_RIGHT);
-                                break;
+                            if (isP2btn) NesCore.P2_ButtonPress(btnIndex);
+                            else NesCore.P1_ButtonPress(btnIndex);
+                        }
+                        else
+                        {
+                            if (isP2btn) NesCore.P2_ButtonUnPress(btnIndex);
+                            else NesCore.P1_ButtonUnPress(btnIndex);
                         }
                     }
                 }
@@ -1299,7 +1379,13 @@ public string GetRomInfo()
                 return true;
             }
             if (NES_KeyMAP.ContainsKey(keyboard_key))
-                NesCore.P1_ButtonPress((byte)NES_KeyMAP[keyboard_key]);
+            {
+                KeyMap km = NES_KeyMAP[keyboard_key];
+                if ((int)km >= 8)
+                    NesCore.P2_ButtonPress((byte)((int)km - 8));
+                else
+                    NesCore.P1_ButtonPress((byte)km);
+            }
             return true;
         }
 
@@ -1339,7 +1425,13 @@ public string GetRomInfo()
         {
             if (!running) return;
             if (NES_KeyMAP.ContainsKey(e.KeyValue))
-                NesCore.P1_ButtonUnPress((byte)NES_KeyMAP[e.KeyValue]);
+            {
+                KeyMap km = NES_KeyMAP[e.KeyValue];
+                if ((int)km >= 8)
+                    NesCore.P2_ButtonUnPress((byte)((int)km - 8));
+                else
+                    NesCore.P1_ButtonUnPress((byte)km);
+            }
         }
 
         bool LimitFPS = true;

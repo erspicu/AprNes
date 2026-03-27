@@ -10,7 +10,7 @@ namespace NativeTools
         // DirectInput devices (non-XInput game controllers)
         struct DiDevice
         {
-            public int       ID;
+            public int       ID;        // stable ID derived from GuidInstance
             public IntPtr    Device;
             public DIJOYSTATE PrevState;
         }
@@ -18,6 +18,12 @@ namespace NativeTools
         IntPtr _di;
 
         public int PeriodMin = 10; // ms between polls
+
+        // Derive a stable positive int ID from a GUID (survives USB re-plug / reboot)
+        static int GuidToStableId(Guid g)
+        {
+            return g.GetHashCode() & 0x7FFFFF00; // mask to positive, avoid XInput range (1000-1003)
+        }
 
         // XInput state — player index 0-3, device ID = XI_ID_BASE + index
         const int XI_ID_BASE = 1000;
@@ -34,7 +40,6 @@ namespace NativeTools
             st.Restart();
 
             _diDevices.Clear();
-            int nextId = 0;
 
             // DirectInput — enumerate non-XInput game controllers
             try
@@ -44,13 +49,14 @@ namespace NativeTools
                 {
                     IntPtr dev = DirectInputNative.OpenDevice(_di, info.GuidInstance, hwnd);
                     if (dev == IntPtr.Zero) continue;
+                    int stableId = GuidToStableId(info.GuidInstance);
                     _diDevices.Add(new DiDevice
                     {
-                        ID        = nextId++,
+                        ID        = stableId,
                         Device    = dev,
                         PrevState = DirectInputNative.DefaultState()
                     });
-                    Console.WriteLine("DirectInput device " + (nextId - 1) + ": " + info.Name);
+                    Console.WriteLine("DirectInput device " + stableId.ToString("X8") + ": " + info.Name + " (GUID=" + info.GuidInstance + ")");
                 }
             }
             catch (Exception ex)

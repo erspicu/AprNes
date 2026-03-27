@@ -150,6 +150,7 @@ namespace AprNes
             if (corruptOamRow!= null) { Marshal.FreeHGlobal((IntPtr)corruptOamRow);corruptOamRow= null; }
             if (ppu_ram      != null) { Marshal.FreeHGlobal((IntPtr)ppu_ram);      ppu_ram      = null; }
             if (P1_joypad_status != null) { Marshal.FreeHGlobal((IntPtr)P1_joypad_status); P1_joypad_status = null; }
+            if (P2_joypad_status != null) { Marshal.FreeHGlobal((IntPtr)P2_joypad_status); P2_joypad_status = null; }
             if (NES_MEM      != null) { Marshal.FreeHGlobal((IntPtr)NES_MEM);      NES_MEM      = null; }
             if (Vertical           != null) { Marshal.FreeHGlobal((IntPtr)Vertical);           Vertical           = null; }
             if (AnalogScreenBuf  != null) { Marshal.FreeHGlobal((IntPtr)AnalogScreenBuf);  AnalogScreenBuf  = null; AnalogBufSize = 0; }
@@ -360,6 +361,7 @@ namespace AprNes
                 corruptOamRow    = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
                 ppu_ram          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 0x4000);
                 P1_joypad_status = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
+                P2_joypad_status = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 NES_MEM          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 65536);
 
                 // Compute PRG+CHR CRC32 (skip 16-byte iNES header, matching Mesen2 DB format)
@@ -398,6 +400,7 @@ namespace AprNes
                 for (int i = 0; i < 256; i++) spr_ram[i] = 0;
                 for (int i = 0; i < 32; i++) { secondaryOAM[i] = 0; corruptOamRow[i] = 0; }
                 for (int i = 0; i < 8; i++) P1_joypad_status[i] = 0x40;
+                for (int i = 0; i < 8; i++) P2_joypad_status[i] = 0x40;
                 for (int i = 0; i < 65536; i++) NES_MEM[i] = 0;
 
                 HardResetState();  // reset all CPU/PPU/DMA static state

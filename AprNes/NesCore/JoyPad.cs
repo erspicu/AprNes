@@ -1,4 +1,4 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 
 namespace AprNes
 {
@@ -6,6 +6,9 @@ namespace AprNes
     {
         static byte* P1_joypad_status;
         static byte P1_StrobeState = 0;
+
+        static byte* P2_joypad_status;
+        static byte P2_StrobeState = 0;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static public void P1_ButtonPress(byte v)
@@ -21,6 +24,20 @@ namespace AprNes
             P1_joypad_status[v] = 0x40;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static public void P2_ButtonPress(byte v)
+        {
+            if (v > 7) return;
+            P2_joypad_status[v] = 0x41;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static public void P2_ButtonUnPress(byte v)
+        {
+            if (v > 7) return;
+            P2_joypad_status[v] = 0x40;
+        }
+
         static byte P1_r = 0;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -33,6 +50,18 @@ namespace AprNes
             return (byte)((P1_r & 0x1F) | (cpubus & 0xE0)); // upper 3 bits are CPU open bus
         }
 
+        static byte P2_r = 0;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static public byte gamepad_r_4017()
+        {
+            if (P2_StrobeState < 8) P2_r = P2_joypad_status[P2_StrobeState];
+            else P2_r = 1; // After 8 buttons, shift register returns D0=1 (NES hardware)
+            P2_StrobeState++;
+            if (P2_StrobeState == 24) P2_StrobeState = 0;
+            return (byte)((P2_r & 0x1F) | (cpubus & 0xE0)); // upper 3 bits are CPU open bus
+        }
+
         static byte P1_LastWrite = 0;
         static int strobeWritePending = 0;
         static byte strobeWriteValue = 0;
@@ -43,7 +72,11 @@ namespace AprNes
         {
             if (strobeWritePending > 0 && --strobeWritePending == 0)
             {
-                if ((P1_LastWrite & 1) == 1 && (strobeWriteValue & 1) == 0) P1_StrobeState = 0;
+                if ((P1_LastWrite & 1) == 1 && (strobeWriteValue & 1) == 0)
+                {
+                    P1_StrobeState = 0;
+                    P2_StrobeState = 0; // $4016 strobe resets both controllers
+                }
                 P1_LastWrite = strobeWriteValue;
             }
         }

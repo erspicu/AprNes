@@ -17,7 +17,7 @@ namespace AprNes
             {
                 if      (addr == 0x4015) return apu_r_4015();
                 else if (addr == 0x4016) return gamepad_r_4016();
-                else if (addr == 0x4017) return (byte)(cpubus & 0xE0);
+                else if (addr == 0x4017) return gamepad_r_4017();
                 else                     return cpubus;
             }
         }
