@@ -89,6 +89,10 @@
             for (int i = 0; i < 3; i++) { audioTimer[i] = 0; toneStep[i] = 0; }
             audioProcessTick = false;
             NesCore.mapperExpansionAudio = 0;
+            NesCore.expansionChipType = NesCore.ExpansionChipType.Sunsoft5B;
+            NesCore.expansionChannelCount = 3;
+            NesCore.expansionChannels[0] = NesCore.expansionChannels[1] = NesCore.expansionChannels[2] = 0;
+            NesCore.mmix_UpdateExpansionGain();
         }
 
         public byte MapperR_ExpansionROM(ushort address) { return NesCore.cpubus; }
@@ -199,7 +203,6 @@
             // Sunsoft 5B audio — clocked at CPU/2
             if (audioProcessTick)
             {
-                short summedOutput = 0;
                 for (int ch = 0; ch < 3; ch++)
                 {
                     audioTimer[ch]--;
@@ -210,12 +213,9 @@
                     }
                     // Tone enabled (bit=0 means enabled) and in high half of 16-step cycle
                     bool toneEnabled = ((audioRegs[7] >> ch) & 1) == 0;
-                    if (toneEnabled && toneStep[ch] < 8)
-                        summedOutput += (short)volumeLut[audioRegs[8 + ch] & 0x0F];
+                    NesCore.expansionChannels[ch] = (toneEnabled && toneStep[ch] < 8)
+                        ? volumeLut[audioRegs[8 + ch] & 0x0F] : 0;
                 }
-                // Gain calibrated per mixing guide: 5B max (531) × 120 ≈ 63,720
-                // Comparable to VRC6 max (~48,800), matching 2.0-2.5× APU pulse recommendation
-                NesCore.mapperExpansionAudio = summedOutput * 120;
             }
             audioProcessTick = !audioProcessTick;
         }

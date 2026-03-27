@@ -86,6 +86,10 @@
             sawRate = sawAccum = sawFreq = sawTimer = sawStep = sawFShift = 0;
             sawEnable = false;
             NesCore.mapperExpansionAudio = 0;
+            NesCore.expansionChipType = NesCore.ExpansionChipType.VRC6;
+            NesCore.expansionChannelCount = 3;
+            NesCore.expansionChannels[0] = NesCore.expansionChannels[1] = NesCore.expansionChannels[2] = 0;
+            NesCore.mmix_UpdateExpansionGain();
             UpdateCHRBanks();
         }
 
@@ -421,11 +425,13 @@
                 }
             }
 
-            // Update expansion audio
+            // Update expansion audio — per-channel raw output
             int p0out = (pEnable[0] && !haltAudio) ? (pIgnDuty[0] ? pVol[0] : (pStep[0] <= pDuty[0] ? pVol[0] : 0)) : 0;
             int p1out = (pEnable[1] && !haltAudio) ? (pIgnDuty[1] ? pVol[1] : (pStep[1] <= pDuty[1] ? pVol[1] : 0)) : 0;
             int sawout = (sawEnable && !haltAudio) ? (sawAccum >> 3) : 0;
-            NesCore.mapperExpansionAudio = (p0out + p1out + sawout) * 800;
+            NesCore.expansionChannels[0] = p0out;
+            NesCore.expansionChannels[1] = p1out;
+            NesCore.expansionChannels[2] = sawout;
         }
 
         public void NotifyA12(int addr, int ppuAbsCycle) { }

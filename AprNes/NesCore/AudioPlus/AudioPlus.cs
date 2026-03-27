@@ -108,6 +108,7 @@ namespace AprNes
             cmf_Reset();
             mfx_Reset();
             mmix_ResetBiquad();
+            mmix_UpdateExpansionGain();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -609,12 +610,17 @@ namespace AprNes
         // ==================================================================
         const int MMIX_MAX_SAMPLES = 800;
 
+        const int MMIX_NES_CH = 5;   // NES built-in: sq1, sq2, tri, noise, dmc
+        const int MMIX_EXP_CH = 8;   // max expansion channels (Namco163 = 8)
+        const int MMIX_TOTAL_CH = MMIX_NES_CH + MMIX_EXP_CH; // 13
+
         static float** mmix_chBuf;
         static float* mmix_basePanL;
         static float* mmix_basePanR;
         static float* mmix_panL;
         static float* mmix_panR;
-        static float* mmix_normScale;
+        static float* mmix_normScale;  // [5] NES channels
+        static float  mmix_expGain;    // combined chip gain × user volume for current expansion
         static double mmix_bq_b0, mmix_bq_b1, mmix_bq_b2, mmix_bq_a1, mmix_bq_a2;
         static double mmix_bq_s1, mmix_bq_s2; // Transposed Direct Form II state
         static int mmix_cachedBoostDb;
@@ -622,15 +628,18 @@ namespace AprNes
 
         static void mmix_InitTables()
         {
-            mmix_basePanL = apm_AllocFloat(5);
+            mmix_basePanL = apm_AllocFloat(MMIX_TOTAL_CH);
             mmix_basePanL[0] = 0.7f; mmix_basePanL[1] = 0.3f; mmix_basePanL[2] = 0.5f;
             mmix_basePanL[3] = 0.5f; mmix_basePanL[4] = 0.5f;
+            // Expansion channels: default center pan
+            for (int i = MMIX_NES_CH; i < MMIX_TOTAL_CH; i++) mmix_basePanL[i] = 0.5f;
 
-            mmix_basePanR = apm_AllocFloat(5);
+            mmix_basePanR = apm_AllocFloat(MMIX_TOTAL_CH);
             mmix_basePanR[0] = 0.3f; mmix_basePanR[1] = 0.7f; mmix_basePanR[2] = 0.5f;
             mmix_basePanR[3] = 0.5f; mmix_basePanR[4] = 0.5f;
+            for (int i = MMIX_NES_CH; i < MMIX_TOTAL_CH; i++) mmix_basePanR[i] = 0.5f;
 
-            mmix_normScale = apm_AllocFloat(5);
+            mmix_normScale = apm_AllocFloat(MMIX_NES_CH);
             mmix_normScale[0] = 1f / 15f;
             mmix_normScale[1] = 1f / 15f;
             mmix_normScale[2] = 1f / 15f;
@@ -641,17 +650,27 @@ namespace AprNes
         static void mmix_Init()
         {
             if (mmix_chBuf != null) return; // 已配置，共用記憶體
-            mmix_chBuf = (float**)Marshal.AllocHGlobal(5 * sizeof(float*));
-            for (int i = 0; i < 5; i++)
+            mmix_chBuf = (float**)Marshal.AllocHGlobal(MMIX_TOTAL_CH * sizeof(float*));
+            for (int i = 0; i < MMIX_TOTAL_CH; i++)
                 mmix_chBuf[i] = apm_AllocFloat(MMIX_MAX_SAMPLES);
-            mmix_panL = apm_AllocFloat(5);
-            mmix_panR = apm_AllocFloat(5);
+            mmix_panL = apm_AllocFloat(MMIX_TOTAL_CH);
+            mmix_panR = apm_AllocFloat(MMIX_TOTAL_CH);
+        }
+
+        /// <summary>Update expansion channel gain from current chip type and user volume.</summary>
+        public static void mmix_UpdateExpansionGain()
+        {
+            int ct = (int)expansionChipType;
+            if (ct < DefaultChipGain.Length)
+                mmix_expGain = DefaultChipGain[ct] * (ExpansionChipUserVolume[ct] * 0.01f) * (1f / 98302f);
+            else
+                mmix_expGain = 0f;
         }
 
         static void mmix_SetStereoWidth(int width)
         {
             float w = Math.Max(0, Math.Min(100, width)) / 100f;
-            for (int ch = 0; ch < 5; ch++)
+            for (int ch = 0; ch < MMIX_TOTAL_CH; ch++)
             {
                 mmix_panL[ch] = 0.5f + (mmix_basePanL[ch] - 0.5f) * w;
                 mmix_panR[ch] = 0.5f + (mmix_basePanR[ch] - 0.5f) * w;
@@ -700,6 +719,15 @@ namespace AprNes
             ose_PushSample(3, tri * mmix_normScale[2]);
             ose_PushSample(4, noise * mmix_normScale[3]);
             ose_PushSample(5, dmc * mmix_normScale[4]);
+
+            // Expansion channels (oversampler idx 6~13)
+            int expCount = expansionChannelCount;
+            if (expCount > 0)
+            {
+                float g = mmix_expGain;
+                for (int i = 0; i < expCount; i++)
+                    ose_PushSample(6 + i, expansionChannels[i] * g);
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -729,6 +757,16 @@ namespace AprNes
             L += s3 * mmix_panL[3]; R += s3 * mmix_panR[3];
             L += s4 * mmix_panL[4]; R += s4 * mmix_panR[4];
 
+            // Expansion channels (oversampler idx 6~13)
+            int expCount = expansionChannelCount;
+            for (int i = 0; i < expCount; i++)
+            {
+                float es;
+                ose_TryGetSample(6 + i, out es);
+                int pi = MMIX_NES_CH + i;
+                L += es * mmix_panL[pi]; R += es * mmix_panR[pi];
+            }
+
             mfx_ProcessSample(ref L, ref R);
 
             return true;
@@ -736,9 +774,14 @@ namespace AprNes
 
         static int mmix_ProcessFrame(float[] stereoOut, int maxStereoSamples)
         {
+            int expCount = expansionChannelCount;
+            int totalCh = MMIX_NES_CH + expCount;
+
             int count = ose_Decimate(1, mmix_chBuf[0], MMIX_MAX_SAMPLES);
-            for (int ch = 1; ch < 5; ch++)
+            for (int ch = 1; ch < MMIX_NES_CH; ch++)
                 ose_Decimate(ch + 1, mmix_chBuf[ch], MMIX_MAX_SAMPLES);
+            for (int ch = 0; ch < expCount; ch++)
+                ose_Decimate(6 + ch, mmix_chBuf[MMIX_NES_CH + ch], MMIX_MAX_SAMPLES);
 
             int outCount = Math.Min(count, maxStereoSamples);
             float* p0 = mmix_chBuf[0];
@@ -751,7 +794,6 @@ namespace AprNes
             // Pass 1: 純量處理 IIR 濾波器 (解決狀態相依問題)
             // 直接原地覆寫 ch2 陣列，準備給下一個階段無縫讀取
             // ==============================================================
-            // Transposed Direct Form II: fewer state shuffles per sample
             for (int i = 0; i < outCount; i++)
             {
                 double triSample = p2[i];
@@ -762,7 +804,7 @@ namespace AprNes
             }
 
             // ==============================================================
-            // Pass 2: SIMD 5軌立體聲矩陣混音 (算力碾壓)
+            // Pass 2: NES 5 channel SIMD 立體聲矩陣混音 + expansion scalar mix
             // ==============================================================
             int vecLen = Vector<float>.Count;
             int iIdx = 0;
@@ -801,6 +843,19 @@ namespace AprNes
                     pOut[iIdx * 2] = L;
                     pOut[iIdx * 2 + 1] = R;
                 }
+
+                // Pass 3: add expansion channels (scalar, since count is dynamic)
+                for (int ec = 0; ec < expCount; ec++)
+                {
+                    float* pe = mmix_chBuf[MMIX_NES_CH + ec];
+                    int pi = MMIX_NES_CH + ec;
+                    float pL = mmix_panL[pi], pR = mmix_panR[pi];
+                    for (int i = 0; i < outCount; i++)
+                    {
+                        pOut[i * 2]     += pe[i] * pL;
+                        pOut[i * 2 + 1] += pe[i] * pR;
+                    }
+                }
             }
 
             return outCount;
@@ -813,9 +868,9 @@ namespace AprNes
 
         // ==================================================================
         // OversamplingEngine (ose_) — 6 instances indexed
-        // idx 0 = authentic, idx 1~5 = modern ch0~ch4
+        // idx 0 = authentic, idx 1~5 = modern NES ch0~ch4, idx 6~13 = expansion ch0~ch7
         // ==================================================================
-        const int OSE_COUNT = 6;
+        const int OSE_COUNT = 14;
         const int OSE_TAPS = 256;
         const int OSE_PHASES = 128;
         const int OSE_HALF_TAPS = OSE_TAPS / 2;

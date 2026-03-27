@@ -72,6 +72,10 @@
             clockTimer = 0;
             audioMuted = false;
             NesCore.mapperExpansionAudio = 0;
+            NesCore.expansionChipType = NesCore.ExpansionChipType.VRC7;
+            NesCore.expansionChannelCount = 1; // OPLL outputs single mixed sample
+            NesCore.expansionChannels[0] = 0;
+            NesCore.mmix_UpdateExpansionGain();
         }
 
         static int TranslateAddr(int addr)
@@ -232,7 +236,8 @@
                 // OPLL output range: ~±12285 (6 ch × ~2048)
                 // Scale to match NES APU range (~0..98302) and other expansion audio
                 // VRC6 max ~28000, Namco163 ~15000; use factor 3 for comparable level
-                NesCore.mapperExpansionAudio = audioMuted ? 0 : output * 3;
+                int expOut = audioMuted ? 0 : output;
+                NesCore.expansionChannels[0] = expOut;
                 previousOutput = output;
             }
         }

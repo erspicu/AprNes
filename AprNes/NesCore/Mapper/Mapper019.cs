@@ -73,6 +73,10 @@ namespace AprNes
             audioUpdateCtr = 0; audioChannel = 7;
             audioDisable = false;
             NesCore.mapperExpansionAudio = 0;
+            NesCore.expansionChipType = NesCore.ExpansionChipType.Namco163;
+            NesCore.expansionChannelCount = 0; // updated dynamically by audio engine
+            for (int i = 0; i < 8; i++) NesCore.expansionChannels[i] = 0;
+            NesCore.mmix_UpdateExpansionGain();
             UpdateCHRBanks();
         }
 
@@ -265,13 +269,14 @@ namespace AprNes
 
             chOutput[ch] = (short)((sample - 8) * volume);
 
-            // Update summed output
+            // Update per-channel expansion output
+            // N163 hardware: more active channels = each channel gets less time = quieter
+            // Divide each channel by (numCh+1) to match averaging behavior
             int numCh = GetNumChannels();
-            int sum = 0;
-            for (int i = 7; i >= 7 - numCh; i--) sum += chOutput[i];
-            int avg = sum / (numCh + 1);
-
-            NesCore.mapperExpansionAudio = avg * 500;
+            int activeCh = numCh + 1; // GetNumChannels() returns 0-based count
+            NesCore.expansionChannelCount = activeCh;
+            for (int i = 0; i < activeCh; i++)
+                NesCore.expansionChannels[i] = chOutput[7 - i] / activeCh;
         }
 
         public void CpuCycle()

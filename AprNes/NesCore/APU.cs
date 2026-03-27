@@ -63,6 +63,42 @@ namespace AprNes
         // Expansion audio (VRC6, Namco163, VRC7 etc.) — set by mapper each CPU cycle
         static public int mapperExpansionAudio = 0;
 
+        // ── Expansion Audio 多 channel 獨立處理 ──
+        // Mapper 啟動時設定 chipType 和 channelCount，每 cycle 寫入 expansionChannels[]
+        // Mode 2 (Modern) 使用獨立 oversampler；Mode 0/1 用 mapperExpansionAudio 向後相容
+        public enum ExpansionChipType : byte
+        {
+            None = 0,
+            VRC6 = 1,      // Mapper 024/026 — 2 Pulse + 1 Sawtooth (3 ch)
+            VRC7 = 2,      // Mapper 085 — 6 FM (OPLL) (1 ch mixed output)
+            Namco163 = 3,  // Mapper 019 — 1~8 Wavetable (dynamic)
+            Sunsoft5B = 4, // Mapper 069 — 3 Square (5B) (3 ch)
+            MMC5 = 5,      // Mapper 005 — 2 Pulse + PCM (future)
+            FDS = 6,       // FDS — Wavetable (future)
+        }
+
+        static public ExpansionChipType expansionChipType = ExpansionChipType.None;
+        static public int   expansionChannelCount = 0;       // 0~8
+        static public int[] expansionChannels = new int[8];   // raw output per channel
+
+        // 每晶片增益 — 匹配原有 mapperExpansionAudio 乘數
+        // 讓 per-channel × gain 加總後落在 NES APU 混音範圍 (~0-98302)
+        // Mode 2 再透過 ÷98302 正規化至 0-1.0 與 NES channel 對齊
+        // N163: mapper 端已除以 (numCh+1)，所以增益固定 500
+        static readonly float[] DefaultChipGain = new float[]
+        {
+            0f,    // None
+            740f,  // VRC6:      max≈45140 (≈APU range 1/2)
+            3f,    // VRC7:      OPLL raw ±12285, ×3 → max≈36855
+            500f,  // Namco163:  mapper 已 ÷(numCh+1), ×500 → max≈60000
+            120f,  // Sunsoft5B: 原 sum×120, max≈63720
+            43f,   // MMC5      (future)
+            20f,   // FDS       (future)
+        };
+
+        // 使用者可調音量 (0~200, 預設 100 = 100%)
+        static public int[] ExpansionChipUserVolume = new int[] { 100, 100, 100, 100, 100, 100, 100 };
+
         // =====================================================================
         // 原有 APU 欄位 (保留相容)
         // =====================================================================
@@ -184,6 +220,11 @@ namespace AprNes
             _noiseMode = false; _noiseOut = 0;
             _sampleAccum = 0.0;
             _dckiller    = 0;
+
+            // 清除 expansion audio 的暫存值，但不重設 chipType/channelCount
+            // (由 mapper Reset 負責設定，且 mapper Reset 在 apuSoftReset 之前執行)
+            mapperExpansionAudio = 0;
+            for (int i = 0; i < 8; i++) expansionChannels[i] = 0;
 
             AudioPlus_Reset();
         }
@@ -423,6 +464,17 @@ namespace AprNes
             clockdmc();
 
             // 生成音效樣本
+            // 為 Mode 0/1 計算相容的單一 mapperExpansionAudio 值
+            if (expansionChannelCount > 0 && AudioMode < 2)
+            {
+                int ct = (int)expansionChipType;
+                float gain = DefaultChipGain[ct] * (ExpansionChipUserVolume[ct] * 0.01f);
+                int sum = 0;
+                for (int i = 0; i < expansionChannelCount; i++)
+                    sum += (int)(expansionChannels[i] * gain);
+                mapperExpansionAudio = sum;
+            }
+
             if (AudioMode > 0)
             {
                 // Authentic / Modern: 每 APU cycle 推入 AudioPlus
