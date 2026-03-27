@@ -1333,9 +1333,9 @@
             this.MaximizeBox = false;
             this.Name = "AprNes_ConfigureUI";
             this.Text = "Configure";
-            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.GBEMU_ConfigureUI_FormClosing);
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.AprNes_ConfigureUI_FormClosing);
             this.Load += new System.EventHandler(this.AprNes_ConfigureUI_Load);
-            this.Shown += new System.EventHandler(this.GBEMU_ConfigureUI_Shown);
+            this.Shown += new System.EventHandler(this.AprNes_ConfigureUI_Shown);
             this.groupBox1.ResumeLayout(false);
             this.groupBox1.PerformLayout();
             this.groupBox2.ResumeLayout(false);

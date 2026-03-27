@@ -689,13 +689,13 @@ namespace AprNes
 
             return tmp;
         }
-        private void GBEMU_ConfigureUI_FormClosing(object sender, FormClosingEventArgs e)
+        private void AprNes_ConfigureUI_FormClosing(object sender, FormClosingEventArgs e)
         {
             e.Cancel = true;
             this.Visible = false;
         }
         Dictionary<string, AprNesUI.KeyMap> NES_KeyMAP_joypad_config = new Dictionary<string, AprNesUI.KeyMap>();
-        private void GBEMU_ConfigureUI_Shown(object sender, EventArgs e)
+        private void AprNes_ConfigureUI_Shown(object sender, EventArgs e)
         {
             _activeJoyControl = null;
             NES_KeyMAP_joypad_config.Clear();

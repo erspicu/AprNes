@@ -44,7 +44,7 @@ public partial class ConfigWindow : Window
         LoadFromIni();
     }
 
-    // ── Load current INI → UI (mirrors GBEMU_ConfigureUI_Shown) ───────────
+    // ── Load current INI → UI (mirrors AprNes_ConfigureUI_Shown) ───────────
     private void LoadFromIni()
     {
         // Keyboard mapping

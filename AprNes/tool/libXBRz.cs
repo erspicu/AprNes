@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
+using System.Numerics;
 
 namespace XBRz_speed
 {
@@ -86,19 +87,18 @@ namespace XBRz_speed
         }
 
         static byte* _preProcBuffer;
-        static byte* results_j, results_k, results_g, results_f, preProcBuffer_local;
+        static byte* preProcBuffer_local;
         static int width, height;
-
+        static uint* results_merged;
         public static unsafe void initTable(int _width, int _height)
         {
             if (lTable_dist != null) return;
             width = _width; height = _height;
             lTable_dist = (int*)Marshal.AllocHGlobal(sizeof(int) * 0x1000000);
             _preProcBuffer = (byte*)Marshal.AllocHGlobal(sizeof(byte) * width * height);
-            results_f = (byte*)Marshal.AllocHGlobal(sizeof(byte) * width * height);
-            results_j = (byte*)Marshal.AllocHGlobal(sizeof(byte) * width * height);
-            results_k = (byte*)Marshal.AllocHGlobal(sizeof(byte) * width * height);
-            results_g = (byte*)Marshal.AllocHGlobal(sizeof(byte) * width * height);
+
+            // ★ 配置合併後的 uint 陣列
+            results_merged = (uint*)Marshal.AllocHGlobal(sizeof(uint) * width * height);
             preProcBuffer_local = (byte*)Marshal.AllocHGlobal(sizeof(byte) * width);
 
             for (int i = 0; i < 0x1000000; i++)
@@ -139,7 +139,28 @@ namespace XBRz_speed
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static int DistYCbCr(uint p1, uint p2) => lTable_dist[((((((p1 & 0xff0000) >> 16) - ((p2 & 0xff0000) >> 16)) + 255) >> 1) << 16) | ((((((p1 & 0xff00) >> 8) - ((p2 & 0xff00) >> 8)) + 255) >> 1) << 8) | ((((p1 & 0xff) - (p2 & 0xff)) + 255) >> 1)];
+        static int DistYCbCr(uint p1, uint p2)
+        {
+            // ★ 同色短路：相同顏色直接回傳 0，徹底避開後續計算與查表
+            if (p1 == p2) return 0;
+            return lTable_dist[((((((p1 & 0xff0000) >> 16) - ((p2 & 0xff0000) >> 16)) + 255) >> 1) << 16) | ((((((p1 & 0xff00) >> 8) - ((p2 & 0xff00) >> 8)) + 255) >> 1) << 8) | ((((p1 & 0xff) - (p2 & 0xff)) + 255) >> 1)];
+        }
+
+        // 無查表版本：純整數 ALU 運算，避免 16MB LUT 的 cache miss
+        // 保留供未來 benchmark 切換使用
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static int DistYCbCr_NoTable(uint p1, uint p2)
+        {
+            if (p1 == p2) return 0;
+            int r_diff = (int)((p1 >> 16) & 0xFF) - (int)((p2 >> 16) & 0xFF);
+            int g_diff = (int)((p1 >> 8) & 0xFF) - (int)((p2 >> 8) & 0xFF);
+            int b_diff = (int)(p1 & 0xFF) - (int)(p2 & 0xFF);
+            int y = (262 * r_diff + 678 * g_diff + 59 * b_diff) / 1000;
+            int cb = (531 * (b_diff - y)) / 1000;
+            int cr = (678 * (r_diff - y)) / 1000;
+            return y * y + cb * cb + cr * cr;
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static bool ColorEQ(uint p1, uint p2) => (p1 == p2) || DistYCbCr(p1, p2) < eqColorThres;
 
@@ -165,32 +186,66 @@ namespace XBRz_speed
             }
         }
 
-        // —— 流程 1：統一特徵偵測 (與 Scale 倍率無關) ——
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void ComputeEdgeFeatures(uint* src)
         {
+            // =========================================================
+            // 第一階段：平行計算所有邊緣特徵與顏色距離
+            // =========================================================
             Parallel.For(0, height, y =>
             {
-                int sM1 = Math.Max(y - 1, 0); int s0 = y;
-                int sP1 = Math.Min(y + 1, height - 1); int sP2 = Math.Min(y + 2, height - 1);
+                int sM1 = Math.Max(y - 1, 0);
+                int s0 = y;
+                int sP1 = Math.Min(y + 1, height - 1);
+                int sP2 = Math.Min(y + 2, height - 1);
 
-                for (int x = 0; x < width; ++x)
+                // 【優化一：指標外提】預先算出這 4 個 Y 軸的指標起點
+                uint* pM1 = src + sM1 * width;
+                uint* p0 = src + s0 * width;
+                uint* pP1 = src + sP1 * width;
+                uint* pP2 = src + sP2 * width;
+
+                // 【優化二：索引遞增】將 2D 座標轉換改為極速的 1D 累加
+                int array_loc = y * width;
+
+                // 用於快取上一個像素的距離計算
+                int prev_dist_fk = 0;
+                int prev_dist_jg = 0;
+
+                for (int x = 0; x < width; ++x, ++array_loc)
                 {
-                    int xM1 = Math.Max(x - 1, 0); int xP1 = Math.Min(x + 1, width - 1); int xP2 = Math.Min(x + 2, width - 1);
-                    int array_loc = x + y * width;
+                    int xM1 = Math.Max(x - 1, 0);
+                    int xP1 = Math.Min(x + 1, width - 1);
+                    int xP2 = Math.Min(x + 2, width - 1);
 
-                    uint ker4b = src[sM1 * width + x]; uint ker4c = src[sM1 * width + xP1];
-                    uint ker4e = src[s0 * width + xM1]; uint ker4f = src[s0 * width + x];
-                    uint ker4g = src[s0 * width + xP1]; uint ker4h = src[s0 * width + xP2];
-                    uint ker4i = src[sP1 * width + xM1]; uint ker4j = src[sP1 * width + x];
-                    uint ker4k = src[sP1 * width + xP1]; uint ker4l = src[sP1 * width + xP2];
-                    uint ker4n = src[sP2 * width + x]; uint ker4o = src[sP2 * width + xP1];
+                    // 1. 透過指標直接讀取相鄰像素
+                    uint ker4b = pM1[x]; uint ker4c = pM1[xP1];
+                    uint ker4e = p0[xM1]; uint ker4f = p0[x];
+                    uint ker4g = p0[xP1]; uint ker4h = p0[xP2];
+                    uint ker4i = pP1[xM1]; uint ker4j = pP1[x];
+                    uint ker4k = pP1[xP1]; uint ker4l = pP1[xP2];
+                    uint ker4n = pP2[x]; uint ker4o = pP2[xP1];
+
+                    // 2. 預先計算並抽取這兩個距離
+                    int dist_jg = DistYCbCr(ker4j, ker4g);
+                    int dist_fk = DistYCbCr(ker4f, ker4k);
+
+                    // 【優化三：水平滑動快取】
+                    int dist_ej = (x == 0) ? DistYCbCr(ker4e, ker4j) : prev_dist_fk;
+                    int dist_if = (x == 0) ? DistYCbCr(ker4i, ker4f) : prev_dist_jg;
 
                     bool diff = (ker4f != ker4g | ker4j != ker4k) & (ker4f != ker4j | ker4g != ker4k);
-                    int jg = DistYCbCr(ker4i, ker4f) + DistYCbCr(ker4f, ker4c) + DistYCbCr(ker4n, ker4k) + DistYCbCr(ker4k, ker4h) + (DistYCbCr(ker4j, ker4g) << 2);
-                    int fk = DistYCbCr(ker4e, ker4j) + DistYCbCr(ker4j, ker4o) + DistYCbCr(ker4b, ker4g) + DistYCbCr(ker4g, ker4l) + (DistYCbCr(ker4f, ker4k) << 2);
 
-                    bool jg_lt_fk = jg < fk; bool fk_lt_jg = fk < jg;
+                    // 3. 代入快取好的距離，計算方向權重
+                    int jg = dist_if + DistYCbCr(ker4f, ker4c) + DistYCbCr(ker4n, ker4k) + DistYCbCr(ker4k, ker4h) + (dist_jg << 2);
+                    int fk = dist_ej + DistYCbCr(ker4j, ker4o) + DistYCbCr(ker4b, ker4g) + DistYCbCr(ker4g, ker4l) + (dist_fk << 2);
+
+                    // 4. 將當前像素算完的結果儲存，給下一個像素 (x+1) 沿用
+                    prev_dist_fk = dist_fk;
+                    prev_dist_jg = dist_jg;
+
+                    bool jg_lt_fk = jg < fk;
+                    bool fk_lt_jg = fk < jg;
                     bool isDom_jg = (dominantDirectionThreshold * jg < fk);
                     bool isDom_fk = (dominantDirectionThreshold * fk < jg);
 
@@ -202,22 +257,39 @@ namespace XBRz_speed
                     bool cond_j = diff & fk_lt_jg & (ker4j != ker4f) & (ker4j != ker4k);
                     bool cond_g = diff & fk_lt_jg & (ker4g != ker4f) & (ker4g != ker4k);
 
-                    results_f[array_loc] = (byte)(-(int)(*(byte*)&cond_f) & val_jg);
-                    results_k[array_loc] = (byte)(-(int)(*(byte*)&cond_k) & val_jg);
-                    results_j[array_loc] = (byte)(-(int)(*(byte*)&cond_j) & val_fk);
-                    results_g[array_loc] = (byte)(-(int)(*(byte*)&cond_g) & val_fk);
+                    // 【優化四：記憶體寫入合併 (Write Combining)】
+                    // 將 4 個狀態打包進一個 uint，一次性對齊寫入記憶體
+                    uint merged_state = (uint)(
+                        ((-(int)(*(byte*)&cond_f) & val_jg)) |
+                        ((-(int)(*(byte*)&cond_k) & val_jg) << 8) |
+                        ((-(int)(*(byte*)&cond_j) & val_fk) << 16) |
+                        ((-(int)(*(byte*)&cond_g) & val_fk) << 24)
+                    );
+                    results_merged[array_loc] = merged_state;
                 }
             });
 
+            // =========================================================
+            // 第二階段：合併特徵狀態至 _preProcBuffer
+            // =========================================================
             for (int y = 0; y < height; ++y)
             {
-                byte blendXy1 = 0; int array_loc = 0;
-                for (int x = 0; x < width - 1; ++x, array_loc = x + y * width)
+                byte blendXy1 = 0;
+                int array_loc = y * width;
+                for (int x = 0; x < width - 1; ++x, ++array_loc)
                 {
-                    _preProcBuffer[array_loc] = (byte)(preProcBuffer_local[x] | (results_f[array_loc] << 4));
-                    preProcBuffer_local[x] = blendXy1 = (byte)(blendXy1 | (results_j[array_loc] << 2));
-                    blendXy1 = results_k[array_loc];
-                    preProcBuffer_local[(x + 1)] = (byte)(preProcBuffer_local[(x + 1)] | (results_g[array_loc] << 6));
+                    // ★ 解壓縮：一次讀取 uint，再利用位元遮罩與移位還原 4 個狀態
+                    uint state = results_merged[array_loc];
+                    byte r_f = (byte)(state & 0xFF);
+                    byte r_k = (byte)((state >> 8) & 0xFF);
+                    byte r_j = (byte)((state >> 16) & 0xFF);
+                    byte r_g = (byte)((state >> 24) & 0xFF);
+
+                    // 套用原本的組裝邏輯
+                    _preProcBuffer[array_loc] = (byte)(preProcBuffer_local[x] | (r_f << 4));
+                    preProcBuffer_local[x] = blendXy1 = (byte)(blendXy1 | (r_j << 2));
+                    blendXy1 = r_k;
+                    preProcBuffer_local[x + 1] = (byte)(preProcBuffer_local[x + 1] | (r_g << 6));
                 }
             }
         }
@@ -291,10 +363,6 @@ namespace XBRz_speed
                 }
             });
         }
-
-        // ============================================================
-        // 各倍率專屬的 Jump Table 分派函式 (ProcessRotationNX)
-        // ============================================================
 
         // ============================================================
         // 各倍率專屬的 Jump Table 分派函式 (ProcessRotationNX)
@@ -397,32 +465,42 @@ namespace XBRz_speed
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void _FillBlock4x(uint* trg, int trgi, int pitch, uint col)
         {
-            ulong c64 = col | ((ulong)col << 32);
-            *(ulong*)(trg + trgi) = c64; *(ulong*)(trg + trgi + 2) = c64; trgi += pitch;
-            *(ulong*)(trg + trgi) = c64; *(ulong*)(trg + trgi + 2) = c64; trgi += pitch;
-            *(ulong*)(trg + trgi) = c64; *(ulong*)(trg + trgi + 2) = c64; trgi += pitch;
-            *(ulong*)(trg + trgi) = c64; *(ulong*)(trg + trgi + 2) = c64;
+            // 黑魔法：將 uint 位元保留轉型為 float，利用 Vector4 廣播 4 個相同的像素 (128-bit)
+            float fCol = *(float*)&col;
+            Vector4 vCol = new Vector4(fCol);
+
+            for (int r = 0; r < 4; r++)
+            {
+                *(Vector4*)(trg + trgi + r * pitch) = vCol; // 一次寫入 4 像素
+            }
         }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void _FillBlock5x(uint* trg, int trgi, int pitch, uint col)
         {
-            ulong c64 = col | ((ulong)col << 32);
-            *(ulong*)(trg + trgi) = c64; *(ulong*)(trg + trgi + 2) = c64; trg[trgi + 4] = col; trgi += pitch;
-            *(ulong*)(trg + trgi) = c64; *(ulong*)(trg + trgi + 2) = c64; trg[trgi + 4] = col; trgi += pitch;
-            *(ulong*)(trg + trgi) = c64; *(ulong*)(trg + trgi + 2) = c64; trg[trgi + 4] = col; trgi += pitch;
-            *(ulong*)(trg + trgi) = c64; *(ulong*)(trg + trgi + 2) = c64; trg[trgi + 4] = col; trgi += pitch;
-            *(ulong*)(trg + trgi) = c64; *(ulong*)(trg + trgi + 2) = c64; trg[trgi + 4] = col;
+            float fCol = *(float*)&col;
+            Vector4 vCol = new Vector4(fCol);
+
+            for (int r = 0; r < 5; r++)
+            {
+                uint* p = trg + trgi + r * pitch;
+                *(Vector4*)p = vCol;       // 寫入像素 0, 1, 2, 3
+                *(Vector4*)(p + 1) = vCol; // 寫入像素 1, 2, 3, 4 (重疊 1,2,3)
+            }
         }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void _FillBlock6x(uint* trg, int trgi, int pitch, uint col)
         {
-            ulong c64 = col | ((ulong)col << 32);
-            *(ulong*)(trg + trgi) = c64; *(ulong*)(trg + trgi + 2) = c64; *(ulong*)(trg + trgi + 4) = c64; trgi += pitch;
-            *(ulong*)(trg + trgi) = c64; *(ulong*)(trg + trgi + 2) = c64; *(ulong*)(trg + trgi + 4) = c64; trgi += pitch;
-            *(ulong*)(trg + trgi) = c64; *(ulong*)(trg + trgi + 2) = c64; *(ulong*)(trg + trgi + 4) = c64; trgi += pitch;
-            *(ulong*)(trg + trgi) = c64; *(ulong*)(trg + trgi + 2) = c64; *(ulong*)(trg + trgi + 4) = c64; trgi += pitch;
-            *(ulong*)(trg + trgi) = c64; *(ulong*)(trg + trgi + 2) = c64; *(ulong*)(trg + trgi + 4) = c64; trgi += pitch;
-            *(ulong*)(trg + trgi) = c64; *(ulong*)(trg + trgi + 2) = c64; *(ulong*)(trg + trgi + 4) = c64;
+            float fCol = *(float*)&col;
+            Vector4 vCol = new Vector4(fCol);
+
+            for (int r = 0; r < 6; r++)
+            {
+                uint* p = trg + trgi + r * pitch;
+                *(Vector4*)p = vCol;       // 寫入像素 0, 1, 2, 3
+                *(Vector4*)(p + 2) = vCol; // 寫入像素 2, 3, 4, 5 (重疊 2,3)
+            }
         }
 
         // ============================================================
@@ -431,18 +509,18 @@ namespace XBRz_speed
         static void BlendLineShallow2X(uint col, uint* trg, int outi, int outW, int nr)
         {
             _AlphaBlend(1, 0, col, 1, 4, trg, outi, outW, nr);
-            _SetPixel(1, 1, col, trg, outi, outW, nr);
+            _AlphaBlend(1, 1, col, 3, 4, trg, outi, outW, nr);
         }
         static void BlendLineSteep2X(uint col, uint* trg, int outi, int outW, int nr)
         {
             _AlphaBlend(0, 1, col, 1, 4, trg, outi, outW, nr);
-            _SetPixel(1, 1, col, trg, outi, outW, nr);
+            _AlphaBlend(1, 1, col, 3, 4, trg, outi, outW, nr);
         }
         static void BlendLineSteepAndShallow2X(uint col, uint* trg, int outi, int outW, int nr)
         {
             _AlphaBlend(1, 0, col, 1, 4, trg, outi, outW, nr);
             _AlphaBlend(0, 1, col, 1, 4, trg, outi, outW, nr);
-            _SetPixel(1, 1, col, trg, outi, outW, nr);
+            _AlphaBlend(1, 1, col, 5, 6, trg, outi, outW, nr);
         }
         static void BlendLineDiagonal2X(uint col, uint* trg, int outi, int outW, int nr)
         {
@@ -459,16 +537,16 @@ namespace XBRz_speed
         static void BlendLineShallow3X(uint col, uint* trg, int outi, int outW, int nr)
         {
             _AlphaBlend(2, 0, col, 1, 4, trg, outi, outW, nr);
+            _AlphaBlend(1, 2, col, 1, 4, trg, outi, outW, nr);
             _AlphaBlend(2, 1, col, 3, 4, trg, outi, outW, nr);
             _SetPixel(2, 2, col, trg, outi, outW, nr);
-            _SetPixel(1, 2, col, trg, outi, outW, nr);
         }
         static void BlendLineSteep3X(uint col, uint* trg, int outi, int outW, int nr)
         {
             _AlphaBlend(0, 2, col, 1, 4, trg, outi, outW, nr);
+            _AlphaBlend(2, 1, col, 1, 4, trg, outi, outW, nr);
             _AlphaBlend(1, 2, col, 3, 4, trg, outi, outW, nr);
             _SetPixel(2, 2, col, trg, outi, outW, nr);
-            _SetPixel(2, 1, col, trg, outi, outW, nr);
         }
         static void BlendLineSteepAndShallow3X(uint col, uint* trg, int outi, int outW, int nr)
         {
@@ -480,15 +558,13 @@ namespace XBRz_speed
         }
         static void BlendLineDiagonal3X(uint col, uint* trg, int outi, int outW, int nr)
         {
-            _AlphaBlend(2, 1, col, 1, 2, trg, outi, outW, nr);
-            _AlphaBlend(1, 2, col, 1, 2, trg, outi, outW, nr);
-            _SetPixel(2, 2, col, trg, outi, outW, nr);
+            _AlphaBlend(1, 2, col, 1, 8, trg, outi, outW, nr);
+            _AlphaBlend(2, 1, col, 1, 8, trg, outi, outW, nr);
+            _AlphaBlend(2, 2, col, 7, 8, trg, outi, outW, nr);
         }
         static void BlendCorner3X(uint col, uint* trg, int outi, int outW, int nr)
         {
             _AlphaBlend(2, 2, col, 45, 100, trg, outi, outW, nr);
-            _AlphaBlend(2, 1, col, 14, 100, trg, outi, outW, nr);
-            _AlphaBlend(1, 2, col, 14, 100, trg, outi, outW, nr);
         }
 
         // ============================================================

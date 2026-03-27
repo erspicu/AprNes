@@ -237,7 +237,9 @@ namespace AprNes
         // ── OPLL instance state ──────────────────────────────────────
         uint clk, rate;
         byte chip_type;
+#pragma warning disable CS0414
         uint adr;
+#pragma warning restore CS0414
         double inp_step, out_step, out_time;
         byte[] reg = new byte[0x40];
         byte test_flag;
