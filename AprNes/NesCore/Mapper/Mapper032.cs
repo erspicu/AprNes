@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Irem G-101 — Image Fight (J/U), Daiku no Gen San (J/2), Hammerin' Harry (E)
     // PRG: two switchable 8K banks + fixed last two 8K banks ($E000=N-1 always)
@@ -98,5 +98,6 @@ namespace AprNes
         public void MapperW_CHR(int addr, byte val) { if (CHR_ROM_count == 0) ppu_ram[addr] = val; }
         public void CpuCycle() { }
         public void NotifyA12(int addr, int ppuAbsCycle) { }
-    }
+            public void Cleanup() { }
+}
 }

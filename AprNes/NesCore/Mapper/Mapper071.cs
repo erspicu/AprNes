@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Camerica / Codemasters BF909x — Mapper 071
     // PRG: 16KB switchable at $8000, last 16KB fixed at $C000
@@ -82,5 +82,6 @@ namespace AprNes
         public void CpuCycle() { }
         public MapperA12Mode A12NotifyMode => MapperA12Mode.None;
         public void NotifyA12(int addr, int ppuAbsCycle) { }
-    }
+            public void Cleanup() { }
+}
 }

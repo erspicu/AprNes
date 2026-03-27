@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Irem H-3001 — Daiku no Gen San 2 (J), Kaiou - Wrath of the Black Dragon (J)
     // PRG: 3×8K switchable ($8000/$A000/$C000 regs), 1×8K fixed last bank at $E000
@@ -121,5 +121,6 @@ namespace AprNes
         }
 
         public void NotifyA12(int addr, int ppuAbsCycle) { }
-    }
+            public void Cleanup() { }
+}
 }

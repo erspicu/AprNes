@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Bandai 74161/32 — Mapper 070 and Mapper 152
     // Write to $8000-$FFFF:
@@ -96,6 +96,7 @@ namespace AprNes
         }
 
         public void MapperW_CHR(int addr, byte val) { if (CHR_ROM_count == 0) ppu_ram[addr] = val; }
+        public void Cleanup() { }
     }
 
     // Mapper 152 = Bandai 74161/32 with mirroring control

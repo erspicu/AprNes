@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Nina-1 — Deadly Towers (U), Impossible Mission II (U), Mashou (J)
     // Two sub-mappers in one:
@@ -92,5 +92,6 @@ namespace AprNes
         public void CpuCycle() { }
         public MapperA12Mode A12NotifyMode => MapperA12Mode.None;
         public void NotifyA12(int addr, int ppuAbsCycle) { }
-    }
+            public void Cleanup() { }
+}
 }

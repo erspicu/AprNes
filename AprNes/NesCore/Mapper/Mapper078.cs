@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Irem 74HC161/32 — Holy Diver (J), Uchuusen Cosmo Carrier (J)
     // Single register $8000-$FFFF: CCCCPPPP
@@ -81,5 +81,6 @@ namespace AprNes
         public void CpuCycle() { }
         public MapperA12Mode A12NotifyMode => MapperA12Mode.None;
         public void NotifyA12(int addr, int ppuAbsCycle) { }
-    }
+            public void Cleanup() { }
+}
 }

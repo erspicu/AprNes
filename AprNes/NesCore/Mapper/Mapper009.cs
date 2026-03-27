@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // MMC2 — used exclusively by Punch-Out!! (U/JU/E)
     // PRG: 8K swappable at $8000; last 3×8K fixed at $A000/$C000/$E000
@@ -115,5 +115,6 @@ namespace AprNes
         public void MapperW_CHR(int addr, byte val) { }  // CHR-ROM only, no writes
         public void CpuCycle() { }
         public MapperA12Mode A12NotifyMode => MapperA12Mode.MMC2_4;
-    }
+            public void Cleanup() { }
+}
 }

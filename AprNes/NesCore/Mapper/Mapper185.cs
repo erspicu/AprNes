@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // CNROM + CHR copy-protection — Mapper 185
     // Write to $8000-$FFFF selects CHR 8KB bank AND controls protection.
@@ -84,5 +84,6 @@ namespace AprNes
 
         public void CpuCycle() { }
         public void NotifyA12(int addr, int ppuAbsCycle) { }
-    }
+            public void Cleanup() { }
+}
 }

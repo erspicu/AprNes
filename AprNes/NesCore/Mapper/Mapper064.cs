@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Tengen RAMBO-1 — Shinobi (Tengen), Klax (Tengen), Skull & Crossbones (Tengen)
     // Similar to MMC3 but with key differences:
@@ -248,5 +248,6 @@ namespace AprNes
             }
             lastA12 = a12;
         }
-    }
+            public void Cleanup() { }
+}
 }

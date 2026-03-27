@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Namco 108 (MMC3 subset) — no IRQ, hardwired mirroring
     // All $8000-$FFFF writes are redirected to $8000/$8001 (addr &= 0x8001).
@@ -106,5 +106,6 @@ namespace AprNes
         public void NotifyA12(int addr, int ppuAbsCycle) { }
         public void CpuCycle() { }
         public MapperA12Mode A12NotifyMode => MapperA12Mode.None;
-    }
+            public void Cleanup() { }
+}
 }

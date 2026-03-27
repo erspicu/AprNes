@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Konami VRC6 — Mapper 024 (VRC6a), Mapper 026 (VRC6b)
     // PRG: 2×8K at $8000-$BFFF (16K bank via reg $8000), 1×8K at $C000-$DFFF, fixed last 8K
@@ -429,5 +429,6 @@ namespace AprNes
         }
 
         public void NotifyA12(int addr, int ppuAbsCycle) { }
-    }
+            public void Cleanup() { }
+}
 }

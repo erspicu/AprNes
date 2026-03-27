@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Jaleco JF-11 / JF-14 — Mapper 140
     // Register at $6000-$7FFF (write-only):
@@ -77,5 +77,6 @@ namespace AprNes
         }
 
         public void MapperW_CHR(int addr, byte val) { if (CHR_ROM_count == 0) ppu_ram[addr] = val; }
-    }
+            public void Cleanup() { }
+}
 }

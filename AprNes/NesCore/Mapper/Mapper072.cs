@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Jaleco JF-17 — Mapper 072
     // Write to $8000-$FFFF (latch-based, bus conflicts):
@@ -90,5 +90,6 @@ namespace AprNes
 
         public void CpuCycle() { }
         public void NotifyA12(int addr, int ppuAbsCycle) { }
-    }
+            public void Cleanup() { }
+}
 }

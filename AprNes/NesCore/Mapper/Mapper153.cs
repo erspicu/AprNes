@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Bandai LZ93D50 + 8KiB WRAM — Mapper 153
     // Same layout as Mapper016 but:
@@ -139,5 +139,6 @@ namespace AprNes
         }
 
         public void NotifyA12(int addr, int ppuAbsCycle) { }
-    }
+            public void Cleanup() { }
+}
 }

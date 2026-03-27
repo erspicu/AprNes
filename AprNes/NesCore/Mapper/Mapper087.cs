@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Jaleco JF-09 / JF-10 / JF-18 — Mapper 087
     // Write to $6000-$7FFF:
@@ -80,5 +80,6 @@ namespace AprNes
 
         public void CpuCycle() { }
         public void NotifyA12(int addr, int ppuAbsCycle) { }
-    }
+            public void Cleanup() { }
+}
 }

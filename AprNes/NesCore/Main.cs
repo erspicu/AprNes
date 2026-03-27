@@ -138,6 +138,7 @@ namespace AprNes
 
         static void FreeUnmanagedMemory()
         {
+            if (MapperObj != null) { MapperObj.Cleanup(); MapperObj = null; }
             if (PRG_ROM      != null) { Marshal.FreeHGlobal((IntPtr)PRG_ROM);      PRG_ROM      = null; }
             if (CHR_ROM      != null) { Marshal.FreeHGlobal((IntPtr)CHR_ROM);      CHR_ROM      = null; }
             if (ScreenBuf1x  != null) { Marshal.FreeHGlobal((IntPtr)ScreenBuf1x);  ScreenBuf1x  = null; }

@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // TxSROM — Mapper 118 (TKSROM and TLSROM)
     // Full MMC3 functionality, but nametable control is via CHR bank registers:
@@ -324,5 +324,6 @@ namespace AprNes
         }
 
         public void MapperW_CHR(int addr, byte val) { if (CHR_ROM_count == 0) ppu_ram[addr] = val; }
-    }
+            public void Cleanup() { }
+}
 }

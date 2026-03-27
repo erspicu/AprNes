@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Camerica BF9096 Quattro — Mapper 232
     // PRG: two 16KB banks; $8000-$BFFF = swappable, $C000-$FFFF = fixed to last of outer group
@@ -84,5 +84,6 @@ namespace AprNes
         }
 
         public void MapperW_CHR(int addr, byte val) { if (CHR_ROM_count == 0) ppu_ram[addr] = val; }
-    }
+            public void Cleanup() { }
+}
 }

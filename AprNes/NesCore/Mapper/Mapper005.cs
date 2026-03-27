@@ -717,5 +717,10 @@ namespace AprNes
         }
 
         public void Reset() { }
+        public void Cleanup()
+        {
+            if (exRamPtr != null) { Marshal.FreeHGlobal((IntPtr)exRamPtr); exRamPtr = null; }
+            if (fillNTPtr != null) { Marshal.FreeHGlobal((IntPtr)fillNTPtr); fillNTPtr = null; }
+        }
     }
 }

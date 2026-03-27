@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.InteropServices;
 
 namespace AprNes
@@ -97,6 +98,10 @@ namespace AprNes
             byte* ptr = NesCore.chrBankPtrs[(addr >> 10) & 7];
             if (ptr >= chrRam && ptr < chrRam + 6 * 1024)
                 ptr[addr & 0x3FF] = val;
+        }
+        public void Cleanup()
+        {
+            if (chrRam != null) { Marshal.FreeHGlobal((IntPtr)chrRam); chrRam = null; }
         }
     }
 }

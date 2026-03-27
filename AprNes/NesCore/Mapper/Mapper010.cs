@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // MMC4 — Fire Emblem, Famicom Wars
     // PRG: 16K swappable at $8000; last 16K fixed at $C000
@@ -108,5 +108,6 @@ namespace AprNes
         public void MapperW_CHR(int addr, byte val) { }  // CHR-ROM only, no writes
         public void CpuCycle() { }
         public MapperA12Mode A12NotifyMode => MapperA12Mode.MMC2_4;
-    }
+            public void Cleanup() { }
+}
 }

@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // NINA-03 / NINA-06 — Mapper 079 (AVE)
     // Write to $4100-$5FFF (address must satisfy (addr & 0xE100) == 0x4100):
@@ -76,5 +76,6 @@ namespace AprNes
 
         public void CpuCycle() { }
         public void NotifyA12(int addr, int ppuAbsCycle) { }
-    }
+            public void Cleanup() { }
+}
 }

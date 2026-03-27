@@ -251,6 +251,7 @@ namespace AprNes
                 }
             }
         }
-    }
+            public void Cleanup() { }
+}
 }
 

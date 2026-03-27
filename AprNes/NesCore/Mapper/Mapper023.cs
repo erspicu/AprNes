@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Konami VRC2b — Contra (J), Getsufuu Maden (J)
     // Identical to VRC2a except:
@@ -87,5 +87,6 @@ namespace AprNes
         public void MapperW_CHR(int addr, byte val) { if (CHR_ROM_count == 0) ppu_ram[addr] = val; }
         public void CpuCycle() { }
         public void NotifyA12(int addr, int ppuAbsCycle) { }
-    }
+            public void Cleanup() { }
+}
 }

@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Sunsoft-3 — Mapper 067
     // PRG: 16KB switchable at $8000, last 16KB fixed at $C000
@@ -127,5 +127,6 @@ namespace AprNes
         }
 
         public void MapperW_CHR(int addr, byte val) { if (CHR_ROM_count == 0) ppu_ram[addr] = val; }
-    }
+            public void Cleanup() { }
+}
 }

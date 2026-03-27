@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Sunsoft-1 (FC-08) — Mapper 184
     // Write to $6000-$7FFF:
@@ -80,5 +80,6 @@ namespace AprNes
 
         public void CpuCycle() { }
         public void NotifyA12(int addr, int ppuAbsCycle) { }
-    }
+            public void Cleanup() { }
+}
 }

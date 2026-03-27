@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Bandai FCG / LZ93D50 — Mapper 016
     // Games: Dragon Ball series, DBZ series, Famicom Jump, Magical Taruruuto-kun, etc.
@@ -176,5 +176,6 @@ namespace AprNes
         }
 
         public void NotifyA12(int addr, int ppuAbsCycle) { }
-    }
+            public void Cleanup() { }
+}
 }

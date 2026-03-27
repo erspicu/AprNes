@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Sunsoft-2 (Fantasy Zone II variant) — Mapper 093
     // Write to $8000-$FFFF:
@@ -76,5 +76,6 @@ namespace AprNes
 
         public void CpuCycle() { }
         public void NotifyA12(int addr, int ppuAbsCycle) { }
-    }
+            public void Cleanup() { }
+}
 }

@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Sunsoft Mapper #4 — AfterBurner II (J), Maharaja (J)
     // PRG: switchable 16K at $8000 ($F000 bits 2-0), fixed last 16K at $C000
@@ -183,5 +183,6 @@ namespace AprNes
         }
 
         public void NotifyA12(int addr, int ppuAbsCycle) { }
-    }
+            public void Cleanup() { }
+}
 }

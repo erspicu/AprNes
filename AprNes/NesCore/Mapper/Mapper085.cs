@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Konami VRC7 — Mapper 085
     // PRG: 3×8K switchable ($8000/$A000/$C000) + fixed last 8K ($E000-$FFFF)
@@ -238,5 +238,6 @@ namespace AprNes
         }
 
         public void NotifyA12(int addr, int ppuAbsCycle) { }
-    }
+            public void Cleanup() { }
+}
 }

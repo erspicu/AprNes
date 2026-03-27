@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Konami VRC4 — Mapper 025 (VRC4b / VRC4d)
     // VRC4b: chip-A0 = cpu-A1, chip-A1 = cpu-A0  (A0/A1 swapped vs VRC4a)
@@ -207,5 +207,6 @@ namespace AprNes
         }
 
         public void NotifyA12(int addr, int ppuAbsCycle) { }
-    }
+            public void Cleanup() { }
+}
 }

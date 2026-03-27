@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Crazy Climber / UnRom_180 — Mapper 180
     // UNROM variant: fixed FIRST 16KB at $8000-$BFFF, switchable LAST at $C000-$FFFF.
@@ -57,5 +57,6 @@ namespace AprNes
         // CHR-RAM
         public byte MapperR_CHR(int address) { return NesCore.chrBankPtrs[(address >> 10) & 7][address & 0x3FF]; }
         public void MapperW_CHR(int addr, byte val) { NesCore.chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF] = val; }
-    }
+            public void Cleanup() { }
+}
 }

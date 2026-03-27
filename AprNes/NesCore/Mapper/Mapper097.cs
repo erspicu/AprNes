@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Irem TAM-S1 — Mapper 097
     // PRG: $8000-$BFFF fixed to last 16KB; $C000-$FFFF switchable 16KB
@@ -65,5 +65,6 @@ namespace AprNes
         // CHR-RAM (8KB in ppu_ram)
         public byte MapperR_CHR(int address) { return NesCore.chrBankPtrs[(address >> 10) & 7][address & 0x3FF]; }
         public void MapperW_CHR(int addr, byte val) { NesCore.chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF] = val; }
-    }
+            public void Cleanup() { }
+}
 }

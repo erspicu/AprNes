@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Konami VRC1 — Mapper 075
     // PRG: 4×8KB; $8000/$A000/$C000 swappable, $E000 fixed to last bank
@@ -115,5 +115,6 @@ namespace AprNes
         }
 
         public void MapperW_CHR(int addr, byte val) { if (CHR_ROM_count == 0) ppu_ram[addr] = val; }
-    }
+            public void Cleanup() { }
+}
 }

@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Jaleco SS8806 — Mapper 018
     // Games: Ninja Jajamaru, Pizza Pop!, Magic John, Saiyuuki World 2, etc.
@@ -179,5 +179,6 @@ namespace AprNes
         }
 
         public void NotifyA12(int addr, int ppuAbsCycle) { }
-    }
+            public void Cleanup() { }
+}
 }

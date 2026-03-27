@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.InteropServices;
 
 namespace AprNes
@@ -80,6 +81,10 @@ namespace AprNes
         public void MapperW_CHR(int addr, byte val)
         {
             NesCore.chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF] = val;
+        }
+        public void Cleanup()
+        {
+            if (chrRam != null) { Marshal.FreeHGlobal((IntPtr)chrRam); chrRam = null; }
         }
     }
 }

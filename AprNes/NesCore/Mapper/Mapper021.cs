@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Konami VRC4 — Mapper 021 (VRC4a / VRC4c)
     // Games: Wai Wai World 2, Ganbare Goemon Gaiden 2, Gradius 2 (J) etc.
@@ -220,5 +220,6 @@ namespace AprNes
         }
 
         public void NotifyA12(int addr, int ppuAbsCycle) { }
-    }
+            public void Cleanup() { }
+}
 }

@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Namco 109 / Namco108_76 — Mapper 076
     // Namco 108 family: same register mechanism as Mapper088/206,
@@ -96,5 +96,6 @@ namespace AprNes
         }
 
         public void MapperW_CHR(int addr, byte val) { if (CHR_ROM_count == 0) ppu_ram[addr] = val; }
-    }
+            public void Cleanup() { }
+}
 }

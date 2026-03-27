@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Taito TC0190 — Akira (J), Don Doko Don (J), Insector X (J)
     // PRG: 2×8K switchable at $8000/$A000 ($8000/$8001 regs, bits 5-0)
@@ -101,5 +101,6 @@ namespace AprNes
         public void MapperW_CHR(int addr, byte val) { if (CHR_ROM_count == 0) ppu_ram[addr] = val; }
         public void CpuCycle() { }
         public void NotifyA12(int addr, int ppuAbsCycle) { }
-    }
+            public void Cleanup() { }
+}
 }

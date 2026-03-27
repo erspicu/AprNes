@@ -1,4 +1,4 @@
-namespace AprNes
+﻿namespace AprNes
 {
     // Action 52 / ActionEnterprises — Mapper 228
     // All logic derived from write address + data bits.
@@ -106,5 +106,6 @@ namespace AprNes
         }
 
         public void MapperW_CHR(int addr, byte val) { if (CHR_ROM_count == 0) ppu_ram[addr] = val; }
-    }
+            public void Cleanup() { }
+}
 }

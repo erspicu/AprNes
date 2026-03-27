@@ -25,5 +25,6 @@
         void Reset();
         void CpuCycle();
         void NotifyA12(int addr, int ppuAbsCycle);
+        void Cleanup();
     }
 }
