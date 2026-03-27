@@ -143,10 +143,34 @@ WaveVolumeTable = {36, 24, 17, 14}  // masterVolume 0-3
 
 ## 實作計畫
 
+### Phase 0: BIOS 載入與驗證 (前置條件)
+
+**BIOS 放置路徑** (固定，不需使用者設定):
+```
+{執行檔所在目錄}/FDSBIOS/DISKSYS.ROM
+```
+
+**載入流程**:
+1. 使用者開啟 `*.fds` 檔案時，先檢查 BIOS 是否存在
+2. 讀取 `FDSBIOS/DISKSYS.ROM`，驗證檔案大小 (必須為 8,192 bytes)
+3. 計算 SHA-256 hash，比對已知正確值:
+   - `99c18490ed9002d9c6d999b9d8d15be5c051bdfa7cc7e73318053c9a994b0178` (標準版)
+4. 驗證通過 → 繼續載入 .fds 遊戲
+5. 驗證失敗 → 彈出 MessageBox 警告，停止載入:
+   - 檔案不存在: `"Famicom Disk System BIOS not found.\nPlease place DISKSYS.ROM in the FDSBIOS folder next to the executable."`
+   - 大小錯誤: `"Invalid FDS BIOS file (wrong size). Expected 8192 bytes."`
+   - Hash 不符: `"FDS BIOS hash mismatch. The file may be corrupted or incorrect."`
+     (Hash 不符僅顯示警告但仍嘗試載入，因為可能存在合法的不同版本)
+
+**設計原則**:
+- 不提供 UI 路徑設定，固定位置降低使用複雜度
+- BIOS 驗證在 ROM 載入階段 (Main.cs) 執行，早於 Mapper 初始化
+- Hash 檢查用於提示使用者，非強制阻擋 (僅大小檢查為強制)
+
 ### Phase 1: 基礎框架
 - [ ] 建立 MapperFDS.cs (或 Mapper020.cs)
 - [ ] .fds 檔案解析 (header, side data, gap padding)
-- [ ] BIOS ROM 載入 (disksys.rom)
+- [ ] BIOS ROM 載入 (Phase 0 驗證通過後，映射至 $E000-$FFFF)
 - [ ] 記憶體映射 (PRG-RAM $6000-$DFFF, BIOS $E000-$FFFF, CHR-RAM)
 - [ ] IRQ Timer ($4020-$4022, $4030 bit0)
 - [ ] MapperRegistry 登記
@@ -167,7 +191,6 @@ WaveVolumeTable = {36, 24, 17, 14}  // masterVolume 0-3
 ### Phase 4: 使用體驗
 - [ ] 手動換碟 (UI 快捷鍵: 退碟/插入指定面)
 - [ ] 自動換碟偵測 (偵測 BIOS 呼叫 $E18C/$E445)
-- [ ] BIOS 路徑設定 UI
 - [ ] 存檔支援 (IPS patch 或直接寫回)
 
 ## IMapper 介面適配
@@ -179,7 +202,7 @@ WaveVolumeTable = {36, 24, 17, 14}  // masterVolume 0-3
 - `UpdateCHRBanks()` → CHR-RAM 映射
 
 ### 需要額外處理
-- **BIOS 載入**: MapperInit 時額外讀取 disksys.rom 到 $E000-$FFFF
+- **BIOS 載入**: ROM 載入階段預先驗證並讀取 `FDSBIOS/DISKSYS.ROM`，MapperInit 時映射至 $E000-$FFFF
 - **多碟面儲存**: 內部管理碟面資料陣列 (byte[][])
 - **碟片操作**: 需要新的公開方法 (InsertDisk/EjectDisk) 供 UI 呼叫
 
