@@ -123,19 +123,44 @@ namespace AprNes
         {
             if (!LangINI.LangLoadOK) return;
 
-            UIOpenRom.Text = fun1ToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["rom"];
-            UIConfig.Text = fun3ToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["setting"];
-            UIReset.Text = LangINI.lang_table[AppConfigure["Lang"]]["reset"];
+            fun1ToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["rom"];
+            fun3ToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["setting"];
             fun2ToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["reset"] + " (Soft)";
             fun7ToolStripMenuItem.Text = "Hard Reset";
-            UIAbout.Text = fun6ToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["about"];
+            fun6ToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["about"];
             fun5ToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["appclose"];
             fullScreeenToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["fullscreen"];
             normalToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["normal"];
             screenModeToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["screenmode"];
-            RomInf.Text = fun4ToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["rominfo"]; //rominfo
+            fun4ToolStripMenuItem.Text = LangINI.lang_table[AppConfigure["Lang"]]["rominfo"];
             if (_recentROMsMenuItem != null)
                 _recentROMsMenuItem.Text = LangINI.Get(AppConfigure["Lang"], "recent", "Recent");
+
+            // MenuStrip i18n
+            string lang = AppConfigure["Lang"];
+            _menuFile.Text = LangINI.Get(lang, "menu_file", "File");
+            _menuFileOpen.Text = LangINI.lang_table[lang]["rom"];
+            _menuFileRecent.Text = LangINI.Get(lang, "recent", "Recent");
+            _menuFileExit.Text = LangINI.lang_table[lang]["appclose"];
+            _menuEmulation.Text = LangINI.Get(lang, "menu_emulation", "Emulation");
+            _menuEmulationSoftReset.Text = LangINI.lang_table[lang]["reset"] + " (Soft)";
+            _menuEmulationHardReset.Text = "Hard Reset";
+            _menuEmulationLimitFps.Text = LangINI.lang_table[lang]["limitfps"];
+            _menuEmulationPerdotFSM.Text = LangINI.lang_table[lang]["perdotFSM"];
+            _menuView.Text = LangINI.Get(lang, "menu_view", "View");
+            _menuViewToggleFullScreen.Text = LangINI.lang_table[lang]["fullscreen"];
+            _menuViewSound.Text = NesCore.AudioEnabled
+                ? LangINI.lang_table[lang]["SoundON"]
+                : LangINI.lang_table[lang]["SoundOFF"];
+            _menuViewUltraAnalog.Text = LangINI.Get(lang, "ultra_analog", "Ultra Analog")
+                + (NesCore.UltraAnalog ? ": ON" : ": OFF");
+            _menuTools.Text = LangINI.Get(lang, "menu_tools", "Tools");
+            _menuToolsScreenshot.Text = LangINI.Get(lang, "screenshot", "Screenshot");
+            _menuToolsRomInfo.Text = LangINI.lang_table[lang]["rominfo"];
+            _menuToolsConfig.Text = LangINI.lang_table[lang]["setting"];
+            _menuHelp.Text = LangINI.Get(lang, "menu_help", "Help");
+            _menuHelpShortcuts.Text = LangINI.Get(lang, "shortcuts", "Keyboard Shortcuts");
+            _menuHelpAbout.Text = LangINI.lang_table[lang]["about"];
         }
 
         int ScreenSize = 1;
@@ -204,20 +229,19 @@ namespace AprNes
 
             if (ScreenCenterFull)
             {
-                UIAbout.Visible = RomInf.Visible = UIOpenRom.Visible = UIReset.Visible = UIConfig.Visible = label3.Visible = false;
+                label3.Visible = false;
 
                 fullScreeenToolStripMenuItem_Click(null, null);
                 panel1.Visible = true;
                 return;
             }
 
-            UIAbout.Visible = RomInf.Visible = UIOpenRom.Visible = UIReset.Visible = UIConfig.Visible = label3.Visible = true;
+            label3.Visible = true;
             panel1.Location = new Point(5, 35);
             this.Width  = renderWidth  + 26;   // panel + 左右邊框
             this.Height = renderHeight + 92;   // panel + 上工具列(35) + 下按鈕列(57)
 
-            UIAbout.Location = new Point(Width - 82, renderHeight + 37);
-            RomInf.Location  = new Point(5,          renderHeight + 37);
+            label3.Location = new Point(5, renderHeight + 37);
             panel1.Visible = true;
         }
 
@@ -369,6 +393,7 @@ namespace AprNes
             LimitFPS = false;
             if (AppConfigure["LimitFPS"] == "1")
                 LimitFPS = true;
+            _menuEmulationLimitFps.Checked = LimitFPS;
 
             key_A = int.Parse(AppConfigure["key_A"]);
             key_B = int.Parse(AppConfigure["key_B"]);
@@ -472,6 +497,7 @@ namespace AprNes
 
             // 讀取 Accuracy 選項設定 (預設全開)
             NesCore.AccuracyOptA = !AppConfigure.ContainsKey("AccuracyOptA") || AppConfigure["AccuracyOptA"] != "0";
+            _menuEmulationPerdotFSM.Checked = NesCore.AccuracyOptA;
 
             // 讀取類比訊號模擬設定 (預設關閉)
             NesCore.AnalogEnabled = AppConfigure.ContainsKey("AnalogMode") && AppConfigure["AnalogMode"] == "1";
@@ -724,12 +750,15 @@ namespace AprNes
         void BuildRecentROMsMenu()
         {
             _recentROMsMenuItem.DropDownItems.Clear();
+            _menuFileRecent.DropDownItems.Clear();
             if (_recentROMs.Count == 0)
             {
                 _recentROMsMenuItem.Enabled = false;
+                _menuFileRecent.Enabled = false;
                 return;
             }
             _recentROMsMenuItem.Enabled = true;
+            _menuFileRecent.Enabled = true;
             foreach (string path in _recentROMs)
             {
                 var item = new ToolStripMenuItem(Path.GetFileName(path));
@@ -737,6 +766,12 @@ namespace AprNes
                 item.Tag = path;
                 item.Click += RecentROM_Click;
                 _recentROMsMenuItem.DropDownItems.Add(item);
+
+                var item2 = new ToolStripMenuItem(Path.GetFileName(path));
+                item2.ToolTipText = path;
+                item2.Tag = path;
+                item2.Click += RecentROM_Click;
+                _menuFileRecent.DropDownItems.Add(item2);
             }
         }
 
@@ -1330,17 +1365,21 @@ public string GetRomInfo()
         {
             if (_soundMenuItem == null || !LangINI.LangLoadOK) return;
             string lang = AppConfigure["Lang"];
-            _soundMenuItem.Text = NesCore.AudioEnabled
+            string text = NesCore.AudioEnabled
                 ? LangINI.Get(lang, "SoundON",  "Sound ON")
                 : LangINI.Get(lang, "SoundOFF", "Sound OFF");
+            _soundMenuItem.Text = text;
+            _menuViewSound.Text = text;
         }
 
         void UpdateUltraAnalogMenuText()
         {
             if (_ultraAnalogMenuItem == null) return;
-            _ultraAnalogMenuItem.Text = NesCore.UltraAnalog
+            string text = NesCore.UltraAnalog
                 ? "Ultra Analog: ON"
                 : "Ultra Analog: OFF";
+            _ultraAnalogMenuItem.Text = text;
+            _menuViewUltraAnalog.Text = text;
         }
 
         public string rom_file_name = "";
@@ -1504,36 +1543,22 @@ public string GetRomInfo()
         //http://stackoverflow.com/questions/11754874/keydown-not-firing-for-up-down-left-and-right
         protected override bool ProcessCmdKey(ref System.Windows.Forms.Message msg, System.Windows.Forms.Keys keyData)
         {
-            // ── 全域快捷鍵（不需要 ROM 在執行） ──
-            switch (keyData)
+            // Escape: 退出全螢幕（MenuStrip 無法處理的特殊邏輯）
+            if (keyData == Keys.Escape)
             {
-                case Keys.Control | Keys.O:
-                    button1_Click(null, null);
-                    return true;
-                case Keys.F11:
-                    if (ScreenCenterFull || analogFullScreen)
-                        fun8ToolStripMenuItem_Click(null, null);
-                    else
-                        fullScreeenToolStripMenuItem_Click(null, null);
-                    return true;
-                case Keys.Escape:
-                    if (ScreenCenterFull || analogFullScreen)
-                        fun8ToolStripMenuItem_Click(null, null);
-                    return true;
-                case Keys.Control | Keys.R:
-                    if (running) label4_Click(null, null); // Reset
-                    return true;
-            }
-
-            //for KeyDown check
-            if (!running) return true;
-            int keyboard_key = (int)keyData;
-
-            if (keyboard_key == 65616)
-            {
-                NESCaptureScreen();
+                if (ScreenCenterFull || analogFullScreen)
+                    fun8ToolStripMenuItem_Click(null, null);
                 return true;
             }
+
+            // 讓 MenuStrip ShortcutKeys 優先處理 (F11, Ctrl+O, Ctrl+R, Ctrl+Shift+P 等)
+            if (base.ProcessCmdKey(ref msg, keyData))
+                return true;
+
+            // 遊戲手把按鍵
+            if (!running) return false;
+            int keyboard_key = (int)keyData;
+
             if (NES_KeyMAP.ContainsKey(keyboard_key))
             {
                 KeyMap km = NES_KeyMAP[keyboard_key];
@@ -1541,8 +1566,9 @@ public string GetRomInfo()
                     NesCore.P2_ButtonPress((byte)((int)km - 8));
                 else
                     NesCore.P1_ButtonPress((byte)km);
+                return true;
             }
-            return true;
+            return false;
         }
 
         bool writing = false;
@@ -1618,18 +1644,6 @@ public string GetRomInfo()
                 while (_fpsStopWatch.Elapsed.TotalSeconds < _fpsDeadline) { }
                 _fpsDeadline += NES_FRAME_SECONDS;
             }
-        }
-
-        private void label1_MouseEnter(object sender, EventArgs e)
-        {
-            this.Cursor = Cursors.Hand;
-            (sender as Label).BackColor = Color.LightGray;
-        }
-
-        private void label1_MouseLeave(object sender, EventArgs e)
-        {
-            this.Cursor = Cursors.Default;
-            (sender as Label).BackColor = Color.WhiteSmoke;
         }
 
         bool configure = false;
@@ -1857,16 +1871,25 @@ public string GetRomInfo()
         {
             bool hasFfmpeg = !string.IsNullOrEmpty(GetFfmpegPath());
             _recordMenuItem.Visible = hasFfmpeg;
+            _menuToolsRecord.Visible = hasFfmpeg;
             if (hasFfmpeg)
             {
                 bool videoRec = VideoRecorder.IsRecording;
                 bool audioRec = AudioRecorder.IsRecording;
 
-                _recordVideoMenuItem.Text = videoRec ? "■ Stop Recording" : "● Record Video";
-                _recordVideoMenuItem.Enabled = videoRec || (running && !audioRec);
+                string videoText = videoRec ? "■ Stop Recording" : "● Record Video";
+                bool videoEnabled = videoRec || (running && !audioRec);
+                _recordVideoMenuItem.Text = videoText;
+                _recordVideoMenuItem.Enabled = videoEnabled;
+                _menuToolsRecordVideo.Text = videoText;
+                _menuToolsRecordVideo.Enabled = videoEnabled;
 
-                _recordAudioMenuItem.Text = audioRec ? "■ Stop Audio Recording" : "● Record Audio";
-                _recordAudioMenuItem.Enabled = audioRec || (running && !videoRec);
+                string audioText = audioRec ? "■ Stop Audio Recording" : "● Record Audio";
+                bool audioEnabled = audioRec || (running && !videoRec);
+                _recordAudioMenuItem.Text = audioText;
+                _recordAudioMenuItem.Enabled = audioEnabled;
+                _menuToolsRecordAudio.Text = audioText;
+                _menuToolsRecordAudio.Enabled = audioEnabled;
             }
         }
 
@@ -2028,6 +2051,35 @@ public string GetRomInfo()
             RomInf_LinkClicked(null, null);
         }
 
+        private void _menuEmulationLimitFps_Click(object sender, EventArgs e)
+        {
+            LimitFPS = _menuEmulationLimitFps.Checked;
+            AppConfigure["LimitFPS"] = LimitFPS ? "1" : "0";
+            Configure_Write();
+        }
+
+        private void _menuEmulationPerdotFSM_Click(object sender, EventArgs e)
+        {
+            NesCore.AccuracyOptA = _menuEmulationPerdotFSM.Checked;
+            AppConfigure["AccuracyOptA"] = NesCore.AccuracyOptA ? "1" : "0";
+            Configure_Write();
+        }
+
+        private void _menuToolsScreenshot_Click(object sender, EventArgs e)
+        {
+            if (running) NESCaptureScreen();
+        }
+
+        private void _menuHelpShortcuts_Click(object sender, EventArgs e)
+        {
+            string lang = AppConfigure.ContainsKey("Lang") ? AppConfigure["Lang"] : "en-us";
+            string title = LangINI.Get(lang, "shortcuts", "Keyboard Shortcuts");
+            string body = LangINI.Get(lang, "shortcuts_body",
+                "Ctrl+O\tOpen ROM\nCtrl+R\tSoft Reset\nCtrl+Shift+P\tScreenshot\nF11\tToggle FullScreen\nEscape\tExit FullScreen");
+            body = body.Replace("\\n", "\r\n").Replace("\\t", "\t");
+            MessageBox.Show(body, title, MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
         bool ScreenCenterFull = false;
         bool analogFullScreen = false;
 
@@ -2104,7 +2156,7 @@ public string GetRomInfo()
             // UI 全螢幕
             panel1.Visible = false;
             panel1.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            UIAbout.Visible = RomInf.Visible = UIOpenRom.Visible = UIReset.Visible = UIConfig.Visible = label3.Visible = false;
+            label3.Visible = false;
             this.BackColor = Color.Black;
             this.FormBorderStyle = FormBorderStyle.None;
             this.WindowState = FormWindowState.Maximized;
@@ -2205,6 +2257,14 @@ public string GetRomInfo()
             initUIsize();
         }
 
+        private void _menuViewToggleFullScreen_Click(object sender, EventArgs e)
+        {
+            if (ScreenCenterFull || analogFullScreen)
+                fun8ToolStripMenuItem_Click(null, null);
+            else
+                fullScreeenToolStripMenuItem_Click(null, null);
+        }
+
         private void fullScreeenToolStripMenuItem_Click(object sender, EventArgs e)
         {
             StopRecordingIfActive(true);
@@ -2213,7 +2273,7 @@ public string GetRomInfo()
             if (this.WindowState != FormWindowState.Maximized) Opacity = 0;
             panel1.Visible = false;
             panel1.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            UIAbout.Visible = RomInf.Visible = UIOpenRom.Visible = UIReset.Visible = UIConfig.Visible = label3.Visible = false;
+            label3.Visible = false;
             this.BackColor = Color.Black;
             this.FormBorderStyle = FormBorderStyle.None;
             this.WindowState = FormWindowState.Maximized;

@@ -405,7 +405,7 @@
             this.label9.Name = "label9";
             this.label9.Size = new System.Drawing.Size(300, 18);
             this.label9.TabIndex = 5;
-            this.label9.Text = "Shift + p screen capture save file location";
+            this.label9.Text = "Ctrl+Shift+P screen capture save file location";
             // 
             // choose_dir
             // 

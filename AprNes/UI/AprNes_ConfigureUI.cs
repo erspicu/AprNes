@@ -141,7 +141,7 @@ namespace AprNes
             LimitFPS_checkBox.Text = LangStr("limitfps");
             perdotFSM.Text   = LangStr("perdotFSM");
             label18.Text     = LangStr("langchoose");
-            label9.Text      = "Shift + p " + LangStr("capture_path");
+            label9.Text      = LangStr("capture_path");
             label36.Text     = LangStr("video_output_folder");
             label37.Text     = LangStr("audio_output_folder");
             button1.Text     = LangStr("selectfolder");
