@@ -16,20 +16,19 @@
 
 ## 待實作 🔲
 
-### P1: Color Emphasis 紅綠交換 (影響遊戲畫面正確性)
-- [ ] PPU.cs: 讀取 $2001 emphasis bits 時，PAL 模式下交換 bit 5 (Red↔Green) 和 bit 6 (Green↔Red)
-- [ ] 影響位置：寫入 $2001 時解析 emphasis、渲染時套用 emphasis attenuation
-- [ ] 類比模式的 emphasis 處理也需要交換
+### P1: Color Emphasis 紅綠交換 ✅ (2026-03-29)
+- [x] PPU.cs: 寫入 $2001 時，PAL/Dendy 模式下交換 ppuEmphasis bit0(R) 和 bit1(G)
+- [x] 使用 bit manipulation: `(emph & 4) | ((emph & 1) << 1) | ((emph >> 1) & 1)`
 
-### P2: Odd Frame Dot Skip 禁用 (影響時序正確性)
-- [ ] PPU.cs: `scanline == preRenderLine && cx == 339` 的 odd frame skip 邏輯，PAL 模式下跳過
-- [ ] PAL 每幀固定 341 dots，無 dot skip
+### P2: Odd Frame Dot Skip 禁用 ✅ (2026-03-29)
+- [x] PPU.cs: `Region == RegionType.NTSC` guard 在 odd frame skip 邏輯前
+- [x] PAL/Dendy 每幀固定 341 dots，無 dot skip
 
-### P3: PAL 專用調色盤 (影響畫面色彩)
-- [ ] PPU.cs `initPalette()`: 根據 Region 載入不同的 64-color RGB 查找表
-- [ ] PAL 電壓位準不同 → RGB 映射不同
-- [ ] 可選方案：(a) 內建 PAL palette LUT (b) 用 PAL 電壓動態計算
-- [ ] 參考 FirebrandX PAL palette 或用 PAL voltage → YUV → RGB 計算
+### P3: PAL 專用調色盤 ✅ (2026-03-29)
+- [x] PPU.cs: `generatePaletteFromVoltages()` 從 PAL 2C07 DAC 電壓動態生成 64-color palette
+- [x] PAL voltages: lo=[-0.117, 0.000, 0.223, 0.490], hi=[0.306, 0.543, 0.741, 1.000]
+- [x] YUV→RGB 解碼（PAL 用 YUV 而非 NTSC 的 YIQ）
+- [x] NTSC 保留原 hardcoded palette（已驗證 174+136 tests）
 
 ### P4: PAL 類比訊號模擬 (大工程，低優先)
 - [ ] Ntsc.cs 的 loLevels/hiLevels 需要 PAL 電壓值

@@ -15,23 +15,102 @@ namespace AprNes
         // Fills NesColors (uint*) and default palette into ppu_ram[0x3F00..0x3F1F] (byte*)
         static void initPalette()
         {
-            NesColors[ 0]=0xFF7C7C7C; NesColors[ 1]=0xFF0000FC; NesColors[ 2]=0xFF0000BC; NesColors[ 3]=0xFF4428BC;
-            NesColors[ 4]=0xFF940084; NesColors[ 5]=0xFFA80020; NesColors[ 6]=0xFFA81000; NesColors[ 7]=0xFF881400;
-            NesColors[ 8]=0xFF503000; NesColors[ 9]=0xFF007800; NesColors[10]=0xFF006800; NesColors[11]=0xFF005800;
-            NesColors[12]=0xFF004058; NesColors[13]=0xFF000000; NesColors[14]=0xFF000000; NesColors[15]=0xFF000000;
-            NesColors[16]=0xFFBCBCBC; NesColors[17]=0xFF0078F8; NesColors[18]=0xFF0058F8; NesColors[19]=0xFF6844FC;
-            NesColors[20]=0xFFD800CC; NesColors[21]=0xFFE40058; NesColors[22]=0xFFF83800; NesColors[23]=0xFFE45C10;
-            NesColors[24]=0xFFAC7C00; NesColors[25]=0xFF00B800; NesColors[26]=0xFF00A800; NesColors[27]=0xFF00A844;
-            NesColors[28]=0xFF008888; NesColors[29]=0xFF000000; NesColors[30]=0xFF000000; NesColors[31]=0xFF000000;
-            NesColors[32]=0xFFF8F8F8; NesColors[33]=0xFF3CBCFC; NesColors[34]=0xFF6888FC; NesColors[35]=0xFF9878F8;
-            NesColors[36]=0xFFF878F8; NesColors[37]=0xFFF85898; NesColors[38]=0xFFF87858; NesColors[39]=0xFFFCA044;
-            NesColors[40]=0xFFF8B800; NesColors[41]=0xFFB8F818; NesColors[42]=0xFF58D854; NesColors[43]=0xFF58F898;
-            NesColors[44]=0xFF00E8D8; NesColors[45]=0xFF787878; NesColors[46]=0xFF000000; NesColors[47]=0xFF000000;
-            NesColors[48]=0xFFFCFCFC; NesColors[49]=0xFFA4E4FC; NesColors[50]=0xFFB8B8F8; NesColors[51]=0xFFD8B8F8;
-            NesColors[52]=0xFFF8B8F8; NesColors[53]=0xFFF8A4C0; NesColors[54]=0xFFF0D0B0; NesColors[55]=0xFFFCE0A8;
-            NesColors[56]=0xFFF8D878; NesColors[57]=0xFFD8F878; NesColors[58]=0xFFB8F8B8; NesColors[59]=0xFFB8F8D8;
-            NesColors[60]=0xFF00FCFC; NesColors[61]=0xFFF8D8F8; NesColors[62]=0xFF000000; NesColors[63]=0xFF000000;
+            if (Region == RegionType.PAL)
+            {
+                // Generate PAL palette from 2C07 voltage levels + YUV decoding
+                generatePaletteFromVoltages(
+                    new float[] { -0.117f, 0.000f, 0.223f, 0.490f }, // lo levels
+                    new float[] {  0.306f, 0.543f, 0.741f, 1.000f }, // hi levels
+                    true); // YUV decoding
+            }
+            else
+            {
+                // NTSC hardcoded palette (verified with 174 blargg + 136 AccuracyCoin tests)
+                NesColors[ 0]=0xFF7C7C7C; NesColors[ 1]=0xFF0000FC; NesColors[ 2]=0xFF0000BC; NesColors[ 3]=0xFF4428BC;
+                NesColors[ 4]=0xFF940084; NesColors[ 5]=0xFFA80020; NesColors[ 6]=0xFFA81000; NesColors[ 7]=0xFF881400;
+                NesColors[ 8]=0xFF503000; NesColors[ 9]=0xFF007800; NesColors[10]=0xFF006800; NesColors[11]=0xFF005800;
+                NesColors[12]=0xFF004058; NesColors[13]=0xFF000000; NesColors[14]=0xFF000000; NesColors[15]=0xFF000000;
+                NesColors[16]=0xFFBCBCBC; NesColors[17]=0xFF0078F8; NesColors[18]=0xFF0058F8; NesColors[19]=0xFF6844FC;
+                NesColors[20]=0xFFD800CC; NesColors[21]=0xFFE40058; NesColors[22]=0xFFF83800; NesColors[23]=0xFFE45C10;
+                NesColors[24]=0xFFAC7C00; NesColors[25]=0xFF00B800; NesColors[26]=0xFF00A800; NesColors[27]=0xFF00A844;
+                NesColors[28]=0xFF008888; NesColors[29]=0xFF000000; NesColors[30]=0xFF000000; NesColors[31]=0xFF000000;
+                NesColors[32]=0xFFF8F8F8; NesColors[33]=0xFF3CBCFC; NesColors[34]=0xFF6888FC; NesColors[35]=0xFF9878F8;
+                NesColors[36]=0xFFF878F8; NesColors[37]=0xFFF85898; NesColors[38]=0xFFF87858; NesColors[39]=0xFFFCA044;
+                NesColors[40]=0xFFF8B800; NesColors[41]=0xFFB8F818; NesColors[42]=0xFF58D854; NesColors[43]=0xFF58F898;
+                NesColors[44]=0xFF00E8D8; NesColors[45]=0xFF787878; NesColors[46]=0xFF000000; NesColors[47]=0xFF000000;
+                NesColors[48]=0xFFFCFCFC; NesColors[49]=0xFFA4E4FC; NesColors[50]=0xFFB8B8F8; NesColors[51]=0xFFD8B8F8;
+                NesColors[52]=0xFFF8B8F8; NesColors[53]=0xFFF8A4C0; NesColors[54]=0xFFF0D0B0; NesColors[55]=0xFFFCE0A8;
+                NesColors[56]=0xFFF8D878; NesColors[57]=0xFFD8F878; NesColors[58]=0xFFB8F8B8; NesColors[59]=0xFFB8F8D8;
+                NesColors[60]=0xFF00FCFC; NesColors[61]=0xFFF8D8F8; NesColors[62]=0xFF000000; NesColors[63]=0xFF000000;
+            }
 
+        }
+
+        /// <summary>
+        /// Generate 64-color NES palette from PPU DAC voltage levels.
+        /// Each color index encodes a luminance column (bits 5-4) and hue (bits 3-0).
+        /// The PPU outputs a square wave between Lo/Hi voltages; phase determines hue.
+        /// </summary>
+        static void generatePaletteFromVoltages(float[] lo, float[] hi, bool palMode)
+        {
+            for (int idx = 0; idx < 64; idx++)
+            {
+                int row = (idx >> 4) & 3;
+                int hue = idx & 0xF;
+                float y = 0, cb = 0, cr = 0;
+
+                if (hue == 0) // achromatic (gray)
+                {
+                    y = (lo[row] + hi[row]) * 0.5f;
+                }
+                else if (hue <= 12) // chromatic
+                {
+                    float phase = (float)((hue - 1) * Math.PI / 6.0);
+                    for (int s = 0; s < 12; s++)
+                    {
+                        float angle = (float)(s * Math.PI / 6.0);
+                        // Signal is HIGH when sample is within ±90° of hue phase
+                        float diff = angle - phase;
+                        if (diff > Math.PI)  diff -= (float)(2 * Math.PI);
+                        if (diff < -Math.PI) diff += (float)(2 * Math.PI);
+                        float sig = (Math.Abs(diff) <= Math.PI * 0.5f) ? hi[row] : lo[row];
+                        y  += sig;
+                        cb += sig * (float)Math.Cos(angle);
+                        cr += sig * (float)Math.Sin(angle);
+                    }
+                    y  /= 12f;
+                    cb /= 6f;
+                    cr /= 6f;
+                }
+                else if (hue == 13) // darker achromatic
+                {
+                    y = lo[row];
+                }
+                // hue 14, 15 = black (y=0, cb=cr=0)
+
+                float r, g, b;
+                if (palMode) // YUV → RGB
+                {
+                    r = y + 1.140f * cr;
+                    g = y - 0.395f * cb - 0.581f * cr;
+                    b = y + 2.032f * cb;
+                }
+                else // YIQ → RGB (NTSC)
+                {
+                    r = y + 0.956f * cb + 0.621f * cr;
+                    g = y - 0.272f * cb - 0.647f * cr;
+                    b = y - 1.107f * cb + 1.704f * cr;
+                }
+
+                int ri = Math.Max(0, Math.Min(255, (int)(r * 255)));
+                int gi = Math.Max(0, Math.Min(255, (int)(g * 255)));
+                int bi = Math.Max(0, Math.Min(255, (int)(b * 255)));
+                NesColors[idx] = 0xFF000000 | ((uint)ri << 16) | ((uint)gi << 8) | (uint)bi;
+            }
+        }
+
+        static void initPaletteRam()
+        {
             // table from blargg_ppu power_up_palette.asm
             ppu_ram[0x3F00]=0x09; ppu_ram[0x3F01]=0x01; ppu_ram[0x3F02]=0x00; ppu_ram[0x3F03]=0x01;
             ppu_ram[0x3F04]=0x00; ppu_ram[0x3F05]=0x02; ppu_ram[0x3F06]=0x02; ppu_ram[0x3F07]=0x0D;
@@ -587,8 +666,9 @@ namespace AprNes
             if (scanline == preRenderLine && cx == 2)
                 isVblank = false;
 
-            // Odd frame skip: on odd frames with rendering enabled, skip last idle cycle of pre-render
-            if (scanline == preRenderLine && cx == 339)
+            // Odd frame skip: NTSC only — on odd frames with rendering enabled, skip last idle cycle of pre-render.
+            // PAL/Dendy: no dot skip (PAL phase alternation eliminates dot crawl naturally).
+            if (Region == RegionType.NTSC && scanline == preRenderLine && cx == 339)
             {
                 oddSwap = !oddSwap;
                 if (!oddSwap && (ShowBackGround || ShowSprites))
@@ -1246,6 +1326,9 @@ namespace AprNes
             ShowBackGround = (value & 0x08) != 0;
             ShowSprites    = (value & 0x10) != 0;
             ppuEmphasis    = (byte)((value >> 5) & 0x7); // bits 5-7: RGB emphasis
+            // PAL/Dendy: Red (bit0) and Green (bit1) are swapped in hardware
+            if (Region != RegionType.NTSC)
+                ppuEmphasis = (byte)((ppuEmphasis & 0x4) | ((ppuEmphasis & 1) << 1) | ((ppuEmphasis >> 1) & 1));
 
             bool newRenderingEnabled = ShowBackGround || ShowSprites;
             if (prevRenderingEnabled != newRenderingEnabled && scanline >= 0 && scanline < 240)

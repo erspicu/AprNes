@@ -450,6 +450,7 @@ namespace AprNes
                 }
 
                 initPalette();
+                initPaletteRam();
 
                 //init function array
                 init_function();
