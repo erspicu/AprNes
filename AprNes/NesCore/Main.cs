@@ -64,6 +64,10 @@ namespace AprNes
         // true = full hardware accuracy; false = skip FSM for ~13% performance gain (no test failures)
         static public bool AccuracyOptA = false;
 
+        // TV system region
+        public enum RegionType { NTSC, PAL, Dendy }
+        static public RegionType Region = RegionType.NTSC;
+
         // ── AudioPlus 音訊引擎設定 ──────────────────────────────────
         // AudioMode: 0=Pure Digital, 1=Authentic, 2=Modern
         static public int AudioMode = 0;

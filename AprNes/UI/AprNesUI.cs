@@ -145,6 +145,7 @@ namespace AprNes
             _menuEmulation.Text = LangINI.Get(lang, "menu_emulation", "Emulation");
             _menuEmulationSoftReset.Text = LangINI.lang_table[lang]["reset"] + " (Soft)";
             _menuEmulationHardReset.Text = "Hard Reset";
+            _menuEmulationRegion.Text = LangINI.Get(lang, "region", "Region");
             _menuEmulationLimitFps.Text = LangINI.lang_table[lang]["limitfps"];
             _menuEmulationPerdotFSM.Text = LangINI.lang_table[lang]["perdotFSM"];
             _menuView.Text = LangINI.Get(lang, "menu_view", "View");
@@ -498,6 +499,15 @@ namespace AprNes
             // 讀取 Accuracy 選項設定 (預設全開)
             NesCore.AccuracyOptA = !AppConfigure.ContainsKey("AccuracyOptA") || AppConfigure["AccuracyOptA"] != "0";
             _menuEmulationPerdotFSM.Checked = NesCore.AccuracyOptA;
+
+            // 讀取 Region 設定 (預設 NTSC)
+            if (AppConfigure.ContainsKey("Region"))
+            {
+                NesCore.RegionType r;
+                if (System.Enum.TryParse(AppConfigure["Region"], out r))
+                    NesCore.Region = r;
+            }
+            UpdateRegionCheckmarks();
 
             // 讀取類比訊號模擬設定 (預設關閉)
             NesCore.AnalogEnabled = AppConfigure.ContainsKey("AnalogMode") && AppConfigure["AnalogMode"] == "1";
@@ -2063,6 +2073,33 @@ public string GetRomInfo()
             NesCore.AccuracyOptA = _menuEmulationPerdotFSM.Checked;
             AppConfigure["AccuracyOptA"] = NesCore.AccuracyOptA ? "1" : "0";
             Configure_Write();
+        }
+
+        private void _menuEmulationRegion_Click(object sender, EventArgs e)
+        {
+            var item = sender as ToolStripMenuItem;
+            if (item == null) return;
+
+            NesCore.RegionType newRegion;
+            if (item == _menuEmulationRegionPAL) newRegion = NesCore.RegionType.PAL;
+            else if (item == _menuEmulationRegionDendy) newRegion = NesCore.RegionType.Dendy;
+            else newRegion = NesCore.RegionType.NTSC;
+
+            if (newRegion == NesCore.Region) return;
+
+            NesCore.Region = newRegion;
+            UpdateRegionCheckmarks();
+            AppConfigure["Region"] = NesCore.Region.ToString();
+            Configure_Write();
+
+            if (running) HardReset();
+        }
+
+        void UpdateRegionCheckmarks()
+        {
+            _menuEmulationRegionNTSC.Checked  = NesCore.Region == NesCore.RegionType.NTSC;
+            _menuEmulationRegionPAL.Checked   = NesCore.Region == NesCore.RegionType.PAL;
+            _menuEmulationRegionDendy.Checked = NesCore.Region == NesCore.RegionType.Dendy;
         }
 
         private void _menuToolsScreenshot_Click(object sender, EventArgs e)

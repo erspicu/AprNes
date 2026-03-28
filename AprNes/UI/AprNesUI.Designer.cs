@@ -59,6 +59,10 @@
             this._menuEmulation = new System.Windows.Forms.ToolStripMenuItem();
             this._menuEmulationSoftReset = new System.Windows.Forms.ToolStripMenuItem();
             this._menuEmulationHardReset = new System.Windows.Forms.ToolStripMenuItem();
+            this._menuEmulationRegion = new System.Windows.Forms.ToolStripMenuItem();
+            this._menuEmulationRegionNTSC = new System.Windows.Forms.ToolStripMenuItem();
+            this._menuEmulationRegionPAL = new System.Windows.Forms.ToolStripMenuItem();
+            this._menuEmulationRegionDendy = new System.Windows.Forms.ToolStripMenuItem();
             this._menuEmulationSep1 = new System.Windows.Forms.ToolStripSeparator();
             this._menuEmulationLimitFps = new System.Windows.Forms.ToolStripMenuItem();
             this._menuEmulationPerdotFSM = new System.Windows.Forms.ToolStripMenuItem();
@@ -195,6 +199,7 @@
             this._ultraAnalogMenuItem.Name = "_ultraAnalogMenuItem";
             this._ultraAnalogMenuItem.Size = new System.Drawing.Size(229, 30);
             this._ultraAnalogMenuItem.Text = "Ultra Analog: OFF";
+            this._ultraAnalogMenuItem.Visible = false;
             this._ultraAnalogMenuItem.Click += new System.EventHandler(this._ultraAnalogMenuItem_Click);
             // 
             // _recordMenuItem
@@ -305,6 +310,7 @@
             this._menuEmulationSoftReset,
             this._menuEmulationHardReset,
             this._menuEmulationSep1,
+            this._menuEmulationRegion,
             this._menuEmulationLimitFps,
             this._menuEmulationPerdotFSM});
             this._menuEmulation.Name = "_menuEmulation";
@@ -330,9 +336,42 @@
             // 
             this._menuEmulationSep1.Name = "_menuEmulationSep1";
             this._menuEmulationSep1.Size = new System.Drawing.Size(262, 6);
-            // 
+            //
+            // _menuEmulationRegion
+            //
+            this._menuEmulationRegion.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this._menuEmulationRegionNTSC,
+            this._menuEmulationRegionPAL,
+            this._menuEmulationRegionDendy});
+            this._menuEmulationRegion.Name = "_menuEmulationRegion";
+            this._menuEmulationRegion.Size = new System.Drawing.Size(265, 34);
+            this._menuEmulationRegion.Text = "Region";
+            //
+            // _menuEmulationRegionNTSC
+            //
+            this._menuEmulationRegionNTSC.Checked = true;
+            this._menuEmulationRegionNTSC.Name = "_menuEmulationRegionNTSC";
+            this._menuEmulationRegionNTSC.Size = new System.Drawing.Size(200, 34);
+            this._menuEmulationRegionNTSC.Text = "NTSC";
+            this._menuEmulationRegionNTSC.Click += new System.EventHandler(this._menuEmulationRegion_Click);
+            //
+            // _menuEmulationRegionPAL
+            //
+            this._menuEmulationRegionPAL.Name = "_menuEmulationRegionPAL";
+            this._menuEmulationRegionPAL.Size = new System.Drawing.Size(200, 34);
+            this._menuEmulationRegionPAL.Text = "PAL";
+            this._menuEmulationRegionPAL.Click += new System.EventHandler(this._menuEmulationRegion_Click);
+            //
+            // _menuEmulationRegionDendy
+            //
+            this._menuEmulationRegionDendy.Name = "_menuEmulationRegionDendy";
+            this._menuEmulationRegionDendy.Size = new System.Drawing.Size(200, 34);
+            this._menuEmulationRegionDendy.Text = "Dendy";
+            this._menuEmulationRegionDendy.Visible = false;
+            this._menuEmulationRegionDendy.Click += new System.EventHandler(this._menuEmulationRegion_Click);
+            //
             // _menuEmulationLimitFps
-            // 
+            //
             this._menuEmulationLimitFps.CheckOnClick = true;
             this._menuEmulationLimitFps.Name = "_menuEmulationLimitFps";
             this._menuEmulationLimitFps.Size = new System.Drawing.Size(265, 34);
@@ -383,6 +422,7 @@
             this._menuViewUltraAnalog.Name = "_menuViewUltraAnalog";
             this._menuViewUltraAnalog.Size = new System.Drawing.Size(259, 34);
             this._menuViewUltraAnalog.Text = "Ultra Analog: OFF";
+            this._menuViewUltraAnalog.Visible = false;
             this._menuViewUltraAnalog.Click += new System.EventHandler(this._ultraAnalogMenuItem_Click);
             // 
             // _menuTools
@@ -536,6 +576,10 @@
         private System.Windows.Forms.ToolStripMenuItem _menuEmulation;
         private System.Windows.Forms.ToolStripMenuItem _menuEmulationSoftReset;
         private System.Windows.Forms.ToolStripMenuItem _menuEmulationHardReset;
+        private System.Windows.Forms.ToolStripMenuItem _menuEmulationRegion;
+        private System.Windows.Forms.ToolStripMenuItem _menuEmulationRegionNTSC;
+        private System.Windows.Forms.ToolStripMenuItem _menuEmulationRegionPAL;
+        private System.Windows.Forms.ToolStripMenuItem _menuEmulationRegionDendy;
         private System.Windows.Forms.ToolStripSeparator _menuEmulationSep1;
         private System.Windows.Forms.ToolStripMenuItem _menuEmulationLimitFps;
         private System.Windows.Forms.ToolStripMenuItem _menuEmulationPerdotFSM;
