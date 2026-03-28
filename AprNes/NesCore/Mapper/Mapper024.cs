@@ -89,7 +89,7 @@
             NesCore.expansionChipType = NesCore.ExpansionChipType.VRC6;
             NesCore.expansionChannelCount = 3;
             NesCore.expansionChannels[0] = NesCore.expansionChannels[1] = NesCore.expansionChannels[2] = 0;
-            NesCore.mmix_UpdateExpansionGain();
+            NesCore.mmix_UpdateChannelGains();
             UpdateCHRBanks();
         }
 

@@ -76,7 +76,7 @@ namespace AprNes
             NesCore.expansionChipType = NesCore.ExpansionChipType.Namco163;
             NesCore.expansionChannelCount = 0; // updated dynamically by audio engine
             for (int i = 0; i < 8; i++) NesCore.expansionChannels[i] = 0;
-            NesCore.mmix_UpdateExpansionGain();
+            NesCore.mmix_UpdateChannelGains();
             UpdateCHRBanks();
         }
 

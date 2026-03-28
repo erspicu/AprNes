@@ -380,7 +380,7 @@ namespace AprNes
                 expansionChipType = ExpansionChipType.FDS;
                 expansionChannelCount = 1;
                 expansionChannels[0] = 0;
-                mmix_UpdateExpansionGain();
+                mmix_UpdateChannelGains();
 
                 // Auto-insert disk 0, side A
                 fds_InsertDisk(0);

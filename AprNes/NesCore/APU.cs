@@ -96,8 +96,14 @@ namespace AprNes
             20f,   // FDS       (future)
         };
 
-        // 使用者可調音量 (0~200, 預設 100 = 100%)
-        static public int[] ExpansionChipUserVolume = new int[] { 100, 100, 100, 100, 100, 100, 100 };
+        // ── Per-channel 音量 (Mode 2 per-channel, Mode 0/1 per-chip average) ──
+        // [0]=Pulse1, [1]=Pulse2, [2]=Triangle, [3]=Noise, [4]=DMC
+        // [5..12]=Expansion ch0~ch7 (VRC6: P1/P2/Saw, N163: ch0~ch7, 5B: A/B/C, etc.)
+        // 範圍 0~100, 0=靜音, 100=該聲道最大
+        static public int[] ChannelVolume = new int[] { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 };
+
+        // Mode 0/1 擴展音效增益 (從 ChannelVolume[5..] 平均值預算, 由 AudioPlus 更新)
+        static public float ap_mode01ExpGain = 0f;
 
         // =====================================================================
         // 原有 APU 欄位 (保留相容)
@@ -467,8 +473,7 @@ namespace AprNes
             // 為 Mode 0/1 計算相容的單一 mapperExpansionAudio 值
             if (expansionChannelCount > 0 && AudioMode < 2)
             {
-                int ct = (int)expansionChipType;
-                float gain = DefaultChipGain[ct] * (ExpansionChipUserVolume[ct] * 0.01f);
+                float gain = ap_mode01ExpGain;
                 int sum = 0;
                 for (int i = 0; i < expansionChannelCount; i++)
                     sum += (int)(expansionChannels[i] * gain);

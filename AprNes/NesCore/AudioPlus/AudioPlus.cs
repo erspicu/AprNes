@@ -57,6 +57,10 @@ namespace AprNes
         // ==================================================================
         // AudioPlus — 總調度器 (AudioPlus_)
         // ==================================================================
+        const float AP_GAIN_MODE1 = 40000f;  // Mode 1: DAC 電壓 ~0-0.8 → 適合 40000
+        const float AP_GAIN_MODE2 = 20000f;  // Mode 2: 正規化 0-1 × 5ch pan sum → 適合 20000
+
+        static float ap_modeGain = AP_GAIN_MODE1;
         static bool ap_initialized = false;
         static bool ap_tablesInitialized = false;
 
@@ -88,6 +92,7 @@ namespace AprNes
         public static void AudioPlus_ApplySettings()
         {
             if (!ap_initialized) return;
+            ap_modeGain = (AudioMode == 2) ? AP_GAIN_MODE2 : AP_GAIN_MODE1;
             cmf_SetModel(ConsoleModel, CustomLpfCutoff, CustomBuzz);
             cmf_SetBuzzParams(BuzzFreq, BuzzAmplitude);
             cmf_SetRfVolume(RfVolume);
@@ -98,6 +103,7 @@ namespace AprNes
             mfx_SetReverbWet(ReverbWet);
             mfx_SetCombFeedback(CombFeedback);
             mfx_SetCombDamp(CombDamp);
+            mmix_UpdateChannelGains();
         }
 
         public static void AudioPlus_Reset()
@@ -108,7 +114,7 @@ namespace AprNes
             cmf_Reset();
             mfx_Reset();
             mmix_ResetBiquad();
-            mmix_UpdateExpansionGain();
+            mmix_UpdateChannelGains();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -149,11 +155,10 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ap_OutputStereo(float left, float right)
         {
-            const float GAIN = 40000f;
-            float volumeScale = Volume * 0.01f;
+            float g = ap_modeGain * (Volume * 0.01f);
 
-            int scaledL = ap_Clamp16((int)(left * GAIN * volumeScale));
-            int scaledR = ap_Clamp16((int)(right * GAIN * volumeScale));
+            int scaledL = ap_SoftClipToInt16(left * g);
+            int scaledR = ap_SoftClipToInt16(right * g);
 
             AudioSampleReady?.Invoke((short)scaledL, (short)scaledR);
 
@@ -166,12 +171,28 @@ namespace AprNes
             }
         }
 
+        /// <summary>
+        /// Soft limiter: 線性通過 ±80% (±26214)，超過部分漸進壓縮至 ±32767。
+        /// 消除硬 clip 爆音，同時保留正常範圍的線性度。
+        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static int ap_Clamp16(int sample)
+        static int ap_SoftClipToInt16(float x)
         {
-            if ((uint)(sample + 32768) <= 65535u)
-                return sample;
-            return sample < 0 ? -32768 : 32767;
+            const float KNEE = 26214f;       // 32767 × 0.8
+            const float RANGE = 6553f;       // 32767 - KNEE
+            const float INV_RANGE = 1f / 6553f;
+
+            if (x > KNEE)
+            {
+                float over = (x - KNEE) * INV_RANGE;
+                return (int)(KNEE + RANGE * over / (1f + over));
+            }
+            if (x < -KNEE)
+            {
+                float over = (-x - KNEE) * INV_RANGE;
+                return -(int)(KNEE + RANGE * over / (1f + over));
+            }
+            return (int)x;
         }
 
         // ==================================================================
@@ -619,8 +640,8 @@ namespace AprNes
         static float* mmix_basePanR;
         static float* mmix_panL;
         static float* mmix_panR;
-        static float* mmix_normScale;  // [5] NES channels
-        static float  mmix_expGain;    // combined chip gain × user volume for current expansion
+        static float* mmix_normScale;  // [5] NES channels base normalization (1/15, 1/127)
+        static float* mmix_chGain;     // [13] precomputed per-channel gain = normScale × (chVol/100)
         static double mmix_bq_b0, mmix_bq_b1, mmix_bq_b2, mmix_bq_a1, mmix_bq_a2;
         static double mmix_bq_s1, mmix_bq_s2; // Transposed Direct Form II state
         static int mmix_cachedBoostDb;
@@ -655,16 +676,41 @@ namespace AprNes
                 mmix_chBuf[i] = apm_AllocFloat(MMIX_MAX_SAMPLES);
             mmix_panL = apm_AllocFloat(MMIX_TOTAL_CH);
             mmix_panR = apm_AllocFloat(MMIX_TOTAL_CH);
+            mmix_chGain = apm_AllocFloat(MMIX_TOTAL_CH);
         }
 
-        /// <summary>Update expansion channel gain from current chip type and user volume.</summary>
-        public static void mmix_UpdateExpansionGain()
+        /// <summary>
+        /// 從 ChannelVolume[13] 預算所有聲道增益。
+        /// Mode 2: per-channel gain = normScale × (chVol/100) (NES) 或 chipGain/98302 × (chVol/100) (expansion)
+        /// Mode 0/1: 從擴展聲道音量平均值計算 per-chip 增益 (ap_mode01ExpGain)
+        /// </summary>
+        public static void mmix_UpdateChannelGains()
         {
+            // Mode 2: NES 聲道 per-channel gain
+            for (int i = 0; i < MMIX_NES_CH; i++)
+                mmix_chGain[i] = mmix_normScale[i] * (ChannelVolume[i] * 0.01f);
+
+            // Mode 2: 擴展聲道 per-channel gain
             int ct = (int)expansionChipType;
-            if (ct < DefaultChipGain.Length)
-                mmix_expGain = DefaultChipGain[ct] * (ExpansionChipUserVolume[ct] * 0.01f) * (1f / 98302f);
+            float baseGain = (ct > 0 && ct < DefaultChipGain.Length)
+                ? DefaultChipGain[ct] * (1f / 98302f) : 0f;
+            for (int i = 0; i < MMIX_EXP_CH; i++)
+                mmix_chGain[MMIX_NES_CH + i] = baseGain * (ChannelVolume[MMIX_NES_CH + i] * 0.01f);
+
+            // Mode 0/1: 擴展聲道 per-chip 平均增益
+            int expCount = expansionChannelCount;
+            if (expCount > 0 && ct > 0 && ct < DefaultChipGain.Length)
+            {
+                float avgVol = 0f;
+                for (int i = 0; i < expCount; i++)
+                    avgVol += ChannelVolume[MMIX_NES_CH + i];
+                avgVol = avgVol / expCount * 0.01f;
+                ap_mode01ExpGain = DefaultChipGain[ct] * avgVol;
+            }
             else
-                mmix_expGain = 0f;
+            {
+                ap_mode01ExpGain = 0f;
+            }
         }
 
         static void mmix_SetStereoWidth(int width)
@@ -714,19 +760,18 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void mmix_PushChannels(int sq1, int sq2, int tri, int noise, int dmc)
         {
-            ose_PushSample(1, sq1 * mmix_normScale[0]);
-            ose_PushSample(2, sq2 * mmix_normScale[1]);
-            ose_PushSample(3, tri * mmix_normScale[2]);
-            ose_PushSample(4, noise * mmix_normScale[3]);
-            ose_PushSample(5, dmc * mmix_normScale[4]);
+            ose_PushSample(1, sq1 * mmix_chGain[0]);
+            ose_PushSample(2, sq2 * mmix_chGain[1]);
+            ose_PushSample(3, tri * mmix_chGain[2]);
+            ose_PushSample(4, noise * mmix_chGain[3]);
+            ose_PushSample(5, dmc * mmix_chGain[4]);
 
             // Expansion channels (oversampler idx 6~13)
             int expCount = expansionChannelCount;
             if (expCount > 0)
             {
-                float g = mmix_expGain;
                 for (int i = 0; i < expCount; i++)
-                    ose_PushSample(6 + i, expansionChannels[i] * g);
+                    ose_PushSample(6 + i, expansionChannels[i] * mmix_chGain[MMIX_NES_CH + i]);
             }
         }
 

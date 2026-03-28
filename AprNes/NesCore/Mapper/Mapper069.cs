@@ -92,7 +92,7 @@
             NesCore.expansionChipType = NesCore.ExpansionChipType.Sunsoft5B;
             NesCore.expansionChannelCount = 3;
             NesCore.expansionChannels[0] = NesCore.expansionChannels[1] = NesCore.expansionChannels[2] = 0;
-            NesCore.mmix_UpdateExpansionGain();
+            NesCore.mmix_UpdateChannelGains();
         }
 
         public byte MapperR_ExpansionROM(ushort address) { return NesCore.cpubus; }

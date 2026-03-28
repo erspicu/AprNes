@@ -75,7 +75,7 @@
             NesCore.expansionChipType = NesCore.ExpansionChipType.VRC7;
             NesCore.expansionChannelCount = 1; // OPLL outputs single mixed sample
             NesCore.expansionChannels[0] = 0;
-            NesCore.mmix_UpdateExpansionGain();
+            NesCore.mmix_UpdateChannelGains();
         }
 
         static int TranslateAddr(int addr)
