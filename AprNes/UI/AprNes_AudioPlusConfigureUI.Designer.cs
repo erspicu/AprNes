@@ -58,6 +58,7 @@ namespace AprNes.UI
             this.lblBassFreqVal = new System.Windows.Forms.Label();
             this.btnOK = new System.Windows.Forms.Button();
             this.btnCancel = new System.Windows.Forms.Button();
+            this.ChannelVol = new System.Windows.Forms.GroupBox();
             this.grpAuthentic.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.trkCustomCutoff)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.trkBuzzAmp)).BeginInit();
@@ -71,6 +72,7 @@ namespace AprNes.UI
             ((System.ComponentModel.ISupportInitialize)(this.trkCombDamp)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.trkBassDb)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.trkBassFreq)).BeginInit();
+            this.ChannelVol.SuspendLayout();
             this.SuspendLayout();
             // 
             // grpAuthentic
@@ -517,7 +519,7 @@ namespace AprNes.UI
             // 
             // btnOK
             // 
-            this.btnOK.Location = new System.Drawing.Point(978, 580);
+            this.btnOK.Location = new System.Drawing.Point(970, 875);
             this.btnOK.Name = "btnOK";
             this.btnOK.Size = new System.Drawing.Size(90, 32);
             this.btnOK.TabIndex = 2;
@@ -527,19 +529,33 @@ namespace AprNes.UI
             // 
             // btnCancel
             // 
-            this.btnCancel.Location = new System.Drawing.Point(1074, 580);
+            this.btnCancel.Location = new System.Drawing.Point(1074, 875);
             this.btnCancel.Name = "btnCancel";
             this.btnCancel.Size = new System.Drawing.Size(90, 32);
             this.btnCancel.TabIndex = 3;
             this.btnCancel.Text = "Cancel";
             this.btnCancel.UseVisualStyleBackColor = true;
             this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
+            //
+            // ChannelVol (children built dynamically in BuildChannelVolumeUI)
+            //
+            this.ChannelVol.Location = new System.Drawing.Point(12, 581);
+            this.ChannelVol.Name = "ChannelVol";
+            this.ChannelVol.Size = new System.Drawing.Size(1152, 280);
+            this.ChannelVol.TabIndex = 4;
+            this.ChannelVol.TabStop = false;
+            this.ChannelVol.Text = "Channel Volume";
+            // 
+            // label1
+            // (ChannelVol children built dynamically)
+            // (remaining ChannelVol children built dynamically)
             // 
             // AprNes_AudioPlusConfigureUI
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 18F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1186, 625);
+            this.ClientSize = new System.Drawing.Size(1186, 920);
+            this.Controls.Add(this.ChannelVol);
             this.Controls.Add(this.grpAuthentic);
             this.Controls.Add(this.grpModern);
             this.Controls.Add(this.btnOK);
@@ -564,6 +580,7 @@ namespace AprNes.UI
             ((System.ComponentModel.ISupportInitialize)(this.trkCombDamp)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.trkBassDb)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.trkBassFreq)).EndInit();
+            this.ChannelVol.ResumeLayout(false);
             this.ResumeLayout(false);
 
         }
@@ -613,5 +630,6 @@ namespace AprNes.UI
         private System.Windows.Forms.Label lblBassFreqVal;
         private System.Windows.Forms.Button btnOK;
         private System.Windows.Forms.Button btnCancel;
+        private System.Windows.Forms.GroupBox ChannelVol;
     }
 }

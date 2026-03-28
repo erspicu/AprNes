@@ -70,13 +70,25 @@ namespace AprNes
                 System.IO.File.Move(oldPath, newPath);
         }
 
+        static readonly string LogFile = System.IO.Path.Combine(Application.StartupPath, "AprNes.log");
+
+        static void LogError(string msg)
+        {
+            try
+            {
+                string line = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + msg + Environment.NewLine;
+                System.IO.File.AppendAllText(LogFile, line);
+            }
+            catch { }
+        }
+
         Stopwatch st = new Stopwatch();//test UI finish time
 
         public AprNesUI()
         {
             st.Restart();
             InitializeComponent();
-            NesCore.OnError = msg => MessageBox.Show(msg);
+            NesCore.OnError = msg => { LogError(msg); MessageBox.Show(msg); };
 
             // 確保 configure 目錄存在
             if (!System.IO.Directory.Exists(ConfigureDir))
@@ -864,10 +876,7 @@ namespace AprNes
         public void FileWriteAllText(string path, string str)
         {
             Console.WriteLine("Configure save !");
-            Stream s = File.OpenWrite(path);
-            StreamWriter sw = new StreamWriter(s);
-            sw.WriteLine(str);
-            sw.Close();
+            File.WriteAllText(path, str);
         }
 
         // ────────────────────────────────────────────────────────────────────
@@ -876,6 +885,7 @@ namespace AprNes
 
         void LoadAudioPlusIni()
         {
+            InitChipDefaults();
             var cfg = new Dictionary<string, string>();
 
             if (File.Exists(AudioPlusIniFile))
@@ -914,6 +924,56 @@ namespace AprNes
             NesCore.CombDamp = ReadInt("CombDamp", 30, 10, 70);
             NesCore.BassBoostDb = ReadInt("BassBoostDb", 0, 0, 12);
             NesCore.BassBoostFreq = ReadInt("BassBoostFreq", 150, 80, 300);
+
+            // ── Channel Volume ──
+            string[] nesChKeys = { "Pulse1", "Pulse2", "Triangle", "Noise", "DMC" };
+            for (int i = 0; i < 5; i++)
+            {
+                NesCore.ChannelVolume[i] = ReadInt("ChVol_" + nesChKeys[i], 70, 0, 100);
+                NesCore.ChannelEnabled[i] = !cfg.ContainsKey("ChEn_" + nesChKeys[i]) || cfg["ChEn_" + nesChKeys[i]] != "0";
+            }
+            // Expansion channel volumes: per-chip keys (ChVol_VRC6_0, ChVol_N163_0, etc.)
+            string[] chipPrefixes = { "", "VRC6", "VRC7", "N163", "S5B", "MMC5", "FDS" };
+            for (int chip = 1; chip < chipPrefixes.Length; chip++)
+            {
+                for (int ch = 0; ch < 8; ch++)
+                {
+                    string volKey = "ChVol_" + chipPrefixes[chip] + "_" + ch;
+                    string enKey  = "ChEn_"  + chipPrefixes[chip] + "_" + ch;
+                    // Store per-chip settings in a parallel array; on ROM load, copy matching chip to ChannelVolume[5..12]
+                    if (cfg.ContainsKey(volKey))
+                    {
+                        int v;
+                        if (int.TryParse(cfg[volKey], out v))
+                            _chipChVol[chip, ch] = Math.Max(0, Math.Min(100, v));
+                    }
+                    if (cfg.ContainsKey(enKey))
+                        _chipChEn[chip, ch] = cfg[enKey] != "0";
+                }
+            }
+            // Apply current chip's settings to ChannelVolume[5..12]
+            ApplyChipChannelSettings((int)NesCore.expansionChipType);
+        }
+
+        // Per-chip channel volume/enable storage (persisted across chip changes)
+        int[,] _chipChVol = new int[7, 8];
+        bool[,] _chipChEn = new bool[7, 8];
+
+        void InitChipDefaults()
+        {
+            for (int c = 0; c < 7; c++)
+                for (int i = 0; i < 8; i++)
+                { _chipChVol[c, i] = 70; _chipChEn[c, i] = true; }
+        }
+
+        void ApplyChipChannelSettings(int chipIdx)
+        {
+            if (chipIdx < 0 || chipIdx >= 7) chipIdx = 0;
+            for (int i = 0; i < 8; i++)
+            {
+                NesCore.ChannelVolume[5 + i] = _chipChVol[chipIdx, i];
+                NesCore.ChannelEnabled[5 + i] = _chipChEn[chipIdx, i];
+            }
         }
 
         public void SaveAudioPlusIniPublic() { SaveAudioPlusIni(); }
@@ -988,7 +1048,39 @@ namespace AprNes
                 "CombFeedback=" + NesCore.CombFeedback + "\r\n" +
                 "CombDamp=" + NesCore.CombDamp + "\r\n" +
                 "BassBoostDb=" + NesCore.BassBoostDb + "\r\n" +
-                "BassBoostFreq=" + NesCore.BassBoostFreq + "\r\n";
+                "BassBoostFreq=" + NesCore.BassBoostFreq + "\r\n" +
+                "\r\n" +
+                "; ── Channel Volume ──\r\n";
+
+            // NES channels
+            string[] nesChKeys = { "Pulse1", "Pulse2", "Triangle", "Noise", "DMC" };
+            for (int i = 0; i < 5; i++)
+            {
+                content += "ChVol_" + nesChKeys[i] + "=" + NesCore.ChannelVolume[i] + "\r\n";
+                content += "ChEn_"  + nesChKeys[i] + "=" + (NesCore.ChannelEnabled[i] ? "1" : "0") + "\r\n";
+            }
+
+            // Save current chip's expansion channel settings back to _chipChVol
+            int curChip = (int)NesCore.expansionChipType;
+            if (curChip > 0 && curChip < 7)
+            {
+                for (int i = 0; i < 8; i++)
+                {
+                    _chipChVol[curChip, i] = NesCore.ChannelVolume[5 + i];
+                    _chipChEn[curChip, i] = NesCore.ChannelEnabled[5 + i];
+                }
+            }
+
+            // Per-chip expansion channels
+            string[] chipPrefixes = { "", "VRC6", "VRC7", "N163", "S5B", "MMC5", "FDS" };
+            for (int chip = 1; chip < chipPrefixes.Length; chip++)
+            {
+                for (int ch = 0; ch < 8; ch++)
+                {
+                    content += "ChVol_" + chipPrefixes[chip] + "_" + ch + "=" + _chipChVol[chip, ch] + "\r\n";
+                    content += "ChEn_"  + chipPrefixes[chip] + "_" + ch + "=" + (_chipChEn[chip, ch] ? "1" : "0") + "\r\n";
+                }
+            }
 
             FileWriteAllText(AudioPlusIniFile, content);
         }
@@ -1282,6 +1374,7 @@ public string GetRomInfo()
                 }
                 catch (Exception ex)
                 {
+                    LogError("Thread join error: " + ex.Message);
                     MessageBox.Show(ex.Message);
                 }
             }
@@ -1322,6 +1415,7 @@ public string GetRomInfo()
                 fps_count_timer.Enabled = false;
                 running = false;
                 label3.Text = "fps : ";
+                LogError("ROM init failed: " + (nes_name ?? "(unknown)"));
                 MessageBox.Show("fail !");
                 return;
             }
@@ -1647,6 +1741,7 @@ public string GetRomInfo()
                 fps_count_timer.Enabled = false;
                 running = false;
                 label3.Text = "fps : ";
+                LogError("Hard Reset failed: " + (nes_name ?? "(unknown)"));
                 MessageBox.Show("Hard Reset fail !");
                 return;
             }

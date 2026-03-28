@@ -58,7 +58,20 @@ namespace AprNes
         // AudioPlus — 總調度器 (AudioPlus_)
         // ==================================================================
         const float AP_GAIN_MODE1 = 40000f;  // Mode 1: DAC 電壓 ~0-0.8 → 適合 40000
-        const float AP_GAIN_MODE2 = 20000f;  // Mode 2: 正規化 0-1 × 5ch pan sum → 適合 20000
+        const float AP_GAIN_MODE2 = 13000f;  // Mode 2: 正規化 0-1 × 5ch pan sum + Haas → 13000 避免常態壓縮
+
+        // Mode 2 擴展音效 per-channel 正規化 (1/maxPerChannel → 0-1.0)
+        // 索引對應 ExpansionChipType enum
+        static readonly float[] Mode2ExpChNorm = new float[]
+        {
+            0f,           // None
+            1f / 15f,     // VRC6: pulse 0-15→1.0, saw 0-31→~2.0 (soft limiter 處理)
+            1f / 2000f,   // VRC7: OPLL mixed ±12285; 高於此由 soft limiter 處理
+            0.25f / 15f,  // N163: mapper 已÷activeCh, per-ch ~0-15 (×0.25)
+            1f / 32f,     // 5B: AY log DAC, volumeLut[10]=31≈1.0 (遊戲常用 vol 10-13; 高於此由 soft limiter 處理)
+            1f / 15f,     // MMC5: pulse 0-15 (同 NES)
+            1f / 63f,     // FDS: 6-bit wavetable 0-63
+        };
 
         static float ap_modeGain = AP_GAIN_MODE1;
         static bool ap_initialized = false;
@@ -681,31 +694,50 @@ namespace AprNes
 
         /// <summary>
         /// 從 ChannelVolume[13] 預算所有聲道增益。
-        /// Mode 2: per-channel gain = normScale × (chVol/100) (NES) 或 chipGain/98302 × (chVol/100) (expansion)
+        /// Mode 2: per-channel gain = normScale × (chVol/100) — 正規化至 0-1.0
         /// Mode 0/1: 從擴展聲道音量平均值計算 per-chip 增益 (ap_mode01ExpGain)
         /// </summary>
         public static void mmix_UpdateChannelGains()
         {
+            if (!ap_initialized || mmix_chGain == null) return;
             // Mode 2: NES 聲道 per-channel gain
+            // 70% = 1.0× (校調基準), 100% = 1.43×, 0% = 靜音
+            // ChannelEnabled=false → gain=0 (mute)
+            const float CH_VOL_BASE = 70f;
             for (int i = 0; i < MMIX_NES_CH; i++)
-                mmix_chGain[i] = mmix_normScale[i] * (ChannelVolume[i] * 0.01f);
+                mmix_chGain[i] = ChannelEnabled[i]
+                    ? mmix_normScale[i] * (ChannelVolume[i] / CH_VOL_BASE)
+                    : 0f;
 
-            // Mode 2: 擴展聲道 per-channel gain
+            // Mode 2: 擴展聲道 per-channel gain — 使用 Mode2ExpChNorm 正規化至 0-1.0
             int ct = (int)expansionChipType;
-            float baseGain = (ct > 0 && ct < DefaultChipGain.Length)
-                ? DefaultChipGain[ct] * (1f / 98302f) : 0f;
+            float baseGain = (ct > 0 && ct < Mode2ExpChNorm.Length)
+                ? Mode2ExpChNorm[ct] : 0f;
             for (int i = 0; i < MMIX_EXP_CH; i++)
-                mmix_chGain[MMIX_NES_CH + i] = baseGain * (ChannelVolume[MMIX_NES_CH + i] * 0.01f);
+                mmix_chGain[MMIX_NES_CH + i] = ChannelEnabled[MMIX_NES_CH + i]
+                    ? baseGain * (ChannelVolume[MMIX_NES_CH + i] / CH_VOL_BASE)
+                    : 0f;
 
-            // Mode 0/1: 擴展聲道 per-chip 平均增益
+            // Mode 0/1: 擴展聲道 per-chip 平均增益 (respect ChannelEnabled)
             int expCount = expansionChannelCount;
             if (expCount > 0 && ct > 0 && ct < DefaultChipGain.Length)
             {
                 float avgVol = 0f;
+                int activeCount = 0;
                 for (int i = 0; i < expCount; i++)
-                    avgVol += ChannelVolume[MMIX_NES_CH + i];
-                avgVol = avgVol / expCount * 0.01f;
-                ap_mode01ExpGain = DefaultChipGain[ct] * avgVol;
+                {
+                    if (ChannelEnabled[MMIX_NES_CH + i])
+                    {
+                        avgVol += ChannelVolume[MMIX_NES_CH + i];
+                        activeCount++;
+                    }
+                }
+                if (activeCount > 0)
+                {
+                    avgVol = avgVol / expCount / CH_VOL_BASE;
+                    ap_mode01ExpGain = DefaultChipGain[ct] * avgVol;
+                }
+                else ap_mode01ExpGain = 0f;
             }
             else
             {

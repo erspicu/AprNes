@@ -100,7 +100,10 @@ namespace AprNes
         // [0]=Pulse1, [1]=Pulse2, [2]=Triangle, [3]=Noise, [4]=DMC
         // [5..12]=Expansion ch0~ch7 (VRC6: P1/P2/Saw, N163: ch0~ch7, 5B: A/B/C, etc.)
         // 範圍 0~100, 0=靜音, 100=該聲道最大
-        static public int[] ChannelVolume = new int[] { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 };
+        static public int[] ChannelVolume = new int[] { 70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70 };
+        // Per-channel enable/disable (CheckBox mute)
+        // [0]=Pulse1, [1]=Pulse2, [2]=Tri, [3]=Noise, [4]=DMC, [5..12]=Exp ch0~7
+        static public bool[] ChannelEnabled = new bool[] { true, true, true, true, true, true, true, true, true, true, true, true, true };
 
         // Mode 0/1 擴展音效增益 (從 ChannelVolume[5..] 平均值預算, 由 AudioPlus 更新)
         static public float ap_mode01ExpGain = 0f;
@@ -476,20 +479,24 @@ namespace AprNes
                 float gain = ap_mode01ExpGain;
                 int sum = 0;
                 for (int i = 0; i < expansionChannelCount; i++)
-                    sum += (int)(expansionChannels[i] * gain);
+                {
+                    if (ChannelEnabled[5 + i])
+                        sum += (int)(expansionChannels[i] * gain);
+                }
                 mapperExpansionAudio = sum;
             }
+
+            // Apply per-channel enable/mute
+            int sq1val  = ChannelEnabled[0] ? volume[0] * _pulseOut[0] : 0;
+            int sq2val  = ChannelEnabled[1] ? volume[1] * _pulseOut[1] : 0;
+            int trival  = ChannelEnabled[2] ? _triOut : 0;
+            int noisval = ChannelEnabled[3] ? volume[3] * _noiseOut : 0;
+            int dmcval  = ChannelEnabled[4] ? dmcvalue : 0;
 
             if (AudioMode > 0)
             {
                 // Authentic / Modern: 每 APU cycle 推入 AudioPlus
-                AudioPlus_PushApuCycle(
-                    volume[0] * _pulseOut[0],   // sq1: 0-15
-                    volume[1] * _pulseOut[1],   // sq2: 0-15
-                    _triOut,                     // tri: 0-15
-                    volume[3] * _noiseOut,       // noise: 0-15
-                    dmcvalue,                    // dmc: 0-127
-                    mapperExpansionAudio);
+                AudioPlus_PushApuCycle(sq1val, sq2val, trival, noisval, dmcval, mapperExpansionAudio);
             }
             else
             {
@@ -498,7 +505,7 @@ namespace AprNes
                 if (_sampleAccum >= _cycPerSample)
                 {
                     _sampleAccum -= _cycPerSample;
-                    generateSample();
+                    generateSample(sq1val, sq2val, trival, noisval, dmcval);
                 }
             }
         }
@@ -506,16 +513,16 @@ namespace AprNes
         // =====================================================================
         // 混音並送出樣本
         // =====================================================================
-        static void generateSample()
+        static void generateSample(int sq1, int sq2, int tri, int noise, int dmc)
         {
             if (!AudioEnabled) return;
 
             // Pulse 混音 (非線性查找表)
-            int sqIdx = volume[0] * _pulseOut[0] + volume[1] * _pulseOut[1];
+            int sqIdx = sq1 + sq2;
             if (sqIdx >= 31) sqIdx = 30;
 
             // TND 混音
-            int tndIdx = 3 * _triOut + 2 * volume[3] * _noiseOut + dmcvalue;
+            int tndIdx = 3 * tri + 2 * noise + dmc;
             if (tndIdx >= 203) tndIdx = 202;
 
             int mixed = SQUARELOOKUP[sqIdx] + TNDLOOKUP[tndIdx]; // 0..~98302
