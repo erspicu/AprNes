@@ -855,10 +855,49 @@ namespace AprNes
                 fdsAutoDiskSwitchCounter--;
                 if (fdsAutoDiskSwitchCounter == 0)
                 {
-                    Console.WriteLine("[FDS] Auto-inserted dummy disk.");
-                    fds_InsertDisk(0);
+                    int targetSide = fds_FindRequestedSide();
+                    if (targetSide < 0)
+                    {
+                        // Fallback: try next side after the one that was ejected
+                        targetSide = (fdsPreviousDiskNumber + 1) % fdsSideCount;
+                    }
+                    Console.WriteLine("[FDS] Auto disk switch → Disk " + (targetSide / 2 + 1) +
+                        ((targetSide & 1) != 0 ? " Side B" : " Side A"));
+                    fds_InsertDisk(targetSide);
                 }
             }
+        }
+
+        /// <summary>
+        /// Match BIOS disk-check buffer against disk headers to find requested side.
+        /// Same logic as fds_CheckBiosAccess($E445) but callable at auto-insert time.
+        /// Returns side index, or -1 if no unique match.
+        /// </summary>
+        static int fds_FindRequestedSide()
+        {
+            // BIOS stores target disk info pointer at $00/$01
+            ushort bufferAddr = (ushort)(NES_MEM[0] | (NES_MEM[1] << 8));
+            if (bufferAddr < 0x6000 || bufferAddr > 0xDFF0) return -1;
+
+            byte[] buffer = new byte[10];
+            for (int i = 0; i < 10; i++)
+                buffer[i] = NES_MEM[(ushort)(bufferAddr + i)];
+
+            int matchCount = 0, matchIndex = -1;
+            for (int j = 0; j < fdsSideCount; j++)
+            {
+                bool match = true;
+                for (int i = 0; i < 10; i++)
+                {
+                    if (buffer[i] != 0xFF && buffer[i] != fdsDiskHeaders[j][i + 14])
+                    {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) { matchCount++; matchIndex = matchCount > 1 ? -1 : j; }
+            }
+            return matchIndex;
         }
 
         // ── Auto disk side detection (on BIOS reads) ──────────────────────
