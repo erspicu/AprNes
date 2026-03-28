@@ -68,6 +68,36 @@ namespace AprNes
         public enum RegionType { NTSC, PAL, Dendy }
         static public RegionType Region = RegionType.NTSC;
 
+        // ── Region-dependent timing parameters (set by ApplyRegionProfile) ──
+        static int totalScanlines = 262;      // NTSC=262, PAL=312
+        static int preRenderLine  = 261;      // NTSC=261, PAL=311
+        static int masterPerCpu   = 12;       // NTSC=12, PAL=16
+        static int masterPerPpu   = 4;        // NTSC=4,  PAL=5
+        static double cpuFreq          = 1789773.0;  // NTSC=1789773, PAL=1662607
+        static public double FrameSeconds = 1.0 / 60.0988; // NTSC=1/60.0988, PAL=1/50.0070
+
+        static void ApplyRegionProfile()
+        {
+            if (Region == RegionType.PAL)
+            {
+                totalScanlines = 312;
+                preRenderLine  = 311;
+                masterPerCpu   = 16;
+                masterPerPpu   = 5;
+                cpuFreq        = 1662607.0;
+                FrameSeconds   = 1.0 / 50.0070;
+            }
+            else // NTSC (and Dendy for now)
+            {
+                totalScanlines = 262;
+                preRenderLine  = 261;
+                masterPerCpu   = 12;
+                masterPerPpu   = 4;
+                cpuFreq        = 1789773.0;
+                FrameSeconds   = 1.0 / 60.0988;
+            }
+        }
+
         // ── AudioPlus 音訊引擎設定 ──────────────────────────────────
         // AudioMode: 0=Pure Digital, 1=Authentic, 2=Modern
         static public int AudioMode = 0;
@@ -410,6 +440,7 @@ namespace AprNes
                 for (int i = 0; i < 8; i++) P2_joypad_status[i] = 0x40;
                 for (int i = 0; i < 65536; i++) NES_MEM[i] = 0;
 
+                ApplyRegionProfile(); // set timing parameters before any subsystem init
                 HardResetState();  // reset all CPU/PPU/DMA static state
 
                 if (AnalogEnabled)

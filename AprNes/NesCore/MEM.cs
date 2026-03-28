@@ -22,40 +22,42 @@ namespace AprNes
         static bool spriteDmaTransfer = false;  // OAM DMA in progress
         static byte spriteDmaOffset = 0;        // OAM source page ($4014 value)
 
-        // Master Clock timing (NTSC: 21,477,272.73 Hz)
-        // CPU = master ÷ 12, PPU = master ÷ 4, APU = CPU rate
-        // 1 CPU cycle = 12 master clocks = 3 PPU dots
-        const int MASTER_PER_CPU = 12;
-        const int MASTER_PER_PPU = 4;
-        static long masterClock = 7 * MASTER_PER_CPU; // calibrated: 7 boot CPU cycles worth
-        static long cpuCycleCount = 7;   // derived: masterClock / MASTER_PER_CPU
-        static long ppuClock = 7 * MASTER_PER_CPU;    // PPU catch-up position (master clock units)
-        static long apuClock = 7 * MASTER_PER_CPU - 4; // APU catch-up position (4 MCU behind → fires in tick_pre)
+        // Master Clock timing
+        // NTSC: 21,477,272.73 Hz — CPU = master ÷ 12, PPU = master ÷ 4 (3:1)
+        // PAL:  26,601,714 Hz   — CPU = master ÷ 16, PPU = master ÷ 5 (3.2:1)
+        // masterPerCpu / masterPerPpu are set by ApplyRegionProfile() in Main.cs
+        static long masterClock = 7 * 12; // calibrated: 7 boot CPU cycles worth
+        static long cpuCycleCount = 7;    // derived: masterClock / masterPerCpu
+        static long ppuClock = 7 * 12;    // PPU catch-up position (master clock units)
+        static long apuClock = 7 * 12 - 4; // APU catch-up position (4 MCU behind → fires in tick_pre)
 
         // Catch up PPU to current master clock position.
-        // masterClock always advances by MASTER_PER_CPU (12) per CPU cycle,
-        // and each PPU step advances ppuClock by MASTER_PER_PPU (4), so exactly
-        // 3 steps are always needed — loop unrolled to eliminate branch overhead.
+        // NTSC: masterPerCpu=12, masterPerPpu=4 → exactly 3 PPU steps per CPU cycle (unrolled)
+        // PAL:  masterPerCpu=16, masterPerPpu=5 → 3 or 4 PPU steps (3+3+3+3+4 pattern over 5 cycles)
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void catchUpPPU()
         {
             bool o;
-            ppuClock += MASTER_PER_PPU; ppu_step_new();
+            ppuClock += masterPerPpu; ppu_step_new();
             o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
-            ppuClock += MASTER_PER_PPU; ppu_step_new();
+            ppuClock += masterPerPpu; ppu_step_new();
             o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
-            ppuClock += MASTER_PER_PPU; ppu_step_new();
+            ppuClock += masterPerPpu; ppu_step_new();
             o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
+            // PAL 4th step: masterPerCpu=16, 3×5=15 < 16, so one extra step needed
+            if (ppuClock < masterClock)
+            {
+                ppuClock += masterPerPpu; ppu_step_new();
+                o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
+            }
         }
 
         // Catch up APU to current master clock position.
-        // masterClock always advances by MASTER_PER_CPU (12) per CPU cycle,
-        // and each APU step also advances apuClock by MASTER_PER_CPU (12),
-        // so exactly 1 step is always needed — while loop eliminated.
+        // APU runs at CPU rate (1 step per CPU cycle) regardless of region.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void catchUpAPU()
         {
-            apuClock += MASTER_PER_CPU;
+            apuClock += masterPerCpu;
             apu_step();
         }
 
@@ -69,7 +71,7 @@ namespace AprNes
         static void StartCpuCycle()
         {
             irqLinePrev = irqLineCurrent; // save BEFORE any mutations in this cycle
-            masterClock += MASTER_PER_CPU;
+            masterClock += masterPerCpu;
             cpuCycleCount++;
             m2PhaseIsWrite = (cpuCycleCount & 1) != 0;
 

@@ -19,10 +19,10 @@ namespace AprNes
         // APU 基本常數
         // =====================================================================
         const int    APU_SAMPLE_RATE = 44100;
-        const double CPU_FREQ        = 1789773.0; // NTSC CPU 頻率
+        // CPU_FREQ is now region-dependent: use cpuFreq field from Main.cs
 
         static double _sampleAccum  = 0.0;
-        static double _cycPerSample = CPU_FREQ / APU_SAMPLE_RATE; // ~40.58
+        static double _cycPerSample = 1789773.0 / APU_SAMPLE_RATE; // recalculated in initAPU from cpuFreq
 
         // 音效開關與音量 (可由 UI 控制)
         static public bool AudioEnabled = true;
@@ -180,10 +180,10 @@ namespace AprNes
         static void apuSoftReset()
         {
             apucycle = 0;
-            masterClock = 7 * MASTER_PER_CPU; // calibrated: 7 boot CPU cycles
+            masterClock = 7 * masterPerCpu; // calibrated: 7 boot CPU cycles
             cpuCycleCount = 7;
-            ppuClock = 7 * MASTER_PER_CPU;
-            apuClock = 7 * MASTER_PER_CPU - 4;
+            ppuClock = 7 * masterPerCpu;
+            apuClock = 7 * masterPerCpu - (Region == RegionType.PAL ? 5 : 4);
 
             // Re-apply last $4017 value (nesdev: "at reset, $4017 rewritten with last value")
             ctrmode    = ((last4017Val & 0x80) != 0) ? 5 : 4;
@@ -198,7 +198,7 @@ namespace AprNes
                 setsweep();
                 setvolumes();
             }
-            framectrdiv = 7449; // match power-on advance (with tick-before-write compensation)
+            framectrdiv = (Region == RegionType.PAL) ? 8305 : 7449;
             irqAssertCycles = 0;
             frameIrqClearPending = false;
 
@@ -281,22 +281,42 @@ namespace AprNes
                 int[] dv = { 0,1,0,0,0,0,0,0, 0,1,1,0,0,0,0,0, 0,1,1,1,1,0,0,0, 1,0,0,1,1,1,1,1 };
                 for (int i = 0; i < 32; i++) DUTYLOOKUP[i] = dv[i]; }
 
-            // Initialize fixed data arrays
-            frameReload4[0] = 7458; frameReload4[1] = 7456; frameReload4[2] = 7458; frameReload4[3] = 7458;
-            frameReload5[0] = 7458; frameReload5[1] = 7456; frameReload5[2] = 7458; frameReload5[3] = 7458; frameReload5[4] = 7452;
+            // Initialize region-dependent data arrays
+            _cycPerSample = cpuFreq / APU_SAMPLE_RATE;
+
+            if (Region == RegionType.PAL)
+            {
+                frameReload4[0] = 8314; frameReload4[1] = 8314; frameReload4[2] = 8312; frameReload4[3] = 8314;
+                frameReload5[0] = 8314; frameReload5[1] = 8314; frameReload5[2] = 8312; frameReload5[3] = 8314; frameReload5[4] = 8312;
+
+                noiseperiod[0]=4; noiseperiod[1]=8; noiseperiod[2]=14; noiseperiod[3]=30;
+                noiseperiod[4]=60; noiseperiod[5]=88; noiseperiod[6]=118; noiseperiod[7]=148;
+                noiseperiod[8]=188; noiseperiod[9]=236; noiseperiod[10]=354; noiseperiod[11]=472;
+                noiseperiod[12]=708; noiseperiod[13]=944; noiseperiod[14]=1890; noiseperiod[15]=3778;
+
+                dmcperiods[0]=398; dmcperiods[1]=354; dmcperiods[2]=316; dmcperiods[3]=298;
+                dmcperiods[4]=276; dmcperiods[5]=236; dmcperiods[6]=210; dmcperiods[7]=198;
+                dmcperiods[8]=176; dmcperiods[9]=148; dmcperiods[10]=132; dmcperiods[11]=118;
+                dmcperiods[12]=98; dmcperiods[13]=78; dmcperiods[14]=66; dmcperiods[15]=50;
+            }
+            else // NTSC
+            {
+                frameReload4[0] = 7458; frameReload4[1] = 7456; frameReload4[2] = 7458; frameReload4[3] = 7458;
+                frameReload5[0] = 7458; frameReload5[1] = 7456; frameReload5[2] = 7458; frameReload5[3] = 7458; frameReload5[4] = 7452;
+
+                noiseperiod[0]=4; noiseperiod[1]=8; noiseperiod[2]=16; noiseperiod[3]=32;
+                noiseperiod[4]=64; noiseperiod[5]=96; noiseperiod[6]=128; noiseperiod[7]=160;
+                noiseperiod[8]=202; noiseperiod[9]=254; noiseperiod[10]=380; noiseperiod[11]=508;
+                noiseperiod[12]=762; noiseperiod[13]=1016; noiseperiod[14]=2034; noiseperiod[15]=4068;
+
+                dmcperiods[0]=428; dmcperiods[1]=380; dmcperiods[2]=340; dmcperiods[3]=320;
+                dmcperiods[4]=286; dmcperiods[5]=254; dmcperiods[6]=226; dmcperiods[7]=214;
+                dmcperiods[8]=190; dmcperiods[9]=160; dmcperiods[10]=142; dmcperiods[11]=128;
+                dmcperiods[12]=106; dmcperiods[13]=84; dmcperiods[14]=72; dmcperiods[15]=54;
+            }
 
             { int[] _lv = { 10,254,20,2,40,4,80,6,160,8,60,10,14,12,26,14,12,16,24,18,48,20,96,22,192,24,72,26,16,28,32,30 };
               for (int i = 0; i < 32; i++) lenctrload[i] = _lv[i]; }
-
-            noiseperiod[0]=4; noiseperiod[1]=8; noiseperiod[2]=16; noiseperiod[3]=32;
-            noiseperiod[4]=64; noiseperiod[5]=96; noiseperiod[6]=128; noiseperiod[7]=160;
-            noiseperiod[8]=202; noiseperiod[9]=254; noiseperiod[10]=380; noiseperiod[11]=508;
-            noiseperiod[12]=762; noiseperiod[13]=1016; noiseperiod[14]=2034; noiseperiod[15]=4068;
-
-            dmcperiods[0]=428; dmcperiods[1]=380; dmcperiods[2]=340; dmcperiods[3]=320;
-            dmcperiods[4]=286; dmcperiods[5]=254; dmcperiods[6]=226; dmcperiods[7]=214;
-            dmcperiods[8]=190; dmcperiods[9]=160; dmcperiods[10]=142; dmcperiods[11]=128;
-            dmcperiods[12]=106; dmcperiods[13]=84; dmcperiods[14]=72; dmcperiods[15]=54;
 
             for (int i = 0; i < 31; i++)
                 SQUARELOOKUP[i] = (int)((95.52 / (8128.0 / (i == 0 ? 0.0001 : i) + 100)) * 49151);
@@ -307,13 +327,14 @@ namespace AprNes
             for (int i = 0; i < 4; i++) { lenCtrEnable[i] = 1; lengthClockThisCycle[i] = 0; lenctrHalt[i] = 1; envConstVolume[i] = 1; envelopeStartFlag[i] = 0; }
             for (int i = 0; i < 2; i++) { sweepenable[i] = 0; sweepnegate[i] = 0; sweepsilence[i] = 0; sweepreload[i] = 0; }
 
-            framectrdiv = 7449; // 7458 + 1(even jitter) - 9(power-on advance) - 1(tick-before-write compensation)
+            // framectrdiv: base reload + 1(even jitter) - 9(power-on advance) - 1(tick-before-write compensation)
+            framectrdiv = (Region == RegionType.PAL) ? 8305 : 7449;
             irqAssertCycles = 0;
             apucycle    = 0;
-            masterClock = 7 * MASTER_PER_CPU; // calibrated: 7 boot CPU cycles
+            masterClock = 7 * masterPerCpu; // calibrated: 7 boot CPU cycles
             cpuCycleCount = 7;
-            ppuClock = 7 * MASTER_PER_CPU;
-            apuClock = 7 * MASTER_PER_CPU - 4;
+            ppuClock = 7 * masterPerCpu;
+            apuClock = 7 * masterPerCpu - (Region == RegionType.PAL ? 5 : 4);
             framectr = 0; ctrmode = 4;
 
             // 聲道計時器重置

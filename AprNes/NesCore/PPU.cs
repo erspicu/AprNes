@@ -139,7 +139,7 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void Increment2007()
         {
-            if ((ShowBackGround || ShowSprites) && (scanline < 240 || scanline == 261))
+            if ((ShowBackGround || ShowSprites) && (scanline < 240 || scanline == preRenderLine))
             {
                 CXinc();
                 Yinc();
@@ -372,7 +372,7 @@ namespace AprNes
                 oamCopyBuffer = secondaryOAM[0];
 
             // Pre-render scanline: continuous vert(v) = vert(t) copy at cycles 280-304
-            if (scanline == 261 && cx >= 280 && cx <= 304)
+            if (scanline == preRenderLine && cx >= 280 && cx <= 304)
             {
                 vram_addr = (vram_addr & ~0x7BE0) | (vram_addr_internal & 0x7BE0);
             }
@@ -463,7 +463,7 @@ namespace AprNes
             if (ppuRenderingEnabled)
             {
                 if ((scanline >= 0 && scanline < 240 && cx < 256)
-                    || ((scanline < 240 || scanline == 261)
+                    || ((scanline < 240 || scanline == preRenderLine)
                         && cx >= 320 && cx < 336))
                 {
                     lowshift_s0 <<= 1;
@@ -471,7 +471,7 @@ namespace AprNes
                 }
             }
 
-            if (scanline < 240 || scanline == 261)
+            if (scanline < 240 || scanline == preRenderLine)
             {
                 if (ppuRenderingEnabled)
                     ppu_rendering_tick(cx);
@@ -503,7 +503,7 @@ namespace AprNes
                         }
                     }
                     // Pre-render line: save sprite0_eval_addr at dot 65
-                    else if (scanline == 261 && cx == 65 && ppuRenderingEnabled)
+                    else if (scanline == preRenderLine && cx == 65 && ppuRenderingEnabled)
                     {
                         sprite0_eval_addr = spr_ram_add;
                     }
@@ -549,7 +549,7 @@ namespace AprNes
                 }
 
                 // Pre-render line: compute pre-render sprite data at dot 257
-                if (scanline == 261 && cx == 257 && ppuRenderingEnabled)
+                if (scanline == preRenderLine && cx == 257 && ppuRenderingEnabled)
                     PrecomputePreRenderSprites();
 
             }
@@ -582,13 +582,13 @@ namespace AprNes
             // Pre-render: clear PPU status flags
             // M2 duty cycle effect: sprite flags are read at M2 fall (~1.875 PPU dots after M2 rise)
             // So sprite flags appear to clear ~2 dots earlier than VBL flag
-            if (scanline == 261 && cx == 1)
+            if (scanline == preRenderLine && cx == 1)
                 isSprite0hit = isSpriteOverflow = false;
-            if (scanline == 261 && cx == 2)
+            if (scanline == preRenderLine && cx == 2)
                 isVblank = false;
 
             // Odd frame skip: on odd frames with rendering enabled, skip last idle cycle of pre-render
-            if (scanline == 261 && cx == 339)
+            if (scanline == preRenderLine && cx == 339)
             {
                 oddSwap = !oddSwap;
                 if (!oddSwap && (ShowBackGround || ShowSprites))
@@ -604,7 +604,7 @@ namespace AprNes
             // Advance scanline
             if (cx == 341)
             {
-                if (++scanline == 262)
+                if (++scanline == totalScanlines)
                 {
                     scanline = 0;
                     // Process OAM corruption at frame start if rendering is enabled
@@ -959,7 +959,7 @@ namespace AprNes
         static void PrecomputePreRenderSprites()
         {
             prerender_sprite0_valid = false;
-            int effectiveScanline = 261 & 255; // = 5
+            int effectiveScanline = preRenderLine & 255; // NTSC: 261&255=5, PAL: 311&255=55
             int height = Spritesize8x16 ? 16 : 8;
 
             // Check first entry in secondary OAM (potential sprite 0)
@@ -1281,7 +1281,7 @@ namespace AprNes
         {
             openbus = value;
             // During rendering (visible + pre-render), writes don't modify OAM; OAMADDR increments by 4 and aligns to 4-byte boundary
-            if ((scanline < 240 || scanline == 261) && scanline >= 0 && (ShowBackGround || ShowSprites))
+            if ((scanline < 240 || scanline == preRenderLine) && scanline >= 0 && (ShowBackGround || ShowSprites))
             {
                 spr_ram_add = (byte)((spr_ram_add + 4) & 0xFC);
             }

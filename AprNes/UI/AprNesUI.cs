@@ -1627,7 +1627,6 @@ public string GetRomInfo()
         }
 
         bool LimitFPS = true;
-        const double NES_FRAME_SECONDS = 1.0 / 60.0988;
         readonly Stopwatch _fpsStopWatch = new Stopwatch();
         double _fpsDeadline = 0;
 
@@ -1648,11 +1647,11 @@ public string GetRomInfo()
                 if (!_fpsStopWatch.IsRunning) _fpsStopWatch.Restart();
                 double now = _fpsStopWatch.Elapsed.TotalSeconds;
                 if (_fpsDeadline < now)
-                    _fpsDeadline = now + NES_FRAME_SECONDS;
+                    _fpsDeadline = now + NesCore.FrameSeconds;
                 while (_fpsDeadline - _fpsStopWatch.Elapsed.TotalSeconds > 0.001)
                     Thread.Sleep(1);
                 while (_fpsStopWatch.Elapsed.TotalSeconds < _fpsDeadline) { }
-                _fpsDeadline += NES_FRAME_SECONDS;
+                _fpsDeadline += NesCore.FrameSeconds;
             }
         }
 

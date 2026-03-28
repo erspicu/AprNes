@@ -50,9 +50,9 @@ namespace AprNes
         // ==================================================================
         // AudioPlus — 共用常數
         // ==================================================================
-        const double AP_CPU_FREQ = 1789772.72;
+        static double AP_CPU_FREQ = 1789772.72; // updated by ApplyRegionProfile via AudioPlus_ApplyRegion()
         const int AP_SAMPLE_RATE = 44100;
-        const double AP_CLOCKS_PER_SAMPLE = AP_CPU_FREQ / AP_SAMPLE_RATE;
+        static double AP_CLOCKS_PER_SAMPLE = AP_CPU_FREQ / AP_SAMPLE_RATE;
 
         // ==================================================================
         // AudioPlus — 總調度器 (AudioPlus_)
@@ -79,6 +79,7 @@ namespace AprNes
 
         public static void AudioPlus_Init()
         {
+            AudioPlus_ApplyRegion(); // set frequency-dependent constants before table init
             ap_InitTables();
             ose_InitInstances();
             blip_Init();
@@ -88,6 +89,21 @@ namespace AprNes
             ap_initialized = true;
             AudioPlus_Reset();
             AudioPlus_ApplySettings();
+        }
+
+        /// <summary>
+        /// Recalculate all frequency-dependent constants for the current Region.
+        /// Called during init and whenever Region changes.
+        /// </summary>
+        public static void AudioPlus_ApplyRegion()
+        {
+            AP_CPU_FREQ = cpuFreq;
+            AP_CLOCKS_PER_SAMPLE = AP_CPU_FREQ / AP_SAMPLE_RATE;
+            OSE_CUTOFF_NORM = 20000.0 / AP_CPU_FREQ;
+            OSE_CLOCKS_PER_SAMPLE_FP = (uint)(AP_CLOCKS_PER_SAMPLE * OSE_ONE_CLOCK_FP);
+            CMF_RF_PHASE_INC = (Region == RegionType.PAL ? 50.0 : 59.94) / AP_SAMPLE_RATE;
+            // Force oversampler kernel rebuild (cutoff depends on CPU freq)
+            ap_tablesInitialized = false;
         }
 
         static void ap_InitTables()
@@ -356,7 +372,7 @@ namespace AprNes
         // ==================================================================
         const double CMF_DT = 1.0 / 44100.0;
         const float CMF_HPF_ALPHA_44K = 0.9872f;
-        const double CMF_RF_PHASE_INC = 59.94 / 44100.0;
+        static double CMF_RF_PHASE_INC = 59.94 / 44100.0; // recalculated in AudioPlus_ApplyRegion (NTSC=59.94, PAL=50.0)
 
         static double* cmf_presetCutoffs;
         static byte* cmf_presetBuzz;
@@ -953,9 +969,9 @@ namespace AprNes
         const int OSE_HALF_TAPS = OSE_TAPS / 2;
         const int OSE_BUF_SIZE = 65536;
         const int OSE_BUF_MASK = OSE_BUF_SIZE - 1;
-        const double OSE_CUTOFF_NORM = 20000.0 / AP_CPU_FREQ;
+        static double OSE_CUTOFF_NORM = 20000.0 / 1789772.72; // recalculated in AudioPlus_ApplyRegion
         const uint OSE_ONE_CLOCK_FP = 1 << 16;
-        const uint OSE_CLOCKS_PER_SAMPLE_FP = (uint)(AP_CLOCKS_PER_SAMPLE * OSE_ONE_CLOCK_FP);
+        static uint OSE_CLOCKS_PER_SAMPLE_FP = (uint)((1789772.72 / AP_SAMPLE_RATE) * OSE_ONE_CLOCK_FP); // recalculated in AudioPlus_ApplyRegion
 
         static float* ose_kernelFlat;
         static float** ose_ringBuf;    // [OSE_COUNT] pointers
