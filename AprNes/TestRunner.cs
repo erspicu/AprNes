@@ -134,6 +134,9 @@ namespace AprNes
             double benchmarkSec = 20;
             bool audioDsp = false;     // --audio-dsp: enable audio DSP pipeline (no playback)
             int audioDspMode = -1;     // --audio-mode <0|1|2>: audio mode for DSP benchmark
+            string resizeStage1 = null; // --resize-stage1 <spec>: e.g. "xbrz_4", "nn_3", "scalex_2"
+            string resizeStage2 = null; // --resize-stage2 <spec>
+            bool resizeScanline = false; // --scanline: enable scanline post-process
 
             // Parse arguments
             for (int i = 0; i < args.Length; i++)
@@ -232,12 +235,26 @@ namespace AprNes
                                 audioDspMode = m;
                         }
                         break;
+                    case "--resize-stage1":
+                        if (i + 1 < args.Length) resizeStage1 = args[++i];
+                        break;
+                    case "--resize-stage2":
+                        if (i + 1 < args.Length) resizeStage2 = args[++i];
+                        break;
+                    case "--scanline":
+                        resizeScanline = true;
+                        break;
                 }
             }
 
             if (romPath == null)
             {
-                Console.Error.WriteLine("Usage: AprNes.exe --rom <file.nes> [--time <seconds>] [--wait-result] [--max-wait <seconds>] [--soft-reset <seconds>] [--input \"A:1.0,B:2.0,...\"] [--screenshot <out.png>] [--timed-screenshots \"path1:t1,path2:t2,...\"] [--dump-ac-results] [--log <results.log>]");
+                Console.Error.WriteLine("Usage: AprNes.exe --rom <file.nes> [--time <seconds>] [--wait-result] [--max-wait <seconds>]");
+                Console.Error.WriteLine("       [--soft-reset <seconds>] [--input \"A:1.0,B:2.0,...\"]");
+                Console.Error.WriteLine("       [--screenshot <out.png>] [--timed-screenshots \"path1:t1,path2:t2,...\"]");
+                Console.Error.WriteLine("       [--dump-ac-results] [--log <results.log>]");
+                Console.Error.WriteLine("       [--benchmark <seconds>] [--resize-stage1 <filter>] [--resize-stage2 <filter>] [--scanline]");
+                Console.Error.WriteLine("  Filter specs: xbrz_2..xbrz_6, scalex_2, scalex_3, nn_2..nn_N, none");
                 return 2;
             }
 
@@ -318,6 +335,9 @@ namespace AprNes
             // Benchmark stopwatch
             Stopwatch benchSw = benchmarkMode ? new Stopwatch() : null;
 
+            // Filter renderer (initialized after ROM load, used by handler lambda)
+            Render_resize filterRenderer = null;
+
             // Wire up VideoOutput handler
             EventHandler handler = null;
             handler = (sender, e) =>
@@ -327,6 +347,10 @@ namespace AprNes
                 // Benchmark mode: just count frames for wall-clock duration
                 if (benchmarkMode)
                 {
+                    // Apply image filter pipeline if configured
+                    if (filterRenderer != null)
+                        filterRenderer.RenderFilter();
+
                     if (!benchSw.IsRunning) benchSw.Start();
                     if (benchSw.Elapsed.TotalSeconds >= benchmarkSec)
                     {
@@ -587,6 +611,22 @@ namespace AprNes
                 NesCore.AudioPlus_ApplySettings();
             }
 
+            // Setup image filter pipeline for benchmark (headless, no GDI)
+            if (benchmarkMode && (resizeStage1 != null || resizeStage2 != null || resizeScanline))
+            {
+                filterRenderer = new Render_resize();
+                var s1Filter = ParseResizeFilter(resizeStage1);
+                int s1Scale  = ParseResizeScale(resizeStage1);
+                var s2Filter = ParseResizeFilter(resizeStage2);
+                int s2Scale  = ParseResizeScale(resizeStage2);
+                filterRenderer.Configure(s1Filter, s1Scale, s2Filter, s2Scale, resizeScanline);
+                filterRenderer.initHeadless(NesCore.ScreenBuf1x);
+
+                string filterDesc = FormatFilterDesc(resizeStage1, resizeStage2, resizeScanline);
+                Console.Error.WriteLine("[Benchmark] Filter: " + filterDesc
+                    + " → " + NesCore.RenderOutputW + "×" + NesCore.RenderOutputH);
+            }
+
             // Run emulation on a background thread
             Thread emuThread = new Thread(() => NesCore.run());
             emuThread.IsBackground = true;
@@ -600,7 +640,12 @@ namespace AprNes
             {
                 double elapsed = benchSw.Elapsed.TotalSeconds;
                 double fps = frameCount / elapsed;
-                Console.WriteLine(string.Format("BENCHMARK: {0} frames in {1:F2}s = {2:F2} FPS", frameCount, elapsed, fps));
+                string filterDesc = (filterRenderer != null)
+                    ? FormatFilterDesc(resizeStage1, resizeStage2, resizeScanline)
+                    : "none";
+                Console.WriteLine(string.Format("BENCHMARK: {0} frames in {1:F2}s = {2:F2} FPS [Filter: {3}]",
+                    frameCount, elapsed, fps, filterDesc));
+                if (filterRenderer != null) filterRenderer.freeMem();
                 return 0;
             }
 
@@ -847,6 +892,39 @@ namespace AprNes
             if (f0 == 1)   return "(no $6000 signature, $F0=0x01 = passed)";
             if (f0 >= 2 && f0 <= 15) return "(no $6000 signature, $F0=0x" + f0.ToString("X2") + " = failed)";
             return "(no $6000 signature, $F0=0x" + f0.ToString("X2") + ")";
+        }
+
+        // Parse filter spec: "xbrz_4" → XBRz, "nn_3" → NN, "scalex_2" → ScaleX, null/"none" → None
+        static ResizeFilter ParseResizeFilter(string spec)
+        {
+            if (string.IsNullOrEmpty(spec) || spec == "none") return ResizeFilter.None;
+            string prefix = spec.Split('_')[0].ToLowerInvariant();
+            switch (prefix)
+            {
+                case "xbrz":   return ResizeFilter.XBRz;
+                case "scalex": return ResizeFilter.ScaleX;
+                case "nn":     return ResizeFilter.NN;
+                default:       return ResizeFilter.None;
+            }
+        }
+
+        // Parse scale from spec: "xbrz_4" → 4, "none" → 1
+        static int ParseResizeScale(string spec)
+        {
+            if (string.IsNullOrEmpty(spec) || spec == "none") return 1;
+            string[] parts = spec.Split('_');
+            int s;
+            return (parts.Length == 2 && int.TryParse(parts[1], out s)) ? s : 1;
+        }
+
+        // Format filter description for log output
+        static string FormatFilterDesc(string stage1, string stage2, bool scanline)
+        {
+            string s1 = string.IsNullOrEmpty(stage1) ? "none" : stage1;
+            string s2 = string.IsNullOrEmpty(stage2) ? "none" : stage2;
+            string desc = "S1=" + s1 + ", S2=" + s2;
+            if (scanline) desc += ", Scanline=ON";
+            return desc;
         }
 
         static void SaveScreenshot(string path)

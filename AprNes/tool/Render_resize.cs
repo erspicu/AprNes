@@ -96,7 +96,41 @@ namespace AprNes
             NesCore.RenderOutputH = _finalH;
         }
 
+        // Headless init: allocate buffers without GDI device (for benchmark mode)
+        public void initHeadless(uint* input)
+        {
+            _input = input;
+
+            bool needStage1Buf = (_s1Filter != ResizeFilter.None) && (_s2Filter != ResizeFilter.None);
+            bool needOutputBuf = (_s1Filter != ResizeFilter.None) || (_s2Filter != ResizeFilter.None);
+
+            if (needStage1Buf)
+                _stage1Buf = (uint*)Marshal.AllocHGlobal(sizeof(uint) * _stage1W * _stage1H);
+
+            if (needOutputBuf)
+                _output = (uint*)Marshal.AllocHGlobal(sizeof(uint) * _finalW * _finalH);
+            else
+                _output = _input;
+
+            if (_s1Filter == ResizeFilter.XBRz)
+                HS_XBRz.initTable(256, 240);
+
+            if (_scanline)
+                LibScanline.InitRates();
+
+            NesCore.RenderOutputPtr = _output;
+            NesCore.RenderOutputW = _finalW;
+            NesCore.RenderOutputH = _finalH;
+        }
+
         public void Render()
+        {
+            RenderFilter();
+            NativeGDI.DrawImageHighSpeedtoDevice();
+        }
+
+        // Run filter pipeline only (no GDI draw) — used by headless benchmark
+        public void RenderFilter()
         {
             uint* src = _input;
             uint* dst;
@@ -125,8 +159,6 @@ namespace AprNes
             // Scanline post-process (in-place on output)
             if (_scanline)
                 LibScanline.ApplyInPlace(_output, _finalW, _finalH);
-
-            NativeGDI.DrawImageHighSpeedtoDevice();
         }
 
         static void ApplyFilter(ResizeFilter filter, int scale, uint* src, uint* dst, int srcW, int srcH)

@@ -141,7 +141,20 @@ namespace XBRz_speed
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static int DistYCbCr(uint p1, uint p2)
         {
-            // ★ 同色短路：相同顏色直接回傳 0，徹底避開後續計算與查表
+            if (p1 == p2) return 0;
+            int r_diff = (int)((p1 >> 16) & 0xFF) - (int)((p2 >> 16) & 0xFF);
+            int g_diff = (int)((p1 >> 8) & 0xFF) - (int)((p2 >> 8) & 0xFF);
+            int b_diff = (int)(p1 & 0xFF) - (int)(p2 & 0xFF);
+            int y = (262 * r_diff + 678 * g_diff + 59 * b_diff) / 1000;
+            int cb = (531 * (b_diff - y)) / 1000;
+            int cr = (678 * (r_diff - y)) / 1000;
+            return y * y + cb * cb + cr * cr;
+        }
+
+        // 查表版本，保留供 benchmark 切換
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static int DistYCbCr_Table(uint p1, uint p2)
+        {
             if (p1 == p2) return 0;
             return lTable_dist[((((((p1 & 0xff0000) >> 16) - ((p2 & 0xff0000) >> 16)) + 255) >> 1) << 16) | ((((((p1 & 0xff00) >> 8) - ((p2 & 0xff00) >> 8)) + 255) >> 1) << 8) | ((((p1 & 0xff) - (p2 & 0xff)) + 255) >> 1)];
         }
