@@ -105,7 +105,13 @@ namespace AprNes
                 }
             }
 
-            // --accuracy flag overrides INI: presence of 'A' enables OPT-A, absence disables it
+            // Validation tests (--wait-result, --dump-ac-results) require full accuracy
+            // to avoid false regressions when INI is missing or defaults to performance mode.
+            bool isValidation = Array.Exists(args, a => a == "--wait-result" || a == "--dump-ac-results");
+            if (isValidation)
+                NesCore.AccuracyOptA = true;
+
+            // --accuracy flag overrides everything (including validation default)
             for (int i = 0; i < args.Length - 1; i++)
             {
                 if (args[i] == "--accuracy")
