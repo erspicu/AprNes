@@ -142,6 +142,10 @@ namespace AprNes
             perdotFSM.Text   = LangStr("perdotFSM");
             label18.Text     = LangStr("langchoose");
             label9.Text      = "Shift + p " + LangStr("capture_path");
+            label36.Text     = LangStr("video_output_folder");
+            label37.Text     = LangStr("audio_output_folder");
+            button1.Text     = LangStr("selectfolder");
+            button2.Text     = LangStr("selectfolder");
 
             // 畫面輸出
             resize.Text      = LangStr("resize_group");
@@ -309,6 +313,9 @@ namespace AprNes
 
         public void BeforClose()
         {
+            // 設定變更前先停止錄影（避免 raw 格式不一致）
+            AprNesUI.GetInstance().StopRecordingOnSettingsChange();
+
             // ── 先暫停模擬執行緒，再修改任何 NesCore 欄位 ──────────────────
             // 防止 CrtScreen.Render() 在欄位已改、緩衝區未重建時存取越界記憶體
             bool isRunning = AprNesUI.GetInstance().IsRunning;
@@ -368,6 +375,8 @@ namespace AprNes
             NesCore.AccuracyOptA = perdotFSM.Checked;
 
             AprNesUI.GetInstance().AppConfigure["CaptureScreenPath"] = screen_path.Text;
+            AprNesUI.GetInstance().AppConfigure["CaptureVideoPath"] = textBox17.Text;
+            AprNesUI.GetInstance().AppConfigure["CaptureAudioPath"] = textBox18.Text;
             AprNesUI.GetInstance().key_A = key_A;
             AprNesUI.GetInstance().key_B = key_B;
             AprNesUI.GetInstance().key_SELECT = key_SELECT;
@@ -748,6 +757,8 @@ namespace AprNes
             else LimitFPS_checkBox.Checked = false;
 
             screen_path.Text = AprNesUI.GetInstance().AppConfigure["CaptureScreenPath"];
+            textBox17.Text = AprNesUI.GetInstance().AppConfigure.ContainsKey("CaptureVideoPath") ? AprNesUI.GetInstance().AppConfigure["CaptureVideoPath"] : "";
+            textBox18.Text = AprNesUI.GetInstance().AppConfigure.ContainsKey("CaptureAudioPath") ? AprNesUI.GetInstance().AppConfigure["CaptureAudioPath"] : "";
 
             textBox_A.Text = ((Keys)int.Parse(AprNesUI.GetInstance().AppConfigure["key_A"])).ToString();
             textBox_B.Text = ((Keys)int.Parse(AprNesUI.GetInstance().AppConfigure["key_B"])).ToString();
@@ -823,6 +834,20 @@ namespace AprNes
             FolderBrowserDialog fd = new FolderBrowserDialog();
             if (fd.ShowDialog() != DialogResult.OK) return;
             screen_path.Text = fd.SelectedPath;
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            FolderBrowserDialog fd = new FolderBrowserDialog();
+            if (fd.ShowDialog() != DialogResult.OK) return;
+            textBox17.Text = fd.SelectedPath;
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            FolderBrowserDialog fd = new FolderBrowserDialog();
+            if (fd.ShowDialog() != DialogResult.OK) return;
+            textBox18.Text = fd.SelectedPath;
         }
 
         int key_A = 0, key_B = 0, key_SELECT = 0, key_START = 0, key_RIGHT = 0, key_LEFT = 0, key_UP = 0, key_DOWN = 0;

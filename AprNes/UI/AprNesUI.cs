@@ -312,7 +312,9 @@ namespace AprNes
                 AppConfigure["ResizeStage1"] = "none";
                 AppConfigure["ResizeStage2"] = "none";
                 AppConfigure["Scanline"] = "0";
-                AppConfigure["CaptureScreenPath"] = Application.StartupPath+ @"\Captures\Screenshots";
+                AppConfigure["CaptureScreenPath"] = Path.Combine(Application.StartupPath, "Captures", "Screenshots");
+                AppConfigure["CaptureVideoPath"] = Path.Combine(Application.StartupPath, "Captures", "Video");
+                AppConfigure["CaptureAudioPath"] = Path.Combine(Application.StartupPath, "Captures", "Audio");
                 AppConfigure["joypad_A"] = "";
                 AppConfigure["joypad_B"] = "";
                 AppConfigure["joypad_SELECT"] = "";
@@ -508,8 +510,30 @@ namespace AprNes
             // 改變 CrtScreen._analogSize，導致 DemodulateRow 使用新 dstW 存取舊 buffer 而 crash。
             // 正確的 sync 由 ApplyRenderSettings() 負責（已確保模擬執行緒完全停止）。
 
+            // 驗證並確保 Capture 路徑存在（INI 缺失或路徑無效時使用預設值）
+            EnsureCapturePath("CaptureScreenPath", Path.Combine(Application.StartupPath, "Captures", "Screenshots"));
+            EnsureCapturePath("CaptureVideoPath",  Path.Combine(Application.StartupPath, "Captures", "Video"));
+            EnsureCapturePath("CaptureAudioPath",  Path.Combine(Application.StartupPath, "Captures", "Audio"));
+
             NES_init_KeyMap();
 
+        }
+
+        void EnsureCapturePath(string key, string defaultPath)
+        {
+            if (!AppConfigure.ContainsKey(key) || string.IsNullOrWhiteSpace(AppConfigure[key]))
+                AppConfigure[key] = defaultPath;
+            try
+            {
+                if (!Directory.Exists(AppConfigure[key]))
+                    Directory.CreateDirectory(AppConfigure[key]);
+            }
+            catch
+            {
+                AppConfigure[key] = defaultPath;
+                if (!Directory.Exists(defaultPath))
+                    Directory.CreateDirectory(defaultPath);
+            }
         }
 
         private void NES_init_KeyMap()
@@ -887,6 +911,12 @@ namespace AprNes
         {
             InitChipDefaults();
             var cfg = new Dictionary<string, string>();
+
+            if (!File.Exists(AudioPlusIniFile))
+            {
+                // 檔案遺漏：用預設值重建
+                SaveAudioPlusIni();
+            }
 
             if (File.Exists(AudioPlusIniFile))
             {
@@ -1361,7 +1391,7 @@ public string GetRomInfo()
             rom_file_name = filePath.Remove(filePath.Length - 4, 4);
             current_rom_bytes = rom_bytes;
 
-            StopRecordingIfActive();
+            StopRecordingIfActive(true);
 
             if (nes_t != null)
             {
@@ -1614,6 +1644,7 @@ public string GetRomInfo()
         unsafe public void Reset()
         {
             if (!running) return;
+            StopRecordingIfActive(true);
 
             SaveSRam();
             NesCore.rom_file_name = rom_file_name;
@@ -1705,6 +1736,7 @@ public string GetRomInfo()
         unsafe public void HardReset()
         {
             if (!running || current_rom_bytes == null) return;
+            StopRecordingIfActive(true);
 
             // 停止模擬線程
             EndHighResPeriod();
@@ -1763,6 +1795,7 @@ public string GetRomInfo()
 
         private void _soundMenuItem_Click(object sender, EventArgs e)
         {
+            StopRecordingIfActive(true);
             NesCore.AudioEnabled = !NesCore.AudioEnabled;
             if (!NesCore.AudioEnabled)
                 WaveOutPlayer.CloseAudio();
@@ -1776,6 +1809,7 @@ public string GetRomInfo()
 
         private unsafe void _ultraAnalogMenuItem_Click(object sender, EventArgs e)
         {
+            StopRecordingIfActive(true);
             NesCore.UltraAnalog = !NesCore.UltraAnalog;
             UpdateUltraAnalogMenuText();
             AppConfigure["UltraAnalog"] = NesCore.UltraAnalog ? "1" : "0";
@@ -1802,7 +1836,6 @@ public string GetRomInfo()
 
         static string GetFfmpegPath()
         {
-            if (_ffmpegPath != null) return _ffmpegPath;
             string path = Path.Combine(Application.StartupPath, "tools", "ffmpeg", "ffmpeg.exe");
             _ffmpegPath = File.Exists(path) ? path : "";
             return _ffmpegPath;
@@ -1814,9 +1847,14 @@ public string GetRomInfo()
             _recordMenuItem.Visible = hasFfmpeg;
             if (hasFfmpeg)
             {
-                _recordVideoMenuItem.Text = VideoRecorder.IsRecording
-                    ? "■ Stop Recording" : "● Record Video";
-                _recordVideoMenuItem.Enabled = running || VideoRecorder.IsRecording;
+                bool videoRec = VideoRecorder.IsRecording;
+                bool audioRec = AudioRecorder.IsRecording;
+
+                _recordVideoMenuItem.Text = videoRec ? "■ Stop Recording" : "● Record Video";
+                _recordVideoMenuItem.Enabled = videoRec || (running && !audioRec);
+
+                _recordAudioMenuItem.Text = audioRec ? "■ Stop Audio Recording" : "● Record Audio";
+                _recordAudioMenuItem.Enabled = audioRec || (running && !videoRec);
             }
         }
 
@@ -1832,7 +1870,7 @@ public string GetRomInfo()
 
             if (!running) return;
 
-            string capturesDir = Path.Combine(Application.StartupPath, "Captures", "Video");
+            string capturesDir = AppConfigure.ContainsKey("CaptureVideoPath") ? AppConfigure["CaptureVideoPath"] : Path.Combine(Application.StartupPath, "Captures", "Video");
             // Analog mode: read dimensions fresh from CrtScreen (buffer can be reallocated)
             int recW = NesCore.AnalogEnabled ? NesCore.Crt_DstW : NesCore.RenderOutputW;
             int recH = NesCore.AnalogEnabled ? NesCore.Crt_DstH : NesCore.RenderOutputH;
@@ -1850,12 +1888,65 @@ public string GetRomInfo()
             }
         }
 
-        void StopRecordingIfActive()
+        void _recordAudioMenuItem_Click(object sender, EventArgs e)
         {
+            if (AudioRecorder.IsRecording)
+            {
+                AudioRecorder.Stop();
+                UpdateRecordMenuVisibility();
+                if (!VideoRecorder.IsRecording)
+                    this.Text = "AprNes";
+                return;
+            }
+
+            if (!running) return;
+
+            string capturesDir = AppConfigure.ContainsKey("CaptureAudioPath") ? AppConfigure["CaptureAudioPath"] : Path.Combine(Application.StartupPath, "Captures", "Audio");
+            bool ok = AudioRecorder.Start(GetFfmpegPath(), capturesDir);
+            if (ok)
+            {
+                UpdateRecordMenuVisibility();
+                if (!VideoRecorder.IsRecording)
+                    this.Text = "AprNes [REC Audio]";
+            }
+            else
+            {
+                string err = AudioRecorder.LastError ?? "Unknown error";
+                MessageBox.Show("Failed to start audio recording.\n\n" + err,
+                    "Recording Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Called from ConfigureUI when settings change while recording.
+        /// </summary>
+        public void StopRecordingOnSettingsChange() => StopRecordingIfActive(true);
+
+        void StopRecordingIfActive(bool notify = false)
+        {
+            bool wasStopped = false;
             if (VideoRecorder.IsRecording)
             {
                 VideoRecorder.Stop();
+                wasStopped = true;
+            }
+            if (AudioRecorder.IsRecording)
+            {
+                AudioRecorder.Stop();
+                wasStopped = true;
+            }
+            if (wasStopped)
+            {
+                UpdateRecordMenuVisibility();
                 try { this.Text = "AprNes"; } catch { }
+                if (notify)
+                {
+                    string lang = AppConfigure.ContainsKey("Lang") ? AppConfigure["Lang"] : "en-us";
+                    string title = LangINI.Get(lang, "rec_stopped_title", "Recording Stopped");
+                    string msg = LangINI.Get(lang, "rec_stopped_msg",
+                        "Recording has been stopped due to settings change.");
+                    MessageBox.Show(msg, title, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
             }
         }
 
@@ -2092,6 +2183,7 @@ public string GetRomInfo()
 
         private void fun8ToolStripMenuItem_Click(object sender, EventArgs e)
         {
+            StopRecordingIfActive(true);
             if (analogFullScreen) { ExitAnalogFullScreen(); return; }
             panel1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.BackColor = SystemColors.Menu;
@@ -2103,6 +2195,7 @@ public string GetRomInfo()
 
         private void fullScreeenToolStripMenuItem_Click(object sender, EventArgs e)
         {
+            StopRecordingIfActive(true);
             if (NesCore.AnalogEnabled) { EnterAnalogFullScreen(); return; }
 
             if (this.WindowState != FormWindowState.Maximized) Opacity = 0;
@@ -2126,6 +2219,7 @@ public string GetRomInfo()
 
         private void normalToolStripMenuItem_Click(object sender, EventArgs e)
         {
+            StopRecordingIfActive(true);
             if (analogFullScreen) { ExitAnalogFullScreen(); return; }
             panel1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.BackColor = SystemColors.Menu;

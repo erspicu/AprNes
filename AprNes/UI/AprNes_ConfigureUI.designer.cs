@@ -126,6 +126,12 @@
             this.label34 = new System.Windows.Forms.Label();
             this.label35 = new System.Windows.Forms.Label();
             this.textBox16 = new System.Windows.Forms.TextBox();
+            this.button1 = new System.Windows.Forms.Button();
+            this.label36 = new System.Windows.Forms.Label();
+            this.textBox17 = new System.Windows.Forms.TextBox();
+            this.button2 = new System.Windows.Forms.Button();
+            this.label37 = new System.Windows.Forms.Label();
+            this.textBox18 = new System.Windows.Forms.TextBox();
             this.groupBox1.SuspendLayout();
             this.groupBox2.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.SoundtrackBar)).BeginInit();
@@ -368,7 +374,7 @@
             // 
             this.LimitFPS_checkBox.AutoSize = true;
             this.LimitFPS_checkBox.Font = new System.Drawing.Font("新細明體", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
-            this.LimitFPS_checkBox.Location = new System.Drawing.Point(898, 18);
+            this.LimitFPS_checkBox.Location = new System.Drawing.Point(891, 18);
             this.LimitFPS_checkBox.Margin = new System.Windows.Forms.Padding(4);
             this.LimitFPS_checkBox.Name = "LimitFPS_checkBox";
             this.LimitFPS_checkBox.Size = new System.Drawing.Size(104, 22);
@@ -379,18 +385,18 @@
             // screen_path
             // 
             this.screen_path.BackColor = System.Drawing.SystemColors.ControlLight;
-            this.screen_path.Location = new System.Drawing.Point(898, 84);
+            this.screen_path.Location = new System.Drawing.Point(891, 84);
             this.screen_path.Margin = new System.Windows.Forms.Padding(4);
             this.screen_path.Name = "screen_path";
             this.screen_path.ReadOnly = true;
-            this.screen_path.Size = new System.Drawing.Size(487, 29);
+            this.screen_path.Size = new System.Drawing.Size(331, 29);
             this.screen_path.TabIndex = 4;
             // 
             // label9
             // 
             this.label9.AutoSize = true;
             this.label9.Font = new System.Drawing.Font("新細明體", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
-            this.label9.Location = new System.Drawing.Point(898, 56);
+            this.label9.Location = new System.Drawing.Point(891, 56);
             this.label9.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label9.Name = "label9";
             this.label9.Size = new System.Drawing.Size(300, 18);
@@ -401,7 +407,7 @@
             // 
             this.choose_dir.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.choose_dir.Font = new System.Drawing.Font("新細明體", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
-            this.choose_dir.Location = new System.Drawing.Point(1241, 39);
+            this.choose_dir.Location = new System.Drawing.Point(1234, 84);
             this.choose_dir.Margin = new System.Windows.Forms.Padding(4);
             this.choose_dir.Name = "choose_dir";
             this.choose_dir.Size = new System.Drawing.Size(147, 34);
@@ -630,7 +636,7 @@
             // comboBox1
             // 
             this.comboBox1.FormattingEnabled = true;
-            this.comboBox1.Location = new System.Drawing.Point(898, 401);
+            this.comboBox1.Location = new System.Drawing.Point(886, 544);
             this.comboBox1.Margin = new System.Windows.Forms.Padding(4);
             this.comboBox1.Name = "comboBox1";
             this.comboBox1.Size = new System.Drawing.Size(180, 26);
@@ -639,7 +645,7 @@
             // label18
             // 
             this.label18.AutoSize = true;
-            this.label18.Location = new System.Drawing.Point(898, 378);
+            this.label18.Location = new System.Drawing.Point(886, 521);
             this.label18.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label18.Name = "label18";
             this.label18.Size = new System.Drawing.Size(74, 18);
@@ -738,7 +744,7 @@
             // perdotFSM
             // 
             this.perdotFSM.AutoSize = true;
-            this.perdotFSM.Location = new System.Drawing.Point(898, 138);
+            this.perdotFSM.Location = new System.Drawing.Point(886, 281);
             this.perdotFSM.Name = "perdotFSM";
             this.perdotFSM.Size = new System.Drawing.Size(320, 22);
             this.perdotFSM.TabIndex = 23;
@@ -824,7 +830,7 @@
             this.groupBoxAnalog.Controls.Add(this.VideoInput);
             this.groupBoxAnalog.Controls.Add(this.label_analogSize);
             this.groupBoxAnalog.Controls.Add(this.comboBox_analogSize);
-            this.groupBoxAnalog.Location = new System.Drawing.Point(898, 175);
+            this.groupBoxAnalog.Location = new System.Drawing.Point(886, 318);
             this.groupBoxAnalog.Name = "groupBoxAnalog";
             this.groupBoxAnalog.Size = new System.Drawing.Size(339, 185);
             this.groupBoxAnalog.TabIndex = 38;
@@ -1307,11 +1313,85 @@
             this.textBox16.TabIndex = 0;
             this.textBox16.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             // 
+            // button1
+            // 
+            this.button1.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.button1.Font = new System.Drawing.Font("新細明體", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
+            this.button1.Location = new System.Drawing.Point(1231, 154);
+            this.button1.Margin = new System.Windows.Forms.Padding(4);
+            this.button1.Name = "button1";
+            this.button1.Size = new System.Drawing.Size(147, 34);
+            this.button1.TabIndex = 44;
+            this.button1.Text = "folder select";
+            this.button1.UseVisualStyleBackColor = true;
+            this.button1.Click += new System.EventHandler(this.button1_Click);
+            // 
+            // label36
+            // 
+            this.label36.AutoSize = true;
+            this.label36.Font = new System.Drawing.Font("新細明體", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
+            this.label36.Location = new System.Drawing.Point(891, 126);
+            this.label36.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.label36.Name = "label36";
+            this.label36.Size = new System.Drawing.Size(149, 18);
+            this.label36.TabIndex = 43;
+            this.label36.Text = "Video Output Folder";
+            // 
+            // textBox17
+            // 
+            this.textBox17.BackColor = System.Drawing.SystemColors.ControlLight;
+            this.textBox17.Location = new System.Drawing.Point(891, 154);
+            this.textBox17.Margin = new System.Windows.Forms.Padding(4);
+            this.textBox17.Name = "textBox17";
+            this.textBox17.ReadOnly = true;
+            this.textBox17.Size = new System.Drawing.Size(331, 29);
+            this.textBox17.TabIndex = 42;
+            // 
+            // button2
+            // 
+            this.button2.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.button2.Font = new System.Drawing.Font("新細明體", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
+            this.button2.Location = new System.Drawing.Point(1234, 229);
+            this.button2.Margin = new System.Windows.Forms.Padding(4);
+            this.button2.Name = "button2";
+            this.button2.Size = new System.Drawing.Size(147, 34);
+            this.button2.TabIndex = 47;
+            this.button2.Text = "folder select";
+            this.button2.UseVisualStyleBackColor = true;
+            this.button2.Click += new System.EventHandler(this.button2_Click);
+            // 
+            // label37
+            // 
+            this.label37.AutoSize = true;
+            this.label37.Font = new System.Drawing.Font("新細明體", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
+            this.label37.Location = new System.Drawing.Point(891, 202);
+            this.label37.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.label37.Name = "label37";
+            this.label37.Size = new System.Drawing.Size(149, 18);
+            this.label37.TabIndex = 46;
+            this.label37.Text = "Audio Output Folder";
+            // 
+            // textBox18
+            // 
+            this.textBox18.BackColor = System.Drawing.SystemColors.ControlLight;
+            this.textBox18.Location = new System.Drawing.Point(891, 229);
+            this.textBox18.Margin = new System.Windows.Forms.Padding(4);
+            this.textBox18.Name = "textBox18";
+            this.textBox18.ReadOnly = true;
+            this.textBox18.Size = new System.Drawing.Size(331, 29);
+            this.textBox18.TabIndex = 45;
+            // 
             // AprNes_ConfigureUI
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 18F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1402, 639);
+            this.Controls.Add(this.button2);
+            this.Controls.Add(this.label37);
+            this.Controls.Add(this.textBox18);
+            this.Controls.Add(this.button1);
+            this.Controls.Add(this.label36);
+            this.Controls.Add(this.textBox17);
             this.Controls.Add(this.groupBox3);
             this.Controls.Add(this.groupBox4);
             this.Controls.Add(this.resize);
@@ -1456,5 +1536,11 @@
         private System.Windows.Forms.Label label34;
         private System.Windows.Forms.Label label35;
         private System.Windows.Forms.TextBox textBox16;
+        private System.Windows.Forms.Button button1;
+        private System.Windows.Forms.Label label36;
+        private System.Windows.Forms.TextBox textBox17;
+        private System.Windows.Forms.Button button2;
+        private System.Windows.Forms.Label label37;
+        private System.Windows.Forms.TextBox textBox18;
     }
 }

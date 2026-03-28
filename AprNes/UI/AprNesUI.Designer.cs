@@ -196,6 +196,7 @@
             this._recordAudioMenuItem.Size = new System.Drawing.Size(207, 34);
             this._recordAudioMenuItem.Text = "Record Audio";
             this._recordAudioMenuItem.Enabled = false;
+            this._recordAudioMenuItem.Click += new System.EventHandler(this._recordAudioMenuItem_Click);
             //
             // _recordSettingsMenuItem
             //
