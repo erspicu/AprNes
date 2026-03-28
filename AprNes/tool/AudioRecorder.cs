@@ -33,6 +33,9 @@ namespace AprNes
         public static string LastOutputPath { get; private set; }
         public static string LastError { get; private set; }
 
+        /// <summary>Audio bitrate in kbps: 192, 160, 128.</summary>
+        public static int AudioBitrate = 160;
+
         static void Log(string msg)
         {
             if (!DebugLog) return;
@@ -83,9 +86,9 @@ namespace AprNes
                 // FFmpeg: raw PCM input → MP3 output
                 string args = string.Format(
                     "-y -f s16le -ar 44100 -ac 2 -i \\\\.\\pipe\\{0} " +
-                    "-c:a libmp3lame -b:a 160k -ac 2 -ar 44100 " +
+                    "-c:a libmp3lame -b:a {2}k -ac 2 -ar 44100 " +
                     "\"{1}\"",
-                    pipeName, outputPath);
+                    pipeName, outputPath, AudioBitrate);
 
                 _stderrBuf = "";
                 _ffmpeg = new Process

@@ -146,6 +146,9 @@ namespace AprNes
             label37.Text     = LangStr("audio_output_folder");
             button1.Text     = LangStr("selectfolder");
             button2.Text     = LangStr("selectfolder");
+            label38.Text     = LangStr("video_rec_quality");
+            label39.Text     = LangStr("audio_rec_quality");
+            InitRecordingQualityComboBoxes();
 
             // 畫面輸出
             resize.Text      = LangStr("resize_group");
@@ -377,6 +380,15 @@ namespace AprNes
             AprNesUI.GetInstance().AppConfigure["CaptureScreenPath"] = screen_path.Text;
             AprNesUI.GetInstance().AppConfigure["CaptureVideoPath"] = textBox17.Text;
             AprNesUI.GetInstance().AppConfigure["CaptureAudioPath"] = textBox18.Text;
+
+            // Recording quality
+            int vqSel = comboBox2.SelectedIndex;
+            AprNesUI.GetInstance().AppConfigure["VideoQuality"] =
+                (vqSel >= 0 && vqSel < videoQualityValues.Length) ? videoQualityValues[vqSel].ToString() : "90";
+            int abSel = comboBox3.SelectedIndex;
+            AprNesUI.GetInstance().AppConfigure["AudioBitrate"] =
+                (abSel >= 0 && abSel < audioBitrateValues.Length) ? audioBitrateValues[abSel].ToString() : "160";
+
             AprNesUI.GetInstance().key_A = key_A;
             AprNesUI.GetInstance().key_B = key_B;
             AprNesUI.GetInstance().key_SELECT = key_SELECT;
@@ -760,6 +772,12 @@ namespace AprNes
             textBox17.Text = AprNesUI.GetInstance().AppConfigure.ContainsKey("CaptureVideoPath") ? AprNesUI.GetInstance().AppConfigure["CaptureVideoPath"] : "";
             textBox18.Text = AprNesUI.GetInstance().AppConfigure.ContainsKey("CaptureAudioPath") ? AprNesUI.GetInstance().AppConfigure["CaptureAudioPath"] : "";
 
+            // Recording quality
+            int vqIdx = System.Array.IndexOf(videoQualityValues, VideoRecorder.VideoQuality);
+            comboBox2.SelectedIndex = vqIdx >= 0 ? vqIdx : 0;
+            int abIdx = System.Array.IndexOf(audioBitrateValues, AudioRecorder.AudioBitrate);
+            comboBox3.SelectedIndex = abIdx >= 0 ? abIdx : 1;
+
             textBox_A.Text = ((Keys)int.Parse(AprNesUI.GetInstance().AppConfigure["key_A"])).ToString();
             textBox_B.Text = ((Keys)int.Parse(AprNesUI.GetInstance().AppConfigure["key_B"])).ToString();
             textBox_SELECT.Text = ((Keys)int.Parse(AprNesUI.GetInstance().AppConfigure["key_SELECT"])).ToString();
@@ -848,6 +866,32 @@ namespace AprNes
             FolderBrowserDialog fd = new FolderBrowserDialog();
             if (fd.ShowDialog() != DialogResult.OK) return;
             textBox18.Text = fd.SelectedPath;
+        }
+
+        // ── Recording quality comboboxes ─────────────────────────────────
+        static readonly int[] videoQualityValues = { 90, 80, 70, 60 };
+        static readonly string[] videoQualityKeys = {
+            "rec_vq_90", "rec_vq_80", "rec_vq_70", "rec_vq_60"
+        };
+        static readonly int[] audioBitrateValues = { 192, 160, 128 };
+        static readonly string[] audioBitrateKeys = {
+            "rec_ab_192", "rec_ab_160", "rec_ab_128"
+        };
+
+        void InitRecordingQualityComboBoxes()
+        {
+            int prevVQ = comboBox2.SelectedIndex;
+            int prevAB = comboBox3.SelectedIndex;
+            comboBox2.DropDownStyle = ComboBoxStyle.DropDownList;
+            comboBox3.DropDownStyle = ComboBoxStyle.DropDownList;
+            comboBox2.Items.Clear();
+            comboBox3.Items.Clear();
+            foreach (var k in videoQualityKeys)
+                comboBox2.Items.Add(LangStr(k));
+            foreach (var k in audioBitrateKeys)
+                comboBox3.Items.Add(LangStr(k));
+            if (prevVQ >= 0 && prevVQ < comboBox2.Items.Count) comboBox2.SelectedIndex = prevVQ;
+            if (prevAB >= 0 && prevAB < comboBox3.Items.Count) comboBox3.SelectedIndex = prevAB;
         }
 
         int key_A = 0, key_B = 0, key_SELECT = 0, key_START = 0, key_RIGHT = 0, key_LEFT = 0, key_UP = 0, key_DOWN = 0;

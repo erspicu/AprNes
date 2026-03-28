@@ -132,6 +132,10 @@
             this.button2 = new System.Windows.Forms.Button();
             this.label37 = new System.Windows.Forms.Label();
             this.textBox18 = new System.Windows.Forms.TextBox();
+            this.comboBox2 = new System.Windows.Forms.ComboBox();
+            this.label38 = new System.Windows.Forms.Label();
+            this.label39 = new System.Windows.Forms.Label();
+            this.comboBox3 = new System.Windows.Forms.ComboBox();
             this.groupBox1.SuspendLayout();
             this.groupBox2.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.SoundtrackBar)).BeginInit();
@@ -420,7 +424,7 @@
             // 
             this.Ok_btn.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.Ok_btn.Font = new System.Drawing.Font("新細明體", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(136)));
-            this.Ok_btn.Location = new System.Drawing.Point(1238, 579);
+            this.Ok_btn.Location = new System.Drawing.Point(1238, 582);
             this.Ok_btn.Margin = new System.Windows.Forms.Padding(4);
             this.Ok_btn.Name = "Ok_btn";
             this.Ok_btn.Size = new System.Drawing.Size(147, 34);
@@ -636,7 +640,7 @@
             // comboBox1
             // 
             this.comboBox1.FormattingEnabled = true;
-            this.comboBox1.Location = new System.Drawing.Point(886, 544);
+            this.comboBox1.Location = new System.Drawing.Point(886, 596);
             this.comboBox1.Margin = new System.Windows.Forms.Padding(4);
             this.comboBox1.Name = "comboBox1";
             this.comboBox1.Size = new System.Drawing.Size(180, 26);
@@ -645,7 +649,7 @@
             // label18
             // 
             this.label18.AutoSize = true;
-            this.label18.Location = new System.Drawing.Point(886, 521);
+            this.label18.Location = new System.Drawing.Point(886, 573);
             this.label18.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label18.Name = "label18";
             this.label18.Size = new System.Drawing.Size(74, 18);
@@ -744,7 +748,7 @@
             // perdotFSM
             // 
             this.perdotFSM.AutoSize = true;
-            this.perdotFSM.Location = new System.Drawing.Point(886, 281);
+            this.perdotFSM.Location = new System.Drawing.Point(891, 342);
             this.perdotFSM.Name = "perdotFSM";
             this.perdotFSM.Size = new System.Drawing.Size(320, 22);
             this.perdotFSM.TabIndex = 23;
@@ -830,7 +834,7 @@
             this.groupBoxAnalog.Controls.Add(this.VideoInput);
             this.groupBoxAnalog.Controls.Add(this.label_analogSize);
             this.groupBoxAnalog.Controls.Add(this.comboBox_analogSize);
-            this.groupBoxAnalog.Location = new System.Drawing.Point(886, 318);
+            this.groupBoxAnalog.Location = new System.Drawing.Point(886, 376);
             this.groupBoxAnalog.Name = "groupBoxAnalog";
             this.groupBoxAnalog.Size = new System.Drawing.Size(339, 185);
             this.groupBoxAnalog.TabIndex = 38;
@@ -1381,11 +1385,49 @@
             this.textBox18.Size = new System.Drawing.Size(331, 29);
             this.textBox18.TabIndex = 45;
             // 
+            // comboBox2
+            // 
+            this.comboBox2.FormattingEnabled = true;
+            this.comboBox2.Location = new System.Drawing.Point(894, 300);
+            this.comboBox2.Name = "comboBox2";
+            this.comboBox2.Size = new System.Drawing.Size(130, 26);
+            this.comboBox2.TabIndex = 48;
+            // 
+            // label38
+            // 
+            this.label38.AutoSize = true;
+            this.label38.Location = new System.Drawing.Point(894, 272);
+            this.label38.Name = "label38";
+            this.label38.Size = new System.Drawing.Size(180, 18);
+            this.label38.TabIndex = 49;
+            this.label38.Text = "Video Recording Quality";
+            // 
+            // label39
+            // 
+            this.label39.AutoSize = true;
+            this.label39.Location = new System.Drawing.Point(1090, 272);
+            this.label39.Name = "label39";
+            this.label39.Size = new System.Drawing.Size(180, 18);
+            this.label39.TabIndex = 51;
+            this.label39.Text = "Audio Recording Quality";
+            // 
+            // comboBox3
+            // 
+            this.comboBox3.FormattingEnabled = true;
+            this.comboBox3.Location = new System.Drawing.Point(1090, 300);
+            this.comboBox3.Name = "comboBox3";
+            this.comboBox3.Size = new System.Drawing.Size(130, 26);
+            this.comboBox3.TabIndex = 50;
+            // 
             // AprNes_ConfigureUI
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 18F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1402, 639);
+            this.Controls.Add(this.label39);
+            this.Controls.Add(this.comboBox3);
+            this.Controls.Add(this.label38);
+            this.Controls.Add(this.comboBox2);
             this.Controls.Add(this.button2);
             this.Controls.Add(this.label37);
             this.Controls.Add(this.textBox18);
@@ -1542,5 +1584,9 @@
         private System.Windows.Forms.Button button2;
         private System.Windows.Forms.Label label37;
         private System.Windows.Forms.TextBox textBox18;
+        private System.Windows.Forms.ComboBox comboBox2;
+        private System.Windows.Forms.Label label38;
+        private System.Windows.Forms.Label label39;
+        private System.Windows.Forms.ComboBox comboBox3;
     }
 }

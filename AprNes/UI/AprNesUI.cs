@@ -315,6 +315,8 @@ namespace AprNes
                 AppConfigure["CaptureScreenPath"] = Path.Combine(Application.StartupPath, "Captures", "Screenshots");
                 AppConfigure["CaptureVideoPath"] = Path.Combine(Application.StartupPath, "Captures", "Video");
                 AppConfigure["CaptureAudioPath"] = Path.Combine(Application.StartupPath, "Captures", "Audio");
+                AppConfigure["VideoQuality"] = "90";
+                AppConfigure["AudioBitrate"] = "160";
                 AppConfigure["joypad_A"] = "";
                 AppConfigure["joypad_B"] = "";
                 AppConfigure["joypad_SELECT"] = "";
@@ -514,6 +516,16 @@ namespace AprNes
             EnsureCapturePath("CaptureScreenPath", Path.Combine(Application.StartupPath, "Captures", "Screenshots"));
             EnsureCapturePath("CaptureVideoPath",  Path.Combine(Application.StartupPath, "Captures", "Video"));
             EnsureCapturePath("CaptureAudioPath",  Path.Combine(Application.StartupPath, "Captures", "Audio"));
+
+            // 錄影/錄音品質設定
+            int vq;
+            int[] validVQ = { 90, 80, 70, 60 };
+            VideoRecorder.VideoQuality = (AppConfigure.ContainsKey("VideoQuality") &&
+                int.TryParse(AppConfigure["VideoQuality"], out vq) && System.Array.IndexOf(validVQ, vq) >= 0) ? vq : 90;
+            int ab;
+            int[] validAB = { 192, 160, 128 };
+            AudioRecorder.AudioBitrate = (AppConfigure.ContainsKey("AudioBitrate") &&
+                int.TryParse(AppConfigure["AudioBitrate"], out ab) && System.Array.IndexOf(validAB, ab) >= 0) ? ab : 160;
 
             NES_init_KeyMap();
 

@@ -105,20 +105,35 @@ namespace AprNes
             return _cachedEncoder;
         }
 
+        /// <summary>Video quality: 90, 80, 70, 60 (percent). Maps to qp/crf values.</summary>
+        public static int VideoQuality = 90;
+
+        static int QualityToQp(int quality)
+        {
+            switch (quality)
+            {
+                case 90: return 4;
+                case 80: return 8;
+                case 70: return 14;
+                default: return 20; // 60%
+            }
+        }
+
         static string GetEncoderArgs(string encoder)
         {
+            int qp = QualityToQp(VideoQuality);
             switch (encoder)
             {
                 case "h264_nvenc":
-                    return "-c:v h264_nvenc -rc constqp -qp 6 -preset p4 -pix_fmt yuv420p";
+                    return string.Format("-c:v h264_nvenc -rc constqp -qp {0} -preset p4 -pix_fmt yuv420p", qp);
                 case "h264_amf":
-                    return "-c:v h264_amf -rc cqp -qp_i 6 -qp_p 6 -quality balanced -pix_fmt yuv420p";
+                    return string.Format("-c:v h264_amf -rc cqp -qp_i {0} -qp_p {0} -quality balanced -pix_fmt yuv420p", qp);
                 case "h264_qsv":
-                    return "-c:v h264_qsv -global_quality 6 -preset faster -pix_fmt yuv420p";
+                    return string.Format("-c:v h264_qsv -global_quality {0} -preset faster -pix_fmt yuv420p", qp);
                 case "h264_d3d12va":
-                    return "-c:v h264_d3d12va -rc cqp -qp 6 -pix_fmt yuv420p";
+                    return string.Format("-c:v h264_d3d12va -rc cqp -qp {0} -pix_fmt yuv420p", qp);
                 default:
-                    return "-c:v libx264 -crf 6 -preset fast -pix_fmt yuv420p";
+                    return string.Format("-c:v libx264 -crf {0} -preset fast -pix_fmt yuv420p", qp);
             }
         }
 

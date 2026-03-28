@@ -203,6 +203,7 @@
             this._recordSettingsMenuItem.Name = "_recordSettingsMenuItem";
             this._recordSettingsMenuItem.Size = new System.Drawing.Size(207, 34);
             this._recordSettingsMenuItem.Text = "Settings";
+            this._recordSettingsMenuItem.Visible = false;
             this._recordSettingsMenuItem.Enabled = false;
             //
             // fps_count_timer
