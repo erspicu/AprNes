@@ -299,7 +299,7 @@ namespace AprNes
                 dmcperiods[8]=176; dmcperiods[9]=148; dmcperiods[10]=132; dmcperiods[11]=118;
                 dmcperiods[12]=98; dmcperiods[13]=78; dmcperiods[14]=66; dmcperiods[15]=50;
             }
-            else // NTSC
+            else // NTSC and Dendy (Dendy uses NTSC APU tables)
             {
                 frameReload4[0] = 7458; frameReload4[1] = 7456; frameReload4[2] = 7458; frameReload4[3] = 7458;
                 frameReload5[0] = 7458; frameReload5[1] = 7456; frameReload5[2] = 7458; frameReload5[3] = 7458; frameReload5[4] = 7452;
@@ -588,10 +588,11 @@ namespace AprNes
                 setlength();
                 setsweep();
             }
-            if (framectr == 3 && ctrmode == 4)
+            if (framectr == 3 && ctrmode == 4 && Region != RegionType.Dendy)
             {
                 // Frame IRQ flag is set unconditionally for 3 cycles (even when apuintflag=true)
                 // On the 3rd cycle, it's cleared if apuintflag is true
+                // Dendy: frame counter IRQ is completely disabled (UMC hardware bug)
                 statusframeint = true;
                 frameIrqClearPending = false; // cancel deferred clear — flag was just asserted
                 irqAssertCycles = 2; // 2 more cycles after this one (3 total)

@@ -109,7 +109,10 @@ namespace AprNes
             // to avoid false regressions when INI is missing or defaults to performance mode.
             bool isValidation = Array.Exists(args, a => a == "--wait-result" || a == "--dump-ac-results");
             if (isValidation)
+            {
                 NesCore.AccuracyOptA = true;
+                NesCore.Region = NesCore.RegionType.NTSC; // prevent INI Region=PAL from polluting NTSC tests
+            }
 
             // --accuracy flag overrides everything (including validation default)
             for (int i = 0; i < args.Length - 1; i++)
@@ -249,6 +252,15 @@ namespace AprNes
                         break;
                     case "--scanline":
                         resizeScanline = true;
+                        break;
+                    case "--region":
+                        if (i + 1 < args.Length)
+                        {
+                            string r = args[++i].ToUpperInvariant();
+                            if (r == "PAL") NesCore.Region = NesCore.RegionType.PAL;
+                            else if (r == "DENDY") NesCore.Region = NesCore.RegionType.Dendy;
+                            else NesCore.Region = NesCore.RegionType.NTSC;
+                        }
                         break;
                 }
             }

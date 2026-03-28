@@ -648,8 +648,9 @@ namespace AprNes
             // Advance cycle counter; writeback to static
             ppu_cycles_x = ++cx;
 
-            // VBlank start at scanline 241, cycle 1 (post-increment)
-            if (scanline == 241 && cx == 1)
+            // VBlank start at nmiTriggerLine, cycle 1 (post-increment)
+            // NTSC/PAL=241, Dendy=291 (51 lines post-render idle)
+            if (scanline == nmiTriggerLine && cx == 1)
             {
                 if (!SuppressVbl)
                 {
@@ -1260,9 +1261,9 @@ namespace AprNes
         {
             bool vblFlag = isVblank;
 
-            // VBL suppression at exact VBL set dot (sl=241, cx=1):
+            // VBL suppression at exact VBL set dot (sl=nmiTriggerLine, cx=1):
             // VBL was just set by tick; suppress flag read and NMI
-            if (scanline == 241 && ppu_cycles_x == 1)
+            if (scanline == nmiTriggerLine && ppu_cycles_x == 1)
             {
                 vblFlag = false;
             }

@@ -101,7 +101,7 @@ namespace AprNes
             AP_CLOCKS_PER_SAMPLE = AP_CPU_FREQ / AP_SAMPLE_RATE;
             OSE_CUTOFF_NORM = 20000.0 / AP_CPU_FREQ;
             OSE_CLOCKS_PER_SAMPLE_FP = (uint)(AP_CLOCKS_PER_SAMPLE * OSE_ONE_CLOCK_FP);
-            CMF_RF_PHASE_INC = (Region == RegionType.PAL ? 50.0 : 59.94) / AP_SAMPLE_RATE;
+            CMF_RF_PHASE_INC = (Region == RegionType.NTSC ? 59.94 : 50.0) / AP_SAMPLE_RATE;
             // Force oversampler kernel rebuild (cutoff depends on CPU freq)
             ap_tablesInitialized = false;
         }

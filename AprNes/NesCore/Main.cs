@@ -69,12 +69,13 @@ namespace AprNes
         static public RegionType Region = RegionType.NTSC;
 
         // ── Region-dependent timing parameters (set by ApplyRegionProfile) ──
-        static int totalScanlines = 262;      // NTSC=262, PAL=312
-        static int preRenderLine  = 261;      // NTSC=261, PAL=311
-        static int masterPerCpu   = 12;       // NTSC=12, PAL=16
-        static int masterPerPpu   = 4;        // NTSC=4,  PAL=5
-        static double cpuFreq          = 1789773.0;  // NTSC=1789773, PAL=1662607
-        static public double FrameSeconds = 1.0 / 60.0988; // NTSC=1/60.0988, PAL=1/50.0070
+        static int totalScanlines = 262;      // NTSC=262, PAL/Dendy=312
+        static int preRenderLine  = 261;      // NTSC=261, PAL/Dendy=311
+        static int nmiTriggerLine = 241;      // NTSC/PAL=241, Dendy=291
+        static int masterPerCpu   = 12;       // NTSC=12, PAL=16, Dendy=15
+        static int masterPerPpu   = 4;        // NTSC=4,  PAL/Dendy=5
+        static double cpuFreq          = 1789773.0;  // NTSC=1789773, PAL=1662607, Dendy=1773447
+        static public double FrameSeconds = 1.0 / 60.0988; // NTSC=1/60.0988, PAL/Dendy=1/50.0070
 
         static void ApplyRegionProfile()
         {
@@ -82,15 +83,27 @@ namespace AprNes
             {
                 totalScanlines = 312;
                 preRenderLine  = 311;
+                nmiTriggerLine = 241;
                 masterPerCpu   = 16;
                 masterPerPpu   = 5;
                 cpuFreq        = 1662607.0;
                 FrameSeconds   = 1.0 / 50.0070;
             }
-            else // NTSC (and Dendy for now)
+            else if (Region == RegionType.Dendy)
+            {
+                totalScanlines = 312;
+                preRenderLine  = 311;
+                nmiTriggerLine = 291;   // 51 lines post-render idle (240-290), NMI at 291
+                masterPerCpu   = 15;    // PAL master clock ÷15
+                masterPerPpu   = 5;     // same as PAL
+                cpuFreq        = 1773447.0; // 26601712 / 15
+                FrameSeconds   = 1.0 / 50.0070;
+            }
+            else // NTSC
             {
                 totalScanlines = 262;
                 preRenderLine  = 261;
+                nmiTriggerLine = 241;
                 masterPerCpu   = 12;
                 masterPerPpu   = 4;
                 cpuFreq        = 1789773.0;

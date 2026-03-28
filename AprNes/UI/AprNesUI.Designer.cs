@@ -367,7 +367,7 @@
             this._menuEmulationRegionDendy.Name = "_menuEmulationRegionDendy";
             this._menuEmulationRegionDendy.Size = new System.Drawing.Size(200, 34);
             this._menuEmulationRegionDendy.Text = "Dendy";
-            this._menuEmulationRegionDendy.Visible = false;
+            this._menuEmulationRegionDendy.Visible = true;
             this._menuEmulationRegionDendy.Click += new System.EventHandler(this._menuEmulationRegion_Click);
             //
             // _menuEmulationLimitFps
