@@ -1171,30 +1171,36 @@ namespace AprNes
             }
         }
 
-        static int pixel, array_loc;
-
-        static void RenderSpritesLine()
+        // ── RenderSpritesLine 優化摘要 ──
+        // Pass 1: unsigned subtraction 範圍檢查取代雙分支; 找到 8 個後 break
+        // Pass 2: long* 批次清零 sprSet (32×8=256 bytes); shift 取像素取代 mask+乘法;
+        //         8x16 tile 選擇用 line>>3 取代 if 分支; priority 直接位移取值
+        // Pass 3: long* 8-byte block-scan 跳過全空區域 (sprite 通常只佔少數像素)
+        static unsafe void RenderSpritesLine()
         {
             // Pass 1: scan OAM 0→63, pick first 8 sprites visible on this scanline.
             // NES hardware only performs sprite evaluation when rendering is enabled.
             // Overflow detection is handled by PrecomputeOverflow() at cycle-accurate timing.
+            if (!(ShowBackGround || ShowSprites)) return;
+
             int* sel = stackalloc int[8];
             int selCount = 0;
             int height = Spritesize8x16 ? 15 : 7;
-            bool renderingEnabled = ShowBackGround || ShowSprites;
 
-            if (renderingEnabled)
+            for (int oam_th = 0; oam_th < 64; oam_th++)
             {
-                for (int oam_th = 0; oam_th < 64; oam_th++)
+                // Selection uses Y+1 (sprites display one scanline later).
+                // Unsigned subtraction trick: (uint)(a - b) <= (uint)h
+                // is equivalent to (a >= b && a - b <= h) but avoids two branches.
+                int render_y = spr_ram[oam_th << 2] + 1;
+                if ((uint)(scanline - render_y) <= (uint)height)
                 {
-                    // Selection for rendering uses Y+1 (sprites display one scanline later)
-                    int render_y = spr_ram[oam_th << 2] + 1;
-                    if (scanline < render_y || scanline - render_y > height) continue;
                     if (selCount < 8) sel[selCount++] = oam_th;
+                    else break; // hardware stops after 8 sprites
                 }
             }
 
-            if (!ShowSprites) return;
+            if (!ShowSprites || selCount == 0) return;
 
             // Per-pixel sprite winner buffers.
             // NES hardware picks ONE winning sprite per pixel (lowest OAM index with opaque pixel).
@@ -1205,75 +1211,66 @@ namespace AprNes
             byte* sprPriority = stackalloc byte[256]; // 1 = behind BG, 0 = in front
             byte* sprSet      = stackalloc byte[256]; // 1 = a winning sprite pixel exists here
             byte* sprPalIdx   = stackalloc byte[256]; // NTSC: raw palette index of winning sprite
-            for (int i = 0; i < 256; i++) sprSet[i] = 0;
+            // Clear sprSet with long* writes: 32 × 8 bytes = 256 bytes (replaces scalar loop)
+            long* pClear = (long*)sprSet;
+            for (int i = 0; i < 32; i++) pClear[i] = 0;
 
             // Pass 2: evaluate sprites in reverse OAM order so lower-index sprites overwrite higher,
             // making the lowest-index sprite the final winner at each pixel.
             for (int si = selCount - 1; si >= 0; si--)
             {
-                int oam_th = sel[si];
-                int oam_addr = oam_th << 2;
+                int oam_addr = sel[si] << 2;
                 int y_loc = spr_ram[oam_addr] + 1; // NES hardware: sprites display at OAM_Y + 1
-
-                int offset, tile_th_t, line, line_t;
-                byte tile_th;
-
-                if (Spritesize8x16)
-                {
-                    byte byte0 = spr_ram[oam_addr | 1];
-                    tile_th = (byte)(byte0 & 0xfe);
-                    offset = (byte0 & 1) != 0 ? 256 : 0;
-                }
-                else
-                {
-                    tile_th = spr_ram[oam_addr | 1];
-                    offset = SpPatternTableAddr >> 4;
-                }
-
+                byte tile_th = spr_ram[oam_addr | 1];
                 byte sprite_attr = spr_ram[oam_addr | 2];
                 byte x_loc = spr_ram[oam_addr | 3];
-                bool priority = (sprite_attr & 0x20) != 0;
 
-                if (scanline <= y_loc + 7)
+                int tile_th_t, line;
+                if (Spritesize8x16)
                 {
-                    tile_th_t = tile_th + offset;
+                    int offset = (tile_th & 1) << 8; // bit 0 selects pattern bank (0 or 0x100)
+                    tile_th &= 0xFE;
                     line = scanline - y_loc;
+                    tile_th_t = tile_th + offset + (line >> 3); // line 0~7 → +0 (top), 8~15 → +1 (bottom)
+                    line &= 7;
                 }
                 else
                 {
-                    tile_th_t = tile_th + offset + 1;
-                    line = scanline - y_loc - 8;
+                    tile_th_t = tile_th + (SpPatternTableAddr >> 4);
+                    line = scanline - y_loc;
                 }
 
+                // Vertical flip: reverse line within tile + swap top/bottom for 8x16
                 if ((sprite_attr & 0x80) != 0)
                 {
-                    line_t = 7 - line;
-                    if (Spritesize8x16) tile_th_t ^= 1;
+                    line = 7 - line;
+                    if (Spritesize8x16) tile_th_t ^= 1; // swap top ↔ bottom tile
                 }
-                else line_t = line;
 
-                int th_a = (tile_th_t << 4) | (line_t + 8); byte tile_hbyte = chrBankPtrs[(th_a >> 10) & 7][th_a & 0x3FF];
-                int tl_a = (tile_th_t << 4) | line_t;       byte tile_lbyte = chrBankPtrs[(tl_a >> 10) & 7][tl_a & 0x3FF];
+                int addr_low = (tile_th_t << 4) | line;
+                byte tile_lbyte = chrBankPtrs[(addr_low >> 10) & 7][addr_low & 0x3FF];
+                byte tile_hbyte = chrBankPtrs[((addr_low + 8) >> 10) & 7][(addr_low + 8) & 0x3FF];
                 bool flip_x = (sprite_attr & 0x40) != 0;
+                int palBase = 0x3F10 + ((sprite_attr & 3) << 2);
+                byte priority = (byte)((sprite_attr & 0x20) >> 5); // 0 = front, 1 = behind BG
 
                 for (int loc = 0; loc < 8; loc++)
                 {
-                    int screenX = x_loc + loc;
-                    if (screenX > 255) continue;
-                    if (!ShowSprLeft8 && screenX < 8) continue;
-                    int loc_t = flip_x ? (7 - loc) : loc;
-                    int mask = 1 << (7 - loc_t);
-                    pixel = (((tile_hbyte & mask) << 1) + (tile_lbyte & mask)) >> (7 - loc_t);
-                    if (pixel == 0) continue;
+                    int sx = x_loc + loc;
+                    if (sx > 255) break; // past right edge — remaining pixels also out of bounds
+                    if (!ShowSprLeft8 && sx < 8) continue;
 
-                    array_loc = (scanline << 8) + screenX;
+                    // Extract 2-bit pixel from tile planes using shift (branchless, no mask multiply)
+                    int shift = flip_x ? loc : (7 - loc);
+                    int p = ((tile_hbyte >> shift) & 1) << 1 | ((tile_lbyte >> shift) & 1);
+                    if (p == 0) continue;
 
                     // Record as winner at this column (lower OAM index will overwrite later)
-                    sprSet[screenX]      = 1;
-                    sprPriority[screenX] = (byte)(priority ? 1 : 0);
-                    byte sprRawPal       = (byte)(ppu_ram[0x3f10 + ((sprite_attr & 3) << 2) | pixel] & 0x3f);
-                    sprColor[screenX]    = NesColors[sprRawPal];
-                    sprPalIdx[screenX]   = sprRawPal; // NTSC: preserve raw palette index
+                    byte rawPal = (byte)(ppu_ram[palBase | p] & 0x3F);
+                    sprSet[sx]      = 1;
+                    sprPriority[sx] = priority;
+                    sprColor[sx]    = NesColors[rawPal];
+                    sprPalIdx[sx]   = rawPal;
                 }
             }
 
@@ -1281,34 +1278,22 @@ namespace AprNes
             //   BG is disabled, OR BG pixel is transparent, OR winning sprite is front-priority.
             // A behind-BG winner (priority=1) with opaque BG blocks ALL sprites at that pixel,
             // correctly implementing the mask-sprite trick used by SMB3.
+            // long* 8-byte block-scan: skip all-zero blocks 8 pixels at a time.
             int scanOff = scanline << 8;
-            // P33: ulong 8-byte block-scan — skip all-zero blocks 8 pixels at a time,
-            // fall back to scalar only for blocks that contain sprite pixels.
+            long* pSprSetLong = (long*)sprSet;
+            for (int b = 0; b < 32; b++)
             {
-                int sx = 0;
-                while (sx <= 248) // 256 - 8
+                if (pSprSetLong[b] == 0) continue; // 8 pixels all empty — skip (performance core)
+                int bx = b << 3;
+                for (int i = 0; i < 8; i++)
                 {
-                    if (*(ulong*)(sprSet + sx) == 0) { sx += 8; continue; }
-                    int blockEnd = sx + 8;
-                    for (; sx < blockEnd; sx++)
-                    {
-                        if (sprSet[sx] == 0) continue;
-                        array_loc = scanOff + sx;
-                        if (!ShowBackGround || Buffer_BG_array[array_loc] == 0 || sprPriority[sx] == 0)
-                        {
-                            ScreenBuf1x[array_loc] = sprColor[sx];
-                            if (AnalogEnabled) ntscScanBuf[sx] = sprPalIdx[sx]; // NTSC: override with sprite palette
-                        }
-                    }
-                }
-                for (; sx < 256; sx++)
-                {
+                    int sx = bx + i;
                     if (sprSet[sx] == 0) continue;
-                    array_loc = scanOff + sx;
-                    if (!ShowBackGround || Buffer_BG_array[array_loc] == 0 || sprPriority[sx] == 0)
+                    int loc = scanOff + sx;
+                    if (!ShowBackGround || Buffer_BG_array[loc] == 0 || sprPriority[sx] == 0)
                     {
-                        ScreenBuf1x[array_loc] = sprColor[sx];
-                        if (AnalogEnabled) ntscScanBuf[sx] = sprPalIdx[sx]; // NTSC: override with sprite palette
+                        ScreenBuf1x[loc] = sprColor[sx];
+                        if (AnalogEnabled) ntscScanBuf[sx] = sprPalIdx[sx];
                     }
                 }
             }
