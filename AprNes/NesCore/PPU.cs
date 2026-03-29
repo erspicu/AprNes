@@ -644,23 +644,60 @@ namespace AprNes
         }
 
         // ═══════════════════════════════════════════════════════════════
+        // Scanline Event 常數 — 用於 ppu_step_*() 的快速事件判定
+        //
+        // 優化原理：VBL/Sprite Reset/VBL End 三個事件只發生在 cx==1 或 cx==2，
+        // 但原本每個 dot（0~340）都要做 3 次 (scanline == ? && cx == ?) 比較。
+        //
+        // 簡化方式：
+        //   1. 先用 if (cx <= 2) 做 early-out，339/341 的 dot 直接跳過全部檢查
+        //   2. 進入 guard 後，將 scanline 與 cx 打包成單一 int：
+        //        L = (scanline << 9) | cx
+        //      因為 cx 最大值 340 < 512 (2^9)，不會溢位
+        //   3. 與預先計算好的 const 比較，一次比較取代兩次
+        //
+        // const 在 C# 中是編譯期替換（等同直接寫字面值），JIT 視為 hardcode 常數。
+        // ═══════════════════════════════════════════════════════════════
+
+        // NTSC: nmiTriggerLine=241, preRenderLine=261
+        private const int L_NTSC_VBL_START    = 0x1E201; // 241<<9|1  VBlank set + NMI
+        private const int L_NTSC_SPRITE_RESET = 0x20A01; // 261<<9|1  clear sprite0hit/overflow
+        private const int L_NTSC_VBL_END      = 0x20A02; // 261<<9|2  VBlank clear
+
+        // PAL: nmiTriggerLine=241, preRenderLine=311
+        private const int L_PAL_VBL_START     = 0x1E201; // 241<<9|1  (same as NTSC)
+        private const int L_PAL_SPRITE_RESET  = 0x26E01; // 311<<9|1
+        private const int L_PAL_VBL_END       = 0x26E02; // 311<<9|2
+
+        // Dendy: nmiTriggerLine=291, preRenderLine=311
+        private const int L_DENDY_VBL_START   = 0x24601; // 291<<9|1
+        private const int L_DENDY_SPRITE_RESET= 0x26E01; // 311<<9|1  (same as PAL)
+        private const int L_DENDY_VBL_END     = 0x26E02; // 311<<9|2  (same as PAL)
+
+        // ═══════════════════════════════════════════════════════════════
         // NTSC: preRenderLine=261, nmiTriggerLine=241, totalScanlines=262, has dot skip
         // ═══════════════════════════════════════════════════════════════
         static void ppu_step_ntsc()
         {
             int cx; bool re;
             ppu_step_common(out cx, out re);
-            ppu_step_rendering(cx, re, 261); // ★ REGION
+            ppu_step_rendering(cx, re, 261);
             ppu_cycles_x = ++cx;
 
-            if (scanline == 241 && cx == 1) // ★ REGION: nmiTriggerLine=241
-            { if (!SuppressVbl) isVblank = true; SuppressVbl = false; }
-            if (scanline == 261 && cx == 1) // ★ REGION: preRenderLine=261
-                isSprite0hit = isSpriteOverflow = false;
-            if (scanline == 261 && cx == 2) // ★ REGION
-                isVblank = false;
+            // ★ Scanline event guard: cx<=2 時才可能觸發 VBL/Sprite/VBL-end 事件
+            //   339/341 dots 完全跳過，僅 dot 1 & 2 進入內部判定
+            if (cx <= 2)
+            {
+                int L = (scanline << 9) | cx;
+                if (L == L_NTSC_VBL_START)         // scanline 241, dot 1
+                { if (!SuppressVbl) isVblank = true; SuppressVbl = false; }
+                else if (L == L_NTSC_SPRITE_RESET) // scanline 261, dot 1
+                    isSprite0hit = isSpriteOverflow = false;
+                else if (L == L_NTSC_VBL_END)      // scanline 261, dot 2
+                    isVblank = false;
+            }
 
-            // ★ REGION: NTSC odd frame dot skip
+            // NTSC odd frame dot skip (pre-render line 261, dot 339)
             if (scanline == 261 && cx == 339)
             {
                 oddSwap = !oddSwap;
@@ -673,7 +710,7 @@ namespace AprNes
             }
             if (cx == 341)
             {
-                if (++scanline == 262) // ★ REGION: totalScanlines=262
+                if (++scanline == 262)
                 { scanline = 0; if (ShowBackGround || ShowSprites) ProcessOamCorruption(); }
                 ppu_cycles_x = 0;
             }
@@ -686,19 +723,23 @@ namespace AprNes
         {
             int cx; bool re;
             ppu_step_common(out cx, out re);
-            ppu_step_rendering(cx, re, 311); // ★ REGION
+            ppu_step_rendering(cx, re, 311);
             ppu_cycles_x = ++cx;
 
-            if (scanline == 241 && cx == 1) // ★ REGION: nmiTriggerLine=241
-            { if (!SuppressVbl) isVblank = true; SuppressVbl = false; }
-            if (scanline == 311 && cx == 1) // ★ REGION: preRenderLine=311
-                isSprite0hit = isSpriteOverflow = false;
-            if (scanline == 311 && cx == 2) // ★ REGION
-                isVblank = false;
-            // ★ REGION: PAL — no dot skip
+            if (cx <= 2)
+            {
+                int L = (scanline << 9) | cx;
+                if (L == L_PAL_VBL_START)         // scanline 241, dot 1
+                { if (!SuppressVbl) isVblank = true; SuppressVbl = false; }
+                else if (L == L_PAL_SPRITE_RESET) // scanline 311, dot 1
+                    isSprite0hit = isSpriteOverflow = false;
+                else if (L == L_PAL_VBL_END)      // scanline 311, dot 2
+                    isVblank = false;
+            }
+            // PAL — no dot skip
             if (cx == 341)
             {
-                if (++scanline == 312) // ★ REGION: totalScanlines=312
+                if (++scanline == 312)
                 { scanline = 0; if (ShowBackGround || ShowSprites) ProcessOamCorruption(); }
                 ppu_cycles_x = 0;
             }
@@ -711,19 +752,23 @@ namespace AprNes
         {
             int cx; bool re;
             ppu_step_common(out cx, out re);
-            ppu_step_rendering(cx, re, 311); // ★ REGION
+            ppu_step_rendering(cx, re, 311);
             ppu_cycles_x = ++cx;
 
-            if (scanline == 291 && cx == 1) // ★ REGION: nmiTriggerLine=291
-            { if (!SuppressVbl) isVblank = true; SuppressVbl = false; }
-            if (scanline == 311 && cx == 1) // ★ REGION: preRenderLine=311
-                isSprite0hit = isSpriteOverflow = false;
-            if (scanline == 311 && cx == 2) // ★ REGION
-                isVblank = false;
-            // ★ REGION: Dendy — no dot skip
+            if (cx <= 2)
+            {
+                int L = (scanline << 9) | cx;
+                if (L == L_DENDY_VBL_START)         // scanline 291, dot 1
+                { if (!SuppressVbl) isVblank = true; SuppressVbl = false; }
+                else if (L == L_DENDY_SPRITE_RESET) // scanline 311, dot 1
+                    isSprite0hit = isSpriteOverflow = false;
+                else if (L == L_DENDY_VBL_END)      // scanline 311, dot 2
+                    isVblank = false;
+            }
+            // Dendy — no dot skip
             if (cx == 341)
             {
-                if (++scanline == 312) // ★ REGION: totalScanlines=312
+                if (++scanline == 312)
                 { scanline = 0; if (ShowBackGround || ShowSprites) ProcessOamCorruption(); }
                 ppu_cycles_x = 0;
             }
@@ -783,20 +828,19 @@ namespace AprNes
         }
 
         // OAM corruption: copy first 8 bytes of OAM over each marked row
-        static void ProcessOamCorruption()
+        // Optimized: single long (8-byte) read/write replaces inner byte loop
+        static unsafe void ProcessOamCorruption()
         {
-            for (int i = 0; i < 32; i++)
+            long sourcePattern = *(long*)spr_ram; // row 0: first 8 bytes
+            for (int i = 1; i < 32; i++)
             {
                 if (corruptOamRow[i] != 0)
                 {
-                    if (i > 0)
-                    {
-                        for (int j = 0; j < 8; j++)
-                            spr_ram[i * 8 + j] = spr_ram[j];
-                    }
+                    ((long*)spr_ram)[i] = sourcePattern;
                     corruptOamRow[i] = 0;
                 }
             }
+            corruptOamRow[0] = 0;
         }
 
         // Pre-compute sprite 0 tile data for the current scanline so hit detection
