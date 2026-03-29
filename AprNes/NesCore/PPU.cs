@@ -323,7 +323,7 @@ namespace AprNes
         // BG tiles fetched at cycles 0-255 (visible) and 320-335 (next-scanline prefetch).
         // A12 notifications: BG at phases 0 (NT addr, A12=0) and 4 (CHR low addr, A12=BG table bit12),
         // sprites at phases 0 (garbage NT, A12=0) and 3 (sprite CHR, A12=sprite table bit12).
-        static void ppu_rendering_tick(int cx)
+        static void ppu_rendering_tick(int cx, int preRenderLn)
         {
             if (cx < 256 || (cx >= 320 && cx < 336))
             {
@@ -451,7 +451,7 @@ namespace AprNes
                 oamCopyBuffer = secondaryOAM[0];
 
             // Pre-render scanline: continuous vert(v) = vert(t) copy at cycles 280-304
-            if (scanline == preRenderLine && cx >= 280 && cx <= 304)
+            if (scanline == preRenderLn && cx >= 280 && cx <= 304)
             {
                 vram_addr = (vram_addr & ~0x7BE0) | (vram_addr_internal & 0x7BE0);
             }
@@ -473,7 +473,13 @@ namespace AprNes
             MapperObj.NotifyA12(address, scanline * 341 + ppu_cycles_x);
         }
 
-        static void ppu_step_new()
+        // ── Region-specialized PPU step functions ──
+        // Common logic extracted into ppu_step_common + ppu_step_rendering (AggressiveInlining).
+        // Region-specific tail (VBL trigger, flag clear, dot skip, scanline wrap) hardcoded per version.
+        // Search "★ REGION" for all difference points.
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void ppu_step_common(out int cx, out bool renderingEnabled)
         {
             // $2007 read cooldown (suppresses rapid consecutive reads)
             if (ppu2007ReadCooldown > 0) ppu2007ReadCooldown--;
@@ -492,12 +498,8 @@ namespace AprNes
                 openbus = 0;
             }
 
-            bool renderingEnabled = ShowBackGround || ShowSprites;
-            // ppuRenderingEnabled is the delayed version (Mesen2 model: updated at end of previous dot).
-            // Used for tile fetch gating — the mask write takes effect 1 PPU dot later for rendering.
-
-            // Shadow ppu_cycles_x to local for JIT enregistration
-            int cx = ppu_cycles_x;
+            renderingEnabled = ShowBackGround || ShowSprites;
+            cx = ppu_cycles_x;
 
             // At dot 0 of visible scanlines: precompute sprite 0 data for hit detection.
             // Must run BEFORE the hit check so sprite0_on_line is valid at dot 0.
@@ -532,17 +534,16 @@ namespace AprNes
                     }
                 }
             }
-            // Per-dot BG shift register shifting (shadow registers for sprite 0 hit).
-            // "Output then shift" model: hit check reads BEFORE shift, shift happens after.
-            // Hardware: shift registers are FROZEN when rendering is disabled (both BG+sprites off).
-            // When rendering is enabled, shift with serial input: low plane = 0, high plane = 1.
-            // AccuracyCoin "Stale BG Shift Registers" confirms: regs not clocked when off → stale data preserved.
-            // AccuracyCoin "Rendering Flag" confirms: regs empty if never loaded → no false hit.
-            // Use delayed ppuRenderingEnabled: shift registers are clocked by the same signal as tile fetches.
+        }
+
+        // ★ REGION: shared rendering body — PRE_RENDER_LINE passed as hardcoded literal from each version
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void ppu_step_rendering(int cx, bool renderingEnabled, int PRE_RENDER_LINE)
+        {
             if (ppuRenderingEnabled)
             {
                 if ((scanline >= 0 && scanline < 240 && cx < 256)
-                    || ((scanline < 240 || scanline == preRenderLine)
+                    || ((scanline < 240 || scanline == PRE_RENDER_LINE) // ★ REGION
                         && cx >= 320 && cx < 336))
                 {
                     lowshift_s0 <<= 1;
@@ -550,10 +551,10 @@ namespace AprNes
                 }
             }
 
-            if (scanline < 240 || scanline == preRenderLine)
+            if (scanline < 240 || scanline == PRE_RENDER_LINE) // ★ REGION
             {
                 if (ppuRenderingEnabled)
-                    ppu_rendering_tick(cx);
+                    ppu_rendering_tick(cx, PRE_RENDER_LINE); // ★ REGION
 
                 // Per-dot sprite evaluation (visible scanlines only)
                 if (AccuracyOptA)
@@ -582,7 +583,7 @@ namespace AprNes
                         }
                     }
                     // Pre-render line: save sprite0_eval_addr at dot 65
-                    else if (scanline == preRenderLine && cx == 65 && ppuRenderingEnabled)
+                    else if (scanline == PRE_RENDER_LINE && cx == 65 && ppuRenderingEnabled) // ★ REGION
                     {
                         sprite0_eval_addr = spr_ram_add;
                     }
@@ -628,70 +629,102 @@ namespace AprNes
                 }
 
                 // Pre-render line: compute pre-render sprite data at dot 257
-                if (scanline == preRenderLine && cx == 257 && ppuRenderingEnabled)
+                if (scanline == PRE_RENDER_LINE && cx == 257 && ppuRenderingEnabled) // ★ REGION
                     PrecomputePreRenderSprites();
 
             }
 
-            // Screen output at scanline 240 cycle 1 (matches ppu_step timing)
             if (scanline == 240 && cx == 1)
             {
                 RenderScreen();
                 frame_count++;
                 if (AnalogEnabled) { Ntsc_SetFrameCount(frame_count); Crt_SetFrameCount(frame_count); }
-                // StopWatch 持續計時，不在此 Restart（供 deadline 絕對計時使用）
             }
-
-            // Update delayed rendering flag (Mesen2: _renderingEnabled updated at end of dot)
             ppuRenderingEnabled = renderingEnabled;
+        }
 
-            // Advance cycle counter; writeback to static
+        // ═══════════════════════════════════════════════════════════════
+        // NTSC: preRenderLine=261, nmiTriggerLine=241, totalScanlines=262, has dot skip
+        // ═══════════════════════════════════════════════════════════════
+        static void ppu_step_ntsc()
+        {
+            int cx; bool re;
+            ppu_step_common(out cx, out re);
+            ppu_step_rendering(cx, re, 261); // ★ REGION
             ppu_cycles_x = ++cx;
 
-            // VBlank start at nmiTriggerLine, cycle 1 (post-increment)
-            // NTSC/PAL=241, Dendy=291 (51 lines post-render idle)
-            if (scanline == nmiTriggerLine && cx == 1)
-            {
-                if (!SuppressVbl)
-                {
-                    isVblank = true;
-                }
-                SuppressVbl = false;
-            }
-
-            // Pre-render: clear PPU status flags
-            // M2 duty cycle effect: sprite flags are read at M2 fall (~1.875 PPU dots after M2 rise)
-            // So sprite flags appear to clear ~2 dots earlier than VBL flag
-            if (scanline == preRenderLine && cx == 1)
+            if (scanline == 241 && cx == 1) // ★ REGION: nmiTriggerLine=241
+            { if (!SuppressVbl) isVblank = true; SuppressVbl = false; }
+            if (scanline == 261 && cx == 1) // ★ REGION: preRenderLine=261
                 isSprite0hit = isSpriteOverflow = false;
-            if (scanline == preRenderLine && cx == 2)
+            if (scanline == 261 && cx == 2) // ★ REGION
                 isVblank = false;
 
-            // Odd frame skip: NTSC only — on odd frames with rendering enabled, skip last idle cycle of pre-render.
-            // PAL/Dendy: no dot skip (PAL phase alternation eliminates dot crawl naturally).
-            if (Region == RegionType.NTSC && scanline == preRenderLine && cx == 339)
+            // ★ REGION: NTSC odd frame dot skip
+            if (scanline == 261 && cx == 339)
             {
                 oddSwap = !oddSwap;
                 if (!oddSwap && (ShowBackGround || ShowSprites))
                 {
-                    // Dot 339 is being skipped, but MMC5 needs the garbage NT fetch notification
-                    // for 3-consecutive-NT-read scanline detection to work on odd frames.
                     if (mmc5Ref != null)
                         mmc5Ref.NotifyVramRead(0x2000 | (vram_addr & 0x0FFF));
                     ppu_cycles_x = ++cx;
                 }
             }
-
-            // Advance scanline
             if (cx == 341)
             {
-                if (++scanline == totalScanlines)
-                {
-                    scanline = 0;
-                    // Process OAM corruption at frame start if rendering is enabled
-                    if (ShowBackGround || ShowSprites)
-                        ProcessOamCorruption();
-                }
+                if (++scanline == 262) // ★ REGION: totalScanlines=262
+                { scanline = 0; if (ShowBackGround || ShowSprites) ProcessOamCorruption(); }
+                ppu_cycles_x = 0;
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // PAL: preRenderLine=311, nmiTriggerLine=241, totalScanlines=312, no dot skip
+        // ═══════════════════════════════════════════════════════════════
+        static void ppu_step_pal()
+        {
+            int cx; bool re;
+            ppu_step_common(out cx, out re);
+            ppu_step_rendering(cx, re, 311); // ★ REGION
+            ppu_cycles_x = ++cx;
+
+            if (scanline == 241 && cx == 1) // ★ REGION: nmiTriggerLine=241
+            { if (!SuppressVbl) isVblank = true; SuppressVbl = false; }
+            if (scanline == 311 && cx == 1) // ★ REGION: preRenderLine=311
+                isSprite0hit = isSpriteOverflow = false;
+            if (scanline == 311 && cx == 2) // ★ REGION
+                isVblank = false;
+            // ★ REGION: PAL — no dot skip
+            if (cx == 341)
+            {
+                if (++scanline == 312) // ★ REGION: totalScanlines=312
+                { scanline = 0; if (ShowBackGround || ShowSprites) ProcessOamCorruption(); }
+                ppu_cycles_x = 0;
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Dendy: preRenderLine=311, nmiTriggerLine=291, totalScanlines=312, no dot skip
+        // ═══════════════════════════════════════════════════════════════
+        static void ppu_step_dendy()
+        {
+            int cx; bool re;
+            ppu_step_common(out cx, out re);
+            ppu_step_rendering(cx, re, 311); // ★ REGION
+            ppu_cycles_x = ++cx;
+
+            if (scanline == 291 && cx == 1) // ★ REGION: nmiTriggerLine=291
+            { if (!SuppressVbl) isVblank = true; SuppressVbl = false; }
+            if (scanline == 311 && cx == 1) // ★ REGION: preRenderLine=311
+                isSprite0hit = isSpriteOverflow = false;
+            if (scanline == 311 && cx == 2) // ★ REGION
+                isVblank = false;
+            // ★ REGION: Dendy — no dot skip
+            if (cx == 341)
+            {
+                if (++scanline == 312) // ★ REGION: totalScanlines=312
+                { scanline = 0; if (ShowBackGround || ShowSprites) ProcessOamCorruption(); }
                 ppu_cycles_x = 0;
             }
         }

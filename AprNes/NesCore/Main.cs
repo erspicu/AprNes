@@ -69,6 +69,7 @@ namespace AprNes
         static public RegionType Region = RegionType.NTSC;
 
         // ── Region-dependent timing parameters (set by ApplyRegionProfile) ──
+        static int regionMode     = 0;        // 0=NTSC, 1=PAL, 2=Dendy (for hot-path if-else branching)
         static int totalScanlines = 262;      // NTSC=262, PAL/Dendy=312
         static int preRenderLine  = 261;      // NTSC=261, PAL/Dendy=311
         static int nmiTriggerLine = 241;      // NTSC/PAL=241, Dendy=291
@@ -81,6 +82,7 @@ namespace AprNes
         {
             if (Region == RegionType.PAL)
             {
+                regionMode     = 1;
                 totalScanlines = 312;
                 preRenderLine  = 311;
                 nmiTriggerLine = 241;
@@ -91,6 +93,7 @@ namespace AprNes
             }
             else if (Region == RegionType.Dendy)
             {
+                regionMode     = 2;
                 totalScanlines = 312;
                 preRenderLine  = 311;
                 nmiTriggerLine = 291;   // 51 lines post-render idle (240-290), NMI at 291
@@ -101,6 +104,7 @@ namespace AprNes
             }
             else // NTSC
             {
+                regionMode     = 0;
                 totalScanlines = 262;
                 preRenderLine  = 261;
                 nmiTriggerLine = 241;

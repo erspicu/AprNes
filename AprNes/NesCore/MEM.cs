@@ -31,25 +31,53 @@ namespace AprNes
         static long ppuClock = 7 * 12;    // PPU catch-up position (master clock units)
         static long apuClock = 7 * 12 - 4; // APU catch-up position (4 MCU behind → fires in tick_pre)
 
-        // Catch up PPU to current master clock position.
-        // NTSC: masterPerCpu=12, masterPerPpu=4 → exactly 3 PPU steps per CPU cycle (unrolled)
-        // PAL:  masterPerCpu=16, masterPerPpu=5 → 3 or 4 PPU steps (3+3+3+3+4 pattern over 5 cycles)
+        // ── Region-specialized catchUpPPU versions ──
+        // Each hardcodes masterPerPpu and step count for JIT constant folding.
+        // NMI edge detection is inlined after each PPU step.
+
+        // NTSC: masterPerCpu=12, masterPerPpu=4 → exactly 3 PPU steps per CPU cycle
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void catchUpPPU()
+        static void catchUpPPU_ntsc()
         {
             bool o;
-            ppuClock += masterPerPpu; ppu_step_new();
+            ppuClock += 4; ppu_step_ntsc();
             o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
-            ppuClock += masterPerPpu; ppu_step_new();
+            ppuClock += 4; ppu_step_ntsc();
             o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
-            ppuClock += masterPerPpu; ppu_step_new();
+            ppuClock += 4; ppu_step_ntsc();
             o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
-            // PAL 4th step: masterPerCpu=16, 3×5=15 < 16, so one extra step needed
+        }
+
+        // PAL: masterPerCpu=16, masterPerPpu=5 → 3 or 4 PPU steps (3+3+3+3+4 pattern over 5 cycles)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void catchUpPPU_pal()
+        {
+            bool o;
+            ppuClock += 5; ppu_step_pal();
+            o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
+            ppuClock += 5; ppu_step_pal();
+            o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
+            ppuClock += 5; ppu_step_pal();
+            o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
+            // PAL 4th step: 3×5=15 < 16, so one extra step needed ~every 5th cycle
             if (ppuClock < masterClock)
             {
-                ppuClock += masterPerPpu; ppu_step_new();
+                ppuClock += 5; ppu_step_pal();
                 o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
             }
+        }
+
+        // Dendy: masterPerCpu=15, masterPerPpu=5 → exactly 3 PPU steps per CPU cycle
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void catchUpPPU_dendy()
+        {
+            bool o;
+            ppuClock += 5; ppu_step_dendy();
+            o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
+            ppuClock += 5; ppu_step_dendy();
+            o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
+            ppuClock += 5; ppu_step_dendy();
+            o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
         }
 
         // Catch up APU to current master clock position.
@@ -77,7 +105,9 @@ namespace AprNes
 
             if (nmi_delay_cycle >= 0 && cpuCycleCount > nmi_delay_cycle)
             { nmi_pending = true; nmi_delay_cycle = -1; }
-            catchUpPPU();
+            if (regionMode == 0)      catchUpPPU_ntsc();
+            else if (regionMode == 1) catchUpPPU_pal();
+            else                      catchUpPPU_dendy();
             catchUpAPU();
             if (strobeWritePending > 0) processStrobeWrite();
         }
