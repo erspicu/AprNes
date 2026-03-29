@@ -1337,6 +1337,7 @@ namespace AprNes
             {
                 // === Analog 同步 fallback (UI 停止渲染執行緒時 / headless 模式) ===
                 screen_lock = true;
+                if (UltraAnalog && CrtEnabled) Crt_Render();
                 VideoOutput?.Invoke(null, null);
                 screen_lock = false;
                 emuWaiting = true;
