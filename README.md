@@ -217,7 +217,11 @@ This project was developed with AI assistance, with a focus on leveraging modern
 
 ## License
 
-You are free to reference, share, use, or incorporate any code from this project into your own work — whether personal or otherwise — as long as it helps you. I believe that AI-assisted development builds upon the collective knowledge shared by developers across the internet; it is only fair to give back in the same spirit. **I retain no copyright over any part of this project.**
+This project is released under the [**WTFPL**](http://www.wtfpl.net/) (Do What The Fuck You Want To Public License). You are free to reference, share, use, modify, or incorporate any code from this project into your own work — for any purpose whatsoever — with absolutely no restrictions.
+
+I believe that AI-assisted development builds upon the collective knowledge shared by developers across the internet; it is only fair to give back in the same spirit. **I retain no copyright over any part of this project.**
+
+See [`LICENSE`](LICENSE) for the full license text.
 
 ---
 
@@ -438,4 +442,8 @@ python run_tests.py -j 10
 
 ## 授權
 
-歡迎參考、分享、使用或將本專案的程式碼整合到您自己的作品中——無論是個人或其他用途——只要對您有幫助。我認為 AI 輔助開發建立在網路上每位開發者共享的知識之上，將成果回饋分享是理所當然的。**本專案不保留任何著作權。**
+本專案採用 [**WTFPL**](http://www.wtfpl.net/)（Do What The Fuck You Want To Public License）授權。您可以自由地參考、分享、使用、修改或將本專案的程式碼整合到您自己的作品中——用於任何目的——完全沒有任何限制。
+
+我認為 AI 輔助開發建立在網路上每位開發者共享的知識之上，將成果回饋分享是理所當然的。**本專案不保留任何著作權。**
+
+完整授權條款請見 [`LICENSE`](LICENSE)。
