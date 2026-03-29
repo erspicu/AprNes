@@ -4,6 +4,20 @@
 
 A cycle-accurate NES (Nintendo Entertainment System) emulator written in C#, developed in collaboration with AI (GitHub Copilot / Claude). The project achieves **perfect scores** on both the blargg and AccuracyCoin test suites.
 
+## Project Status
+
+This project has reached its milestone goals. Future development will continue in a separate project built on **.NET 10 + Avalonia**, leaving behind the .NET Framework 4.8.1 legacy. Once the migration is complete, this repository will no longer be actively maintained.
+
+This project was developed with AI assistance, with a focus on leveraging modern computing power to explore and implement concepts I wanted to try.
+
+## License
+
+This project is released under the [**WTFPL**](http://www.wtfpl.net/) (Do What The Fuck You Want To Public License). You are free to reference, share, use, modify, or incorporate any code from this project into your own work — for any purpose whatsoever — with absolutely no restrictions.
+
+I believe that AI-assisted development builds upon the collective knowledge shared by developers across the internet; it is only fair to give back in the same spirit. **I retain no copyright over any part of this project.**
+
+See [`LICENSE`](LICENSE) for the full license text.
+
 ## Links
 
 - **Website**: https://www.baxermux.org/myemu/AprNes/
@@ -209,20 +223,6 @@ python run_tests.py -j 10
 | 228 (Action 52) | Cheetahmen II (U) |
 | 232 (Camerica Quattro) | Quattro Adventure (U), Quattro Sports (U) |
 
-## Project Status
-
-This project has reached its milestone goals. Future development will continue in a separate project built on **.NET 10 + Avalonia**, leaving behind the .NET Framework 4.8.1 legacy. Once the migration is complete, this repository will no longer be actively maintained.
-
-This project was developed with AI assistance, with a focus on leveraging modern computing power to explore and implement concepts I wanted to try.
-
-## License
-
-This project is released under the [**WTFPL**](http://www.wtfpl.net/) (Do What The Fuck You Want To Public License). You are free to reference, share, use, modify, or incorporate any code from this project into your own work — for any purpose whatsoever — with absolutely no restrictions.
-
-I believe that AI-assisted development builds upon the collective knowledge shared by developers across the internet; it is only fair to give back in the same spirit. **I retain no copyright over any part of this project.**
-
-See [`LICENSE`](LICENSE) for the full license text.
-
 ---
 
 # AprNes - C# NES 模擬器
@@ -230,6 +230,20 @@ See [`LICENSE`](LICENSE) for the full license text.
 > [🇺🇸 English](#aprnes---c-nes-emulator) | 🇹🇼 繁體中文 | 最後編修：2026-03-29
 
 使用 C# 開發的 NES（任天堂娛樂系統）cycle-accurate 模擬器，與 AI（GitHub Copilot / Claude）協作開發完成。在 blargg 與 AccuracyCoin 兩大測試套件上均達到**滿分**。
+
+## 專案狀態
+
+本專案的階段性目標已達成。後續開發將在獨立的新專案中進行，以 **.NET 10 + Avalonia** 為基礎，拋棄 .NET Framework 4.8.1 的歷史包袱。待完整轉移完成後，本專案原則上不再維護。
+
+本專案由 AI 輔助開發，偏向於利用現代電腦效能來實現一些我想嘗試的概念。
+
+## 授權
+
+本專案採用 [**WTFPL**](http://www.wtfpl.net/)（Do What The Fuck You Want To Public License）授權。您可以自由地參考、分享、使用、修改或將本專案的程式碼整合到您自己的作品中——用於任何目的——完全沒有任何限制。
+
+我認為 AI 輔助開發建立在網路上每位開發者共享的知識之上，將成果回饋分享是理所當然的。**本專案不保留任何著作權。**
+
+完整授權條款請見 [`LICENSE`](LICENSE)。
 
 ## 連結
 
@@ -433,17 +447,3 @@ python run_tests.py -j 10
 | 206 (Namco 108) | Karnov（日）、Dragon Slayer 4（日） |
 | 228 (Action 52) | Cheetahmen II (U) |
 | 232 (Camerica Quattro) | Quattro Adventure (U)、Quattro Sports (U) |
-
-## 專案狀態
-
-本專案的階段性目標已達成。後續開發將在獨立的新專案中進行，以 **.NET 10 + Avalonia** 為基礎，拋棄 .NET Framework 4.8.1 的歷史包袱。待完整轉移完成後，本專案原則上不再維護。
-
-本專案由 AI 輔助開發，偏向於利用現代電腦效能來實現一些我想嘗試的概念。
-
-## 授權
-
-本專案採用 [**WTFPL**](http://www.wtfpl.net/)（Do What The Fuck You Want To Public License）授權。您可以自由地參考、分享、使用、修改或將本專案的程式碼整合到您自己的作品中——用於任何目的——完全沒有任何限制。
-
-我認為 AI 輔助開發建立在網路上每位開發者共享的知識之上，將成果回饋分享是理所當然的。**本專案不保留任何著作權。**
-
-完整授權條款請見 [`LICENSE`](LICENSE)。
