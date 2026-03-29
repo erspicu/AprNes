@@ -1561,7 +1561,14 @@ public string GetRomInfo()
                 return true;
             }
 
-            // 讓 MenuStrip ShortcutKeys 優先處理 (F11, Ctrl+O, Ctrl+R, Ctrl+Shift+P 等)
+            // F11: 全螢幕切換（MenuStrip 隱藏時 ShortcutKeys 失效，需手動處理）
+            if (keyData == Keys.F11)
+            {
+                _menuViewToggleFullScreen_Click(null, null);
+                return true;
+            }
+
+            // 讓 MenuStrip ShortcutKeys 優先處理 (Ctrl+O, Ctrl+R, Ctrl+Shift+P 等)
             if (base.ProcessCmdKey(ref msg, keyData))
                 return true;
 
@@ -2190,6 +2197,7 @@ public string GetRomInfo()
             }
 
             // UI 全螢幕
+            menuStrip1.Visible = false;
             panel1.Visible = false;
             panel1.BorderStyle = System.Windows.Forms.BorderStyle.None;
             label3.Visible = false;
@@ -2260,6 +2268,7 @@ public string GetRomInfo()
             }
 
             // 還原 UI 狀態
+            menuStrip1.Visible = true;
             panel1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.BackColor = SystemColors.Menu;
             this.WindowState = FormWindowState.Normal;
@@ -2285,6 +2294,7 @@ public string GetRomInfo()
         {
             StopRecordingIfActive(true);
             if (analogFullScreen) { ExitAnalogFullScreen(); return; }
+            menuStrip1.Visible = true;
             panel1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.BackColor = SystemColors.Menu;
             this.WindowState = FormWindowState.Normal;
@@ -2307,6 +2317,7 @@ public string GetRomInfo()
             if (NesCore.AnalogEnabled) { EnterAnalogFullScreen(); return; }
 
             if (this.WindowState != FormWindowState.Maximized) Opacity = 0;
+            menuStrip1.Visible = false;
             panel1.Visible = false;
             panel1.BorderStyle = System.Windows.Forms.BorderStyle.None;
             label3.Visible = false;
@@ -2329,6 +2340,7 @@ public string GetRomInfo()
         {
             StopRecordingIfActive(true);
             if (analogFullScreen) { ExitAnalogFullScreen(); return; }
+            menuStrip1.Visible = true;
             panel1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.BackColor = SystemColors.Menu;
             this.WindowState = FormWindowState.Normal;
