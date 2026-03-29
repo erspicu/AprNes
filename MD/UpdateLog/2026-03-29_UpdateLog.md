@@ -83,16 +83,43 @@
 
 ---
 
-## 7. 其他
+## 7. Async Double Buffer（類比模式 GDI 非同步渲染）
+
+### 設計
+- **Ping-pong double buffer**：前端 buffer（模擬端寫入 CRT 渲染結果）與後端 buffer（GDI 讀取顯示），每幀交換指標
+- **獨立渲染執行緒**：`AnalogRenderThreadLoop` 專責 `SetDIBitsToDevice` GDI blit，與模擬執行緒完全非同步
+- **ManualResetEventSlim 同步**：`analogRenderReady`（模擬→渲染）、`analogRenderDone`（渲染→模擬）
+
+### 三路 RenderScreen
+1. **Async path**（類比 + 渲染執行緒運行中）：CRT render → wait done → swap → signal ready
+2. **Sync fallback**（類比但渲染執行緒已停止）：emuWaiting + _event 阻塞（不做 CRT render）
+3. **Digital path**（原始同步模式）：VideoOutput.Invoke → emuWaiting + _event
+
+### 死鎖修復（3 件）
+1. **emuWaiting 永遠不設定**：async path 繞過 `_event`/`emuWaiting` 機制，ConfigureUI `BeforClose()` 的 `while (!emuWaiting)` 無限迴圈 → 修法：`BeforClose()` 最前面呼叫 `StopAnalogRenderThread()`
+2. **GDI HDC 跨執行緒競爭**：渲染執行緒持有 panel DC 同時 UI thread 處理 WM_PAINT → 修法：`initUIsize()` 開頭呼叫 `StopAnalogRenderThread()`
+3. **AnalogSize 提前變更**：UI 改 AnalogSize 但 CRT weight tables 未重建，Parallel.For 越界 → 修法：`SwapAnalogBuffers()` 只交換指標，不呼叫 `SyncAnalogConfig()`
+
+### 效能
+- 6x/8x 類比模式均穩定 60 FPS（原本 FPS 浮動不穩，6x 常低於 60 FPS，8x 不到 60 FPS，因 GDI 同步阻塞）
+
+### 文件
+- 死鎖除錯實戰紀錄：`MD/GDI/Async_DoubleBuffer_Deadlock_Postmortem.md`
+
+---
+
+## 8. 其他
 
 - **FDS 修復**：自動換碟改用 BIOS header 匹配正確磁碟面
 - **Benchmark 模式**：新增圖像濾鏡 benchmark（xBRZ NoTable distance）
 - **AccuracyOptA 強制**：無頭驗證模式強制開啟完整精確度
+- **編譯警告修復**：移除未使用的 `totalScanlines`/`masterPerPpu` 欄位
 
 ---
 
 ## 統計
 
-- **Commits**: 18（3/29）
+- **Commits**: 19（3/29）
 - **新增區域支援**: PAL + Dendy（共 3 種 region）
+- **新增非同步渲染**: Async Double Buffer（類比模式專用）
 - **測試基線**: 174/174 blargg PASS, 136/136 AccuracyCoin PASS（無回歸）
