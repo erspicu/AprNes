@@ -1181,7 +1181,11 @@ namespace AprNes
             // Pass 1: scan OAM 0→63, pick first 8 sprites visible on this scanline.
             // NES hardware only performs sprite evaluation when rendering is enabled.
             // Overflow detection is handled by PrecomputeOverflow() at cycle-accurate timing.
-            if (!(ShowBackGround || ShowSprites)) return;
+            if (!(ShowBackGround || ShowSprites))
+            {
+                if (AnalogEnabled) DecodeScanline(scanline, ntscScanBuf, ppuEmphasis);
+                return;
+            }
 
             int* sel = stackalloc int[8];
             int selCount = 0;
@@ -1200,7 +1204,12 @@ namespace AprNes
                 }
             }
 
-            if (!ShowSprites || selCount == 0) return;
+            if (!ShowSprites || selCount == 0)
+            {
+                // Analog mode: must decode every visible scanline even without sprites
+                if (AnalogEnabled) DecodeScanline(scanline, ntscScanBuf, ppuEmphasis);
+                return;
+            }
 
             // Per-pixel sprite winner buffers.
             // NES hardware picks ONE winning sprite per pixel (lowest OAM index with opaque pixel).
