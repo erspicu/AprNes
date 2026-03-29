@@ -70,6 +70,11 @@ namespace WINAPIGDI
             grSrc  = null;
         }
 
+        public unsafe static void UpdateDataPtr(uint* newPtr)
+        {
+            data_ptr = (IntPtr)newPtr;
+        }
+
         public unsafe static void DrawImageHighSpeedtoDevice()
         {
             NativeMethods.SetDIBitsToDevice(hdcDest, loc_x ,loc_y, (uint)w, (uint)h, 0, 0, 0, (uint)h, data_ptr, ref info, DIB_RGB_COLORS);

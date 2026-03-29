@@ -25,6 +25,9 @@ namespace AprNes
             Crt_ApplyProfile();
         }
 
+        /// <summary>只更新 buffer 指標，不改 analogSize 等參數（用於 swap）</summary>
+        public static void Crt_UpdateScreenBuf(uint* buf) => crt_analogScreenBuf = buf;
+
         public static void Crt_SetFrameCount(int fc) => crt_frameCount = fc;
 
         public const int Crt_SrcW = 1024;

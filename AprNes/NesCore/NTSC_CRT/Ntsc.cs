@@ -33,6 +33,9 @@ namespace AprNes
             Ntsc_ApplyProfile();
         }
 
+        /// <summary>只更新 buffer 指標，不改 analogSize 等參數（用於 swap）</summary>
+        public static void Ntsc_UpdateScreenBuf(uint* buf) => ntsc_analogScreenBuf = buf;
+
         public static void Ntsc_SetFrameCount(int fc) => ntsc_frameCount = fc;
 
         // ── 共用唯讀查表與參數 (Thread-Safe) ─────────────────

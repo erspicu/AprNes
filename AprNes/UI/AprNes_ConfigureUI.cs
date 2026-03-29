@@ -319,7 +319,11 @@ namespace AprNes
             // 設定變更前先停止錄影（避免 raw 格式不一致）
             AprNesUI.GetInstance().StopRecordingOnSettingsChange();
 
-            // ── 先暫停模擬執行緒，再修改任何 NesCore 欄位 ──────────────────
+            // ── 先停止 async 渲染執行緒，再暫停模擬執行緒 ────────────────
+            // async 模式下模擬端不走 sync path、不設 emuWaiting，
+            // 必須先停渲染執行緒（內含 _event.Reset），讓模擬端回到 sync fallback
+            AprNesUI.GetInstance().StopAnalogRenderThread();
+
             // 防止 CrtScreen.Render() 在欄位已改、緩衝區未重建時存取越界記憶體
             bool isRunning = AprNesUI.GetInstance().IsRunning;
             if (isRunning)

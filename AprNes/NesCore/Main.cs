@@ -15,8 +15,6 @@ namespace AprNes
 
     unsafe public partial class NesCore
     {
-
-
         public static event EventHandler VideoOutput;
 
 
@@ -70,11 +68,9 @@ namespace AprNes
 
         // ── Region-dependent timing parameters (set by ApplyRegionProfile) ──
         static int regionMode     = 0;        // 0=NTSC, 1=PAL, 2=Dendy (for hot-path if-else branching)
-        static int totalScanlines = 262;      // NTSC=262, PAL/Dendy=312
         static int preRenderLine  = 261;      // NTSC=261, PAL/Dendy=311
         static int nmiTriggerLine = 241;      // NTSC/PAL=241, Dendy=291
         static int masterPerCpu   = 12;       // NTSC=12, PAL=16, Dendy=15
-        static int masterPerPpu   = 4;        // NTSC=4,  PAL/Dendy=5
         static double cpuFreq          = 1789773.0;  // NTSC=1789773, PAL=1662607, Dendy=1773447
         static public double FrameSeconds = 1.0 / 60.0988; // NTSC=1/60.0988, PAL/Dendy=1/50.0070
 
@@ -83,33 +79,27 @@ namespace AprNes
             if (Region == RegionType.PAL)
             {
                 regionMode     = 1;
-                totalScanlines = 312;
                 preRenderLine  = 311;
                 nmiTriggerLine = 241;
                 masterPerCpu   = 16;
-                masterPerPpu   = 5;
                 cpuFreq        = 1662607.0;
                 FrameSeconds   = 1.0 / 50.0070;
             }
             else if (Region == RegionType.Dendy)
             {
                 regionMode     = 2;
-                totalScanlines = 312;
                 preRenderLine  = 311;
                 nmiTriggerLine = 291;   // 51 lines post-render idle (240-290), NMI at 291
                 masterPerCpu   = 15;    // PAL master clock ÷15
-                masterPerPpu   = 5;     // same as PAL
                 cpuFreq        = 1773447.0; // 26601712 / 15
                 FrameSeconds   = 1.0 / 50.0070;
             }
             else // NTSC
             {
                 regionMode     = 0;
-                totalScanlines = 262;
                 preRenderLine  = 261;
                 nmiTriggerLine = 241;
                 masterPerCpu   = 12;
-                masterPerPpu   = 4;
                 cpuFreq        = 1789773.0;
                 FrameSeconds   = 1.0 / 60.0988;
             }
@@ -171,6 +161,32 @@ namespace AprNes
         static public uint* AnalogScreenBuf = null;
         static public int   AnalogBufSize   = 0;  // 目前已分配的 pixel 數（DstW×DstH）
 
+        // Async double buffer for analog mode
+        // AnalogScreenBuf = front buffer (模擬端寫入, CRT render 目標)
+        // AnalogScreenBufBack = back buffer (GDI 讀取上一幀)
+        static public uint* AnalogScreenBufBack = null;
+        // 渲染執行緒同步事件
+        static public ManualResetEventSlim analogRenderReady = new ManualResetEventSlim(false);
+        static public ManualResetEventSlim analogRenderDone  = new ManualResetEventSlim(true); // 初始已完成
+        static public volatile bool analogRenderThreadRunning = false;
+
+        /// <summary>
+        /// 交換 front/back buffer 指標，並更新 CRT/NTSC 的 buffer 指標。
+        /// 呼叫後 AnalogScreenBuf 指向新的空 front buffer（模擬寫入），
+        /// AnalogScreenBufBack 指向剛完成的幀（GDI 讀取）。
+        /// 注意：只更新 buffer 指標，不同步 AnalogSize 等設定參數
+        ///（避免 UI thread 已改 AnalogSize 但 weight tables 未重建的不一致）。
+        /// </summary>
+        static public void SwapAnalogBuffers()
+        {
+            var tmp = AnalogScreenBuf;
+            AnalogScreenBuf = AnalogScreenBufBack;
+            AnalogScreenBufBack = tmp;
+            // 只更新 CRT/NTSC 的 buffer 指標（不改 analogSize 等參數）
+            Ntsc_UpdateScreenBuf(AnalogScreenBuf);
+            Crt_UpdateScreenBuf(AnalogScreenBuf);
+        }
+
         // 錄影用：目前 RenderObj 的最終輸出緩衝區指標與尺寸（由各 Render class init() 設定）
         static public uint* RenderOutputPtr = null;
         static public int   RenderOutputW   = 256;
@@ -206,7 +222,8 @@ namespace AprNes
             if (P2_joypad_status != null) { Marshal.FreeHGlobal((IntPtr)P2_joypad_status); P2_joypad_status = null; }
             if (NES_MEM      != null) { Marshal.FreeHGlobal((IntPtr)NES_MEM);      NES_MEM      = null; }
             if (Vertical           != null) { Marshal.FreeHGlobal((IntPtr)Vertical);           Vertical           = null; }
-            if (AnalogScreenBuf  != null) { Marshal.FreeHGlobal((IntPtr)AnalogScreenBuf);  AnalogScreenBuf  = null; AnalogBufSize = 0; }
+            if (AnalogScreenBuf     != null) { Marshal.FreeHGlobal((IntPtr)AnalogScreenBuf);     AnalogScreenBuf     = null; AnalogBufSize = 0; }
+            if (AnalogScreenBufBack != null) { Marshal.FreeHGlobal((IntPtr)AnalogScreenBufBack); AnalogScreenBufBack = null; }
         }
 
         /// <summary>
@@ -404,7 +421,8 @@ namespace AprNes
                 {
                     SyncAnalogConfig();  // 確保 Crt_DstW/DstH 使用正確的 AnalogSize
                     AnalogBufSize   = Crt_DstW * Crt_DstH;
-                    AnalogScreenBuf = (uint*)Marshal.AllocHGlobal(sizeof(uint) * AnalogBufSize);
+                    AnalogScreenBuf     = (uint*)Marshal.AllocHGlobal(sizeof(uint) * AnalogBufSize);
+                    AnalogScreenBufBack = (uint*)Marshal.AllocHGlobal(sizeof(uint) * AnalogBufSize);
                 }
                 Buffer_BG_array  = (int* )Marshal.AllocHGlobal(sizeof(int)  * 61440);
                 NesColors        = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 64);

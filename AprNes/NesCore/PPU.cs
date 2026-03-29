@@ -1316,13 +1316,40 @@ namespace AprNes
         static public volatile bool emuWaiting = false;
         static void RenderScreen()
         {
-            screen_lock = true;
-            if (AnalogEnabled && NesCore.UltraAnalog && NesCore.CrtEnabled) Crt_Render(); // Stage 2：linearBuffer → AnalogScreenBuf（Level 3 + CRT）
-            VideoOutput?.Invoke(null, null);
-            screen_lock = false;
-            emuWaiting = true;
-            _event.WaitOne();
-            emuWaiting = false;
+            if (AnalogEnabled && analogRenderThreadRunning)
+            {
+                // === Async double buffer path (類比模式) ===
+                screen_lock = true;
+                if (UltraAnalog && CrtEnabled) Crt_Render();
+                screen_lock = false;
+
+                // 等上一幀 GDI 完成（如果還在跑）
+                analogRenderDone.Wait();
+                analogRenderDone.Reset();
+
+                // Swap front/back buffer — GDI 讀 back buffer（上一幀），模擬寫 front buffer（下一幀）
+                SwapAnalogBuffers();
+
+                // 通知渲染執行緒開始 blit back buffer
+                analogRenderReady.Set();
+            }
+            else if (AnalogEnabled)
+            {
+                // === Analog 同步 fallback ===
+                emuWaiting = true;
+                _event.WaitOne();
+                emuWaiting = false;
+            }
+            else
+            {
+                // === 數位模式同步 path / headless ===
+                screen_lock = true;
+                VideoOutput?.Invoke(null, null);
+                screen_lock = false;
+                emuWaiting = true;
+                _event.WaitOne();
+                emuWaiting = false;
+            }
         }
 
         static bool SuppressVbl = false;
