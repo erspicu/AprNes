@@ -61,6 +61,8 @@ namespace AprNes
             new RomDbEntry { Crc = 0x98D60CF2, Name = "Glider Expansion - Mad House (PD)",         MapperOverride = 29, Submapper = -1, MirrorOverride = -1 },
             // Mortal Kombat 2 (Unl): header says mapper 210, actually mapper 90 (JY Company)
             new RomDbEntry { Crc = 0x60BFEB0C, Name = "Mortal Kombat 2 (Unl)",                     MapperOverride = 90, Submapper = -1, MirrorOverride = -1 },
+            // Devil Man (J): header says mapper 88 + fourscreen, actually mapper 154 (Namco 129) + horizontal
+            new RomDbEntry { Crc = 0xD1691028, Name = "Devil Man (J)",                              MapperOverride = 154, Submapper = -1, MirrorOverride = 0 },
         };
 
         public static RomDbEntry Lookup(uint crc)

@@ -382,6 +382,7 @@ namespace AprNes
 
                 if ((ROM_Control_1 & 8) != 0)
                 {
+                    *Vertical = 4; // four-screen: 4 unique nametables
                     Console.WriteLine("fourscreen mirroring : yes");
                 }
                 else Console.WriteLine("fourscreen mirroring : no");

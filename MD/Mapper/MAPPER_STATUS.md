@@ -1,6 +1,6 @@
 # AprNes Mapper 實作狀態
 
-**總計已實作：64 個　　最後更新：2026-03-30**
+**總計已實作：65 個　　最後更新：2026-03-30**
 
 結果說明：✅ 正常　⚠️ 部分問題　❌ 有問題　❓ 待確認／不明
 
@@ -10,11 +10,11 @@
 
 | 結果 | 數量 | Mapper 列表 |
 |:----:|:----:|------------|
-| ✅ 正常 | 58 | 000, 001, 002, 003, 004, 005, 007, 009, 010, 011, 013, 016, 018, 019, 020, 021, 022, 023, 024, 025, 026, 029, 032, 033, 034, 065, 066, 067, 068, 069, 070, 071, 072, 075, 077, 078, 079, 080, 082, 085, 087, 088, 089, 090, 093, 095, 097, 118, 119, 140, 152, 159, 180, 184, 185, 206, 228, 232 |
+| ✅ 正常 | 59 | 000, 001, 002, 003, 004, 005, 007, 009, 010, 011, 013, 016, 018, 019, 020, 021, 022, 023, 024, 025, 026, 029, 032, 033, 034, 065, 066, 067, 068, 069, 070, 071, 072, 075, 077, 078, 079, 080, 082, 085, 087, 088, 089, 090, 093, 095, 097, 118, 119, 140, 152, 154, 159, 180, 184, 185, 206, 228, 232 |
 | ⚠️ 部分問題 | 1 | 064 |
 | ❌ 有問題 | 1 | 076 |
 | ❓ 待確認 | 4 | 153, 209, 210, 211 |
-| **合計校驗** | **64** | |
+| **合計校驗** | **65** | |
 
 
 
@@ -69,7 +69,7 @@
 | **082** | ✅ | 人工驗證通過（2026-03-27）：mirroring 反轉修復 |
 | **085** | ✅ | 人工驗證通過（2026-03-27）：Lagrange Point (J) 正常，含 OPLL (YM2413) FM 合成音效、CHR-RAM banking 修復 |
 | **087** | ✅ | |
-| **088** | ✅ | 人工驗證通過（2026-03-30） |
+| **088** | ✅ | 人工驗證通過（2026-03-30）：Dragon Spirit (J)、Quinty (J) 正常。Devil Man (J) 實為 mapper 154（iNES header 錯誤），已透過 RomDatabase MapperOverride 修正 |
 | **089** | ✅ | 人工驗證通過（2026-03-27） |
 | **090** | ✅ | 人工驗證通過（2026-03-30）：Mortal Kombat 2 (Unl) 正常（iNES header mapper 210→RomDatabase 修正為 090） |
 | **093** | ✅ | |
@@ -80,6 +80,7 @@
 | **140** | ✅ | 人工驗證通過（2026-03-30）：PRG/CHR bank bits 修正（原本反了） |
 | **152** | ✅ | 人工驗證通過（2026-03-27）：mirroring bit 修復（bit6→bit7） |
 | **153** | ❓ | 暫時找不到測試 ROM（2026-03-30） |
+| **154** | ✅ | 新增實作（2026-03-30）：Namco 129，Mapper088 + 動態單屏鏡像（bit6）。Devil Man (J) 人工驗證通過（iNES header 誤標 088，透過 RomDatabase 修正） |
 | **159** | ✅ | 016 sub5 別名（LZ93D50+24C01），共用 Mapper016 類別，隨 016 驗證通過 |
 | **180** | ✅ | |
 | **184** | ✅ | |
@@ -144,7 +145,7 @@
 | **082** | Taito X1-017 | $7EF0–$7EFF regs；chrMode 1KB/2KB；SRAM unlock seq | SD Keiji Blader (J), Harikiri Stadium (J) | ✅ |
 | **085** | Konami VRC7 | 3×8KB PRG；8×1KB CHR；prescaler IRQ；OPLL (YM2413) FM 合成音效 | Lagrange Point (J) | ✅ |
 | **087** | Jaleco JF-09/10/18 | $6000–$7FFF 寫入；D0/D1 bit-swap 選 8KB CHR | Argus (J), City Connection (J), The Goonies (J) | ✅ |
-| **088** | Namco 118 / 634 | Namco108 架構；R0/R1=2KB CHR，R2-R5=1KB CHR | Dragon Spirit (J), Quinty (J) | ✅ |
+| **088** | Namco 118 / 634 | Namco108 架構；R0/R1=2KB CHR（low 64KB），R2-R5=1KB CHR（high 64KB）；固定鏡像 | Dragon Spirit (J), Quinty (J) | ✅ |
 | **089** | Sunsoft-2 (Ikki variant) | bits[6:4]=PRG；(v&7)\|((v&0x80)>>4)=CHR；bit3=single-screen | Tenka no Goikenban - Mito Koumon (J) | ✅ |
 | **090** | JY Company | 4 PRG modes；4 CHR modes；CPU/A12 IRQ；multiply reg；NT control | Mortal Kombat 2 (Unl) | ✅ |
 | **093** | Sunsoft-2 (Fantasy Zone II) | bits[6:4]=PRG 16KB；$C000 固定末；CHR-RAM | Fantasy Zone (J), Shanghai (J) | ✅ |
@@ -155,6 +156,7 @@
 | **140** | Jaleco JF-11 / JF-14 | $6000–$7FFF 寫入；bits[5:4]=PRG 32KB，bits[3:0]=CHR 8KB | Doraemon (J), Bio Senshi Dan (J), Mississippi Satsujin Jiken (J) | ✅ |
 | **152** | Bandai 74161/32 single-screen | Mapper070 subclass；bit7→single-screen 鏡像（bit6→bit7 修復） | Arkanoid II Prototype (J) | ✅ |
 | **153** | Bandai LZ93D50 + WRAM | 5-bit PRG bank；CHR-RAM；8KB WRAM；latch IRQ | — | ❓ |
+| **154** | Namco 129 | Mapper088 + bit6 動態單屏鏡像（ScreenA/ScreenB）；iNES header 常誤標為 088 | Devil Man (J) | ✅ |
 | **159** | Bandai LZ93D50 alias | Mapper016 sub5 的別名 | — | ✅ |
 | **180** | Crazy Climber / UnRom-180 | 首 16KB 固定($8000)，末 16KB 切換($C000)；CHR-RAM | Crazy Climber (J) | ✅ |
 | **184** | Sunsoft-1 / FC-08 | $6000–$7FFF 寫入；下 4KB + 上 4KB（bit7 常設）CHR | Wing of Madoola (J), Atlantis no Nazo (J) | ✅ |

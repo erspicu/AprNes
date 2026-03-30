@@ -11,7 +11,7 @@ namespace AprNes
                 case 159: case 153: case 85:
                 case 25: case 67: case 72: case 76: case 77: case 79: case 80: case 82: case 87: case 89: case 93: case 95: case 97: case 184: case 185:
                 case 32: case 33: case 34: case 64: case 65: case 66: case 68: case 69: case 71: case 78: case 206:
-                case 70: case 75: case 88: case 90: case 118: case 119: case 140: case 152: case 180: case 209: case 210: case 211: case 228: case 232:
+                case 70: case 75: case 88: case 90: case 118: case 119: case 140: case 152: case 154: case 180: case 209: case 210: case 211: case 228: case 232:
                     return true;
                 default:
                     return false;
@@ -81,6 +81,7 @@ namespace AprNes
                 case  70: return "Bandai 74161/32";
                 case  75: return "Konami VRC1";
                 case  88: return "Namco 118";
+                case 154: return "Namco 129";
                 case 118: return "TxSROM";
                 case 140: return "Jaleco JF-11/14";
                 case 152: return "Bandai 74161/32+mirror";
@@ -288,6 +289,12 @@ namespace AprNes
                 case 88: {
                     System.Console.WriteLine("Mapper088: Namco 118");
                     return new Mapper088();
+                }
+                case 154: {
+                    var m = new Mapper088();
+                    m.IsMapper154 = true;
+                    System.Console.WriteLine("Mapper154: Namco 129 (single-screen mirroring)");
+                    return m;
                 }
                 case 118: {
                     System.Console.WriteLine("Mapper118: TxSROM (MMC3+NT control)");

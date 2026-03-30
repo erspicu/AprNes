@@ -1,22 +1,22 @@
 ﻿namespace AprNes
 {
-    // Namco 118 / 634 — Mapper 088
+    // Namco 118 / 634 — Mapper 088 / Mapper 154 (Namco 129)
     // Same register structure as Namco108 (Mapper206), but:
-    //   R0/R1: select 2KB CHR banks at $0000/$0800; bit6 of reg value = NT mirror page select
-    //   R2-R5: select 1KB CHR banks at $1000/$1400/$1800/$1C00; bit6 forced=1 (MSB set)
+    //   R0/R1: select 2KB CHR banks at $0000/$0800; bit6 forced=0 (low 64KB only)
+    //   R2-R5: select 1KB CHR banks at $1000/$1400/$1800/$1C00; bit6 forced=1 (high 64KB)
     //   R6/R7: 8KB PRG banks at $8000/$A000
     //   $C000-$DFFF fixed to second-to-last 8KB
     //   $E000-$FFFF fixed to last 8KB
-    // No IRQ. Nametable mirroring via CHR reg bit6:
-    //   R0 bit6 controls NT0/NT1 (used for $0000 CHR window)
-    //   R1 bit6 controls NT2/NT3 (used for $0800 CHR window)
-    // Actually per NESdev: mirroring is controlled by bits in CHR regs 0 and 1:
-    //   bit6=0 → use CIRAM page 0; bit6=1 → use CIRAM page 1
+    // No IRQ. Mapper 088: hardwired mirroring from header.
+    // Mapper 154 (IsMapper154=true): dynamic single-screen mirroring via bit6 of write value.
+    //   bit6=0 → Screen A (single-screen page 0), bit6=1 → Screen B (single-screen page 1)
     unsafe public class Mapper088 : IMapper
     {
         byte* PRG_ROM, CHR_ROM, ppu_ram;
         int PRG_ROM_count, CHR_ROM_count;
         int* Vertical;
+
+        public bool IsMapper154 = false;
 
         int cmdReg;
         // 8 registers: 0-5=CHR, 6-7=PRG
@@ -45,11 +45,15 @@
 
         public byte MapperR_ExpansionROM(ushort address) { return NesCore.cpubus; }
         public void MapperW_ExpansionROM(ushort address, byte value) { }
-        public void MapperW_RAM(ushort address, byte value) { NesCore.NES_MEM[address] = value; }
-        public byte MapperR_RAM(ushort address) { return NesCore.NES_MEM[address]; }
+        public void MapperW_RAM(ushort address, byte value) { }  // No WRAM on Namco 108/088
+        public byte MapperR_RAM(ushort address) { return NesCore.cpubus; }  // Open bus
 
         public void MapperW_PRG(ushort address, byte value)
         {
+            // Mapper 154: every write checks bit6 for single-screen mirroring
+            if (IsMapper154)
+                *Vertical = (value & 0x40) != 0 ? 3 : 2;  // bit6=1→ScreenB(3), bit6=0→ScreenA(2)
+
             // All writes redirected to $8000/$8001 (addr & 0x8001)
             if ((address & 1) == 0)
             {
@@ -61,12 +65,12 @@
                 int r = cmdReg;
                 if (r <= 1)
                 {
-                    // R0/R1: 2KB CHR banks — bit6 used for NT mirroring, clear it from CHR index
+                    // R0/R1: 2KB CHR banks — bit6 cleared (select from low 64KB)
                     reg[r] = value & 0x3F;
                 }
                 else if (r <= 5)
                 {
-                    // R2-R5: 1KB CHR banks — force bit6=1 (upper half of pattern table)
+                    // R2-R5: 1KB CHR banks — force bit6=1 (select from high 64KB)
                     reg[r] = (value & 0x3F) | 0x40;
                 }
                 else
@@ -74,19 +78,6 @@
                     // R6/R7: PRG banks
                     reg[r] = value & 0x3F;
                 }
-
-                // Update NT mirroring from R0/R1 bit6
-                // R0 bit6 controls left half NT, R1 bit6 controls right half NT
-                // Namco108_88: bit6=0 → page 0 (screen A), bit6=1 → page 1 (screen B)
-                // Simplified: if R0 and R1 agree, use H or V; else implement per-NT
-                // For simplicity match Mesen2 approach: UpdateChrMapping calls Namco108::UpdateChrMapping
-                // which sets nametable via SetNametable. We map to *Vertical:
-                // Actually Mapper088 NT is individual per-bank. We approximate: V if R0≠R1, else single.
-                // Use *Vertical to store: just set based on R0 bit6
-                // Per NESdev Mapper088: mirroring is fixed from cartridge (H or V), not register-controlled
-                // The bit6 in chrBank select is only for CHR address bit 6 (not NT mirroring in standard boards)
-                // Actually, per more careful reading: Namco108_88 uses chr reg bits to select NT pages.
-                // We'll just update CHR banks and leave mirroring from header.
                 UpdateCHRBanks();
             }
         }

@@ -251,7 +251,9 @@ namespace AprNes
                 return addr & 0x27FF;
             if (mirror == 2) // 1-screen A: all → page 0
                 return addr & 0x23FF;
-            return (addr & 0x23FF) | 0x0400; // 1-screen B: all → page 1
+            if (mirror == 3) // 1-screen B: all → page 1
+                return (addr & 0x23FF) | 0x0400;
+            return addr & 0x2FFF; // 4-screen: 4 unique nametables, no mirroring
         }
 
         // ---- Tile fetch state ----
