@@ -10,9 +10,8 @@
 
 | 結果 | 數量 | Mapper 列表 |
 |:----:|:----:|------------|
-| ✅ 正常 | 59 | 000, 001, 002, 003, 004, 005, 007, 009, 010, 011, 013, 016, 018, 019, 020, 021, 022, 023, 024, 025, 026, 029, 032, 033, 034, 065, 066, 067, 068, 069, 070, 071, 072, 075, 077, 078, 079, 080, 082, 085, 087, 088, 089, 090, 093, 095, 097, 118, 119, 140, 152, 154, 159, 180, 184, 185, 206, 228, 232 |
+| ✅ 正常 | 60 | 000, 001, 002, 003, 004, 005, 007, 009, 010, 011, 013, 016, 018, 019, 020, 021, 022, 023, 024, 025, 026, 029, 032, 033, 034, 065, 066, 067, 068, 069, 070, 071, 072, 075, 076, 077, 078, 079, 080, 082, 085, 087, 088, 089, 090, 093, 095, 097, 118, 119, 140, 152, 154, 159, 180, 184, 185, 206, 228, 232 |
 | ⚠️ 部分問題 | 1 | 064 |
-| ❌ 有問題 | 1 | 076 |
 | ❓ 待確認 | 4 | 153, 209, 210, 211 |
 | **合計校驗** | **65** | |
 
@@ -61,7 +60,7 @@
 | **071** | ✅ | 人工驗證通過（2026-03-28）：基於 Mesen2 BF909x 重寫，PRG banking + BF9097 鏡像控制 |
 | **072** | ✅ | |
 | **075** | ✅ | |
-| **076** | ❌ | Battle City - Zen Ge Hack V4 遊戲運行問題（hack ROM） |
+| **076** | ✅ | 人工驗證通過（2026-03-31）：Battle City Hack V4 修復。位址解碼改為 A15 全域（$8000-$FFFF）、線性開機狀態、PRG 指標快取、移除 bank mask 限制 |
 | **077** | ✅ | |
 | **078** | ✅ | Uchuusen - Cosmo Carrier (J) 已修復（2026-03-24） |
 | **079** | ✅ | |
@@ -136,7 +135,7 @@
 | **071** | Camerica / BF909x | 16KB PRG 切換；CHR-RAM；BF9097 variant $9000 自動偵測+單屏鏡像 | Firehawk (U), Linus Spacehead (U) | ✅ |
 | **072** | Jaleco JF-17 | Latch 機制（prgFlag/chrFlag）；16KB PRG + 8KB CHR | Pinball Quest (J), Moero!! Juudou Warriors (J) | ✅ |
 | **075** | Konami VRC1 | 4×8KB PRG；2×4KB CHR；$9000 bit0=H/V | Ganbare Goemon! (J), Jajamaru Ninpou Chou (J) | ✅ |
-| **076** | Namco 109 | Namco108 架構；reg[2-5]=2KB CHR | Digital Devil Monogatari - Megami Tensei (J) | ❌ |
+| **076** | Namco 109 | Namco108 架構；4×2KB CHR；A15 全域解碼；PRG 指標快取 | Battle City Hack V4, Megami Tensei (J) | ✅ |
 | **077** | Napoleon Senki / IremLrog017 | 32KB PRG；slot0=CHR-ROM 2KB，slots1-3=CHR-RAM 6KB | Napoleon Senki (J) | ✅ |
 | **078** | Irem 74HC161/32 | 16KB PRG 切換；4KB×2 CHR；subMapper 鏡像差異 | Holy Diver (J) | ✅ |
 | **078** | Uchuusen Cosmo Carrier | submapper 鏡像修復，正常運作 | Uchuusen Cosmo Carrier (J) | ✅ |
