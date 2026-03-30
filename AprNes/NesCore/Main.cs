@@ -450,7 +450,14 @@ namespace AprNes
                 Console.WriteLine("ROM CRC32: " + romCrc.ToString("X8"));
                 RomDbEntry dbEntry = RomDatabase.Lookup(romCrc);
                 if (!dbEntry.IsNone)
+                {
                     Console.WriteLine("ROM DB: " + dbEntry.Name);
+                    if (dbEntry.MapperOverride >= 0)
+                    {
+                        Console.WriteLine("ROM DB: Mapper override " + mapper + " -> " + dbEntry.MapperOverride);
+                        mapper = dbEntry.MapperOverride;
+                    }
+                }
                 MapperObj = MapperRegistry.Create(mapper, dbEntry);
                 var a12mode = MapperObj.A12NotifyMode;
                 mapperNeedsA12  = a12mode != MapperA12Mode.None;

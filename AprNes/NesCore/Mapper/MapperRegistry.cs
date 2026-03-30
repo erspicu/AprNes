@@ -7,11 +7,11 @@ namespace AprNes
             switch (id)
             {
                 case  0: case  1: case  2: case  3: case  4: case  5:
-                case  7: case  9: case 10: case 11: case 13: case 16: case 18: case 19: case 21: case 22: case 23: case 24: case 26:
+                case  7: case  9: case 10: case 11: case 13: case 16: case 18: case 19: case 21: case 22: case 23: case 24: case 26: case 29:
                 case 159: case 153: case 85:
                 case 25: case 67: case 72: case 76: case 77: case 79: case 80: case 82: case 87: case 89: case 93: case 95: case 97: case 184: case 185:
                 case 32: case 33: case 34: case 64: case 65: case 66: case 68: case 69: case 71: case 78: case 206:
-                case 70: case 75: case 88: case 118: case 119: case 140: case 152: case 180: case 210: case 228: case 232:
+                case 70: case 75: case 88: case 90: case 118: case 119: case 140: case 152: case 180: case 209: case 210: case 211: case 228: case 232:
                     return true;
                 default:
                     return false;
@@ -36,6 +36,7 @@ namespace AprNes
                 case 19:  return "Namco 163";
                 case 24:  return "VRC6a";
                 case 26:  return "VRC6b";
+                case 29:  return "Sealie Computing";
                 case 85:  return "VRC7";
                 case 153: return "Bandai LZ93D50+WRAM";
                 case 159: return "Bandai LZ93D50+24C01";
@@ -71,6 +72,9 @@ namespace AprNes
                 case  79: return "NINA-03/06";
                 case  87: return "Jaleco JF-09/10/18";
                 case  89: return "Sunsoft-2 (Ikki)";
+                case  90: return "JY Company";
+                case 209: return "JY Company (209)";
+                case 211: return "JY Company (211)";
                 case  93: return "Sunsoft-2 (Fantasy Zone II)";
                 case 184: return "Sunsoft-1";
                 case 185: return "CNROM+protection";
@@ -136,6 +140,7 @@ namespace AprNes
                     System.Console.WriteLine("Mapper026: VRC6b");
                     return m;
                 }
+                case 29: return new Mapper029();
                 case 85: {
                     System.Console.WriteLine("Mapper085: VRC7 (OPLL FM synthesis)");
                     return new Mapper085();
@@ -253,6 +258,22 @@ namespace AprNes
                 case 79: return new Mapper079();
                 case 87: return new Mapper087();
                 case 89: return new Mapper089();
+                case 90: {
+                    System.Console.WriteLine("Mapper090: JY Company");
+                    return new Mapper090();
+                }
+                case 209: {
+                    var m = new Mapper090();
+                    m.MapperVariant = 209;
+                    System.Console.WriteLine("Mapper209: JY Company (CHR latch)");
+                    return m;
+                }
+                case 211: {
+                    var m = new Mapper090();
+                    m.MapperVariant = 211;
+                    System.Console.WriteLine("Mapper211: JY Company (extended NT)");
+                    return m;
+                }
                 case 93: return new Mapper093();
                 case 184: return new Mapper184();
                 case 185: return new Mapper185();

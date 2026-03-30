@@ -114,6 +114,7 @@
     <Compile Include="NesCore\Mapper\Mapper079.cs" />
     <Compile Include="NesCore\Mapper\Mapper087.cs" />
     <Compile Include="NesCore\Mapper\Mapper089.cs" />
+    <Compile Include="NesCore\Mapper\Mapper090.cs" />
     <Compile Include="NesCore\Mapper\Mapper093.cs" />
     <Compile Include="NesCore\Mapper\Mapper184.cs" />
     <Compile Include="NesCore\Mapper\Mapper185.cs" />
@@ -124,6 +125,7 @@
     <Compile Include="NesCore\Mapper\Mapper140.cs" />
     <Compile Include="NesCore\Mapper\Mapper232.cs" />
     <Compile Include="NesCore\Mapper\Mapper013.cs" />
+    <Compile Include="NesCore\Mapper\Mapper029.cs" />
     <Compile Include="NesCore\Mapper\Mapper067.cs" />
     <Compile Include="NesCore\Mapper\Mapper076.cs" />
     <Compile Include="NesCore\Mapper\Mapper077.cs" />

@@ -6,12 +6,15 @@
     //   CHR: regs 0,1 address 2K pairs (fine mode: regs 8,9 each split one 1K of the pair independently)
     //        regs 2-5 select 1K each; bit7 inverts A12 (swaps $0xxx/$1xxx CHR pattern tables)
     //   IRQ: A12 scanline mode OR CPU-cycle mode ($C001 bit0); 8-bit down-counter with reload
-    //   Mirror: $A000 bit0 (0=Vertical, 1=Horizontal) — NOTE: opposite of MMC3
+    //   Mirror: $A000 bit0 (0=Vertical, 1=Horizontal) — same encoding as MMC3
     //
-    // IRQ counter logic (Mesen2 reference):
+    // IRQ counter logic (NESdev Wiki / MAME):
     //   On A12 rise (PPU mode) or every 4 CPU cycles (CPU mode): ClockIrqCounter
-    //   ClockIrqCounter: if needReload → reload with +1/+2 bias; else if ctr==0 → reload+1
-    //                    then ctr--; if ctr==0 && enabled → set needIrqDelay
+    //   ClockIrqCounter (IF/ELSE, no always-decrement):
+    //     if needReload → counter = latch | (latch ? 1 : 0)  (OR-with-1 bias)
+    //     else if counter==0 → counter = latch
+    //     else counter--
+    //     if counter==0 && enabled → set needIrqDelay
     //   needIrqDelay counts down per CPU cycle; fires IRQ when it reaches 0
     //   CPU mode delay = 1 cycle, PPU mode delay = 2 cycles
     //
@@ -39,11 +42,10 @@
         const int PpuIrqDelay = 2;
         const int CpuIrqDelay = 1;
 
-        // A12 watcher (same pattern as MMC3)
-        int lastA12       = 0;
-        int a12LowSince   = -100;
-        int lastNotifyTime = -100;
-        const int A12_FILTER = 16;
+        // A12 watcher (Mesen2-style accumulating cyclesDown)
+        int a12LastCycle  = 0;
+        int a12CyclesDown = 0;
+        const int A12_MIN_DELAY = 30;
 
         public MapperA12Mode A12NotifyMode => MapperA12Mode.MMC3;
 
@@ -67,7 +69,7 @@
             cpuClockCounter = 0;
             needIrqDelay = 0;
             forceClock = false;
-            lastA12 = 0; a12LowSince = -100; lastNotifyTime = -100;
+            a12LastCycle = 0; a12CyclesDown = 0;
             UpdateCHRBanks();
         }
 
@@ -80,10 +82,13 @@
         {
             switch (address & 0xE001)
             {
-                case 0x8000:
+                case 0x8000: {
+                    byte changed = (byte)(currentReg ^ value);
                     currentReg = value;
-                    UpdateCHRBanks();  // bit7 (A12 inv) and bit5 (fine mode) affect CHR layout
+                    // MAME: update CHR only if A12-inversion (bit7) or fine-mode (bit5) changed
+                    if ((changed & 0xA0) != 0) UpdateCHRBanks();
                     break;
+                }
 
                 case 0x8001:
                     regs[currentReg & 0x0F] = value;
@@ -91,7 +96,7 @@
                     break;
 
                 case 0xA000:
-                    *Vertical = value & 0x01;  // 0=Vertical, 1=Horizontal (opposite of MMC3)
+                    *Vertical = (value & 0x01) != 0 ? 0 : 1;  // bit0: 0=V, 1=H (same encoding as MMC3)
                     break;
 
                 case 0xC000:
@@ -181,20 +186,22 @@
 
         void ClockIrqCounter(int delay)
         {
+            // NESdev Wiki / MAME style: IF/ELSE (no always-decrement)
             if (needReload)
             {
-                // Hard Drivin' fix: bias reload by +1 (small values) or +2 (larger values)
-                irqCounter = irqReloadValue <= 1
-                    ? (byte)(irqReloadValue + 1)
-                    : (byte)(irqReloadValue + 2);
+                // OR-with-1: reload value ORed with 1 if non-zero (wiki-documented behaviour)
+                irqCounter = (byte)(irqReloadValue | (irqReloadValue != 0 ? 1 : 0));
                 needReload = false;
             }
             else if (irqCounter == 0)
             {
-                irqCounter = (byte)(irqReloadValue + 1);
+                irqCounter = irqReloadValue;
+            }
+            else
+            {
+                irqCounter--;
             }
 
-            irqCounter--;
             if (irqCounter == 0 && irqEnabled)
                 needIrqDelay = delay;
         }
@@ -228,25 +235,29 @@
         {
             if (irqCycleMode) return;  // CPU mode: A12 ignored
 
-            int a12 = (addr >> 12) & 1;
-            int sinceLast = ppuAbsCycle - lastNotifyTime;
-            if (sinceLast < 0) sinceLast += 341 * 262;
-            lastNotifyTime = ppuAbsCycle;
+            // Mesen2-style A12Watcher: accumulate cycles while A12 is low
+            if (a12CyclesDown > 0)
+            {
+                if (a12LastCycle > ppuAbsCycle)
+                    a12CyclesDown += (89342 - a12LastCycle) + ppuAbsCycle; // frame wrapped
+                else
+                    a12CyclesDown += (ppuAbsCycle - a12LastCycle);
+            }
 
-            if (a12 != 0 && lastA12 == 0)
+            if ((addr & 0x1000) == 0)
             {
-                // Rising edge: fire if A12 was low long enough
-                int elapsed = ppuAbsCycle - a12LowSince;
-                if (elapsed < 0) elapsed += 341 * 262;
-                if (elapsed >= A12_FILTER)
+                // A12 low: start counting if not already
+                if (a12CyclesDown == 0)
+                    a12CyclesDown = 1;
+            }
+            else
+            {
+                // A12 high: clock IRQ if was low long enough
+                if (a12CyclesDown > A12_MIN_DELAY)
                     ClockIrqCounter(PpuIrqDelay);
+                a12CyclesDown = 0;
             }
-            else if (a12 == 0 && lastA12 != 0)
-            {
-                if (sinceLast < 341)
-                    a12LowSince = ppuAbsCycle;
-            }
-            lastA12 = a12;
+            a12LastCycle = ppuAbsCycle;
         }
             public void Cleanup() { }
 }

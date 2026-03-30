@@ -403,7 +403,7 @@
             this.label9.Location = new System.Drawing.Point(891, 56);
             this.label9.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label9.Name = "label9";
-            this.label9.Size = new System.Drawing.Size(300, 18);
+            this.label9.Size = new System.Drawing.Size(328, 18);
             this.label9.TabIndex = 5;
             this.label9.Text = "Ctrl+Shift+P screen capture save file location";
             // 
@@ -1390,7 +1390,7 @@
             this.comboBox2.FormattingEnabled = true;
             this.comboBox2.Location = new System.Drawing.Point(894, 300);
             this.comboBox2.Name = "comboBox2";
-            this.comboBox2.Size = new System.Drawing.Size(130, 26);
+            this.comboBox2.Size = new System.Drawing.Size(180, 26);
             this.comboBox2.TabIndex = 48;
             // 
             // label38
@@ -1405,7 +1405,7 @@
             // label39
             // 
             this.label39.AutoSize = true;
-            this.label39.Location = new System.Drawing.Point(1090, 272);
+            this.label39.Location = new System.Drawing.Point(1112, 272);
             this.label39.Name = "label39";
             this.label39.Size = new System.Drawing.Size(180, 18);
             this.label39.TabIndex = 51;
@@ -1414,9 +1414,9 @@
             // comboBox3
             // 
             this.comboBox3.FormattingEnabled = true;
-            this.comboBox3.Location = new System.Drawing.Point(1090, 300);
+            this.comboBox3.Location = new System.Drawing.Point(1112, 300);
             this.comboBox3.Name = "comboBox3";
-            this.comboBox3.Size = new System.Drawing.Size(130, 26);
+            this.comboBox3.Size = new System.Drawing.Size(180, 26);
             this.comboBox3.TabIndex = 50;
             // 
             // AprNes_ConfigureUI
