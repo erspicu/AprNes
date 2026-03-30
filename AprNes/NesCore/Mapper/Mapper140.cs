@@ -2,8 +2,8 @@
 {
     // Jaleco JF-11 / JF-14 — Mapper 140
     // Register at $6000-$7FFF (write-only):
-    //   bits[7:4] = CHR 8KB bank select
-    //   bits[3:0] = PRG 32KB bank select
+    //   bits[5:4] = PRG 32KB bank select
+    //   bits[3:0] = CHR 8KB bank select
     // PRG: 32KB swappable at $8000-$FFFF
     // CHR: 8KB swappable at PPU $0000-$1FFF
     // Mirroring: fixed from header
@@ -41,8 +41,8 @@
         public void MapperW_RAM(ushort address, byte value)
         {
             // Write to $6000-$7FFF = register write
-            chrBank = (value >> 4) & 0x0F;
-            prgBank = value & 0x0F;
+            prgBank = (value >> 4) & 0x03;
+            chrBank = value & 0x0F;
             UpdateCHRBanks();
         }
 
