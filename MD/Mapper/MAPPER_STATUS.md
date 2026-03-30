@@ -125,7 +125,7 @@
 | **034** | Nina-1 | CHR-RAM 變體（$8000 PRG）或 CHR-ROM 變體（$7FFD-$7FFF） | Deadly Towers (U), Impossible Mission II | ✅ |
 | **064** | Tengen RAMBO-1 | 類 MMC3；3×8KB PRG；A12/CPU-cycle IRQ 可切換 | Shinobi (Tengen) | ✅ |
 | **064** | Klax | 進入遊戲後畫面異常（停留標題循環） | Klax (Tengen) | ⚠️ |
-| **065** | Irem H-3001 | 3×8KB PRG switchable；16-bit CPU cycle IRQ | Daiku no Gen San 2 — intro 捲軸條紋 | ⚠️ |
+| **065** | Irem H-3001 | 3×8KB PRG switchable；16-bit CPU cycle IRQ | Daiku no Gen San 2 (J) | ✅ |
 | **066** | GxROM | 32KB PRG × 8KB CHR 一次寫入；PRG modulo 修復 | DragonBall (J), Gumshoe (U) | ✅ |
 | **067** | Sunsoft-3 | 16KB PRG；4×2KB CHR；16-bit 下計數 IRQ | Fantasy Zone 2 (J), Mito Koumon II (J) | ✅ |
 | **068** | Sunsoft #4 | 16KB PRG（固定末）；4×2KB CHR；CHR-as-nametable | AfterBurner II (J), Maharaja (J) | ✅ |
@@ -134,7 +134,7 @@
 | **071** | Camerica / BF909x | 16KB PRG 切換；CHR-RAM；BF9097 variant $9000 自動偵測+單屏鏡像 | Firehawk (U), Linus Spacehead (U) | ✅ |
 | **072** | Jaleco JF-17 | Latch 機制（prgFlag/chrFlag）；16KB PRG + 8KB CHR | Pinball Quest (J), Moero!! Juudou Warriors (J) | ✅ |
 | **075** | Konami VRC1 | 4×8KB PRG；2×4KB CHR；$9000 bit0=H/V | Ganbare Goemon! (J), Jajamaru Ninpou Chou (J) | ✅ |
-| **076** | Namco 109 | Namco108 架構；reg[2-5]=2KB CHR | Digital Devil Monogatari - Megami Tensei (J) | ✅ |
+| **076** | Namco 109 | Namco108 架構；reg[2-5]=2KB CHR | Digital Devil Monogatari - Megami Tensei (J) | ❌ |
 | **077** | Napoleon Senki / IremLrog017 | 32KB PRG；slot0=CHR-ROM 2KB，slots1-3=CHR-RAM 6KB | Napoleon Senki (J) | ✅ |
 | **078** | Irem 74HC161/32 | 16KB PRG 切換；4KB×2 CHR；subMapper 鏡像差異 | Holy Diver (J) | ✅ |
 | **078** | Uchuusen Cosmo Carrier | submapper 鏡像修復，正常運作 | Uchuusen Cosmo Carrier (J) | ✅ |
@@ -153,7 +153,7 @@
 | **119** | TQROM | MMC3 全功能；CHR bank 0x40–0x7F 映射 CHR-RAM | High Speed (U) | ✅ |
 | **140** | Jaleco JF-11 / JF-14 | $6000–$7FFF 寫入；bits[5:4]=PRG 32KB，bits[3:0]=CHR 8KB | Doraemon (J), Bio Senshi Dan (J), Mississippi Satsujin Jiken (J) | ✅ |
 | **152** | Bandai 74161/32 single-screen | Mapper070 subclass；bit7→single-screen 鏡像（bit6→bit7 修復） | Arkanoid II Prototype (J) | ✅ |
-| **153** | Bandai LZ93D50 + WRAM | 5-bit PRG bank；CHR-RAM；8KB WRAM；latch IRQ | Dragon Ball 3 (J) | ✅ |
+| **153** | Bandai LZ93D50 + WRAM | 5-bit PRG bank；CHR-RAM；8KB WRAM；latch IRQ | — | ❓ |
 | **159** | Bandai LZ93D50 alias | Mapper016 sub5 的別名 | — | ✅ |
 | **180** | Crazy Climber / UnRom-180 | 首 16KB 固定($8000)，末 16KB 切換($C000)；CHR-RAM | Crazy Climber (J) | ✅ |
 | **184** | Sunsoft-1 / FC-08 | $6000–$7FFF 寫入；下 4KB + 上 4KB（bit7 常設）CHR | Wing of Madoola (J), Atlantis no Nazo (J) | ✅ |
