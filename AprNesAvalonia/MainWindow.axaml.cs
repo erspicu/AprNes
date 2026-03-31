@@ -67,12 +67,14 @@ public partial class MainWindow : Window
 
         Closing += (_, _) =>
         {
+            StopRecordingIfActive();
             _emu.Dispose();        // Stop + SaveSRam + cleanup
             _writeableBitmap.Dispose();
         };
 
         InitRecentROMs();
         UpdateMenuStates();
+        UpdateRecordMenuVisibility();
     }
 
     // ═══ Settings ═══════════════════════════════════════════════════════════
@@ -553,6 +555,7 @@ public partial class MainWindow : Window
     private void MenuHardReset_Click(object? sender, RoutedEventArgs e)
     {
         if (!_emu.IsRomLoaded) return;
+        StopRecordingIfActive();
         if (!_emu.HardReset()) return;
         _emu.Start();
     }
@@ -563,6 +566,7 @@ public partial class MainWindow : Window
         if (_currentRegion == region) return;
 
         _currentRegion = region;
+        StopRecordingIfActive(true);
         ApplyRegionToNesCore(region);
         _ini.Set("Region", region);
         _ini.Save();
@@ -635,19 +639,121 @@ public partial class MainWindow : Window
         await dlg.ShowDialog(this);
     }
 
-    private void MenuRecordVideo_Click(object? sender, RoutedEventArgs e)
+    // ── Recording ──────────────────────────────────────────────────────────
+    private static string? _ffmpegPath;
+
+    private static string GetFfmpegPath()
     {
-        // TODO: toggle video recording
+        string path = Path.Combine(AppContext.BaseDirectory, "tools", "ffmpeg", "ffmpeg.exe");
+        _ffmpegPath = File.Exists(path) ? path : "";
+        return _ffmpegPath;
     }
 
-    private void MenuRecordAudio_Click(object? sender, RoutedEventArgs e)
+    private void UpdateRecordMenuVisibility()
     {
-        // TODO: toggle audio recording
+        bool hasFfmpeg = !string.IsNullOrEmpty(GetFfmpegPath());
+        MenuRecord.IsVisible = hasFfmpeg;
+        if (hasFfmpeg)
+        {
+            bool videoRec = AprNes.VideoRecorder.IsRecording;
+            bool audioRec = AprNes.AudioRecorder.IsRecording;
+
+            MenuRecordVideo.Header = videoRec ? "■ Stop Recording" : "● Record Video";
+            MenuRecordVideo.IsEnabled = videoRec || (_emu.IsRunning && !audioRec);
+
+            MenuRecordAudio.Header = audioRec ? "■ Stop Audio Recording" : "● Record Audio";
+            MenuRecordAudio.IsEnabled = audioRec || (_emu.IsRunning && !videoRec);
+        }
     }
+
+    private async void MenuRecordVideo_Click(object? sender, RoutedEventArgs e)
+    {
+        if (AprNes.VideoRecorder.IsRecording)
+        {
+            AprNes.VideoRecorder.Stop();
+            UpdateRecordMenuVisibility();
+            Title = "AprNes";
+            return;
+        }
+
+        if (!_emu.IsRunning) return;
+
+        string capturesDir = _ini.Get("CaptureVideoPath",
+            Path.Combine(AppContext.BaseDirectory, "Captures", "Video"));
+        int recW = AprNes.NesCore.AnalogEnabled ? AprNes.NesCore.Crt_DstW : AprNes.NesCore.RenderOutputW;
+        int recH = AprNes.NesCore.AnalogEnabled ? AprNes.NesCore.Crt_DstH : AprNes.NesCore.RenderOutputH;
+        bool ok = AprNes.VideoRecorder.Start(GetFfmpegPath(), capturesDir, recW, recH);
+        if (ok)
+        {
+            UpdateRecordMenuVisibility();
+            Title = "AprNes [REC]";
+        }
+        else
+        {
+            string err = AprNes.VideoRecorder.LastError ?? "Unknown error";
+            await ShowMessageBox("Failed to start recording.\n\n" + err);
+        }
+    }
+
+    private async void MenuRecordAudio_Click(object? sender, RoutedEventArgs e)
+    {
+        if (AprNes.AudioRecorder.IsRecording)
+        {
+            AprNes.AudioRecorder.Stop();
+            UpdateRecordMenuVisibility();
+            if (!AprNes.VideoRecorder.IsRecording)
+                Title = "AprNes";
+            return;
+        }
+
+        if (!_emu.IsRunning) return;
+
+        string capturesDir = _ini.Get("CaptureAudioPath",
+            Path.Combine(AppContext.BaseDirectory, "Captures", "Audio"));
+        bool ok = AprNes.AudioRecorder.Start(GetFfmpegPath(), capturesDir);
+        if (ok)
+        {
+            UpdateRecordMenuVisibility();
+            if (!AprNes.VideoRecorder.IsRecording)
+                Title = "AprNes [REC Audio]";
+        }
+        else
+        {
+            string err = AprNes.AudioRecorder.LastError ?? "Unknown error";
+            await ShowMessageBox("Failed to start audio recording.\n\n" + err);
+        }
+    }
+
+    private async void StopRecordingIfActive(bool notify = false)
+    {
+        bool wasStopped = false;
+        if (AprNes.VideoRecorder.IsRecording)
+        {
+            AprNes.VideoRecorder.Stop();
+            wasStopped = true;
+        }
+        if (AprNes.AudioRecorder.IsRecording)
+        {
+            AprNes.AudioRecorder.Stop();
+            wasStopped = true;
+        }
+        if (wasStopped)
+        {
+            UpdateRecordMenuVisibility();
+            try { Title = "AprNes"; } catch { }
+            if (notify)
+            {
+                await ShowMessageBox(L("rec_stopped_msg",
+                    "Recording has been stopped due to settings change."));
+            }
+        }
+    }
+
+    public void StopRecordingOnSettingsChange() => StopRecordingIfActive(true);
 
     private void MenuRecordSettings_Click(object? sender, RoutedEventArgs e)
     {
-        // TODO: open record settings dialog
+        // TODO: open record settings dialog (future)
     }
 
     private async void MenuConfiguration_Click(object? sender, RoutedEventArgs e)
@@ -655,10 +761,13 @@ public partial class MainWindow : Window
         bool wasRunning = _emu.IsRunning;
         if (wasRunning) _emu.Pause();
 
+        StopRecordingIfActive(true);
+
         var dlg = new ConfigWindow(_ini);
         await dlg.ShowDialog(this);
 
         ApplyIniSettings();
+        UpdateRecordMenuVisibility();
         if (wasRunning) _emu.Resume();
     }
 

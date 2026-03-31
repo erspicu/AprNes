@@ -1,7 +1,7 @@
 # AprNes vs AprNesAvalonia — UI Method 對照清單
 
 > 產生日期: 2026-04-01
-> 最後更新: 2026-04-01 (P0+P1+P2 完成)
+> 最後更新: 2026-04-01 (P0+P1+P2+P3 完成)
 > 目的: 逐一比對 AprNes (WinForms) 的 UI 方法，確認 AprNesAvalonia 是否有對應實作
 
 ## 狀態標記
@@ -108,8 +108,8 @@
 | 45 | `_menuHelpShortcuts_Click()` | 顯示快捷鍵 | `MenuShortcuts_Click()` | OK |
 | 46 | `_soundMenuItem_Click()` | 音效開關 | `MenuSound_Click()` | OK |
 | 47 | `_ultraAnalogMenuItem_Click()` | Ultra Analog 開關 + 重建管線 | `MenuUltraAnalog_Click()` | **PARTIAL** — 有 toggle 但缺重建 NTSC/CRT 管線 |
-| 48 | `_recordVideoMenuItem_Click()` | 錄影開關 (FFmpeg) | `MenuRecordVideo_Click()` | **TODO** |
-| 49 | `_recordAudioMenuItem_Click()` | 錄音開關 | `MenuRecordAudio_Click()` | **TODO** |
+| 48 | `_recordVideoMenuItem_Click()` | 錄影開關 (FFmpeg) | `MenuRecordVideo_Click()` | OK |
+| 49 | `_recordAudioMenuItem_Click()` | 錄音開關 | `MenuRecordAudio_Click()` | OK |
 
 ### 1.10 選單事件 — 右鍵選單 / 對話框
 
@@ -135,13 +135,13 @@
 
 | # | AprNes 方法 | 說明 | Ava 對應 | 狀態 |
 |---|------------|------|----------|------|
-| 60 | `StopRecordingIfActive()` | 停止進行中的錄製 | 無 | **TODO** |
-| 61 | `StopRecordingOnSettingsChange()` | 設定變更時停止錄製 | 無 | **TODO** |
+| 60 | `StopRecordingIfActive()` | 停止進行中的錄製 | `StopRecordingIfActive()` | OK |
+| 61 | `StopRecordingOnSettingsChange()` | 設定變更時停止錄製 | `StopRecordingOnSettingsChange()` | OK |
 | 62 | `UpdateSoundMenuText()` | 更新音效選單文字 | `UpdateMenuStates()` | OK |
 | 63 | `UpdateUltraAnalogMenuText()` | 更新 Ultra Analog 選單文字 | `UpdateMenuStates()` | OK |
-| 64 | `UpdateRecordMenuVisibility()` | 更新錄製選單打勾狀態 | 無 | **TODO** |
+| 64 | `UpdateRecordMenuVisibility()` | 更新錄製選單打勾狀態 | `UpdateRecordMenuVisibility()` | OK |
 | 65 | `UpdateRegionCheckmarks()` | 更新區域選單打勾狀態 | `UpdateMenuStates()` | OK |
-| 66 | `GetFfmpegPath()` | 取得 FFmpeg 路徑 | 無 | **TODO** |
+| 66 | `GetFfmpegPath()` | 取得 FFmpeg 路徑 | `GetFfmpegPath()` | OK |
 
 ### 1.13 工具方法
 
@@ -299,9 +299,9 @@
 
 | 狀態 | 數量 |
 |------|------|
-| OK | 90 |
+| OK | 96 |
 | PARTIAL | 1 |
-| TODO | 14 |
+| TODO | 8 |
 | N/A | 6 |
 | **合計** | **111** |
 
@@ -331,9 +331,9 @@
 12. ~~**AudioPlusConfigWindow 完整後端** — LoadFromNesCore/SaveToNesCore/擴展聲道動態UI (#3-10)~~ ✅
 13. ~~**LoadAnalogConfig / LoadAudioPlusIni / SaveAudioPlusIni** — INI 讀寫 (#20-25)~~ ✅
 
-### P3 — 錄製功能
+### ~~P3 — 錄製功能~~ ✅ 全部完成
 
-14. **錄影 (FFmpeg)** — RecordVideo/RecordAudio/StopRecording (#48-49, #60-61, #64, #66)
+14. ~~**錄影 (FFmpeg)** — RecordVideo/RecordAudio/StopRecording (#48-49, #60-61, #64, #66)~~ ✅
 
 ### P4 — Analog 渲染
 

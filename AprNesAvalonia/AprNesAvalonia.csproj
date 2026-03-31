@@ -28,6 +28,8 @@
 
     <!-- 外部工具 -->
     <Compile Include="../AprNes/tool/WaveOutPlayer.cs" Link="Platform/WaveOutPlayer.cs" />
+    <Compile Include="../AprNes/tool/VideoRecorder.cs" Link="Tool/VideoRecorder.cs" />
+    <Compile Include="../AprNes/tool/AudioRecorder.cs" Link="Tool/AudioRecorder.cs" />
   </ItemGroup>
 
   <ItemGroup>
