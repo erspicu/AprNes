@@ -1,7 +1,7 @@
 # AprNes vs AprNesAvalonia — UI Method 對照清單
 
 > 產生日期: 2026-04-01
-> 最後更新: 2026-04-01 (P0+P1 完成)
+> 最後更新: 2026-04-01 (P0+P1+P2 完成)
 > 目的: 逐一比對 AprNes (WinForms) 的 UI 方法，確認 AprNesAvalonia 是否有對應實作
 
 ## 狀態標記
@@ -55,12 +55,12 @@
 
 | # | AprNes 方法 | 說明 | Ava 對應 | 狀態 |
 |---|------------|------|----------|------|
-| 20 | `LoadAnalogConfig()` | 從 AprNesAnalog.ini 載入類比參數 | AnalogConfigWindow (TODO) | **TODO** |
-| 21 | `LoadAudioPlusIni()` | 從 AprNesAudioPlus.ini 載入音效參數 | AudioPlusConfigWindow (TODO) | **TODO** |
-| 22 | `SaveAudioPlusIni()` | 存回音效參數到 INI | AudioPlusConfigWindow (TODO) | **TODO** |
-| 23 | `SaveAudioPlusIniPublic()` | 公開包裝供 ConfigUI 呼叫 | 無 | **TODO** |
-| 24 | `ApplyChipChannelSettings()` | 套用擴展晶片聲道音量設定 | 無 | **TODO** |
-| 25 | `InitChipDefaults()` | 初始化擴展晶片預設值 (70%/啟用) | 無 | **TODO** |
+| 20 | `LoadAnalogConfig()` | 從 AprNesAnalog.ini 載入類比參數 | `MainWindow.LoadAnalogConfig()` | OK |
+| 21 | `LoadAudioPlusIni()` | 從 AprNesAudioPlus.ini 載入音效參數 | `MainWindow.LoadAudioPlusIni()` | OK |
+| 22 | `SaveAudioPlusIni()` | 存回音效參數到 INI | `AudioPlusConfigWindow.SaveAudioPlusIni()` | OK |
+| 23 | `SaveAudioPlusIniPublic()` | 公開包裝供 ConfigUI 呼叫 | N/A (Ava 版直接在 Window 內存) | N/A |
+| 24 | `ApplyChipChannelSettings()` | 套用擴展晶片聲道音量設定 | `MainWindow.ApplyChipChannelSettings()` + `AudioPlusConfigWindow` | OK |
+| 25 | `InitChipDefaults()` | 初始化擴展晶片預設值 (70%/啟用) | `MainWindow.InitChipDefaults()` + `AudioPlusConfigWindow` | OK |
 
 ### 1.5 模擬控制
 
@@ -241,16 +241,16 @@
 
 | # | AprNes 方法 | 說明 | Ava 對應 | 狀態 |
 |---|------------|------|----------|------|
-| 1 | `AprNes_AnalogConfigureUI()` | 建構子、載入參數、綁定事件 | `AnalogConfigWindow()` | **PARTIAL** — UI 有但缺載入/綁定 |
+| 1 | `AprNes_AnalogConfigureUI()` | 建構子、載入參數、綁定事件 | `AnalogConfigWindow()` + `LoadFromFields()` + `WireEvents()` | OK |
 | 2 | `InitLang()` / `L()` | 語系初始化 | `ApplyLanguage()` / `L()` | OK |
-| 3 | `LoadFromFields()` | 從 NesCore 載入所有參數到 UI | 無 | **TODO** |
-| 4 | `ApplyToFields()` | 套用 UI 值到 NesCore + 重建 LUT | 無 | **TODO** |
-| 5 | `SaveIni()` | 存回 AprNesAnalog.ini | 無 | **TODO** |
-| 6 | `WireEvents()` | 綁定 TrackBar scroll 事件 | 無 | **TODO** |
-| 7 | `ComboPreset_Changed()` | Preset 設定檔切換 | 無 | **TODO** |
-| 8 | `SetNtsc()` | 套用 NTSC preset | 無 | **TODO** |
-| 9 | `SetCrt()` | 套用 CRT preset | 無 | **TODO** |
-| 10 | `UpdateAllLabels()` | 更新所有滑桿數值標籤 | 無 | **TODO** |
+| 3 | `LoadFromFields()` | 從 NesCore 載入所有參數到 UI | `LoadFromFields()` | OK |
+| 4 | `ApplyToFields()` | 套用 UI 值到 NesCore + 重建 LUT | `ApplyToFields()` | OK |
+| 5 | `SaveIni()` | 存回 AprNesAnalog.ini | `SaveIni()` | OK |
+| 6 | `WireEvents()` | 綁定 Slider ValueChanged 事件 | `WireEvents()` | OK |
+| 7 | `ComboPreset_Changed()` | Preset 設定檔切換 | `ComboPreset_Changed()` | OK |
+| 8 | `SetNtsc()` | 套用 NTSC preset | `SetNtsc()` | OK |
+| 9 | `SetCrt()` | 套用 CRT preset | `SetCrt()` | OK |
+| 10 | `UpdateAllLabels()` | 更新所有滑桿數值標籤 | `UpdateAllLabels()` | OK |
 
 ---
 
@@ -258,18 +258,18 @@
 
 | # | AprNes 方法 | 說明 | Ava 對應 | 狀態 |
 |---|------------|------|----------|------|
-| 1 | `AprNes_AudioPlusConfigureUI()` | 建構子、建立動態 UI | `AudioPlusConfigWindow()` | **PARTIAL** — UI 有但缺動態建立 |
-| 2 | `BuildChannelVolumeUI()` | 動態建立 NES+擴展聲道控件 | AXAML 靜態定義 | **PARTIAL** — NES 5ch 靜態 OK，擴展聲道缺動態生成 |
-| 3 | `CreateChannelRow()` | 建立單一聲道控件列 | 無 | **TODO** |
+| 1 | `AprNes_AudioPlusConfigureUI()` | 建構子、建立動態 UI | `AudioPlusConfigWindow()` + `BuildExpChannelUI()` | OK |
+| 2 | `BuildChannelVolumeUI()` | 動態建立 NES+擴展聲道控件 | NES: AXAML 靜態 + Exp: `BuildExpChannelUI()` 動態 | OK |
+| 3 | `CreateChannelRow()` | 建立單一聲道控件列 | `BuildExpChannelUI()` 內建 | OK |
 | 4 | `ApplyLang()` | 語系套用 | `ApplyLanguage()` | OK |
-| 5 | `LoadFromNesCore()` | 從 NesCore 載入音效參數 | 無 | **TODO** |
-| 6 | `SaveToNesCore()` | 套用 UI 值到 NesCore | 無 | **TODO** |
-| 7 | `UpdateExpChannelVisibility()` | 依晶片顯示/隱藏擴展聲道 | 無 | **TODO** |
-| 8 | `cboMapperChip_Changed()` | 晶片切換事件 | 無 | **TODO** |
-| 9 | `cboConsoleModel_Changed()` | 主機型號切換 + LPF 控制 | 無 | **TODO** |
-| 10 | `UpdateAllValueLabels()` | 更新所有數值標籤 | 無 | **TODO** |
-| 11 | `btnOK_Click()` | 確定、存回、套用管線 | `BtnOK_Click()` | **PARTIAL** — 有關閉但缺存檔/套用 |
-| 12 | `btnCancel_Click()` | 取消 | 無 (只有 OK) | **TODO** — 可考慮加 Cancel |
+| 5 | `LoadFromNesCore()` | 從 NesCore 載入音效參數 | `LoadFromNesCore()` | OK |
+| 6 | `SaveToNesCore()` | 套用 UI 值到 NesCore | `SaveToNesCore()` | OK |
+| 7 | `UpdateExpChannelVisibility()` | 依晶片顯示/隱藏擴展聲道 | `UpdateExpChannelVisibility()` | OK |
+| 8 | `cboMapperChip_Changed()` | 晶片切換事件 | `OnExpChipChanged()` → `UpdateExpChannelVisibility()` | OK |
+| 9 | `cboConsoleModel_Changed()` | 主機型號切換 + LPF 控制 | `UpdateCustomEnableState()` | OK |
+| 10 | `UpdateAllValueLabels()` | 更新所有數值標籤 | `UpdateAllValueLabels()` | OK |
+| 11 | `btnOK_Click()` | 確定、存回、套用管線 | `BtnOK_Click()` — SaveToNesCore + SaveIni + ApplySettings | OK |
+| 12 | `btnCancel_Click()` | 取消 | `BtnCancel_Click()` | OK |
 
 ---
 
@@ -299,10 +299,10 @@
 
 | 狀態 | 數量 |
 |------|------|
-| OK | 69 |
-| PARTIAL | 5 |
-| TODO | 32 |
-| N/A | 5 |
+| OK | 90 |
+| PARTIAL | 1 |
+| TODO | 14 |
+| N/A | 6 |
 | **合計** | **111** |
 
 ---
@@ -325,11 +325,11 @@
 9. ~~**Analog 子控件啟停** — ChkAnalog 勾選時啟用/停用相關控件 (#14-16)~~ ✅
 10. ~~**ChkSound 即時生效** — 勾選時即時開關音效 (#18)~~ ✅
 
-### P2 — 進階功能 (Analog/AudioPlus 設定後端)
+### ~~P2 — 進階功能 (Analog/AudioPlus 設定後端)~~ ✅ 全部完成
 
-11. **AnalogConfigWindow 完整後端** — LoadFromFields/ApplyToFields/SaveIni/WireEvents/Presets (#3-10)
-12. **AudioPlusConfigWindow 完整後端** — LoadFromNesCore/SaveToNesCore/擴展聲道動態UI (#3-10)
-13. **LoadAnalogConfig / LoadAudioPlusIni / SaveAudioPlusIni** — INI 讀寫 (#20-25)
+11. ~~**AnalogConfigWindow 完整後端** — LoadFromFields/ApplyToFields/SaveIni/WireEvents/Presets (#3-10)~~ ✅
+12. ~~**AudioPlusConfigWindow 完整後端** — LoadFromNesCore/SaveToNesCore/擴展聲道動態UI (#3-10)~~ ✅
+13. ~~**LoadAnalogConfig / LoadAudioPlusIni / SaveAudioPlusIni** — INI 讀寫 (#20-25)~~ ✅
 
 ### P3 — 錄製功能
 

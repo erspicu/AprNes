@@ -2,8 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="AprNesAvalonia.Views.AudioPlusConfigWindow"
         Title="Advanced Audio Settings"
-        Width="550"
-        SizeToContent="Height"
+        Width="580" Height="620"
         CanResize="False"
         WindowStartupLocation="CenterOwner"
         Background="#F0F0F0">
@@ -13,20 +12,52 @@
 
             <!-- NES Channels -->
             <TabItem x:Name="TabNes" Header="NES Channels">
+                <ScrollViewer>
                 <StackPanel Margin="8" Spacing="8">
 
                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                         <TextBlock Grid.Column="0" x:Name="LblConsoleModel" Text="Console Model" VerticalAlignment="Center"/>
-                        <ComboBox  Grid.Column="1" x:Name="CmbConsoleModel" Width="240">
-                            <ComboBoxItem Content="0 - Famicom (HVC-001)" IsSelected="True"/>
-                            <ComboBoxItem Content="1 - Front-Loader (NES-001)"/>
-                            <ComboBoxItem Content="2 - Top-Loader (NES-101)"/>
-                            <ComboBoxItem Content="3 - AV Famicom (HVC-101)"/>
-                            <ComboBoxItem Content="4 - Sharp Twin Famicom"/>
-                            <ComboBoxItem Content="5 - Sharp Famicom Titler"/>
+                        <ComboBox  Grid.Column="1" x:Name="CmbConsoleModel" Width="260" SelectedIndex="0">
+                            <ComboBoxItem Content="0 - Famicom (HVC-001) ~14kHz"/>
+                            <ComboBoxItem Content="1 - Front-Loader (NES-001) ~4.7kHz"/>
+                            <ComboBoxItem Content="2 - Top-Loader (NES-101) ~20kHz +buzz"/>
+                            <ComboBoxItem Content="3 - AV Famicom (HVC-101) ~19kHz"/>
+                            <ComboBoxItem Content="4 - Sharp Twin Famicom ~12kHz"/>
+                            <ComboBoxItem Content="5 - Sharp Famicom Titler ~16kHz"/>
                             <ComboBoxItem Content="6 - Custom"/>
                         </ComboBox>
                     </Grid>
+
+                    <!-- Authentic mode extras -->
+                    <StackPanel x:Name="PnlAuthentic" Spacing="4">
+                        <CheckBox x:Name="ChkRfCrosstalk" Content="RF Crosstalk"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock x:Name="LblCustomCutoff" Text="LPF Cutoff" VerticalAlignment="Center" MinWidth="70"/>
+                            <Slider x:Name="SlCustomCutoff" Minimum="1000" Maximum="22000" Value="14000" Width="200"
+                                    TickFrequency="100" IsSnapToTickEnabled="True"/>
+                            <TextBlock x:Name="LblCustomCutoffVal" Text="14000 Hz" VerticalAlignment="Center" MinWidth="60"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ChkCustomBuzz" Content="Custom Buzz"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock x:Name="LblBuzzAmp" Text="Buzz Amp" VerticalAlignment="Center" MinWidth="70"/>
+                            <Slider x:Name="SlBuzzAmp" Minimum="0" Maximum="100" Value="30" Width="200"
+                                    TickFrequency="1" IsSnapToTickEnabled="True"/>
+                            <TextBlock x:Name="LblBuzzAmpVal" Text="30%" VerticalAlignment="Center" MinWidth="40"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock x:Name="LblBuzzFreq" Text="Buzz Freq" VerticalAlignment="Center" MinWidth="70"/>
+                            <ComboBox x:Name="CmbBuzzFreq" Width="100" SelectedIndex="0">
+                                <ComboBoxItem Content="60 Hz"/>
+                                <ComboBoxItem Content="50 Hz"/>
+                            </ComboBox>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock x:Name="LblRfVol" Text="RF Volume" VerticalAlignment="Center" MinWidth="70"/>
+                            <Slider x:Name="SlRfVol" Minimum="0" Maximum="200" Value="50" Width="200"
+                                    TickFrequency="1" IsSnapToTickEnabled="True"/>
+                            <TextBlock x:Name="LblRfVolVal" Text="50" VerticalAlignment="Center" MinWidth="40"/>
+                        </StackPanel>
+                    </StackPanel>
 
                     <Separator/>
 
@@ -35,102 +66,110 @@
                           RowSpacing="6" ColumnSpacing="8">
                         <CheckBox  Grid.Row="0" Grid.Column="0" x:Name="ChkPulse1"   IsChecked="True"/>
                         <TextBlock Grid.Row="0" Grid.Column="1" x:Name="LblPulse1Name" Text="Pulse 1"   VerticalAlignment="Center"/>
-                        <Slider    Grid.Row="0" Grid.Column="2" x:Name="SlPulse1"   Minimum="0" Maximum="100" Value="100"/>
-                        <TextBlock Grid.Row="0" Grid.Column="3" x:Name="LblPulse1"  Text="100" VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="0" Grid.Column="2" x:Name="SlPulse1"   Minimum="0" Maximum="100" Value="70" TickFrequency="1" IsSnapToTickEnabled="True"/>
+                        <TextBlock Grid.Row="0" Grid.Column="3" x:Name="LblPulse1"  Text="70%" VerticalAlignment="Center"/>
 
                         <CheckBox  Grid.Row="1" Grid.Column="0" x:Name="ChkPulse2"   IsChecked="True"/>
                         <TextBlock Grid.Row="1" Grid.Column="1" x:Name="LblPulse2Name" Text="Pulse 2"   VerticalAlignment="Center"/>
-                        <Slider    Grid.Row="1" Grid.Column="2" x:Name="SlPulse2"   Minimum="0" Maximum="100" Value="100"/>
-                        <TextBlock Grid.Row="1" Grid.Column="3" x:Name="LblPulse2"  Text="100" VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="1" Grid.Column="2" x:Name="SlPulse2"   Minimum="0" Maximum="100" Value="70" TickFrequency="1" IsSnapToTickEnabled="True"/>
+                        <TextBlock Grid.Row="1" Grid.Column="3" x:Name="LblPulse2"  Text="70%" VerticalAlignment="Center"/>
 
                         <CheckBox  Grid.Row="2" Grid.Column="0" x:Name="ChkTriangle" IsChecked="True"/>
                         <TextBlock Grid.Row="2" Grid.Column="1" x:Name="LblTriangleName" Text="Triangle" VerticalAlignment="Center"/>
-                        <Slider    Grid.Row="2" Grid.Column="2" x:Name="SlTriangle" Minimum="0" Maximum="100" Value="100"/>
-                        <TextBlock Grid.Row="2" Grid.Column="3" x:Name="LblTriangle" Text="100" VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="2" Grid.Column="2" x:Name="SlTriangle" Minimum="0" Maximum="100" Value="70" TickFrequency="1" IsSnapToTickEnabled="True"/>
+                        <TextBlock Grid.Row="2" Grid.Column="3" x:Name="LblTriangle" Text="70%" VerticalAlignment="Center"/>
 
                         <CheckBox  Grid.Row="3" Grid.Column="0" x:Name="ChkNoise"    IsChecked="True"/>
                         <TextBlock Grid.Row="3" Grid.Column="1" x:Name="LblNoiseName" Text="Noise"    VerticalAlignment="Center"/>
-                        <Slider    Grid.Row="3" Grid.Column="2" x:Name="SlNoise"    Minimum="0" Maximum="100" Value="100"/>
-                        <TextBlock Grid.Row="3" Grid.Column="3" x:Name="LblNoise"   Text="100" VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="3" Grid.Column="2" x:Name="SlNoise"    Minimum="0" Maximum="100" Value="70" TickFrequency="1" IsSnapToTickEnabled="True"/>
+                        <TextBlock Grid.Row="3" Grid.Column="3" x:Name="LblNoise"   Text="70%" VerticalAlignment="Center"/>
 
                         <CheckBox  Grid.Row="4" Grid.Column="0" x:Name="ChkDMC"      IsChecked="True"/>
                         <TextBlock Grid.Row="4" Grid.Column="1" x:Name="LblDMCName" Text="DMC"      VerticalAlignment="Center"/>
-                        <Slider    Grid.Row="4" Grid.Column="2" x:Name="SlDMC"      Minimum="0" Maximum="100" Value="100"/>
-                        <TextBlock Grid.Row="4" Grid.Column="3" x:Name="LblDMC"     Text="100" VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="4" Grid.Column="2" x:Name="SlDMC"      Minimum="0" Maximum="100" Value="70" TickFrequency="1" IsSnapToTickEnabled="True"/>
+                        <TextBlock Grid.Row="4" Grid.Column="3" x:Name="LblDMC"     Text="70%" VerticalAlignment="Center"/>
                     </Grid>
                 </StackPanel>
+                </ScrollViewer>
             </TabItem>
 
             <!-- Expansion Chips -->
             <TabItem x:Name="TabExpansion" Header="Expansion Chips">
+                <ScrollViewer>
                 <StackPanel Margin="8" Spacing="8">
 
                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                         <TextBlock Grid.Column="0" x:Name="LblChip" Text="Chip" VerticalAlignment="Center"/>
-                        <ComboBox  Grid.Column="1" x:Name="CmbExpChip" Width="200">
-                            <ComboBoxItem Content="None" IsSelected="True"/>
-                            <ComboBoxItem Content="VRC6 (3ch)"/>
-                            <ComboBoxItem Content="VRC7 / OPLL (1ch)"/>
-                            <ComboBoxItem Content="Namco 163 (8ch)"/>
-                            <ComboBoxItem Content="Sunsoft 5B (3ch)"/>
-                            <ComboBoxItem Content="MMC5 (2ch)"/>
-                            <ComboBoxItem Content="FDS (1ch)"/>
+                        <ComboBox  Grid.Column="1" x:Name="CmbExpChip" Width="200" SelectedIndex="0">
+                            <ComboBoxItem Content="(None)"/>
+                            <ComboBoxItem Content="VRC6"/>
+                            <ComboBoxItem Content="VRC7"/>
+                            <ComboBoxItem Content="Namco 163"/>
+                            <ComboBoxItem Content="Sunsoft 5B"/>
+                            <ComboBoxItem Content="MMC5"/>
+                            <ComboBoxItem Content="FDS"/>
                         </ComboBox>
                     </Grid>
 
+                    <TextBlock x:Name="LblExpInfo" Text="" Foreground="#888" FontSize="11" TextWrapping="Wrap"/>
+
                     <Separator/>
 
-                    <!-- Dynamic channels placeholder -->
+                    <!-- Dynamic expansion channels -->
                     <StackPanel x:Name="ExpChannelPanel" Spacing="6">
                         <TextBlock x:Name="LblSelectChip" Text="Select a chip to show its channels." Foreground="#888"/>
                     </StackPanel>
                 </StackPanel>
+                </ScrollViewer>
             </TabItem>
 
             <!-- Post-Processing -->
             <TabItem x:Name="TabPostProc" Header="Post-Processing">
+                <ScrollViewer>
                 <StackPanel Margin="8" Spacing="8">
-                    <Grid ColumnDefinitions="120,*,40" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+                    <Grid ColumnDefinitions="120,*,50" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
                           RowSpacing="6" ColumnSpacing="8">
                         <TextBlock Grid.Row="0" Grid.Column="0" x:Name="LblStereoWidth" Text="Stereo Width"  VerticalAlignment="Center"/>
-                        <Slider    Grid.Row="0" Grid.Column="1" x:Name="SlStereoWidth"  Minimum="0" Maximum="100" Value="50"/>
-                        <TextBlock Grid.Row="0" Grid.Column="2" x:Name="LblStereoWidthVal" Text="50" VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="0" Grid.Column="1" x:Name="SlStereoWidth"  Minimum="0" Maximum="100" Value="50" TickFrequency="1" IsSnapToTickEnabled="True"/>
+                        <TextBlock Grid.Row="0" Grid.Column="2" x:Name="LblStereoWidthVal" Text="50%" VerticalAlignment="Center"/>
 
                         <TextBlock Grid.Row="1" Grid.Column="0" x:Name="LblHaasDelay" Text="Haas Delay"    VerticalAlignment="Center"/>
-                        <Slider    Grid.Row="1" Grid.Column="1" x:Name="SlHaasDelay"    Minimum="0" Maximum="100" Value="0"/>
-                        <TextBlock Grid.Row="1" Grid.Column="2" x:Name="LblHaasDelayVal"   Text="0" VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="1" Grid.Column="1" x:Name="SlHaasDelay"    Minimum="10" Maximum="30" Value="20" TickFrequency="1" IsSnapToTickEnabled="True"/>
+                        <TextBlock Grid.Row="1" Grid.Column="2" x:Name="LblHaasDelayVal"   Text="20 ms" VerticalAlignment="Center"/>
 
                         <TextBlock Grid.Row="2" Grid.Column="0" x:Name="LblHaasCrossfeed" Text="Haas Crossfeed" VerticalAlignment="Center"/>
-                        <Slider    Grid.Row="2" Grid.Column="1" x:Name="SlHaasCrossfeed" Minimum="0" Maximum="100" Value="0"/>
-                        <TextBlock Grid.Row="2" Grid.Column="2" x:Name="LblHaasCrossfeedVal" Text="0" VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="2" Grid.Column="1" x:Name="SlHaasCrossfeed" Minimum="0" Maximum="80" Value="40" TickFrequency="1" IsSnapToTickEnabled="True"/>
+                        <TextBlock Grid.Row="2" Grid.Column="2" x:Name="LblHaasCrossfeedVal" Text="40%" VerticalAlignment="Center"/>
 
                         <TextBlock Grid.Row="3" Grid.Column="0" x:Name="LblReverbWet" Text="Reverb Wet"    VerticalAlignment="Center"/>
-                        <Slider    Grid.Row="3" Grid.Column="1" x:Name="SlReverbWet"    Minimum="0" Maximum="100" Value="0"/>
-                        <TextBlock Grid.Row="3" Grid.Column="2" x:Name="LblReverbWetVal"   Text="0" VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="3" Grid.Column="1" x:Name="SlReverbWet"    Minimum="0" Maximum="30" Value="0" TickFrequency="1" IsSnapToTickEnabled="True"/>
+                        <TextBlock Grid.Row="3" Grid.Column="2" x:Name="LblReverbWetVal"   Text="0%" VerticalAlignment="Center"/>
 
                         <TextBlock Grid.Row="4" Grid.Column="0" x:Name="LblCombFeedback" Text="Comb Feedback" VerticalAlignment="Center"/>
-                        <Slider    Grid.Row="4" Grid.Column="1" x:Name="SlCombFeedback" Minimum="0" Maximum="100" Value="0"/>
-                        <TextBlock Grid.Row="4" Grid.Column="2" x:Name="LblCombFeedbackVal" Text="0" VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="4" Grid.Column="1" x:Name="SlCombFeedback" Minimum="30" Maximum="90" Value="70" TickFrequency="1" IsSnapToTickEnabled="True"/>
+                        <TextBlock Grid.Row="4" Grid.Column="2" x:Name="LblCombFeedbackVal" Text="70%" VerticalAlignment="Center"/>
 
                         <TextBlock Grid.Row="5" Grid.Column="0" x:Name="LblCombDamp" Text="Comb Damp"     VerticalAlignment="Center"/>
-                        <Slider    Grid.Row="5" Grid.Column="1" x:Name="SlCombDamp"     Minimum="0" Maximum="100" Value="0"/>
-                        <TextBlock Grid.Row="5" Grid.Column="2" x:Name="LblCombDampVal"    Text="0" VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="5" Grid.Column="1" x:Name="SlCombDamp"     Minimum="10" Maximum="70" Value="30" TickFrequency="1" IsSnapToTickEnabled="True"/>
+                        <TextBlock Grid.Row="5" Grid.Column="2" x:Name="LblCombDampVal"    Text="30%" VerticalAlignment="Center"/>
 
                         <TextBlock Grid.Row="6" Grid.Column="0" x:Name="LblBassBoostDb" Text="Bass Boost dB" VerticalAlignment="Center"/>
-                        <Slider    Grid.Row="6" Grid.Column="1" x:Name="SlBassBoostDb"  Minimum="0" Maximum="100" Value="0"/>
-                        <TextBlock Grid.Row="6" Grid.Column="2" x:Name="LblBassBoostDbVal" Text="0" VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="6" Grid.Column="1" x:Name="SlBassBoostDb"  Minimum="0" Maximum="12" Value="0" TickFrequency="1" IsSnapToTickEnabled="True"/>
+                        <TextBlock Grid.Row="6" Grid.Column="2" x:Name="LblBassBoostDbVal" Text="Off" VerticalAlignment="Center"/>
 
                         <TextBlock Grid.Row="7" Grid.Column="0" x:Name="LblBassBoostFreq" Text="Bass Boost Freq" VerticalAlignment="Center"/>
-                        <Slider    Grid.Row="7" Grid.Column="1" x:Name="SlBassBoostFreq" Minimum="0" Maximum="100" Value="0"/>
-                        <TextBlock Grid.Row="7" Grid.Column="2" x:Name="LblBassBoostFreqVal" Text="0" VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="7" Grid.Column="1" x:Name="SlBassBoostFreq" Minimum="80" Maximum="300" Value="150" TickFrequency="1" IsSnapToTickEnabled="True"/>
+                        <TextBlock Grid.Row="7" Grid.Column="2" x:Name="LblBassBoostFreqVal" Text="150 Hz" VerticalAlignment="Center"/>
                     </Grid>
                 </StackPanel>
+                </ScrollViewer>
             </TabItem>
 
         </TabControl>
 
-        <Button x:Name="BtnOK" Grid.Row="1" Content="OK" Padding="24,6"
-                HorizontalAlignment="Right" Margin="0,8,0,0"
-                Click="BtnOK_Click"/>
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">
+            <Button x:Name="BtnCancel" Content="Cancel" Padding="24,6" Click="BtnCancel_Click"/>
+            <Button x:Name="BtnOK" Content="OK" Padding="24,6" Click="BtnOK_Click"/>
+        </StackPanel>
     </Grid>
 </Window>

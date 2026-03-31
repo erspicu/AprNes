@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using Avalonia;
 using Avalonia.Controls;
@@ -99,8 +100,177 @@ public partial class MainWindow : Window
 
         _emu.ApplyAudioSettings(_soundEnabled, _ini.GetInt("Volume", 80));
 
+        // Load separate INI files for Analog and AudioPlus
+        LoadAnalogConfig();
+        LoadAudioPlusIni();
+
         ApplyLanguage(_ini.Get("Lang", LangHelper.CurrentLang));
         UpdateMenuStates();
+    }
+
+    // ═══ Analog Config INI ═══════════════════════════════════════════════
+    private static string ConfigDir => Path.Combine(AppContext.BaseDirectory, "configure");
+
+    private void LoadAnalogConfig()
+    {
+        string analogFile = Path.Combine(ConfigDir, "AprNesAnalog.ini");
+        if (!File.Exists(analogFile)) return; // use NesCore defaults
+
+        var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string line in File.ReadAllLines(analogFile))
+        {
+            string t = line.TrimStart();
+            if (t.StartsWith(';') || t.StartsWith('#')) continue;
+            var kv = line.Split(new[] { '=' }, 2);
+            if (kv.Length == 2) dict[kv[0].Trim()] = kv[1].Trim();
+        }
+
+        float Get(string key, float def) =>
+            dict.TryGetValue(key, out var s) &&
+            float.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out float v) ? v : def;
+
+        bool GetBool(string key, bool def) =>
+            dict.TryGetValue(key, out var s) ? (s == "1" || s.Equals("true", StringComparison.OrdinalIgnoreCase)) : def;
+
+        // Effect toggles
+        AprNes.NesCore.HbiSimulation    = GetBool("HbiSimulation", true);
+        AprNes.NesCore.ColorBurstJitter = GetBool("ColorBurstJitter", true);
+        AprNes.NesCore.SymmetricIQ      = GetBool("SymmetricIQ", true);
+        AprNes.NesCore.InterlaceJitter  = GetBool("InterlaceJitter", true);
+
+        bool ringingOn     = GetBool("RingingEnabled", true);
+        bool vignetteOn    = GetBool("VignetteEnabled", true);
+        bool shadowMaskOn  = GetBool("ShadowMaskEnabled", true);
+        bool curvatureOn   = GetBool("CurvatureEnabled", true);
+        bool phosphorOn    = GetBool("PhosphorEnabled", true);
+        bool hbeamOn       = GetBool("HBeamEnabled", true);
+        bool convergenceOn = GetBool("ConvergenceEnabled", true);
+
+        // Effect values
+        AprNes.NesCore.RingStrength  = ringingOn ? Get("RingStrength", 0.3f) : 0f;
+        AprNes.NesCore.GammaCoeff   = Get("GammaCoeff", 0.229f);
+        AprNes.NesCore.ColorTempR   = Get("ColorTempR", 1.0f);
+        AprNes.NesCore.ColorTempG   = Get("ColorTempG", 1.0f);
+        AprNes.NesCore.ColorTempB   = Get("ColorTempB", 1.0f);
+        AprNes.NesCore.VignetteStrength   = vignetteOn ? Get("VignetteStrength", 0.15f) : 0f;
+        AprNes.NesCore.ShadowMaskMode     = shadowMaskOn
+            ? (AprNes.NesCore.CrtMaskType)(int)Get("ShadowMaskMode", 1f)
+            : AprNes.NesCore.CrtMaskType.None;
+        AprNes.NesCore.ShadowMaskStrength = Get("ShadowMaskStrength", 0.3f);
+        AprNes.NesCore.CurvatureStrength  = curvatureOn ? Get("CurvatureStrength", 0.12f) : 0f;
+        AprNes.NesCore.PhosphorDecay      = phosphorOn ? Get("PhosphorDecay", 0.15f) : 0f;
+        AprNes.NesCore.HBeamSpread        = hbeamOn ? Get("HBeamSpread", 0.4f) : 0f;
+        AprNes.NesCore.ConvergenceStrength = convergenceOn ? Get("ConvergenceStrength", 2.0f) : 0f;
+
+        // Stage 1 connector
+        AprNes.NesCore.RF_NoiseIntensity = Get("RF_NoiseIntensity", 0.04f);
+        AprNes.NesCore.RF_SlewRate       = Get("RF_SlewRate",       0.60f);
+        AprNes.NesCore.RF_ChromaBlur     = Get("RF_ChromaBlur",     0.10f);
+        AprNes.NesCore.AV_NoiseIntensity = Get("AV_NoiseIntensity", 0.003f);
+        AprNes.NesCore.AV_SlewRate       = Get("AV_SlewRate",       0.80f);
+        AprNes.NesCore.AV_ChromaBlur     = Get("AV_ChromaBlur",     0.35f);
+        AprNes.NesCore.SV_NoiseIntensity = Get("SV_NoiseIntensity", 0.00f);
+        AprNes.NesCore.SV_SlewRate       = Get("SV_SlewRate",       0.90f);
+        AprNes.NesCore.SV_ChromaBlur     = Get("SV_ChromaBlur",     0.45f);
+
+        // Stage 2 connector
+        AprNes.NesCore.RF_BeamSigma       = Get("RF_BeamSigma",       1.10f);
+        AprNes.NesCore.RF_BloomStrength   = Get("RF_BloomStrength",   0.50f);
+        AprNes.NesCore.RF_BrightnessBoost = Get("RF_BrightnessBoost", 1.10f);
+        AprNes.NesCore.AV_BeamSigma       = Get("AV_BeamSigma",       0.85f);
+        AprNes.NesCore.AV_BloomStrength   = Get("AV_BloomStrength",   0.25f);
+        AprNes.NesCore.AV_BrightnessBoost = Get("AV_BrightnessBoost", 1.25f);
+        AprNes.NesCore.SV_BeamSigma       = Get("SV_BeamSigma",       0.65f);
+        AprNes.NesCore.SV_BloomStrength   = Get("SV_BloomStrength",   0.10f);
+        AprNes.NesCore.SV_BrightnessBoost = Get("SV_BrightnessBoost", 1.40f);
+
+        AprNes.NesCore.UpdateGammaLUT();
+    }
+
+    // ═══ AudioPlus INI ═══════════════════════════════════════════════════
+    private readonly int[,]  _chipChVol = new int[7, 8];
+    private readonly bool[,] _chipChEn  = new bool[7, 8];
+    private static readonly string[] _chipIniPrefix = { "", "VRC6", "VRC7", "N163", "S5B", "MMC5", "FDS" };
+
+    private void InitChipDefaults()
+    {
+        for (int c = 0; c < 7; c++)
+            for (int i = 0; i < 8; i++)
+            { _chipChVol[c, i] = 70; _chipChEn[c, i] = true; }
+    }
+
+    private void ApplyChipChannelSettings(int chipIdx)
+    {
+        if (chipIdx < 0 || chipIdx >= 7) chipIdx = 0;
+        for (int i = 0; i < 8; i++)
+        {
+            AprNes.NesCore.ChannelVolume[5 + i]  = _chipChVol[chipIdx, i];
+            AprNes.NesCore.ChannelEnabled[5 + i] = _chipChEn[chipIdx, i];
+        }
+    }
+
+    private void LoadAudioPlusIni()
+    {
+        InitChipDefaults();
+        string iniPath = Path.Combine(ConfigDir, "AprNesAudioPlus.ini");
+
+        if (!File.Exists(iniPath)) return; // use NesCore defaults
+
+        var cfg = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string line in File.ReadAllLines(iniPath))
+        {
+            string t = line.TrimStart();
+            if (t.StartsWith(';') || t.StartsWith('#')) continue;
+            var kv = line.Split(new[] { '=' }, 2);
+            if (kv.Length == 2) cfg[kv[0].Trim()] = kv[1].Trim();
+        }
+
+        int ReadInt(string key, int def, int min, int max) =>
+            cfg.TryGetValue(key, out var s) && int.TryParse(s, out int v)
+                ? Math.Clamp(v, min, max) : def;
+
+        // Authentic
+        AprNes.NesCore.ConsoleModel    = ReadInt("ConsoleModel", 0, 0, 6);
+        AprNes.NesCore.RfCrosstalk     = cfg.TryGetValue("RfCrosstalk", out var rc) && rc == "1";
+        AprNes.NesCore.CustomLpfCutoff = ReadInt("CustomLpfCutoff", 14000, 1000, 22000);
+        AprNes.NesCore.CustomBuzz      = cfg.TryGetValue("CustomBuzz", out var cb) && cb == "1";
+        AprNes.NesCore.BuzzAmplitude   = ReadInt("BuzzAmplitude", 30, 0, 100);
+        AprNes.NesCore.BuzzFreq        = ReadInt("BuzzFreq", 60, 50, 60);
+        AprNes.NesCore.RfVolume        = ReadInt("RfVolume", 50, 0, 200);
+
+        // Modern
+        AprNes.NesCore.StereoWidth   = ReadInt("StereoWidth", 50, 0, 100);
+        AprNes.NesCore.HaasDelay     = ReadInt("HaasDelay", 20, 10, 30);
+        AprNes.NesCore.HaasCrossfeed = ReadInt("HaasCrossfeed", 40, 0, 80);
+        AprNes.NesCore.ReverbWet     = ReadInt("ReverbWet", 0, 0, 30);
+        AprNes.NesCore.CombFeedback  = ReadInt("CombFeedback", 70, 30, 90);
+        AprNes.NesCore.CombDamp      = ReadInt("CombDamp", 30, 10, 70);
+        AprNes.NesCore.BassBoostDb   = ReadInt("BassBoostDb", 0, 0, 12);
+        AprNes.NesCore.BassBoostFreq = ReadInt("BassBoostFreq", 150, 80, 300);
+
+        // NES channel volume
+        string[] nesChKeys = { "Pulse1", "Pulse2", "Triangle", "Noise", "DMC" };
+        for (int i = 0; i < 5; i++)
+        {
+            AprNes.NesCore.ChannelVolume[i] = ReadInt("ChVol_" + nesChKeys[i], 70, 0, 100);
+            AprNes.NesCore.ChannelEnabled[i] = !(cfg.TryGetValue("ChEn_" + nesChKeys[i], out var en) && en == "0");
+        }
+
+        // Per-chip expansion channels
+        for (int chip = 1; chip < _chipIniPrefix.Length; chip++)
+        {
+            for (int ch = 0; ch < 8; ch++)
+            {
+                string volKey = "ChVol_" + _chipIniPrefix[chip] + "_" + ch;
+                string enKey  = "ChEn_"  + _chipIniPrefix[chip] + "_" + ch;
+                if (cfg.TryGetValue(volKey, out var vs) && int.TryParse(vs, out int v))
+                    _chipChVol[chip, ch] = Math.Clamp(v, 0, 100);
+                if (cfg.TryGetValue(enKey, out var es))
+                    _chipChEn[chip, ch] = es != "0";
+            }
+        }
+
+        ApplyChipChannelSettings((int)AprNes.NesCore.expansionChipType);
     }
 
     private string L(string key, string def) => LangHelper.Get(LangHelper.CurrentLang, key, def);

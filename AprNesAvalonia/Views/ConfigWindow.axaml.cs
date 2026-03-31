@@ -334,12 +334,12 @@ public partial class ConfigWindow : Window
 
     private async void BtnAnalogAdvanced_Click(object? sender, RoutedEventArgs e)
     {
-        await new AnalogConfigWindow(_ini).ShowDialog(this);
+        await new AnalogConfigWindow().ShowDialog(this);
     }
 
     private async void BtnAudioAdvanced_Click(object? sender, RoutedEventArgs e)
     {
-        await new AudioPlusConfigWindow(_ini).ShowDialog(this);
+        await new AudioPlusConfigWindow().ShowDialog(this);
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────
