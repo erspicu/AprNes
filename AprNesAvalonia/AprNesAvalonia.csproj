@@ -15,12 +15,19 @@
     <NoWarn>$(NoWarn);AVLN3001</NoWarn>
   </PropertyGroup>
 
-  <!-- NesCoreNET: .NET 10 fork of NesCore (auto-included by SDK from project dir) -->
-  <!-- Mappers: shared directly from AprNes/NesCore/Mapper/ (no duplication) -->
-  <!-- External tools from original AprNes project -->
+  <!-- NesCore: 直接引用 AprNes 全部源碼，不再使用本地 NesCoreNET 副本 -->
   <ItemGroup>
-    <Compile Include="../AprNes/NesCore/Mapper/*.cs" Link="NesCoreNET/Mapper/%(Filename)%(Extension)" />
-    <Compile Include="../AprNes/tool/WaveOutPlayer.cs" Link="WaveOutPlayer.cs" />
+    <!-- 排除本地 NesCoreNET 副本 -->
+    <Compile Remove="NesCoreNET/**/*.cs" />
+
+    <!-- 引用 AprNes NesCore 全部源碼 -->
+    <Compile Include="../AprNes/NesCore/*.cs" Link="NesCore/%(Filename)%(Extension)" />
+    <Compile Include="../AprNes/NesCore/Mapper/*.cs" Link="NesCore/Mapper/%(Filename)%(Extension)" />
+    <Compile Include="../AprNes/NesCore/AudioPlus/*.cs" Link="NesCore/AudioPlus/%(Filename)%(Extension)" />
+    <Compile Include="../AprNes/NesCore/NTSC_CRT/*.cs" Link="NesCore/NTSC_CRT/%(Filename)%(Extension)" />
+
+    <!-- 外部工具 -->
+    <Compile Include="../AprNes/tool/WaveOutPlayer.cs" Link="Platform/WaveOutPlayer.cs" />
   </ItemGroup>
 
   <ItemGroup>

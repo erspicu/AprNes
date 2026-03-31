@@ -1,8 +1,9 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="AprNesAvalonia.Views.ConfigWindow"
-        Title="功能設定"
-        Width="780"
+        x:Name="CfgWindow"
+        Title="Configuration"
+        Width="700"
         SizeToContent="Height"
         CanResize="False"
         WindowStartupLocation="CenterOwner"
@@ -10,115 +11,285 @@
 
     <Grid RowDefinitions="*,Auto" Margin="8">
 
-        <!-- Main content row -->
-        <Grid Grid.Row="0" ColumnDefinitions="220,220,*">
+        <!-- Tab Control -->
+        <TabControl Grid.Row="0">
 
-            <!-- Column 0: Keyboard mapping -->
-            <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                <TextBlock Text="遊戲按鈕鍵盤對應" FontWeight="Bold" Margin="0,0,0,6"/>
-                <Grid ColumnDefinitions="60,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="4">
-                    <TextBlock Grid.Row="0" Grid.Column="0" Text="A"      VerticalAlignment="Center"/>
-                    <Button    Grid.Row="0" Grid.Column="1" x:Name="KB_A"      Content="Z"      HorizontalAlignment="Stretch" Click="KB_Click"/>
-                    <TextBlock Grid.Row="1" Grid.Column="0" Text="B"      VerticalAlignment="Center"/>
-                    <Button    Grid.Row="1" Grid.Column="1" x:Name="KB_B"      Content="X"      HorizontalAlignment="Stretch" Click="KB_Click"/>
-                    <TextBlock Grid.Row="2" Grid.Column="0" Text="SELECT" VerticalAlignment="Center"/>
-                    <Button    Grid.Row="2" Grid.Column="1" x:Name="KB_SELECT" Content="S"      HorizontalAlignment="Stretch" Click="KB_Click"/>
-                    <TextBlock Grid.Row="3" Grid.Column="0" Text="START"  VerticalAlignment="Center"/>
-                    <Button    Grid.Row="3" Grid.Column="1" x:Name="KB_START"  Content="A"      HorizontalAlignment="Stretch" Click="KB_Click"/>
-                    <TextBlock Grid.Row="4" Grid.Column="0" Text="UP"     VerticalAlignment="Center"/>
-                    <Button    Grid.Row="4" Grid.Column="1" x:Name="KB_UP"     Content="Up"     HorizontalAlignment="Stretch" Click="KB_Click"/>
-                    <TextBlock Grid.Row="5" Grid.Column="0" Text="DOWN"   VerticalAlignment="Center"/>
-                    <Button    Grid.Row="5" Grid.Column="1" x:Name="KB_DOWN"   Content="Down"   HorizontalAlignment="Stretch" Click="KB_Click"/>
-                    <TextBlock Grid.Row="6" Grid.Column="0" Text="LEFT"   VerticalAlignment="Center"/>
-                    <Button    Grid.Row="6" Grid.Column="1" x:Name="KB_LEFT"   Content="Left"   HorizontalAlignment="Stretch" Click="KB_Click"/>
-                    <TextBlock Grid.Row="7" Grid.Column="0" Text="RIGHT"  VerticalAlignment="Center"/>
-                    <Button    Grid.Row="7" Grid.Column="1" x:Name="KB_RIGHT"  Content="Right"  HorizontalAlignment="Stretch" Click="KB_Click"/>
-                </Grid>
-            </StackPanel>
+            <!-- P1 Input -->
+            <TabItem x:Name="TabP1" Header="P1 Input">
+                <Grid ColumnDefinitions="*,*" Margin="8">
 
-            <!-- Column 1: Gamepad mapping -->
-            <StackPanel Grid.Column="1" Margin="0,0,8,0">
-                <TextBlock Text="遊戲按鈕手把對應" FontWeight="Bold" Margin="0,0,0,6"/>
-                <Grid ColumnDefinitions="60,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="4">
-                    <TextBlock Grid.Row="0" Grid.Column="0" Text="A"      VerticalAlignment="Center"/>
-                    <Button    Grid.Row="0" Grid.Column="1" x:Name="GP_A"      Content="Button 1" HorizontalAlignment="Stretch"/>
-                    <TextBlock Grid.Row="1" Grid.Column="0" Text="B"      VerticalAlignment="Center"/>
-                    <Button    Grid.Row="1" Grid.Column="1" x:Name="GP_B"      Content="Button 3" HorizontalAlignment="Stretch"/>
-                    <TextBlock Grid.Row="2" Grid.Column="0" Text="SELECT" VerticalAlignment="Center"/>
-                    <Button    Grid.Row="2" Grid.Column="1" x:Name="GP_SELECT" Content="Button 8" HorizontalAlignment="Stretch"/>
-                    <TextBlock Grid.Row="3" Grid.Column="0" Text="START"  VerticalAlignment="Center"/>
-                    <Button    Grid.Row="3" Grid.Column="1" x:Name="GP_START"  Content="Button 7" HorizontalAlignment="Stretch"/>
-                    <TextBlock Grid.Row="4" Grid.Column="0" Text="UP"     VerticalAlignment="Center"/>
-                    <Button    Grid.Row="4" Grid.Column="1" x:Name="GP_UP"     Content="UP"       HorizontalAlignment="Stretch"/>
-                    <TextBlock Grid.Row="5" Grid.Column="0" Text="DOWN"   VerticalAlignment="Center"/>
-                    <Button    Grid.Row="5" Grid.Column="1" x:Name="GP_DOWN"   Content="DOWN"     HorizontalAlignment="Stretch"/>
-                    <TextBlock Grid.Row="6" Grid.Column="0" Text="LEFT"   VerticalAlignment="Center"/>
-                    <Button    Grid.Row="6" Grid.Column="1" x:Name="GP_LEFT"   Content="LEFT"     HorizontalAlignment="Stretch"/>
-                    <TextBlock Grid.Row="7" Grid.Column="0" Text="RIGHT"  VerticalAlignment="Center"/>
-                    <Button    Grid.Row="7" Grid.Column="1" x:Name="GP_RIGHT"  Content="RIGHT"    HorizontalAlignment="Stretch"/>
-                </Grid>
-            </StackPanel>
-
-            <!-- Column 2: Settings -->
-            <StackPanel Grid.Column="2" Spacing="8">
-
-                <!-- Limit FPS + screenshot path -->
-                <CheckBox x:Name="ChkLimitFps" Content="限制FPS速度"/>
-                <StackPanel Orientation="Horizontal" Spacing="4">
-                    <TextBlock Text="Shift+p 抓取畫面擷圖存放處" VerticalAlignment="Center"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="4">
-                    <TextBox x:Name="TxtScreenshotPath" Width="220" IsReadOnly="True"/>
-                    <Button  x:Name="BtnBrowse" Content="目錄選擇" Click="BtnBrowse_Click"/>
-                </StackPanel>
-
-                <!-- Screen size + Scanline + Language -->
-                <Grid ColumnDefinitions="Auto,Auto,Auto">
+                    <!-- P1 Keyboard -->
                     <StackPanel Grid.Column="0" Margin="0,0,12,0">
-                        <TextBlock Text="畫面大小" FontWeight="Bold" Margin="0,0,0,4"/>
-                        <Grid ColumnDefinitions="Auto,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="2">
-                            <RadioButton Grid.Row="0" Grid.Column="0" x:Name="Scale1" Content="x1" GroupName="Scale" IsChecked="True"/>
-                            <RadioButton Grid.Row="0" Grid.Column="1" x:Name="Scale5" Content="x5" GroupName="Scale"/>
-                            <RadioButton Grid.Row="1" Grid.Column="0" x:Name="Scale2" Content="x2" GroupName="Scale"/>
-                            <RadioButton Grid.Row="1" Grid.Column="1" x:Name="Scale6" Content="x6" GroupName="Scale"/>
-                            <RadioButton Grid.Row="2" Grid.Column="0" x:Name="Scale3" Content="x3" GroupName="Scale"/>
-                            <RadioButton Grid.Row="2" Grid.Column="1" x:Name="Scale8" Content="x8" GroupName="Scale"/>
-                            <RadioButton Grid.Row="3" Grid.Column="0" x:Name="Scale4" Content="x4" GroupName="Scale"/>
-                            <RadioButton Grid.Row="3" Grid.Column="1" x:Name="Scale9" Content="x9" GroupName="Scale"/>
+                        <TextBlock x:Name="LblP1Keyboard" Text="Keyboard" FontWeight="Bold" Margin="0,0,0,8"/>
+                        <Grid ColumnDefinitions="70,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="4">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="A"      VerticalAlignment="Center"/>
+                            <Button    Grid.Row="0" Grid.Column="1" x:Name="P1_KB_A"      Content="Z"     HorizontalAlignment="Stretch" Click="KB_Click" Tag="P1"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="B"      VerticalAlignment="Center"/>
+                            <Button    Grid.Row="1" Grid.Column="1" x:Name="P1_KB_B"      Content="X"     HorizontalAlignment="Stretch" Click="KB_Click" Tag="P1"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="SELECT" VerticalAlignment="Center"/>
+                            <Button    Grid.Row="2" Grid.Column="1" x:Name="P1_KB_SELECT" Content="S"     HorizontalAlignment="Stretch" Click="KB_Click" Tag="P1"/>
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="START"  VerticalAlignment="Center"/>
+                            <Button    Grid.Row="3" Grid.Column="1" x:Name="P1_KB_START"  Content="A"     HorizontalAlignment="Stretch" Click="KB_Click" Tag="P1"/>
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="UP"     VerticalAlignment="Center"/>
+                            <Button    Grid.Row="4" Grid.Column="1" x:Name="P1_KB_UP"     Content="Up"    HorizontalAlignment="Stretch" Click="KB_Click" Tag="P1"/>
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="DOWN"   VerticalAlignment="Center"/>
+                            <Button    Grid.Row="5" Grid.Column="1" x:Name="P1_KB_DOWN"   Content="Down"  HorizontalAlignment="Stretch" Click="KB_Click" Tag="P1"/>
+                            <TextBlock Grid.Row="6" Grid.Column="0" Text="LEFT"   VerticalAlignment="Center"/>
+                            <Button    Grid.Row="6" Grid.Column="1" x:Name="P1_KB_LEFT"   Content="Left"  HorizontalAlignment="Stretch" Click="KB_Click" Tag="P1"/>
+                            <TextBlock Grid.Row="7" Grid.Column="0" Text="RIGHT"  VerticalAlignment="Center"/>
+                            <Button    Grid.Row="7" Grid.Column="1" x:Name="P1_KB_RIGHT"  Content="Right" HorizontalAlignment="Stretch" Click="KB_Click" Tag="P1"/>
                         </Grid>
                     </StackPanel>
-                    <StackPanel Grid.Column="1" Margin="0,0,12,0">
-                        <TextBlock Text="掃描線" FontWeight="Bold" Margin="0,0,0,4"/>
-                        <RadioButton x:Name="Scan2" Content="x2" GroupName="Scan"/>
-                        <RadioButton x:Name="Scan4" Content="x4" GroupName="Scan"/>
-                        <RadioButton x:Name="Scan6" Content="x6" GroupName="Scan"/>
+
+                    <!-- P1 Gamepad -->
+                    <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                        <TextBlock x:Name="LblP1Gamepad" Text="Gamepad" FontWeight="Bold" Margin="0,0,0,8"/>
+                        <Grid ColumnDefinitions="70,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="4">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="A"      VerticalAlignment="Center"/>
+                            <Button    Grid.Row="0" Grid.Column="1" x:Name="P1_GP_A"      Content="--" HorizontalAlignment="Stretch" Click="GP_Click" Tag="P1"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="B"      VerticalAlignment="Center"/>
+                            <Button    Grid.Row="1" Grid.Column="1" x:Name="P1_GP_B"      Content="--" HorizontalAlignment="Stretch" Click="GP_Click" Tag="P1"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="SELECT" VerticalAlignment="Center"/>
+                            <Button    Grid.Row="2" Grid.Column="1" x:Name="P1_GP_SELECT" Content="--" HorizontalAlignment="Stretch" Click="GP_Click" Tag="P1"/>
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="START"  VerticalAlignment="Center"/>
+                            <Button    Grid.Row="3" Grid.Column="1" x:Name="P1_GP_START"  Content="--" HorizontalAlignment="Stretch" Click="GP_Click" Tag="P1"/>
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="UP"     VerticalAlignment="Center"/>
+                            <Button    Grid.Row="4" Grid.Column="1" x:Name="P1_GP_UP"     Content="--" HorizontalAlignment="Stretch" Click="GP_Click" Tag="P1"/>
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="DOWN"   VerticalAlignment="Center"/>
+                            <Button    Grid.Row="5" Grid.Column="1" x:Name="P1_GP_DOWN"   Content="--" HorizontalAlignment="Stretch" Click="GP_Click" Tag="P1"/>
+                            <TextBlock Grid.Row="6" Grid.Column="0" Text="LEFT"   VerticalAlignment="Center"/>
+                            <Button    Grid.Row="6" Grid.Column="1" x:Name="P1_GP_LEFT"   Content="--" HorizontalAlignment="Stretch" Click="GP_Click" Tag="P1"/>
+                            <TextBlock Grid.Row="7" Grid.Column="0" Text="RIGHT"  VerticalAlignment="Center"/>
+                            <Button    Grid.Row="7" Grid.Column="1" x:Name="P1_GP_RIGHT"  Content="--" HorizontalAlignment="Stretch" Click="GP_Click" Tag="P1"/>
+                        </Grid>
                     </StackPanel>
-                    <StackPanel Grid.Column="2">
-                        <TextBlock Text="語言選擇" FontWeight="Bold" Margin="0,0,0,4"/>
-                        <ComboBox x:Name="LangCombo" Width="140">
+                </Grid>
+            </TabItem>
+
+            <!-- P2 Input -->
+            <TabItem x:Name="TabP2" Header="P2 Input">
+                <Grid ColumnDefinitions="*,*" Margin="8">
+
+                    <!-- P2 Keyboard -->
+                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                        <TextBlock x:Name="LblP2Keyboard" Text="Keyboard" FontWeight="Bold" Margin="0,0,0,8"/>
+                        <Grid ColumnDefinitions="70,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="4">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="A"      VerticalAlignment="Center"/>
+                            <Button    Grid.Row="0" Grid.Column="1" x:Name="P2_KB_A"      Content="--" HorizontalAlignment="Stretch" Click="KB_Click" Tag="P2"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="B"      VerticalAlignment="Center"/>
+                            <Button    Grid.Row="1" Grid.Column="1" x:Name="P2_KB_B"      Content="--" HorizontalAlignment="Stretch" Click="KB_Click" Tag="P2"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="SELECT" VerticalAlignment="Center"/>
+                            <Button    Grid.Row="2" Grid.Column="1" x:Name="P2_KB_SELECT" Content="--" HorizontalAlignment="Stretch" Click="KB_Click" Tag="P2"/>
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="START"  VerticalAlignment="Center"/>
+                            <Button    Grid.Row="3" Grid.Column="1" x:Name="P2_KB_START"  Content="--" HorizontalAlignment="Stretch" Click="KB_Click" Tag="P2"/>
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="UP"     VerticalAlignment="Center"/>
+                            <Button    Grid.Row="4" Grid.Column="1" x:Name="P2_KB_UP"     Content="--" HorizontalAlignment="Stretch" Click="KB_Click" Tag="P2"/>
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="DOWN"   VerticalAlignment="Center"/>
+                            <Button    Grid.Row="5" Grid.Column="1" x:Name="P2_KB_DOWN"   Content="--" HorizontalAlignment="Stretch" Click="KB_Click" Tag="P2"/>
+                            <TextBlock Grid.Row="6" Grid.Column="0" Text="LEFT"   VerticalAlignment="Center"/>
+                            <Button    Grid.Row="6" Grid.Column="1" x:Name="P2_KB_LEFT"   Content="--" HorizontalAlignment="Stretch" Click="KB_Click" Tag="P2"/>
+                            <TextBlock Grid.Row="7" Grid.Column="0" Text="RIGHT"  VerticalAlignment="Center"/>
+                            <Button    Grid.Row="7" Grid.Column="1" x:Name="P2_KB_RIGHT"  Content="--" HorizontalAlignment="Stretch" Click="KB_Click" Tag="P2"/>
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- P2 Gamepad -->
+                    <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                        <TextBlock x:Name="LblP2Gamepad" Text="Gamepad" FontWeight="Bold" Margin="0,0,0,8"/>
+                        <Grid ColumnDefinitions="70,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="4">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="A"      VerticalAlignment="Center"/>
+                            <Button    Grid.Row="0" Grid.Column="1" x:Name="P2_GP_A"      Content="--" HorizontalAlignment="Stretch" Click="GP_Click" Tag="P2"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="B"      VerticalAlignment="Center"/>
+                            <Button    Grid.Row="1" Grid.Column="1" x:Name="P2_GP_B"      Content="--" HorizontalAlignment="Stretch" Click="GP_Click" Tag="P2"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="SELECT" VerticalAlignment="Center"/>
+                            <Button    Grid.Row="2" Grid.Column="1" x:Name="P2_GP_SELECT" Content="--" HorizontalAlignment="Stretch" Click="GP_Click" Tag="P2"/>
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="START"  VerticalAlignment="Center"/>
+                            <Button    Grid.Row="3" Grid.Column="1" x:Name="P2_GP_START"  Content="--" HorizontalAlignment="Stretch" Click="GP_Click" Tag="P2"/>
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="UP"     VerticalAlignment="Center"/>
+                            <Button    Grid.Row="4" Grid.Column="1" x:Name="P2_GP_UP"     Content="--" HorizontalAlignment="Stretch" Click="GP_Click" Tag="P2"/>
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="DOWN"   VerticalAlignment="Center"/>
+                            <Button    Grid.Row="5" Grid.Column="1" x:Name="P2_GP_DOWN"   Content="--" HorizontalAlignment="Stretch" Click="GP_Click" Tag="P2"/>
+                            <TextBlock Grid.Row="6" Grid.Column="0" Text="LEFT"   VerticalAlignment="Center"/>
+                            <Button    Grid.Row="6" Grid.Column="1" x:Name="P2_GP_LEFT"   Content="--" HorizontalAlignment="Stretch" Click="GP_Click" Tag="P2"/>
+                            <TextBlock Grid.Row="7" Grid.Column="0" Text="RIGHT"  VerticalAlignment="Center"/>
+                            <Button    Grid.Row="7" Grid.Column="1" x:Name="P2_GP_RIGHT"  Content="--" HorizontalAlignment="Stretch" Click="GP_Click" Tag="P2"/>
+                        </Grid>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+
+            <!-- Graphics -->
+            <TabItem x:Name="TabGraphics" Header="Graphics">
+                <StackPanel Margin="8" Spacing="12">
+
+                    <!-- Screen Filters -->
+                    <StackPanel>
+                        <TextBlock x:Name="LblScreenFilters" Text="Screen Filters" FontWeight="Bold" Margin="0,0,0,6"/>
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="6" ColumnSpacing="12">
+                            <TextBlock Grid.Row="0" Grid.Column="0" x:Name="LblStage1" Text="Stage 1" VerticalAlignment="Center"/>
+                            <ComboBox  Grid.Row="0" Grid.Column="1" x:Name="CmbFilter1" Width="220">
+                                <ComboBoxItem Content="None" IsSelected="True"/>
+                                <ComboBoxItem Content="xBRZ 2x"/>
+                                <ComboBoxItem Content="xBRZ 3x"/>
+                                <ComboBoxItem Content="xBRZ 4x"/>
+                                <ComboBoxItem Content="xBRZ 5x"/>
+                                <ComboBoxItem Content="xBRZ 6x"/>
+                                <ComboBoxItem Content="ScaleX 2x"/>
+                                <ComboBoxItem Content="ScaleX 3x"/>
+                                <ComboBoxItem Content="NN 2x"/>
+                                <ComboBoxItem Content="NN 3x"/>
+                                <ComboBoxItem Content="NN 4x"/>
+                            </ComboBox>
+                            <TextBlock Grid.Row="1" Grid.Column="0" x:Name="LblStage2" Text="Stage 2" VerticalAlignment="Center"/>
+                            <ComboBox  Grid.Row="1" Grid.Column="1" x:Name="CmbFilter2" Width="220">
+                                <ComboBoxItem Content="None" IsSelected="True"/>
+                                <ComboBoxItem Content="ScaleX 2x"/>
+                                <ComboBoxItem Content="ScaleX 3x"/>
+                                <ComboBoxItem Content="NN 2x"/>
+                                <ComboBoxItem Content="NN 3x"/>
+                                <ComboBoxItem Content="NN 4x"/>
+                            </ComboBox>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="" />
+                            <CheckBox  Grid.Row="2" Grid.Column="1" x:Name="ChkScanline" Content="Scanline"/>
+                            <TextBlock Grid.Row="3" Grid.Column="0" x:Name="LblOutput" Text="Output" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1" x:Name="LblResolution" Text="256 x 240" Foreground="#555"/>
+                        </Grid>
+                    </StackPanel>
+
+                    <Separator/>
+
+                    <!-- Analog Mode -->
+                    <StackPanel>
+                        <TextBlock x:Name="LblAnalogVideo" Text="Analog Video" FontWeight="Bold" Margin="0,0,0,6"/>
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6" ColumnSpacing="12">
+                            <CheckBox Grid.Row="0" Grid.ColumnSpan="2" x:Name="ChkAnalog" Content="Enable Analog Mode"/>
+                            <CheckBox Grid.Row="1" Grid.ColumnSpan="2" x:Name="ChkUltraAnalog" Content="Ultra Analog"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" x:Name="LblSize" Text="Size" VerticalAlignment="Center"/>
+                            <ComboBox  Grid.Row="2" Grid.Column="1" x:Name="CmbAnalogSize" Width="100">
+                                <ComboBoxItem Content="2x"/>
+                                <ComboBoxItem Content="4x" IsSelected="True"/>
+                                <ComboBoxItem Content="6x"/>
+                                <ComboBoxItem Content="8x"/>
+                            </ComboBox>
+                            <TextBlock Grid.Row="3" Grid.Column="0" x:Name="LblInput" Text="Input" VerticalAlignment="Center"/>
+                            <ComboBox  Grid.Row="3" Grid.Column="1" x:Name="CmbAnalogInput" Width="140">
+                                <ComboBoxItem Content="RF"/>
+                                <ComboBoxItem Content="S-Video"/>
+                                <ComboBoxItem Content="AV" IsSelected="True"/>
+                            </ComboBox>
+                            <CheckBox Grid.Row="4" Grid.ColumnSpan="2" x:Name="ChkCRT" Content="CRT Effect"/>
+                            <Button   Grid.Row="5" Grid.Column="1" x:Name="BtnAnalogAdvanced"
+                                      Content="Advanced Settings..." Click="BtnAnalogAdvanced_Click"
+                                      HorizontalAlignment="Left" Padding="12,4"/>
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
+            </TabItem>
+
+            <!-- Audio -->
+            <TabItem x:Name="TabAudio" Header="Audio">
+                <StackPanel Margin="8" Spacing="12">
+
+                    <CheckBox x:Name="ChkSound" Content="Enable Sound" Click="ChkSound_Click"/>
+
+                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" RowSpacing="8" ColumnSpacing="12">
+                        <TextBlock Grid.Row="0" Grid.Column="0" x:Name="LblMode" Text="Mode" VerticalAlignment="Center"/>
+                        <ComboBox  Grid.Row="0" Grid.Column="1" x:Name="CmbAudioMode" Width="200">
+                            <ComboBoxItem Content="0 - Pure (NES APU only)" IsSelected="True"/>
+                            <ComboBoxItem Content="1 - Authentic (RF/AV crosstalk)"/>
+                            <ComboBoxItem Content="2 - Modern (post-processing)"/>
+                        </ComboBox>
+                        <TextBlock Grid.Row="1" Grid.Column="0" x:Name="LblVolumeLabel" Text="Volume" VerticalAlignment="Center"/>
+                        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                            <Slider x:Name="VolumeSlider" Minimum="0" Maximum="100" Value="80" Width="200"/>
+                            <TextBlock x:Name="LblVolume" Text="80" VerticalAlignment="Center" MinWidth="30"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Separator/>
+
+                    <Button x:Name="BtnAudioAdvanced" Content="Advanced Audio Settings..."
+                            Click="BtnAudioAdvanced_Click" Padding="12,4"
+                            HorizontalAlignment="Left"/>
+                </StackPanel>
+            </TabItem>
+
+            <!-- General -->
+            <TabItem x:Name="TabGeneral" Header="General">
+                <StackPanel Margin="8" Spacing="12">
+
+                    <!-- Language -->
+                    <Grid ColumnDefinitions="Auto,*" RowSpacing="8" ColumnSpacing="12">
+                        <TextBlock Grid.Column="0" x:Name="LblLanguage" Text="Language" VerticalAlignment="Center"/>
+                        <ComboBox  Grid.Column="1" x:Name="LangCombo" Width="200">
                             <ComboBoxItem Content="zh-tw 繁體中文" IsSelected="True"/>
                             <ComboBoxItem Content="zh-cn 简体中文"/>
                             <ComboBoxItem Content="en-us English"/>
                         </ComboBox>
+                    </Grid>
+
+                    <Separator/>
+
+                    <!-- Emulation -->
+                    <StackPanel Spacing="6">
+                        <TextBlock x:Name="LblEmulation" Text="Emulation" FontWeight="Bold"/>
+                        <CheckBox x:Name="ChkLimitFps" Content="Limit FPS"/>
+                        <CheckBox x:Name="ChkAccuracyOptA" Content="AccuracyOptA (per-dot sprite evaluation)"/>
                     </StackPanel>
-                </Grid>
 
-                <!-- AccuracyOptA -->
-                <CheckBox x:Name="ChkAccuracyOptA" Content="逐點精確 Secondary OAM 評估 (AccuracyOptA)"/>
+                    <Separator/>
 
-                <!-- Sound -->
-                <TextBlock Text="音效" FontWeight="Bold"/>
-                <Slider x:Name="VolumeSlider" Minimum="0" Maximum="100" Value="80" Width="200" HorizontalAlignment="Left"/>
-                <CheckBox x:Name="ChkSound" Content="音效 - 關閉" Click="ChkSound_Click"/>
+                    <!-- Screenshot -->
+                    <StackPanel Spacing="6">
+                        <TextBlock x:Name="LblScreenshotPath" Text="Screenshot Path (Shift+P)" FontWeight="Bold"/>
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBox x:Name="TxtScreenshotPath" Width="400" IsReadOnly="True"/>
+                            <Button x:Name="BtnBrowseScreenshot" Content="Browse..." Click="BtnBrowseScreenshot_Click" Padding="12,4"/>
+                        </StackPanel>
+                    </StackPanel>
 
-            </StackPanel>
-        </Grid>
+                    <Separator/>
 
-        <!-- OK button row -->
-        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,8,0,0">
-            <Button Grid.Column="1" x:Name="BtnOK" Content="確定"
-                    Padding="20,4" Click="BtnOK_Click"
-                    HorizontalAlignment="Right"/>
-        </Grid>
+                    <!-- Recording -->
+                    <StackPanel Spacing="6">
+                        <TextBlock x:Name="LblRecording" Text="Recording" FontWeight="Bold"/>
+
+                        <TextBlock x:Name="LblVideoPath" Text="Video Output Path" Margin="0,4,0,0"/>
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBox x:Name="TxtVideoPath" Width="400" IsReadOnly="True"/>
+                            <Button x:Name="BtnBrowseVideo" Content="Browse..." Click="BtnBrowseVideo_Click" Padding="12,4"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="LblAudioPath" Text="Audio Output Path" Margin="0,4,0,0"/>
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBox x:Name="TxtAudioPath" Width="400" IsReadOnly="True"/>
+                            <Button x:Name="BtnBrowseAudio" Content="Browse..." Click="BtnBrowseAudio_Click" Padding="12,4"/>
+                        </StackPanel>
+
+                        <Grid ColumnDefinitions="Auto,*,Auto,*" RowSpacing="6" ColumnSpacing="12" Margin="0,6,0,0">
+                            <TextBlock Grid.Column="0" x:Name="LblVideoQuality" Text="Video Quality" VerticalAlignment="Center"/>
+                            <ComboBox  Grid.Column="1" x:Name="CmbVideoQuality" Width="140">
+                                <ComboBoxItem x:Name="CmbVQ_Low" Content="Low"/>
+                                <ComboBoxItem x:Name="CmbVQ_Med" Content="Medium" IsSelected="True"/>
+                                <ComboBoxItem x:Name="CmbVQ_High" Content="High"/>
+                                <ComboBoxItem x:Name="CmbVQ_Ultra" Content="Ultra"/>
+                            </ComboBox>
+                            <TextBlock Grid.Column="2" x:Name="LblAudioBitrate" Text="Audio Bitrate" VerticalAlignment="Center"/>
+                            <ComboBox  Grid.Column="3" x:Name="CmbAudioBitrate" Width="140">
+                                <ComboBoxItem Content="128 kbps" IsSelected="True"/>
+                                <ComboBoxItem Content="160 kbps"/>
+                                <ComboBoxItem Content="192 kbps"/>
+                            </ComboBox>
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
+            </TabItem>
+
+        </TabControl>
+
+        <!-- Bottom OK -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button x:Name="BtnOK" Content="OK" Padding="24,6" Click="BtnOK_Click"/>
+        </StackPanel>
     </Grid>
 </Window>

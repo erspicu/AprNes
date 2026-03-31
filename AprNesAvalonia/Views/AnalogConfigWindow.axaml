@@ -1,0 +1,97 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AprNesAvalonia.Views.AnalogConfigWindow"
+        Title="Analog Video Settings"
+        Width="500"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#F0F0F0">
+
+    <Grid RowDefinitions="*,Auto" Margin="8">
+        <TabControl Grid.Row="0">
+
+            <!-- NTSC -->
+            <TabItem x:Name="TabNtsc" Header="NTSC">
+                <StackPanel Margin="8" Spacing="8">
+                    <CheckBox x:Name="ChkHBI" Content="HBI (Horizontal Blanking Injection)"/>
+                    <CheckBox x:Name="ChkColorBurstJitter" Content="Color Burst Jitter"/>
+                    <CheckBox x:Name="ChkSymmetricIQ" Content="Symmetric IQ"/>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <CheckBox x:Name="ChkRinging" Content="Ringing"/>
+                        <Slider x:Name="SliderRinging" Minimum="0" Maximum="200" Value="100" Width="200"/>
+                        <TextBlock x:Name="LblRinging" Text="100" VerticalAlignment="Center" MinWidth="30"/>
+                    </StackPanel>
+
+                    <Separator/>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock x:Name="LblGammaLabel" Text="Gamma" VerticalAlignment="Center" MinWidth="50"/>
+                        <Slider x:Name="SliderGamma" Minimum="0" Maximum="200" Value="100" Width="200"/>
+                        <TextBlock x:Name="LblGamma" Text="1.00" VerticalAlignment="Center" MinWidth="40"/>
+                    </StackPanel>
+
+                    <Separator/>
+
+                    <TextBlock x:Name="LblColorTemp" Text="Color Temperature" FontWeight="Bold"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="R" VerticalAlignment="Center" MinWidth="20"/>
+                        <Slider x:Name="SliderTempR" Minimum="0" Maximum="200" Value="100" Width="180"/>
+                        <TextBlock x:Name="LblTempR" Text="1.00" VerticalAlignment="Center" MinWidth="40"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="G" VerticalAlignment="Center" MinWidth="20"/>
+                        <Slider x:Name="SliderTempG" Minimum="0" Maximum="200" Value="100" Width="180"/>
+                        <TextBlock x:Name="LblTempG" Text="1.00" VerticalAlignment="Center" MinWidth="40"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="B" VerticalAlignment="Center" MinWidth="20"/>
+                        <Slider x:Name="SliderTempB" Minimum="0" Maximum="200" Value="100" Width="180"/>
+                        <TextBlock x:Name="LblTempB" Text="1.00" VerticalAlignment="Center" MinWidth="40"/>
+                    </StackPanel>
+                </StackPanel>
+            </TabItem>
+
+            <!-- CRT -->
+            <TabItem x:Name="TabCrt" Header="CRT">
+                <StackPanel Margin="8" Spacing="8">
+                    <CheckBox x:Name="ChkInterlaceJitter" Content="Interlace Jitter"/>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <CheckBox x:Name="ChkVignette" Content="Vignette"/>
+                        <Slider x:Name="SliderVignette" Minimum="0" Maximum="100" Value="50" Width="200"/>
+                        <TextBlock x:Name="LblVignette" Text="50" VerticalAlignment="Center" MinWidth="30"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <CheckBox x:Name="ChkShadowMask" Content="Shadow Mask"/>
+                        <ComboBox x:Name="CmbShadowMaskMode" Width="100">
+                            <ComboBoxItem Content="Aperture" IsSelected="True"/>
+                            <ComboBoxItem Content="Slot"/>
+                            <ComboBoxItem Content="Dot"/>
+                        </ComboBox>
+                        <Slider x:Name="SliderShadowMask" Minimum="0" Maximum="100" Value="50" Width="120"/>
+                        <TextBlock x:Name="LblShadowMask" Text="50" VerticalAlignment="Center" MinWidth="30"/>
+                    </StackPanel>
+
+                    <CheckBox x:Name="ChkCurvature" Content="Curvature"/>
+                    <CheckBox x:Name="ChkPhosphor" Content="Phosphor Persistence"/>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <CheckBox x:Name="ChkHorizontalBeam" Content="Horizontal Beam"/>
+                        <Slider x:Name="SliderHBeam" Minimum="0" Maximum="100" Value="50" Width="200"/>
+                        <TextBlock x:Name="LblHBeam" Text="50" VerticalAlignment="Center" MinWidth="30"/>
+                    </StackPanel>
+
+                    <CheckBox x:Name="ChkConvergence" Content="Convergence"/>
+                </StackPanel>
+            </TabItem>
+
+        </TabControl>
+
+        <Button x:Name="BtnOK" Grid.Row="1" Content="OK" Padding="24,6"
+                HorizontalAlignment="Right" Margin="0,8,0,0"
+                Click="BtnOK_Click"/>
+    </Grid>
+</Window>

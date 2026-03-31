@@ -8,42 +8,134 @@
         WindowStartupLocation="CenterScreen">
 
     <DockPanel>
-        <!-- Toolbar -->
-        <StackPanel DockPanel.Dock="Top"
-                    Orientation="Horizontal"
-                    Spacing="4"
-                    Margin="4,4,4,2">
-            <Button x:Name="BtnOpen"   Content="開啟遊戲" Padding="8,3" Click="BtnOpen_Click" />
-            <Button x:Name="BtnReset"  Content="重置"     Padding="8,3" Click="BtnReset_Click" />
-            <Button x:Name="BtnConfig" Content="功能設定" Padding="8,3" Click="BtnConfig_Click" />
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
-                <TextBlock Text="fps : " VerticalAlignment="Center" />
-                <TextBlock x:Name="FpsLabel" Text="--" VerticalAlignment="Center" MinWidth="40" />
-            </StackPanel>
-        </StackPanel>
+        <!-- ═══ Menu Bar ═══ -->
+        <Menu DockPanel.Dock="Top">
 
-        <!-- Status bar -->
-        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" Margin="4,2,4,4">
-            <TextBlock x:Name="RomInfoLabel"
-                       Grid.Column="0"
-                       Text="ROM資訊"
-                       VerticalAlignment="Center"
-                       Cursor="Hand"
-                       PointerPressed="RomInfoLabel_Click" />
-            <TextBlock x:Name="AboutLabel"
-                       Grid.Column="1"
-                       Text="關於"
-                       VerticalAlignment="Center"
-                       Cursor="Hand"
-                       PointerPressed="AboutLabel_Click" />
-        </Grid>
+            <!-- File -->
+            <MenuItem x:Name="MenuFile" Header="_File">
+                <MenuItem x:Name="MenuOpenRom" Header="Open ROM"
+                          InputGesture="Ctrl+O" Click="MenuOpenRom_Click" />
+                <MenuItem x:Name="MenuRecentRoms" Header="Recent ROMs">
+                    <MenuItem Header="(empty)" IsEnabled="False" />
+                </MenuItem>
+                <Separator />
+                <MenuItem x:Name="MenuExit" Header="Exit"
+                          InputGesture="Ctrl+W" Click="MenuExit_Click" />
+            </MenuItem>
 
-        <!-- Game canvas: NES output 256x240 at 1x scale -->
-        <Border Background="Black" Margin="4,0,4,0"
-                Width="256" Height="240">
+            <!-- Emulation -->
+            <MenuItem x:Name="MenuEmulation" Header="_Emulation">
+                <MenuItem x:Name="MenuSoftReset" Header="Soft Reset"
+                          InputGesture="Ctrl+R" Click="MenuSoftReset_Click" />
+                <MenuItem x:Name="MenuHardReset" Header="Hard Reset"
+                          Click="MenuHardReset_Click" />
+                <Separator />
+                <MenuItem x:Name="MenuRegion" Header="Region">
+                    <MenuItem x:Name="MenuRegionNTSC"  Header="NTSC"
+                              Click="MenuRegion_Click" Tag="NTSC" />
+                    <MenuItem x:Name="MenuRegionPAL"   Header="PAL"
+                              Click="MenuRegion_Click" Tag="PAL" />
+                    <MenuItem x:Name="MenuRegionDendy" Header="Dendy"
+                              Click="MenuRegion_Click" Tag="Dendy" />
+                </MenuItem>
+                <Separator />
+                <MenuItem x:Name="MenuLimitFPS" Header="Limit FPS"
+                          Click="MenuLimitFPS_Click" />
+                <MenuItem x:Name="MenuAccuracyOptA" Header="AccuracyOptA"
+                          Click="MenuAccuracyOptA_Click" />
+            </MenuItem>
+
+            <!-- View -->
+            <MenuItem x:Name="MenuView" Header="_View">
+                <MenuItem x:Name="MenuFullscreen" Header="Fullscreen"
+                          InputGesture="F11" Click="MenuFullscreen_Click" />
+                <Separator />
+                <MenuItem x:Name="MenuSound" Header="Sound: OFF"
+                          Click="MenuSound_Click" />
+                <MenuItem x:Name="MenuUltraAnalog" Header="Ultra Analog: OFF"
+                          Click="MenuUltraAnalog_Click" />
+            </MenuItem>
+
+            <!-- Tools -->
+            <MenuItem x:Name="MenuTools" Header="_Tools">
+                <MenuItem x:Name="MenuScreenshot" Header="Screenshot"
+                          InputGesture="Ctrl+Shift+P" Click="MenuScreenshot_Click" />
+                <MenuItem x:Name="MenuRomInfo" Header="ROM Info"
+                          Click="MenuRomInfo_Click" />
+                <Separator />
+                <MenuItem x:Name="MenuRecord" Header="Record">
+                    <MenuItem x:Name="MenuRecordVideo" Header="Record Video"
+                              Click="MenuRecordVideo_Click" />
+                    <MenuItem x:Name="MenuRecordAudio" Header="Record Audio"
+                              Click="MenuRecordAudio_Click" />
+                    <MenuItem x:Name="MenuRecordSettings" Header="Record Settings"
+                              Click="MenuRecordSettings_Click" />
+                </MenuItem>
+                <Separator />
+                <MenuItem x:Name="MenuConfiguration" Header="Configuration"
+                          Click="MenuConfiguration_Click" />
+            </MenuItem>
+
+            <!-- Help -->
+            <MenuItem x:Name="MenuHelp" Header="_Help">
+                <MenuItem x:Name="MenuShortcuts" Header="Keyboard Shortcuts"
+                          Click="MenuShortcuts_Click" />
+                <MenuItem x:Name="MenuAbout" Header="About"
+                          Click="MenuAbout_Click" />
+            </MenuItem>
+        </Menu>
+
+        <!-- ═══ Status Bar ═══ -->
+        <Border DockPanel.Dock="Bottom"
+                Background="#E8E8E8"
+                BorderBrush="#CCC" BorderThickness="0,1,0,0"
+                Padding="6,3">
+            <Grid ColumnDefinitions="*,Auto,Auto">
+                <TextBlock x:Name="StatusRomName" Grid.Column="0"
+                           Text="No ROM loaded"
+                           VerticalAlignment="Center"
+                           Foreground="#555" FontSize="12" />
+                <TextBlock x:Name="StatusRegion" Grid.Column="1"
+                           Text="NTSC"
+                           VerticalAlignment="Center"
+                           Foreground="#555" FontSize="12"
+                           Margin="12,0" />
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <TextBlock x:Name="StatusFpsLabel" Text="FPS: "
+                               VerticalAlignment="Center"
+                               Foreground="#555" FontSize="12" />
+                    <TextBlock x:Name="StatusFps" Text="--"
+                               VerticalAlignment="Center"
+                               Foreground="#555" FontSize="12"
+                               MinWidth="28" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ═══ Game Canvas ═══ -->
+        <Border x:Name="GameBorder" Background="Black" Margin="0">
+            <Border.ContextMenu>
+                <ContextMenu>
+                    <MenuItem x:Name="CtxOpenRom"    Header="Open ROM"     Click="MenuOpenRom_Click" />
+                    <MenuItem x:Name="CtxSoftReset"  Header="Soft Reset"   Click="MenuSoftReset_Click" />
+                    <MenuItem x:Name="CtxHardReset"  Header="Hard Reset"   Click="MenuHardReset_Click" />
+                    <Separator />
+                    <MenuItem x:Name="CtxConfig"     Header="Configuration" Click="MenuConfiguration_Click" />
+                    <MenuItem x:Name="CtxRomInfo"    Header="ROM Info"     Click="MenuRomInfo_Click" />
+                    <Separator />
+                    <MenuItem x:Name="CtxFullscreen" Header="Fullscreen"   Click="MenuFullscreen_Click" />
+                    <MenuItem x:Name="CtxSound" Header="Sound: OFF"
+                              Click="MenuSound_Click" />
+                    <MenuItem x:Name="CtxUltraAnalog" Header="Ultra Analog: OFF"
+                              Click="MenuUltraAnalog_Click" />
+                    <Separator />
+                    <MenuItem x:Name="CtxExit"       Header="Exit"         Click="MenuExit_Click" />
+                </ContextMenu>
+            </Border.ContextMenu>
             <Image x:Name="GameCanvas"
                    Width="256" Height="240"
-                   Stretch="None" />
+                   Stretch="Fill"
+                   RenderOptions.BitmapInterpolationMode="None" />
         </Border>
     </DockPanel>
 </Window>

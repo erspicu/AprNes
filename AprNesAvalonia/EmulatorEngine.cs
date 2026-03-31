@@ -2,11 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using Avalonia.Input;
 using AprNes;
+using AprNesAvalonia.Platform;
 
 namespace AprNesAvalonia;
 
@@ -21,7 +23,13 @@ public sealed unsafe class EmulatorEngine : IDisposable
     private volatile bool _running;
     private volatile bool _romLoaded;
     private byte[]? _romBytes;
+    private byte[]? _biosBytes;     // FDS BIOS (null for cartridge ROMs)
     private string  _romFileName = "";
+    private string  _romFilePath = ""; // full path for SRAM derivation
+
+    // ── Platform backends ────────────────────────────────────────────────
+    private readonly IAudioBackend   _audio   = PlatformFactory.CreateAudioBackend();
+    private readonly IGamepadBackend _gamepad = PlatformFactory.CreateGamepadBackend();
 
     // ── Video ──────────────────────────────────────────────────────────────
     // Pre-allocated 256×240 BGRA8888 frame buffer (written on emulator thread, read on UI thread)
@@ -69,6 +77,7 @@ public sealed unsafe class EmulatorEngine : IDisposable
     // ── Public API ─────────────────────────────────────────────────────────
     public bool IsRunning   => _running;
     public bool IsRomLoaded => _romLoaded;
+    public string RomFilePath => _romFilePath;
 
     /// <summary>Apply keyboard mapping from INI (Windows VK codes).</summary>
     public void ApplyKeyMap(int vkA, int vkB, int vkSelect, int vkStart,
@@ -80,35 +89,125 @@ public sealed unsafe class EmulatorEngine : IDisposable
         Map(vkUp,     4); Map(vkDown,  5); Map(vkLeft,   6); Map(vkRight, 7);
     }
 
-    /// <summary>Apply audio settings: set NesCore flags and open/close WaveOut.</summary>
+    /// <summary>Apply audio settings: set NesCore flags and open/close audio backend.</summary>
     public void ApplyAudioSettings(bool enabled, int volume)
     {
         NesCore.AudioEnabled = enabled;
         NesCore.Volume       = volume;
-        WaveOutPlayer.CloseAudio();
+        _audio.Close();
         if (enabled && _running)
-            WaveOutPlayer.OpenAudio();
+            _audio.Open();
     }
 
-    /// <summary>Load and initialise a ROM. Returns true on success.</summary>
+    /// <summary>Load and initialise a ROM (supports .nes, .fds, .zip). Returns true on success.</summary>
     public bool LoadRom(string path)
     {
         Stop();
-        NesCore.AccuracyOptA = true;
+        SaveSRam(); // save previous ROM's battery RAM
 
         byte[] rom;
-        try   { rom = File.ReadAllBytes(path); }
+        try
+        {
+            if (path.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            {
+                rom = null;
+                using var archive = ZipFile.OpenRead(path);
+                foreach (var entry in archive.Entries)
+                {
+                    string ext = Path.GetExtension(entry.FullName).ToLowerInvariant();
+                    if (ext == ".nes" || ext == ".fds")
+                    {
+                        using var ms = new MemoryStream();
+                        using (var s = entry.Open()) s.CopyTo(ms);
+                        rom = ms.ToArray();
+                        _romFileName = entry.Name;
+                        break;
+                    }
+                }
+                if (rom == null) return false;
+            }
+            else
+            {
+                rom = File.ReadAllBytes(path);
+                _romFileName = Path.GetFileName(path);
+            }
+        }
         catch { return false; }
 
-        if (!NesCore.init(rom)) return false;
-        _romLoaded   = true;
-        _romBytes    = rom;
-        _romFileName = path;
-        NesCore.rom_file_name = Path.GetFileNameWithoutExtension(path);
+        _romFilePath = path;
+        _romBytes = rom;
+        NesCore.rom_file_name = SRamBaseName(path);
+        NesCore.exit = false;
+
+        bool initOk;
+        if (NesCore.IsFdsFile(rom))
+        {
+            byte[] bios = NesCore.LoadAndValidateFdsBios(AppContext.BaseDirectory);
+            if (bios == null) return false;
+            _biosBytes = bios;
+            initOk = NesCore.initFDS(bios, rom);
+        }
+        else
+        {
+            _biosBytes = null;
+            initOk = NesCore.init(rom);
+        }
+
+        if (!initOk) return false;
+        _romLoaded = true;
+        LoadSRam();
 
         NesCore.VideoOutput -= OnVideoOutput;
         NesCore.VideoOutput += OnVideoOutput;
         return true;
+    }
+
+    /// <summary>Hard reset (power cycle): re-init current ROM from scratch.</summary>
+    public bool HardReset()
+    {
+        if (!_romLoaded || _romBytes == null) return false;
+        Stop();
+        SaveSRam();
+
+        NesCore.exit = false;
+        NesCore.rom_file_name = SRamBaseName(_romFilePath);
+
+        bool initOk;
+        if (_biosBytes != null && NesCore.IsFdsFile(_romBytes))
+            initOk = NesCore.initFDS(_biosBytes, _romBytes);
+        else
+            initOk = NesCore.init(_romBytes);
+
+        if (!initOk) return false;
+        LoadSRam();
+
+        NesCore.VideoOutput -= OnVideoOutput;
+        NesCore.VideoOutput += OnVideoOutput;
+        return true;
+    }
+
+    // ── SRAM (battery-backed RAM) ────────────────────────────────────────
+    private static string SRamBaseName(string path) =>
+        string.IsNullOrEmpty(path) ? "" : path.Remove(path.Length - Path.GetExtension(path).Length);
+
+    private string SRamPath() => SRamBaseName(_romFilePath) + ".sav";
+
+    public void SaveSRam()
+    {
+        if (!_romLoaded || !NesCore.HasBattery) return;
+        try { File.WriteAllBytes(SRamPath(), NesCore.DumpSRam()); }
+        catch { /* ignore write errors */ }
+    }
+
+    public void LoadSRam()
+    {
+        if (!NesCore.HasBattery) return;
+        string path = SRamPath();
+        if (File.Exists(path))
+        {
+            try { NesCore.LoadSRam(File.ReadAllBytes(path)); }
+            catch { }
+        }
     }
 
     /// <summary>Start (or resume) the emulator loop.</summary>
@@ -124,13 +223,13 @@ public sealed unsafe class EmulatorEngine : IDisposable
         _thread.Start();
 
         if (NesCore.AudioEnabled)
-            WaveOutPlayer.OpenAudio();
+            _audio.Open();
     }
 
     /// <summary>Stop the emulator loop and wait for thread to exit.</summary>
     public void Stop()
     {
-        WaveOutPlayer.CloseAudio();
+        _audio.Close();
         if (!_running) return;
         _running = false;
         NesCore.exit = true;
@@ -229,6 +328,8 @@ public sealed unsafe class EmulatorEngine : IDisposable
     public void Dispose()
     {
         Stop();
+        SaveSRam();
+        _gamepad.Shutdown();
         NesCore.VideoOutput -= OnVideoOutput;
     }
 }

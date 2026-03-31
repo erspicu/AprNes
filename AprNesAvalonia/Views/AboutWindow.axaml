@@ -9,7 +9,7 @@
 
     <Grid RowDefinitions="*,Auto" Margin="16">
         <StackPanel Grid.Row="0" Spacing="10" VerticalAlignment="Center">
-            <TextBlock Text="April Nintendo Entertainment System Emulator" />
+            <TextBlock x:Name="DescLabel" Text="April Nintendo Entertainment System Emulator" />
             <TextBlock x:Name="AuthorLabel" Text="Author : erspicu_brox" />
             <TextBlock x:Name="VersionLabel" />
             <TextBlock x:Name="SiteLink"
@@ -19,7 +19,7 @@
                        Cursor="Hand"
                        PointerPressed="SiteLink_Click" />
         </StackPanel>
-        <Button Grid.Row="1" Content="OK" Padding="20,4"
+        <Button x:Name="BtnOK" Grid.Row="1" Content="OK" Padding="20,4"
                 HorizontalAlignment="Right"
                 Click="BtnOK_Click" />
     </Grid>

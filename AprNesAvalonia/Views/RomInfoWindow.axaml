@@ -18,8 +18,8 @@
                  BorderThickness="1" />
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right"
                     Spacing="8" Margin="0,8,0,0">
-            <Button x:Name="BtnCopy" Content="Copy" Padding="20,4" Click="BtnCopy_Click"/>
-            <Button x:Name="BtnOK"   Content="OK"   Padding="20,4" Click="BtnOK_Click"/>
+            <Button x:Name="BtnCopy" Content="Copy"  Padding="20,4" Click="BtnCopy_Click"/>
+            <Button x:Name="BtnOK"   Content="OK"    Padding="20,4" Click="BtnOK_Click"/>
         </StackPanel>
     </Grid>
 </Window>

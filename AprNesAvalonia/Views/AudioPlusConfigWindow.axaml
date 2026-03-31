@@ -1,0 +1,136 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AprNesAvalonia.Views.AudioPlusConfigWindow"
+        Title="Advanced Audio Settings"
+        Width="550"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#F0F0F0">
+
+    <Grid RowDefinitions="*,Auto" Margin="8">
+        <TabControl Grid.Row="0">
+
+            <!-- NES Channels -->
+            <TabItem x:Name="TabNes" Header="NES Channels">
+                <StackPanel Margin="8" Spacing="8">
+
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                        <TextBlock Grid.Column="0" x:Name="LblConsoleModel" Text="Console Model" VerticalAlignment="Center"/>
+                        <ComboBox  Grid.Column="1" x:Name="CmbConsoleModel" Width="240">
+                            <ComboBoxItem Content="0 - Famicom (HVC-001)" IsSelected="True"/>
+                            <ComboBoxItem Content="1 - Front-Loader (NES-001)"/>
+                            <ComboBoxItem Content="2 - Top-Loader (NES-101)"/>
+                            <ComboBoxItem Content="3 - AV Famicom (HVC-101)"/>
+                            <ComboBoxItem Content="4 - Sharp Twin Famicom"/>
+                            <ComboBoxItem Content="5 - Sharp Famicom Titler"/>
+                            <ComboBoxItem Content="6 - Custom"/>
+                        </ComboBox>
+                    </Grid>
+
+                    <Separator/>
+
+                    <!-- 5 NES channels -->
+                    <Grid ColumnDefinitions="Auto,80,*,40" RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+                          RowSpacing="6" ColumnSpacing="8">
+                        <CheckBox  Grid.Row="0" Grid.Column="0" x:Name="ChkPulse1"   IsChecked="True"/>
+                        <TextBlock Grid.Row="0" Grid.Column="1" x:Name="LblPulse1Name" Text="Pulse 1"   VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="0" Grid.Column="2" x:Name="SlPulse1"   Minimum="0" Maximum="100" Value="100"/>
+                        <TextBlock Grid.Row="0" Grid.Column="3" x:Name="LblPulse1"  Text="100" VerticalAlignment="Center"/>
+
+                        <CheckBox  Grid.Row="1" Grid.Column="0" x:Name="ChkPulse2"   IsChecked="True"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" x:Name="LblPulse2Name" Text="Pulse 2"   VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="1" Grid.Column="2" x:Name="SlPulse2"   Minimum="0" Maximum="100" Value="100"/>
+                        <TextBlock Grid.Row="1" Grid.Column="3" x:Name="LblPulse2"  Text="100" VerticalAlignment="Center"/>
+
+                        <CheckBox  Grid.Row="2" Grid.Column="0" x:Name="ChkTriangle" IsChecked="True"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1" x:Name="LblTriangleName" Text="Triangle" VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="2" Grid.Column="2" x:Name="SlTriangle" Minimum="0" Maximum="100" Value="100"/>
+                        <TextBlock Grid.Row="2" Grid.Column="3" x:Name="LblTriangle" Text="100" VerticalAlignment="Center"/>
+
+                        <CheckBox  Grid.Row="3" Grid.Column="0" x:Name="ChkNoise"    IsChecked="True"/>
+                        <TextBlock Grid.Row="3" Grid.Column="1" x:Name="LblNoiseName" Text="Noise"    VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="3" Grid.Column="2" x:Name="SlNoise"    Minimum="0" Maximum="100" Value="100"/>
+                        <TextBlock Grid.Row="3" Grid.Column="3" x:Name="LblNoise"   Text="100" VerticalAlignment="Center"/>
+
+                        <CheckBox  Grid.Row="4" Grid.Column="0" x:Name="ChkDMC"      IsChecked="True"/>
+                        <TextBlock Grid.Row="4" Grid.Column="1" x:Name="LblDMCName" Text="DMC"      VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="4" Grid.Column="2" x:Name="SlDMC"      Minimum="0" Maximum="100" Value="100"/>
+                        <TextBlock Grid.Row="4" Grid.Column="3" x:Name="LblDMC"     Text="100" VerticalAlignment="Center"/>
+                    </Grid>
+                </StackPanel>
+            </TabItem>
+
+            <!-- Expansion Chips -->
+            <TabItem x:Name="TabExpansion" Header="Expansion Chips">
+                <StackPanel Margin="8" Spacing="8">
+
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                        <TextBlock Grid.Column="0" x:Name="LblChip" Text="Chip" VerticalAlignment="Center"/>
+                        <ComboBox  Grid.Column="1" x:Name="CmbExpChip" Width="200">
+                            <ComboBoxItem Content="None" IsSelected="True"/>
+                            <ComboBoxItem Content="VRC6 (3ch)"/>
+                            <ComboBoxItem Content="VRC7 / OPLL (1ch)"/>
+                            <ComboBoxItem Content="Namco 163 (8ch)"/>
+                            <ComboBoxItem Content="Sunsoft 5B (3ch)"/>
+                            <ComboBoxItem Content="MMC5 (2ch)"/>
+                            <ComboBoxItem Content="FDS (1ch)"/>
+                        </ComboBox>
+                    </Grid>
+
+                    <Separator/>
+
+                    <!-- Dynamic channels placeholder -->
+                    <StackPanel x:Name="ExpChannelPanel" Spacing="6">
+                        <TextBlock x:Name="LblSelectChip" Text="Select a chip to show its channels." Foreground="#888"/>
+                    </StackPanel>
+                </StackPanel>
+            </TabItem>
+
+            <!-- Post-Processing -->
+            <TabItem x:Name="TabPostProc" Header="Post-Processing">
+                <StackPanel Margin="8" Spacing="8">
+                    <Grid ColumnDefinitions="120,*,40" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+                          RowSpacing="6" ColumnSpacing="8">
+                        <TextBlock Grid.Row="0" Grid.Column="0" x:Name="LblStereoWidth" Text="Stereo Width"  VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="0" Grid.Column="1" x:Name="SlStereoWidth"  Minimum="0" Maximum="100" Value="50"/>
+                        <TextBlock Grid.Row="0" Grid.Column="2" x:Name="LblStereoWidthVal" Text="50" VerticalAlignment="Center"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" x:Name="LblHaasDelay" Text="Haas Delay"    VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="1" Grid.Column="1" x:Name="SlHaasDelay"    Minimum="0" Maximum="100" Value="0"/>
+                        <TextBlock Grid.Row="1" Grid.Column="2" x:Name="LblHaasDelayVal"   Text="0" VerticalAlignment="Center"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" x:Name="LblHaasCrossfeed" Text="Haas Crossfeed" VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="2" Grid.Column="1" x:Name="SlHaasCrossfeed" Minimum="0" Maximum="100" Value="0"/>
+                        <TextBlock Grid.Row="2" Grid.Column="2" x:Name="LblHaasCrossfeedVal" Text="0" VerticalAlignment="Center"/>
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" x:Name="LblReverbWet" Text="Reverb Wet"    VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="3" Grid.Column="1" x:Name="SlReverbWet"    Minimum="0" Maximum="100" Value="0"/>
+                        <TextBlock Grid.Row="3" Grid.Column="2" x:Name="LblReverbWetVal"   Text="0" VerticalAlignment="Center"/>
+
+                        <TextBlock Grid.Row="4" Grid.Column="0" x:Name="LblCombFeedback" Text="Comb Feedback" VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="4" Grid.Column="1" x:Name="SlCombFeedback" Minimum="0" Maximum="100" Value="0"/>
+                        <TextBlock Grid.Row="4" Grid.Column="2" x:Name="LblCombFeedbackVal" Text="0" VerticalAlignment="Center"/>
+
+                        <TextBlock Grid.Row="5" Grid.Column="0" x:Name="LblCombDamp" Text="Comb Damp"     VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="5" Grid.Column="1" x:Name="SlCombDamp"     Minimum="0" Maximum="100" Value="0"/>
+                        <TextBlock Grid.Row="5" Grid.Column="2" x:Name="LblCombDampVal"    Text="0" VerticalAlignment="Center"/>
+
+                        <TextBlock Grid.Row="6" Grid.Column="0" x:Name="LblBassBoostDb" Text="Bass Boost dB" VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="6" Grid.Column="1" x:Name="SlBassBoostDb"  Minimum="0" Maximum="100" Value="0"/>
+                        <TextBlock Grid.Row="6" Grid.Column="2" x:Name="LblBassBoostDbVal" Text="0" VerticalAlignment="Center"/>
+
+                        <TextBlock Grid.Row="7" Grid.Column="0" x:Name="LblBassBoostFreq" Text="Bass Boost Freq" VerticalAlignment="Center"/>
+                        <Slider    Grid.Row="7" Grid.Column="1" x:Name="SlBassBoostFreq" Minimum="0" Maximum="100" Value="0"/>
+                        <TextBlock Grid.Row="7" Grid.Column="2" x:Name="LblBassBoostFreqVal" Text="0" VerticalAlignment="Center"/>
+                    </Grid>
+                </StackPanel>
+            </TabItem>
+
+        </TabControl>
+
+        <Button x:Name="BtnOK" Grid.Row="1" Content="OK" Padding="24,6"
+                HorizontalAlignment="Right" Margin="0,8,0,0"
+                Click="BtnOK_Click"/>
+    </Grid>
+</Window>

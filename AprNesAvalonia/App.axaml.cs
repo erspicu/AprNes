@@ -11,8 +11,18 @@ public partial class App : Application
         AvaloniaXamlLoader.Load(this);
         // Load language table once at startup
         string langPath = System.IO.Path.Combine(
-            System.AppContext.BaseDirectory, "AprNesLang.ini");
+            System.AppContext.BaseDirectory, "configure", "AprNesLang.ini");
         LangHelper.Init(langPath);
+
+        // Auto-detect default language from system locale
+        var culture = System.Globalization.CultureInfo.CurrentUICulture.Name;
+        if (culture.StartsWith("zh-TW", System.StringComparison.OrdinalIgnoreCase) ||
+            culture.StartsWith("zh-Hant", System.StringComparison.OrdinalIgnoreCase))
+            LangHelper.CurrentLang = "zh-tw";
+        else if (culture.StartsWith("zh", System.StringComparison.OrdinalIgnoreCase))
+            LangHelper.CurrentLang = "zh-cn";
+        else
+            LangHelper.CurrentLang = "en-us";
     }
 
     public override void OnFrameworkInitializationCompleted()

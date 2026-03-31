@@ -11,6 +11,7 @@ public static class LangHelper
     private static readonly Dictionary<string, Dictionary<string, string>> _table = new(StringComparer.OrdinalIgnoreCase);
 
     public static bool Loaded { get; private set; }
+    public static string CurrentLang { get; set; } = "zh-tw";
 
     public static void Init(string iniPath)
     {
