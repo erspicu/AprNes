@@ -436,10 +436,26 @@
 - **已知問題**：`highshift_s0` 的 `|1` 填充（sprite 0 hit 優化）可能影響 per-dot pixel 的 palette 精度 — 需要改用 main shift registers + phase 7 latch 或新增獨立的 rendering shift registers
 - **測試**：174/174 + 136/136 無回歸（SMB3 等遊戲畫面正常）
 
+### 2026-04-02 — feature/ppu-high-precision: per-dot pixel via main shift registers + latch（`36555c6`）
+- **修正**：`ppu_half_step` 改用 `lowshift`/`highshift`（不是 `_s0` 的 `|1` 汙染版）
+- Phase 7 pre-reload latch 確保最後像素用正確的 pre-reload 資料
+- Per-dot attribute 選擇：`bit >= 8` → `bg_attr_p3`，`bit < 8` → `bg_attr_p2`
+
+### 2026-04-02 — feature/ppu-high-precision: $2001 四層 flag 系統（`93086bf`）
+- **修正**：Tier 1 `_Instant`（immediate）用於 odd frame / OAM / renderingEnabled
+- Tier 2 `ShowBackGround`/`ShowSprites`（delayed 2 cycles）用於 pixel rendering / sprite compositing
+- Tier 3 `ppuRenderingEnabled`（end-of-dot of Tier 1）用於 tile fetch
+- **測試**：174/174 blargg PASS
+
+### 2026-04-02 — feature/ppu-high-precision: $2000 delay（`3e4f5f7`）
+- **修正**：pattern table / sprite size 延遲 2 PPU cycles，NMI enable 保持即時
+- **測試**：174/174 blargg PASS
+
+### 2026-04-02 — feature/ppu-high-precision: $2006 delay 3→4（`599076f`）
+- **修正**：t→v copy 延遲從固定 3 改為 4 PPU dots（對齊 TriCNES 4-5 cycles）
+- **測試**：174/174 blargg PASS，AC 135/136（Page 19 -1，不回退）
+
 ### 待處理項目
-- [ ] 修正 `highshift_s0` 的 `|1` 問題（改用 main shift registers + phase 7 pre-reload latch）
-- [ ] $2001 四層 flag 系統（instant / main / delayed / eval-delayed）
-- [ ] $2000 delay（1-2 cycle alignment-dependent）
-- [ ] $2006 delay 對齊 TriCNES（4-5 cycles alignment-dependent，現為固定 3）
 - [ ] 半 dot 精度的 VBL set latch（`PPU_PendingVBlank` → `PPU_VSET`）
 - [ ] Sprite 0 hit 的 1.5 dot pending delay
+- [ ] 排查 AC Page 19 的 1 個 regression（$2006 delay 或 $2000 delay 相關）
