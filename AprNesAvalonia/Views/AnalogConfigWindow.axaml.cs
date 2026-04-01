@@ -375,8 +375,22 @@ public partial class AnalogConfigWindow : Window
     // ── OK button ──────────────────────────────────────────────────────
     private void BtnOK_Click(object? sender, RoutedEventArgs e)
     {
+        // Pause emu thread before modifying NesCore CRT/NTSC fields
+        // (ConfigWindow no longer pauses emu on open; ApplyRenderSettings does it internally)
+        bool needSync = !NesCore.emuWaiting && !NesCore.exit;
+        if (needSync)
+        {
+            NesCore._event.Reset();
+            while (!NesCore.emuWaiting && !NesCore.exit)
+                System.Threading.Thread.Sleep(1);
+        }
+
         ApplyToFields();
         SaveIni();
+
+        if (needSync)
+            NesCore._event.Set();
+
         Close();
     }
 
