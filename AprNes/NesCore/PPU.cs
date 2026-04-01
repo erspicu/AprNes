@@ -268,6 +268,13 @@ namespace AprNes
         // ---- BG shift registers (16-bit, two tiles: high=current, low=next) ----
         static ushort lowshift = 0, highshift = 0;
 
+        // ---- Pre-reload latch for per-dot pixel output (half-step) ----
+        // At phase 7, main shift registers are reloaded AFTER tile fetch.
+        // Half-step needs PRE-reload data for the last pixel of the tile group.
+        static ushort halfStepLow = 0, halfStepHigh = 0;
+        static byte halfStepAttrCurrent = 0, halfStepAttrNext = 0;
+        static bool halfStepPhase7 = false;
+
         // ---- Per-dot shifted BG registers for sprite 0 hit (serial in: 0=low, 1=high) ----
         static ushort lowshift_s0 = 0, highshift_s0 = 0;
 
@@ -361,8 +368,16 @@ namespace AprNes
                     else
                         highTile = chrBankPtrs[(ioaddr >> 10) & 7][ioaddr & 0x3FF];
                     if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ioaddr);
-                    // Render 8 pixels using shift registers BEFORE reload (visible only, BG on)
-                    // Use delayed ppuRenderingEnabled for correct mid-scanline $2001 toggle behavior
+                    // Save pre-reload state for half-step pixel output at phase 7
+                    if (scanline < 240 && cx < 256)
+                    {
+                        halfStepLow = lowshift;
+                        halfStepHigh = highshift;
+                        halfStepAttrCurrent = bg_attr_p3;
+                        halfStepAttrNext = bg_attr_p2;
+                        halfStepPhase7 = true;
+                    }
+                    // Palette cache update (for compatibility)
                     if (scanline < 240 && cx < 256 && ppuRenderingEnabled)
                         RenderBGTile(cx);
                     // Load shift registers (high = old-low = previous tile, low = new tile)
@@ -461,21 +476,38 @@ namespace AprNes
             if (cx < 0 || cx >= 256 || scanline < 0 || scanline >= 240)
                 return;
 
-            // Per-dot BG pixel output from shift registers
-            // (replaces Phase 7 batch rendering in RenderBGTile for visible pixels)
+            // Per-dot BG pixel output using main shift registers
+            // Phase 7 uses pre-reload latch (saved before shift register reload in full-step)
             if (ppuRenderingEnabled && ShowBackGround)
             {
-                int bit = 15 - FineX;
-                int bgPixel = ((lowshift_s0 >> bit) & 1) | (((highshift_s0 >> bit) & 1) << 1);
+                ushort ls, hs;
+                byte attrCur, attrNxt;
+                if (halfStepPhase7)
+                {
+                    ls = halfStepLow;
+                    hs = halfStepHigh;
+                    attrCur = halfStepAttrCurrent;
+                    attrNxt = halfStepAttrNext;
+                    halfStepPhase7 = false;
+                }
+                else
+                {
+                    ls = lowshift;
+                    hs = highshift;
+                    attrCur = bg_attr_p3;
+                    attrNxt = bg_attr_p2;
+                }
+
+                int dotInGroup = cx & 7;
+                int bit = 15 - dotInGroup - FineX;
+                int bgPixel = ((ls >> bit) & 1) | (((hs >> bit) & 1) << 1);
+                byte attrUse = (bit >= 8) ? attrCur : attrNxt;
 
                 bool masked = !ShowBgLeft8 && cx < 8;
                 int slot = (scanline << 8) + cx;
                 Buffer_BG_array[slot] = masked ? 0 : bgPixel;
 
-                // Look up palette color
-                // Attribute for current pixel: use bg_attr_p3 (current tile's attribute)
-                int attrBits = bg_attr_p3;
-                int baseAddr = 0x3f00 | (attrBits << 2);
+                int baseAddr = 0x3f00 | (attrUse << 2);
                 uint bgColor = NesColors[ppu_ram[0x3f00] & 0x3f];
                 uint color = (masked || bgPixel == 0)
                     ? bgColor
@@ -490,6 +522,8 @@ namespace AprNes
                         : (byte)(ppu_ram[baseAddr + bgPixel] & 0x3f);
                 }
             }
+            else
+                halfStepPhase7 = false; // discard latch if rendering disabled
         }
 
         // ── Region-specialized PPU step functions ──
