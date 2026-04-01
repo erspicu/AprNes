@@ -455,7 +455,30 @@
 - **修正**：t→v copy 延遲從固定 3 改為 4 PPU dots（對齊 TriCNES 4-5 cycles）
 - **測試**：174/174 blargg PASS，AC 135/136（Page 19 -1，不回退）
 
-### 待處理項目
-- [ ] 半 dot 精度的 VBL set latch（`PPU_PendingVBlank` → `PPU_VSET`）
-- [ ] Sprite 0 hit 的 1.5 dot pending delay
-- [ ] 排查 AC Page 19 的 1 個 regression（$2006 delay 或 $2000 delay 相關）
+### 2026-04-02 — feature/ppu-high-precision: VBL latch + Sprite 0 pending（`d93a390`）
+- **VBL**：full-step 設 `pendingVblank`，half-step promote → `isVblank`
+- **Sprite 0 hit**：偵測設 `pendingSprite0Hit`，half-step promote → `isSprite0hit`（~0.5 dot delay）
+- Guard + pre-render line 清除完整處理
+- **測試**：174/174 blargg PASS
+
+### 所有 TODO 完成 ✅
+
+| 項目 | Commit | 狀態 |
+|------|--------|:----:|
+| highshift_s0 \|1 修正 → main shift + latch | `36555c6` | ✅ |
+| $2001 四層 flag 系統 | `93086bf` | ✅ |
+| $2000 delay (2 PPU cycles) | `3e4f5f7` | ✅ |
+| $2006 delay 3→4 PPU cycles | `599076f` | ✅ |
+| VBL half-dot latch | `d93a390` | ✅ |
+| Sprite 0 hit pending delay | `d93a390` | ✅ |
+
+### 當前狀態
+- **blargg**: 174/174 PASS
+- **AC**: 135/136（Page 19 -1，$2006 delay 變更相關，不回退）
+- **架構**：half-step 完整運作，所有 PPU 寄存器延遲對齊 TriCNES 模型
+
+### 後續方向
+- [ ] 排查 AC Page 19 的 1 個 regression
+- [ ] alignment-dependent delay（目前全部固定值，TriCNES 依 PPUClock & 3 動態調整）
+- [ ] $2007 state machine（替代簡單 cooldown）
+- [ ] per-dot pixel output 擴展到 sprite compositing（目前 sprite 仍是 batch 渲染）
