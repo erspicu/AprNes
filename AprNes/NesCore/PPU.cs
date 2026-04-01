@@ -488,6 +488,20 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_half_step()
         {
+            // VBL half-dot latch: promote pending → actual (TriCNES: PPU_PendingVBlank → PPUStatus_VBlank)
+            if (pendingVblank)
+            {
+                pendingVblank = false;
+                isVblank = true;
+            }
+
+            // Sprite 0 hit half-dot latch: promote pending → actual
+            if (pendingSprite0Hit)
+            {
+                pendingSprite0Hit = false;
+                isSprite0hit = true;
+            }
+
             int cx = ppu_cycles_x - 1; // cx is the dot we just completed in ppu_step (already incremented)
             if (cx < 0 || cx >= 256 || scanline < 0 || scanline >= 240)
                 return;
@@ -616,7 +630,7 @@ namespace AprNes
             // sprite0_on_line / !isSprite0hit eliminate most scanlines instantly.
             // Range check (cx in [sprite0_line_x, +8)) narrows to 8 dots from 256,
             // avoiding the inner sprCol calculation for the other 248 dots per scanline.
-            if (sprite0_on_line && !isSprite0hit
+            if (sprite0_on_line && !isSprite0hit && !pendingSprite0Hit
                 && cx >= sprite0_line_x && cx < sprite0_line_x + 8
                 && cx < 256
                 && scanline >= 0 && scanline < 240
@@ -634,7 +648,7 @@ namespace AprNes
                         int mask = 1 << (7 - loc_t);
                         int sprPx = (((sprite0_tile_high & mask) << 1) + (sprite0_tile_low & mask)) >> (7 - loc_t);
                         if (sprPx != 0)
-                            isSprite0hit = true;
+                            pendingSprite0Hit = true; // promoted in half-step
                     }
                 }
             }
@@ -796,9 +810,9 @@ namespace AprNes
             {
                 int L = (scanline << 9) | cx;
                 if (L == L_NTSC_VBL_START)         // scanline 241, dot 1
-                { if (!SuppressVbl) isVblank = true; SuppressVbl = false; }
+                { if (!SuppressVbl) pendingVblank = true; SuppressVbl = false; }
                 else if (L == L_NTSC_SPRITE_RESET) // scanline 261, dot 1
-                    isSprite0hit = isSpriteOverflow = false;
+                    { isSprite0hit = isSpriteOverflow = false; pendingSprite0Hit = false; }
                 else if (L == L_NTSC_VBL_END)      // scanline 261, dot 2
                     isVblank = false;
             }
@@ -836,9 +850,9 @@ namespace AprNes
             {
                 int L = (scanline << 9) | cx;
                 if (L == L_PAL_VBL_START)         // scanline 241, dot 1
-                { if (!SuppressVbl) isVblank = true; SuppressVbl = false; }
+                { if (!SuppressVbl) pendingVblank = true; SuppressVbl = false; }
                 else if (L == L_PAL_SPRITE_RESET) // scanline 311, dot 1
-                    isSprite0hit = isSpriteOverflow = false;
+                    { isSprite0hit = isSpriteOverflow = false; pendingSprite0Hit = false; }
                 else if (L == L_PAL_VBL_END)      // scanline 311, dot 2
                     isVblank = false;
             }
@@ -865,9 +879,9 @@ namespace AprNes
             {
                 int L = (scanline << 9) | cx;
                 if (L == L_DENDY_VBL_START)         // scanline 291, dot 1
-                { if (!SuppressVbl) isVblank = true; SuppressVbl = false; }
+                { if (!SuppressVbl) pendingVblank = true; SuppressVbl = false; }
                 else if (L == L_DENDY_SPRITE_RESET) // scanline 311, dot 1
-                    isSprite0hit = isSpriteOverflow = false;
+                    { isSprite0hit = isSpriteOverflow = false; pendingSprite0Hit = false; }
                 else if (L == L_DENDY_VBL_END)      // scanline 311, dot 2
                     isVblank = false;
             }
@@ -954,7 +968,7 @@ namespace AprNes
         static void PrecomputeSprite0Line()
         {
             sprite0_on_line = false;
-            if (isSprite0hit) return;
+            if (isSprite0hit || pendingSprite0Hit) return;
             if (!ShowBackGround && !ShowSprites) return;
 
             // Sprite 0 is the first sprite processed during evaluation on the PREVIOUS
@@ -1463,6 +1477,8 @@ namespace AprNes
         }
 
         static bool SuppressVbl = false;
+        static bool pendingVblank = false; // half-dot VBL latch (TriCNES: PPU_PendingVBlank)
+        static bool pendingSprite0Hit = false; // half-dot sprite 0 hit latch (TriCNES: PPUStatus_PendingSpriteZeroHit)
         //ref http://wiki.nesdev.com/w/index.php/PPU_scrolling
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ppu_r_2002()
