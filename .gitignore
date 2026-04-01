@@ -194,3 +194,6 @@ etc/
 # FFmpeg tools & recording output (large binaries)
 **/tools/ffmpeg/
 **/Captures/
+
+# Temp working directories
+temp2/
