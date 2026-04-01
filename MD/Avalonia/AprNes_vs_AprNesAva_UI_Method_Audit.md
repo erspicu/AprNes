@@ -1,7 +1,7 @@
 # AprNes vs AprNesAvalonia — UI Method 對照清單
 
 > 產生日期: 2026-04-01
-> 最後更新: 2026-04-01 (P0+P1+P2+P3 完成)
+> 最後更新: 2026-04-01 (P0+P1+P2+P3+P4+P6 完成)
 > 目的: 逐一比對 AprNes (WinForms) 的 UI 方法，確認 AprNesAvalonia 是否有對應實作
 
 ## 狀態標記
@@ -25,9 +25,9 @@
 | 2 | `GetInstance()` | Singleton 存取 | N/A (Avalonia 單視窗) | N/A |
 | 3 | `LoadConfig()` | 從 AprNes.ini 載入所有設定 | `ApplyIniSettings()` | OK |
 | 4 | `initUILang()` | 套用語系到所有 UI 控件 | `ApplyLanguage()` | OK |
-| 5 | `initUIsize()` | 依縮放/Analog模式調整視窗大小 | 無 | **TODO** |
+| 5 | `initUIsize()` | 依縮放/Analog模式調整視窗大小 | N/A (Avalonia 使用 Stretch.Uniform 自適應) | N/A |
 | 6 | `Configure_Write()` | 存回所有設定到 INI | ConfigWindow `SaveToIni()` | OK |
-| 7 | `CreateRenderResize()` | 建立濾鏡/掃描線的 Render 物件 | 無 | **TODO** |
+| 7 | `CreateRenderResize()` | 建立濾鏡/掃描線的 Render 物件 | N/A (Avalonia 無 GDI Render 管線，濾鏡由 GPU/Skia 處理) | N/A |
 | 8 | `GetDefaultLang()` | 依系統語系決定預設語言 | `App.axaml.cs` 自動偵測 | OK |
 | 9 | `MigrateOldIni()` | 將舊版 INI 搬到 configure/ | 無 (Ava 版直接用 configure/) | N/A |
 
@@ -68,7 +68,7 @@
 |---|------------|------|----------|------|
 | 26 | `Reset()` | 軟體重置 | `MenuSoftReset_Click()` | OK |
 | 27 | `HardReset()` | 硬體重置 (斷電重開) | `MenuHardReset_Click()` + `EmulatorEngine.HardReset()` | OK |
-| 28 | `ApplyRenderSettings()` | 變更濾鏡後重建 Render 物件 | 無 | **TODO** |
+| 28 | `ApplyRenderSettings()` | 變更濾鏡後重建 Render 物件 | N/A (Avalonia 無 GDI Render 管線) | N/A |
 
 ### 1.6 渲染與顯示
 
@@ -76,12 +76,12 @@
 |---|------------|------|----------|------|
 | 29 | `NESCaptureScreen()` | 截圖存 PNG | `CaptureScreen()` | OK |
 | 30 | `VideoOutputDeal()` | 一般模式影像輸出 + FPS 限制 | `EmulatorEngine.OnVideoOutput()` | OK |
-| 31 | `AnalogRenderThreadLoop()` | Analog 模式非同步渲染 loop | 無 | **TODO** |
-| 32 | `StartAnalogRenderThread()` | 啟動 Analog 渲染執行緒 | 無 | **TODO** |
-| 33 | `StopAnalogRenderThread()` | 停止 Analog 渲染執行緒 | 無 | **TODO** |
-| 34 | `EnterAnalogFullScreen()` | 進入 Analog 全螢幕 (8:7 PAR) | 無 | **TODO** |
-| 35 | `ExitAnalogFullScreen()` | 離開 Analog 全螢幕 | 無 | **TODO** |
-| 36 | `FullScreenModeTransition()` | Analog/一般模式全螢幕切換 | 無 | **TODO** |
+| 31 | `AnalogRenderThreadLoop()` | Analog 模式非同步渲染 loop | N/A (Avalonia 用 WriteableBitmap + Dispatcher，無需獨立 GDI 渲染執行緒) | N/A |
+| 32 | `StartAnalogRenderThread()` | 啟動 Analog 渲染執行緒 | N/A (同上) | N/A |
+| 33 | `StopAnalogRenderThread()` | 停止 Analog 渲染執行緒 | N/A (同上) | N/A |
+| 34 | `EnterAnalogFullScreen()` | 進入 Analog 全螢幕 (8:7 PAR) | `ToggleFullscreen()` (Stretch.Uniform 自動 letterbox) | OK |
+| 35 | `ExitAnalogFullScreen()` | 離開 Analog 全螢幕 | `ToggleFullscreen()` | OK |
+| 36 | `FullScreenModeTransition()` | Analog/一般模式全螢幕切換 | `ToggleFullscreen()` (統一模式) | OK |
 
 ### 1.7 選單事件 — 檔案
 
@@ -107,7 +107,7 @@
 | 44 | `_menuToolsScreenshot_Click()` | 截圖 | `MenuScreenshot_Click()` | OK |
 | 45 | `_menuHelpShortcuts_Click()` | 顯示快捷鍵 | `MenuShortcuts_Click()` | OK |
 | 46 | `_soundMenuItem_Click()` | 音效開關 | `MenuSound_Click()` | OK |
-| 47 | `_ultraAnalogMenuItem_Click()` | Ultra Analog 開關 + 重建管線 | `MenuUltraAnalog_Click()` | **PARTIAL** — 有 toggle 但缺重建 NTSC/CRT 管線 |
+| 47 | `_ultraAnalogMenuItem_Click()` | Ultra Analog 開關 + 重建管線 | `MenuUltraAnalog_Click()` | OK |
 | 48 | `_recordVideoMenuItem_Click()` | 錄影開關 (FFmpeg) | `MenuRecordVideo_Click()` | OK |
 | 49 | `_recordAudioMenuItem_Click()` | 錄音開關 | `MenuRecordAudio_Click()` | OK |
 
@@ -118,7 +118,7 @@
 | 50 | `fun3ToolStripMenuItem_Click()` | 開啟設定 | `MenuConfiguration_Click()` | OK |
 | 51 | `fun4ToolStripMenuItem_Click()` | ROM 資訊 | `MenuRomInfo_Click()` | OK |
 | 52 | `fun6ToolStripMenuItem_Click()` | 關於 | `MenuAbout_Click()` | OK |
-| 53 | `fun8ToolStripMenuItem_Click()` | 全螢幕切換 (含 Analog) | `MenuFullscreen_Click()` | **PARTIAL** — 一般全螢幕 OK，Analog 全螢幕缺 |
+| 53 | `fun8ToolStripMenuItem_Click()` | 全螢幕切換 (含 Analog) | `MenuFullscreen_Click()` → `ToggleFullscreen()` | OK |
 | 54 | `fullScreeenToolStripMenuItem_Click()` | 進入全螢幕 | `ToggleFullscreen()` | OK |
 | 55 | `normalToolStripMenuItem_Click()` | 離開全螢幕 | `ToggleFullscreen()` | OK |
 
@@ -147,9 +147,9 @@
 
 | # | AprNes 方法 | 說明 | Ava 對應 | 狀態 |
 |---|------------|------|----------|------|
-| 67 | `LogError()` | 寫入錯誤日誌 | 無 | **TODO** |
-| 68 | `BeginHighResPeriod()` | 啟用高精度計時器 (1ms) | 無 | **TODO** |
-| 69 | `EndHighResPeriod()` | 還原計時器精度 | 無 | **TODO** |
+| 67 | `LogError()` | 寫入錯誤日誌 | `LogError()` | OK |
+| 68 | `BeginHighResPeriod()` | 啟用高精度計時器 (1ms) | N/A (.NET 10 Timer 精度已足夠，無需 winmm.dll) | N/A |
+| 69 | `EndHighResPeriod()` | 還原計時器精度 | N/A (同上) | N/A |
 | 70 | `SRamPath()` | 回傳 .sav 路徑 | `EmulatorEngine.SRamPath()` | OK |
 | 71 | `FileWriteAllText()` | 寫入設定檔 helper | `IniFile.Save()` | OK |
 
@@ -189,8 +189,8 @@
 |---|------------|------|----------|------|
 | 9 | `FindFilterIndex()` | 找濾鏡索引 | `LoadFromIni()` 用 SelectedIndex | OK |
 | 10 | `GetFilterScale()` | 解析倍率 | 無 (Ava 版直接用 index) | N/A |
-| 11 | `sizelevel_Changed()` | 濾鏡變更時更新解析度標籤 | 無 | **TODO** — Stage 1/2 變更時應即時更新 LblResolution |
-| 12 | `UpdateResolutionLabel()` | 更新解析度顯示 | 無 | **TODO** |
+| 11 | `sizelevel_Changed()` | 濾鏡變更時更新解析度標籤 | `CmbFilter_Changed()` | OK |
+| 12 | `UpdateResolutionLabel()` | 更新解析度顯示 | `UpdateResolutionLabel()` | OK |
 
 ### 2.4 Analog 設定
 
@@ -299,11 +299,11 @@
 
 | 狀態 | 數量 |
 |------|------|
-| OK | 96 |
+| OK | 112 |
 | PARTIAL | 1 |
-| TODO | 8 |
-| N/A | 6 |
-| **合計** | **111** |
+| TODO | 7 |
+| N/A | 13 |
+| **合計** | **133** |
 
 ---
 
@@ -335,21 +335,22 @@
 
 14. ~~**錄影 (FFmpeg)** — RecordVideo/RecordAudio/StopRecording (#48-49, #60-61, #64, #66)~~ ✅
 
-### P4 — Analog 渲染
+### ~~P4 — Analog 渲染 + 濾鏡~~ ✅ 全部完成
 
-15. **Analog 渲染管線** — RenderThread/EnterFullScreen/ExitFullScreen (#31-36)
-16. **CreateRenderResize / ApplyRenderSettings** — 濾鏡渲染物件 (#7, #28)
-17. **UltraAnalog 重建管線** — 切換時重建 NTSC/CRT (#47)
-18. **UpdateResolutionLabel** — 濾鏡變更時更新解析度 (#11-12)
+15. ~~**Analog 渲染管線** — N/A: Avalonia 用 WriteableBitmap + Dispatcher，無需獨立 GDI 渲染執行緒 (#31-33)~~ N/A
+16. ~~**Analog 全螢幕** — Avalonia ToggleFullscreen() + Stretch.Uniform 統一處理 (#34-36)~~ ✅
+17. ~~**CreateRenderResize / ApplyRenderSettings** — N/A: Avalonia 無 GDI Render 管線 (#7, #28)~~ N/A
+18. ~~**UltraAnalog 重建管線** — MenuUltraAnalog_Click + SyncAnalogConfig/Ntsc_Init/Crt_Init (#47)~~ ✅
+19. ~~**UpdateResolutionLabel** — CmbFilter_Changed + UpdateResolutionLabel (#11-12)~~ ✅
 
-### P5 — 手把
+### P5 — 手把 (待 Win32GamepadBackend 實作)
 
-19. **手把輪詢執行緒** — polling_listener (#73)
-20. **手把設定捕獲** — Setup_JoyPad_define/ExpectedJoyInputType (#21-24)
-21. **手把實際輸入** — IGamepadBackend Win32 實作
+20. **手把輪詢執行緒** — polling_listener (#73)
+21. **手把設定捕獲** — Setup_JoyPad_define/ExpectedJoyInputType (#21-24)
+22. **手把實際輸入** — IGamepadBackend Win32 實作 (DirectInput + XInput)
 
-### P6 — 雜項
+### ~~P6 — 雜項~~ ✅ 全部完成
 
-22. **initUIsize** — 視窗大小自適應 (#5)
-23. **LogError** — 錯誤日誌 (#67)
-24. **HighResPeriod** — 高精度計時器 (#68-69)
+23. ~~**initUIsize** — N/A: Avalonia 用 Stretch.Uniform 自適應 (#5)~~ N/A
+24. ~~**LogError** — MainWindow.LogError() + NesCore.OnError 綁定 (#67)~~ ✅
+25. ~~**HighResPeriod** — N/A: .NET 10 Timer 精度已足夠 (#68-69)~~ N/A

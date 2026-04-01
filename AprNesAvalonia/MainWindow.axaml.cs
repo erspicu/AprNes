@@ -72,6 +72,8 @@ public partial class MainWindow : Window
             _writeableBitmap.Dispose();
         };
 
+        AprNes.NesCore.OnError = LogError;
+
         InitRecentROMs();
         UpdateMenuStates();
         UpdateRecordMenuVisibility();
@@ -355,6 +357,20 @@ public partial class MainWindow : Window
         StatusRegion.Text = _currentRegion;
     }
 
+    // ═══ Error logging ═════════════════════════════════════════════════════
+
+    private static readonly string LogFile = Path.Combine(AppContext.BaseDirectory, "AprNes.log");
+
+    private static void LogError(string msg)
+    {
+        try
+        {
+            string line = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + msg + Environment.NewLine;
+            File.AppendAllText(LogFile, line);
+        }
+        catch { }
+    }
+
     // ═══ Frame rendering ════════════════════════════════════════════════════
 
     private unsafe void OnFrameReady()
@@ -623,9 +639,22 @@ public partial class MainWindow : Window
 
     private void MenuUltraAnalog_Click(object? sender, RoutedEventArgs e)
     {
+        StopRecordingIfActive(true);
         _ultraAnalogEnabled = !_ultraAnalogEnabled;
-        // TODO: apply Ultra Analog to NesCore
+        AprNes.NesCore.UltraAnalog = _ultraAnalogEnabled;
+        _ini.Set("UltraAnalog", _ultraAnalogEnabled ? "1" : "0");
+        _ini.Save();
         UpdateMenuStates();
+
+        // Sync rendering pipeline if running in Analog mode
+        if (_emu.IsRunning && AprNes.NesCore.AnalogEnabled)
+        {
+            _emu.Pause();
+            AprNes.NesCore.SyncAnalogConfig();
+            AprNes.NesCore.Ntsc_Init();
+            AprNes.NesCore.Crt_Init();
+            _emu.Resume();
+        }
     }
 
     // ═══ Menu: Tools ════════════════════════════════════════════════════════

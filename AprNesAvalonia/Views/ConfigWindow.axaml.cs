@@ -51,6 +51,9 @@ public partial class ConfigWindow : Window
         LangCombo.SelectionChanged += LangCombo_SelectionChanged;
         ChkAnalog.Click += (_, _) => UpdateAnalogEnableState();
         ChkUltraAnalog.Click += (_, _) => UpdateAnalogEnableState();
+        CmbFilter1.SelectionChanged += CmbFilter_Changed;
+        CmbFilter2.SelectionChanged += CmbFilter_Changed;
+        UpdateResolutionLabel();
     }
 
     private string L(string key, string def) => LangHelper.Get(LangHelper.CurrentLang, key, def);
@@ -315,6 +318,35 @@ public partial class ConfigWindow : Window
         {
             ChkUltraAnalog.IsChecked = false;
         }
+    }
+
+    // ── Filter resolution ────────────────────────────────────────────────
+
+    // Scale factors matching ComboBox order — Stage 1: None,xBRZ2-6,ScaleX2-3,NN2-4
+    private static readonly int[] _s1Scale = { 1, 2, 3, 4, 5, 6, 2, 3, 2, 3, 4 };
+    // Stage 2: None,ScaleX2-3,NN2-4
+    private static readonly int[] _s2Scale = { 1, 2, 3, 2, 3, 4 };
+
+    private void CmbFilter_Changed(object? sender, SelectionChangedEventArgs e)
+    {
+        if (sender == CmbFilter1)
+        {
+            bool s1None = CmbFilter1.SelectedIndex == 0;
+            CmbFilter2.IsEnabled = !s1None;
+            if (s1None) CmbFilter2.SelectedIndex = 0;
+        }
+        UpdateResolutionLabel();
+    }
+
+    private void UpdateResolutionLabel()
+    {
+        int i1 = CmbFilter1.SelectedIndex;
+        int i2 = CmbFilter2.SelectedIndex;
+        int s1 = (i1 >= 0 && i1 < _s1Scale.Length) ? _s1Scale[i1] : 1;
+        int s2 = (i2 >= 0 && i2 < _s2Scale.Length) ? _s2Scale[i2] : 1;
+        int w = 256 * s1 * s2;
+        int h = 240 * s1 * s2;
+        LblResolution.Text = w + " × " + h;
     }
 
     // ── Audio UI ────────────────────────────────────────────────────────
