@@ -387,7 +387,8 @@ namespace AprNes
                         highTile = chrBankPtrs[(ioaddr >> 10) & 7][ioaddr & 0x3FF];
                     if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ioaddr);
                     // Render 8 pixels using shift registers BEFORE reload (visible only, BG on)
-                    if (scanline < 240 && cx < 256 && ShowBackGround)
+                    // Use delayed ppuRenderingEnabled for correct mid-scanline $2001 toggle behavior
+                    if (scanline < 240 && cx < 256 && ppuRenderingEnabled)
                         RenderBGTile(cx);
                     // Load shift registers (high = old-low = previous tile, low = new tile)
                     lowshift  = (ushort)((lowshift  << 8) | lowTile);
@@ -600,7 +601,9 @@ namespace AprNes
                         int scanOff = scanline << 8;
                         int* bgp = Buffer_BG_array + scanOff;
                         for (int* bge = bgp + 256; bgp < bge; bgp++) *bgp = 0;
-                        if (!ShowBackGround)
+                        // Use delayed ppuRenderingEnabled (not immediate ShowBackGround)
+                        // to avoid premature backdrop fill when $2001 is toggled mid-scanline.
+                        if (!ppuRenderingEnabled)
                         {
                             uint bgColor = NesColors[ppu_ram[0x3f00] & 0x3f];
                             uint* sp = ScreenBuf1x + scanOff;
