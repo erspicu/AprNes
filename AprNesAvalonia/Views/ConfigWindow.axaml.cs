@@ -59,6 +59,7 @@ public partial class ConfigWindow : Window
         ChkUltraAnalog.Click += (_, _) => UpdateAnalogEnableState();
         CmbFilter1.SelectionChanged += CmbFilter_Changed;
         CmbFilter2.SelectionChanged += CmbFilter_Changed;
+        CmbAnalogSize.SelectionChanged += (_, _) => UpdateResolutionLabel();
         UpdateResolutionLabel();
     }
 
@@ -360,11 +361,18 @@ public partial class ConfigWindow : Window
         ChkCRT.IsEnabled            = analogOn;
         BtnAnalogAdvanced.IsEnabled = analogOn;
 
+        // Analog mode disables digital filter controls
+        CmbFilter1.IsEnabled  = !analogOn;
+        CmbFilter2.IsEnabled  = !analogOn;
+        ChkScanline.IsEnabled = !analogOn;
+
         // Ultra Analog sub-controls
         if (!analogOn)
         {
             ChkUltraAnalog.IsChecked = false;
         }
+
+        UpdateResolutionLabel();
     }
 
     // ── Filter resolution ────────────────────────────────────────────────
@@ -385,15 +393,26 @@ public partial class ConfigWindow : Window
         UpdateResolutionLabel();
     }
 
+    private static readonly int[] _analogSizeValues = { 2, 4, 6, 8 };
+
     private void UpdateResolutionLabel()
     {
-        int i1 = CmbFilter1.SelectedIndex;
-        int i2 = CmbFilter2.SelectedIndex;
-        int s1 = (i1 >= 0 && i1 < _s1Scale.Length) ? _s1Scale[i1] : 1;
-        int s2 = (i2 >= 0 && i2 < _s2Scale.Length) ? _s2Scale[i2] : 1;
-        int w = 256 * s1 * s2;
-        int h = 240 * s1 * s2;
-        LblResolution.Text = w + " × " + h;
+        if (ChkAnalog.IsChecked == true)
+        {
+            int idx = CmbAnalogSize.SelectedIndex;
+            int sz = (idx >= 0 && idx < _analogSizeValues.Length) ? _analogSizeValues[idx] : 4;
+            LblResolution.Text = (256 * sz) + " × " + (210 * sz);
+        }
+        else
+        {
+            int i1 = CmbFilter1.SelectedIndex;
+            int i2 = CmbFilter2.SelectedIndex;
+            int s1 = (i1 >= 0 && i1 < _s1Scale.Length) ? _s1Scale[i1] : 1;
+            int s2 = (i2 >= 0 && i2 < _s2Scale.Length) ? _s2Scale[i2] : 1;
+            int w = 256 * s1 * s2;
+            int h = 240 * s1 * s2;
+            LblResolution.Text = w + " × " + h;
+        }
     }
 
     // ── Audio UI ────────────────────────────────────────────────────────

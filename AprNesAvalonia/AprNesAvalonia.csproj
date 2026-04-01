@@ -35,6 +35,14 @@
     <Compile Include="../AprNes/tool/NativeAPIShare.cs" Link="Platform/NativeAPIShare.cs" />
     <Compile Include="../AprNes/tool/DirectInputHelper.cs" Link="Platform/DirectInputHelper.cs" />
     <Compile Include="../AprNes/tool/joystick.cs" Link="Platform/joystick.cs" />
+
+    <!-- 共用 enum -->
+    <Compile Include="../AprNes/tool/ResizeFilter.cs" Link="Tool/ResizeFilter.cs" />
+
+    <!-- 濾鏡 (pure unsafe pointer, 無 WinForms 依賴) -->
+    <Compile Include="../AprNes/tool/libXBRz.cs" Link="Tool/libXBRz.cs" />
+    <Compile Include="../AprNes/tool/Scalex.cs" Link="Tool/Scalex.cs" />
+    <Compile Include="../AprNes/tool/LibScanline.cs" Link="Tool/LibScanline.cs" />
   </ItemGroup>
 
   <ItemGroup>

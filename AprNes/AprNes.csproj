@@ -144,6 +144,7 @@
     <Compile Include="tool\LangINI.cs" />
     <Compile Include="tool\LibScanline.cs" />
     <Compile Include="tool\NativeAPIShare.cs" />
+    <Compile Include="tool\ResizeFilter.cs" />
     <Compile Include="tool\Render_resize.cs" />
     <Compile Include="tool\Scalex.cs" />
     <Compile Include="UI\AprNes_AnalogConfigureUI.cs">

@@ -134,7 +134,7 @@
             </Border.ContextMenu>
             <Image x:Name="GameCanvas"
                    Width="256" Height="240"
-                   Stretch="Fill"
+                   Stretch="None"
                    RenderOptions.BitmapInterpolationMode="None" />
         </Border>
     </DockPanel>

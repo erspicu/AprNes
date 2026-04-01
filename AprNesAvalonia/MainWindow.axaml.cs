@@ -10,6 +10,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using AprNes;
 using AprNesAvalonia.Views;
 
 namespace AprNesAvalonia;
@@ -18,7 +19,7 @@ public partial class MainWindow : Window
 {
     private readonly EmulatorEngine _emu = new();
     private readonly IniFile _ini;
-    private readonly WriteableBitmap _writeableBitmap = new WriteableBitmap(
+    private WriteableBitmap _writeableBitmap = new WriteableBitmap(
         new PixelSize(256, 240),
         new Vector(96, 96),
         PixelFormats.Bgra8888,
@@ -42,16 +43,17 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
-        // Load INI settings
+        // Wire events before loading settings so initial resolution is applied
+        _emu.FrameReady += OnFrameReady;
+        _emu.ResolutionChanged += OnResolutionChanged;
+
+        // Load INI settings (triggers ApplyRenderPipeline → ResolutionChanged)
         string iniPath = Path.Combine(AppContext.BaseDirectory, "configure", "AprNes.ini");
         _ini = new IniFile(iniPath);
         ApplyIniSettings();
 
         // Canvas
         GameCanvas.Source = _writeableBitmap;
-
-        // Frame-ready
-        _emu.FrameReady += OnFrameReady;
 
         // FPS display
         _fpsTimer.Tick += (_, _) => StatusFps.Text = _emu.TakeFrameCount().ToString();
@@ -115,12 +117,61 @@ public partial class MainWindow : Window
         // Reload gamepad mapping
         _emu.ReloadGamepadMapping(_ini);
 
+        // Analog / render pipeline
+        bool analogOn = _ini.GetBool("AnalogMode", false);
+        AprNes.NesCore.AnalogEnabled = analogOn;
+        _ultraAnalogEnabled = _ini.GetBool("UltraAnalog", false);
+        AprNes.NesCore.UltraAnalog = _ultraAnalogEnabled;
+
+        int[] validSizes = { 2, 4, 6, 8 };
+        int aSize = _ini.GetInt("AnalogSize", 4);
+        AprNes.NesCore.AnalogSize = Array.IndexOf(validSizes, aSize) >= 0 ? aSize : 4;
+
+        ApplyRenderPipeline();
+
         // Load separate INI files for Analog and AudioPlus
         LoadAnalogConfig();
         LoadAudioPlusIni();
 
         ApplyLanguage(_ini.Get("Lang", LangHelper.CurrentLang));
         UpdateMenuStates();
+    }
+
+    // ═══ Render Pipeline ════════════════════════════════════════════════
+
+    // Stage 1 ComboBox index → (filter, scale)
+    // 0=None, 1=xBRZ2x, 2=xBRZ3x, 3=xBRZ4x, 4=xBRZ5x, 5=xBRZ6x, 6=ScaleX2x, 7=ScaleX3x, 8=NN2x, 9=NN3x, 10=NN4x
+    private static readonly (ResizeFilter f, int s)[] _stage1Map =
+    [
+        (ResizeFilter.None, 1),
+        (ResizeFilter.XBRz, 2), (ResizeFilter.XBRz, 3), (ResizeFilter.XBRz, 4),
+        (ResizeFilter.XBRz, 5), (ResizeFilter.XBRz, 6),
+        (ResizeFilter.ScaleX, 2), (ResizeFilter.ScaleX, 3),
+        (ResizeFilter.NN, 2), (ResizeFilter.NN, 3), (ResizeFilter.NN, 4),
+    ];
+
+    // Stage 2 ComboBox index → (filter, scale)
+    // 0=None, 1=ScaleX2x, 2=ScaleX3x, 3=NN2x, 4=NN3x, 5=NN4x
+    private static readonly (ResizeFilter f, int s)[] _stage2Map =
+    [
+        (ResizeFilter.None, 1),
+        (ResizeFilter.ScaleX, 2), (ResizeFilter.ScaleX, 3),
+        (ResizeFilter.NN, 2), (ResizeFilter.NN, 3), (ResizeFilter.NN, 4),
+    ];
+
+    private void ApplyRenderPipeline()
+    {
+        int s1Idx = _ini.GetInt("ResizeStage1", 0);
+        int s2Idx = _ini.GetInt("ResizeStage2", 0);
+        bool scanline = _ini.GetBool("Scanline", false);
+
+        var (s1f, s1s) = s1Idx >= 0 && s1Idx < _stage1Map.Length ? _stage1Map[s1Idx] : (ResizeFilter.None, 1);
+        var (s2f, s2s) = s2Idx >= 0 && s2Idx < _stage2Map.Length ? _stage2Map[s2Idx] : (ResizeFilter.None, 1);
+
+        bool analogEnabled = AprNes.NesCore.AnalogEnabled;
+        int analogSize = AprNes.NesCore.AnalogSize;
+
+        _emu.ApplyRenderSettings(s1f, s1s, s2f, s2s, scanline, analogEnabled, analogSize);
     }
 
     // ═══ Analog Config INI ═══════════════════════════════════════════════
@@ -384,6 +435,19 @@ public partial class MainWindow : Window
 
     // ═══ Frame rendering ════════════════════════════════════════════════════
 
+    private void OnResolutionChanged(int w, int h)
+    {
+        _writeableBitmap?.Dispose();
+        _writeableBitmap = new WriteableBitmap(
+            new PixelSize(w, h),
+            new Vector(96, 96),
+            PixelFormats.Bgra8888,
+            AlphaFormat.Unpremul);
+        GameCanvas.Width  = w;
+        GameCanvas.Height = h;
+        GameCanvas.Source  = _writeableBitmap;
+    }
+
     private unsafe void OnFrameReady()
     {
         var src = _emu.FrameBuffer;
@@ -473,9 +537,9 @@ public partial class MainWindow : Window
         else
         {
             WindowState = WindowState.Normal;
-            GameCanvas.Width  = 256;
-            GameCanvas.Height = 240;
-            GameCanvas.Stretch = Avalonia.Media.Stretch.Fill;
+            GameCanvas.Width  = _emu.OutputW;
+            GameCanvas.Height = _emu.OutputH;
+            GameCanvas.Stretch = Avalonia.Media.Stretch.None;
             GameBorder.Margin = new Thickness(0);
         }
     }
@@ -505,12 +569,13 @@ public partial class MainWindow : Window
             {
                 fixed (byte* p = src)
                 {
+                    int w = _emu.OutputW, h = _emu.OutputH;
                     var bmp = new Bitmap(
                         PixelFormats.Bgra8888, AlphaFormat.Unpremul,
                         (nint)p,
-                        new PixelSize(256, 240),
+                        new PixelSize(w, h),
                         new Vector(96, 96),
-                        256 * 4);
+                        w * 4);
                     using var fs = File.Create(filePath);
                     bmp.Save(fs);
                     bmp.Dispose();
@@ -664,6 +729,7 @@ public partial class MainWindow : Window
             AprNes.NesCore.SyncAnalogConfig();
             AprNes.NesCore.Ntsc_Init();
             AprNes.NesCore.Crt_Init();
+            ApplyRenderPipeline();
             _emu.Resume();
         }
     }
