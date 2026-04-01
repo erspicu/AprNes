@@ -154,6 +154,11 @@ namespace AprNes
         static byte ppu_2007_buffer = 0, ppu_2007_temp = 0;
         static int ppu2007ReadCooldown = 0; // 6 PPU dots cooldown after $2007 read (Mesen2: _ignoreVramRead)
 
+        // $2000 delayed control update (TriCNES: PPU_Update2000Delay, 1-2 PPU cycles)
+        // NMI enable is immediate; pattern table/sprite size delayed
+        static int ppu2000UpdateDelay = 0;
+        static byte ppu2000PendingValue = 0;
+
         // $2001 delayed mask update (TriCNES: PPU_Update2001Delay, 2-3 PPU cycles)
         // _Instant flags set immediately; ShowBackGround/ShowSprites applied after delay
         static int ppu2001UpdateDelay = 0;
@@ -569,6 +574,14 @@ namespace AprNes
                     vram_addr_internal = (vram_addr_internal & 0x7fe0) | ((v & 0xf8) >> 3);
                     FineX = v & 0x07;
                 }
+            }
+
+            // $2000 delayed control update (pattern table, sprite size)
+            if (ppu2000UpdateDelay > 0 && --ppu2000UpdateDelay == 0)
+            {
+                SpPatternTableAddr = ((ppu2000PendingValue & 8) > 0) ? 0x1000 : 0;
+                BgPatternTableAddr = ((ppu2000PendingValue & 0x10) > 0) ? 0x1000 : 0;
+                Spritesize8x16 = ((ppu2000PendingValue & 0x20) > 0);
             }
 
             // $2001 delayed mask update (Tier 2: ShowBackGround/ShowSprites)
@@ -1486,30 +1499,27 @@ namespace AprNes
         static byte openbus;
         static public byte cpubus;  // CPU data bus value (last byte read/written by CPU)
 
-        static void ppu_w_2000(byte value) //ok
+        static void ppu_w_2000(byte value)
         {
             openbus = value;
 
-            // t: ...BA.. ........ = d: ......BA
-            vram_addr_internal = (ushort)((vram_addr_internal & 0x73ff) | ((value & 3) << 10)); // 0xx73ff
+            // Immediate: nametable bits (for t register) and NMI enable
+            vram_addr_internal = (ushort)((vram_addr_internal & 0x73ff) | ((value & 3) << 10));
             BaseNameTableAddr = 0x2000 | ((value & 3) << 10);
             VramaddrIncrement = ((value & 4) > 0) ? 32 : 1;
-            SpPatternTableAddr = ((value & 8) > 0) ? 0x1000 : 0;
-            BgPatternTableAddr = ((value & 0x10) > 0) ? 0x1000 : 0;
-            Spritesize8x16 = ((value & 0x20) > 0) ? true : false;
-            bool wasNMIable = NMIable;
-            NMIable = ((value & 0x80) > 0) ? true : false;
+            NMIable = ((value & 0x80) > 0);
 
-            // NMI edge detection for $2000 writes:
-            // Falling edge (disable NMI): cancel nmi_delay (not yet promoted)
-            //   but NOT nmi_pending — once promoted, NMI cannot be cancelled by disable
-            // Rising edge (enable NMI): let next tick() detect it (natural delay)
+            // NMI edge detection (immediate — critical for NMI timing)
             bool nmi_output = isVblank && NMIable;
             if (!nmi_output && nmi_output_prev)
             {
                 nmi_delay_cycle = -1;
                 nmi_output_prev = false;
             }
+
+            // Delayed: pattern table addresses, sprite size (TriCNES: PPU_Update2000Delay = 1-2)
+            ppu2000UpdateDelay = 2;
+            ppu2000PendingValue = value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
