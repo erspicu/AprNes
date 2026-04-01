@@ -109,6 +109,10 @@ public partial class MainWindow : Window
 
         _emu.ApplyAudioSettings(_soundEnabled, _ini.GetInt("Volume", 80));
 
+        // Audio DSP mode (0=Pure Digital, 1=Authentic, 2=Modern)
+        int audioMode = _ini.GetInt("AudioMode", 0);
+        AprNes.NesCore.AudioMode = audioMode >= 0 && audioMode <= 2 ? audioMode : 0;
+
         // Reload gamepad mapping
         _emu.ReloadGamepadMapping(_ini);
 
@@ -117,16 +121,32 @@ public partial class MainWindow : Window
         AprNes.NesCore.AnalogEnabled = analogOn;
         _ultraAnalogEnabled = _ini.GetBool("UltraAnalog", false);
         AprNes.NesCore.UltraAnalog = _ultraAnalogEnabled;
+        AprNes.NesCore.CrtEnabled = _ini.GetBool("crt", true);
 
         int[] validSizes = { 2, 4, 6, 8 };
         int aSize = _ini.GetInt("AnalogSize", 4);
         AprNes.NesCore.AnalogSize = Array.IndexOf(validSizes, aSize) >= 0 ? aSize : 4;
+
+        // AnalogOutput (RF/SVideo/AV)
+        string ao = _ini.Get("AnalogOutput", "AV");
+        AprNes.NesCore.AnalogOutput = ao switch
+        {
+            "RF"     => AprNes.AnalogOutputMode.RF,
+            "SVideo" => AprNes.AnalogOutputMode.SVideo,
+            _        => AprNes.AnalogOutputMode.AV,
+        };
 
         ApplyRenderPipeline();
 
         // Load separate INI files for Analog and AudioPlus
         LoadAnalogConfig();
         LoadAudioPlusIni();
+
+        // Recording quality settings
+        int vq = _ini.GetInt("VideoQuality", 90);
+        AprNes.VideoRecorder.VideoQuality = Array.IndexOf(new[] { 90, 80, 70, 60 }, vq) >= 0 ? vq : 90;
+        int ab = _ini.GetInt("AudioBitrate", 160);
+        AprNes.AudioRecorder.AudioBitrate = Array.IndexOf(new[] { 192, 160, 128 }, ab) >= 0 ? ab : 160;
 
         ApplyLanguage(_ini.Get("Lang", LangHelper.CurrentLang));
         UpdateMenuStates();
@@ -579,6 +599,7 @@ public partial class MainWindow : Window
 
     private void LoadAndStartRom(string path)
     {
+        StopRecordingIfActive(true);
         _emu.Stop();
         if (!_emu.LoadRom(path)) return;
 
@@ -702,6 +723,7 @@ public partial class MainWindow : Window
     private void MenuSoftReset_Click(object? sender, RoutedEventArgs e)
     {
         if (!_emu.IsRomLoaded) return;
+        StopRecordingIfActive(true);
         AprNes.NesCore.SoftReset();
         if (!_emu.IsRunning) _emu.Start();
     }
@@ -768,6 +790,7 @@ public partial class MainWindow : Window
 
     private void MenuSound_Click(object? sender, RoutedEventArgs e)
     {
+        StopRecordingIfActive(true);
         _soundEnabled = !_soundEnabled;
         _emu.ApplyAudioSettings(_soundEnabled, _ini.GetInt("Volume", 80));
         _ini.Set("Sound", _soundEnabled ? "1" : "0");

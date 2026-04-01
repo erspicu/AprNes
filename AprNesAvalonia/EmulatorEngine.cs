@@ -195,6 +195,19 @@ public sealed unsafe class EmulatorEngine : IDisposable
             newW = _pipeline.OutputW;
             newH = _pipeline.OutputH;
             _pipelineActive = _pipeline.HasFilters;
+
+            // Analog→Digital: free NesCore analog buffers (mirrors AprNes WinForms)
+            if (NesCore.AnalogScreenBuf != null)
+            {
+                Marshal.FreeHGlobal((IntPtr)NesCore.AnalogScreenBuf);
+                NesCore.AnalogScreenBuf = null;
+            }
+            if (NesCore.AnalogScreenBufBack != null)
+            {
+                Marshal.FreeHGlobal((IntPtr)NesCore.AnalogScreenBufBack);
+                NesCore.AnalogScreenBufBack = null;
+            }
+            NesCore.AnalogBufSize = 0;
         }
 
         bool resChanged = newW != _outputW || newH != _outputH;
