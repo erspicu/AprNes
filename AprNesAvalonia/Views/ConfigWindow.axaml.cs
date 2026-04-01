@@ -205,9 +205,11 @@ public partial class ConfigWindow : Window
         // Recording
         TxtVideoPath.Text = _ini.Get("CaptureVideoPath", "");
         TxtAudioPath.Text = _ini.Get("CaptureAudioPath", "");
-        CmbVideoQuality.SelectedIndex = _ini.GetInt("VideoQuality", 1);
-        CmbAudioBitrate.SelectedIndex = _ini.Get("AudioBitrate", "128") switch
-            { "160" => 1, "192" => 2, _ => 0 };
+        // VideoQuality: INI stores 90/80/70/60 → index 0(Ultra)/1(High)/2(Medium)/3(Low)
+        CmbVideoQuality.SelectedIndex = _ini.Get("VideoQuality", "90") switch
+            { "60" => 0, "70" => 1, "80" => 2, _ => 3 };
+        CmbAudioBitrate.SelectedIndex = _ini.Get("AudioBitrate", "160") switch
+            { "128" => 0, "192" => 2, _ => 1 };
     }
 
     // ── Save UI → INI ───────────────────────────────────────────────────
@@ -278,8 +280,10 @@ public partial class ConfigWindow : Window
         // Recording
         _ini.Set("CaptureVideoPath", TxtVideoPath.Text ?? "");
         _ini.Set("CaptureAudioPath", TxtAudioPath.Text ?? "");
-        _ini.Set("VideoQuality", CmbVideoQuality.SelectedIndex.ToString());
-        string audioBitrate = CmbAudioBitrate.SelectedIndex switch { 1 => "160", 2 => "192", _ => "128" };
+        // VideoQuality: index 0=Low(60), 1=Medium(70), 2=High(80), 3=Ultra(90)
+        string videoQuality = CmbVideoQuality.SelectedIndex switch { 0 => "60", 1 => "70", 2 => "80", _ => "90" };
+        _ini.Set("VideoQuality", videoQuality);
+        string audioBitrate = CmbAudioBitrate.SelectedIndex switch { 0 => "128", 2 => "192", _ => "160" };
         _ini.Set("AudioBitrate", audioBitrate);
 
         string lang = LangCombo.SelectedIndex switch { 1 => "zh-cn", 2 => "en-us", _ => "zh-tw" };
