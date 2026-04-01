@@ -1,6 +1,6 @@
 # AprNes Mapper 實作狀態
 
-**總計已實作：65 個　　最後更新：2026-03-30**
+**已實作：65 個　　預備實作：16 個　　最後更新：2026-04-02**
 
 結果說明：✅ 正常　⚠️ 部分問題　❌ 有問題　❓ 待確認／不明
 
@@ -13,156 +13,131 @@
 | ✅ 正常 | 60 | 000, 001, 002, 003, 004, 005, 007, 009, 010, 011, 013, 016, 018, 019, 020, 021, 022, 023, 024, 025, 026, 029, 032, 033, 034, 065, 066, 067, 068, 069, 070, 071, 072, 075, 076, 077, 078, 079, 080, 082, 085, 087, 088, 089, 090, 093, 095, 097, 118, 119, 140, 152, 154, 159, 180, 184, 185, 206, 228, 232 |
 | ⚠️ 部分問題 | 1 | 064 |
 | ❓ 待確認 | 4 | 153, 209, 210, 211 |
-| **合計校驗** | **65** | |
-
-
+| **合計已實作** | **65** | |
 
 ---
 
-## 人工校驗紀錄
+## 已實作 — 人工校驗紀錄
 
-校驗日期：**2026-03-27**
+校驗日期：**2026-03-27**（部分 2026-03-30 補驗）
 
-| Mapper | 校驗結果 | 說明 |
-|:------:|:--------:|------|
-| **000** | ✅ | |
-| **001** | ✅ | |
-| **002** | ✅ | |
-| **003** | ✅ | |
-| **004** | ✅ | |
-| **005** | ✅ | 完整重寫：PRG/CHR banking、nametable mapping、scanline IRQ、extended attribute mode、Mesen2 風格 VRAM read notification。人工驗證通過（2026-03-25）：CV3 標題/遊戲正常、mmc5test split screen 正確 |
-| **007** | ✅ | |
-| **009** | ✅ | 人工驗證通過（2026-03-30）：Punch-Out!! 正常。Gradius II (J)(VC) 綠屏為 iNES header 錯誤（header 標 mapper 9，實際為 mapper 25 VRC4b），已透過 RomDatabase MapperOverride 修正 |
-| **010** | ✅ | |
-| **011** | ✅ | |
-| **013** | ✅ | 人工驗證通過（2026-03-30）：Videomation 正常。Glider Expansion 系列為 iNES header 錯誤（實為 mapper 29），已透過 RomDatabase MapperOverride 修正；其中 The House / Plato's Bath House 為 bad dump（Mesen2 也綠屏） |
-| **020** | ✅ | FDS 磁碟機支援（2026-03-28）：獨立於 IMapper 架構，NesCore partial class。BIOS 驗證（SHA-256）、gap-inserted 磁碟映像、IRQ timer、wavetable + FM 音效。人工驗證 10+ 遊戲（DK, SMB, Bubble Bobble, Dracula II, Galaga, Xevious 等） |
-| **016** | ✅ | 人工驗證通過（含 Dragon Ball Z - Kyoushuu Saiya Jin）。016/159 共用 Mapper016 類別：sub4=FCG-1/2($6000)、sub5=LZ93D50($8000)；159 為 016 sub5 別名（LZ93D50+24C01） |
-| **018** | ✅ | |
-| **019** | ✅ | 人工驗證通過（2026-03-27）：Splatterhouse (J)、Chibi Maruko-Chan (J) 正常，含 Namco 163 8ch 波形音效、CIRAM nametable/CHR 映射修復 |
-| **021** | ✅ | |
-| **022** | ✅ | |
-| **023** | ✅ | |
-| **024** | ✅ | 人工驗證通過（2026-03-25）：Akumajou Densetsu (J) 正常，含 VRC6 擴展音效 |
-| **025** | ✅ | 人工驗證通過（2026-03-27）：TMNT (J) 正常，VRC4d 地址線 A0/A1 修復 |
-| **026** | ✅ | Esper Dream 2 - Aratanaru Tatakai (J) 已修復（2026-03-24） |
-| **029** | ✅ | 新增實作（2026-03-30）：Sealie Computing。Glider Expansion - Mad House (PD) 正常。16KB switchable + 16KB fixed PRG、32KB CHR-RAM、8KB WRAM |
-| **032** | ✅ | |
-| **033** | ✅ | |
-| **034** | ✅ | 人工驗證通過 |
-| **064** | ⚠️ | Klax 畫面有問題 |
-| **065** | ✅ | 人工驗證通過（2026-03-27）：Daiku no Gen San 2 (J) 正常，鏡像邏輯修復 |
-| **066** | ✅ | 人工驗證通過（2026-03-27）：PRG bank modulo 修復 |
-| **067** | ✅ | 人工驗證通過（2026-03-30） |
-| **068** | ✅ | |
-| **069** | ✅ | 人工驗證通過（2026-03-25）：含 Sunsoft 5B (YM2149) 3ch 擴展音效 |
-| **070** | ✅ | 人工驗證通過（2026-03-28）：bit7 啟發式偵測修復，Arkanoid II 標題正常 |
-| **071** | ✅ | 人工驗證通過（2026-03-28）：基於 Mesen2 BF909x 重寫，PRG banking + BF9097 鏡像控制 |
-| **072** | ✅ | |
-| **075** | ✅ | |
-| **076** | ✅ | 人工驗證通過（2026-03-31）：Battle City Hack V4 修復。位址解碼改為 A15 全域（$8000-$FFFF）、線性開機狀態、PRG 指標快取、移除 bank mask 限制 |
-| **077** | ✅ | |
-| **078** | ✅ | Uchuusen - Cosmo Carrier (J) 已修復（2026-03-24） |
-| **079** | ✅ | |
-| **080** | ✅ | 人工驗證通過（2026-03-27）：mirroring 反轉修復 |
-| **082** | ✅ | 人工驗證通過（2026-03-27）：mirroring 反轉修復 |
-| **085** | ✅ | 人工驗證通過（2026-03-27）：Lagrange Point (J) 正常，含 OPLL (YM2413) FM 合成音效、CHR-RAM banking 修復 |
-| **087** | ✅ | |
-| **088** | ✅ | 人工驗證通過（2026-03-30）：Dragon Spirit (J)、Quinty (J) 正常。Devil Man (J) 實為 mapper 154（iNES header 錯誤），已透過 RomDatabase MapperOverride 修正 |
-| **089** | ✅ | 人工驗證通過（2026-03-27） |
-| **090** | ✅ | 人工驗證通過（2026-03-30）：Mortal Kombat 2 (Unl) 正常（iNES header mapper 210→RomDatabase 修正為 090） |
-| **093** | ✅ | |
-| **095** | ✅ | 人工驗證通過（2026-03-30） |
-| **097** | ✅ | |
-| **118** | ✅ | 人工驗證通過（2026-03-25） |
-| **119** | ✅ | |
-| **140** | ✅ | 人工驗證通過（2026-03-30）：PRG/CHR bank bits 修正（原本反了） |
-| **152** | ✅ | 人工驗證通過（2026-03-27）：mirroring bit 修復（bit6→bit7） |
-| **153** | ❓ | 暫時找不到測試 ROM（2026-03-30） |
-| **154** | ✅ | 新增實作（2026-03-30）：Namco 129，Mapper088 + 動態單屏鏡像（bit6）。Devil Man (J) 人工驗證通過（iNES header 誤標 088，透過 RomDatabase 修正） |
-| **159** | ✅ | 016 sub5 別名（LZ93D50+24C01），共用 Mapper016 類別，隨 016 驗證通過 |
-| **180** | ✅ | |
-| **184** | ✅ | |
-| **185** | ✅ | |
-| **206** | ✅ | 人工驗證通過（2026-03-27）：CHR/PRG bank modulo 修復 |
-| **209** | ❓ | 暫時找不到測試 ROM（2026-03-30） |
-| **210** | ❓ | 暫時找不到測試 ROM（2026-03-30）；先前綠屏為 MK2 ROM（實為 mapper 090，已透過 RomDatabase 修正） |
-| **211** | ❓ | 暫時找不到測試 ROM（2026-03-30） |
-| **228** | ✅ | |
-| **232** | ✅ | |
+| Mapper | 名稱 / 晶片 | 校驗結果 | 測試遊戲 | 說明 |
+|:------:|------------|:--------:|---------|------|
+| **000** | NROM | ✅ | — | 固定 32KB PRG，8KB CHR |
+| **001** | MMC1 | ✅ | Legend of Zelda, Metroid, MegaMan 2 | 序列寫入；16KB×2 PRG，4KB×2 CHR；4種鏡像 |
+| **002** | UxROM | ✅ | Castlevania, MegaMan, Ghosts & Goblins | 16KB PRG 切換 + 固定末，CHR-RAM |
+| **003** | CNROM | ✅ | Solomon's Key, Gradius | 固定 32KB PRG，8KB CHR 切換 |
+| **004** | MMC3 / MMC3 RevA / MMC6 | ✅ | SMB2, SMB3, MegaMan 3–6 | 8KB×4 PRG，1KB×8 CHR；A12 掃描線 IRQ |
+| **005** | MMC5 | ✅ | CV3, Gemfire, L'Empereur, ROTK | PRG/CHR banking(4 modes)、scanline IRQ、extended attribute、nametable mapping。缺：vertical split、MMC5 audio |
+| **007** | AxROM | ✅ | Battletoads, Wizards & Warriors | 32KB PRG 切換，CHR-RAM，single-screen |
+| **009** | MMC2 | ✅ | Punch-Out!! (U) | PPU Latch 自動換頁。Gradius II (J)(VC) 為 iNES header 錯誤（實為 mapper 25），已透過 RomDatabase 修正 |
+| **010** | MMC4 | ✅ | Fire Emblem, Famicom Wars | MMC2 演進版；PPU Latch 延遲更新 |
+| **011** | Color Dreams | ✅ | Crystal Mines, Pesterminator | 32KB PRG + 8KB CHR（非授權） |
+| **013** | CPROM | ✅ | Videomation | 固定 32KB PRG；16KB CHR-RAM（上半 4KB 切換）。Glider Expansion 為 mapper 29（RomDB 修正） |
+| **016** | Bandai FCG-1/2 / LZ93D50 | ✅ | Dragon Ball (J), DBZ Kyoushuu Saiya Jin | $6000/$8000 regs；CPU cycle / latch IRQ；EEPROM stub |
+| **018** | Jaleco SS8806 | ✅ | Ninja Jajamaru, Pizza Pop!, Magic John | 3×8KB PRG + 8×1KB CHR；nibble 寫入；可變寬度 IRQ |
+| **019** | Namco 163 | ✅ | Splatterhouse (J), Rolling Thunder 2 (J) | 8ch 波形音效；≥0xE0 映射 CIRAM；15-bit 上計數 IRQ |
+| **020** | FDS 磁碟機 | ✅ | DK, SMB, Bubble Bobble, Dracula II 等 10+ | BIOS + PRG-RAM + CHR-RAM；磁碟 I/O；IRQ timer；wavetable + FM |
+| **021** | Konami VRC4a/c | ✅ | Wai Wai World 2, Goemon Gaiden 2 | 4×8KB PRG；8×1KB CHR；prescaler IRQ |
+| **022** | Konami VRC2a | ✅ | TwinBee 3 (J) | CHR index >>1 |
+| **023** | Konami VRC2b | ✅ | Contra (J), Getsufuu Maden (J) | CHR index 不右移 |
+| **024** | Konami VRC6a | ✅ | Akumajou Densetsu (J) | 3ch 擴充音效；prescaler IRQ |
+| **025** | Konami VRC4b/d | ✅ | Gradius II (J), TMNT (J) | VRC4 A0/A1 對調 |
+| **026** | Konami VRC6b | ✅ | Esper Dream 2 (J), Madara (J) | VRC6 A0/A1 對調 |
+| **029** | Sealie Computing | ✅ | Glider Expansion - Mad House (PD) | 16KB switchable + 16KB fixed；32KB CHR-RAM；8KB WRAM |
+| **032** | Irem G-101 | ✅ | Image Fight (J), Major League (J) | SubMapper1=Major League |
+| **033** | Taito TC0190 | ✅ | Akira (J), Don Doko Don (J) | addr&0xA003 decode |
+| **034** | Nina-1 | ✅ | Deadly Towers (U), Impossible Mission II | CHR-RAM/ROM 變體 |
+| **064** | Tengen RAMBO-1 | ⚠️ | Shinobi ✅ / Klax ⚠️ | Klax 畫面異常（停留標題循環） |
+| **065** | Irem H-3001 | ✅ | Daiku no Gen San 2 (J) | 16-bit CPU cycle IRQ；鏡像邏輯修復 |
+| **066** | GxROM | ✅ | DragonBall (J), Gumshoe (U) | PRG modulo 修復 |
+| **067** | Sunsoft-3 | ✅ | Fantasy Zone 2 (J), Mito Koumon II (J) | 16-bit 下計數 IRQ |
+| **068** | Sunsoft #4 | ✅ | AfterBurner II (J), Maharaja (J) | CHR-as-nametable |
+| **069** | Sunsoft FME-7 / 5B | ✅ | Batman (J), Gimmick! (J) | YM2149 3ch 擴展音效；CPU cycle IRQ |
+| **070** | Bandai 74161/32 | ✅ | Kamen Rider Club (J), Arkanoid II (J) | bit7 啟發式偵測 mislabeled ROM |
+| **071** | Camerica / BF909x | ✅ | Firehawk (U), Linus Spacehead (U) | BF9097 variant 自動偵測+單屏鏡像 |
+| **072** | Jaleco JF-17 | ✅ | Pinball Quest (J), Moero!! Juudou Warriors (J) | Latch 機制（prgFlag/chrFlag） |
+| **075** | Konami VRC1 | ✅ | Ganbare Goemon! (J) | $9000 bit0=H/V |
+| **076** | Namco 109 | ✅ | Battle City Hack V4, Megami Tensei (J) | A15 全域解碼；PRG 指標快取 |
+| **077** | IremLrog017 | ✅ | Napoleon Senki (J) | slot0=CHR-ROM 2KB，slots1-3=CHR-RAM 6KB |
+| **078** | Irem 74HC161/32 | ✅ | Holy Diver (J), Uchuusen Cosmo Carrier (J) | subMapper 鏡像差異修復 |
+| **079** | NINA-03/06 (AVE) | ✅ | Blackjack (AVE), Deathbots (AVE) | (addr&0xE100)==0x4100 |
+| **080** | Taito X1-005 | ✅ | Minelvaton Saga (J), Fudou Myouou Den (J) | RAM unlock；mirroring 反轉修復 |
+| **082** | Taito X1-017 | ✅ | SD Keiji Blader (J), Harikiri Stadium (J) | SRAM unlock seq；mirroring 反轉修復 |
+| **085** | Konami VRC7 | ✅ | Lagrange Point (J) | OPLL (YM2413) FM 合成音效；CHR-RAM banking 修復 |
+| **087** | Jaleco JF-09/10/18 | ✅ | Argus (J), City Connection (J), Goonies (J) | D0/D1 bit-swap |
+| **088** | Namco 118 / 634 | ✅ | Dragon Spirit (J), Quinty (J) | R0/R1=2KB CHR(low 64KB)，R2-R5=1KB CHR(high 64KB) |
+| **089** | Sunsoft-2 (Ikki) | ✅ | Tenka no Goikenban (J) | bit3=single-screen |
+| **090** | JY Company | ✅ | Mortal Kombat 2 (Unl) | 4 PRG/CHR modes；CPU/A12 IRQ；multiply reg；NT control |
+| **093** | Sunsoft-2 (FZ2) | ✅ | Fantasy Zone (J), Shanghai (J) | CHR-RAM |
+| **095** | Namco 118 DxROM | ✅ | Dragon Buster (J) | reg[0][1] bit5=NT select |
+| **097** | Irem TAM-S1 | ✅ | Kaiketsu Yanchamaru (J) | 首 16KB 固定，末 16KB 切換 |
+| **118** | TxSROM | ✅ | Ys III (J), Armadillo (J), NES Play Action Football | CHR bit7 控制 nametable |
+| **119** | TQROM | ✅ | High Speed (U) | CHR bank 0x40–0x7F 映射 CHR-RAM |
+| **140** | Jaleco JF-11/14 | ✅ | Doraemon (J), Bio Senshi Dan (J) | bits[5:4]=PRG，bits[3:0]=CHR；PRG/CHR bits 修正 |
+| **152** | Bandai single-screen | ✅ | Arkanoid II Prototype (J) | bit7→single-screen（bit6→bit7 修復） |
+| **153** | Bandai LZ93D50+WRAM | ❓ | — | 已實作，ROM 庫中無對應遊戲 |
+| **154** | Namco 129 | ✅ | Devil Man (J) | Mapper088 + bit6 動態單屏鏡像 |
+| **159** | Bandai LZ93D50 alias | ✅ | — | 016 sub5 別名，隨 016 驗證通過 |
+| **180** | Crazy Climber | ✅ | Crazy Climber (J) | 首 16KB 固定，末 16KB 切換 |
+| **184** | Sunsoft-1 / FC-08 | ✅ | Wing of Madoola (J), Atlantis no Nazo (J) | 下 4KB + 上 4KB（bit7 常設）CHR |
+| **185** | CNROM + copy-protect | ✅ | B-Wings (J), Bird Week (J), Mighty Bomb Jack (J) | nibble 保護 heuristic |
+| **206** | Namco 108 | ✅ | Karnov (J) | MMC3 雛形；無 IRQ |
+| **209** | JY Company (209) | ❓ | Mike Tyson's Punch-Out!! (Unl) [!] 等 | Mapper 090 + CHR latch（待人工驗證） |
+| **210** | Namco 175/340 | ❓ | ⚠️ MK2 為 header 誤標（實為 090） | SubMapper1=175（無IRQ）；SubMapper2=340（IRQ+NT） |
+| **211** | JY Company (211) | ❓ | DKC4 + Jungle Book 2 (Unl) [!] 等 | Mapper 090 + extended NT（待人工驗證） |
+| **228** | Action 52 | ✅ | Cheetahmen II (U) | addr+data 編碼；chipSelect；16/32KB mode |
+| **232** | Camerica BF9096 | ✅ | Quattro Adventure (U), Quattro Sports (U) | 外層+內層二段 PRG；Aladdin variant |
 
 ---
 
-| Mapper | 名稱 / 晶片 | PRG / CHR 架構 | 測試遊戲 | 結果 |
-|:------:|------------|----------------|---------|:----:|
-| **000** | NROM | 固定 32KB PRG，8KB CHR | — | ✅ |
-| **001** | MMC1 | 序列寫入；16KB×2 PRG，4KB×2 CHR；4種鏡像 | Legend of Zelda, Metroid, MegaMan 2 | ✅ |
-| **002** | UxROM | 16KB PRG 切換 + 固定末，CHR-RAM | Castlevania, MegaMan, Ghosts & Goblins | ✅ |
-| **003** | CNROM | 固定 32KB PRG，8KB CHR 切換 | Solomon's Key, Gradius | ✅ |
-| **004** | MMC3 | 8KB×4 PRG，1KB×8 CHR；A12 掃描線 IRQ | SMB2, SMB3, MegaMan 3–6 | ✅ |
-| **004** | MMC3 RevA | MMC3 變體（RevA 行為差異） | — | ✅ |
-| **004** | MMC6 | MMC3 + 1KB PRG-RAM | — | ✅ |
-| **005** | MMC5 | 8KB×4 PRG，1KB×8 CHR；PRG/CHR banking(4 modes)、scanline IRQ、extended attribute mode、nametable mapping、Mesen2 風格 VRAM read notification。缺：vertical split、MMC5 audio | Castlevania III, Gemfire, L'Empereur, ROTK | ✅ |
-| **007** | AxROM | 32KB PRG 切換，CHR-RAM，single-screen | Battletoads, Wizards & Warriors | ✅ |
-| **009** | MMC2 | PPU Latch 自動換頁；16KB×2 PRG，4KB×2 CHR | Punch-Out!! (U) | ✅ |
-| **010** | MMC4 | MMC2 演進版；16KB PRG；PPU Latch 延遲更新 | Fire Emblem, Famicom Wars | ✅ |
-| **011** | Color Dreams | 32KB PRG 切換，8KB CHR 切換（非授權） | Crystal Mines, Pesterminator | ✅ |
-| **013** | CPROM | 固定 32KB PRG；16KB CHR-RAM（上半 4KB 切換） | Videomation | ✅ |
-| **016** | Bandai FCG-1/2 | 16KB PRG，1KB×8 CHR；$6000 regs；CPU cycle IRQ | Dragon Ball (J), Famicom Jump (J) | ✅ |
-| **016** | Bandai LZ93D50 | 同上；$8000 regs；latch IRQ；EEPROM stub | Magical Taruruuto-kun (J) | ✅ |
-| **016** | Dragon Ball Z - Kyoushuu Saiya Jin | CIRAM read-time mirroring 修復後正常 | Dragon Ball Z - Kyoushuu Saiya Jin (J) | ✅ |
-| **018** | Jaleco SS8806 | 3×8KB PRG + 8×1KB CHR；nibble 寫入；可變寬度 IRQ | Ninja Jajamaru, Pizza Pop!, Magic John, Saiyuuki World 2 | ✅ |
-| **019** | Namco 163 | 3×8KB PRG；8×1KB CHR（≥0xE0 映射 CIRAM）；15-bit 上計數 IRQ；8ch 波形音效 | Splatterhouse (J), Rolling Thunder 2 (J) | ✅ |
-| **020** | FDS 磁碟機 | BIOS($E000) + PRG-RAM(32KB) + CHR-RAM；磁碟 I/O 狀態機；IRQ timer；wavetable 音效 + FM 調變 | Donkey Kong, SMB, Bubble Bobble, Dracula II 等 10+ 遊戲 | ✅ |
-| **021** | Konami VRC4a/c | 4×8KB PRG switchable；8×1KB CHR；prescaler IRQ | Wai Wai World 2 (J), Ganbare Goemon Gaiden 2 (J) | ✅ |
-| **022** | Konami VRC2a | 8KB×2 PRG + 8×1KB CHR；CHR index >>1 | TwinBee 3 (J) | ✅ |
-| **023** | Konami VRC2b | 同 VRC2a 但 CHR index 不右移 | Contra (J), Getsufuu Maden (J) | ✅ |
-| **024** | Konami VRC6a | 16KB+8KB PRG；8×1KB CHR；prescaler IRQ；3ch 擴充音效 | Akumajou Densetsu (J) | ✅ |
-| **025** | Konami VRC4b/d | VRC4 A0/A1 地址線對調 | Gradius II (J), Bio Miracle Bokutte Upa (J), TMNT (J) | ✅ |
-| **026** | Konami VRC6b | VRC6 A0/A1 地址線對調 | Madara (J) | ✅ |
-| **029** | Sealie Computing | 16KB switchable + 16KB fixed PRG；32KB CHR-RAM（8KB×4）；8KB WRAM | Glider Expansion - Mad House (PD) | ✅ |
-| **032** | Irem G-101 | 8KB×3 PRG switchable；8×1KB CHR；SubMapper1=Major League | Image Fight (J), Major League (J) | ✅ |
-| **033** | Taito TC0190 | 2×8KB PRG；2KB×2+1KB×4 CHR；addr&0xA003 decode | Akira (J), Don Doko Don (J) | ✅ |
-| **034** | Nina-1 | CHR-RAM 變體（$8000 PRG）或 CHR-ROM 變體（$7FFD-$7FFF） | Deadly Towers (U), Impossible Mission II | ✅ |
-| **064** | Tengen RAMBO-1 | 類 MMC3；3×8KB PRG；A12/CPU-cycle IRQ 可切換 | Shinobi (Tengen) | ✅ |
-| **064** | Klax | 進入遊戲後畫面異常（停留標題循環） | Klax (Tengen) | ⚠️ |
-| **065** | Irem H-3001 | 3×8KB PRG switchable；16-bit CPU cycle IRQ | Daiku no Gen San 2 (J) | ✅ |
-| **066** | GxROM | 32KB PRG × 8KB CHR 一次寫入；PRG modulo 修復 | DragonBall (J), Gumshoe (U) | ✅ |
-| **067** | Sunsoft-3 | 16KB PRG；4×2KB CHR；16-bit 下計數 IRQ | Fantasy Zone 2 (J), Mito Koumon II (J) | ✅ |
-| **068** | Sunsoft #4 | 16KB PRG（固定末）；4×2KB CHR；CHR-as-nametable | AfterBurner II (J), Maharaja (J) | ✅ |
-| **069** | Sunsoft FME-7 / 5B | CPU cycle IRQ；PRG-RAM 分頁；4種鏡像；YM2149 3ch 擴展音效（對數音量 LUT、CPU/2 時脈） | Batman (J), Gimmick! (J) | ✅ |
-| **070** | Bandai 74161/32 | 16KB PRG + 8KB CHR 一次寫入；$C000 固定末；bit7 啟發式偵測 mislabeled ROM 鏡像 | Kamen Rider Club (J), Arkanoid II (J) | ✅ |
-| **071** | Camerica / BF909x | 16KB PRG 切換；CHR-RAM；BF9097 variant $9000 自動偵測+單屏鏡像 | Firehawk (U), Linus Spacehead (U) | ✅ |
-| **072** | Jaleco JF-17 | Latch 機制（prgFlag/chrFlag）；16KB PRG + 8KB CHR | Pinball Quest (J), Moero!! Juudou Warriors (J) | ✅ |
-| **075** | Konami VRC1 | 4×8KB PRG；2×4KB CHR；$9000 bit0=H/V | Ganbare Goemon! (J), Jajamaru Ninpou Chou (J) | ✅ |
-| **076** | Namco 109 | Namco108 架構；4×2KB CHR；A15 全域解碼；PRG 指標快取 | Battle City Hack V4, Megami Tensei (J) | ✅ |
-| **077** | Napoleon Senki / IremLrog017 | 32KB PRG；slot0=CHR-ROM 2KB，slots1-3=CHR-RAM 6KB | Napoleon Senki (J) | ✅ |
-| **078** | Irem 74HC161/32 | 16KB PRG 切換；4KB×2 CHR；subMapper 鏡像差異 | Holy Diver (J) | ✅ |
-| **078** | Uchuusen Cosmo Carrier | submapper 鏡像修復，正常運作 | Uchuusen Cosmo Carrier (J) | ✅ |
-| **079** | NINA-03 / NINA-06 (AVE) | (addr&0xE100)==0x4100；32KB PRG + 8KB CHR | Blackjack (AVE), Deathbots (AVE) | ✅ |
-| **080** | Taito X1-005 | $7EF0–$7EFF regs；3×8KB PRG；2KB+1KB×4 CHR；RAM unlock | Minelvaton Saga (J), Fudou Myouou Den (J) | ✅ |
-| **082** | Taito X1-017 | $7EF0–$7EFF regs；chrMode 1KB/2KB；SRAM unlock seq | SD Keiji Blader (J), Harikiri Stadium (J) | ✅ |
-| **085** | Konami VRC7 | 3×8KB PRG；8×1KB CHR；prescaler IRQ；OPLL (YM2413) FM 合成音效 | Lagrange Point (J) | ✅ |
-| **087** | Jaleco JF-09/10/18 | $6000–$7FFF 寫入；D0/D1 bit-swap 選 8KB CHR | Argus (J), City Connection (J), The Goonies (J) | ✅ |
-| **088** | Namco 118 / 634 | Namco108 架構；R0/R1=2KB CHR（low 64KB），R2-R5=1KB CHR（high 64KB）；固定鏡像 | Dragon Spirit (J), Quinty (J) | ✅ |
-| **089** | Sunsoft-2 (Ikki variant) | bits[6:4]=PRG；(v&7)\|((v&0x80)>>4)=CHR；bit3=single-screen | Tenka no Goikenban - Mito Koumon (J) | ✅ |
-| **090** | JY Company | 4 PRG modes；4 CHR modes；CPU/A12 IRQ；multiply reg；NT control | Mortal Kombat 2 (Unl) | ✅ |
-| **093** | Sunsoft-2 (Fantasy Zone II) | bits[6:4]=PRG 16KB；$C000 固定末；CHR-RAM | Fantasy Zone (J), Shanghai (J) | ✅ |
-| **095** | Namco 118 DxROM | Namco108 架構；reg[0][1] bit5=NT select | Dragon Buster (J) | ✅ |
-| **097** | Irem TAM-S1 | 首 16KB 固定，末 16KB 切換；bits[7:6]=mirror；CHR-RAM | Kaiketsu Yanchamaru (J) | ✅ |
-| **118** | TxSROM | MMC3 全功能 + CHR bit7 控制 nametable（ntBankPtrs） | Ys III (J), Armadillo (J), NES Play Action Football (U) | ✅ |
-| **119** | TQROM | MMC3 全功能；CHR bank 0x40–0x7F 映射 CHR-RAM | High Speed (U) | ✅ |
-| **140** | Jaleco JF-11 / JF-14 | $6000–$7FFF 寫入；bits[5:4]=PRG 32KB，bits[3:0]=CHR 8KB | Doraemon (J), Bio Senshi Dan (J), Mississippi Satsujin Jiken (J) | ✅ |
-| **152** | Bandai 74161/32 single-screen | Mapper070 subclass；bit7→single-screen 鏡像（bit6→bit7 修復） | Arkanoid II Prototype (J) | ✅ |
-| **153** | Bandai LZ93D50 + WRAM | 5-bit PRG bank；CHR-RAM；8KB WRAM；latch IRQ | — | ❓ |
-| **154** | Namco 129 | Mapper088 + bit6 動態單屏鏡像（ScreenA/ScreenB）；iNES header 常誤標為 088 | Devil Man (J) | ✅ |
-| **159** | Bandai LZ93D50 alias | Mapper016 sub5 的別名 | — | ✅ |
-| **180** | Crazy Climber / UnRom-180 | 首 16KB 固定($8000)，末 16KB 切換($C000)；CHR-RAM | Crazy Climber (J) | ✅ |
-| **184** | Sunsoft-1 / FC-08 | $6000–$7FFF 寫入；下 4KB + 上 4KB（bit7 常設）CHR | Wing of Madoola (J), Atlantis no Nazo (J) | ✅ |
-| **185** | CNROM + CHR copy-protect | nibble 保護 heuristic；不符合則讀 0xFF | B-Wings (J), Bird Week (J), Mighty Bomb Jack (J) | ✅ |
-| **206** | Namco 108 | MMC3 雛形；無 IRQ；固定鏡像 | Karnov (J) | ✅ |
-| **209** | JY Company (209) | Mapper 090 + CHR latch（MMC2-style） | — | ❓ |
-| **210** | Namco 175 / Namco 340 | SubMapper1=175（無IRQ）；SubMapper2=340（IRQ+NT控制） | Famista '92 (J), Wagyan Land 2 (J) | ❓ |
-| **211** | JY Company (211) | Mapper 090 + extended NT control | — | ❓ |
-| **228** | Action 52 | addr+data 編碼 PRG/CHR/mirror；chipSelect；16/32KB mode | Cheetahmen II (U) | ✅ |
-| **232** | Camerica BF9096 Quattro | 外層+內層二段 PRG；Aladdin variant submapper | Quattro Adventure (U), Quattro Sports (U) | ✅ |
+## 預備實作清單
+
+來源：new NES Mapper 實作清單與建議.xlsx（2026-04-02）
+
+### 建議優先順序
+
+| 優先級 | Mapper | 理由 |
+|:------:|:------:|------|
+| **P1** | 074, 163, 176 | 極高價值：漢化 RPG、南晶、外星核心 |
+| **P2** | 177, 164, 112 | 高價值：外星 RPG、南晶後期、台灣 Asder |
+| **P3** | 096, 209, 211 | 技術挑戰：PPU Latch、JY 系列擴充 |
+| **P4** | 241, 191, 012 | 中等價值：小霸王、漢化字庫、Bus Conflict |
+| **P5** | 126 | 低價值：合卡 |
+| **暫緩** | 153, 157, 192, 194 | 無 ROM 或特殊外設需求 |
+
+### 🟢 已備 ROM — 可直接實作
+
+| Mapper | 廠商 / 類別 | 代表作 | 技術要點 | 價值 | 測試 ROM 數 |
+|:------:|------------|--------|---------|:----:|:----------:|
+| **074** | 漢化版 MMC3 | 重裝機兵、吞食天地 II | CHR-RAM 變體：特定 Bank 改 RAM 產生中文字 | 高 | 5 |
+| **163** | 南晶科技 | 神奇寶貝、FF VII | 防寫鎖定序列、模擬器環境偵測 | 極高 | 5 |
+| **176** | 外星科技 | 仙劍奇俠傳、大富翁 | 混合 Banking（16KB/8KB）、存檔致能電路 | 極高 | 5 |
+| **177** | 外星科技 | 魔界大空戰、新神雕俠侶 | SRAM 鎖定狀態機、嚴格寫入保護序列 | 高 | 5 |
+| **164** | 南晶科技（後期） | 幻想水滸傳 | 暫存器位址偏移（與 163 類似） | 中 | 5 |
+| **112** | 台灣 Asder | 三國志、封神榜 | 暫存器偏移、IRQ 時序微調 | 高 | 5 |
+| **096** | Oeka Kids | 麵包超人繪圖板 | PPU Read Latch：掃描線位置即時變更 CHR Bank | 高 | 2 |
+| **241** | 小霸王 (Subor) | 學習卡 1-12 冊 | 多層 WRAM 映射 | 中 | 5 |
+| **191** | 中文字庫專用 | 超級機器人大戰中文版 | 細碎 CHR 映射（1KB 以下細分） | 中 | 5 |
+| **209** | JY Company | 早期 JY 作品 | Mapper 090 + CHR Latch（MMC2-style） | 中 | 5 |
+| **211** | JY Company | 真人快打擴充版 | Mapper 090 + extended NT control | 高 | 4 |
+| **012** | DBDROM | 匯流排衝突遊戲 | Bus Conflict 電位變化切換 Bank | 中 | 4 |
+
+### 🟡 ROM 不足
+
+| Mapper | 廠商 / 類別 | 技術要點 | 價值 | 測試 ROM 數 |
+|:------:|------------|---------|:----:|:----------:|
+| **126** | Power Joy (台灣) | 多層選單跳轉、大型 ROM (4MB+) 多級 Banking | 低 | 1 |
+
+### 🔴 無 ROM — 暫緩實作
+
+| Mapper | 廠商 / 類別 | 技術要點 | 備註 |
+|:------:|------------|---------|------|
+| **153** | Bandai LZ93D50+WRAM | 5-bit PRG、CHR-RAM、8KB WRAM、latch IRQ | 已實作（❓ 待確認），ROM 庫無對應遊戲 |
+| **157** | Bandai Datach | I2C EEPROM + 條碼掃描器 | 需特殊外設模擬，實作門檻高 |
+| **192** | 漢化 MMC3 變體 | CHR-ROM/RAM 混合（類似 074） | ROM 庫無對應遊戲 |
+| **194** | 漢化 MMC3 變體 | 特殊鏡像控制 | ROM 庫無對應遊戲，價值低 |
+
+---
+
+測試 ROM 位置：`temp/mapper###/`（已實作）、`temp2/mapper###/`（預備實作）。均不納入 git。
