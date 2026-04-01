@@ -1646,7 +1646,9 @@ namespace AprNes
                 // In AprNes's tick-before-write model, 3 PPU dots of the current CPU cycle
                 // have already executed, so a delay of 3 more gives ~5-6 total from cycle start.
                 ppu2006PendingAddr = vram_addr_internal;
-                ppu2006UpdateDelay = 3;
+                // TriCNES: 4-5 cycles depending on CPU/PPU alignment
+                // (cases 0,1,3: 4 cycles; case 2: 5 cycles)
+                ppu2006UpdateDelay = 4;
             }
             vram_latch = !vram_latch;
         }
