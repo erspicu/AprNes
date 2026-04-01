@@ -127,9 +127,15 @@ namespace AprNes
         static public bool Spritesize8x16 = false;
         static bool NMIable = false;
 
-        //ppu mask 0x2001
-        public static bool ShowBackGround = false, ShowSprites = false;
-        static bool ShowBgLeft8 = true, ShowSprLeft8 = true; // bit1/bit2: show in leftmost 8 pixels
+        //ppu mask 0x2001 — four-tier flag system (TriCNES model)
+        // Tier 1: _Instant — set immediately on $2001 write. Used for: odd frame skip, OAM corruption,
+        //         renderingEnabled (core PPU state), vram increment, sprite 0 re-eval
+        // Tier 2: ShowBackGround/ShowSprites — delayed by ppu2001UpdateDelay (2-3 PPU cycles).
+        //         Used for: pixel rendering, backdrop fill, sprite compositing
+        // Tier 3: ppuRenderingEnabled — end-of-dot delay of Tier 1. Used for: tile fetch, sprite eval
+        public static bool ShowBackGround = false, ShowSprites = false; // Tier 2 (delayed)
+        static bool ShowBackGround_Instant = false, ShowSprites_Instant = false; // Tier 1 (immediate)
+        static bool ShowBgLeft8 = true, ShowSprLeft8 = true; // bit1/bit2 (delayed with $2001)
         static byte ppuEmphasis = 0; // $2001[7:5] emphasis bits (for NTSC signal amplitude)
 
         // NTSC 類比模式：每條掃描線的原始調色盤索引緩衝區（256 bytes，0x00-0x3F）
@@ -147,6 +153,11 @@ namespace AprNes
         static bool vram_latch = false;
         static byte ppu_2007_buffer = 0, ppu_2007_temp = 0;
         static int ppu2007ReadCooldown = 0; // 6 PPU dots cooldown after $2007 read (Mesen2: _ignoreVramRead)
+
+        // $2001 delayed mask update (TriCNES: PPU_Update2001Delay, 2-3 PPU cycles)
+        // _Instant flags set immediately; ShowBackGround/ShowSprites applied after delay
+        static int ppu2001UpdateDelay = 0;
+        static byte ppu2001PendingValue = 0;
 
         // $2005 delayed scroll update (TriCNES model: 1-2 PPU dots after CPU write)
         static int ppu2005UpdateDelay = 0;
@@ -223,7 +234,7 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void Increment2007()
         {
-            if ((ShowBackGround || ShowSprites) && (scanline < 240 || scanline == preRenderLine))
+            if ((ShowBackGround_Instant || ShowSprites_Instant) && (scanline < 240 || scanline == preRenderLine))
             {
                 CXinc();
                 Yinc();
@@ -440,7 +451,7 @@ namespace AprNes
             }
 
             // Dot 321: latch secondary OAM[0] into oamCopyBuffer for dots 321-340
-            if (cx == 321 && scanline < 240 && (ShowBackGround || ShowSprites))
+            if (cx == 321 && scanline < 240 && (ShowBackGround_Instant || ShowSprites_Instant))
                 oamCopyBuffer = secondaryOAM[0];
 
             // Pre-render scanline: continuous vert(v) = vert(t) copy at cycles 280-304
@@ -560,6 +571,15 @@ namespace AprNes
                 }
             }
 
+            // $2001 delayed mask update (Tier 2: ShowBackGround/ShowSprites)
+            if (ppu2001UpdateDelay > 0 && --ppu2001UpdateDelay == 0)
+            {
+                ShowBgLeft8    = (ppu2001PendingValue & 0x02) != 0;
+                ShowSprLeft8   = (ppu2001PendingValue & 0x04) != 0;
+                ShowBackGround = (ppu2001PendingValue & 0x08) != 0;
+                ShowSprites    = (ppu2001PendingValue & 0x10) != 0;
+            }
+
             // Open bus decay
             if (--open_bus_decay_timer == 0)
             {
@@ -567,7 +587,9 @@ namespace AprNes
                 openbus = 0;
             }
 
-            renderingEnabled = ShowBackGround || ShowSprites;
+            // renderingEnabled uses _Instant flags (Tier 1) for core PPU state
+            // (odd frame skip, vram increment, tile fetch control, etc.)
+            renderingEnabled = ShowBackGround_Instant || ShowSprites_Instant;
             cx = ppu_cycles_x;
 
             // At dot 0 of visible scanlines: precompute sprite 0 data for hit detection.
@@ -772,7 +794,7 @@ namespace AprNes
             if (scanline == 261 && cx == 339)
             {
                 oddSwap = !oddSwap;
-                if (!oddSwap && (ShowBackGround || ShowSprites))
+                if (!oddSwap && (ShowBackGround_Instant || ShowSprites_Instant))
                 {
                     if (mmc5Ref != null)
                         mmc5Ref.NotifyVramRead(0x2000 | (vram_addr & 0x0FFF));
@@ -782,7 +804,7 @@ namespace AprNes
             if (cx == 341)
             {
                 if (++scanline == 262)
-                { scanline = 0; if (ShowBackGround || ShowSprites) ProcessOamCorruption(); }
+                { scanline = 0; if (ShowBackGround_Instant || ShowSprites_Instant) ProcessOamCorruption(); }
                 ppu_cycles_x = 0;
             }
         }
@@ -811,7 +833,7 @@ namespace AprNes
             if (cx == 341)
             {
                 if (++scanline == 312)
-                { scanline = 0; if (ShowBackGround || ShowSprites) ProcessOamCorruption(); }
+                { scanline = 0; if (ShowBackGround_Instant || ShowSprites_Instant) ProcessOamCorruption(); }
                 ppu_cycles_x = 0;
             }
         }
@@ -840,7 +862,7 @@ namespace AprNes
             if (cx == 341)
             {
                 if (++scanline == 312)
-                { scanline = 0; if (ShowBackGround || ShowSprites) ProcessOamCorruption(); }
+                { scanline = 0; if (ShowBackGround_Instant || ShowSprites_Instant) ProcessOamCorruption(); }
                 ppu_cycles_x = 0;
             }
         }
@@ -1252,7 +1274,7 @@ namespace AprNes
             // Pass 1: scan OAM 0→63, pick first 8 sprites visible on this scanline.
             // NES hardware only performs sprite evaluation when rendering is enabled.
             // Overflow detection is handled by PrecomputeOverflow() at cycle-accurate timing.
-            if (!(ShowBackGround || ShowSprites))
+            if (!(ShowBackGround_Instant || ShowSprites_Instant))
             {
                 if (AnalogEnabled) DecodeScanline(scanline, ntscScanBuf, ppuEmphasis);
                 return;
@@ -1491,28 +1513,24 @@ namespace AprNes
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void ppu_w_2001(byte value) //ok
+        static void ppu_w_2001(byte value)
         {
             openbus = value;
 
-            ShowBgLeft8  = (value & 0x02) != 0; // bit1: show BG in leftmost 8 pixels
-            ShowSprLeft8 = (value & 0x04) != 0; // bit2: show sprites in leftmost 8 pixels
-            ShowBackGround = (value & 0x08) != 0;
-            ShowSprites    = (value & 0x10) != 0;
-            ppuEmphasis    = (byte)((value >> 5) & 0x7); // bits 5-7: RGB emphasis
-            // PAL/Dendy: Red (bit0) and Green (bit1) are swapped in hardware
+            // Tier 1: Instant flags — take effect immediately
+            ShowBackGround_Instant = (value & 0x08) != 0;
+            ShowSprites_Instant    = (value & 0x10) != 0;
+            ppuEmphasis = (byte)((value >> 5) & 0x7);
             if (Region != RegionType.NTSC)
                 ppuEmphasis = (byte)((ppuEmphasis & 0x4) | ((ppuEmphasis & 1) << 1) | ((ppuEmphasis >> 1) & 1));
 
-            bool newRenderingEnabled = ShowBackGround || ShowSprites;
-            if (prevRenderingEnabled != newRenderingEnabled && scanline >= 0 && scanline < 240)
+            // OAM corruption uses instant flags
+            bool newRenderingInstant = ShowBackGround_Instant || ShowSprites_Instant;
+            if (prevRenderingEnabled != newRenderingInstant && scanline >= 0 && scanline < 240)
             {
-                if (newRenderingEnabled)
+                if (newRenderingInstant)
                 {
                     ProcessOamCorruption();
-                    // Mid-scanline rendering re-enable: sprite 0 wasn't precomputed at dot 0
-                    // (rendering was off then). Re-run now so hit detection can work.
-                    // Sprite counters were frozen, so sprite appears at the current dot.
                     if (!sprite0_on_line && !isSprite0hit && ppu_cycles_x > 0)
                     {
                         PrecomputeSprite0Line();
@@ -1523,7 +1541,12 @@ namespace AprNes
                 else
                     SetOamCorruptionFlags();
             }
-            prevRenderingEnabled = newRenderingEnabled;
+            prevRenderingEnabled = newRenderingInstant;
+
+            // Tier 2: Delayed flags — applied after 2-3 PPU cycles
+            // (ShowBackGround, ShowSprites, ShowBgLeft8, ShowSprLeft8)
+            ppu2001UpdateDelay = 2; // TriCNES: 2-3 cycles depending on alignment
+            ppu2001PendingValue = value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1538,7 +1561,7 @@ namespace AprNes
         {
             openbus = value;
             // During rendering (visible + pre-render), writes don't modify OAM; OAMADDR increments by 4 and aligns to 4-byte boundary
-            if ((scanline < 240 || scanline == preRenderLine) && scanline >= 0 && (ShowBackGround || ShowSprites))
+            if ((scanline < 240 || scanline == preRenderLine) && scanline >= 0 && (ShowBackGround_Instant || ShowSprites_Instant))
             {
                 spr_ram_add = (byte)((spr_ram_add + 4) & 0xFC);
             }
@@ -1552,7 +1575,7 @@ namespace AprNes
         static byte ppu_r_2004()
         {
             byte val;
-            bool renderingOn = ShowBackGround || ShowSprites;
+            bool renderingOn = ShowBackGround_Instant || ShowSprites_Instant;
             if (scanline >= 0 && scanline < 240 && renderingOn)
             {
                 // Timing offset: tick() processes 3 PPU dots BEFORE the bus read,
