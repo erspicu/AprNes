@@ -276,14 +276,13 @@ namespace AprNes
         // This correctly delays attribute by 2 fetch groups with no index drift.
         static byte bg_attr_p1 = 0, bg_attr_p2 = 0, bg_attr_p3 = 0;
 
-        // Render 8 BG pixels at screen positions [ppu_cycles_x-7 .. ppu_cycles_x]
-        // using shift registers BEFORE reload (high byte = current tile data).
+        // Phase 7 tile reload (pixel output moved to ppu_half_step per-dot)
+        // Only updates palette caches — shift register reload happens in ppu_rendering_tick phase 7.
         static void RenderBGTile(int cx)
         {
+            // Palette caches still needed for ppu_half_step pixel output
             byte renderAttr = bg_attr_p3;
             byte nextAttr   = bg_attr_p2;
-
-            // Refresh palette caches for this tile (static alloc, no heap activity)
             int baseAddrR = 0x3f00 | (renderAttr << 2);
             int baseAddrN = 0x3f00 | (nextAttr   << 2);
             uint bgColor = NesColors[ppu_ram[0x3f00] & 0x3f];
@@ -294,36 +293,7 @@ namespace AprNes
             palCacheN[1] = NesColors[ppu_ram[baseAddrN + 1] & 0x3f];
             palCacheN[2] = NesColors[ppu_ram[baseAddrN + 2] & 0x3f];
             palCacheN[3] = NesColors[ppu_ram[baseAddrN + 3] & 0x3f];
-
-            int baseX = cx - 7;
-            int scanOff = scanline << 8;
-            int fineX = FineX;
-            bool bgLeft8 = ShowBgLeft8;
-            ushort ls = lowshift;
-            ushort hs = highshift;
-            for (int loc = 0; loc < 8; loc++)
-            {
-                int screenX = baseX + loc;
-
-                int bit = 15 - loc - fineX;
-                byte attrUse = (bit >= 8) ? renderAttr : nextAttr;
-                int bgPixel = ((ls >> bit) & 1) | (((hs >> bit) & 1) << 1);
-
-                bool masked = !bgLeft8 && screenX < 8;
-                int slot = scanOff + screenX;
-                Buffer_BG_array[slot] = masked ? 0 : bgPixel;
-                uint* pal = (attrUse == renderAttr) ? palCacheR : palCacheN;
-                ScreenBuf1x[slot] = masked ? bgColor : pal[bgPixel];
-
-                // NTSC: 寫入原始調色盤索引（不經 NesColors RGB 轉換）
-                if (AnalogEnabled && (uint)screenX < 256)
-                {
-                    int padrBase = (attrUse == renderAttr) ? baseAddrR : baseAddrN;
-                    ntscScanBuf[screenX] = (masked || bgPixel == 0)
-                        ? (byte)(ppu_ram[0x3f00] & 0x3f)
-                        : (byte)(ppu_ram[padrBase + bgPixel] & 0x3f);
-                }
-            }
+            // Pixel output is now done per-dot in ppu_half_step()
         }
 
         // Per-8-cycle tile fetch: runs each PPU cycle on visible/pre-render scanlines when rendering enabled.
@@ -479,6 +449,47 @@ namespace AprNes
         static void NotifyMapperA12(int address)
         {
             MapperObj.NotifyA12(address, scanline * 341 + ppu_cycles_x);
+        }
+
+        // ── Half-step: runs AFTER each full ppu_step (mid-dot) ──
+        // TriCNES model: _EmulateHalfPPU() at PPUClock==2
+        // Handles: per-dot pixel output from shift registers, fine-grained register delays
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void ppu_half_step()
+        {
+            int cx = ppu_cycles_x - 1; // cx is the dot we just completed in ppu_step (already incremented)
+            if (cx < 0 || cx >= 256 || scanline < 0 || scanline >= 240)
+                return;
+
+            // Per-dot BG pixel output from shift registers
+            // (replaces Phase 7 batch rendering in RenderBGTile for visible pixels)
+            if (ppuRenderingEnabled && ShowBackGround)
+            {
+                int bit = 15 - FineX;
+                int bgPixel = ((lowshift_s0 >> bit) & 1) | (((highshift_s0 >> bit) & 1) << 1);
+
+                bool masked = !ShowBgLeft8 && cx < 8;
+                int slot = (scanline << 8) + cx;
+                Buffer_BG_array[slot] = masked ? 0 : bgPixel;
+
+                // Look up palette color
+                // Attribute for current pixel: use bg_attr_p3 (current tile's attribute)
+                int attrBits = bg_attr_p3;
+                int baseAddr = 0x3f00 | (attrBits << 2);
+                uint bgColor = NesColors[ppu_ram[0x3f00] & 0x3f];
+                uint color = (masked || bgPixel == 0)
+                    ? bgColor
+                    : NesColors[ppu_ram[baseAddr + bgPixel] & 0x3f];
+                ScreenBuf1x[slot] = color;
+
+                // NTSC analog: write palette index
+                if (AnalogEnabled)
+                {
+                    ntscScanBuf[cx] = (masked || bgPixel == 0)
+                        ? (byte)(ppu_ram[0x3f00] & 0x3f)
+                        : (byte)(ppu_ram[baseAddr + bgPixel] & 0x3f);
+                }
+            }
         }
 
         // ── Region-specialized PPU step functions ──

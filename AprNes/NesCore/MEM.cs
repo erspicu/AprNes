@@ -35,16 +35,19 @@ namespace AprNes
         // Each hardcodes masterPerPpu and step count for JIT constant folding.
         // NMI edge detection is inlined after each PPU step.
 
-        // NTSC: masterPerCpu=12, masterPerPpu=4 → exactly 3 PPU steps per CPU cycle
+        // NTSC: masterPerCpu=12, masterPerPpu=4 → 3 PPU dots per CPU cycle
+        // Each dot split into full-step + half-step (TriCNES model: _EmulatePPU + _EmulateHalfPPU)
+        //   full-step: tile fetch, sprite eval, delay countdowns, VBL/NMI events
+        //   half-step: shift register pixel output, fine-grained register delays
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void catchUpPPU_ntsc()
         {
             bool o;
-            ppuClock += 4; ppu_step_ntsc();
+            ppuClock += 4; ppu_step_ntsc(); ppu_half_step();
             o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
-            ppuClock += 4; ppu_step_ntsc();
+            ppuClock += 4; ppu_step_ntsc(); ppu_half_step();
             o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
-            ppuClock += 4; ppu_step_ntsc();
+            ppuClock += 4; ppu_step_ntsc(); ppu_half_step();
             o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
         }
 
@@ -53,16 +56,16 @@ namespace AprNes
         static void catchUpPPU_pal()
         {
             bool o;
-            ppuClock += 5; ppu_step_pal();
+            ppuClock += 5; ppu_step_pal(); ppu_half_step();
             o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
-            ppuClock += 5; ppu_step_pal();
+            ppuClock += 5; ppu_step_pal(); ppu_half_step();
             o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
-            ppuClock += 5; ppu_step_pal();
+            ppuClock += 5; ppu_step_pal(); ppu_half_step();
             o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
             // PAL 4th step: 3×5=15 < 16, so one extra step needed ~every 5th cycle
             if (ppuClock < masterClock)
             {
-                ppuClock += 5; ppu_step_pal();
+                ppuClock += 5; ppu_step_pal(); ppu_half_step();
                 o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
             }
         }
@@ -72,11 +75,11 @@ namespace AprNes
         static void catchUpPPU_dendy()
         {
             bool o;
-            ppuClock += 5; ppu_step_dendy();
+            ppuClock += 5; ppu_step_dendy(); ppu_half_step();
             o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
-            ppuClock += 5; ppu_step_dendy();
+            ppuClock += 5; ppu_step_dendy(); ppu_half_step();
             o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
-            ppuClock += 5; ppu_step_dendy();
+            ppuClock += 5; ppu_step_dendy(); ppu_half_step();
             o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
         }
 
