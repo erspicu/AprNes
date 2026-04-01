@@ -13,6 +13,8 @@
     <TieredPGO>true</TieredPGO>
     <!-- ConfigWindow uses parameterized constructor only; XAML runtime loader not used -->
     <NoWarn>$(NoWarn);AVLN3001</NoWarn>
+    <!-- Build timestamp embedded into assembly metadata (immune to copy/rename) -->
+    <SourceRevisionId>build$([System.DateTime]::Now.ToString("yyyyMMdd-HHmmss"))</SourceRevisionId>
   </PropertyGroup>
 
   <!-- NesCore: 直接引用 AprNes 全部源碼，不再使用本地 NesCoreNET 副本 -->
