@@ -31,7 +31,13 @@ public sealed unsafe class EmulatorEngine : IDisposable
     private readonly IAudioBackend   _audio   = PlatformFactory.CreateAudioBackend();
     private readonly IGamepadBackend _gamepad = PlatformFactory.CreateGamepadBackend();
 
-    // ── Video ──────────────────────────────────────────────────────────────
+    // ── Video (Lock-Free Double Buffering) ───────────────────────────────
+    private IntPtr _bufferA;
+    private IntPtr _bufferB;
+    private IntPtr _backBuffer;
+    private IntPtr _frontBuffer;
+    private int _bufferSize;
+    private readonly object _resizeLock = new();
     private int _pendingFrame;          // interlocked flag: 1 = new frame available
     private int _frameCounter;          // raw frame count since last FPS query
     // ── Render pipeline (two-stage filter engine) ────────────────────────
@@ -40,8 +46,8 @@ public sealed unsafe class EmulatorEngine : IDisposable
     private bool _analogMode;           // true = read from AnalogScreenBuf
     private int _outputW = 256, _outputH = 240;
 
-    /// <summary>Zero-copy: pointer to current frame's pixel data (uint* BGRA).</summary>
-    public IntPtr CurrentFramePtr { get; private set; }
+    /// <summary>Front buffer pointer — safe to read from Render Thread while Emu Thread writes to back buffer.</summary>
+    public IntPtr CurrentFrontBuffer => _frontBuffer;
 
     /// <summary>Fired on the UI thread when a new frame is ready.</summary>
     public event Action? FrameReady;
@@ -137,24 +143,54 @@ public sealed unsafe class EmulatorEngine : IDisposable
         _gamepad.LoadMapping(ini);
     }
 
-    /// <summary>Apply render settings: configure filter pipeline or analog mode, resize buffer.</summary>
+    /// <summary>Apply render settings: configure filter pipeline or analog mode, resize buffer.
+    /// Must be called from UI thread. If emulator is running, caller should Pause() first.</summary>
     public void ApplyRenderSettings(ResizeFilter s1Filter, int s1Scale,
                                      ResizeFilter s2Filter, int s2Scale,
                                      bool scanline, bool analogEnabled, int analogSize)
     {
+        // Safety: if running, detach video output and wait for emu thread to fully stop
+        // (mirrors AprNes WinForms: _event.Reset → while(!emuWaiting) Sleep)
+        bool wasAttached = false;
+        if (_running)
+        {
+            NesCore.VideoOutput -= OnVideoOutput;
+            wasAttached = true;
+            NesCore._event.Reset();
+            // Spin until emu thread confirms it's blocked on _event.WaitOne()
+            while (!NesCore.emuWaiting)
+                Thread.Sleep(1);
+        }
+
         _analogMode = analogEnabled;
 
         int newW, newH;
         if (analogEnabled)
         {
-            // Analog: output = 256×AnalogSize × 210×AnalogSize (8:7 PAR)
             newW = 256 * analogSize;
             newH = 210 * analogSize;
             _pipelineActive = false;
+
+            // Analog NesCore buffer management (mirrors AprNes WinForms ApplyRenderSettings)
+            NesCore.SyncAnalogConfig();
+            int neededPx = NesCore.Crt_DstW * NesCore.Crt_DstH;
+            if (NesCore.AnalogScreenBuf == null || NesCore.AnalogBufSize != neededPx)
+            {
+                if (NesCore.AnalogScreenBuf != null)
+                    { Marshal.FreeHGlobal((IntPtr)NesCore.AnalogScreenBuf); NesCore.AnalogScreenBuf = null; }
+                if (NesCore.AnalogScreenBufBack != null)
+                    { Marshal.FreeHGlobal((IntPtr)NesCore.AnalogScreenBufBack); NesCore.AnalogScreenBufBack = null; }
+
+                NesCore.AnalogBufSize       = neededPx;
+                NesCore.AnalogScreenBuf     = (uint*)Marshal.AllocHGlobal(sizeof(uint) * neededPx);
+                NesCore.AnalogScreenBufBack = (uint*)Marshal.AllocHGlobal(sizeof(uint) * neededPx);
+            }
+            NesCore.SyncAnalogConfig();
+            NesCore.Ntsc_Init();
+            NesCore.Crt_Init();
         }
         else
         {
-            // Digital: configure two-stage filter pipeline
             _pipeline.Configure(s1Filter, s1Scale, s2Filter, s2Scale, scanline);
             newW = _pipeline.OutputW;
             newH = _pipeline.OutputH;
@@ -165,8 +201,30 @@ public sealed unsafe class EmulatorEngine : IDisposable
         _outputW = newW;
         _outputH = newH;
 
-        // Init pipeline buffers only if ScreenBuf1x is already valid;
-        // otherwise deferred to Start() after ROM init.
+        // Allocate/resize double buffers — emu thread is confirmed stopped
+        int needed = newW * newH * 4;
+        lock (_resizeLock)
+        {
+            _frontBuffer = IntPtr.Zero;
+
+            if (_bufferSize != needed)
+            {
+                if (_bufferA != IntPtr.Zero) Marshal.FreeHGlobal(_bufferA);
+                if (_bufferB != IntPtr.Zero) Marshal.FreeHGlobal(_bufferB);
+
+                _bufferA = Marshal.AllocHGlobal(needed);
+                _bufferB = Marshal.AllocHGlobal(needed);
+                _bufferSize = needed;
+            }
+
+            new Span<byte>((void*)_bufferA, needed).Clear();
+            new Span<byte>((void*)_bufferB, needed).Clear();
+
+            _backBuffer  = _bufferA;
+            _frontBuffer = _bufferB;
+        }
+
+        // Init pipeline buffers
         if (_pipelineActive && NesCore.ScreenBuf1x != null)
             _pipeline.Init(NesCore.ScreenBuf1x);
         else
@@ -174,6 +232,13 @@ public sealed unsafe class EmulatorEngine : IDisposable
 
         if (resChanged)
             ResolutionChanged?.Invoke(newW, newH);
+
+        // Re-attach video output and resume emu thread
+        if (wasAttached)
+        {
+            NesCore.VideoOutput += OnVideoOutput;
+            NesCore._event.Set();
+        }
     }
 
     private void GamepadPollLoop()
@@ -385,29 +450,41 @@ public sealed unsafe class EmulatorEngine : IDisposable
     // ── Private ────────────────────────────────────────────────────────────
     private void OnVideoOutput(object? sender, EventArgs e)
     {
-        // Zero-copy: just latch the pointer — no Buffer.MemoryCopy at all.
-        if (_analogMode && NesCore.AnalogScreenBuf != null)
-        {
-            CurrentFramePtr = (IntPtr)NesCore.AnalogScreenBuf;
-        }
-        else if (_pipelineActive)
-        {
-            if (!_pipeline.IsInitialized && NesCore.ScreenBuf1x != null)
-                _pipeline.Init(NesCore.ScreenBuf1x);
+        int copyBytes = _outputW * _outputH * 4;
 
-            if (_pipeline.IsInitialized)
+        lock (_resizeLock)
+        {
+            if (_bufferSize < copyBytes || _backBuffer == IntPtr.Zero) return;
+
+            void* dst = (void*)_backBuffer;
+
+            if (_analogMode && NesCore.AnalogScreenBuf != null)
             {
-                _pipeline.Process();
-                CurrentFramePtr = (IntPtr)_pipeline.OutputPtr;
+                Buffer.MemoryCopy(NesCore.AnalogScreenBuf, dst, copyBytes, copyBytes);
+            }
+            else if (_pipelineActive)
+            {
+                if (!_pipeline.IsInitialized && NesCore.ScreenBuf1x != null)
+                    _pipeline.Init(NesCore.ScreenBuf1x);
+
+                if (_pipeline.IsInitialized)
+                {
+                    _pipeline.Process();
+                    Buffer.MemoryCopy(_pipeline.OutputPtr, dst, copyBytes, copyBytes);
+                }
+                else
+                {
+                    int baseBytes = 256 * 240 * 4;
+                    Buffer.MemoryCopy(NesCore.ScreenBuf1x, dst, baseBytes, baseBytes);
+                }
             }
             else
             {
-                CurrentFramePtr = (IntPtr)NesCore.ScreenBuf1x;
+                Buffer.MemoryCopy(NesCore.ScreenBuf1x, dst, copyBytes, copyBytes);
             }
-        }
-        else
-        {
-            CurrentFramePtr = (IntPtr)NesCore.ScreenBuf1x;
+
+            // Lock-free atomic swap: front ↔ back
+            _backBuffer = Interlocked.Exchange(ref _frontBuffer, _backBuffer);
         }
 
         Interlocked.Increment(ref _frameCounter);
@@ -446,5 +523,13 @@ public sealed unsafe class EmulatorEngine : IDisposable
         _gamepadThread = null;
         _gamepad.Shutdown();
         NesCore.VideoOutput -= OnVideoOutput;
+
+        lock (_resizeLock)
+        {
+            if (_bufferA != IntPtr.Zero) Marshal.FreeHGlobal(_bufferA);
+            if (_bufferB != IntPtr.Zero) Marshal.FreeHGlobal(_bufferB);
+            _bufferA = _bufferB = _backBuffer = _frontBuffer = IntPtr.Zero;
+            _bufferSize = 0;
+        }
     }
 }

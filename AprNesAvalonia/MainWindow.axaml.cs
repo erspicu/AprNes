@@ -435,9 +435,10 @@ public partial class MainWindow : Window
 
     private void OnFrameReady()
     {
-        // Zero-copy: just hand the pointer to the control and request redraw.
-        // Actual rendering happens on Avalonia's Render Thread via ICustomDrawOperation.
-        GameCanvas.FramePtr = _emu.CurrentFramePtr;
+        // Hand the front buffer pointer to the control and request redraw.
+        // Render Thread reads from front buffer via InstallPixels (zero-copy to GPU).
+        // Emu Thread writes to back buffer — no contention.
+        GameCanvas.FrontBufferPtr = _emu.CurrentFrontBuffer;
         GameCanvas.InvalidateVisual();
     }
 
@@ -545,7 +546,7 @@ public partial class MainWindow : Window
             string stamp    = DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss");
             string filePath = Path.Combine(dir, $"Screen-{stamp}.png");
 
-            var ptr = _emu.CurrentFramePtr;
+            var ptr = _emu.CurrentFrontBuffer;
             if (ptr != IntPtr.Zero)
             {
                 int w = _emu.OutputW, h = _emu.OutputH;
@@ -700,15 +701,9 @@ public partial class MainWindow : Window
         UpdateMenuStates();
 
         // Sync rendering pipeline if running in Analog mode
+        // ApplyRenderSettings handles emu thread sync + NesCore analog init internally
         if (_emu.IsRunning && AprNes.NesCore.AnalogEnabled)
-        {
-            _emu.Pause();
-            AprNes.NesCore.SyncAnalogConfig();
-            AprNes.NesCore.Ntsc_Init();
-            AprNes.NesCore.Crt_Init();
             ApplyRenderPipeline();
-            _emu.Resume();
-        }
     }
 
     // ═══ Menu: Tools ════════════════════════════════════════════════════════
@@ -841,17 +836,15 @@ public partial class MainWindow : Window
 
     private async void MenuConfiguration_Click(object? sender, RoutedEventArgs e)
     {
-        bool wasRunning = _emu.IsRunning;
-        if (wasRunning) _emu.Pause();
-
         StopRecordingIfActive(true);
 
         var dlg = new ConfigWindow(_ini, _emu.Gamepad);
         await dlg.ShowDialog(this);
 
+        // ApplyRenderSettings (called inside ApplyIniSettings) handles
+        // emu thread sync internally: detach → wait emuWaiting → rebuild → reattach
         ApplyIniSettings();
         UpdateRecordMenuVisibility();
-        if (wasRunning) _emu.Resume();
     }
 
     // ═══ Menu: Help ═════════════════════════════════════════════════════════

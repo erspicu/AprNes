@@ -16,16 +16,16 @@ namespace AprNesAvalonia.Views;
 /// </summary>
 public class EmuScreenControl : Control
 {
-    public IntPtr FramePtr { get; set; }
+    public IntPtr FrontBufferPtr { get; set; }
     public int FrameWidth { get; set; } = 256;
     public int FrameHeight { get; set; } = 240;
 
     public override void Render(DrawingContext context)
     {
-        if (FramePtr != IntPtr.Zero && FrameWidth > 0 && FrameHeight > 0)
+        if (FrontBufferPtr != IntPtr.Zero && FrameWidth > 0 && FrameHeight > 0)
         {
             context.Custom(new EmuDrawOperation(
-                new Rect(Bounds.Size), FramePtr, FrameWidth, FrameHeight));
+                new Rect(Bounds.Size), FrontBufferPtr, FrameWidth, FrameHeight));
         }
         base.Render(context);
     }
@@ -50,23 +50,30 @@ public class EmuScreenControl : Control
 
         public void Render(ImmediateDrawingContext context)
         {
-            var leaseFeature = context.TryGetFeature<ISkiaSharpApiLeaseFeature>();
-            if (leaseFeature == null) return;
+            if (_ptr == IntPtr.Zero) return;
 
-            using var lease = leaseFeature.Lease();
-            var canvas = lease.SkCanvas;
+            try
+            {
+                var leaseFeature = context.TryGetFeature<ISkiaSharpApiLeaseFeature>();
+                if (leaseFeature == null) return;
 
-            // Zero-copy: InstallPixels makes SKBitmap point directly at
-            // the emulator's unmanaged buffer — O(1), no pixel copy.
-            var info = new SKImageInfo(_w, _h, SKColorType.Bgra8888, SKAlphaType.Opaque);
-            using var bmp = new SKBitmap();
-            bmp.InstallPixels(info, _ptr, _w * 4);
+                using var lease = leaseFeature.Lease();
+                var canvas = lease.SkCanvas;
 
-            // Nearest-neighbor scaling (matches RenderOptions.BitmapInterpolationMode=None)
-            using var paint = new SKPaint { FilterQuality = SKFilterQuality.None };
-            canvas.DrawBitmap(bmp,
-                new SKRect(0, 0, (float)Bounds.Width, (float)Bounds.Height),
-                paint);
+                // Zero-copy: InstallPixels makes SKBitmap point directly at
+                // the emulator's unmanaged buffer — O(1), no pixel copy.
+                var info = new SKImageInfo(_w, _h, SKColorType.Bgra8888, SKAlphaType.Opaque);
+                using var bmp = new SKBitmap();
+                bmp.InstallPixels(info, _ptr, _w * 4);
+
+                // Bilinear: identical to nearest-neighbor at 100% DPI (1:1 mapping),
+                // but avoids Moiré artifacts with scanline filter at non-integer DPI scaling
+                using var paint = new SKPaint { FilterQuality = SKFilterQuality.Low };
+                canvas.DrawBitmap(bmp,
+                    new SKRect(0, 0, (float)Bounds.Width, (float)Bounds.Height),
+                    paint);
+            }
+            catch (AccessViolationException) { }
         }
 
         public void Dispose() { }
