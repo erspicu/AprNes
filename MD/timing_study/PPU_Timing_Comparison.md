@@ -403,3 +403,43 @@
 1. **短期（低風險）**：保持現狀。174/174 + 136/136 PERFECT 已是頂級精度。
 2. **中期（中風險）**：加入 $2005 delay（1-2 cycle），可能修復 colorwin_ntsc 邊界問題。
 3. **長期（高風險）**：重構 RenderBGTile 為 per-dot pixel output，全面對齊 TriCNES 精度。需要大量測試驗證。
+
+---
+
+## 修正歷史（feature/ppu-high-precision 分支）
+
+### 2026-04-01 — master: ppuRenderingEnabled for BG fill + RenderBGTile（`3cf7e97`）
+- **修正**：`cx==0` backdrop fill 和 `RenderBGTile` 呼叫條件從即時 `ShowBackGround` 改為延遲 `ppuRenderingEnabled`
+- **效果**：修復 scanline-a1 大塊綠色（mid-scanline $2001 toggle 導致下一 scanline 被錯誤預填 backdrop）
+- **殘留**：scanline-a1 第一區右側 5 個星號（$2001 delay 不足）
+- **測試**：174/174 + 136/136 無回歸
+
+### 2026-04-01 — master: $2005 scroll write delay 2 PPU dots（`6d3ce08`）
+- **修正**：`ppu_w_2005` 改為延遲套用（`ppu2005UpdateDelay = 2`），在 `ppu_step_common` 中 countdown
+- **效果**：修復 colorwin_ntsc 右邊界垂直彩色條紋（scroll 切換時機延遲對齊 TriCNES）
+- **測試**：174/174 + 136/136 無回歸
+
+### 2026-04-01 — master: 嘗試 $2001 delay 2-3 cycles（回退）
+- **嘗試**：加入 `ppu2001UpdateDelay`，`ShowBackGround`/`ShowSprites` 延遲 2-3 cycle 更新
+- **問題**：`renderingEnabled` 延遲影響 odd frame skip 和 OAM corruption，導致 `ppu_vbl_nmi/10-even_odd_timing` 失敗
+- **結論**：$2001 delay 影響面太廣，需要 TriCNES 的四層 flag 系統（instant/delayed/eval-delayed）才能正確隔離。需要配合 per-dot pixel output 才有意義
+- **動作**：完全回退，保持即時更新 + ppuRenderingEnabled 1-dot delay
+
+### 2026-04-02 — feature/ppu-high-precision: half-step 架構拆分（`dbe3d62`）
+- **修正**：`catchUpPPU_*()` 每 dot 改為 full-step + half-step 兩次呼叫
+  - full-step（`ppu_step_*`）：tile fetch、sprite eval、delay countdowns、VBL/NMI
+  - half-step（`ppu_half_step`）：per-dot BG pixel output from shift registers
+- **架構變更**：
+  - `RenderBGTile()` 剝離像素輸出，僅保留 palette cache 更新
+  - `ppu_half_step()` 使用 `lowshift_s0` / `highshift_s0` per-dot shift registers 輸出 1 pixel
+  - 為後續 $2001/$2005/$2000 的 half-dot 精度延遲奠定基礎
+- **已知問題**：`highshift_s0` 的 `|1` 填充（sprite 0 hit 優化）可能影響 per-dot pixel 的 palette 精度 — 需要改用 main shift registers + phase 7 latch 或新增獨立的 rendering shift registers
+- **測試**：174/174 + 136/136 無回歸（SMB3 等遊戲畫面正常）
+
+### 待處理項目
+- [ ] 修正 `highshift_s0` 的 `|1` 問題（改用 main shift registers + phase 7 pre-reload latch）
+- [ ] $2001 四層 flag 系統（instant / main / delayed / eval-delayed）
+- [ ] $2000 delay（1-2 cycle alignment-dependent）
+- [ ] $2006 delay 對齊 TriCNES（4-5 cycles alignment-dependent，現為固定 3）
+- [ ] 半 dot 精度的 VBL set latch（`PPU_PendingVBlank` → `PPU_VSET`）
+- [ ] Sprite 0 hit 的 1.5 dot pending delay
