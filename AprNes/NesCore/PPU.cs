@@ -148,6 +148,11 @@ namespace AprNes
         static byte ppu_2007_buffer = 0, ppu_2007_temp = 0;
         static int ppu2007ReadCooldown = 0; // 6 PPU dots cooldown after $2007 read (Mesen2: _ignoreVramRead)
 
+        // $2005 delayed scroll update (TriCNES model: 1-2 PPU dots after CPU write)
+        static int ppu2005UpdateDelay = 0;
+        static byte ppu2005PendingValue = 0;
+        static bool ppu2005PendingIsSecond = false; // true = second write (Y scroll)
+
         // $2006 delayed t→v copy (TriCNES model: 3 PPU dots after CPU write)
         // Real hardware doesn't update vram_addr immediately on the second $2006 write;
         // there's a ~4-5 PPU dot delay depending on CPU/PPU alignment.
@@ -492,6 +497,22 @@ namespace AprNes
             {
                 vram_addr = ppu2006PendingAddr;
                 if (mapperNeedsA12) NotifyMapperA12(vram_addr);
+            }
+
+            // $2005 delayed scroll update
+            if (ppu2005UpdateDelay > 0 && --ppu2005UpdateDelay == 0)
+            {
+                byte v = ppu2005PendingValue;
+                if (ppu2005PendingIsSecond)
+                {
+                    scrol_y = v & 7;
+                    vram_addr_internal = (vram_addr_internal & 0x0C1F) | ((v & 0x7) << 12) | ((v & 0xF8) << 2);
+                }
+                else
+                {
+                    vram_addr_internal = (vram_addr_internal & 0x7fe0) | ((v & 0xf8) >> 3);
+                    FineX = v & 0x07;
+                }
             }
 
             // Open bus decay
@@ -1529,16 +1550,10 @@ namespace AprNes
         static void ppu_w_2005(byte value) //ok
         {
             openbus = value;
-            if (vram_latch)
-            {
-                scrol_y = value & 7;
-                vram_addr_internal = (vram_addr_internal & 0x0C1F) | ((value & 0x7) << 12) | ((value & 0xF8) << 2);
-            }
-            else
-            {//first
-                vram_addr_internal = (vram_addr_internal & 0x7fe0) | ((value & 0xf8) >> 3);
-                FineX = value & 0x07;
-            }
+            // Delayed scroll update (TriCNES: PPU_Update2005Delay = 1-2 cycles)
+            ppu2005PendingValue = value;
+            ppu2005PendingIsSecond = vram_latch;
+            ppu2005UpdateDelay = 2; // ~2 PPU dots delay
             vram_latch = !vram_latch;
         }
         static void ppu_w_2006(byte value)
