@@ -1,14 +1,19 @@
+using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
+using AprNesAvalonia.Platform;
 
 namespace AprNesAvalonia.Views;
 
 public partial class ConfigWindow : Window
 {
     private readonly IniFile _ini;
+    private readonly IGamepadBackend? _gamepad;
 
     // VK code ↔ Avalonia Key
     private static readonly Dictionary<int, Key> _vkToKey = new()
@@ -37,10 +42,11 @@ public partial class ConfigWindow : Window
     // The button currently waiting for a keypress
     private Button? _capturingButton;
 
-    public ConfigWindow(IniFile ini)
+    public ConfigWindow(IniFile ini, IGamepadBackend? gamepad = null)
     {
         InitializeComponent();
         _ini = ini;
+        _gamepad = gamepad;
         KeyDown += OnWindowKeyDown;
         VolumeSlider.ValueChanged += (_, _) => UpdateVolumeLabel();
         LoadFromIni();
@@ -227,6 +233,25 @@ public partial class ConfigWindow : Window
         _ini.Set("key_P2_LEFT",   _p2_LEFT.ToString());
         _ini.Set("key_P2_RIGHT",  _p2_RIGHT.ToString());
 
+        // P1/P2 Gamepad — save captured keys (or keep existing if not re-captured)
+        SaveGpKey("P1_GP_A",      "joypad_A");
+        SaveGpKey("P1_GP_B",      "joypad_B");
+        SaveGpKey("P1_GP_SELECT", "joypad_SELECT");
+        SaveGpKey("P1_GP_START",  "joypad_START");
+        SaveGpKey("P1_GP_UP",     "joypad_UP");
+        SaveGpKey("P1_GP_DOWN",   "joypad_DOWN");
+        SaveGpKey("P1_GP_LEFT",   "joypad_LEFT");
+        SaveGpKey("P1_GP_RIGHT",  "joypad_RIGHT");
+
+        SaveGpKey("P2_GP_A",      "joypad_P2_A");
+        SaveGpKey("P2_GP_B",      "joypad_P2_B");
+        SaveGpKey("P2_GP_SELECT", "joypad_P2_SELECT");
+        SaveGpKey("P2_GP_START",  "joypad_P2_START");
+        SaveGpKey("P2_GP_UP",     "joypad_P2_UP");
+        SaveGpKey("P2_GP_DOWN",   "joypad_P2_DOWN");
+        SaveGpKey("P2_GP_LEFT",   "joypad_P2_LEFT");
+        SaveGpKey("P2_GP_RIGHT",  "joypad_P2_RIGHT");
+
         // Graphics
         _ini.Set("ResizeStage1", CmbFilter1.SelectedIndex.ToString());
         _ini.Set("ResizeStage2", CmbFilter2.SelectedIndex.ToString());
@@ -284,13 +309,35 @@ public partial class ConfigWindow : Window
         e.Handled = true;
     }
 
-    // ── Gamepad capture (placeholder) ───────────────────────────────────
+    // ── Gamepad capture ─────────────────────────────────────────────────
 
-    private void GP_Click(object? sender, RoutedEventArgs e)
+    // Gamepad INI key strings (updated during capture, saved on OK)
+    private readonly Dictionary<string, string> _gpIniKeys = new();
+
+    private async void GP_Click(object? sender, RoutedEventArgs e)
     {
-        // TODO: implement gamepad button capture via IGamepadBackend.WaitForButton()
-        if (sender is Button btn)
-            btn.Content = "...";
+        if (sender is not Button btn) return;
+        if (_gamepad == null || !_gamepad.IsAvailable)
+        {
+            btn.Content = "N/A";
+            return;
+        }
+
+        string prevContent = btn.Content?.ToString() ?? "--";
+        btn.Content = "...";
+
+        // Wait for button on background thread (5 second timeout)
+        var result = await Task.Run(() => _gamepad.WaitForButton(5000));
+
+        if (result != null)
+        {
+            btn.Content = result.DisplayName;
+            _gpIniKeys[btn.Name!] = result.IniKey;
+        }
+        else
+        {
+            btn.Content = prevContent;
+        }
     }
 
     // ── Language instant switch ──────────────────────────────────────────
@@ -382,6 +429,13 @@ public partial class ConfigWindow : Window
         if (string.IsNullOrEmpty(iniVal) || iniVal == "--") return "--";
         var parts = iniVal.Split(',');
         return parts.Length >= 2 ? parts[1] : iniVal;
+    }
+
+    private void SaveGpKey(string buttonName, string iniKey)
+    {
+        if (_gpIniKeys.TryGetValue(buttonName, out string? val))
+            _ini.Set(iniKey, val);
+        // else: not re-captured, keep existing INI value
     }
 
     private static string VkName(int vk)

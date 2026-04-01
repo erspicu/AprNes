@@ -74,6 +74,14 @@ public partial class MainWindow : Window
 
         AprNes.NesCore.OnError = LogError;
 
+        // Init gamepad after window has a native handle
+        Opened += (_, _) =>
+        {
+            var ph = TryGetPlatformHandle();
+            IntPtr hwnd = ph?.Handle ?? IntPtr.Zero;
+            _emu.InitGamepad(hwnd, _ini);
+        };
+
         InitRecentROMs();
         UpdateMenuStates();
         UpdateRecordMenuVisibility();
@@ -103,6 +111,9 @@ public partial class MainWindow : Window
         ApplyRegionToNesCore(_currentRegion);
 
         _emu.ApplyAudioSettings(_soundEnabled, _ini.GetInt("Volume", 80));
+
+        // Reload gamepad mapping
+        _emu.ReloadGamepadMapping(_ini);
 
         // Load separate INI files for Analog and AudioPlus
         LoadAnalogConfig();
@@ -792,7 +803,7 @@ public partial class MainWindow : Window
 
         StopRecordingIfActive(true);
 
-        var dlg = new ConfigWindow(_ini);
+        var dlg = new ConfigWindow(_ini, _emu.Gamepad);
         await dlg.ShowDialog(this);
 
         ApplyIniSettings();

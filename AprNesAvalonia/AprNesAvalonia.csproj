@@ -30,6 +30,11 @@
     <Compile Include="../AprNes/tool/WaveOutPlayer.cs" Link="Platform/WaveOutPlayer.cs" />
     <Compile Include="../AprNes/tool/VideoRecorder.cs" Link="Tool/VideoRecorder.cs" />
     <Compile Include="../AprNes/tool/AudioRecorder.cs" Link="Tool/AudioRecorder.cs" />
+
+    <!-- 手把 (DirectInput8 + XInput, pure P/Invoke) -->
+    <Compile Include="../AprNes/tool/NativeAPIShare.cs" Link="Platform/NativeAPIShare.cs" />
+    <Compile Include="../AprNes/tool/DirectInputHelper.cs" Link="Platform/DirectInputHelper.cs" />
+    <Compile Include="../AprNes/tool/joystick.cs" Link="Platform/joystick.cs" />
   </ItemGroup>
 
   <ItemGroup>

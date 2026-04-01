@@ -22,10 +22,7 @@ public static class PlatformFactory
     public static IGamepadBackend CreateGamepadBackend()
     {
         if (OperatingSystem.IsWindows())
-        {
-            // TODO: return new Win32GamepadBackend() wrapping joystick.cs (DI8+XI)
-            return new NullGamepadBackend();
-        }
+            return new Win32GamepadBackend();
 
         // TODO: Linux → SDL2GamepadBackend or EvdevBackend
         // TODO: macOS → SDL2GamepadBackend

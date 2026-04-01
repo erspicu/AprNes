@@ -74,10 +74,17 @@ public sealed unsafe class EmulatorEngine : IDisposable
         { 90, Key.Z },
     };
 
+    // ── Gamepad polling thread ────────────────────────────────────────────
+    private Thread? _gamepadThread;
+    private volatile bool _gamepadRunning;
+
     // ── Public API ─────────────────────────────────────────────────────────
     public bool IsRunning   => _running;
     public bool IsRomLoaded => _romLoaded;
     public string RomFilePath => _romFilePath;
+
+    /// <summary>Access to the gamepad backend (for config capture).</summary>
+    public IGamepadBackend Gamepad => _gamepad;
 
     /// <summary>Apply keyboard mapping from INI (Windows VK codes).</summary>
     public void ApplyKeyMap(int vkA, int vkB, int vkSelect, int vkStart,
@@ -97,6 +104,36 @@ public sealed unsafe class EmulatorEngine : IDisposable
         _audio.Close();
         if (enabled && _running)
             _audio.Open();
+    }
+
+    /// <summary>Initialize gamepad backend with the window handle and load mapping from INI.</summary>
+    public void InitGamepad(IntPtr windowHandle, IniFile ini)
+    {
+        _gamepad.Initialize(windowHandle);
+        _gamepad.LoadMapping(ini);
+
+        if (!_gamepadRunning && _gamepad.IsAvailable)
+        {
+            _gamepadRunning = true;
+            _gamepadThread = new Thread(GamepadPollLoop) { IsBackground = true, Name = "GamepadPoll" };
+            _gamepadThread.Start();
+        }
+    }
+
+    /// <summary>Reload gamepad mapping (after config change).</summary>
+    public void ReloadGamepadMapping(IniFile ini)
+    {
+        _gamepad.LoadMapping(ini);
+    }
+
+    private void GamepadPollLoop()
+    {
+        while (_gamepadRunning)
+        {
+            Thread.Sleep(10);
+            if (_running)
+                _gamepad.Poll();
+        }
     }
 
     /// <summary>Load and initialise a ROM (supports .nes, .fds, .zip). Returns true on success.</summary>
@@ -329,6 +366,9 @@ public sealed unsafe class EmulatorEngine : IDisposable
     {
         Stop();
         SaveSRam();
+        _gamepadRunning = false;
+        _gamepadThread?.Join(500);
+        _gamepadThread = null;
         _gamepad.Shutdown();
         NesCore.VideoOutput -= OnVideoOutput;
     }

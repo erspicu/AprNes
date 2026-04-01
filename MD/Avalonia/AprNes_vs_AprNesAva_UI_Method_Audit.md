@@ -1,7 +1,7 @@
 # AprNes vs AprNesAvalonia — UI Method 對照清單
 
 > 產生日期: 2026-04-01
-> 最後更新: 2026-04-01 (P0+P1+P2+P3+P4+P6 完成)
+> 最後更新: 2026-04-01 (P0+P1+P2+P3+P4+P5+P6 全部完成)
 > 目的: 逐一比對 AprNes (WinForms) 的 UI 方法，確認 AprNesAvalonia 是否有對應實作
 
 ## 狀態標記
@@ -157,9 +157,9 @@
 
 | # | AprNes 方法 | 說明 | Ava 對應 | 狀態 |
 |---|------------|------|----------|------|
-| 72 | `NES_init_KeyMap()` | 初始化鍵盤/手把對應字典 | `EmulatorEngine.ApplyKeyMap()` | **PARTIAL** — 鍵盤 OK，手把缺 |
-| 73 | `polling_listener()` | 手把輸入輪詢執行緒 | 無 | **TODO** |
-| 74 | `JoyPadWayName()` | 軸向值轉方向名稱 | 無 | **TODO** |
+| 72 | `NES_init_KeyMap()` | 初始化鍵盤/手把對應字典 | `EmulatorEngine.ApplyKeyMap()` + `Win32GamepadBackend.LoadMapping()` | OK |
+| 73 | `polling_listener()` | 手把輸入輪詢執行緒 | `EmulatorEngine.GamepadPollLoop()` | OK |
+| 74 | `JoyPadWayName()` | 軸向值轉方向名稱 | `Win32GamepadBackend.WayName()` | OK |
 
 ---
 
@@ -173,7 +173,7 @@
 | 2 | `GetInstance()` | Singleton | N/A | N/A |
 | 3 | `init()` | 載入語系、初始化下拉選單 | `LoadFromIni()` + `ApplyLanguage()` | OK |
 | 4 | `InitResizeComboBoxes()` | 填充濾鏡下拉選單 | AXAML 靜態定義 | OK |
-| 5 | `RegisterJoyActivation()` | 綁定手把 TextBox 的 Click/Enter 事件 | `GP_Click()` 佔位 | **TODO** |
+| 5 | `RegisterJoyActivation()` | 綁定手把 TextBox 的 Click/Enter 事件 | `GP_Click()` + `WaitForButton()` | OK |
 | 6 | `RegisterP2KeyboardEvents()` | 綁定 P2 鍵盤 TextBox 事件 | AXAML 綁定 `KB_Click` | OK |
 
 ### 2.2 語系
@@ -214,10 +214,10 @@
 
 | # | AprNes 方法 | 說明 | Ava 對應 | 狀態 |
 |---|------------|------|----------|------|
-| 21 | `ExpectedJoyInputType()` | 判斷控件接受的輸入類型 | 無 | **TODO** |
-| 22 | `Setup_JoyPad_define()` | 捕獲手把輸入並對應到 NES 按鈕 | 無 | **TODO** |
-| 23 | `SetupP2JoyPad()` | P2 手把設定 helper | 無 | **TODO** |
-| 24 | `JoyPadWayName()` | 軸向值轉方向名稱 | 無 | **TODO** |
+| 21 | `ExpectedJoyInputType()` | 判斷控件接受的輸入類型 | N/A (Avalonia GP_Click 統一接受按鈕+軸向) | N/A |
+| 22 | `Setup_JoyPad_define()` | 捕獲手把輸入並對應到 NES 按鈕 | `GP_Click()` + `WaitForButton()` → `_gpIniKeys` | OK |
+| 23 | `SetupP2JoyPad()` | P2 手把設定 helper | `GP_Click()` 統一 P1/P2 | OK |
+| 24 | `JoyPadWayName()` | 軸向值轉方向名稱 | `Win32GamepadBackend.WayName()` | OK |
 
 ### 2.7 鍵盤設定
 
@@ -299,10 +299,10 @@
 
 | 狀態 | 數量 |
 |------|------|
-| OK | 112 |
-| PARTIAL | 1 |
-| TODO | 7 |
-| N/A | 13 |
+| OK | 119 |
+| PARTIAL | 0 |
+| TODO | 0 |
+| N/A | 14 |
 | **合計** | **133** |
 
 ---
@@ -343,11 +343,11 @@
 18. ~~**UltraAnalog 重建管線** — MenuUltraAnalog_Click + SyncAnalogConfig/Ntsc_Init/Crt_Init (#47)~~ ✅
 19. ~~**UpdateResolutionLabel** — CmbFilter_Changed + UpdateResolutionLabel (#11-12)~~ ✅
 
-### P5 — 手把 (待 Win32GamepadBackend 實作)
+### ~~P5 — 手把~~ ✅ 全部完成
 
-20. **手把輪詢執行緒** — polling_listener (#73)
-21. **手把設定捕獲** — Setup_JoyPad_define/ExpectedJoyInputType (#21-24)
-22. **手把實際輸入** — IGamepadBackend Win32 實作 (DirectInput + XInput)
+20. ~~**手把輪詢執行緒** — EmulatorEngine.GamepadPollLoop() (#73)~~ ✅
+21. ~~**手把設定捕獲** — GP_Click() + WaitForButton() (#5, #21-24)~~ ✅
+22. ~~**手把實際輸入** — Win32GamepadBackend (DirectInput8 + XInput, 共用 joystick.cs)~~ ✅
 
 ### ~~P6 — 雜項~~ ✅ 全部完成
 

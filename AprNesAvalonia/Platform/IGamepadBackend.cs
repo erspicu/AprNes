@@ -1,3 +1,5 @@
+using System;
+
 namespace AprNesAvalonia.Platform;
 
 /// <summary>
@@ -6,23 +8,26 @@ namespace AprNesAvalonia.Platform;
 /// </summary>
 public interface IGamepadBackend
 {
-    /// <summary>Initialize gamepad subsystem and enumerate devices.</summary>
-    void Initialize();
+    /// <summary>Initialize gamepad subsystem. windowHandle required for DirectInput on Windows.</summary>
+    void Initialize(IntPtr windowHandle);
 
-    /// <summary>Poll device state. Call once per frame.</summary>
+    /// <summary>Poll device state and dispatch NesCore button presses. Call once per frame.</summary>
     void Poll();
 
     /// <summary>Shutdown and release all devices.</summary>
     void Shutdown();
 
-    /// <summary>Check if a button is currently pressed.</summary>
+    /// <summary>Check if a mapped NES button is currently pressed.</summary>
     bool IsButtonPressed(int playerIndex, GamepadButton button);
 
     /// <summary>
-    /// Enter config mode: wait for any button press and return its info.
+    /// Enter config mode: wait for any button/axis press and return its info.
     /// Returns null on timeout.
     /// </summary>
-    GamepadButtonInfo? WaitForButton(int timeoutMs);
+    GamepadCaptureResult? WaitForButton(int timeoutMs);
+
+    /// <summary>Load button mapping from INI joypad_* keys.</summary>
+    void LoadMapping(IniFile ini);
 
     /// <summary>Whether the backend is available on this platform.</summary>
     bool IsAvailable { get; }
@@ -38,5 +43,5 @@ public enum GamepadButton : byte
     Up = 4, Down = 5, Left = 6, Right = 7
 }
 
-/// <summary>Info returned when a gamepad button is captured in config mode.</summary>
-public record GamepadButtonInfo(string DeviceId, string ButtonName, int RawIndex);
+/// <summary>Result of gamepad button capture in config mode.</summary>
+public record GamepadCaptureResult(string IniKey, string DisplayName);

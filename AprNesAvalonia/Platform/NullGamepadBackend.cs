@@ -1,3 +1,5 @@
+using System;
+
 namespace AprNesAvalonia.Platform;
 
 /// <summary>
@@ -8,9 +10,10 @@ public class NullGamepadBackend : IGamepadBackend
     public bool IsAvailable => false;
     public int ConnectedCount => 0;
 
-    public void Initialize() { }
+    public void Initialize(IntPtr windowHandle) { }
     public void Poll() { }
     public void Shutdown() { }
+    public void LoadMapping(IniFile ini) { }
     public bool IsButtonPressed(int playerIndex, GamepadButton button) => false;
-    public GamepadButtonInfo? WaitForButton(int timeoutMs) => null;
+    public GamepadCaptureResult? WaitForButton(int timeoutMs) => null;
 }
