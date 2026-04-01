@@ -60,7 +60,7 @@ namespace ScanLineBuilder
 
                 for (int x = 0; x < width; x++)
                 {
-                    uint px = row[x] & 0xFFFFFFu;
+                    uint px = row[x];
 
                     if (isDark)
                     {
@@ -68,11 +68,11 @@ namespace ScanLineBuilder
                         int G = (int)((px >> 8) & 0xFF);
                         int B = (int)(px & 0xFF);
                         R = rt[R]; G = rt[G]; B = rt[B];
-                        line[x] = (R << 16) | (G << 8) | B;
+                        line[x] = (int)(0xFF000000u | (uint)(R << 16) | (uint)(G << 8) | (uint)B);
                     }
                     else
                     {
-                        line[x] = (int)px;
+                        line[x] = (int)(px | 0xFF000000u);
                     }
                 }
 
@@ -82,10 +82,10 @@ namespace ScanLineBuilder
                 for (int x = 1; x < last; x++)
                 {
                     int L = line[x - 1], C = line[x], Ri = line[x + 1];
-                    row[x] = (uint)(
-                        (((((L & 0xFF0000) + (Ri & 0xFF0000)) << 1) + ((C & 0xFF0000) << 2)) >> 3 & 0xFF0000) |
-                        (((((L & 0x00FF00) + (Ri & 0x00FF00)) << 1) + ((C & 0x00FF00) << 2)) >> 3 & 0x00FF00) |
-                        (((((L & 0x0000FF) + (Ri & 0x0000FF)) << 1) + ((C & 0x0000FF) << 2)) >> 3 & 0x0000FF));
+                    row[x] = 0xFF000000u |
+                        (uint)(((((L & 0xFF0000) + (Ri & 0xFF0000)) << 1) + ((C & 0xFF0000) << 2)) >> 3 & 0xFF0000) |
+                        (uint)(((((L & 0x00FF00) + (Ri & 0x00FF00)) << 1) + ((C & 0x00FF00) << 2)) >> 3 & 0x00FF00) |
+                        (uint)(((((L & 0x0000FF) + (Ri & 0x0000FF)) << 1) + ((C & 0x0000FF) << 2)) >> 3 & 0x0000FF);
                 }
                 row[last] = (uint)line[last];
             });

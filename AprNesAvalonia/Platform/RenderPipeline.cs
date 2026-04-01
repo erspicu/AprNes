@@ -103,15 +103,6 @@ public unsafe class RenderPipeline : IDisposable
         // Scanline post-process
         if (_scanline)
             LibScanline.ApplyInPlace(_output, OutputW, OutputH);
-
-        // Ensure alpha = 0xFF (some filters may strip the alpha byte)
-        FixAlpha(_output, OutputW * OutputH);
-    }
-
-    private static void FixAlpha(uint* buf, int count)
-    {
-        for (int i = 0; i < count; i++)
-            buf[i] |= 0xFF000000;
     }
 
     private static void ApplyFilter(ResizeFilter filter, int scale, uint* src, uint* dst, int srcW, int srcH)

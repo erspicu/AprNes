@@ -32,7 +32,6 @@ public sealed unsafe class EmulatorEngine : IDisposable
     private readonly IGamepadBackend _gamepad = PlatformFactory.CreateGamepadBackend();
 
     // ── Video ──────────────────────────────────────────────────────────────
-    private byte[] _frameBuffer = new byte[256 * 240 * 4];
     private int _pendingFrame;          // interlocked flag: 1 = new frame available
     private int _frameCounter;          // raw frame count since last FPS query
     // ── Render pipeline (two-stage filter engine) ────────────────────────
@@ -41,14 +40,14 @@ public sealed unsafe class EmulatorEngine : IDisposable
     private bool _analogMode;           // true = read from AnalogScreenBuf
     private int _outputW = 256, _outputH = 240;
 
-    /// <summary>Fired on the UI thread when a new frame is ready in FrameBuffer.</summary>
+    /// <summary>Zero-copy: pointer to current frame's pixel data (uint* BGRA).</summary>
+    public IntPtr CurrentFramePtr { get; private set; }
+
+    /// <summary>Fired on the UI thread when a new frame is ready.</summary>
     public event Action? FrameReady;
 
     /// <summary>Fired on the UI thread when output resolution changes.</summary>
     public event Action<int, int>? ResolutionChanged;
-
-    /// <summary>Latest rendered frame (Bgra8888, OutputW×OutputH).</summary>
-    public ReadOnlySpan<byte> FrameBuffer => _frameBuffer;
 
     /// <summary>Current output width in pixels.</summary>
     public int OutputW => _outputW;
@@ -165,11 +164,6 @@ public sealed unsafe class EmulatorEngine : IDisposable
         bool resChanged = newW != _outputW || newH != _outputH;
         _outputW = newW;
         _outputH = newH;
-
-        // Resize managed frame buffer
-        int needed = newW * newH * 4;
-        if (_frameBuffer.Length != needed)
-            _frameBuffer = new byte[needed];
 
         // Init pipeline buffers only if ScreenBuf1x is already valid;
         // otherwise deferred to Start() after ROM init.
@@ -391,42 +385,29 @@ public sealed unsafe class EmulatorEngine : IDisposable
     // ── Private ────────────────────────────────────────────────────────────
     private void OnVideoOutput(object? sender, EventArgs e)
     {
-        // Running on the emulator thread.
-        // Route: Analog → AnalogScreenBuf, Pipeline → filtered output, else → ScreenBuf1x
-        int copyBytes = _outputW * _outputH * 4;
-
+        // Zero-copy: just latch the pointer — no Buffer.MemoryCopy at all.
         if (_analogMode && NesCore.AnalogScreenBuf != null)
         {
-            // Analog: read from AnalogScreenBuf (already rendered by NesCore CRT pipeline)
-            fixed (byte* dst = _frameBuffer)
-                Buffer.MemoryCopy(NesCore.AnalogScreenBuf, dst, copyBytes, copyBytes);
+            CurrentFramePtr = (IntPtr)NesCore.AnalogScreenBuf;
         }
         else if (_pipelineActive)
         {
-            // Lazy re-init if pipeline lost its state
             if (!_pipeline.IsInitialized && NesCore.ScreenBuf1x != null)
                 _pipeline.Init(NesCore.ScreenBuf1x);
 
             if (_pipeline.IsInitialized)
             {
                 _pipeline.Process();
-                uint* outPtr = _pipeline.OutputPtr;
-                fixed (byte* dst = _frameBuffer)
-                    Buffer.MemoryCopy(outPtr, dst, copyBytes, copyBytes);
+                CurrentFramePtr = (IntPtr)_pipeline.OutputPtr;
             }
             else
             {
-                // Fallback: copy base 256×240 into top-left of buffer
-                int baseBytes = 256 * 240 * 4;
-                fixed (byte* dst = _frameBuffer)
-                    Buffer.MemoryCopy(NesCore.ScreenBuf1x, dst, baseBytes, baseBytes);
+                CurrentFramePtr = (IntPtr)NesCore.ScreenBuf1x;
             }
         }
         else
         {
-            // Digital 1x: direct copy from ScreenBuf1x
-            fixed (byte* dst = _frameBuffer)
-                Buffer.MemoryCopy(NesCore.ScreenBuf1x, dst, copyBytes, copyBytes);
+            CurrentFramePtr = (IntPtr)NesCore.ScreenBuf1x;
         }
 
         Interlocked.Increment(ref _frameCounter);

@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:AprNesAvalonia.Views"
         x:Class="AprNesAvalonia.MainWindow"
         Title="AprNes"
         SizeToContent="WidthAndHeight"
@@ -132,10 +133,9 @@
                     <MenuItem x:Name="CtxExit"       Header="Exit"         Click="MenuExit_Click" />
                 </ContextMenu>
             </Border.ContextMenu>
-            <Image x:Name="GameCanvas"
+            <views:EmuScreenControl x:Name="GameCanvas"
                    Width="256" Height="240"
-                   Stretch="None"
-                   RenderOptions.BitmapInterpolationMode="None" />
+                   ClipToBounds="True" />
         </Border>
     </DockPanel>
 </Window>

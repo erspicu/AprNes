@@ -6,7 +6,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
@@ -19,11 +18,6 @@ public partial class MainWindow : Window
 {
     private readonly EmulatorEngine _emu = new();
     private readonly IniFile _ini;
-    private WriteableBitmap _writeableBitmap = new WriteableBitmap(
-        new PixelSize(256, 240),
-        new Vector(96, 96),
-        PixelFormats.Bgra8888,
-        AlphaFormat.Unpremul);
 
     private readonly DispatcherTimer _fpsTimer = new() { Interval = TimeSpan.FromSeconds(1) };
 
@@ -52,9 +46,6 @@ public partial class MainWindow : Window
         _ini = new IniFile(iniPath);
         ApplyIniSettings();
 
-        // Canvas
-        GameCanvas.Source = _writeableBitmap;
-
         // FPS display
         _fpsTimer.Tick += (_, _) => StatusFps.Text = _emu.TakeFrameCount().ToString();
         _fpsTimer.Start();
@@ -71,7 +62,6 @@ public partial class MainWindow : Window
         {
             StopRecordingIfActive();
             _emu.Dispose();        // Stop + SaveSRam + cleanup
-            _writeableBitmap.Dispose();
         };
 
         AprNes.NesCore.OnError = LogError;
@@ -437,24 +427,17 @@ public partial class MainWindow : Window
 
     private void OnResolutionChanged(int w, int h)
     {
-        _writeableBitmap?.Dispose();
-        _writeableBitmap = new WriteableBitmap(
-            new PixelSize(w, h),
-            new Vector(96, 96),
-            PixelFormats.Bgra8888,
-            AlphaFormat.Unpremul);
         GameCanvas.Width  = w;
         GameCanvas.Height = h;
-        GameCanvas.Source  = _writeableBitmap;
+        GameCanvas.FrameWidth  = w;
+        GameCanvas.FrameHeight = h;
     }
 
-    private unsafe void OnFrameReady()
+    private void OnFrameReady()
     {
-        var src = _emu.FrameBuffer;
-        int size = src.Length;
-        fixed (byte* p = src)
-        using (var fb = _writeableBitmap.Lock())
-            Buffer.MemoryCopy(p, fb.Address.ToPointer(), size, size);
+        // Zero-copy: just hand the pointer to the control and request redraw.
+        // Actual rendering happens on Avalonia's Render Thread via ICustomDrawOperation.
+        GameCanvas.FramePtr = _emu.CurrentFramePtr;
         GameCanvas.InvalidateVisual();
     }
 
@@ -528,10 +511,9 @@ public partial class MainWindow : Window
         if (_isFullscreen)
         {
             WindowState = WindowState.FullScreen;
-            // Scale canvas to fill
+            // EmuScreenControl handles scaling via Skia DrawBitmap
             GameCanvas.Width  = double.NaN;
             GameCanvas.Height = double.NaN;
-            GameCanvas.Stretch = Avalonia.Media.Stretch.Uniform;
             GameBorder.Margin = new Thickness(0);
         }
         else
@@ -539,7 +521,6 @@ public partial class MainWindow : Window
             WindowState = WindowState.Normal;
             GameCanvas.Width  = _emu.OutputW;
             GameCanvas.Height = _emu.OutputH;
-            GameCanvas.Stretch = Avalonia.Media.Stretch.None;
             GameBorder.Margin = new Thickness(0);
         }
     }
@@ -564,22 +545,18 @@ public partial class MainWindow : Window
             string stamp    = DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss");
             string filePath = Path.Combine(dir, $"Screen-{stamp}.png");
 
-            var src = _emu.FrameBuffer;
-            unsafe
+            var ptr = _emu.CurrentFramePtr;
+            if (ptr != IntPtr.Zero)
             {
-                fixed (byte* p = src)
-                {
-                    int w = _emu.OutputW, h = _emu.OutputH;
-                    var bmp = new Bitmap(
-                        PixelFormats.Bgra8888, AlphaFormat.Unpremul,
-                        (nint)p,
-                        new PixelSize(w, h),
-                        new Vector(96, 96),
-                        w * 4);
-                    using var fs = File.Create(filePath);
-                    bmp.Save(fs);
-                    bmp.Dispose();
-                }
+                int w = _emu.OutputW, h = _emu.OutputH;
+                using var bmp = new Avalonia.Media.Imaging.Bitmap(
+                    PixelFormats.Bgra8888, AlphaFormat.Unpremul,
+                    ptr,
+                    new PixelSize(w, h),
+                    new Vector(96, 96),
+                    w * 4);
+                using var fs = File.Create(filePath);
+                bmp.Save(fs);
             }
             message = filePath + " " + L("dlg_screenshot_saved", "save!");
         }
