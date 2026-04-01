@@ -37,12 +37,17 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
+        // Ensure default directories exist on startup (mirrors AprNes WinForms)
+        EnsureDefaultDirectories();
+
         // Wire events before loading settings so initial resolution is applied
         _emu.FrameReady += OnFrameReady;
         _emu.ResolutionChanged += OnResolutionChanged;
 
         // Load INI settings (triggers ApplyRenderPipeline → ResolutionChanged)
         string iniPath = Path.Combine(AppContext.BaseDirectory, "configure", "AprNes.ini");
+        if (!File.Exists(iniPath))
+            WriteDefaultIni(iniPath);
         _ini = new IniFile(iniPath);
         ApplyIniSettings();
 
@@ -164,8 +169,86 @@ public partial class MainWindow : Window
         _emu.ApplyRenderSettings(s1f, s1s, s2f, s2s, scanline, analogEnabled, analogSize);
     }
 
-    // ═══ Analog Config INI ═══════════════════════════════════════════════
+    // ═══ Default Directories ════════════════════════════════════════════
     private static string ConfigDir => Path.Combine(AppContext.BaseDirectory, "configure");
+
+    private static void EnsureDefaultDirectories()
+    {
+        string basePath = AppContext.BaseDirectory;
+        string[] dirs =
+        [
+            Path.Combine(basePath, "configure"),
+            Path.Combine(basePath, "Captures", "Screenshots"),
+            Path.Combine(basePath, "Captures", "Video"),
+            Path.Combine(basePath, "Captures", "Audio"),
+        ];
+        foreach (var dir in dirs)
+        {
+            try { Directory.CreateDirectory(dir); }
+            catch { }
+        }
+    }
+
+    /// <summary>Write default AprNes.ini when no config file exists (mirrors AprNes WinForms defaults).</summary>
+    private static void WriteDefaultIni(string path)
+    {
+        string basePath = AppContext.BaseDirectory;
+        string lang = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "zh"
+            ? (System.Globalization.CultureInfo.CurrentUICulture.Name.Contains("TW", StringComparison.OrdinalIgnoreCase) ? "zh-tw" : "zh-cn")
+            : "en-us";
+
+        var lines = new[]
+        {
+            // P1 keyboard (Windows VK codes: Z=90, X=88, S=83, A=65, Up=38, Down=40, Left=37, Right=39)
+            "key_A=90",
+            "key_B=88",
+            "key_SELECT=83",
+            "key_START=65",
+            "key_UP=38",
+            "key_DOWN=40",
+            "key_LEFT=37",
+            "key_RIGHT=39",
+            // P2 keyboard (disabled by default)
+            "key_P2_A=0", "key_P2_B=0", "key_P2_SELECT=0", "key_P2_START=0",
+            "key_P2_UP=0", "key_P2_DOWN=0", "key_P2_LEFT=0", "key_P2_RIGHT=0",
+            // P1 joypad
+            "joypad_A=", "joypad_B=", "joypad_SELECT=", "joypad_START=",
+            "joypad_UP=", "joypad_DOWN=", "joypad_LEFT=", "joypad_RIGHT=",
+            // P2 joypad
+            "joypad_P2_A=", "joypad_P2_B=", "joypad_P2_SELECT=", "joypad_P2_START=",
+            "joypad_P2_UP=", "joypad_P2_DOWN=", "joypad_P2_LEFT=", "joypad_P2_RIGHT=",
+            // Display
+            "LimitFPS=1",
+            "ResizeStage1=0",
+            "ResizeStage2=0",
+            "Scanline=0",
+            // Audio
+            "Sound=1",
+            "Volume=70",
+            // Analog
+            "AnalogMode=0",
+            "AnalogSize=4",
+            "AnalogOutput=AV",
+            "UltraAnalog=0",
+            "crt=1",
+            // Emulation
+            "AccuracyOptA=1",
+            "Region=NTSC",
+            // Capture paths
+            $"CaptureScreenPath={Path.Combine(basePath, "Captures", "Screenshots")}",
+            $"CaptureVideoPath={Path.Combine(basePath, "Captures", "Video")}",
+            $"CaptureAudioPath={Path.Combine(basePath, "Captures", "Audio")}",
+            "VideoQuality=90",
+            "AudioBitrate=160",
+            // Language
+            $"Lang={lang}",
+        };
+
+        try { File.WriteAllLines(path, lines); }
+        catch { }
+    }
+
+    // ═══ Analog Config INI ═══════════════════════════════════════════════
 
     private void LoadAnalogConfig()
     {
@@ -446,8 +529,8 @@ public partial class MainWindow : Window
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
-        // Shift+P = screenshot
-        if (e.KeyModifiers == KeyModifiers.Shift && e.Key == Key.P)
+        // Ctrl+Shift+P = screenshot (matches AprNes WinForms)
+        if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.P)
         {
             CaptureScreen();
             e.Handled = true;
@@ -502,6 +585,7 @@ public partial class MainWindow : Window
         StatusRomName.Text = Path.GetFileName(path);
         _emu.Start();
         AddRecentROM(path);
+        UpdateRecordMenuVisibility();
     }
 
     // ═══ Fullscreen ═════════════════════════════════════════════════════════
@@ -540,7 +624,7 @@ public partial class MainWindow : Window
         try
         {
             string dir = _ini.Get("CaptureScreenPath",
-                         Path.Combine(AppContext.BaseDirectory, "Screenshot"));
+                         Path.Combine(AppContext.BaseDirectory, "Captures", "Screenshots"));
             Directory.CreateDirectory(dir);
 
             string stamp    = DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss");

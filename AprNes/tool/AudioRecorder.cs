@@ -27,7 +27,7 @@ namespace AprNes
         static string _stderrBuf;
 
         static string _logPath;
-        static readonly bool DebugLog = true; // set false for release
+        static readonly bool DebugLog = false; // set true for debugging
 
         public static bool IsRecording => _recording;
         public static string LastOutputPath { get; private set; }

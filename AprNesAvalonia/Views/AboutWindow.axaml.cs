@@ -53,7 +53,7 @@ public partial class AboutWindow : Window
 
     private void SiteLink_Click(object? sender, PointerPressedEventArgs e)
     {
-        try { Process.Start(new ProcessStartInfo("https://github.com/erspicu/AprNes") { UseShellExecute = true }); }
+        try { Process.Start(new ProcessStartInfo("https://baxermux.org/myemu/AprNes") { UseShellExecute = true }); }
         catch { }
     }
 

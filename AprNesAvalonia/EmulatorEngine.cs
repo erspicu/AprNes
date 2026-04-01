@@ -230,6 +230,12 @@ public sealed unsafe class EmulatorEngine : IDisposable
         else
             _pipeline.FreeMem();
 
+        // Update render output info for VideoRecorder (mirrors WinForms RenderObj.init)
+        NesCore.RenderOutputW = newW;
+        NesCore.RenderOutputH = newH;
+        NesCore.RenderOutputPtr = _pipelineActive && _pipeline.IsInitialized
+            ? _pipeline.OutputPtr : NesCore.ScreenBuf1x;
+
         if (resChanged)
             ResolutionChanged?.Invoke(newW, newH);
 
@@ -485,6 +491,18 @@ public sealed unsafe class EmulatorEngine : IDisposable
 
             // Lock-free atomic swap: front ↔ back
             _backBuffer = Interlocked.Exchange(ref _frontBuffer, _backBuffer);
+
+            // Push frame to VideoRecorder (mirrors AprNes WinForms VideoOutputDeal)
+            if (VideoRecorder.IsRecording)
+            {
+                uint* capturePtr = _analogMode && NesCore.AnalogScreenBuf != null
+                    ? NesCore.AnalogScreenBuf
+                    : _pipelineActive && _pipeline.IsInitialized
+                        ? _pipeline.OutputPtr
+                        : NesCore.ScreenBuf1x;
+                if (capturePtr != null)
+                    VideoRecorder.PushFrame(capturePtr);
+            }
         }
 
         Interlocked.Increment(ref _frameCounter);

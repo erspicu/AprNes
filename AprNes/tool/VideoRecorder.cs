@@ -44,7 +44,7 @@ namespace AprNes
         public static string DetectedEncoder { get; private set; }
         public static string LastError { get; private set; }
 
-        static readonly bool DebugLog = true; // set false for release
+        static readonly bool DebugLog = false; // set true for debugging
 
         static void Log(string msg)
         {
