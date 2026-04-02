@@ -36,7 +36,59 @@ namespace AprNes
         static int mcPpuClock = 4;    // PPU: 4→0 (full step at 0, half step at 2) [NTSC]
         static bool mcApuPutCycle = false; // M2 phase (toggles every APU/CPU step)
 
-        // ── Region-specialized catchUpPPU versions ──
+        // ── Per-master-clock execution (TriCNES _EmulatorCore model) ──
+        // Called once per master clock tick. Gates CPU/PPU/APU by countdown timers.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void EmulatorCoreTick_NTSC()
+        {
+            // CPU gate: execute one cycle at countdown == 0
+            if (mcCpuClock == 0)
+            {
+                mcCpuClock = 12;
+                cpuCycleCount++;
+                irqLinePrev = irqLineCurrent;
+                m2PhaseIsWrite = (cpuCycleCount & 1) != 0;
+
+                // NMI promotion (TriCNES: at CPUClock==8, but we do it at CPU execution time
+                // since we don't tick between individual master clocks within catch-up)
+                if (nmi_delay_cycle >= 0 && cpuCycleCount > nmi_delay_cycle)
+                { nmi_pending = true; nmi_delay_cycle = -1; }
+
+                cpu_step_one_cycle();
+
+                if (!isFDS) MapperObj.CpuCycle();
+                else fds_CpuCycle();
+
+                // APU runs at same rate as CPU (every 12 master clocks)
+                apu_step();
+                mcApuPutCycle = !mcApuPutCycle;
+
+                if (strobeWritePending > 0) processStrobeWrite();
+            }
+
+            // PPU full step: execute one dot at countdown == 0
+            if (mcPpuClock == 0)
+            {
+                mcPpuClock = 4;
+                ppu_step_ntsc();
+                // NMI edge detection after each PPU step
+                bool o = isVblank && NMIable;
+                if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount;
+                nmi_output_prev = o;
+            }
+
+            // PPU half step: at countdown == 2 (mid-dot)
+            if (mcPpuClock == 2)
+            {
+                ppu_half_step();
+            }
+
+            // Decrement counters
+            mcCpuClock--;
+            mcPpuClock--;
+        }
+
+        // ── Legacy catch-up functions (kept during transition, will be removed) ──
         // Each hardcodes masterPerPpu and step count for JIT constant folding.
         // NMI edge detection is inlined after each PPU step.
 
