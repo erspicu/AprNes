@@ -500,7 +500,25 @@
 - NTSC DecodeScanline 在 cx==255 half-step 觸發
 - **測試**：174/174 blargg PASS，SMB3 畫面正常
 
-### 後續方向（大型改造）
-- [ ] MEM.cs ppu_read_fun/ppu_write_fun 重構（分離 raw VRAM read 與 $2007 register 行為）
-- [ ] $2007 state machine 完整實作（依賴上述重構）
-- [ ] 排查 AC Page 19 regression（精確 bisect $2000/$2001/$2006 各別影響）
+### 2026-04-02 — feature/ppu-high-precision: backdrop fill + $2007 cooldown restore（`c41e5a1`）
+- **修正**：cx==0 無條件填 backdrop（修復 mid-scanline $2001 toggle 導致的 stale pixel 綠色方塊）
+- 恢復 ppu2007ReadCooldown（double_2007_read 依賴）
+- scanline-a1 完全對齊 TriCNES（數位+類比模式均無綠色）
+- **測試**：174/174 blargg PASS
+
+### 2026-04-02 — feature/ppu-high-precision: MEM.cs lambda 重構（`27b36f8`）
+- **修正**：移除 65536-entry lambda 陣列，新增 PpuBusRead/PpuBusWrite
+- **測試**：174/174 blargg PASS
+
+### 2026-04-02 — feature/ppu-high-precision: $2007 state machine（`aae4655`）
+- **修正**：deferred buffer (state 1/4) + write (state 3) + increment (state 4)
+- SM 在 full-step + half-step 各 tick 一次（半 dot 精度）
+- 移除 ppu2007ReadCooldown（由 SM 流程取代）
+- **改善**：test_ppu_read_buffer + read_write_2007 從 FAIL → PASS
+- **殘留**：double_2007_read（DMC back-to-back $2007，需 SM interrupt 處理）
+- **測試**：173/174 blargg
+
+### 後續方向
+- [ ] $2007 SM interrupt（DMC back-to-back $2007 — double_2007_read）
+- [ ] mystery write（RMW 指令 $2007）
+- [ ] 排查 AC Page 19 regression
