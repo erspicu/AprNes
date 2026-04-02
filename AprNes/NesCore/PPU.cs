@@ -554,7 +554,7 @@ namespace AprNes
                 isSprite0hit = true;
             }
 
-            // $2007 state machine half-step tick (doubles tick rate for half-dot precision)
+            // $2007 state machine half-step tick — buffer update only
             if (ppu2007SM < 9)
             {
                 if (ppu2007SM == 1 && ppu2007SM_isRead && !ppu2007SM_bufferLate)
@@ -562,18 +562,10 @@ namespace AprNes
                     int a = ppu2007SM_addr & 0x3FFF;
                     ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a);
                 }
-                else if (ppu2007SM == 3 && !ppu2007SM_isRead)
+                else if (ppu2007SM == 4 && ppu2007SM_isRead && ppu2007SM_bufferLate)
                 {
-                    PpuBusWrite(ppu2007SM_addr, ppu2007SM_writeValue);
-                }
-                else if (ppu2007SM == 4)
-                {
-                    if (ppu2007SM_isRead && ppu2007SM_bufferLate)
-                    {
-                        int a = ppu2007SM_addr & 0x3FFF;
-                        ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a);
-                    }
-                    Increment2007();
+                    int a = ppu2007SM_addr & 0x3FFF;
+                    ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a);
                     ppu2007SM_bufferLate = false;
                 }
                 ppu2007SM++;
@@ -660,39 +652,23 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_step_common(out int cx, out bool renderingEnabled)
         {
-            // $2007 state machine (TriCNES: PPU_Data_StateMachine)
+            // $2007 state machine — buffer update only (write + increment are immediate)
             if (ppu2007SM < 9)
             {
                 if (ppu2007SM == 1 && ppu2007SM_isRead && !ppu2007SM_bufferLate)
                 {
-                    // State 1: buffer update (normal alignment — phases 2,3)
+                    // State 1: buffer update (normal alignment)
                     int a = ppu2007SM_addr & 0x3FFF;
-                    if (a >= 0x3F00)
-                        ppu_2007_buffer = PpuBusRead(a & 0x2FFF); // palette → buffer gets underlying NT
-                    else
-                        ppu_2007_buffer = PpuBusRead(a);
+                    ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a);
                 }
-                else if (ppu2007SM == 3 && !ppu2007SM_isRead)
+                else if (ppu2007SM == 4 && ppu2007SM_isRead && ppu2007SM_bufferLate)
                 {
-                    // State 3: deferred write execution
-                    PpuBusWrite(ppu2007SM_addr, ppu2007SM_writeValue);
-                }
-                else if (ppu2007SM == 4)
-                {
-                    // State 4: late buffer update + VRAM address increment
-                    if (ppu2007SM_isRead && ppu2007SM_bufferLate)
-                    {
-                        int a = ppu2007SM_addr & 0x3FFF;
-                        if (a >= 0x3F00)
-                            ppu_2007_buffer = PpuBusRead(a & 0x2FFF);
-                        else
-                            ppu_2007_buffer = PpuBusRead(a);
-                    }
-                    Increment2007();
+                    // State 4: late buffer update (alignment phases 0,1)
+                    int a = ppu2007SM_addr & 0x3FFF;
+                    ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a);
                     ppu2007SM_bufferLate = false;
                 }
                 ppu2007SM++;
-                // >= 9 → idle
             }
 
             // $2006 delayed t→v copy
@@ -1617,17 +1593,20 @@ namespace AprNes
                 result = ppu_2007_buffer;
             }
 
-            // Start state machine: buffer update at state 1 or 4, increment at state 4
+            // Snapshot address for SM buffer update, then increment immediately
+            // (deferred increment breaks games/tests that read consecutive $2007 addresses)
             ppu2007SM_addr = vram_addr;
+            Increment2007(); // immediate — vram_addr advances for next access
+
+            // Start state machine for buffer update only
             ppu2007SM_isRead = true;
             if (ppu2007SM >= 9)
             {
                 ppu2007SM = 0;
-                // Alignment: phases 0,1 → late buffer update (state 4); phases 2,3 → early (state 1)
                 ppu2007SM_bufferLate = (ppu_cycles_x % 3 <= 1);
             }
             else
-                ppu2007SM = 0; // back-to-back access: restart
+                ppu2007SM = 0;
 
             openbus = result;
             open_bus_decay_timer = 77777;
@@ -1797,14 +1776,9 @@ namespace AprNes
         {
             openbus = value;
             open_bus_decay_timer = 77777;
-            ppu2007SM_writeValue = value;
-            ppu2007SM_addr = vram_addr;
-            ppu2007SM_isRead = false;
-
-            if (ppu2007SM >= 9)
-                ppu2007SM = 3; // idle → write executes at state 3, increment at state 4
-            else
-                ppu2007SM = 0; // back-to-back access: restart from 0
+            // Immediate write + increment (deferred write breaks games)
+            PpuBusWrite(vram_addr, value);
+            Increment2007();
         }
 
         static void ppu_w_4014(byte value)//DMA , fixex 2017.01.16 pass sprite_ram test
