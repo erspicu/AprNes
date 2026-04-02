@@ -4,24 +4,20 @@
 
 ---
 
-## 需修正的差異
+## 已修正的差異（`3f5cc19`）
 
-### 1. ⚠️ Attribute shift register 載入方式不同
-- **AprNes**：Phase 7 時預填 0xFF 或 0x00（整個 byte 一次填入）
-- **TriCNES**：存 2-bit latch，每 dot shift 進 1 bit
-- **影響**：attribute 在 tile 邊界處的過渡可能不同
+### 1. ✅ Attribute shift register 載入方式（已修正）
+- **修正前**：Phase 7 時預填 0xFF 或 0x00
+- **修正後**：存 2-bit `attrLatch`，每 dot 從 latch shift-in 1 bit
 
-### 2. ⚠️ Rendering disabled 時 shift register 行為
-- **AprNes**：disabled 時繼續 shift（serial-in 持續）
-- **TriCNES**：disabled 時**不 shift**
-- **影響**：BGSerialIn test（AC Page 19）的核心測試點
+### 2. ✅ Rendering disabled 時 shift register 行為（已修正）
+- **修正前**：disabled 時繼續 shift
+- **修正後**：disabled 時不 shift（匹配 TriCNES）
 
-### 3. ⚠️ $2005/$2006 alignment delay 反轉
-- **AprNes**：`ppuAlignPhase == 2` 時延遲較長
-- **TriCNES**：`case 1,2` 延遲較長（不只 case 2）
-- **$2005**：AprNes align[2]=2, others=1 → TriCNES align[0,3]=1, align[1,2]=2
-- **$2006**：AprNes align[2]=5, others=4 → TriCNES align[0,3]=4, align[1,2]=5
-- **影響**：mid-scanline scroll 精度
+### 3. ✅ $2005/$2006/$2000 alignment delay（已修正）
+- **$2000**：align[0,1]=2, align[2,3]=1
+- **$2005**：align[0,3]=1, align[1,2]=2
+- **$2006**：align[0,3]=4, align[1,2]=5
 
 ## 已知但保持的差異（AC/blargg 已通過）
 

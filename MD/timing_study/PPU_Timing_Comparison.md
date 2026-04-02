@@ -568,7 +568,56 @@
 - **blargg**: 174/174 PASS
 - **AC**: 135/136（Page 19 -1 — per-dot 架構精度差異，非寄存器 delay 相關）
 
+### 2026-04-02 — feature/ppu-high-precision: emphasis bits 獨立延遲 + SM state 8（`e671718`）
+- **emphasis delay**：獨立 `ppu2001EmphasisDelay`（align 0,3=2; align 1,2=1），不再即時設定
+- **SM state 8**：interrupted read-to-write — 寫入延遲到 state 8 + extra increment
+- **測試**：174/174 blargg PASS
+
+### 2026-04-02 — feature/ppu-high-precision: 最終審計修正（`3f5cc19`）
+- **alignment delay 修正**：$2000/$2005/$2006 的 alignment mapping 全部對齊 TriCNES 精確值
+  - $2000: align[0,1]=2, align[2,3]=1
+  - $2005: align[0,3]=1, align[1,2]=2
+  - $2006: align[0,3]=4, align[1,2]=5
+- **attribute shift register**：從預填 0xFF/0x00 改為 per-dot 從 `attrLatch` shift-in（TriCNES PPU_AttributeLatchRegister 模型）
+- **rendering disabled 行為**：shift register 不再繼續 shift（TriCNES: gated by rendering enabled）
+- **測試**：174/174 blargg PASS
+
+---
+
+## TriCNES 架構對齊最終狀態（2026-04-02）
+
+| 架構面向 | 對齊 | 備註 |
+|---------|:----:|------|
+| 每 dot 精度 (half-step) | ✅ | full + half step |
+| BG pixel per-dot shift register | ✅ | serial-in: low=0, high=1 |
+| Attribute per-dot shift from latch | ✅ | attrLatch 2-bit → per-dot shift-in |
+| Rendering disabled: no shift | ✅ | 修正完成 |
+| Sprite compositing per-dot | ✅ | half-step |
+| $2001 4-tier flags | ✅ | instant/delayed/ppuRE/evalDelay |
+| $2001 emphasis 獨立延遲 | ✅ | align-dependent 1-2 cycles |
+| 4-phase alignment | ✅ | ppuAlignPhase 0-3 |
+| $2000 delay (align-dependent) | ✅ | align[0,1]=2, align[2,3]=1 |
+| $2005 delay (align-dependent) | ✅ | align[0,3]=1, align[1,2]=2 |
+| $2006 delay (align-dependent) | ✅ | align[0,3]=4, align[1,2]=5 |
+| VBL half-dot latch | ✅ | pending → promote |
+| Sprite 0 hit pending | ✅ | half-step promote |
+| $2007 SM fully deferred | ✅ | buffer(1/4) + write(3) + inc(4) |
+| $2007 mystery write | ✅ | back-to-back write 偵測 |
+| $2007 back-to-back guard | ✅ | SM < 9 → openbus |
+| $2007 SM state 8 | ✅ | interrupted read-to-write |
+| PpuBusRead/Write 分離 | ✅ | MEM.cs lambda 移除 |
+
+**全 18 項 ✅ — PPU 架構完整對齊 TriCNES**
+
+### 已知差異（語義等價，通過所有測試）
+- VBL set: dot 1 (AprNes) vs dot 0 (TriCNES) — pending latch 補償
+- NMI edge: nmi_delay_cycle (AprNes) vs 硬體 latch (TriCNES)
+- Odd frame skip: scanline 261 dot 339 (AprNes) vs scanline 0 (TriCNES)
+
+### 當前測試狀態
+- **blargg**: 174/174 PASS
+- **AC**: 135/136（Page 19 -1）
+
 ### 後續方向
-- [ ] AC Page 19 BGSerialIn 深入排查（可能需要更精確的 $2001 enable/disable dot 位置控制）
-- [ ] TriCNES 的 emphasis bits 獨立延遲（PPU_Update2001EmphasisBitsDelay — 現未分離）
-- [ ] $2007 SM interrupted read-to-write 完整處理（TriCNES state 8 deferred write + extra increment）
+- [ ] AC Page 19 排查（可能需要跑 Page 19 的每個 test 單獨 bisect）
+- [ ] 效能優化（half-step + per-dot shift 的效能影響評估）
