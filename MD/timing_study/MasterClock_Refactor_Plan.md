@@ -211,7 +211,10 @@ static public void run()
 | 3 | ✅ | `6c4ff36` | 169/174 | StartCpuCycle 切換 per-master-clock NTSC（-5 NMI/sprite） |
 | 4 | ✅ | `88105e3` | 166/174 | 刪除 legacy catch-up，全區域 per-master-clock（-84 行） |
 | 5 | ✅ 評估 | — | — | DMA 引擎已在 CpuRead gate，跟 TriCNES 等價，不需大改 |
-| 6 | 待做 | | | Mapper CpuClockRise + NMI timing 調整 |
+| 6 | ✅ | `f25049a` | 166/174 | CpuClockRise() 加入 IMapper + 60 mappers |
+
+**全部 6 Phase 完成。** 架構已切換為 per-master-clock gates。
+166/174 blargg（8 NMI/sprite timing regression — 需要後續調整）。
 
 ---
 
