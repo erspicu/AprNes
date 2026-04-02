@@ -1882,10 +1882,18 @@ namespace AprNes
 
         static void ppu_w_4014(byte value)//DMA , fixex 2017.01.16 pass sprite_ram test
         {
-            // Set OAM DMA flags — deferred to next read cycle via ProcessPendingDma()
+            // OAM DMA trigger — TriCNES per-cycle model
             spriteDmaTransfer = true;
             spriteDmaOffset = value;
-            dmaNeedHalt = true;
+            dmaFirstCycleOam = true;
+            dmaOamAligned = false;
+            dmaOamAddr = 0;
+            // Capture bus state for internal register conflict handling (only if no DMA already running)
+            if (!dmcDmaRunning)
+            {
+                dmaPrevReadAddress = cpuBusAddr;
+                dmaEnableInternalRegReads = ((cpuBusAddr & 0xFFE0) == 0x4000);
+            }
         }
     }
 }

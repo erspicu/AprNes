@@ -2,13 +2,15 @@
 
 **日期**：2026-04-03
 **分支**：feature/ppu-high-precision
-**目前狀態**：151→154/174（NMI >= fix）
+**目前狀態**：154/174（DMA per-cycle dispatch 完成，零回歸）
 
 ---
 
 ## 已修正
 
 - [x] `nmi_delay_cycle` 的 `>` 改 `>=`（配合 CPU-first 新模型）
+- [x] DMA per-cycle dispatch（TODO #3）— ProcessPendingDma blocking loop → per-cycle DmaOneCycle
+- [x] 移除 Start/EndCpuCycle（TODO #6）— 已從 MEM.cs 完全移除
 
 ## 待修正
 
@@ -24,14 +26,11 @@
 - **問題**：DMA 的 StartCpuCycle 也會覆蓋 `irqLinePrev`，造成 DMA 期間的 IRQ 狀態不準
 - **影響 tests**：irq_timing, nmi_and_irq, irq_and_dma, branch_delays_irq
 
-### 3. DMA 引擎：blocking ProcessPendingDma → per-cycle dispatch
-- **現況**：`ProcessPendingDma` 用 while 迴圈一次跑完所有 DMA cycles，每 cycle 呼叫 StartCpuCycle
-- **TriCNES**：DMA 在 `_6502()` 開頭 gate check，每個 CPU gate 只做一個 DMA cycle
-- **問題**：
-  - DMA 的 StartCpuCycle 跑 12 次 PPU tick（但 MasterClockTick 在 DMA block 期間不跑）
-  - DMA 期間的 NMI/IRQ timing 不正確（沒有 CPUClock==8/5 check）
-  - 27 處 StartCpuCycle/EndCpuCycle 呼叫需要移除
-- **影響 tests**：dma_2007_read, dma_4016_read, sprdma_and_dmc_dma, irq_and_dma
+### 3. ~~DMA 引擎：blocking ProcessPendingDma → per-cycle dispatch~~ ✅ DONE
+- **已完成**：ProcessPendingDma 替換為 per-cycle DmaOneCycle()
+- TriCNES 模型：OAM halt/aligned/put/get 狀態機，DMC halt + single-cycle get
+- PPU 透過 MasterClockTick 自然推進（不再需要 StartCpuCycle）
+- APU 每個 DMA cycle 也正常執行（修正了舊模型 APU 在 DMA 期間暫停的 bug）
 
 ### 4. VBL suppression ($2002 read timing)
 - **現況**：`SuppressVbl` 在 `ppu_r_2002` 中設定，條件是 `scanline == nmiTriggerLine && ppu_cycles_x == 1`
@@ -43,17 +42,17 @@
 - **問題**：跟 CPU 的相對位置改變了（CPU 先跑，PPU 後跑）
 - **影響 tests**：sprite_overflow timing
 
-### 6. EndCpuCycle 空函式（DMA 呼叫）
-- **現況**：EndCpuCycle 是空函式，但 DMA 引擎仍呼叫它（20 處）
-- **修正方向**：DMA 改為 per-cycle dispatch 後，Start/EndCpuCycle 可完全移除
+### 6. ~~EndCpuCycle 空函式（DMA 呼叫）~~ ✅ DONE
+- **已完成**：StartCpuCycle/EndCpuCycle/tick/Mem_r/Mem_w/ZP_r/ZP_w 全部移除
+- absorbDmaFlags/ProcessPendingDma 一併移除
 
 ---
 
 ## 修正順序建議
 
-1. **DMA per-cycle dispatch**（最大風險，最多影響）— 移除 blocking loop，改 MasterClockTick gate
+1. ~~**DMA per-cycle dispatch**~~ ✅ DONE
 2. **NMI direct line model**（需要 edge detection 正確才能避免過度觸發）
 3. **IRQ level detection at CPUClock==5**
 4. **VBL suppression dot 調整**
 5. **ppuRenderingEnabled 更新時機**
-6. **移除 Start/EndCpuCycle**（DMA 完成後）
+6. ~~**移除 Start/EndCpuCycle**~~ ✅ DONE（隨 DMA 一起完成）

@@ -59,12 +59,9 @@ namespace AprNes
             doReset = true;
         }
 
-        // --- Per-cycle bus access functions ---
-        // Each call advances the clock (StartCpuCycle/EndCpuCycle), matching Mem_r/Mem_w behavior.
-        // CpuRead also triggers DMA via ProcessPendingDma when dmaNeedHalt is set.
-
-        // Pure bus access — no clock advancement (MasterClockTick handles timing)
-        // DMA gate moved to MasterClockTick CPU gate (TriCNES: DMA check in _6502)
+        // --- Pure bus access functions ---
+        // No clock advancement — MasterClockTick handles timing.
+        // DMA gate is in MasterClockTick CPU gate (TriCNES: DMA check in _6502).
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte CpuRead(ushort addr)
         {
@@ -79,9 +76,9 @@ namespace AprNes
         static void CpuWrite(ushort addr, byte val)
         {
             cpuBusAddr = addr;
-            // Implicit abort: DMA cancelled on write cycle
-            if (dmcImplicitAbortActive && dmaNeedHalt)
-            { dmcImplicitAbortActive = false; dmcDmaRunning = false; dmcNeedDummyRead = false; dmaNeedHalt = false; }
+            // Implicit abort: DMA cancelled on write cycle (still in halt phase)
+            if (dmcImplicitAbortActive && dmcDmaHalt)
+            { dmcImplicitAbortActive = false; dmcDmaRunning = false; dmcDmaHalt = false; }
             cpubus = val;
             mem_write_fun[addr](addr, val);
         }

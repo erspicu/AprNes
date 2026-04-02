@@ -266,10 +266,13 @@ namespace AprNes
             statusmapperint = false;
             doNMI = false; doIRQ = false; doReset = false; doBRK = false; softreset = false;
 
-            // DMA state
-            dmaNeedHalt = false; dmcNeedDummyRead = false; dmcDmaRunning = false;
+            // DMA state (TriCNES per-cycle model)
+            dmcDmaRunning = false; dmcDmaHalt = false;
             spriteDmaTransfer = false; spriteDmaOffset = 0;
+            dmaOamHalt = false; dmaOamAligned = false; dmaFirstCycleOam = false;
+            dmaOamInternalBus = 0; dmaOamAddr = 0;
             dmaPrevReadAddress = 0; dmaReadSkipBusUpdate = false;
+            dmaEnableInternalRegReads = false;
 
             // PPU control registers ($2000/$2001/$2002)
             BaseNameTableAddr = 0; VramaddrIncrement = 1;
@@ -569,7 +572,7 @@ namespace AprNes
                 m2PhaseIsWrite = (cpuCycleCount & 1) != 0;
 
                 // DMA gate: if DMA pending, steal this cycle (TriCNES: _6502 DMA check)
-                if (dmaNeedHalt || dmcDmaRunning || spriteDmaTransfer)
+                if (dmcDmaRunning || spriteDmaTransfer)
                 {
                     DmaOneCycle();
                 }

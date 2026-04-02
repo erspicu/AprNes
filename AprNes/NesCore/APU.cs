@@ -380,9 +380,11 @@ namespace AprNes
             dmcstartaddr = 0xC000; dmcaddr = 0xC000; dmcbitsleft = 8;
             dmcsilence = true; dmcirq = false; dmcloop = false; dmcBufferEmpty = true;
             dmcLoadDmaCountdown = 0; dmcStatusDelay = 0; dmcDelayedEnable = false; dmcAbortDma = false;
-            dmcDmaRunning = false; dmcNeedDummyRead = false; dmaNeedHalt = false;
+            dmcDmaRunning = false; dmcDmaHalt = false;
             dmcDmaCooldown = 0; dmcImplicitAbortPending = false; dmcImplicitAbortActive = false; dmcStatusEnabled = false;
             spriteDmaTransfer = false; spriteDmaOffset = 0;
+            dmaOamHalt = false; dmaOamAligned = false; dmaFirstCycleOam = false;
+            dmaOamInternalBus = 0; dmaOamAddr = 0; dmaEnableInternalRegReads = false;
         }
 
         // =====================================================================
@@ -777,29 +779,33 @@ namespace AprNes
             }
         }
 
-        // Request DMC DMA— sets flags for ProcessPendingDma() (Mesen2: StartDmcTransfer)
+        // Request DMC DMA — TriCNES per-cycle model (starts with halt flag)
         static void dmcStartTransfer()
         {
             if (!dmcDmaRunning && (dmcBufferEmpty && dmcsamplesleft > 0 || dmcImplicitAbortActive))
             {
                 dmcDmaRunning = true;
-                dmcNeedDummyRead = true;
-                dmaNeedHalt = true;
+                dmcDmaHalt = true;
+                // Capture bus state for internal register conflict handling (only if no OAM DMA already running)
+                if (!spriteDmaTransfer)
+                {
+                    dmaPrevReadAddress = cpuBusAddr;
+                    dmaEnableInternalRegReads = ((cpuBusAddr & 0xFFE0) == 0x4000);
+                }
             }
         }
 
-        // Cancel or abort DMC DMA (Mesen2: StopDmcTransfer)
+        // Cancel or abort DMC DMA — TriCNES per-cycle model
         static void dmcStopTransfer()
         {
             if (dmcDmaRunning)
             {
-                if (dmaNeedHalt)
+                if (dmcDmaHalt) // Still in halt phase — cancel immediately
                 {
                     dmcDmaRunning = false;
-                    dmcNeedDummyRead = false;
-                    dmaNeedHalt = false;
+                    dmcDmaHalt = false;
                 }
-                else
+                else // Past halt — deferred abort (picked up by DmaOneCycle gate)
                 {
                     dmcAbortDma = true;
                 }
