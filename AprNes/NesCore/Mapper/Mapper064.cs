@@ -270,6 +270,7 @@ namespace AprNes
             a12LastCycle = ppuAbsCycle;
         }
 
+        public void CpuClockRise() { }
         public void Cleanup() { }
     }
 }

@@ -61,6 +61,7 @@
         public void MapperW_RAM(ushort address, byte value) { NES_MEM[address] = value; }
         public byte MapperR_RAM(ushort address) { return NES_MEM[address]; }
         public void CpuCycle() { }
+        public void CpuClockRise() { }
 
         public void NotifyA12(int address, int ppuAbsCycle)
         {

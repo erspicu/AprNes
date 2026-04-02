@@ -97,6 +97,7 @@
         public byte MapperR_CHR(int address) { return NesCore.chrBankPtrs[(address >> 10) & 7][address & 0x3FF]; }
         public void MapperW_CHR(int addr, byte val) { if (CHR_ROM_count == 0) ppu_ram[addr] = val; }
         public void CpuCycle() { }
+        public void CpuClockRise() { }
         public void NotifyA12(int addr, int ppuAbsCycle) { }
             public void Cleanup() { }
 }

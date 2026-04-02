@@ -44,6 +44,7 @@
         public byte MapperR_RAM(ushort address) { return NesCore.NES_MEM[address]; }
         public void MapperW_RAM(ushort address, byte value) { NesCore.NES_MEM[address] = value; }
         public void CpuCycle() { }
+        public void CpuClockRise() { }
 
         public void MapperW_PRG(ushort address, byte value)
         {

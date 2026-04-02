@@ -127,6 +127,7 @@
         }
 
         public void MapperW_CHR(int addr, byte val) { if (CHR_ROM_count == 0) ppu_ram[addr] = val; }
+        public void CpuClockRise() { }
             public void Cleanup() { }
 }
 }

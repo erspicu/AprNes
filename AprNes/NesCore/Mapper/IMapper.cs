@@ -24,6 +24,7 @@
         void UpdateCHRBanks();
         void Reset();
         void CpuCycle();
+        void CpuClockRise(); // M2 rising edge (TriCNES: CPUClockRise at master clock phase 5)
         void NotifyA12(int addr, int ppuAbsCycle);
         void Cleanup();
     }

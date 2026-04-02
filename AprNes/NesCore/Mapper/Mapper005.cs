@@ -717,6 +717,7 @@ namespace AprNes
         }
 
         public void Reset() { }
+        public void CpuClockRise() { }
         public void Cleanup()
         {
             if (exRamPtr != null) { Marshal.FreeHGlobal((IntPtr)exRamPtr); exRamPtr = null; }

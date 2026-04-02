@@ -490,6 +490,7 @@ namespace AprNes
             }
         }
 
+        public void CpuClockRise() { }
         public void Cleanup() { }
     }
 }
