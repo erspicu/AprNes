@@ -560,7 +560,7 @@ namespace AprNes
                 isSprite0hit = true;
             }
 
-            // $2007 state machine half-step tick — buffer update only
+            // $2007 state machine half-step tick (fully deferred)
             if (ppu2007SM < 9)
             {
                 if (ppu2007SM == 1 && ppu2007SM_isRead && !ppu2007SM_bufferLate)
@@ -568,11 +568,19 @@ namespace AprNes
                     int a = ppu2007SM_addr & 0x3FFF;
                     ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a);
                 }
-                else if (ppu2007SM == 4 && ppu2007SM_isRead && ppu2007SM_bufferLate)
+                else if (ppu2007SM == 3 && !ppu2007SM_isRead)
                 {
-                    int a = ppu2007SM_addr & 0x3FFF;
-                    ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a);
-                    ppu2007SM_bufferLate = false;
+                    PpuBusWrite(ppu2007SM_addr, ppu2007SM_writeValue);
+                }
+                else if (ppu2007SM == 4)
+                {
+                    if (ppu2007SM_isRead && ppu2007SM_bufferLate)
+                    {
+                        int a = ppu2007SM_addr & 0x3FFF;
+                        ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a);
+                        ppu2007SM_bufferLate = false;
+                    }
+                    Increment2007();
                 }
                 ppu2007SM++;
             }
@@ -652,21 +660,27 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_step_common(out int cx, out bool renderingEnabled)
         {
-            // $2007 state machine — buffer update only (write + increment are immediate)
+            // $2007 state machine (fully deferred: buffer/write/increment)
             if (ppu2007SM < 9)
             {
                 if (ppu2007SM == 1 && ppu2007SM_isRead && !ppu2007SM_bufferLate)
                 {
-                    // State 1: buffer update (normal alignment)
                     int a = ppu2007SM_addr & 0x3FFF;
                     ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a);
                 }
-                else if (ppu2007SM == 4 && ppu2007SM_isRead && ppu2007SM_bufferLate)
+                else if (ppu2007SM == 3 && !ppu2007SM_isRead)
                 {
-                    // State 4: late buffer update (alignment phases 0,1)
-                    int a = ppu2007SM_addr & 0x3FFF;
-                    ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a);
-                    ppu2007SM_bufferLate = false;
+                    PpuBusWrite(ppu2007SM_addr, ppu2007SM_writeValue);
+                }
+                else if (ppu2007SM == 4)
+                {
+                    if (ppu2007SM_isRead && ppu2007SM_bufferLate)
+                    {
+                        int a = ppu2007SM_addr & 0x3FFF;
+                        ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a);
+                        ppu2007SM_bufferLate = false;
+                    }
+                    Increment2007();
                 }
                 ppu2007SM++;
             }
@@ -1581,9 +1595,7 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ppu_r_2007()
         {
-            // Back-to-back $2007 read: if SM still running, return openbus
-            // SM ticks 2x per dot (full+half), 3 dots/CPU = 6 ticks/CPU cycle.
-            // Need threshold ~12 (≈2 CPU cycles) to match hardware cooldown behavior.
+            // Back-to-back $2007 access: if SM still running, return openbus
             if (ppu2007SM < 9)
                 return openbus;
 
@@ -1591,21 +1603,12 @@ namespace AprNes
             byte result;
 
             if (addr >= 0x3F00)
-            {
-                // Palette: direct read (not buffered)
                 result = (byte)((openbus & 0xC0) | (PpuBusRead(addr) & 0x3F));
-            }
             else
-            {
-                // Non-palette: return current buffer value
                 result = ppu_2007_buffer;
-            }
 
-            // Snapshot address for SM buffer update, then increment immediately
+            // Fully deferred: buffer update at state 1/4, increment at state 4
             ppu2007SM_addr = vram_addr;
-            Increment2007();
-
-            // Start state machine for deferred buffer update
             ppu2007SM_isRead = true;
             ppu2007SM = 0;
             ppu2007SM_bufferLate = (ppuAlignPhase <= 1);
@@ -1781,35 +1784,27 @@ namespace AprNes
             open_bus_decay_timer = 77777;
 
             // Mystery write: consecutive CPU cycle writes to $2007 (RMW instruction)
-            // TriCNES: if SM is running and previous was a write → mystery write
-            // Write $ZZ to $2007 while PPU address is $YYXX:
-            //   Mystery write #1: store (byte)addr at $YYXX (low byte of address)
-            //   Mystery write #2: store $ZZ at address $YY_ZZ
             if (ppu2007SM < 9 && !ppu2007SM_isRead)
             {
                 int addr = vram_addr & 0x3FFF;
                 int mysteryAddr = (addr & 0xFF00) | value;
-
                 if (mysteryAddr < 0x3F00)
                 {
                     PpuBusWrite(mysteryAddr, value);
                     PpuBusWrite(addr, (byte)(addr & 0xFF));
                 }
                 else
-                {
-                    // Palette: write to mirrored non-palette address
                     PpuBusWrite(addr & 0x2FFF, value);
-                }
             }
 
-            // Normal write + increment
-            PpuBusWrite(vram_addr, value);
-            Increment2007();
-
-            // Mark SM as write (for subsequent mystery write detection)
+            // Fully deferred: write at state 3, increment at state 4
+            ppu2007SM_writeValue = value;
+            ppu2007SM_addr = vram_addr;
             ppu2007SM_isRead = false;
             if (ppu2007SM >= 9)
-                ppu2007SM = 0;
+                ppu2007SM = 3; // idle → write at state 3, increment at state 4
+            else
+                ppu2007SM = 0; // back-to-back: restart
         }
 
         static void ppu_w_4014(byte value)//DMA , fixex 2017.01.16 pass sprite_ram test
