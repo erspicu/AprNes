@@ -477,8 +477,16 @@
 - **AC**: 135/136（Page 19 -1，$2006 delay 變更相關，不回退）
 - **架構**：half-step 完整運作，所有 PPU 寄存器延遲對齊 TriCNES 模型
 
-### 後續方向
-- [ ] 排查 AC Page 19 的 1 個 regression
-- [ ] alignment-dependent delay（目前全部固定值，TriCNES 依 PPUClock & 3 動態調整）
-- [ ] $2007 state machine（替代簡單 cooldown）
-- [ ] per-dot pixel output 擴展到 sprite compositing（目前 sprite 仍是 batch 渲染）
+### 2026-04-02 — feature/ppu-high-precision: alignment-dependent delays（`9dde4fb`）
+- **修正**：所有寄存器延遲改為依 `ppu_cycles_x % 3` 動態調整
+  - $2000: 2/1 cycles（alignment 0,1 vs 2,3）
+  - $2001: 2/3 cycles（alignment 0,1,3 vs 2）
+  - $2005: 1/2 cycles（alignment 0,1,3 vs 2）
+  - $2006: 4/5 cycles（alignment 0,1,3 vs 2）
+- AC Page 19 regression 分析記錄在 `AC_Page19_Regression_Analysis.md`
+- **測試**：174/174 blargg PASS
+
+### 後續方向（大型改造）
+- [ ] $2007 state machine（9-state，替代簡單 6-dot cooldown，含 mystery write 支援）
+- [ ] per-dot sprite compositing（RenderSpritesLine batch → half-step per-dot 合成）
+- [ ] 排查 AC Page 19 regression（精確 bisect $2000/$2001/$2006 各別影響）
