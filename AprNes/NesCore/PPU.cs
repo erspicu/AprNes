@@ -457,7 +457,9 @@ namespace AprNes
                     // Load main shift registers
                     lowshift  = (ushort)((lowshift  << 8) | lowTile);
                     highshift = (ushort)((highshift << 8) | highTile);
-                    // Reload per-dot render shift registers (keep old high byte, load new low)
+                    // Reload per-dot render shift registers
+                    // Per-dot shift has already moved LOW→HIGH over 8 shifts.
+                    // Just load new tile data into LOW byte.
                     renderLow  = (ushort)((renderLow  & 0xFF00) | lowTile);
                     renderHigh = (ushort)((renderHigh & 0xFF00) | highTile);
                     // Attribute latch set at phase 3 (above); shift-in happens per-dot in half-step
@@ -597,6 +599,18 @@ namespace AprNes
             }
 
             int cx = ppu_cycles_x - 1; // cx is the dot we just completed in ppu_step (already incremented)
+
+            // Shift registers must also shift during prefetch (cx 320-335) and pre-render line
+            // Otherwise attribute shift registers have stale data at dot 0
+            bool inPrefetch = (cx >= 320 && cx < 336) && (scanline >= 0 || scanline == preRenderLine);
+            if (inPrefetch && ppuRenderingEnabled)
+            {
+                renderLow  <<= 1;
+                renderHigh = (ushort)((renderHigh << 1) | 1);
+                renderAttrLow  = (ushort)((renderAttrLow << 1) | (attrLatch & 1));
+                renderAttrHigh = (ushort)((renderAttrHigh << 1) | ((attrLatch >> 1) & 1));
+            }
+
             if (cx < 0 || cx >= 256 || scanline < 0 || scanline >= 240)
                 return;
 
@@ -604,16 +618,17 @@ namespace AprNes
             // TriCNES model: shift left 1 bit, read bit (15 - FineX), with serial-in 0/1
             if (ppuRenderingEnabled && ShowBackGround)
             {
-                // Read pixel from current shift register position
+                // Read pixel from per-dot shift registers
                 int bit = 15 - FineX;
                 int bgPixel = ((renderLow >> bit) & 1) | (((renderHigh >> bit) & 1) << 1);
-                int attrBits = ((renderAttrLow >> bit) & 1) | (((renderAttrHigh >> bit) & 1) << 1);
 
-                // Shift left by 1 (serial-in from latch, TriCNES model)
+                // Attribute: use pipeline directly (proven correct in master)
+                // bit >= 8 = current tile (p3), bit < 8 = next tile (p2)
+                int attrBits = (bit >= 8) ? bg_attr_p3 : bg_attr_p2;
+
+                // Shift pattern registers (attribute handled by pipeline, not shift register)
                 renderLow  <<= 1;
                 renderHigh = (ushort)((renderHigh << 1) | 1);
-                renderAttrLow  = (ushort)((renderAttrLow << 1) | (attrLatch & 1));
-                renderAttrHigh = (ushort)((renderAttrHigh << 1) | ((attrLatch >> 1) & 1));
 
                 bool masked = !ShowBgLeft8 && cx < 8;
                 int slot = (scanline << 8) + cx;
