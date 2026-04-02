@@ -606,40 +606,24 @@ namespace AprNes
                 if (strobeWritePending > 0) processStrobeWrite();
             }
 
-            // ── NMI promotion at CPUClock == 8 (TriCNES model) ──
+            // ── NMI promotion at CPUClock == 8 ──
             if (mcCpuClock == 8)
             {
                 if (nmi_delay_cycle >= 0 && cpuCycleCount > nmi_delay_cycle)
                 { nmi_pending = true; nmi_delay_cycle = -1; }
             }
 
-            // ── IRQ level check + Mapper M2 rise at CPUClock == 5 ──
+            // ── IRQ + Mapper M2 rise at CPUClock == 5 ──
             if (mcCpuClock == 5)
             {
-                // TriCNES: IRQLine = IRQ_LevelDetector; Cart.MapperChip.CPUClockRise()
                 if (!isFDS) MapperObj.CpuClockRise();
             }
 
-            // ── PPU full step at PPUClock == 0 ──
-            if (mcPpuClock == 0)
-            {
-                mcPpuClock = masterPerPpu; // NTSC=4, PAL=5, Dendy=5
-                if (regionMode == 0)      ppu_step_ntsc();
-                else if (regionMode == 1) ppu_step_pal();
-                else                      ppu_step_dendy();
-                // NMI edge detection after PPU step
-                bool o = isVblank && NMIable;
-                if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount;
-                nmi_output_prev = o;
-            }
+            // PPU is driven by StartCpuCycle (called from CpuRead/CpuWrite),
+            // NOT here — avoids double execution when CPU gate fires
 
-            // ── PPU half step at PPUClock == mid-point ──
-            if (mcPpuClock == (masterPerPpu >> 1))
-                ppu_half_step();
-
-            // ── Decrement counters ──
+            // ── Decrement CPU counter only ──
             mcCpuClock--;
-            mcPpuClock--;
         }
     }
 

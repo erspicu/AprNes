@@ -94,13 +94,34 @@ namespace AprNes
         // StartCpuCycle: full cycle advance (CC++, NMI promote, PPU, APU, IRQ)
         // Same content as old tick_pre, kept as single unit to preserve timing.
         // The key change is ProcessPendingDma moving BEFORE StartCpuCycle in Mem_r/ZP_r.
-        // Minimal Start/EndCpuCycle — PPU/APU driven by MasterClockTick in Main.cs
+        // StartCpuCycle: advance counters + run masterPerCpu ticks of PPU gates
+        // Called from CpuRead/CpuWrite (normal CPU execution + DMA stolen cycles)
+        // MasterClockTick calls cpu_step_one_cycle which calls CpuRead → StartCpuCycle
+        // So StartCpuCycle MUST advance PPU for DMA cycles (which bypass MasterClockTick)
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void StartCpuCycle()
         {
             irqLinePrev = irqLineCurrent;
             cpuCycleCount++;
             m2PhaseIsWrite = (cpuCycleCount & 1) != 0;
+
+            // Run PPU gates for this CPU cycle (masterPerCpu master ticks)
+            for (int t = 0; t < masterPerCpu; t++)
+            {
+                if (mcPpuClock == 0)
+                {
+                    mcPpuClock = masterPerPpu;
+                    if (regionMode == 0)      ppu_step_ntsc();
+                    else if (regionMode == 1) ppu_step_pal();
+                    else                      ppu_step_dendy();
+                    bool o = isVblank && NMIable;
+                    if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount;
+                    nmi_output_prev = o;
+                }
+                if (mcPpuClock == (masterPerPpu >> 1))
+                    ppu_half_step();
+                mcPpuClock--;
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
