@@ -525,6 +525,19 @@
 - DMA stolen tick `ppu2007SM = 9` 重置允許 DMA 後的正常讀取
 - **測試**：174/174 blargg PASS（double_2007_read 修復）
 
+### 2026-04-02 — feature/ppu-high-precision: $2007 back-to-back guard + mystery write（`46cb68d`, `de8a651`）
+- **guard**：SM < 9 時 $2007 read 返回 openbus（修復 double_2007_read）
+- **mystery write**：back-to-back write 偵測（SM running + prev write）
+  - 寫 `$ZZ` 到 `$YYZZ`，寫 `low(addr)` 到 `$YYXX`
+  - palette 地址重導到 mirrored non-palette
+- **測試**：174/174 blargg PASS
+
+### 2026-04-02 — AC Page 19 bisect（`8315dda`）
+- $2006/$2000/$2001 delay 各別停用測試 → 全部 135/136
+- 根因不在寄存器 delay，在 per-dot 架構精度差異（shift register model）
+
 ### 後續方向
-- [ ] mystery write（RMW 指令 $2007 — 極罕見場景）
-- [ ] 排查 AC Page 19 regression
+- [ ] 真正的 per-dot shift register（每 dot shift + read bit 15，取代靜態 bit position 計算）
+- [ ] $2001 第 4 層 eval-delayed flag
+- [ ] alignment proxy 改進（4 相位 vs 現在 3 相位）
+- [ ] AC Page 19 精確排查（per-dot shift 可能修復 BGSerialIn）
