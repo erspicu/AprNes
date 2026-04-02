@@ -94,48 +94,18 @@ namespace AprNes
         // StartCpuCycle: full cycle advance (CC++, NMI promote, PPU, APU, IRQ)
         // Same content as old tick_pre, kept as single unit to preserve timing.
         // The key change is ProcessPendingDma moving BEFORE StartCpuCycle in Mem_r/ZP_r.
-        // EndCpuCycle: placeholder for future sub-cycle split.
-
+        // Minimal Start/EndCpuCycle — PPU/APU driven by MasterClockTick in Main.cs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void StartCpuCycle()
         {
             irqLinePrev = irqLineCurrent;
-            masterClock += masterPerCpu;
             cpuCycleCount++;
             m2PhaseIsWrite = (cpuCycleCount & 1) != 0;
-
-            // NMI promotion (checked before CPU memory access)
-            if (nmi_delay_cycle >= 0 && cpuCycleCount > nmi_delay_cycle)
-            { nmi_pending = true; nmi_delay_cycle = -1; }
-
-            // Per-master-clock PPU/APU ticks (PPU runs before CPU access — catch-up ordering)
-            int ticks = masterPerCpu;
-            for (int t = 0; t < ticks; t++)
-            {
-                if (mcPpuClock == 0)
-                {
-                    mcPpuClock = masterPerPpu;
-                    if (regionMode == 0)      ppu_step_ntsc();
-                    else if (regionMode == 1) ppu_step_pal();
-                    else                      ppu_step_dendy();
-                    bool o = isVblank && NMIable;
-                    if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount;
-                    nmi_output_prev = o;
-                }
-                if (mcPpuClock == (masterPerPpu >> 1))
-                    ppu_half_step();
-                mcPpuClock--;
-            }
-            apu_step();
-            mcApuPutCycle = !mcApuPutCycle;
-            if (strobeWritePending > 0) processStrobeWrite();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void EndCpuCycle()
         {
-            if (isFDS) fds_CpuCycle();
-            else MapperObj.CpuCycle();
         }
 
         // Called at every site that changes statusframeint, apuintflag, statusdmcint, or statusmapperint
