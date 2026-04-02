@@ -159,6 +159,7 @@ namespace AprNes
         static byte ppu2007SM_writeValue = 0;
         static bool ppu2007SM_bufferLate = false; // alignment: buffer updated at state 4 instead of 1
         static int ppu2007SM_addr = 0; // vram_addr snapshot at time of access
+        static bool ppu2007SM_interruptedReadToWrite = false; // TriCNES: write during active read SM
 
         // $2000 delayed control update (TriCNES: PPU_Update2000Delay, 1-2 PPU cycles)
         // NMI enable is immediate; pattern table/sprite size delayed
@@ -169,6 +170,10 @@ namespace AprNes
         // _Instant flags set immediately; ShowBackGround/ShowSprites applied after delay
         static int ppu2001UpdateDelay = 0;
         static byte ppu2001PendingValue = 0;
+        // Emphasis bits have independent delay (TriCNES: PPU_Update2001EmphasisBitsDelay)
+        // Alignment 0,3: 2 cycles; Alignment 1,2: 1 cycle (with immediate Greyscale+Blue at align 0,3)
+        static int ppu2001EmphasisDelay = 0;
+        static byte ppu2001EmphasisPending = 0;
 
         // $2005 delayed scroll update (TriCNES model: 1-2 PPU dots after CPU write)
         static int ppu2005UpdateDelay = 0;
@@ -582,6 +587,13 @@ namespace AprNes
                     }
                     Increment2007();
                 }
+                else if (ppu2007SM == 8 && ppu2007SM_interruptedReadToWrite)
+                {
+                    // State 8: interrupted read-to-write — deferred write + extra increment
+                    PpuBusWrite(ppu2007SM_addr, ppu2007SM_writeValue);
+                    ppu2007SM_interruptedReadToWrite = false;
+                    Increment2007(); // extra increment
+                }
                 ppu2007SM++;
             }
 
@@ -682,6 +694,12 @@ namespace AprNes
                     }
                     Increment2007();
                 }
+                else if (ppu2007SM == 8 && ppu2007SM_interruptedReadToWrite)
+                {
+                    PpuBusWrite(ppu2007SM_addr, ppu2007SM_writeValue);
+                    ppu2007SM_interruptedReadToWrite = false;
+                    Increment2007();
+                }
                 ppu2007SM++;
             }
 
@@ -723,6 +741,15 @@ namespace AprNes
                 ShowSprLeft8   = (ppu2001PendingValue & 0x04) != 0;
                 ShowBackGround = (ppu2001PendingValue & 0x08) != 0;
                 ShowSprites    = (ppu2001PendingValue & 0x10) != 0;
+            }
+
+            // $2001 emphasis bits independent delay
+            if (ppu2001EmphasisDelay > 0 && --ppu2001EmphasisDelay == 0)
+            {
+                byte v = ppu2001EmphasisPending;
+                ppuEmphasis = (byte)((v >> 5) & 0x7);
+                if (Region != RegionType.NTSC)
+                    ppuEmphasis = (byte)((ppuEmphasis & 0x4) | ((ppuEmphasis & 1) << 1) | ((ppuEmphasis >> 1) & 1));
             }
 
             // Open bus decay
@@ -1653,9 +1680,6 @@ namespace AprNes
             // Tier 1: Instant flags — take effect immediately
             ShowBackGround_Instant = (value & 0x08) != 0;
             ShowSprites_Instant    = (value & 0x10) != 0;
-            ppuEmphasis = (byte)((value >> 5) & 0x7);
-            if (Region != RegionType.NTSC)
-                ppuEmphasis = (byte)((ppuEmphasis & 0x4) | ((ppuEmphasis & 1) << 1) | ((ppuEmphasis >> 1) & 1));
 
             // OAM corruption uses instant flags
             bool newRenderingInstant = ShowBackGround_Instant || ShowSprites_Instant;
@@ -1676,11 +1700,14 @@ namespace AprNes
             }
             prevRenderingEnabled = newRenderingInstant;
 
-            // Tier 2: Delayed flags — applied after 2-3 PPU cycles
-            // TriCNES: alignment 0,1,3=2cycles; alignment 2=3cycles
+            // Tier 2: Delayed mask flags (ShowBG/ShowSprites/Left8)
             ppu2001UpdateDelay = (ppuAlignPhase == 2) ? 3 : 2;
             ppu2001PendingValue = value;
-            ppu2001PendingValue = value;
+
+            // Emphasis bits: independent delay (TriCNES: PPU_Update2001EmphasisBitsDelay)
+            // Alignment 0,3: 2 cycles; Alignment 1,2: 1 cycle
+            ppu2001EmphasisDelay = (ppuAlignPhase == 0 || ppuAlignPhase == 3) ? 2 : 1;
+            ppu2001EmphasisPending = value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1783,28 +1810,42 @@ namespace AprNes
             openbus = value;
             open_bus_decay_timer = 77777;
 
-            // Mystery write: consecutive CPU cycle writes to $2007 (RMW instruction)
-            if (ppu2007SM < 9 && !ppu2007SM_isRead)
+            // Back-to-back $2007 access detection
+            if (ppu2007SM < 9)
             {
-                int addr = vram_addr & 0x3FFF;
-                int mysteryAddr = (addr & 0xFF00) | value;
-                if (mysteryAddr < 0x3F00)
+                if (ppu2007SM_isRead)
                 {
-                    PpuBusWrite(mysteryAddr, value);
-                    PpuBusWrite(addr, (byte)(addr & 0xFF));
+                    // Interrupted read-to-write: write deferred to state 8 (TriCNES model)
+                    ppu2007SM_interruptedReadToWrite = true;
+                    ppu2007SM_writeValue = value;
+                    ppu2007SM_addr = vram_addr;
+                    ppu2007SM_isRead = false;
+                    return; // don't restart SM — let it continue to state 8
                 }
                 else
-                    PpuBusWrite(addr & 0x2FFF, value);
+                {
+                    // Mystery write: consecutive writes (RMW instruction)
+                    int addr = vram_addr & 0x3FFF;
+                    int mysteryAddr = (addr & 0xFF00) | value;
+                    if (mysteryAddr < 0x3F00)
+                    {
+                        PpuBusWrite(mysteryAddr, value);
+                        PpuBusWrite(addr, (byte)(addr & 0xFF));
+                    }
+                    else
+                        PpuBusWrite(addr & 0x2FFF, value);
+                }
             }
 
             // Fully deferred: write at state 3, increment at state 4
             ppu2007SM_writeValue = value;
             ppu2007SM_addr = vram_addr;
             ppu2007SM_isRead = false;
+            ppu2007SM_interruptedReadToWrite = false;
             if (ppu2007SM >= 9)
-                ppu2007SM = 3; // idle → write at state 3, increment at state 4
+                ppu2007SM = 3;
             else
-                ppu2007SM = 0; // back-to-back: restart
+                ppu2007SM = 0;
         }
 
         static void ppu_w_4014(byte value)//DMA , fixex 2017.01.16 pass sprite_ram test
