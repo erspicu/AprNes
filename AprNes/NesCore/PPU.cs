@@ -424,6 +424,8 @@ namespace AprNes
                         ATVal = (byte)((ppu_ram[CIRAMAddr(ioaddr)] >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
                     }
                     bg_attr_p3 = bg_attr_p2; bg_attr_p2 = bg_attr_p1; bg_attr_p1 = ATVal;
+                    // Update attribute latch at phase 3 (TriCNES: PPU_AttributeLatchRegister = PPU_Attribute)
+                    attrLatch = ATVal;
                     if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ioaddr);
                 } else if (phase == 4) {
                     if (extAttrEnabled && extAttrChrSize > 0)
@@ -458,12 +460,8 @@ namespace AprNes
                     // Reload per-dot render shift registers (keep old high byte, load new low)
                     renderLow  = (ushort)((renderLow  & 0xFF00) | lowTile);
                     renderHigh = (ushort)((renderHigh & 0xFF00) | highTile);
-                    // Attribute: parallel load low 8 bits (hardware loads in parallel, not serial)
-                    // TriCNES sets latch at phase 3 + shifts gradually; pre-fill is equivalent
-                    byte atL = (byte)(bg_attr_p2 & 1);
-                    byte atH = (byte)((bg_attr_p2 >> 1) & 1);
-                    renderAttrLow  = (ushort)((renderAttrLow  & 0xFF00) | (atL != 0 ? 0xFF : 0x00));
-                    renderAttrHigh = (ushort)((renderAttrHigh & 0xFF00) | (atH != 0 ? 0xFF : 0x00));
+                    // Attribute latch set at phase 3 (above); shift-in happens per-dot in half-step
+                    // No pre-fill needed — latch was already set 4 dots ago at phase 3
                     // Sync sprite 0 shadow registers
                     lowshift_s0  = (ushort)((lowshift_s0  & 0xFF00) | lowTile);
                     highshift_s0 = (ushort)((highshift_s0 & 0xFF00) | highTile);
@@ -611,11 +609,11 @@ namespace AprNes
                 int bgPixel = ((renderLow >> bit) & 1) | (((renderHigh >> bit) & 1) << 1);
                 int attrBits = ((renderAttrLow >> bit) & 1) | (((renderAttrHigh >> bit) & 1) << 1);
 
-                // Shift left by 1 (serial-in: pattern low=0, high=1; attribute=0)
+                // Shift left by 1 (serial-in from latch, TriCNES model)
                 renderLow  <<= 1;
                 renderHigh = (ushort)((renderHigh << 1) | 1);
-                renderAttrLow  <<= 1;
-                renderAttrHigh <<= 1;
+                renderAttrLow  = (ushort)((renderAttrLow << 1) | (attrLatch & 1));
+                renderAttrHigh = (ushort)((renderAttrHigh << 1) | ((attrLatch >> 1) & 1));
 
                 bool masked = !ShowBgLeft8 && cx < 8;
                 int slot = (scanline << 8) + cx;
@@ -636,26 +634,8 @@ namespace AprNes
                         : (byte)(ppu_ram[baseAddr + bgPixel] & 0x3f);
                 }
 
-                // Per-dot sprite compositing (replaces batch Pass 3 in RenderSpritesLine)
-                if (sprLineReady && sprLineSet[cx] != 0 && ShowSprites)
-                {
-                    // Sprite visible if: BG disabled, OR BG pixel transparent, OR sprite is front-priority
-                    if (!ShowBackGround || Buffer_BG_array[slot] == 0 || sprLinePri[cx] == 0)
-                    {
-                        ScreenBuf1x[slot] = sprLineBuf[cx];
-                        if (AnalogEnabled) ntscScanBuf[cx] = sprLinePalIdx[cx];
-                    }
-                }
             }
             // TriCNES: shift registers do NOT shift when rendering is disabled
-
-            // End of visible scanline: trigger NTSC decode and reset sprite buffer
-            if (cx == 255)
-            {
-                if (AnalogEnabled)
-                    DecodeScanline(scanline, ntscScanBuf, ppuEmphasis);
-                sprLineReady = false;
-            }
         }
 
         // ── Region-specialized PPU step functions ──
@@ -870,15 +850,21 @@ namespace AprNes
                             }
                         }
                         PrecomputeOverflow();
-                        // Pre-fill sprite pixel buffer for per-dot compositing in half-step
-                        if (mmc5Ref != null) mmc5Ref.PreSpriteRender();
-                        RenderSpritesLine();
                     }
 
                     // Per-cycle sprite overflow flag
                     if (spriteOverflowCycle >= 0 && cx == spriteOverflowCycle)
                         isSpriteOverflow = true;
 
+                }
+
+                // Sprite rendering at dot 257 — batch composite over BG
+                // (per-dot compositing requires sprite buffer before dot 0, which isn't possible
+                //  because sprite tiles must be fetched with correct CHR banks at dot 257+)
+                if (scanline >= 0 && scanline < 240 && cx == 257)
+                {
+                    if (mmc5Ref != null) mmc5Ref.PreSpriteRender();
+                    RenderSpritesLine_Batch();
                 }
 
                 // Pre-render line: compute pre-render sprite data at dot 257
@@ -1430,7 +1416,7 @@ namespace AprNes
         // Pass 2: long* 批次清零 sprSet (32×8=256 bytes); shift 取像素取代 mask+乘法;
         //         8x16 tile 選擇用 line>>3 取代 if 分支; priority 直接位移取值
         // Pass 3: long* 8-byte block-scan 跳過全空區域 (sprite 通常只佔少數像素)
-        static unsafe void RenderSpritesLine()
+        static unsafe void RenderSpritesLine_Batch()
         {
             // Pass 1: scan OAM 0→63, pick first 8 sprites visible on this scanline.
             // NES hardware only performs sprite evaluation when rendering is enabled.
@@ -1529,11 +1515,28 @@ namespace AprNes
                 }
             }
 
-            // Compositing moved to ppu_half_step (per-dot)
-            sprLineReady = true;
+            // Batch compositing (restored — per-dot requires buffer before dot 0, not feasible with MMC3)
+            int scanOff = scanline << 8;
+            long* pSprSetLong = (long*)sprLineSet;
+            for (int b = 0; b < 32; b++)
+            {
+                if (pSprSetLong[b] == 0) continue;
+                int bx = b << 3;
+                for (int i = 0; i < 8; i++)
+                {
+                    int sx = bx + i;
+                    if (sprLineSet[sx] == 0) continue;
+                    int loc = scanOff + sx;
+                    if (!ShowBackGround || Buffer_BG_array[loc] == 0 || sprLinePri[sx] == 0)
+                    {
+                        ScreenBuf1x[loc] = sprLineBuf[sx];
+                        if (AnalogEnabled) ntscScanBuf[sx] = sprLinePalIdx[sx];
+                    }
+                }
+            }
 
-            // NTSC analog: still need to decode after all pixels are composited.
-            // This will be triggered at end-of-scanline in half-step or at cx==256.
+            if (AnalogEnabled)
+                DecodeScanline(scanline, ntscScanBuf, ppuEmphasis);
         }
 
         static public bool screen_lock = false;
@@ -1662,9 +1665,10 @@ namespace AprNes
 
             // Delayed: pattern table addresses, sprite size
             // TriCNES: alignment 0,1=2cycles; alignment 2,3=1cycle
-            // TriCNES: case 0,1=2cycles; case 2,3=1cycle
-            ppu2000UpdateDelay = (ppuAlignPhase <= 1) ? 2 : 1;
-            ppu2000PendingValue = value;
+            // Immediate (delay breaks MMC3 games like SMB3 that switch pattern table via IRQ)
+            SpPatternTableAddr = ((value & 8) > 0) ? 0x1000 : 0;
+            BgPatternTableAddr = ((value & 0x10) > 0) ? 0x1000 : 0;
+            Spritesize8x16 = ((value & 0x20) > 0);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
