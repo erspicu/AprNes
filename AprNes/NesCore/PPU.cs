@@ -152,12 +152,15 @@ namespace AprNes
         static int vram_addr_internal = 0, vram_addr = 0, scrol_y = 0, FineX = 0;
         static bool vram_latch = false;
         static byte ppu_2007_buffer = 0, ppu_2007_temp = 0;
-        // $2007 state machine (TriCNES model: PPU_Data_StateMachine)
-        // States: 9=idle, 0=access started, 1=buffer update, 3=write+address inc, 4=delayed inc
+        // $2007 read cooldown (suppresses rapid consecutive reads, e.g. double_2007_read test)
+        static int ppu2007ReadCooldown = 0;
+
+        // $2007 state machine (TriCNES model: PPU_Data_StateMachine) — PLACEHOLDER
+        // Full implementation requires MEM.cs lambda refactor
         static int ppu2007SM = 9; // 9 = idle
         static bool ppu2007SM_isRead = false;
         static byte ppu2007SM_writeValue = 0;
-        static bool ppu2007SM_bufferLate = false; // alignment: buffer updated at state 4 instead of 1
+        static bool ppu2007SM_bufferLate = false;
 
         // $2000 delayed control update (TriCNES: PPU_Update2000Delay, 1-2 PPU cycles)
         // NMI enable is immediate; pattern table/sprite size delayed
@@ -588,11 +591,10 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_step_common(out int cx, out bool renderingEnabled)
         {
-            // $2007 state machine (TriCNES model) — PLACEHOLDER
-            // Full implementation requires refactoring MEM.cs ppu_read_fun/ppu_write_fun lambdas
-            // to separate raw VRAM access from $2007 register behavior (buffer swap, increment).
-            // Current lambdas embed the entire $2007 read/write logic inline.
-            // TODO: Extract raw VRAM read into separate functions, then wire state machine.
+            // $2007 read cooldown
+            if (ppu2007ReadCooldown > 0) ppu2007ReadCooldown--;
+
+            // $2007 state machine — PLACEHOLDER (requires MEM.cs lambda refactor)
 
             // $2006 delayed t→v copy
             if (ppu2006UpdateDelay > 0 && --ppu2006UpdateDelay == 0)
@@ -743,7 +745,9 @@ namespace AprNes
                         int scanOff = scanline << 8;
                         int* bgp = Buffer_BG_array + scanOff;
                         for (int* bge = bgp + 256; bgp < bge; bgp++) *bgp = 0;
-                        if (!ppuRenderingEnabled)
+                        // Always fill backdrop: per-dot rendering overwrites active BG pixels,
+                        // but dots where rendering is disabled mid-scanline ($2001 toggle)
+                        // must show backdrop, not stale data from the previous frame.
                         {
                             uint bgColor = NesColors[ppu_ram[0x3f00] & 0x3f];
                             uint* sp = ScreenBuf1x + scanOff;
@@ -1500,11 +1504,10 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ppu_r_2007()
         {
-            // Existing lambdas in ppu_read_fun handle buffer swap + fill + increment + openbus.
-            // State machine handles deferred increment timing — remove Increment2007 from lambdas
-            // and let state machine do it at state 4.
-            // For now, delegate to existing lambdas (which still do everything).
+            if (ppu2007ReadCooldown > 0)
+                return openbus; // suppress rapid consecutive $2007 reads
             byte result = ppu_read_fun[vram_addr](vram_addr);
+            ppu2007ReadCooldown = 6;
             return result;
         }
 
