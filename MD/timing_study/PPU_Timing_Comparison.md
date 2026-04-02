@@ -494,8 +494,13 @@
 - **影響**：mystery write（RMW 指令讀 $2007）和 back-to-back $2007 access 精度
 - **現行保持**：原有 lambda 行為（立即 buffer + increment），cooldown 已移除
 
+### 2026-04-02 — feature/ppu-high-precision: per-dot sprite compositing（`d114be8`）
+- **修正**：RenderSpritesLine 移至 cx==0（填 sprite buffer），Pass 3 compositing 移至 half-step per-dot
+- Static sprite buffers（sprLineBuf/Pri/Set/PalIdx）取代 stackalloc
+- NTSC DecodeScanline 在 cx==255 half-step 觸發
+- **測試**：174/174 blargg PASS，SMB3 畫面正常
+
 ### 後續方向（大型改造）
 - [ ] MEM.cs ppu_read_fun/ppu_write_fun 重構（分離 raw VRAM read 與 $2007 register 行為）
 - [ ] $2007 state machine 完整實作（依賴上述重構）
-- [ ] per-dot sprite compositing（RenderSpritesLine batch → half-step per-dot 合成）
 - [ ] 排查 AC Page 19 regression（精確 bisect $2000/$2001/$2006 各別影響）
