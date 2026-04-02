@@ -1579,6 +1579,12 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ppu_r_2007()
         {
+            // Back-to-back $2007 read: if SM still running, return openbus
+            // SM ticks 2x per dot (full+half), 3 dots/CPU = 6 ticks/CPU cycle.
+            // Need threshold ~12 (≈2 CPU cycles) to match hardware cooldown behavior.
+            if (ppu2007SM < 9)
+                return openbus;
+
             int addr = vram_addr & 0x3FFF;
             byte result;
 
@@ -1594,19 +1600,13 @@ namespace AprNes
             }
 
             // Snapshot address for SM buffer update, then increment immediately
-            // (deferred increment breaks games/tests that read consecutive $2007 addresses)
             ppu2007SM_addr = vram_addr;
-            Increment2007(); // immediate — vram_addr advances for next access
+            Increment2007();
 
-            // Start state machine for buffer update only
+            // Start state machine for deferred buffer update
             ppu2007SM_isRead = true;
-            if (ppu2007SM >= 9)
-            {
-                ppu2007SM = 0;
-                ppu2007SM_bufferLate = (ppu_cycles_x % 3 <= 1);
-            }
-            else
-                ppu2007SM = 0;
+            ppu2007SM = 0;
+            ppu2007SM_bufferLate = (ppu_cycles_x % 3 <= 1);
 
             openbus = result;
             open_bus_decay_timer = 77777;
