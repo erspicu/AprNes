@@ -22,14 +22,19 @@ namespace AprNes
         static bool spriteDmaTransfer = false;  // OAM DMA in progress
         static byte spriteDmaOffset = 0;        // OAM source page ($4014 value)
 
-        // Master Clock timing
+        // Master Clock timing (TriCNES model: per-master-clock execution)
         // NTSC: 21,477,272.73 Hz — CPU = master ÷ 12, PPU = master ÷ 4 (3:1)
         // PAL:  26,601,714 Hz   — CPU = master ÷ 16, PPU = master ÷ 5 (3.2:1)
-        // masterPerCpu / masterPerPpu are set by ApplyRegionProfile() in Main.cs
-        static long masterClock = 7 * 12; // calibrated: 7 boot CPU cycles worth
-        static long cpuCycleCount = 7;    // derived: masterClock / masterPerCpu
-        static long ppuClock = 7 * 12;    // PPU catch-up position (master clock units)
-        static long apuClock = 7 * 12 - 4; // APU catch-up position (4 MCU behind → fires in tick_pre)
+        static long masterClock = 7 * 12;
+        static long cpuCycleCount = 7;
+        static long ppuClock = 7 * 12;    // legacy catch-up position (kept during refactor)
+        static long apuClock = 7 * 12 - 4;
+
+        // Per-master-clock dividers (TriCNES: CPUClock/PPUClock countdown timers)
+        // Count DOWN to 0, component executes when counter reaches 0, then resets.
+        static int mcCpuClock = 12;   // CPU: 12→0 (execute at 0, reset to 12) [NTSC]
+        static int mcPpuClock = 4;    // PPU: 4→0 (full step at 0, half step at 2) [NTSC]
+        static bool mcApuPutCycle = false; // M2 phase (toggles every APU/CPU step)
 
         // ── Region-specialized catchUpPPU versions ──
         // Each hardcodes masterPerPpu and step count for JIT constant folding.
