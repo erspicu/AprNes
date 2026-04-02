@@ -612,14 +612,14 @@ namespace AprNes
                 if (strobeWritePending > 0) processStrobeWrite();
             }
 
-            // ── NMI promotion at CPUClock == 8 (TriCNES) ──
+            // ── NMI promotion at CPUClock == 8 ──
             if (mcCpuClock == 8)
             {
                 if (nmi_delay_cycle >= 0 && cpuCycleCount > nmi_delay_cycle)
                 { nmi_pending = true; nmi_delay_cycle = -1; }
             }
 
-            // ── IRQ + Mapper M2 rise at CPUClock == 5 (TriCNES) ──
+            // ── Mapper M2 rise at CPUClock == 5 ──
             if (mcCpuClock == 5)
             {
                 if (!isFDS) MapperObj.CpuClockRise();
