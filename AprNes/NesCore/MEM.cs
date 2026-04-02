@@ -158,17 +158,39 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void StartCpuCycle()
         {
-            irqLinePrev = irqLineCurrent; // save BEFORE any mutations in this cycle
+            irqLinePrev = irqLineCurrent;
             masterClock += masterPerCpu;
             cpuCycleCount++;
             m2PhaseIsWrite = (cpuCycleCount & 1) != 0;
 
             if (nmi_delay_cycle >= 0 && cpuCycleCount > nmi_delay_cycle)
             { nmi_pending = true; nmi_delay_cycle = -1; }
-            if (regionMode == 0)      catchUpPPU_ntsc();
-            else if (regionMode == 1) catchUpPPU_pal();
-            else                      catchUpPPU_dendy();
-            catchUpAPU();
+
+            // Per-master-clock: run 12 ticks (NTSC) of PPU/APU gates
+            // (CPU gate is skipped — CPU is already executing via CpuRead/CpuWrite caller)
+            if (regionMode == 0)
+            {
+                for (int t = 0; t < 12; t++)
+                {
+                    if (mcPpuClock == 0)
+                    {
+                        mcPpuClock = 4;
+                        ppu_step_ntsc();
+                        bool o = isVblank && NMIable;
+                        if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount;
+                        nmi_output_prev = o;
+                    }
+                    if (mcPpuClock == 2)
+                        ppu_half_step();
+                    mcPpuClock--;
+                }
+                apu_step();
+                mcApuPutCycle = !mcApuPutCycle;
+            }
+            else if (regionMode == 1) catchUpPPU_pal();  // PAL: keep old model for now
+            else                      catchUpPPU_dendy(); // Dendy: keep old model for now
+
+            if (regionMode != 0) catchUpAPU(); // non-NTSC still uses old APU catch-up
             if (strobeWritePending > 0) processStrobeWrite();
         }
 

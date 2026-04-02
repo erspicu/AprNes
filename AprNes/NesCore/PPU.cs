@@ -1674,7 +1674,7 @@ namespace AprNes
             ppu2007SM_addr = vram_addr;
             ppu2007SM_isRead = true;
             ppu2007SM = 0;
-            ppu2007SM_bufferLate = (ppuAlignPhase <= 1);
+            ppu2007SM_bufferLate = ((mcPpuClock & 3) <= 1);
 
             openbus = result;
             open_bus_decay_timer = 77777;
@@ -1739,12 +1739,12 @@ namespace AprNes
             prevRenderingEnabled = newRenderingInstant;
 
             // Tier 2: Delayed mask flags (ShowBG/ShowSprites/Left8)
-            ppu2001UpdateDelay = (ppuAlignPhase == 2) ? 3 : 2;
+            ppu2001UpdateDelay = ((mcPpuClock & 3) == 2) ? 3 : 2;
             ppu2001PendingValue = value;
 
             // Emphasis bits: independent delay (TriCNES: PPU_Update2001EmphasisBitsDelay)
             // Alignment 0,3: 2 cycles; Alignment 1,2: 1 cycle
-            ppu2001EmphasisDelay = (ppuAlignPhase == 0 || ppuAlignPhase == 3) ? 2 : 1;
+            ppu2001EmphasisDelay = ((mcPpuClock & 3) == 0 || (mcPpuClock & 3) == 3) ? 2 : 1;
             ppu2001EmphasisPending = value;
         }
 
@@ -1822,7 +1822,7 @@ namespace AprNes
             ppu2005PendingIsSecond = vram_latch;
             // TriCNES: alignment 0,1,3=1cycle; alignment 2=2cycles
             // TriCNES: case 0,3=1cycle; case 1,2=2cycles
-            ppu2005UpdateDelay = (ppuAlignPhase == 1 || ppuAlignPhase == 2) ? 2 : 1;
+            ppu2005UpdateDelay = ((mcPpuClock & 3) == 1 || (mcPpuClock & 3) == 2) ? 2 : 1;
             vram_latch = !vram_latch;
         }
         static void ppu_w_2006(byte value)
@@ -1839,7 +1839,7 @@ namespace AprNes
                 ppu2006PendingAddr = vram_addr_internal;
                 // TriCNES: alignment 0,1,3=4cycles; alignment 2=5cycles
                 // TriCNES: case 0,3=4cycles; case 1,2=5cycles
-                ppu2006UpdateDelay = (ppuAlignPhase == 1 || ppuAlignPhase == 2) ? 5 : 4;
+                ppu2006UpdateDelay = ((mcPpuClock & 3) == 1 || (mcPpuClock & 3) == 2) ? 5 : 4;
             }
             vram_latch = !vram_latch;
         }
