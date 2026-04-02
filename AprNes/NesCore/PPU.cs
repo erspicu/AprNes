@@ -1533,8 +1533,9 @@ namespace AprNes
                 nmi_output_prev = false;
             }
 
-            // Delayed: pattern table addresses, sprite size (TriCNES: PPU_Update2000Delay = 1-2)
-            ppu2000UpdateDelay = 2;
+            // Delayed: pattern table addresses, sprite size
+            // TriCNES: alignment 0,1=2cycles; alignment 2,3=1cycle
+            ppu2000UpdateDelay = (ppu_cycles_x % 3 == 2) ? 1 : 2;
             ppu2000PendingValue = value;
         }
 
@@ -1570,8 +1571,8 @@ namespace AprNes
             prevRenderingEnabled = newRenderingInstant;
 
             // Tier 2: Delayed flags — applied after 2-3 PPU cycles
-            // (ShowBackGround, ShowSprites, ShowBgLeft8, ShowSprLeft8)
-            ppu2001UpdateDelay = 2; // TriCNES: 2-3 cycles depending on alignment
+            // TriCNES: alignment 0,1,3=2cycles; alignment 2=3cycles
+            ppu2001UpdateDelay = (ppu_cycles_x % 3 == 2) ? 3 : 2;
             ppu2001PendingValue = value;
         }
 
@@ -1647,7 +1648,8 @@ namespace AprNes
             // Delayed scroll update (TriCNES: PPU_Update2005Delay = 1-2 cycles)
             ppu2005PendingValue = value;
             ppu2005PendingIsSecond = vram_latch;
-            ppu2005UpdateDelay = 2; // ~2 PPU dots delay
+            // TriCNES: alignment 0,1,3=1cycle; alignment 2=2cycles
+            ppu2005UpdateDelay = (ppu_cycles_x % 3 == 2) ? 2 : 1;
             vram_latch = !vram_latch;
         }
         static void ppu_w_2006(byte value)
@@ -1662,9 +1664,8 @@ namespace AprNes
                 // In AprNes's tick-before-write model, 3 PPU dots of the current CPU cycle
                 // have already executed, so a delay of 3 more gives ~5-6 total from cycle start.
                 ppu2006PendingAddr = vram_addr_internal;
-                // TriCNES: 4-5 cycles depending on CPU/PPU alignment
-                // (cases 0,1,3: 4 cycles; case 2: 5 cycles)
-                ppu2006UpdateDelay = 4;
+                // TriCNES: alignment 0,1,3=4cycles; alignment 2=5cycles
+                ppu2006UpdateDelay = (ppu_cycles_x % 3 == 2) ? 5 : 4;
             }
             vram_latch = !vram_latch;
         }
