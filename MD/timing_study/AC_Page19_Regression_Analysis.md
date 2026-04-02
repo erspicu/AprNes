@@ -59,9 +59,11 @@
 - 四層 flag 系統改變了 ShowBgLeft8/ShowSprLeft8 的生效時機
 - 可能影響 rendering enable 狀態下的 t register 更新
 
-## 最可能的根因
+## Bisect 結果
 
-**$2006 delay 3→4（假設 1 或 2）** — 因為這是最後一個非文件變更的 commit，且 $2006 的 t→v copy 延遲直接影響 vram_addr 相關的 BG fetch 行為。
+- **$2006 delay 3/4 → 4/5**：改回 3/4 仍 135/136 → **排除 $2006**
+- 根因在 $2000 delay 或 $2001 四層 flag 系統（或兩者組合）
+- 需要進一步 bisect $2000 delay 和 $2001 delay 各別影響
 
 ## 修復方向（後續）
 
