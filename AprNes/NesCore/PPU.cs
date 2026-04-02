@@ -458,8 +458,12 @@ namespace AprNes
                     // Reload per-dot render shift registers (keep old high byte, load new low)
                     renderLow  = (ushort)((renderLow  & 0xFF00) | lowTile);
                     renderHigh = (ushort)((renderHigh & 0xFF00) | highTile);
-                    // Update attribute latch for per-dot shift-in (TriCNES: PPU_AttributeLatchRegister)
-                    attrLatch = (byte)(bg_attr_p2 & 3);
+                    // Attribute: parallel load low 8 bits (hardware loads in parallel, not serial)
+                    // TriCNES sets latch at phase 3 + shifts gradually; pre-fill is equivalent
+                    byte atL = (byte)(bg_attr_p2 & 1);
+                    byte atH = (byte)((bg_attr_p2 >> 1) & 1);
+                    renderAttrLow  = (ushort)((renderAttrLow  & 0xFF00) | (atL != 0 ? 0xFF : 0x00));
+                    renderAttrHigh = (ushort)((renderAttrHigh & 0xFF00) | (atH != 0 ? 0xFF : 0x00));
                     // Sync sprite 0 shadow registers
                     lowshift_s0  = (ushort)((lowshift_s0  & 0xFF00) | lowTile);
                     highshift_s0 = (ushort)((highshift_s0 & 0xFF00) | highTile);
@@ -607,13 +611,11 @@ namespace AprNes
                 int bgPixel = ((renderLow >> bit) & 1) | (((renderHigh >> bit) & 1) << 1);
                 int attrBits = ((renderAttrLow >> bit) & 1) | (((renderAttrHigh >> bit) & 1) << 1);
 
-                // Shift left by 1 (TriCNES model)
-                // Pattern: serial-in 0 for low, 1 for high
-                // Attribute: serial-in from attrLatch bits (NOT 0)
+                // Shift left by 1 (serial-in: pattern low=0, high=1; attribute=0)
                 renderLow  <<= 1;
                 renderHigh = (ushort)((renderHigh << 1) | 1);
-                renderAttrLow  = (ushort)((renderAttrLow << 1) | (attrLatch & 1));
-                renderAttrHigh = (ushort)((renderAttrHigh << 1) | ((attrLatch >> 1) & 1));
+                renderAttrLow  <<= 1;
+                renderAttrHigh <<= 1;
 
                 bool masked = !ShowBgLeft8 && cx < 8;
                 int slot = (scanline << 8) + cx;
