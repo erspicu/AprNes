@@ -180,10 +180,7 @@ namespace AprNes
         static void apuSoftReset()
         {
             apucycle = 0;
-            masterClock = 7 * masterPerCpu; // calibrated: 7 boot CPU cycles
             cpuCycleCount = 7;
-            ppuClock = 7 * masterPerCpu;
-            apuClock = 7 * masterPerCpu - (Region == RegionType.PAL ? 5 : 4);
 
             // Re-apply last $4017 value (nesdev: "at reset, $4017 rewritten with last value")
             ctrmode    = ((last4017Val & 0x80) != 0) ? 5 : 4;
@@ -331,10 +328,7 @@ namespace AprNes
             framectrdiv = (Region == RegionType.PAL) ? 8305 : 7449;
             irqAssertCycles = 0;
             apucycle    = 0;
-            masterClock = 7 * masterPerCpu; // calibrated: 7 boot CPU cycles
             cpuCycleCount = 7;
-            ppuClock = 7 * masterPerCpu;
-            apuClock = 7 * masterPerCpu - (Region == RegionType.PAL ? 5 : 4);
             framectr = 0; ctrmode = 4;
 
             // 聲道計時器重置

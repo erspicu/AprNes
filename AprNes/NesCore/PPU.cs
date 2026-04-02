@@ -205,12 +205,7 @@ namespace AprNes
         static bool ppuRenderingEnabled = false; // Tier 3: Delayed rendering enable (end of PPU dot)
         static bool ppuRenderingEnabled_EvalDelay = false; // Tier 4: 1 extra cycle delay for sprite evaluation (TriCNES: _Delayed)
 
-        // CPU/PPU alignment phase (0-3, like TriCNES PPUClock & 3)
-        // GLOBAL state — constant within a frame, only changes on odd frame skip (+1).
-        // In NTSC: 12 master clocks/CPU cycle, 4 master clocks/PPU dot → 12%4=0 → same phase per frame.
-        // Odd frame skip shifts by 1 PPU dot (4 master clocks) → phase toggles.
-        // NOT per-dot increment (that was wrong — would cycle through all 4 phases every 4 dots).
-        static int ppuAlignPhase = 0;
+        // CPU/PPU alignment: use (mcPpuClock & 3) from master clock divider
         static bool nmi_output_prev = false;  // NMI edge detection: previous NMI output level
         static long nmi_delay_cycle = -1;     // CPU cycle that detected NMI edge (-1 = inactive)
                                               // Promotes to nmi_pending when cpuCycleCount > nmi_delay_cycle
@@ -772,8 +767,6 @@ namespace AprNes
             // renderingEnabled uses _Instant flags (Tier 1) for core PPU state
             // (odd frame skip, vram increment, tile fetch control, etc.)
             renderingEnabled = ShowBackGround_Instant || ShowSprites_Instant;
-            // ppuAlignPhase is NOT incremented per-dot — it's a global frame-level state
-            // that only changes on odd frame skip (see ppu_step_ntsc odd frame logic)
             cx = ppu_cycles_x;
 
             // At dot 0 of visible scanlines: precompute sprite 0 data for hit detection.
@@ -980,8 +973,7 @@ namespace AprNes
                 oddSwap = !oddSwap;
                 if (!oddSwap && (ShowBackGround_Instant || ShowSprites_Instant))
                 {
-                    // Odd frame skip: shifts CPU/PPU alignment by 1 phase
-                    ppuAlignPhase = (ppuAlignPhase + 1) & 3;
+                    // Odd frame skip: mcPpuClock naturally shifts alignment
                     if (mmc5Ref != null)
                         mmc5Ref.NotifyVramRead(0x2000 | (vram_addr & 0x0FFF));
                     ppu_cycles_x = ++cx;

@@ -25,79 +25,17 @@ namespace AprNes
         // Master Clock timing (TriCNES model: per-master-clock execution)
         // NTSC: 21,477,272.73 Hz — CPU = master ÷ 12, PPU = master ÷ 4 (3:1)
         // PAL:  26,601,714 Hz   — CPU = master ÷ 16, PPU = master ÷ 5 (3.2:1)
-        static long masterClock = 7 * 12;
         static long cpuCycleCount = 7;
-        static long ppuClock = 7 * 12;    // legacy catch-up position (kept during refactor)
-        static long apuClock = 7 * 12 - 4;
 
         // Per-master-clock dividers (TriCNES: CPUClock/PPUClock countdown timers)
         // Count DOWN to 0, component executes when counter reaches 0, then resets.
         static int mcCpuClock = 12;   // CPU: 12→0 (execute at 0, reset to 12) [NTSC]
         static int mcPpuClock = 0;    // PPU: 4→0 (full step at 0, half step at 2)
         static bool mcApuPutCycle = false; // M2 phase (toggles every APU/CPU step)
-        static bool inMasterTick = false;  // true when inside MasterClockTick's CPU gate
 
-        // ── Per-master-clock execution (TriCNES _EmulatorCore model) ──
-        // Called once per master clock tick. Gates CPU/PPU/APU by countdown timers.
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void EmulatorCoreTick_NTSC()
-        {
-            // CPU gate: execute one cycle at countdown == 0
-            if (mcCpuClock == 0)
-            {
-                mcCpuClock = 12;
-                cpuCycleCount++;
-                irqLinePrev = irqLineCurrent;
-                m2PhaseIsWrite = (cpuCycleCount & 1) != 0;
-
-                // NMI promotion (TriCNES: at CPUClock==8, but we do it at CPU execution time
-                // since we don't tick between individual master clocks within catch-up)
-                if (nmi_delay_cycle >= 0 && cpuCycleCount > nmi_delay_cycle)
-                { nmi_pending = true; nmi_delay_cycle = -1; }
-
-                cpu_step_one_cycle();
-
-                if (!isFDS) MapperObj.CpuCycle();
-                else fds_CpuCycle();
-
-                // APU runs at same rate as CPU (every 12 master clocks)
-                apu_step();
-                mcApuPutCycle = !mcApuPutCycle;
-
-                if (strobeWritePending > 0) processStrobeWrite();
-            }
-
-            // PPU full step: execute one dot at countdown == 0
-            if (mcPpuClock == 0)
-            {
-                mcPpuClock = 4;
-                ppu_step_ntsc();
-                // NMI edge detection after each PPU step
-                bool o = isVblank && NMIable;
-                if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount;
-                nmi_output_prev = o;
-            }
-
-            // PPU half step: at countdown == 2 (mid-dot)
-            if (mcPpuClock == 2)
-            {
-                ppu_half_step();
-            }
-
-            // Decrement counters
-            mcCpuClock--;
-            mcPpuClock--;
-        }
-
-        // Legacy catch-up functions REMOVED — replaced by per-master-clock gates in StartCpuCycle
-
-        // --- M2 Phase Split (Mesen2 model) ---
-        // StartCpuCycle: full cycle advance (CC++, NMI promote, PPU, APU, IRQ)
-        // Same content as old tick_pre, kept as single unit to preserve timing.
-        // The key change is ProcessPendingDma moving BEFORE StartCpuCycle in Mem_r/ZP_r.
-        // StartCpuCycle: only used by DMA stolen cycles (inside ProcessPendingDma)
-        // Normal CPU cycles are driven by MasterClockTick — CpuRead/CpuWrite don't call this.
-        // DMA needs to advance PPU for each stolen cycle (PPU-only, no mcCpuClock touch).
+        // StartCpuCycle: ONLY used by DMA stolen cycles (ProcessPendingDma)
+        // Normal CPU cycles driven by MasterClockTick in Main.cs
+        // Advances PPU for one CPU cycle but does NOT touch mcCpuClock
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void StartCpuCycle()
         {
