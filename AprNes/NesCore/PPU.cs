@@ -351,10 +351,10 @@ namespace AprNes
         // these shift left by 1 each half-step for per-dot pixel output.
         // Reloaded at phase 7 (same data as main shift registers).
         static ushort renderLow = 0, renderHigh = 0;
-        // Per-dot attribute shift: 2 bits per pixel, shifted alongside render registers
+        // Per-dot attribute shift: shifted alongside render registers, serial-in from latch
         static ushort renderAttrLow = 0, renderAttrHigh = 0;
-        // Attribute latch loaded at phase 7 for next tile
-        static byte attrLatchLow = 0, attrLatchHigh = 0;
+        // Attribute latch: 2-bit value from which bits are shifted in (TriCNES: PPU_AttributeLatchRegister)
+        static byte attrLatch = 0; // bits [1:0] = palette high bits for next tile
 
         // ---- Per-dot shifted BG registers for sprite 0 hit (serial in: 0=low, 1=high) ----
         static ushort lowshift_s0 = 0, highshift_s0 = 0;
@@ -458,11 +458,8 @@ namespace AprNes
                     // Reload per-dot render shift registers (keep old high byte, load new low)
                     renderLow  = (ushort)((renderLow  & 0xFF00) | lowTile);
                     renderHigh = (ushort)((renderHigh & 0xFF00) | highTile);
-                    // Reload attribute shift registers: fill low 8 bits from next-tile attribute
-                    byte atL = (byte)(bg_attr_p2 & 1);
-                    byte atH = (byte)((bg_attr_p2 >> 1) & 1);
-                    renderAttrLow  = (ushort)((renderAttrLow  & 0xFF00) | (atL != 0 ? 0xFF : 0x00));
-                    renderAttrHigh = (ushort)((renderAttrHigh & 0xFF00) | (atH != 0 ? 0xFF : 0x00));
+                    // Update attribute latch for per-dot shift-in (TriCNES: PPU_AttributeLatchRegister)
+                    attrLatch = (byte)(bg_attr_p2 & 3);
                     // Sync sprite 0 shadow registers
                     lowshift_s0  = (ushort)((lowshift_s0  & 0xFF00) | lowTile);
                     highshift_s0 = (ushort)((highshift_s0 & 0xFF00) | highTile);
@@ -610,11 +607,13 @@ namespace AprNes
                 int bgPixel = ((renderLow >> bit) & 1) | (((renderHigh >> bit) & 1) << 1);
                 int attrBits = ((renderAttrLow >> bit) & 1) | (((renderAttrHigh >> bit) & 1) << 1);
 
-                // Shift left by 1 (serial-in: 0 for low plane, 1 for high plane — TriCNES model)
+                // Shift left by 1 (TriCNES model)
+                // Pattern: serial-in 0 for low, 1 for high
+                // Attribute: serial-in from attrLatch bits (NOT 0)
                 renderLow  <<= 1;
-                renderHigh = (ushort)((renderHigh << 1) | 1); // high plane serial-in = 1
-                renderAttrLow  <<= 1;
-                renderAttrHigh <<= 1;
+                renderHigh = (ushort)((renderHigh << 1) | 1);
+                renderAttrLow  = (ushort)((renderAttrLow << 1) | (attrLatch & 1));
+                renderAttrHigh = (ushort)((renderAttrHigh << 1) | ((attrLatch >> 1) & 1));
 
                 bool masked = !ShowBgLeft8 && cx < 8;
                 int slot = (scanline << 8) + cx;
@@ -646,14 +645,7 @@ namespace AprNes
                     }
                 }
             }
-            else
-            {
-                // Rendering disabled: still shift registers (serial-in behavior)
-                renderLow <<= 1;
-                renderHigh = (ushort)((renderHigh << 1) | 1);
-                renderAttrLow <<= 1;
-                renderAttrHigh <<= 1;
-            }
+            // TriCNES: shift registers do NOT shift when rendering is disabled
 
             // End of visible scanline: trigger NTSC decode and reset sprite buffer
             if (cx == 255)
@@ -1668,7 +1660,8 @@ namespace AprNes
 
             // Delayed: pattern table addresses, sprite size
             // TriCNES: alignment 0,1=2cycles; alignment 2,3=1cycle
-            ppu2000UpdateDelay = (ppuAlignPhase == 2) ? 1 : 2;
+            // TriCNES: case 0,1=2cycles; case 2,3=1cycle
+            ppu2000UpdateDelay = (ppuAlignPhase <= 1) ? 2 : 1;
             ppu2000PendingValue = value;
         }
 
@@ -1783,7 +1776,8 @@ namespace AprNes
             ppu2005PendingValue = value;
             ppu2005PendingIsSecond = vram_latch;
             // TriCNES: alignment 0,1,3=1cycle; alignment 2=2cycles
-            ppu2005UpdateDelay = (ppuAlignPhase == 2) ? 2 : 1;
+            // TriCNES: case 0,3=1cycle; case 1,2=2cycles
+            ppu2005UpdateDelay = (ppuAlignPhase == 1 || ppuAlignPhase == 2) ? 2 : 1;
             vram_latch = !vram_latch;
         }
         static void ppu_w_2006(byte value)
@@ -1799,7 +1793,8 @@ namespace AprNes
                 // have already executed, so a delay of 3 more gives ~5-6 total from cycle start.
                 ppu2006PendingAddr = vram_addr_internal;
                 // TriCNES: alignment 0,1,3=4cycles; alignment 2=5cycles
-                ppu2006UpdateDelay = (ppuAlignPhase == 2) ? 5 : 4;
+                // TriCNES: case 0,3=4cycles; case 1,2=5cycles
+                ppu2006UpdateDelay = (ppuAlignPhase == 1 || ppuAlignPhase == 2) ? 5 : 4;
             }
             vram_latch = !vram_latch;
         }
