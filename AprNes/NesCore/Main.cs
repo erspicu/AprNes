@@ -290,7 +290,7 @@ namespace AprNes
             ppu_cycles_x = 0; scanline = -1; frame_count = 0;
             oddSwap = false; ppuRenderingEnabled = false; prevRenderingEnabled = false;
             ppuAlignPhase = 0; ppuRenderingEnabled_EvalDelay = false;
-            mcCpuClock = 12; mcPpuClock = 4; mcApuPutCycle = false;
+            mcCpuClock = 12; mcPpuClock = 0; mcApuPutCycle = false; // 0 = PPU fires immediately on first tick
             spr_ram_add = 0;
 
             // PPU tile pipeline

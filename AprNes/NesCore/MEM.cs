@@ -104,53 +104,28 @@ namespace AprNes
             cpuCycleCount++;
             m2PhaseIsWrite = (cpuCycleCount & 1) != 0;
 
-            // Per-master-clock: run masterPerCpu ticks with TriCNES-style event ordering
-            // TriCNES _EmulatorCore order per tick:
-            //   CPUClock==0:  CPU (already executed by caller)
-            //   CPUClock==8:  NMI promotion
-            //   PPUClock==0:  PPU full step
-            //   PPUClock==2:  PPU half step
-            //   CPUClock==5:  IRQ check + mapper rise
-            //   CPUClock==12: APU step
-            int ticks = masterPerCpu; // NTSC=12, PAL=16, Dendy=15
-            int mcCpu = ticks; // CPU clock countdown (starts at masterPerCpu, counts down)
+            // NMI promotion (checked before CPU memory access)
+            if (nmi_delay_cycle >= 0 && cpuCycleCount > nmi_delay_cycle)
+            { nmi_pending = true; nmi_delay_cycle = -1; }
+
+            // Per-master-clock PPU/APU ticks (PPU runs before CPU access — catch-up ordering)
+            int ticks = masterPerCpu;
             for (int t = 0; t < ticks; t++)
             {
-                // NMI promotion at CPU clock phase 8 (TriCNES: CPUClock==8)
-                if (mcCpu == 8)
-                {
-                    if (nmi_delay_cycle >= 0 && cpuCycleCount > nmi_delay_cycle)
-                    { nmi_pending = true; nmi_delay_cycle = -1; }
-                }
-
-                // IRQ check + mapper rise at CPU clock phase 5 (TriCNES: CPUClock==5)
-                if (mcCpu == 5)
-                {
-                    if (!isFDS) MapperObj.CpuClockRise();
-                }
-
-                // PPU full step
                 if (mcPpuClock == 0)
                 {
                     mcPpuClock = masterPerPpu;
                     if (regionMode == 0)      ppu_step_ntsc();
                     else if (regionMode == 1) ppu_step_pal();
                     else                      ppu_step_dendy();
-                    // NMI edge detection after each PPU step
                     bool o = isVblank && NMIable;
                     if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount;
                     nmi_output_prev = o;
                 }
-
-                // PPU half step
                 if (mcPpuClock == (masterPerPpu >> 1))
                     ppu_half_step();
-
                 mcPpuClock--;
-                mcCpu--;
             }
-
-            // APU at end of CPU cycle (TriCNES: CPUClock==12, which is start of cycle)
             apu_step();
             mcApuPutCycle = !mcApuPutCycle;
             if (strobeWritePending > 0) processStrobeWrite();
@@ -159,12 +134,8 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void EndCpuCycle()
         {
-            // irqLinePrev saved at start of StartCpuCycle
-            // irqLineCurrent maintained by UpdateIRQLine() at every mutation site
-            if (isFDS)
-                fds_CpuCycle();
-            else
-                MapperObj.CpuCycle();
+            if (isFDS) fds_CpuCycle();
+            else MapperObj.CpuCycle();
         }
 
         // Called at every site that changes statusframeint, apuintflag, statusdmcint, or statusmapperint
