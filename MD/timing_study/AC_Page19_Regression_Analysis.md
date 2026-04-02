@@ -61,9 +61,21 @@
 
 ## Bisect 結果
 
-- **$2006 delay 3/4 → 4/5**：改回 3/4 仍 135/136 → **排除 $2006**
-- 根因在 $2000 delay 或 $2001 四層 flag 系統（或兩者組合）
-- 需要進一步 bisect $2000 delay 和 $2001 delay 各別影響
+- **$2006 delay 4/5 → 3/4**：仍 135/136 → **排除 $2006**
+- **$2000 delay 停用（即時）**：仍 135/136 → **排除 $2000**
+- **$2001 delay 停用（即時）**：仍 135/136 → **排除 $2001**
+- **所有寄存器 delay 都已排除**
+
+## 根因範圍縮小
+
+三個 delay 都不是根因。可能的原因：
+1. per-dot pixel output 架構（RenderBGTile batch → half-step per-dot）
+2. per-dot sprite compositing（RenderSpritesLine 移至 cx==0）
+3. backdrop fill 改為無條件（cx==0 always fill）
+4. half-step tick 改變了某個 timing 精度
+5. $2007 state machine buffer deferred update
+
+TEST_BGSerialIn 是最可能受影響的 test — 它測試 rendering disable/enable 的精確 dot 位置對 shift register 的影響。per-dot 架構改變了 shift register 的 pixel 輸出時機。
 
 ## 修復方向（後續）
 

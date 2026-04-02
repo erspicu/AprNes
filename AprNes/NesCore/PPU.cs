@@ -1675,6 +1675,7 @@ namespace AprNes
             // TriCNES: alignment 0,1,3=2cycles; alignment 2=3cycles
             ppu2001UpdateDelay = (ppu_cycles_x % 3 == 2) ? 3 : 2;
             ppu2001PendingValue = value;
+            ppu2001PendingValue = value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
