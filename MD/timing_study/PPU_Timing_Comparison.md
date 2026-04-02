@@ -486,7 +486,16 @@
 - AC Page 19 regression 分析記錄在 `AC_Page19_Regression_Analysis.md`
 - **測試**：174/174 blargg PASS
 
+### 2026-04-02 — feature/ppu-high-precision: $2007 state machine 評估（placeholder）
+- **結論**：TriCNES 的 9-state $2007 state machine 需要重構 MEM.cs 的 `ppu_read_fun`/`ppu_write_fun` 架構
+- 現有 lambda 將 $2007 register 行為（buffer swap、increment、openbus）嵌入 PPU address dispatch
+- 正確實作需將 raw VRAM access 與 $2007 register 行為分離
+- 已加入變數宣告和 placeholder 註解，待 MEM.cs 重構後啟用
+- **影響**：mystery write（RMW 指令讀 $2007）和 back-to-back $2007 access 精度
+- **現行保持**：原有 lambda 行為（立即 buffer + increment），cooldown 已移除
+
 ### 後續方向（大型改造）
-- [ ] $2007 state machine（9-state，替代簡單 6-dot cooldown，含 mystery write 支援）
+- [ ] MEM.cs ppu_read_fun/ppu_write_fun 重構（分離 raw VRAM read 與 $2007 register 行為）
+- [ ] $2007 state machine 完整實作（依賴上述重構）
 - [ ] per-dot sprite compositing（RenderSpritesLine batch → half-step per-dot 合成）
 - [ ] 排查 AC Page 19 regression（精確 bisect $2000/$2001/$2006 各別影響）

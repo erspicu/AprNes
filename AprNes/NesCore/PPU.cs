@@ -152,7 +152,12 @@ namespace AprNes
         static int vram_addr_internal = 0, vram_addr = 0, scrol_y = 0, FineX = 0;
         static bool vram_latch = false;
         static byte ppu_2007_buffer = 0, ppu_2007_temp = 0;
-        static int ppu2007ReadCooldown = 0; // 6 PPU dots cooldown after $2007 read (Mesen2: _ignoreVramRead)
+        // $2007 state machine (TriCNES model: PPU_Data_StateMachine)
+        // States: 9=idle, 0=access started, 1=buffer update, 3=write+address inc, 4=delayed inc
+        static int ppu2007SM = 9; // 9 = idle
+        static bool ppu2007SM_isRead = false;
+        static byte ppu2007SM_writeValue = 0;
+        static bool ppu2007SM_bufferLate = false; // alignment: buffer updated at state 4 instead of 1
 
         // $2000 delayed control update (TriCNES: PPU_Update2000Delay, 1-2 PPU cycles)
         // NMI enable is immediate; pattern table/sprite size delayed
@@ -564,8 +569,11 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_step_common(out int cx, out bool renderingEnabled)
         {
-            // $2007 read cooldown (suppresses rapid consecutive reads)
-            if (ppu2007ReadCooldown > 0) ppu2007ReadCooldown--;
+            // $2007 state machine (TriCNES model) — PLACEHOLDER
+            // Full implementation requires refactoring MEM.cs ppu_read_fun/ppu_write_fun lambdas
+            // to separate raw VRAM access from $2007 register behavior (buffer swap, increment).
+            // Current lambdas embed the entire $2007 read/write logic inline.
+            // TODO: Extract raw VRAM read into separate functions, then wire state machine.
 
             // $2006 delayed t→v copy
             if (ppu2006UpdateDelay > 0 && --ppu2006UpdateDelay == 0)
@@ -1505,10 +1513,11 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ppu_r_2007()
         {
-            if (ppu2007ReadCooldown > 0)
-                return openbus; // suppress rapid consecutive $2007 reads
+            // Existing lambdas in ppu_read_fun handle buffer swap + fill + increment + openbus.
+            // State machine handles deferred increment timing — remove Increment2007 from lambdas
+            // and let state machine do it at state 4.
+            // For now, delegate to existing lambdas (which still do everything).
             byte result = ppu_read_fun[vram_addr](vram_addr);
-            ppu2007ReadCooldown = 6; // 6 PPU dots ≈ 2 CPU cycles
             return result;
         }
 
@@ -1673,6 +1682,7 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_w_2007(byte value)
         {
+            // Existing lambda handles write + increment
             open_bus_decay_timer = 77777;
             ppu_write_fun[vram_addr](value);
         }
