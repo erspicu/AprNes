@@ -285,6 +285,7 @@ namespace AprNes
             // PPU scan position & frame state
             ppu_cycles_x = 0; scanline = -1; frame_count = 0;
             oddSwap = false; ppuRenderingEnabled = false; prevRenderingEnabled = false;
+            ppuAlignPhase = 0; ppuRenderingEnabled_EvalDelay = false;
             spr_ram_add = 0;
 
             // PPU tile pipeline
