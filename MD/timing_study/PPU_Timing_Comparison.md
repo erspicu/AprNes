@@ -518,7 +518,13 @@
 - **殘留**：double_2007_read（DMC back-to-back $2007，需 SM interrupt 處理）
 - **測試**：173/174 blargg
 
+### 2026-04-02 — feature/ppu-high-precision: $2007 SM immediate write+increment + guard（`e893726`, `46cb68d`）
+- **修正**：write 和 increment 回復即時（deferred 會破壞連續 $2007 存取模式）
+- SM 僅管理 buffer deferred update（state 1/4）
+- 新增 back-to-back read guard：SM < 9 時返回 openbus
+- DMA stolen tick `ppu2007SM = 9` 重置允許 DMA 後的正常讀取
+- **測試**：174/174 blargg PASS（double_2007_read 修復）
+
 ### 後續方向
-- [ ] $2007 SM interrupt（DMC back-to-back $2007 — double_2007_read）
-- [ ] mystery write（RMW 指令 $2007）
+- [ ] mystery write（RMW 指令 $2007 — 極罕見場景）
 - [ ] 排查 AC Page 19 regression
