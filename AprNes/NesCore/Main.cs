@@ -278,7 +278,7 @@ namespace AprNes
             // PPU VRAM address / scroll
             vram_addr_internal = 0; vram_addr = 0; scrol_y = 0; FineX = 0;
             vram_latch = false;
-            ppu_2007_buffer = 0; ppu_2007_temp = 0; ppu2007ReadCooldown = 0;
+            ppu_2007_buffer = 0; ppu_2007_temp = 0; ppu2007SM = 9;
             ppu2006UpdateDelay = 0; ppu2006PendingAddr = 0;
             openbus = 0; open_bus_decay_timer = 77777;
 
