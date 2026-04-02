@@ -197,7 +197,12 @@ namespace AprNes
         static byte spr_ram_add = 0;
 
         static bool oddSwap = false;
-        static bool ppuRenderingEnabled = false; // Delayed rendering enable (Mesen2 model: updated at end of PPU dot)
+        static bool ppuRenderingEnabled = false; // Tier 3: Delayed rendering enable (end of PPU dot)
+        static bool ppuRenderingEnabled_EvalDelay = false; // Tier 4: 1 extra cycle delay for sprite evaluation (TriCNES: _Delayed)
+
+        // CPU/PPU alignment phase (0-3, cycles with PPU dots like TriCNES PPUClock & 3)
+        // Used for alignment-dependent register write delays
+        static int ppuAlignPhase = 0;
         static bool nmi_output_prev = false;  // NMI edge detection: previous NMI output level
         static long nmi_delay_cycle = -1;     // CPU cycle that detected NMI edge (-1 = inactive)
                                               // Promotes to nmi_pending when cpuCycleCount > nmi_delay_cycle
@@ -716,6 +721,7 @@ namespace AprNes
             // renderingEnabled uses _Instant flags (Tier 1) for core PPU state
             // (odd frame skip, vram increment, tile fetch control, etc.)
             renderingEnabled = ShowBackGround_Instant || ShowSprites_Instant;
+            ppuAlignPhase = (ppuAlignPhase + 1) & 3; // 4-phase cycle (TriCNES: PPUClock & 3)
             cx = ppu_cycles_x;
 
             // At dot 0 of visible scanlines: precompute sprite 0 data for hit detection.
@@ -776,7 +782,7 @@ namespace AprNes
                 // Per-dot sprite evaluation (visible scanlines only)
                 if (AccuracyOptA)
                 {
-                    if (scanline >= 0 && scanline < 240 && ppuRenderingEnabled)
+                    if (scanline >= 0 && scanline < 240 && ppuRenderingEnabled_EvalDelay)
                     {
                         // Dots 1-64: clear secondary OAM (write $FF, 2 dots per byte)
                         if (cx >= 1 && cx <= 64)
@@ -852,6 +858,7 @@ namespace AprNes
                 frame_count++;
                 if (AnalogEnabled) { Ntsc_SetFrameCount(frame_count); Crt_SetFrameCount(frame_count); }
             }
+            ppuRenderingEnabled_EvalDelay = ppuRenderingEnabled; // Tier 4: 1-cycle lag from Tier 3
             ppuRenderingEnabled = renderingEnabled;
         }
 
@@ -1601,7 +1608,7 @@ namespace AprNes
             // Start state machine for deferred buffer update
             ppu2007SM_isRead = true;
             ppu2007SM = 0;
-            ppu2007SM_bufferLate = (ppu_cycles_x % 3 <= 1);
+            ppu2007SM_bufferLate = (ppuAlignPhase <= 1);
 
             openbus = result;
             open_bus_decay_timer = 77777;
@@ -1631,7 +1638,7 @@ namespace AprNes
 
             // Delayed: pattern table addresses, sprite size
             // TriCNES: alignment 0,1=2cycles; alignment 2,3=1cycle
-            ppu2000UpdateDelay = (ppu_cycles_x % 3 == 2) ? 1 : 2;
+            ppu2000UpdateDelay = (ppuAlignPhase == 2) ? 1 : 2;
             ppu2000PendingValue = value;
         }
 
@@ -1668,7 +1675,7 @@ namespace AprNes
 
             // Tier 2: Delayed flags — applied after 2-3 PPU cycles
             // TriCNES: alignment 0,1,3=2cycles; alignment 2=3cycles
-            ppu2001UpdateDelay = (ppu_cycles_x % 3 == 2) ? 3 : 2;
+            ppu2001UpdateDelay = (ppuAlignPhase == 2) ? 3 : 2;
             ppu2001PendingValue = value;
             ppu2001PendingValue = value;
         }
@@ -1746,7 +1753,7 @@ namespace AprNes
             ppu2005PendingValue = value;
             ppu2005PendingIsSecond = vram_latch;
             // TriCNES: alignment 0,1,3=1cycle; alignment 2=2cycles
-            ppu2005UpdateDelay = (ppu_cycles_x % 3 == 2) ? 2 : 1;
+            ppu2005UpdateDelay = (ppuAlignPhase == 2) ? 2 : 1;
             vram_latch = !vram_latch;
         }
         static void ppu_w_2006(byte value)
@@ -1762,7 +1769,7 @@ namespace AprNes
                 // have already executed, so a delay of 3 more gives ~5-6 total from cycle start.
                 ppu2006PendingAddr = vram_addr_internal;
                 // TriCNES: alignment 0,1,3=4cycles; alignment 2=5cycles
-                ppu2006UpdateDelay = (ppu_cycles_x % 3 == 2) ? 5 : 4;
+                ppu2006UpdateDelay = (ppuAlignPhase == 2) ? 5 : 4;
             }
             vram_latch = !vram_latch;
         }
