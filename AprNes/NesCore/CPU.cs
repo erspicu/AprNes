@@ -63,24 +63,15 @@ namespace AprNes
         // Each call advances the clock (StartCpuCycle/EndCpuCycle), matching Mem_r/Mem_w behavior.
         // CpuRead also triggers DMA via ProcessPendingDma when dmaNeedHalt is set.
 
+        // Pure bus access — no clock advancement (MasterClockTick handles timing)
+        // DMA gate moved to MasterClockTick CPU gate (TriCNES: DMA check in _6502)
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte CpuRead(ushort addr)
         {
             cpuBusAddr = addr;
-            StartCpuCycle();
-            if (dmaNeedHalt) ProcessPendingDma(addr);
             byte val;
-            if (addr < 0x2000)
-            {
-                val = NES_MEM[addr & 0x7FF];
-                cpubus = val;
-            }
-            else
-            {
-                val = mem_read_fun[addr](addr);
-                if (addr != 0x4015) cpubus = val;
-            }
-            EndCpuCycle();
+            if (addr < 0x2000) { val = NES_MEM[addr & 0x7FF]; cpubus = val; }
+            else { val = mem_read_fun[addr](addr); if (addr != 0x4015) cpubus = val; }
             return val;
         }
 
@@ -88,30 +79,18 @@ namespace AprNes
         static void CpuWrite(ushort addr, byte val)
         {
             cpuBusAddr = addr;
-            StartCpuCycle();
-            // TriCNES line 8758: implicit abort DMA cancelled if delayed by write cycle
-            // "The 1-cycle DMA should not get delayed by a write cycle, rather it just shouldn't occur"
+            // Implicit abort: DMA cancelled on write cycle
             if (dmcImplicitAbortActive && dmaNeedHalt)
-            {
-                dmcImplicitAbortActive = false;
-                dmcDmaRunning = false;
-                dmcNeedDummyRead = false;
-                dmaNeedHalt = false;
-            }
+            { dmcImplicitAbortActive = false; dmcDmaRunning = false; dmcNeedDummyRead = false; dmaNeedHalt = false; }
             cpubus = val;
             mem_write_fun[addr](addr, val);
-            EndCpuCycle();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte CpuReadZP(byte addr)
         {
             cpuBusAddr = addr;
-            StartCpuCycle();
-            if (dmaNeedHalt) ProcessPendingDma(addr);
-            byte val = NES_MEM[addr];
-            cpubus = val;
-            EndCpuCycle();
+            byte val = NES_MEM[addr]; cpubus = val;
             return val;
         }
 
@@ -119,10 +98,7 @@ namespace AprNes
         static void CpuWriteZP(byte addr, byte val)
         {
             cpuBusAddr = addr;
-            StartCpuCycle();
-            NES_MEM[addr] = val;
-            cpubus = val;
-            EndCpuCycle();
+            NES_MEM[addr] = val; cpubus = val;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -557,73 +557,93 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void MasterClockTick()
         {
-            // ── CPU gate: execute one cycle at countdown == 0 ──
+            // ── CPU gate: one CPU cycle at countdown == 0 ──
             // TriCNES: if (CPUClock == 0) { CPUClock = 12; _6502(); }
             if (mcCpuClock == 0)
             {
-                mcCpuClock = masterPerCpu; // NTSC=12, PAL=16, Dendy=15
+                mcCpuClock = masterPerCpu;
 
-                // Interrupt service at instruction boundary (operationCycle == 0)
-                if (operationCycle == 0)
+                // CPU cycle housekeeping (was in StartCpuCycle)
+                irqLinePrev = irqLineCurrent;
+                cpuCycleCount++;
+                m2PhaseIsWrite = (cpuCycleCount & 1) != 0;
+
+                // DMA gate: if DMA pending, steal this cycle (TriCNES: _6502 DMA check)
+                if (dmaNeedHalt || dmcDmaRunning || spriteDmaTransfer)
                 {
-                    if (nmi_pending && !nmi_just_deferred)
+                    DmaOneCycle();
+                }
+                else
+                {
+                    // Interrupt service at instruction boundary
+                    if (operationCycle == 0)
                     {
-                        nmi_pending = false;
-                        doNMI = true;
-                        irq_pending = false;
+                        if (nmi_pending && !nmi_just_deferred)
+                        { nmi_pending = false; doNMI = true; irq_pending = false; }
+                        else if (nmi_just_deferred)
+                            nmi_just_deferred = false;
+                        else if (irq_pending)
+                        { irq_pending = false; doIRQ = true; }
                     }
-                    else if (nmi_just_deferred)
-                        nmi_just_deferred = false;
-                    else if (irq_pending)
+
+                    byte prevFlagI = flagI;
+                    cpu_step_one_cycle();
+
+                    // End-of-instruction processing
+                    if (operationCycle == 0)
                     {
-                        irq_pending = false;
-                        doIRQ = true;
+                        if (opcode == 0x00 && nmi_pending)
+                            nmi_just_deferred = true;
+                        if (opcode != 0x00)
+                        {
+                            byte irqPollI = (opcode == 0x40) ? flagI : prevFlagI;
+                            irq_pending = (irqPollI == 0 && irqLinePrev);
+                        }
                     }
                 }
 
-                byte prevFlagI = flagI;
-                cpu_step_one_cycle(); // single CPU cycle (calls CpuRead/CpuWrite internally)
-
-                // End-of-instruction processing
-                if (operationCycle == 0)
-                {
-                    if (opcode == 0x00 && nmi_pending)
-                        nmi_just_deferred = true;
-                    if (opcode != 0x00)
-                    {
-                        byte irqPollI = (opcode == 0x40) ? flagI : prevFlagI;
-                        irq_pending = (irqPollI == 0 && irqLinePrev);
-                    }
-                }
-
-                // Mapper callback (TriCNES: Cart.MapperChip.CPUClock())
+                // Mapper callback
                 if (!isFDS) MapperObj.CpuCycle();
                 else fds_CpuCycle();
 
-                // APU at CPU rate (inside CPU gate = same tick)
+                // APU
                 apu_step();
                 mcApuPutCycle = !mcApuPutCycle;
                 if (strobeWritePending > 0) processStrobeWrite();
             }
 
-            // ── NMI promotion at CPUClock == 8 ──
+            // ── NMI promotion at CPUClock == 8 (TriCNES) ──
             if (mcCpuClock == 8)
             {
                 if (nmi_delay_cycle >= 0 && cpuCycleCount > nmi_delay_cycle)
                 { nmi_pending = true; nmi_delay_cycle = -1; }
             }
 
-            // ── IRQ + Mapper M2 rise at CPUClock == 5 ──
+            // ── IRQ + Mapper M2 rise at CPUClock == 5 (TriCNES) ──
             if (mcCpuClock == 5)
             {
                 if (!isFDS) MapperObj.CpuClockRise();
             }
 
-            // PPU is driven by StartCpuCycle (called from CpuRead/CpuWrite),
-            // NOT here — avoids double execution when CPU gate fires
+            // ── PPU full step at PPUClock == 0 ──
+            if (mcPpuClock == 0)
+            {
+                mcPpuClock = masterPerPpu;
+                if (regionMode == 0)      ppu_step_ntsc();
+                else if (regionMode == 1) ppu_step_pal();
+                else                      ppu_step_dendy();
+                bool o = isVblank && NMIable;
+                if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount;
+                nmi_output_prev = o;
+            }
 
-            // ── Decrement CPU counter only ──
+            // ── PPU half step ──
+            if (mcPpuClock == (masterPerPpu >> 1))
+                ppu_half_step();
+
+            // ── Decrement all counters ──
             mcCpuClock--;
+            mcPpuClock--;
         }
     }
 

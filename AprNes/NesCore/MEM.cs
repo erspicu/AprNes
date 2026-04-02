@@ -33,8 +33,9 @@ namespace AprNes
         // Per-master-clock dividers (TriCNES: CPUClock/PPUClock countdown timers)
         // Count DOWN to 0, component executes when counter reaches 0, then resets.
         static int mcCpuClock = 12;   // CPU: 12→0 (execute at 0, reset to 12) [NTSC]
-        static int mcPpuClock = 4;    // PPU: 4→0 (full step at 0, half step at 2) [NTSC]
+        static int mcPpuClock = 0;    // PPU: 4→0 (full step at 0, half step at 2)
         static bool mcApuPutCycle = false; // M2 phase (toggles every APU/CPU step)
+        static bool inMasterTick = false;  // true when inside MasterClockTick's CPU gate
 
         // ── Per-master-clock execution (TriCNES _EmulatorCore model) ──
         // Called once per master clock tick. Gates CPU/PPU/APU by countdown timers.
@@ -94,10 +95,9 @@ namespace AprNes
         // StartCpuCycle: full cycle advance (CC++, NMI promote, PPU, APU, IRQ)
         // Same content as old tick_pre, kept as single unit to preserve timing.
         // The key change is ProcessPendingDma moving BEFORE StartCpuCycle in Mem_r/ZP_r.
-        // StartCpuCycle: advance counters + run masterPerCpu ticks of PPU gates
-        // Called from CpuRead/CpuWrite (normal CPU execution + DMA stolen cycles)
-        // MasterClockTick calls cpu_step_one_cycle which calls CpuRead → StartCpuCycle
-        // So StartCpuCycle MUST advance PPU for DMA cycles (which bypass MasterClockTick)
+        // StartCpuCycle: called from CpuRead/CpuWrite for EVERY CPU bus cycle
+        // If inside MasterClockTick CPU gate: minimal (MasterClockTick handles PPU)
+        // If DMA stolen cycle: run masterPerCpu ticks of PPU gates
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void StartCpuCycle()
         {
@@ -105,9 +105,25 @@ namespace AprNes
             cpuCycleCount++;
             m2PhaseIsWrite = (cpuCycleCount & 1) != 0;
 
-            // Run PPU gates for this CPU cycle (masterPerCpu master ticks)
+            // Always advance PPU for this CPU cycle
+            // (MasterClockTick's PPU gates are disabled during CPU gate ticks)
+            RunMasterTicksForOneCpuCycle();
+        }
+
+        // Run masterPerCpu ticks of PPU/NMI/IRQ gates (used by StartCpuCycle for DMA)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void RunMasterTicksForOneCpuCycle()
+        {
             for (int t = 0; t < masterPerCpu; t++)
             {
+                // NMI promotion at CPUClock == 8
+                if (mcCpuClock == 8)
+                {
+                    if (nmi_delay_cycle >= 0 && cpuCycleCount > nmi_delay_cycle)
+                    { nmi_pending = true; nmi_delay_cycle = -1; }
+                }
+
+                // PPU full step
                 if (mcPpuClock == 0)
                 {
                     mcPpuClock = masterPerPpu;
@@ -118,9 +134,13 @@ namespace AprNes
                     if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount;
                     nmi_output_prev = o;
                 }
+
+                // PPU half step
                 if (mcPpuClock == (masterPerPpu >> 1))
                     ppu_half_step();
+
                 mcPpuClock--;
+                mcCpuClock--;
             }
         }
 
@@ -146,6 +166,14 @@ namespace AprNes
 
         // Mesen2-style DMA engine — called from CpuRead when dmaNeedHalt is set
         // Runs ALL DMA cycles in one blocking call (each with Start/EndCpuCycle)
+        // Bridge: called from MasterClockTick CPU gate when DMA is pending
+        // Runs ALL DMA cycles blocking (legacy model — PPU pauses during DMA)
+        // TODO: convert to per-cycle DMA dispatch for true interleaving
+        static void DmaOneCycle()
+        {
+            ProcessPendingDma(cpuBusAddr);
+        }
+
         static void ProcessPendingDma(ushort readAddress)
         {
             if (!dmaNeedHalt && !dmcDmaRunning && !dmcNeedDummyRead && !spriteDmaTransfer && !dmcImplicitAbortPending) return;
