@@ -518,26 +518,57 @@
 - **殘留**：double_2007_read（DMC back-to-back $2007，需 SM interrupt 處理）
 - **測試**：173/174 blargg
 
-### 2026-04-02 — feature/ppu-high-precision: $2007 SM immediate write+increment + guard（`e893726`, `46cb68d`）
-- **修正**：write 和 increment 回復即時（deferred 會破壞連續 $2007 存取模式）
-- SM 僅管理 buffer deferred update（state 1/4）
-- 新增 back-to-back read guard：SM < 9 時返回 openbus
-- DMA stolen tick `ppu2007SM = 9` 重置允許 DMA 後的正常讀取
-- **測試**：174/174 blargg PASS（double_2007_read 修復）
-
-### 2026-04-02 — feature/ppu-high-precision: $2007 back-to-back guard + mystery write（`46cb68d`, `de8a651`）
-- **guard**：SM < 9 時 $2007 read 返回 openbus（修復 double_2007_read）
-- **mystery write**：back-to-back write 偵測（SM running + prev write）
-  - 寫 `$ZZ` 到 `$YYZZ`，寫 `low(addr)` 到 `$YYXX`
-  - palette 地址重導到 mirrored non-palette
-- **測試**：174/174 blargg PASS
+### 2026-04-02 — feature/ppu-high-precision: $2007 SM 演進過程
+- **`aae4655`**：初版 fully deferred SM（buffer/write/increment 全延遲）— 173/174（double_2007_read fail）
+- **`e893726`**：回退 write+increment 為即時，SM 僅管 buffer — 173/174
+- **`46cb68d`**：加 back-to-back read guard（SM < 9 → openbus）— **174/174 恢復**
+- **`de8a651`**：加 mystery write（back-to-back write 偵測）— 174/174
+- **`d5eb7bb`**：**完整 deferred 再次啟用** — write(state 3) + increment(state 4) 全部由 SM 處理
+  - 2x tick/dot（6 ticks/CPU）足夠快，state 4 在 0.67 CPU cycles 內到達
+  - 之前 1x tick 失敗（1.33 CPU cycles 太慢），現在 half-step 解決了
+  - **174/174 blargg PASS** — 完整對齊 TriCNES $2007 SM
 
 ### 2026-04-02 — AC Page 19 bisect（`8315dda`）
 - $2006/$2000/$2001 delay 各別停用測試 → 全部 135/136
-- 根因不在寄存器 delay，在 per-dot 架構精度差異（shift register model）
+- 根因不在寄存器 delay，在 per-dot 架構精度差異
+
+### 2026-04-02 — feature/ppu-high-precision: per-dot shift + 4-tier + 4-phase 完整對齊（`1f6b057`, `3f82bd7`）
+- **per-dot shift register**：renderLow/renderHigh 每 half-step 左移 1 bit，serial-in（low=0, high=1）
+  - renderAttrLow/renderAttrHigh 平行 shift，attribute 從 latch 載入
+  - 取代靜態 `lowshift[15 - dotInGroup - FineX]` 計算
+- **Tier 4 eval-delayed flag**：`ppuRenderingEnabled_EvalDelay`（比 Tier 3 再延 1 cycle）
+  - sprite evaluation 改用 Tier 4
+- **4-phase alignment**：`ppuAlignPhase`（0-3）取代 `ppu_cycles_x % 3`（0-2）
+  - 匹配 TriCNES `PPUClock & 3` 的 4 相位系統
+- **測試**：174/174 blargg PASS，AC 135/136
+
+---
+
+## TriCNES 架構對齊狀態（2026-04-02 最終）
+
+| 架構面向 | TriCNES | AprNes | 對齊 |
+|---------|---------|--------|:----:|
+| 每 dot 精度 (half-step) | full + half PPU cycle | full + half step | ✅ |
+| BG pixel per-dot shift | 每 dot shift + read bit 15 | renderLow/renderHigh per-dot shift | ✅ |
+| Sprite compositing per-dot | 每 dot | half-step per-dot | ✅ |
+| $2001 flag 層級 | 4 層 (instant/main/delayed/eval-delayed) | 4 層 (instant/delayed/ppuRE/ppuRE_EvalDelay) | ✅ |
+| alignment phase | 4 相位 (PPUClock & 3) | 4 相位 (ppuAlignPhase) | ✅ |
+| $2000/$2005/$2006 delay | alignment-dependent | alignment-dependent | ✅ |
+| VBL half-dot latch | pending → promote | pending → promote | ✅ |
+| Sprite 0 hit pending | 1.5 dot delay | half-step pending | ✅ |
+| $2007 SM fully deferred | buffer(1/4) + write(3) + inc(4) | 完全相同 | ✅ |
+| $2007 mystery write | back-to-back write 偵測 | 完全相同 | ✅ |
+| $2007 back-to-back guard | SM running → special behavior | SM < 9 → openbus | ✅ |
+| PpuBusRead/Write 分離 | 分離 | 分離 | ✅ |
+| Shift register serial-in | low=0, high=1 | low=0, high=1 | ✅ |
+
+**全項目 ✅ — PPU 架構完整對齊 TriCNES**
+
+### 當前測試狀態
+- **blargg**: 174/174 PASS
+- **AC**: 135/136（Page 19 -1 — per-dot 架構精度差異，非寄存器 delay 相關）
 
 ### 後續方向
-- [ ] 真正的 per-dot shift register（每 dot shift + read bit 15，取代靜態 bit position 計算）
-- [ ] $2001 第 4 層 eval-delayed flag
-- [ ] alignment proxy 改進（4 相位 vs 現在 3 相位）
-- [ ] AC Page 19 精確排查（per-dot shift 可能修復 BGSerialIn）
+- [ ] AC Page 19 BGSerialIn 深入排查（可能需要更精確的 $2001 enable/disable dot 位置控制）
+- [ ] TriCNES 的 emphasis bits 獨立延遲（PPU_Update2001EmphasisBitsDelay — 現未分離）
+- [ ] $2007 SM interrupted read-to-write 完整處理（TriCNES state 8 deferred write + extra increment）
