@@ -406,16 +406,14 @@ namespace AprNes
         static Action<ushort, byte>[] mem_write_fun = null;
         static Func<ushort, byte>[] mem_read_fun = null;
 
-        static Action<byte>[] ppu_write_fun = null;
-        static Func<int, byte>[] ppu_read_fun = null;
+        // ppu_read_fun/ppu_write_fun removed — replaced by PpuBusRead/PpuBusWrite in PPU.cs
 
         static void init_function()
         {
             mem_write_fun = new Action<ushort, byte>[0x10000];
             mem_read_fun = new Func<ushort, byte>[0x10000];
 
-            ppu_write_fun = new Action<byte>[0x10000];
-            ppu_read_fun = new Func<int, byte>[0x10000];
+            // ppu_write_fun/ppu_read_fun arrays removed (replaced by PpuBusRead/PpuBusWrite)
 
             for (int address = 0; address < 0x10000; address++)
             {
@@ -437,157 +435,8 @@ namespace AprNes
             }
 
 
-            for (int address = 0; address < 0x10000; address++)
-            {
-
-                int vram_addr_wrap = 0;
-                if ((address & 0x3F00) == 0x3F00)
-                {
-
-
-                    vram_addr_wrap = address & 0x2FFF;
-
-                    if (vram_addr_wrap < 0x2000)
-                    {
-                        ppu_read_fun[address] = new Func<int, byte>((val) =>
-                        {
-
-
-                            ppu_2007_temp = ppu_ram[val & ((val & 0x03) == 0 ? 0x0C : 0x1F) + 0x3f00];
-                            ppu_2007_buffer = MapperObj.MapperR_CHR(val & 0x2FFF);
-
-                            ppu_2007_temp = (byte)((openbus & 0xC0) | (ppu_2007_temp & 0x3F));//add openbus fix
-
-                            Increment2007();
-                            openbus = ppu_2007_temp;
-                            open_bus_decay_timer = 77777;//fixed add
-
-                            return openbus;
-                        });
-                    }
-                    else
-                    {
-
-                        ppu_read_fun[address] = new Func<int, byte>((val) =>
-                        {
-                            int nt_addr = val & 0x2FFF;
-                            ppu_2007_temp = ppu_ram[val & ((val & 0x03) == 0 ? 0x0C : 0x1F) + 0x3f00];
-                            if (ntChrOverrideEnabled)
-                                ppu_2007_buffer = ntBankPtrs[(nt_addr >> 10) & 3][nt_addr & 0x3FF];
-                            else
-                                ppu_2007_buffer = ppu_ram[CIRAMAddr(nt_addr)];
-
-                            ppu_2007_temp = (byte)((openbus & 0xC0) | (ppu_2007_temp & 0x3F));//add openbus fix
-
-                            Increment2007();
-                            openbus = ppu_2007_temp;
-                            open_bus_decay_timer = 77777;//fixed add
-                            return openbus;
-                        });
-                    }
-                }
-                else
-                {
-
-                    vram_addr_wrap = address & 0x3FFF;
-
-                    if (vram_addr_wrap < 0x2000)
-                    {
-
-                        ppu_read_fun[address] = new Func<int, byte>((val) =>
-                        {
-                            ppu_2007_temp = ppu_2007_buffer; //need read from buffer
-                            ppu_2007_buffer = MapperObj.MapperR_CHR(val & 0x3FFF);//Pattern Table
-                            Increment2007();
-                            openbus = ppu_2007_temp;
-                            open_bus_decay_timer = 77777;//fixed add
-                            return openbus;
-                        });
-                    }
-                    else if (vram_addr_wrap < 0x3F00)
-                    {
-                        ppu_read_fun[address] = new Func<int, byte>((val) =>
-                        {
-                            int nt_addr = val & 0x2FFF;
-                            ppu_2007_temp = ppu_2007_buffer; //need read from buffer
-                            if (ntChrOverrideEnabled)
-                                ppu_2007_buffer = ntBankPtrs[(nt_addr >> 10) & 3][nt_addr & 0x3FF];
-                            else
-                                ppu_2007_buffer = ppu_ram[CIRAMAddr(nt_addr)]; //Name Table & Attribute Table ($3000-$3EFF mirrors $2000-$2EFF)
-                            Increment2007();
-                            openbus = ppu_2007_temp;
-                            open_bus_decay_timer = 77777;//fixed add
-                            return openbus;
-                        });
-                    }
-                    else
-                    {
-
-                        ppu_read_fun[address] = new Func<int, byte>((val) =>
-                        {
-                            ppu_2007_temp = ppu_2007_buffer; //need read from buffer
-                            int _vram_addr_wrap = val & 0x2FFF;
-                            ppu_2007_buffer = ppu_ram[_vram_addr_wrap & ((_vram_addr_wrap & 0x03) == 0 ? 0x0C : 0x1F) + 0x3f00]; // //Sprite Palette & Image Palette
-                            Increment2007();
-                            openbus = ppu_2007_temp;
-                            open_bus_decay_timer = 77777;//fixed add
-                            return openbus;
-                        });
-
-
-                    }
-                }
-
-            }
-
-
-            for (int address = 0; address < 0x10000; address++)
-            {
-
-                int vram_addr_wrap = 0;
-
-                vram_addr_wrap = address & 0x3FFF;
-                if (vram_addr_wrap < 0x2000)
-                {
-                    ppu_write_fun[address] = new Action<byte>((val) =>
-                    {
-                        int _vram_addr_wrap = vram_addr & 0x3FFF;
-                        openbus = val;
-                        MapperObj.MapperW_CHR(_vram_addr_wrap, val);
-                        Increment2007();
-                    });
-                }
-                else if (vram_addr_wrap < 0x3f00) //Name Table & Attribute Table
-                {
-                    ppu_write_fun[address] = new Action<byte>((val) =>
-                   {
-                       int _vram_addr_wrap = vram_addr & 0x2FFF; // $3000-$3EFF mirrors $2000-$2EFF
-                       openbus = val;
-                       if (ntChrOverrideEnabled)
-                       {
-                           int slot = (_vram_addr_wrap >> 10) & 3;
-                           if (ntBankWritable[slot])
-                               ntBankPtrs[slot][_vram_addr_wrap & 0x3FF] = val;
-                       }
-                       else
-                           ppu_ram[CIRAMAddr(_vram_addr_wrap)] = val;
-                       Increment2007();
-                   });
-                }
-                else
-                {
-                    ppu_write_fun[address] = new Action<byte>((val) =>
-                   {
-                       int _vram_addr_wrap = vram_addr & 0x3FFF;
-                       openbus = val;
-                       ppu_ram[(_vram_addr_wrap & ((_vram_addr_wrap & 0x03) == 0 ? 0x0C : 0x1F)) + 0x3f00] = val; //Sprite Palette & Image Palette
-                       Increment2007();
-                   });
-                }
-
-
-
-            }
+            // PPU bus read/write lambdas removed — replaced by PpuBusRead/PpuBusWrite in PPU.cs
+            // $2007 register behavior (buffer, increment) handled in ppu_r_2007/ppu_w_2007
         }
     }
 }

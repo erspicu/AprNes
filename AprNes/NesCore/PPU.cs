@@ -243,6 +243,52 @@ namespace AprNes
             }
         }
 
+        // ── Raw PPU bus read/write (no $2007 register side effects) ──
+        // Used by ppu_r_2007/ppu_w_2007 and future $2007 state machine.
+        // Tile fetch uses chrBankPtrs/ppu_ram directly (not these functions).
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static byte PpuBusRead(int addr)
+        {
+            addr &= 0x3FFF;
+            if (addr < 0x2000)
+                return MapperObj.MapperR_CHR(addr);
+            if (addr < 0x3F00)
+            {
+                int nt_addr = addr & 0x2FFF;
+                return ntChrOverrideEnabled
+                    ? ntBankPtrs[(nt_addr >> 10) & 3][nt_addr & 0x3FF]
+                    : ppu_ram[CIRAMAddr(nt_addr)];
+            }
+            // Palette ($3F00-$3FFF): mirrored, transparent-mirrored at $3F10/$3F14/$3F18/$3F1C
+            return ppu_ram[(addr & ((addr & 0x03) == 0 ? 0x0C : 0x1F)) + 0x3F00];
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void PpuBusWrite(int addr, byte val)
+        {
+            addr &= 0x3FFF;
+            if (addr < 0x2000)
+            {
+                MapperObj.MapperW_CHR(addr, val);
+                return;
+            }
+            if (addr < 0x3F00)
+            {
+                int nt_addr = addr & 0x2FFF;
+                if (ntChrOverrideEnabled)
+                {
+                    int slot = (nt_addr >> 10) & 3;
+                    if (ntBankWritable[slot])
+                        ntBankPtrs[slot][nt_addr & 0x3FF] = val;
+                }
+                else
+                    ppu_ram[CIRAMAddr(nt_addr)] = val;
+                return;
+            }
+            // Palette
+            ppu_ram[(addr & ((addr & 0x03) == 0 ? 0x0C : 0x1F)) + 0x3F00] = val;
+        }
+
         // $2007 access increment: during rendering → CXinc + Yinc; otherwise → +1/+32
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void Increment2007()
@@ -1506,9 +1552,28 @@ namespace AprNes
         {
             if (ppu2007ReadCooldown > 0)
                 return openbus; // suppress rapid consecutive $2007 reads
-            byte result = ppu_read_fun[vram_addr](vram_addr);
+
+            int addr = vram_addr & 0x3FFF;
+            byte result;
+
+            if (addr >= 0x3F00)
+            {
+                // Palette: direct read (not buffered), but buffer gets underlying nametable data
+                result = (byte)((openbus & 0xC0) | (PpuBusRead(addr) & 0x3F));
+                ppu_2007_buffer = PpuBusRead(addr & 0x2FFF); // buffer reads from mirrored NT
+            }
+            else
+            {
+                // Non-palette: return buffer, fill buffer with new data
+                result = ppu_2007_buffer;
+                ppu_2007_buffer = PpuBusRead(addr);
+            }
+
+            Increment2007();
+            openbus = result;
+            open_bus_decay_timer = 77777;
             ppu2007ReadCooldown = 6;
-            return result;
+            return openbus;
         }
 
         static byte openbus;
@@ -1672,9 +1737,10 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_w_2007(byte value)
         {
-            // Existing lambda handles write + increment
+            openbus = value;
             open_bus_decay_timer = 77777;
-            ppu_write_fun[vram_addr](value);
+            PpuBusWrite(vram_addr, value);
+            Increment2007();
         }
 
         static void ppu_w_4014(byte value)//DMA , fixex 2017.01.16 pass sprite_ram test
