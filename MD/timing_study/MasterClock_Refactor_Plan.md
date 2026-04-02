@@ -208,10 +208,10 @@ static public void run()
 |:-----:|:----:|--------|:------:|------|
 | 1 | ✅ | `f644784` | 174/174 | mcCpuClock/mcPpuClock/mcApuPutCycle 加入 |
 | 2 | ✅ | `8ad749d` | 174/174 | EmulatorCoreTick_NTSC 建立（未啟用） |
-| 3 | ✅ | `6c4ff36` | 169/174 | StartCpuCycle 切換 per-master-clock（-5 NMI/sprite） |
-| 4 | 待做 | | | 移除 legacy catch-up |
-| 5 | 待做 | | | DMA 重構 |
-| 6 | 待做 | | | Mapper CpuClockRise |
+| 3 | ✅ | `6c4ff36` | 169/174 | StartCpuCycle 切換 per-master-clock NTSC（-5 NMI/sprite） |
+| 4 | ✅ | `88105e3` | 166/174 | 刪除 legacy catch-up，全區域 per-master-clock（-84 行） |
+| 5 | ✅ 評估 | — | — | DMA 引擎已在 CpuRead gate，跟 TriCNES 等價，不需大改 |
+| 6 | 待做 | | | Mapper CpuClockRise + NMI timing 調整 |
 
 ---
 
