@@ -354,7 +354,10 @@ namespace AprNes
         // Per-dot attribute shift: shifted alongside render registers, serial-in from latch
         static ushort renderAttrLow = 0, renderAttrHigh = 0;
         // Attribute latch: 2-bit value from which bits are shifted in (TriCNES: PPU_AttributeLatchRegister)
-        static byte attrLatch = 0; // bits [1:0] = palette high bits for next tile
+        static byte attrLatch = 0;
+        // Phase 7 pre-reload latch: saves render registers BEFORE reload for correct last-pixel
+        static ushort halfStepRenderLow = 0, halfStepRenderHigh = 0;
+        static bool halfStepIsPhase7 = false;
 
         // ---- Per-dot shifted BG registers for sprite 0 hit (serial in: 0=low, 1=high) ----
         static ushort lowshift_s0 = 0, highshift_s0 = 0;
@@ -454,12 +457,17 @@ namespace AprNes
                     // Palette cache update
                     if (scanline < 240 && cx < 256 && ppuRenderingEnabled)
                         RenderBGTile(cx);
+                    // Save pre-reload render state for half-step (phase 7 pixel)
+                    if (scanline < 240 && cx < 256)
+                    {
+                        halfStepRenderLow = renderLow;
+                        halfStepRenderHigh = renderHigh;
+                        halfStepIsPhase7 = true;
+                    }
                     // Load main shift registers
                     lowshift  = (ushort)((lowshift  << 8) | lowTile);
                     highshift = (ushort)((highshift << 8) | highTile);
                     // Reload per-dot render shift registers
-                    // Per-dot shift has already moved LOW→HIGH over 8 shifts.
-                    // Just load new tile data into LOW byte.
                     renderLow  = (ushort)((renderLow  & 0xFF00) | lowTile);
                     renderHigh = (ushort)((renderHigh & 0xFF00) | highTile);
                     // Attribute latch set at phase 3 (above); shift-in happens per-dot in half-step
@@ -615,15 +623,25 @@ namespace AprNes
                 return;
 
             // Per-dot BG pixel output using per-dot render shift registers
-            // TriCNES model: shift left 1 bit, read bit (15 - FineX), with serial-in 0/1
             if (ppuRenderingEnabled && ShowBackGround)
             {
-                // Read pixel from per-dot shift registers
+                // At phase 7, use pre-reload latch
+                ushort rL, rH;
+                if (halfStepIsPhase7)
+                {
+                    rL = halfStepRenderLow;
+                    rH = halfStepRenderHigh;
+                    halfStepIsPhase7 = false;
+                }
+                else
+                {
+                    rL = renderLow;
+                    rH = renderHigh;
+                }
                 int bit = 15 - FineX;
-                int bgPixel = ((renderLow >> bit) & 1) | (((renderHigh >> bit) & 1) << 1);
+                int bgPixel = ((rL >> bit) & 1) | (((rH >> bit) & 1) << 1);
 
-                // Attribute: use pipeline directly (proven correct in master)
-                // bit >= 8 = current tile (p3), bit < 8 = next tile (p2)
+                // Attribute from pipeline (proven correct)
                 int attrBits = (bit >= 8) ? bg_attr_p3 : bg_attr_p2;
 
                 // Shift pattern registers (attribute handled by pipeline, not shift register)
