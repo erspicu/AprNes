@@ -167,7 +167,7 @@ namespace AprNes
             StartCpuCycle();
             if (!(dmcAbortDma && skipDummyReads))
             {
-                ppu2007ReadCooldown = 0;
+                ppu2007SM = 9; // reset $2007 state machine
                 mem_read_fun[readAddress](readAddress);
             }
             EndCpuCycle();
@@ -256,7 +256,7 @@ namespace AprNes
                         cpuBusAddr = readAddress;
                         if (!skipDummyReads)
                         {
-                            ppu2007ReadCooldown = 0;
+                            ppu2007SM = 9; // reset $2007 state machine
                             mem_read_fun[readAddress](readAddress);
                         }
                         EndCpuCycle();
@@ -282,7 +282,7 @@ namespace AprNes
                         cpuBusAddr = readAddress;
                         if (!skipDummyReads)
                         {
-                            ppu2007ReadCooldown = 0;
+                            ppu2007SM = 9; // reset $2007 state machine
                             mem_read_fun[readAddress](readAddress);
                         }
                         EndCpuCycle();

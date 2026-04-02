@@ -429,6 +429,10 @@ namespace AprNes
                 NesColors        = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 64);
                 palCacheR        = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 4);
                 palCacheN        = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 4);
+                sprLineBuf       = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 256);
+                sprLinePri       = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
+                sprLineSet       = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
+                sprLinePalIdx    = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
                 spr_ram          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
                 secondaryOAM     = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
                 corruptOamRow    = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);

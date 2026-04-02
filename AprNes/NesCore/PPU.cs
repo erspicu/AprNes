@@ -556,9 +556,28 @@ namespace AprNes
                         ? (byte)(ppu_ram[0x3f00] & 0x3f)
                         : (byte)(ppu_ram[baseAddr + bgPixel] & 0x3f);
                 }
+
+                // Per-dot sprite compositing (replaces batch Pass 3 in RenderSpritesLine)
+                if (sprLineReady && sprLineSet[cx] != 0 && ShowSprites)
+                {
+                    // Sprite visible if: BG disabled, OR BG pixel transparent, OR sprite is front-priority
+                    if (!ShowBackGround || Buffer_BG_array[slot] == 0 || sprLinePri[cx] == 0)
+                    {
+                        ScreenBuf1x[slot] = sprLineBuf[cx];
+                        if (AnalogEnabled) ntscScanBuf[cx] = sprLinePalIdx[cx];
+                    }
+                }
             }
             else
                 halfStepPhase7 = false; // discard latch if rendering disabled
+
+            // End of visible scanline: trigger NTSC decode and reset sprite buffer
+            if (cx == 255)
+            {
+                if (AnalogEnabled)
+                    DecodeScanline(scanline, ntscScanBuf, ppuEmphasis);
+                sprLineReady = false;
+            }
         }
 
         // ── Region-specialized PPU step functions ──
@@ -724,14 +743,11 @@ namespace AprNes
                         int scanOff = scanline << 8;
                         int* bgp = Buffer_BG_array + scanOff;
                         for (int* bge = bgp + 256; bgp < bge; bgp++) *bgp = 0;
-                        // Use delayed ppuRenderingEnabled (not immediate ShowBackGround)
-                        // to avoid premature backdrop fill when $2001 is toggled mid-scanline.
                         if (!ppuRenderingEnabled)
                         {
                             uint bgColor = NesColors[ppu_ram[0x3f00] & 0x3f];
                             uint* sp = ScreenBuf1x + scanOff;
                             for (uint* se = sp + 256; sp < se; sp++) *sp = bgColor;
-                            // NTSC: BG 關閉時填入背景色調色盤索引
                             if (AnalogEnabled)
                             {
                                 byte bgIdx = (byte)(ppu_ram[0x3f00] & 0x3f);
@@ -739,20 +755,14 @@ namespace AprNes
                             }
                         }
                         PrecomputeOverflow();
-                    }
-
-                    // Per-cycle sprite overflow flag (set at the exact evaluation cycle)
-                    if (spriteOverflowCycle >= 0 && cx == spriteOverflowCycle)
-                        isSpriteOverflow = true;
-
-                    // Sprite evaluation + rendering at cycle 257 (after BG tiles complete at cycle 255)
-                    if (cx == 257)
-                    {
-                        // MMC5: force A set (sprite) CHR banks before sprite rendering
-                        // NotifyVramRead-based switch doesn't fire until cx=258
+                        // Pre-fill sprite pixel buffer for per-dot compositing in half-step
                         if (mmc5Ref != null) mmc5Ref.PreSpriteRender();
                         RenderSpritesLine();
                     }
+
+                    // Per-cycle sprite overflow flag
+                    if (spriteOverflowCycle >= 0 && cx == spriteOverflowCycle)
+                        isSpriteOverflow = true;
 
                 }
 
@@ -1339,17 +1349,9 @@ namespace AprNes
                 return;
             }
 
-            // Per-pixel sprite winner buffers.
-            // NES hardware picks ONE winning sprite per pixel (lowest OAM index with opaque pixel).
-            // That winner's priority bit then decides the BG/sprite composite for ALL sprites at that pixel.
-            // This implements the "sprite priority quirk": a behind-BG mask sprite (low OAM index,
-            // priority=1) can suppress a front sprite (high OAM index, priority=0) at the same pixel.
-            uint* sprColor    = stackalloc uint[256];
-            byte* sprPriority = stackalloc byte[256]; // 1 = behind BG, 0 = in front
-            byte* sprSet      = stackalloc byte[256]; // 1 = a winning sprite pixel exists here
-            byte* sprPalIdx   = stackalloc byte[256]; // NTSC: raw palette index of winning sprite
-            // Clear sprSet with long* writes: 32 × 8 bytes = 256 bytes (replaces scalar loop)
-            long* pClear = (long*)sprSet;
+            // Use static per-dot sprite buffers (compositing moved to ppu_half_step)
+            // Clear sprLineSet with long* writes: 32 × 8 bytes = 256 bytes
+            long* pClear = (long*)sprLineSet;
             for (int i = 0; i < 32; i++) pClear[i] = 0;
 
             // Pass 2: evaluate sprites in reverse OAM order so lower-index sprites overwrite higher,
@@ -1404,40 +1406,18 @@ namespace AprNes
 
                     // Record as winner at this column (lower OAM index will overwrite later)
                     byte rawPal = (byte)(ppu_ram[palBase | p] & 0x3F);
-                    sprSet[sx]      = 1;
-                    sprPriority[sx] = priority;
-                    sprColor[sx]    = NesColors[rawPal];
-                    sprPalIdx[sx]   = rawPal;
+                    sprLineSet[sx]    = 1;
+                    sprLinePri[sx]    = priority;
+                    sprLineBuf[sx]    = NesColors[rawPal];
+                    sprLinePalIdx[sx] = rawPal;
                 }
             }
 
-            // Pass 3: composite — draw winning sprite pixel only if:
-            //   BG is disabled, OR BG pixel is transparent, OR winning sprite is front-priority.
-            // A behind-BG winner (priority=1) with opaque BG blocks ALL sprites at that pixel,
-            // correctly implementing the mask-sprite trick used by SMB3.
-            // long* 8-byte block-scan: skip all-zero blocks 8 pixels at a time.
-            int scanOff = scanline << 8;
-            long* pSprSetLong = (long*)sprSet;
-            for (int b = 0; b < 32; b++)
-            {
-                if (pSprSetLong[b] == 0) continue; // 8 pixels all empty — skip (performance core)
-                int bx = b << 3;
-                for (int i = 0; i < 8; i++)
-                {
-                    int sx = bx + i;
-                    if (sprSet[sx] == 0) continue;
-                    int loc = scanOff + sx;
-                    if (!ShowBackGround || Buffer_BG_array[loc] == 0 || sprPriority[sx] == 0)
-                    {
-                        ScreenBuf1x[loc] = sprColor[sx];
-                        if (AnalogEnabled) ntscScanBuf[sx] = sprPalIdx[sx];
-                    }
-                }
-            }
+            // Compositing moved to ppu_half_step (per-dot)
+            sprLineReady = true;
 
-            // NTSC: 訊號解碼（使用已填好的 ntscScanBuf 原始調色盤索引）
-            if (AnalogEnabled)
-                DecodeScanline(scanline, ntscScanBuf, ppuEmphasis);
+            // NTSC analog: still need to decode after all pixels are composited.
+            // This will be triggered at end-of-scanline in half-step or at cx==256.
         }
 
         static public bool screen_lock = false;
@@ -1487,6 +1467,13 @@ namespace AprNes
         static bool SuppressVbl = false;
         static bool pendingVblank = false; // half-dot VBL latch (TriCNES: PPU_PendingVBlank)
         static bool pendingSprite0Hit = false; // half-dot sprite 0 hit latch (TriCNES: PPUStatus_PendingSpriteZeroHit)
+
+        // Per-dot sprite compositing buffers (filled at cx==257, consumed per-dot in half-step)
+        static uint* sprLineBuf;     // 256 entries: winning sprite color (NesColors[])
+        static byte* sprLinePri;     // 256 entries: priority (0=front, 1=behind BG)
+        static byte* sprLineSet;     // 256 entries: 1=sprite pixel present, 0=empty
+        static byte* sprLinePalIdx;  // 256 entries: raw palette index (for NTSC analog)
+        static bool sprLineReady = false; // true after RenderSpritesLine fills buffers
         //ref http://wiki.nesdev.com/w/index.php/PPU_scrolling
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ppu_r_2002()
