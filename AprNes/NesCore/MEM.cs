@@ -95,9 +95,9 @@ namespace AprNes
         // StartCpuCycle: full cycle advance (CC++, NMI promote, PPU, APU, IRQ)
         // Same content as old tick_pre, kept as single unit to preserve timing.
         // The key change is ProcessPendingDma moving BEFORE StartCpuCycle in Mem_r/ZP_r.
-        // StartCpuCycle: called from CpuRead/CpuWrite for EVERY CPU bus cycle
-        // If inside MasterClockTick CPU gate: minimal (MasterClockTick handles PPU)
-        // If DMA stolen cycle: run masterPerCpu ticks of PPU gates
+        // StartCpuCycle: only used by DMA stolen cycles (inside ProcessPendingDma)
+        // Normal CPU cycles are driven by MasterClockTick — CpuRead/CpuWrite don't call this.
+        // DMA needs to advance PPU for each stolen cycle (PPU-only, no mcCpuClock touch).
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void StartCpuCycle()
         {
@@ -105,25 +105,10 @@ namespace AprNes
             cpuCycleCount++;
             m2PhaseIsWrite = (cpuCycleCount & 1) != 0;
 
-            // Always advance PPU for this CPU cycle
-            // (MasterClockTick's PPU gates are disabled during CPU gate ticks)
-            RunMasterTicksForOneCpuCycle();
-        }
-
-        // Run masterPerCpu ticks of PPU/NMI/IRQ gates (used by StartCpuCycle for DMA)
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void RunMasterTicksForOneCpuCycle()
-        {
+            // Advance PPU for one CPU cycle (DMA stolen cycle)
+            // Uses mcPpuClock but NOT mcCpuClock (mcCpuClock is MasterClockTick's domain)
             for (int t = 0; t < masterPerCpu; t++)
             {
-                // NMI promotion at CPUClock == 8
-                if (mcCpuClock == 8)
-                {
-                    if (nmi_delay_cycle >= 0 && cpuCycleCount > nmi_delay_cycle)
-                    { nmi_pending = true; nmi_delay_cycle = -1; }
-                }
-
-                // PPU full step
                 if (mcPpuClock == 0)
                 {
                     mcPpuClock = masterPerPpu;
@@ -134,13 +119,9 @@ namespace AprNes
                     if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount;
                     nmi_output_prev = o;
                 }
-
-                // PPU half step
                 if (mcPpuClock == (masterPerPpu >> 1))
                     ppu_half_step();
-
                 mcPpuClock--;
-                mcCpuClock--;
             }
         }
 
