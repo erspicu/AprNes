@@ -88,66 +88,7 @@ namespace AprNes
             mcPpuClock--;
         }
 
-        // ── Legacy catch-up functions (kept during transition, will be removed) ──
-        // Each hardcodes masterPerPpu and step count for JIT constant folding.
-        // NMI edge detection is inlined after each PPU step.
-
-        // NTSC: masterPerCpu=12, masterPerPpu=4 → 3 PPU dots per CPU cycle
-        // Each dot split into full-step + half-step (TriCNES model: _EmulatePPU + _EmulateHalfPPU)
-        //   full-step: tile fetch, sprite eval, delay countdowns, VBL/NMI events
-        //   half-step: shift register pixel output, fine-grained register delays
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void catchUpPPU_ntsc()
-        {
-            bool o;
-            ppuClock += 4; ppu_step_ntsc(); ppu_half_step();
-            o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
-            ppuClock += 4; ppu_step_ntsc(); ppu_half_step();
-            o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
-            ppuClock += 4; ppu_step_ntsc(); ppu_half_step();
-            o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
-        }
-
-        // PAL: masterPerCpu=16, masterPerPpu=5 → 3 or 4 PPU steps (3+3+3+3+4 pattern over 5 cycles)
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void catchUpPPU_pal()
-        {
-            bool o;
-            ppuClock += 5; ppu_step_pal(); ppu_half_step();
-            o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
-            ppuClock += 5; ppu_step_pal(); ppu_half_step();
-            o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
-            ppuClock += 5; ppu_step_pal(); ppu_half_step();
-            o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
-            // PAL 4th step: 3×5=15 < 16, so one extra step needed ~every 5th cycle
-            if (ppuClock < masterClock)
-            {
-                ppuClock += 5; ppu_step_pal(); ppu_half_step();
-                o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
-            }
-        }
-
-        // Dendy: masterPerCpu=15, masterPerPpu=5 → exactly 3 PPU steps per CPU cycle
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void catchUpPPU_dendy()
-        {
-            bool o;
-            ppuClock += 5; ppu_step_dendy(); ppu_half_step();
-            o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
-            ppuClock += 5; ppu_step_dendy(); ppu_half_step();
-            o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
-            ppuClock += 5; ppu_step_dendy(); ppu_half_step();
-            o = isVblank && NMIable; if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount; nmi_output_prev = o;
-        }
-
-        // Catch up APU to current master clock position.
-        // APU runs at CPU rate (1 step per CPU cycle) regardless of region.
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void catchUpAPU()
-        {
-            apuClock += masterPerCpu;
-            apu_step();
-        }
+        // Legacy catch-up functions REMOVED — replaced by per-master-clock gates in StartCpuCycle
 
         // --- M2 Phase Split (Mesen2 model) ---
         // StartCpuCycle: full cycle advance (CC++, NMI promote, PPU, APU, IRQ)
@@ -166,31 +107,27 @@ namespace AprNes
             if (nmi_delay_cycle >= 0 && cpuCycleCount > nmi_delay_cycle)
             { nmi_pending = true; nmi_delay_cycle = -1; }
 
-            // Per-master-clock: run 12 ticks (NTSC) of PPU/APU gates
-            // (CPU gate is skipped — CPU is already executing via CpuRead/CpuWrite caller)
-            if (regionMode == 0)
+            // Per-master-clock: run masterPerCpu ticks of PPU/APU gates
+            // PPU step function selected by region
+            int ticks = masterPerCpu; // NTSC=12, PAL=16, Dendy=15
+            for (int t = 0; t < ticks; t++)
             {
-                for (int t = 0; t < 12; t++)
+                if (mcPpuClock == 0)
                 {
-                    if (mcPpuClock == 0)
-                    {
-                        mcPpuClock = 4;
-                        ppu_step_ntsc();
-                        bool o = isVblank && NMIable;
-                        if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount;
-                        nmi_output_prev = o;
-                    }
-                    if (mcPpuClock == 2)
-                        ppu_half_step();
-                    mcPpuClock--;
+                    mcPpuClock = masterPerPpu; // NTSC=4, PAL=5, Dendy=5
+                    if (regionMode == 0)      ppu_step_ntsc();
+                    else if (regionMode == 1) ppu_step_pal();
+                    else                      ppu_step_dendy();
+                    bool o = isVblank && NMIable;
+                    if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount;
+                    nmi_output_prev = o;
                 }
-                apu_step();
-                mcApuPutCycle = !mcApuPutCycle;
+                if (mcPpuClock == (masterPerPpu >> 1)) // NTSC: 2, PAL/Dendy: 2 (floor of 5/2)
+                    ppu_half_step();
+                mcPpuClock--;
             }
-            else if (regionMode == 1) catchUpPPU_pal();  // PAL: keep old model for now
-            else                      catchUpPPU_dendy(); // Dendy: keep old model for now
-
-            if (regionMode != 0) catchUpAPU(); // non-NTSC still uses old APU catch-up
+            apu_step();
+            mcApuPutCycle = !mcApuPutCycle;
             if (strobeWritePending > 0) processStrobeWrite();
         }
 

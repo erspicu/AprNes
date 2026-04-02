@@ -71,6 +71,7 @@ namespace AprNes
         static int preRenderLine  = 261;      // NTSC=261, PAL/Dendy=311
         static int nmiTriggerLine = 241;      // NTSC/PAL=241, Dendy=291
         static int masterPerCpu   = 12;       // NTSC=12, PAL=16, Dendy=15
+        static int masterPerPpu   = 4;        // NTSC=4, PAL=5, Dendy=5
         static double cpuFreq          = 1789773.0;  // NTSC=1789773, PAL=1662607, Dendy=1773447
         static public double FrameSeconds = 1.0 / 60.0988; // NTSC=1/60.0988, PAL/Dendy=1/50.0070
 
@@ -82,6 +83,7 @@ namespace AprNes
                 preRenderLine  = 311;
                 nmiTriggerLine = 241;
                 masterPerCpu   = 16;
+                masterPerPpu   = 5;
                 cpuFreq        = 1662607.0;
                 FrameSeconds   = 1.0 / 50.0070;
             }
@@ -89,9 +91,10 @@ namespace AprNes
             {
                 regionMode     = 2;
                 preRenderLine  = 311;
-                nmiTriggerLine = 291;   // 51 lines post-render idle (240-290), NMI at 291
-                masterPerCpu   = 15;    // PAL master clock ÷15
-                cpuFreq        = 1773447.0; // 26601712 / 15
+                nmiTriggerLine = 291;
+                masterPerCpu   = 15;
+                masterPerPpu   = 5;
+                cpuFreq        = 1773447.0;
                 FrameSeconds   = 1.0 / 50.0070;
             }
             else // NTSC
@@ -100,6 +103,7 @@ namespace AprNes
                 preRenderLine  = 261;
                 nmiTriggerLine = 241;
                 masterPerCpu   = 12;
+                masterPerPpu   = 4;
                 cpuFreq        = 1789773.0;
                 FrameSeconds   = 1.0 / 60.0988;
             }
