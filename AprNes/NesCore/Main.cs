@@ -613,9 +613,12 @@ namespace AprNes
             }
 
             // ── NMI promotion at CPUClock == 8 ──
+            // Use >= (not >) because in per-master-clock model, PPU sets nmi_delay_cycle
+            // in the SAME cycle as the NMI check (PPU runs after CPU gate).
+            // Old catch-up model used > because PPU ran before NMI check.
             if (mcCpuClock == 8)
             {
-                if (nmi_delay_cycle >= 0 && cpuCycleCount > nmi_delay_cycle)
+                if (nmi_delay_cycle >= 0 && cpuCycleCount >= nmi_delay_cycle)
                 { nmi_pending = true; nmi_delay_cycle = -1; }
             }
 
