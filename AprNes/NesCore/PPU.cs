@@ -1777,9 +1777,37 @@ namespace AprNes
         {
             openbus = value;
             open_bus_decay_timer = 77777;
-            // Immediate write + increment (deferred write breaks games)
+
+            // Mystery write: consecutive CPU cycle writes to $2007 (RMW instruction)
+            // TriCNES: if SM is running and previous was a write → mystery write
+            // Write $ZZ to $2007 while PPU address is $YYXX:
+            //   Mystery write #1: store (byte)addr at $YYXX (low byte of address)
+            //   Mystery write #2: store $ZZ at address $YY_ZZ
+            if (ppu2007SM < 9 && !ppu2007SM_isRead)
+            {
+                int addr = vram_addr & 0x3FFF;
+                int mysteryAddr = (addr & 0xFF00) | value;
+
+                if (mysteryAddr < 0x3F00)
+                {
+                    PpuBusWrite(mysteryAddr, value);
+                    PpuBusWrite(addr, (byte)(addr & 0xFF));
+                }
+                else
+                {
+                    // Palette: write to mirrored non-palette address
+                    PpuBusWrite(addr & 0x2FFF, value);
+                }
+            }
+
+            // Normal write + increment
             PpuBusWrite(vram_addr, value);
             Increment2007();
+
+            // Mark SM as write (for subsequent mystery write detection)
+            ppu2007SM_isRead = false;
+            if (ppu2007SM >= 9)
+                ppu2007SM = 0;
         }
 
         static void ppu_w_4014(byte value)//DMA , fixex 2017.01.16 pass sprite_ram test
