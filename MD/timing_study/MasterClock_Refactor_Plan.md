@@ -202,6 +202,19 @@ static public void run()
 
 ---
 
+## 執行進度
+
+| Phase | 狀態 | Commit | blargg | 備註 |
+|:-----:|:----:|--------|:------:|------|
+| 1 | ✅ | `f644784` | 174/174 | mcCpuClock/mcPpuClock/mcApuPutCycle 加入 |
+| 2 | ✅ | `8ad749d` | 174/174 | EmulatorCoreTick_NTSC 建立（未啟用） |
+| 3 | ✅ | `6c4ff36` | 169/174 | StartCpuCycle 切換 per-master-clock（-5 NMI/sprite） |
+| 4 | 待做 | | | 移除 legacy catch-up |
+| 5 | 待做 | | | DMA 重構 |
+| 6 | 待做 | | | Mapper CpuClockRise |
+
+---
+
 ## 測試策略
 
 1. **Phase 1-2 完成後**：跑 174 blargg — 確認基礎架構不回歸
