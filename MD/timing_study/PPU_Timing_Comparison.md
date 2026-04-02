@@ -618,6 +618,17 @@
 - **blargg**: 174/174 PASS
 - **AC**: 135/136（Page 19 -1）
 
-### 後續方向
-- [ ] AC Page 19 排查（可能需要跑 Page 19 的每個 test 單獨 bisect）
-- [ ] 效能優化（half-step + per-dot shift 的效能影響評估）
+### 2026-04-02 — PPU clock alignment 修正 + 關鍵發現（`5a9ecef`）
+- ppuAlignPhase 改為全域 frame-level（只在 odd frame skip +1）
+- **重大發現**：TriCNES 使用 per-master-clock 執行模型
+  - `_EmulatorCore()` 每個 master clock 呼叫一次
+  - CPUClock(12→0) + PPUClock(4→0) 各自倒數
+  - `PPUClock & 3` 在每次 CPU write 時不同（取決於 CPU/PPU clock 的相對位置）
+  - AprNes 的 catch-up 批次模型無法重現此 interleaving
+- 要 100% 對齊需改為 per-master-clock 主迴圈
+
+### 後續方向（架構級改造）
+- [ ] **per-master-clock 執行模型**（CPUClock + PPUClock 倒數，取代 catch-up 批次）
+- [ ] per-dot shift register scanline 過渡（1-2px 綠線根因）
+- [ ] AC Page 19 排查
+- [ ] 效能優化（per-master-clock 的效能影響評估）
