@@ -600,7 +600,7 @@ namespace AprNes
                 if (!isFDS) MapperObj.CpuCycle();
                 else fds_CpuCycle();
 
-                // APU runs at CPU rate (TriCNES: if CPUClock == 12)
+                // APU at CPU rate (inside CPU gate = same tick)
                 apu_step();
                 mcApuPutCycle = !mcApuPutCycle;
                 if (strobeWritePending > 0) processStrobeWrite();
@@ -611,6 +611,13 @@ namespace AprNes
             {
                 if (nmi_delay_cycle >= 0 && cpuCycleCount > nmi_delay_cycle)
                 { nmi_pending = true; nmi_delay_cycle = -1; }
+            }
+
+            // ── IRQ level check + Mapper M2 rise at CPUClock == 5 ──
+            if (mcCpuClock == 5)
+            {
+                // TriCNES: IRQLine = IRQ_LevelDetector; Cart.MapperChip.CPUClockRise()
+                if (!isFDS) MapperObj.CpuClockRise();
             }
 
             // ── PPU full step at PPUClock == 0 ──
