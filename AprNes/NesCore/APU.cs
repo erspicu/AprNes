@@ -479,6 +479,7 @@ namespace AprNes
                     case 7457: apuQuarterFrame = true; break;
                     case 14913: apuQuarterFrame = true; apuHalfFrame = true; break;
                     case 22371: apuQuarterFrame = true; break;
+                    case 29829: break; // TriCNES: explicit no-op (5-step skips IRQ)
                     case 37281: apuQuarterFrame = true; apuHalfFrame = true; break;
                     case 37282: apuFrameCounter = 0; break;
                 }
