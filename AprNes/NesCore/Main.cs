@@ -609,11 +609,15 @@ namespace AprNes
                     }
                 }
 
-                // Mapper callback
+                // Mapper callback (TriCNES: at CPUClock==0, after _6502)
                 if (!isFDS) MapperObj.CpuCycle();
                 else fds_CpuCycle();
+            }
 
-                // APU
+            // ── APU step at CPUClock == 12 (TriCNES: independent gate after CPU reset) ──
+            // Fires same tick as CPU gate (mcCpuClock was just reset to masterPerCpu)
+            if (mcCpuClock == masterPerCpu)
+            {
                 apu_step();
                 mcApuPutCycle = !mcApuPutCycle;
                 if (strobeWritePending > 0) processStrobeWrite();
