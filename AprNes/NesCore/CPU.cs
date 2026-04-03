@@ -11,7 +11,7 @@ namespace AprNes
         static unsafe delegate*<void>[] opFnPtrs = new delegate*<void>[256];
 
         static public bool exit = false;
-        static bool nmi_pending = false;
+        // nmi_pending removed — replaced by NMILine edge detection in MasterClockTick
         static bool irq_pending = false;
         static bool irqLinePrev = false;
         static bool irqLineCurrent = false;
@@ -611,7 +611,8 @@ namespace AprNes
                         StackPush(pushed);
                     }
                     else { CpuRead((ushort)(0x100 | r_SP)); r_SP--; }
-                    if (nmi_pending) { doNMI = true; nmi_pending = false; }
+                    // NMI hijack: if NMI edge arrived during BRK/IRQ handler
+                    if (NMILine && !nmiPinsSignal) { doNMI = true; nmiPinsSignal = true; }
                     break;
                 case 5:
                     if (doNMI) r_PC = (ushort)((r_PC & 0xFF00) | CpuRead(0xFFFA));
@@ -626,7 +627,7 @@ namespace AprNes
                     if (doReset)
                     {
                         Console.WriteLine("soft reset !");
-                        nmi_pending = false; nmi_delay_cycle = -1; nmi_output_prev = false;
+                        NMILine = false; nmiPinsSignal = false; nmiPrevPinsSignal = false;
                         irq_pending = false; statusmapperint = false;
                         apuSoftReset(); strobeWritePending = 0; P1_LastWrite = 0;
                     }

@@ -2,7 +2,7 @@
 
 **日期**：2026-04-03
 **分支**：feature/ppu-high-precision
-**目前狀態**：154/174（DMA per-cycle dispatch 完成，零回歸）
+**目前狀態**：150/174（NMI direct line model 完成，+4 suppression/disable timing 待調）
 
 ---
 
@@ -14,11 +14,13 @@
 
 ## 待修正
 
-### 1. NMI 模型：delay cycle → TriCNES 直接 NMILine
-- **現況**：PPU 設 `nmi_delay_cycle = cpuCycleCount`，MasterClockTick 在 CPUClock==8 用 `>=` promote
-- **TriCNES**：CPUClock==8 直接 `NMILine |= VBL && NMI_EN`，operationCycle==0 時 clear
-- **風險**：上次嘗試直接替換造成 NMI 過度觸發（142/174），需要更仔細的 edge detection
-- **影響 tests**：nmi_timing, suppression, nmi_off_timing, nmi_control, nmi_and_brk
+### 1. ~~NMI 模型：delay cycle → TriCNES 直接 NMILine~~ ✅ DONE (架構完成)
+- **已完成**：nmi_delay_cycle/nmi_output_prev/nmi_pending 替換為 NMILine + edge detection
+- TriCNES 模型：CPUClock==8 `NMILine |= VBL && NMI_EN`，PollInterrupts edge detect
+- 移除：nmi_just_deferred（edge detection 自然處理）
+- **待調**：+4 回歸（06-suppression, 08-nmi_off_timing, 5.nmi_suppression, 6.nmi_disable）
+  - SuppressVbl 未被設為 true（需要補接線）
+  - NMI disable timing 需要 $2000 write → NMILine 清除的精確時機
 
 ### 2. IRQ 模型：irqLinePrev/Current → CPUClock==5 level detection
 - **現況**：`irqLinePrev` 在 StartCpuCycle 保存（每 CPU cycle 開始），`irqLineCurrent` 由 `UpdateIRQLine()` 維護

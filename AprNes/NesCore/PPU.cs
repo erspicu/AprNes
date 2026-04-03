@@ -206,9 +206,11 @@ namespace AprNes
         static bool ppuRenderingEnabled_EvalDelay = false; // Tier 4: 1 extra cycle delay for sprite evaluation (TriCNES: _Delayed)
 
         // CPU/PPU alignment: use (mcPpuClock & 3) from master clock divider
-        static bool nmi_output_prev = false;  // NMI edge detection: previous NMI output level
-        static long nmi_delay_cycle = -1;     // CPU cycle that detected NMI edge (-1 = inactive)
-                                              // Promotes to nmi_pending when cpuCycleCount > nmi_delay_cycle
+
+        // TriCNES NMI model: level signal + edge detection at instruction boundary
+        static bool NMILine = false;              // NMI level signal (set at CPUClock==8)
+        static bool nmiPinsSignal = false;        // Latched NMILine at last instruction boundary
+        static bool nmiPrevPinsSignal = false;    // Previous latch (for edge detection)
         //https://wiki.nesdev.com/w/index.php/PPU_scrolling
 
         #region cycle-accurate PPU
@@ -1640,9 +1642,7 @@ namespace AprNes
             openbus = (byte)((vblFlag ? 0x80 : 0) | ((isSprite0hit) ? 0x40 : 0) | ((isSpriteOverflow) ? 0x20 : 0) | (openbus & 0x1f));
 
             isVblank = false;
-            nmi_delay_cycle = -1;      // Cancel not-yet-promoted NMI (same-cycle $2002 read)
-            nmi_output_prev = false;   // Reset edge state to prevent false rising edge on next tick
-            // Note: nmi_pending is NOT cleared — once promoted, $2002 can't cancel it
+            NMILine = false;           // Cancel NMI (VBL cleared → NMI condition no longer met)
             vram_latch = false;
             return openbus;
         }
@@ -1686,13 +1686,9 @@ namespace AprNes
             VramaddrIncrement = ((value & 4) > 0) ? 32 : 1;
             NMIable = ((value & 0x80) > 0);
 
-            // NMI edge detection (immediate — critical for NMI timing)
-            bool nmi_output = isVblank && NMIable;
-            if (!nmi_output && nmi_output_prev)
-            {
-                nmi_delay_cycle = -1;
-                nmi_output_prev = false;
-            }
+            // NMI edge: if condition no longer met, clear NMILine immediately
+            if (!(isVblank && NMIable))
+                NMILine = false;
 
             // Delayed: pattern table addresses, sprite size
             // TriCNES: alignment 0,1=2cycles; alignment 2,3=1cycle

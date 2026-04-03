@@ -261,7 +261,7 @@ namespace AprNes
             m2PhaseIsWrite = false;
 
             // CPU interrupt state
-            nmi_pending = false; nmi_delay_cycle = -1; nmi_output_prev = false;
+            NMILine = false; nmiPinsSignal = false; nmiPrevPinsSignal = false;
             irq_pending = false; irqLinePrev = false; irqLineCurrent = false;
             statusmapperint = false;
             doNMI = false; doIRQ = false; doReset = false; doBRK = false; softreset = false;
@@ -546,7 +546,6 @@ namespace AprNes
 
         // Per-master-clock main loop (TriCNES _EmulatorCore model)
         // CPU/PPU/APU each gated by their own countdown timer.
-        static bool nmi_just_deferred = false;
 
         static public void run()
         {
@@ -566,7 +565,7 @@ namespace AprNes
             {
                 mcCpuClock = masterPerCpu;
 
-                // CPU cycle housekeeping (was in StartCpuCycle)
+                // CPU cycle housekeeping
                 irqLinePrev = irqLineCurrent;
                 cpuCycleCount++;
                 m2PhaseIsWrite = (cpuCycleCount & 1) != 0;
@@ -578,13 +577,13 @@ namespace AprNes
                 }
                 else
                 {
-                    // Interrupt service at instruction boundary
+                    // NMI/IRQ polling at instruction boundary (TriCNES: PollInterrupts)
                     if (operationCycle == 0)
                     {
-                        if (nmi_pending && !nmi_just_deferred)
-                        { nmi_pending = false; doNMI = true; irq_pending = false; }
-                        else if (nmi_just_deferred)
-                            nmi_just_deferred = false;
+                        nmiPrevPinsSignal = nmiPinsSignal;
+                        nmiPinsSignal = NMILine;
+                        if (nmiPinsSignal && !nmiPrevPinsSignal)
+                        { doNMI = true; }
                         else if (irq_pending)
                         { irq_pending = false; doIRQ = true; }
                     }
@@ -592,11 +591,9 @@ namespace AprNes
                     byte prevFlagI = flagI;
                     cpu_step_one_cycle();
 
-                    // End-of-instruction processing
+                    // End-of-instruction: IRQ polling
                     if (operationCycle == 0)
                     {
-                        if (opcode == 0x00 && nmi_pending)
-                            nmi_just_deferred = true;
                         if (opcode != 0x00)
                         {
                             byte irqPollI = (opcode == 0x40) ? flagI : prevFlagI;
@@ -615,14 +612,12 @@ namespace AprNes
                 if (strobeWritePending > 0) processStrobeWrite();
             }
 
-            // ── NMI promotion at CPUClock == 8 ──
-            // Use >= (not >) because in per-master-clock model, PPU sets nmi_delay_cycle
-            // in the SAME cycle as the NMI check (PPU runs after CPU gate).
-            // Old catch-up model used > because PPU ran before NMI check.
+            // ── NMI evaluation at CPUClock == 8 (TriCNES: direct NMILine model) ──
             if (mcCpuClock == 8)
             {
-                if (nmi_delay_cycle >= 0 && cpuCycleCount >= nmi_delay_cycle)
-                { nmi_pending = true; nmi_delay_cycle = -1; }
+                NMILine |= NMIable && isVblank;
+                if (operationCycle == 0 && !(isVblank && NMIable))
+                    NMILine = false;
             }
 
             // ── Mapper M2 rise at CPUClock == 5 ──
@@ -638,9 +633,6 @@ namespace AprNes
                 if (regionMode == 0)      ppu_step_ntsc();
                 else if (regionMode == 1) ppu_step_pal();
                 else                      ppu_step_dendy();
-                bool o = isVblank && NMIable;
-                if (o && !nmi_output_prev) nmi_delay_cycle = cpuCycleCount;
-                nmi_output_prev = o;
             }
 
             // ── PPU half step ──
