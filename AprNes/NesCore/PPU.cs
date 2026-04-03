@@ -1650,9 +1650,8 @@ namespace AprNes
             BgPatternTableAddr = ((value & 0x10) > 0) ? 0x1000 : 0;
             Spritesize8x16 = ((value & 0x20) > 0);
 
-            // NMI edge: if condition no longer met, clear NMILine immediately
-            if (!(isVblank && NMIable))
-                NMILine = false;
+            // TriCNES: NMILine clearing is NOT done here — it's handled by CPUClock==8 gate
+            // (NMILine cleared at operationCycle==0 when !(isVblank && NMIable))
 
             // Delayed re-application (TriCNES: fixes open bus glitch after 1-2 PPU cycles)
             ppu2000PendingValue = value;
