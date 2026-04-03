@@ -1640,8 +1640,21 @@ namespace AprNes
         {
             openbus = value;
 
-            // TriCNES model: ALL $2000 fields delayed by 1-2 PPU cycles
-            // Phase 0,1 = 2 cycles; Phase 2,3 = 1 cycle
+            // TriCNES model: IMMEDIATE application + delayed re-application
+            // All fields applied immediately (pattern table, NMI enable, etc.)
+            vram_addr_internal = (ushort)((vram_addr_internal & 0x73ff) | ((value & 3) << 10));
+            BaseNameTableAddr = 0x2000 | ((value & 3) << 10);
+            VramaddrIncrement = ((value & 4) > 0) ? 32 : 1;
+            NMIable = ((value & 0x80) > 0);
+            SpPatternTableAddr = ((value & 8) > 0) ? 0x1000 : 0;
+            BgPatternTableAddr = ((value & 0x10) > 0) ? 0x1000 : 0;
+            Spritesize8x16 = ((value & 0x20) > 0);
+
+            // NMI edge: if condition no longer met, clear NMILine immediately
+            if (!(isVblank && NMIable))
+                NMILine = false;
+
+            // Delayed re-application (TriCNES: fixes open bus glitch after 1-2 PPU cycles)
             ppu2000PendingValue = value;
             ppu2000UpdateDelay = ((mcPpuClock & 3) <= 1) ? 2 : 1;
         }
