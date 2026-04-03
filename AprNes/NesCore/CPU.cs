@@ -13,8 +13,8 @@ namespace AprNes
         static public bool exit = false;
         // nmi_pending removed — replaced by NMILine edge detection in MasterClockTick
         static bool irq_pending = false;
-        static bool irqLinePrev = false;
-        static bool irqLineCurrent = false;
+        static bool IRQLine = false;           // Latched from irqLineCurrent at CPUClock==5 (TriCNES: IRQLine)
+        static bool irqLineCurrent = false;    // IRQ level detector (TriCNES: IRQ_LevelDetector)
         static public bool statusmapperint = false;
         // Per-cycle state machine state
         static byte operationCycle = 0;   // 0 = opcode fetch, 1..N = subsequent cycles
@@ -476,7 +476,7 @@ namespace AprNes
         }
 
         // --- Branch helper ---
-        static bool branchIrqSaved; // saved irqLinePrev for branch-taken-no-cross
+        static bool branchIrqSaved; // saved IRQLine for branch-taken-no-cross
 
         static void DoBranch(bool condition)
         {
@@ -484,7 +484,7 @@ namespace AprNes
             {
                 GetImmediate();
                 if (!condition) CompleteOperation();
-                else branchIrqSaved = irqLinePrev; // save before taken-dummy tick
+                else branchIrqSaved = IRQLine; // save before taken-dummy tick
             }
             else if (operationCycle == 2)
             {
@@ -494,7 +494,7 @@ namespace AprNes
                 addressBus = r_PC;
                 if ((temporaryAddress & 0xFF00) == (r_PC & 0xFF00))
                 {
-                    irqLinePrev = branchIrqSaved; // restore: IRQ penultimate = pre-branch state
+                    IRQLine = branchIrqSaved; // restore: IRQ penultimate = pre-branch state
                     CompleteOperation();
                 }
             }
@@ -628,11 +628,12 @@ namespace AprNes
                     {
                         Console.WriteLine("soft reset !");
                         NMILine = false; nmiPinsSignal = false; nmiPrevPinsSignal = false;
-                        irq_pending = false; statusmapperint = false;
+                        irq_pending = false; IRQLine = false; statusmapperint = false;
                         apuSoftReset(); strobeWritePending = 0; P1_LastWrite = 0;
                     }
                     CompleteOperation();
                     doReset = false; doNMI = false; doIRQ = false; doBRK = false; flagI = 1;
+                    IRQLine = false; // TriCNES: clear IRQLine after interrupt service
                     break;
             }
         }

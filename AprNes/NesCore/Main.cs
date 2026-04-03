@@ -262,7 +262,7 @@ namespace AprNes
 
             // CPU interrupt state
             NMILine = false; nmiPinsSignal = false; nmiPrevPinsSignal = false;
-            irq_pending = false; irqLinePrev = false; irqLineCurrent = false;
+            irq_pending = false; IRQLine = false; irqLineCurrent = false;
             statusmapperint = false;
             doNMI = false; doIRQ = false; doReset = false; doBRK = false; softreset = false;
 
@@ -566,7 +566,6 @@ namespace AprNes
                 mcCpuClock = masterPerCpu;
 
                 // CPU cycle housekeeping
-                irqLinePrev = irqLineCurrent;
                 cpuCycleCount++;
                 m2PhaseIsWrite = (cpuCycleCount & 1) != 0;
 
@@ -597,7 +596,7 @@ namespace AprNes
                         if (opcode != 0x00)
                         {
                             byte irqPollI = (opcode == 0x40) ? flagI : prevFlagI;
-                            irq_pending = (irqPollI == 0 && irqLinePrev);
+                            irq_pending = (irqPollI == 0 && IRQLine);
                         }
                     }
                 }
@@ -620,9 +619,14 @@ namespace AprNes
                     NMILine = false;
             }
 
-            // ── Mapper M2 rise at CPUClock == 5 ──
+            // ── IRQ level detection + Mapper M2 rise at CPUClock == 5 ──
+            // TriCNES: IRQLine = IRQ_LevelDetector; then re-assert APU frame IRQ; then mapper rise
             if (mcCpuClock == 5)
             {
+                IRQLine = irqLineCurrent;
+                // APU frame counter re-assertion (TriCNES: keep IRQ asserted while flag active)
+                if (statusframeint && !apuintflag)
+                    irqLineCurrent = true;
                 if (!isFDS) MapperObj.CpuClockRise();
             }
 

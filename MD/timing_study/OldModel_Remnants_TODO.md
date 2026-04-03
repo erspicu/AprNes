@@ -22,11 +22,12 @@
   - SuppressVbl 未被設為 true（需要補接線）
   - NMI disable timing 需要 $2000 write → NMILine 清除的精確時機
 
-### 2. IRQ 模型：irqLinePrev/Current → CPUClock==5 level detection
-- **現況**：`irqLinePrev` 在 StartCpuCycle 保存（每 CPU cycle 開始），`irqLineCurrent` 由 `UpdateIRQLine()` 維護
-- **TriCNES**：CPUClock==5 直接 `IRQLine = IRQ_LevelDetector`，level detection 在 M2 rising edge
-- **問題**：DMA 的 StartCpuCycle 也會覆蓋 `irqLinePrev`，造成 DMA 期間的 IRQ 狀態不準
-- **影響 tests**：irq_timing, nmi_and_irq, irq_and_dma, branch_delays_irq
+### 2. ~~IRQ 模型：irqLinePrev/Current → CPUClock==5 level detection~~ ✅ DONE
+- **已完成**：irqLinePrev 移除，IRQLine 在 CPUClock==5 從 irqLineCurrent (level detector) latch
+- TriCNES 模型：IRQLine = IRQ_LevelDetector at M2 rising edge
+- APU frame counter re-assertion at CPUClock==5
+- BRK completion clears IRQLine（TriCNES acknowledge model）
+- 150/174 零回歸
 
 ### 3. ~~DMA 引擎：blocking ProcessPendingDma → per-cycle dispatch~~ ✅ DONE
 - **已完成**：ProcessPendingDma 替換為 per-cycle DmaOneCycle()
@@ -53,8 +54,8 @@
 ## 修正順序建議
 
 1. ~~**DMA per-cycle dispatch**~~ ✅ DONE
-2. **NMI direct line model**（需要 edge detection 正確才能避免過度觸發）
-3. **IRQ level detection at CPUClock==5**
+2. ~~**NMI direct line model**~~ ✅ DONE
+3. ~~**IRQ level detection at CPUClock==5**~~ ✅ DONE
 4. **VBL suppression dot 調整**
 5. **ppuRenderingEnabled 更新時機**
 6. ~~**移除 Start/EndCpuCycle**~~ ✅ DONE（隨 DMA 一起完成）
