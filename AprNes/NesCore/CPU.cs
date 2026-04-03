@@ -612,8 +612,11 @@ namespace AprNes
                         StackPush(pushed);
                     }
                     else { CpuRead((ushort)(0x100 | r_SP)); r_SP--; }
-                    // NMI hijack: if NMI edge arrived during BRK/IRQ handler
+                    // PollInterrupts at cycle 4 (TriCNES model):
+                    // NMI edge detection — hijack to NMI vector if new edge arrived
                     if (NMILine && !nmiPinsSignal) { doNMI = true; nmiPinsSignal = true; }
+                    // IRQ level detection — redirect to IRQ vector if IRQ active and not masked
+                    if (!doNMI && IRQLine && flagI == 0) { doIRQ = true; }
                     break;
                 case 5:
                     if (doNMI) r_PC = (ushort)((r_PC & 0xFF00) | CpuRead(0xFFFA));

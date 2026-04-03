@@ -2,7 +2,7 @@
 
 **日期**：2026-04-03
 **分支**：feature/ppu-high-precision
-**目前狀態**：150/174 — 第一輪 6 項完成，第二輪 3 項進行中
+**目前狀態**：150/174 — 第一輪 6 項 + 第二輪 3 項全部完成 ✅
 
 ---
 
@@ -21,28 +21,22 @@
 
 ## 第二輪：TriCNES 差異比對（架構層級）
 
-### 7. APU 執行時機：mcCpuClock==0 內 → CPUClock==12 獨立 gate
-- **現況**：APU step 在 mcCpuClock==0 gate 內，CPU step 之後執行
-- **TriCNES**：APU step 在 CPUClock==12（獨立 gate），是下一個 CPU cycle 的開頭
-- **差異**：AprNes APU 在 CPU cycle 結尾跑，TriCNES 在開頭跑（1 cycle offset）
-- **影響 tests**：irq_timing, irq_flag_timing（APU frame counter IRQ timing）
+### 7. ~~APU 執行時機：mcCpuClock==0 內 → CPUClock==12 獨立 gate~~ ✅ DONE
+- APU step 移至 mcCpuClock==masterPerCpu 獨立 gate
+- MasterClockTick gate 順序完全對齊 TriCNES：CPU(0) → APU(12) → NMI(8) → IRQ(5) → PPU
 
-### 8. DMA gate 缺 CPU_Read 條件
-- **現況**：DMA gate 只檢查 `dmcDmaRunning || spriteDmaTransfer`
-- **TriCNES**：DMA gate 額外要求 `CPU_Read == true`，write cycle 時 DMA 被 stall
-- **差異**：AprNes DMA 無論 read/write cycle 都搶 cycle；TriCNES 只在 read cycle 搶
-- **影響 tests**：dma_2007_write, dma_2007_read, dma_4016_read, irq_and_dma, sprdma_and_dmc_dma
+### 8. ~~DMA gate 缺 CPU_Read 條件~~ ✅ DONE
+- 新增 cpuIsRead flag，在 CpuRead/CpuWrite/CompleteOperation 追蹤
+- DMA gate 加入 `&& cpuIsRead`，write cycle 時 DMA 被 stall
 
-### 9. BRK handler cycle 4 的 PollInterrupts
-- **現況**：BRK cycle 4 只檢查 NMI edge（`NMILine && !nmiPinsSignal`）
-- **TriCNES**：BRK cycle 4 呼叫完整 PollInterrupts()（NMI edge + IRQ level）
-- **差異**：AprNes 不會偵測 BRK 執行期間新到達的 IRQ
-- **影響 tests**：nmi_and_brk, nmi_and_irq
+### 9. ~~BRK handler cycle 4 的 PollInterrupts~~ ✅ DONE
+- BRK cycle 4 加入 IRQ level check（`IRQLine && flagI == 0`）配合原有 NMI edge check
+- 完整 PollInterrupts 對齊 TriCNES 模型
 
 ---
 
-## 修正順序建議
+## 修正順序（全部完成）
 
-7. **DMA CPU_Read gate**（影響最多測試，5+ 個 DMA/IRQ 測試）
-8. **APU 獨立 gate at CPUClock==12**（影響 IRQ timing）
-9. **BRK PollInterrupts**（影響 nmi_and_brk/irq 測試）
+7. ~~**DMA CPU_Read gate**~~ ✅ DONE
+8. ~~**APU 獨立 gate at CPUClock==12**~~ ✅ DONE
+9. ~~**BRK PollInterrupts**~~ ✅ DONE
