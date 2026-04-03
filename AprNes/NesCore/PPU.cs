@@ -162,7 +162,7 @@ namespace AprNes
         static bool ppu2007SM_interruptedReadToWrite = false; // TriCNES: write during active read SM
 
         // $2000 delayed control update (TriCNES: PPU_Update2000Delay, 1-2 PPU cycles)
-        // NMI enable is immediate; pattern table/sprite size delayed
+        // ALL fields delayed: NMI enable, pattern table, sprite size, nametable, increment
         static int ppu2000UpdateDelay = 0;
         static byte ppu2000PendingValue = 0;
 
@@ -733,12 +733,16 @@ namespace AprNes
                 }
             }
 
-            // $2000 delayed control update (pattern table, sprite size)
+            // $2000 delayed control update (TriCNES: all fields delayed 1-2 PPU cycles)
             if (ppu2000UpdateDelay > 0 && --ppu2000UpdateDelay == 0)
             {
+                NMIable = ((ppu2000PendingValue & 0x80) > 0);
+                VramaddrIncrement = ((ppu2000PendingValue & 4) > 0) ? 32 : 1;
                 SpPatternTableAddr = ((ppu2000PendingValue & 8) > 0) ? 0x1000 : 0;
                 BgPatternTableAddr = ((ppu2000PendingValue & 0x10) > 0) ? 0x1000 : 0;
                 Spritesize8x16 = ((ppu2000PendingValue & 0x20) > 0);
+                vram_addr_internal = (ushort)((vram_addr_internal & 0x73ff) | ((ppu2000PendingValue & 3) << 10));
+                BaseNameTableAddr = 0x2000 | ((ppu2000PendingValue & 3) << 10);
             }
 
             // $2001 delayed mask update (Tier 2: ShowBackGround/ShowSprites)
@@ -1614,22 +1618,10 @@ namespace AprNes
         {
             openbus = value;
 
-            // Immediate: nametable bits (for t register) and NMI enable
-            vram_addr_internal = (ushort)((vram_addr_internal & 0x73ff) | ((value & 3) << 10));
-            BaseNameTableAddr = 0x2000 | ((value & 3) << 10);
-            VramaddrIncrement = ((value & 4) > 0) ? 32 : 1;
-            NMIable = ((value & 0x80) > 0);
-
-            // NMI edge: if condition no longer met, clear NMILine immediately
-            if (!(isVblank && NMIable))
-                NMILine = false;
-
-            // Delayed: pattern table addresses, sprite size
-            // TriCNES: alignment 0,1=2cycles; alignment 2,3=1cycle
-            // Immediate (delay breaks MMC3 games like SMB3 that switch pattern table via IRQ)
-            SpPatternTableAddr = ((value & 8) > 0) ? 0x1000 : 0;
-            BgPatternTableAddr = ((value & 0x10) > 0) ? 0x1000 : 0;
-            Spritesize8x16 = ((value & 0x20) > 0);
+            // TriCNES model: ALL $2000 fields delayed by 1-2 PPU cycles
+            // Phase 0,1 = 2 cycles; Phase 2,3 = 1 cycle
+            ppu2000PendingValue = value;
+            ppu2000UpdateDelay = ((mcPpuClock & 3) <= 1) ? 2 : 1;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1661,7 +1653,7 @@ namespace AprNes
             prevRenderingEnabled = newRenderingInstant;
 
             // Tier 2: Delayed mask flags (ShowBG/ShowSprites/Left8)
-            ppu2001UpdateDelay = ((mcPpuClock & 3) == 2) ? 3 : 2;
+            ppu2001UpdateDelay = 2; // TriCNES: always 2 (was phase 2=3, others=2)
             ppu2001PendingValue = value;
 
             // Emphasis bits: independent delay (TriCNES: PPU_Update2001EmphasisBitsDelay)
@@ -1744,7 +1736,7 @@ namespace AprNes
             ppu2005PendingIsSecond = vram_latch;
             // TriCNES: alignment 0,1,3=1cycle; alignment 2=2cycles
             // TriCNES: case 0,3=1cycle; case 1,2=2cycles
-            ppu2005UpdateDelay = ((mcPpuClock & 3) == 1 || (mcPpuClock & 3) == 2) ? 2 : 1;
+            ppu2005UpdateDelay = ((mcPpuClock & 3) == 2) ? 2 : 1; // TriCNES: phase 2=2, others=1
             vram_latch = !vram_latch;
         }
         static void ppu_w_2006(byte value)
@@ -1761,7 +1753,7 @@ namespace AprNes
                 ppu2006PendingAddr = vram_addr_internal;
                 // TriCNES: alignment 0,1,3=4cycles; alignment 2=5cycles
                 // TriCNES: case 0,3=4cycles; case 1,2=5cycles
-                ppu2006UpdateDelay = ((mcPpuClock & 3) == 1 || (mcPpuClock & 3) == 2) ? 5 : 4;
+                ppu2006UpdateDelay = ((mcPpuClock & 3) == 2) ? 5 : 4; // TriCNES: phase 2=5, others=4
             }
             vram_latch = !vram_latch;
         }
