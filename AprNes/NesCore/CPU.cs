@@ -16,6 +16,7 @@ namespace AprNes
         static bool irqLineCurrent = false;    // IRQ level detector (TriCNES: IRQ_LevelDetector)
         static bool cpuIsRead = true;          // R/W pin: true=read, false=write (TriCNES: CPU_Read)
         static byte prevFlagI = 1;             // I flag captured at start of CPU cycle (for IRQ polling)
+        static bool pollCantDisableIRQ = false; // TriCNES: PollInterrupts_CantDisableIRQ (branch page-cross)
         static public bool statusmapperint = false;
         // Per-cycle state machine state
         static byte operationCycle = 0;   // 0 = opcode fetch, 1..N = subsequent cycles
@@ -121,17 +122,28 @@ namespace AprNes
             // BRK/NMI/IRQ handler (opcode 0x00) does NOT poll at end (TriCNES line 4229)
             if (opcode != 0x00)
             {
-                // NMI edge detection
+                // NMI edge detection (always runs)
                 nmiPrevPinsSignal = nmiPinsSignal;
                 nmiPinsSignal = NMILine;
                 if (nmiPinsSignal && !nmiPrevPinsSignal)
                     doNMI = true;
                 // IRQ level detection
-                byte irqPollI = (opcode == 0x40) ? flagI : prevFlagI;
-                irq_pending = (irqPollI == 0 && IRQLine);
+                if (pollCantDisableIRQ)
+                {
+                    // TriCNES: PollInterrupts_CantDisableIRQ — only set if not already pending
+                    // Protects first poll's detection from being overridden
+                    if (!irq_pending)
+                        irq_pending = (prevFlagI == 0 && IRQLine);
+                    pollCantDisableIRQ = false;
+                }
+                else
+                {
+                    byte irqPollI = (opcode == 0x40) ? flagI : prevFlagI;
+                    irq_pending = (irqPollI == 0 && IRQLine);
+                }
             }
 
-            operationCycle = 0xFF; // will be incremented to 0 at end of cpu_step_one_cycle
+            operationCycle = 0xFF;
             addressBus = r_PC;
             cpuIsRead = true;
         }
@@ -500,7 +512,15 @@ namespace AprNes
             {
                 GetImmediate();
                 if (!condition) CompleteOperation();
-                else branchIrqSaved = IRQLine; // save before taken-dummy tick
+                else
+                {
+                    // TriCNES: PollInterrupts at cycle 1 of taken branch
+                    nmiPrevPinsSignal = nmiPinsSignal;
+                    nmiPinsSignal = NMILine;
+                    if (nmiPinsSignal && !nmiPrevPinsSignal) doNMI = true;
+                    irq_pending = (prevFlagI == 0 && IRQLine);
+                    branchIrqSaved = IRQLine;
+                }
             }
             else if (operationCycle == 2)
             {
@@ -510,7 +530,8 @@ namespace AprNes
                 addressBus = r_PC;
                 if ((temporaryAddress & 0xFF00) == (r_PC & 0xFF00))
                 {
-                    IRQLine = branchIrqSaved; // restore: IRQ penultimate = pre-branch state
+                    IRQLine = branchIrqSaved;
+                    pollCantDisableIRQ = true; // protect cycle 1's irq_pending
                     CompleteOperation();
                 }
             }
@@ -518,6 +539,7 @@ namespace AprNes
             {
                 CpuRead(addressBus); // dummy read (page fix)
                 r_PC = (ushort)((r_PC & 0xFF) | (temporaryAddress & 0xFF00));
+                pollCantDisableIRQ = true; // TriCNES: CantDisableIRQ at cycle 3
                 CompleteOperation();
             }
         }
