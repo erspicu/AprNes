@@ -190,7 +190,7 @@ namespace AprNes
                 apuHalfFrame = true;
             }
             // Deferred reset (same as $4017 write mechanism)
-            apuFrameCounter = 0;
+            // Don't zero counter directly — let deferred countdown handle it (TriCNES model)
             apuFrameCounterReset = (byte)(mcApuPutCycle ? 3 : 4);
 
             // 清除 IRQ flags
@@ -300,9 +300,7 @@ namespace AprNes
             apucycle    = 0;
             ctrmode = 4;
             apuintflag = false;
-            // Power-on: implicit $4017=$00 write (NES hardware)
-            // Pre-advance counter by CPU reset sequence (7 reset cycles + 2 alignment)
-            // Old model: framectrdiv = 7458 - 9 = 7449. New model: start counter at 9.
+            // Power-on: pre-advance counter by CPU reset sequence (7+2=9 cycles)
             apuFrameCounter = 9;
             apuFrameCounterReset = 0xFF;
 
