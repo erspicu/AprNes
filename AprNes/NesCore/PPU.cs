@@ -151,7 +151,7 @@ namespace AprNes
 
         static int vram_addr_internal = 0, vram_addr = 0, scrol_y = 0, FineX = 0;
         static bool vram_latch = false;
-        static byte ppu_2007_buffer = 0, ppu_2007_temp = 0;
+        static byte ppu_2007_buffer = 0;
         // $2007 state machine (TriCNES model: PPU_Data_StateMachine)
         // States: 9=idle, 0=just accessed, 1=buffer update, 3=write execute, 4=increment
         static int ppu2007SM = 9;
@@ -962,7 +962,7 @@ namespace AprNes
             {
                 int L = (scanline << 9) | cx;
                 if (L == L_NTSC_VBL_START)         // scanline 241, dot 1
-                { if (!SuppressVbl) pendingVblank = true; SuppressVbl = false; }
+                    pendingVblank = true;
                 else if (L == L_NTSC_SPRITE_RESET) // scanline 261, dot 1
                     { isSprite0hit = isSpriteOverflow = false; pendingSprite0Hit = false; }
                 else if (L == L_NTSC_VBL_END)      // scanline 261, dot 2
@@ -1003,7 +1003,7 @@ namespace AprNes
             {
                 int L = (scanline << 9) | cx;
                 if (L == L_PAL_VBL_START)         // scanline 241, dot 1
-                { if (!SuppressVbl) pendingVblank = true; SuppressVbl = false; }
+                    pendingVblank = true;
                 else if (L == L_PAL_SPRITE_RESET) // scanline 311, dot 1
                     { isSprite0hit = isSpriteOverflow = false; pendingSprite0Hit = false; }
                 else if (L == L_PAL_VBL_END)      // scanline 311, dot 2
@@ -1032,7 +1032,7 @@ namespace AprNes
             {
                 int L = (scanline << 9) | cx;
                 if (L == L_DENDY_VBL_START)         // scanline 291, dot 1
-                { if (!SuppressVbl) pendingVblank = true; SuppressVbl = false; }
+                    pendingVblank = true;
                 else if (L == L_DENDY_SPRITE_RESET) // scanline 311, dot 1
                     { isSprite0hit = isSpriteOverflow = false; pendingSprite0Hit = false; }
                 else if (L == L_DENDY_VBL_END)      // scanline 311, dot 2
@@ -1616,7 +1616,6 @@ namespace AprNes
             }
         }
 
-        static bool SuppressVbl = false;
         static bool pendingVblank = false; // half-dot VBL latch (TriCNES: PPU_PendingVBlank)
         static bool pendingSprite0Hit = false; // half-dot sprite 0 hit latch (TriCNES: PPUStatus_PendingSpriteZeroHit)
 
@@ -1625,7 +1624,6 @@ namespace AprNes
         static byte* sprLinePri;     // 256 entries: priority (0=front, 1=behind BG)
         static byte* sprLineSet;     // 256 entries: 1=sprite pixel present, 0=empty
         static byte* sprLinePalIdx;  // 256 entries: raw palette index (for NTSC analog)
-        static bool sprLineReady = false; // true after RenderSpritesLine fills buffers
         //ref http://wiki.nesdev.com/w/index.php/PPU_scrolling
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ppu_r_2002()

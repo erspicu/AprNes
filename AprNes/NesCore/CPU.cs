@@ -11,7 +11,6 @@ namespace AprNes
         static unsafe delegate*<void>[] opFnPtrs = new delegate*<void>[256];
 
         static public bool exit = false;
-        // nmi_pending removed — replaced by NMILine edge detection in MasterClockTick
         static bool irq_pending = false;
         static bool IRQLine = false;           // Latched from irqLineCurrent at CPUClock==5 (TriCNES: IRQLine)
         static bool irqLineCurrent = false;    // IRQ level detector (TriCNES: IRQ_LevelDetector)
