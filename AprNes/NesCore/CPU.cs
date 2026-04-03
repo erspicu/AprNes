@@ -15,6 +15,7 @@ namespace AprNes
         static bool IRQLine = false;           // Latched from irqLineCurrent at CPUClock==5 (TriCNES: IRQLine)
         static bool irqLineCurrent = false;    // IRQ level detector (TriCNES: IRQ_LevelDetector)
         static bool cpuIsRead = true;          // R/W pin: true=read, false=write (TriCNES: CPU_Read)
+        static byte prevFlagI = 1;             // I flag captured at start of CPU cycle (for IRQ polling)
         static public bool statusmapperint = false;
         // Per-cycle state machine state
         static byte operationCycle = 0;   // 0 = opcode fetch, 1..N = subsequent cycles
@@ -116,9 +117,23 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void CompleteOperation()
         {
+            // PollInterrupts at end of instruction (TriCNES: called before CompleteOperation)
+            // BRK/NMI/IRQ handler (opcode 0x00) does NOT poll at end (TriCNES line 4229)
+            if (opcode != 0x00)
+            {
+                // NMI edge detection
+                nmiPrevPinsSignal = nmiPinsSignal;
+                nmiPinsSignal = NMILine;
+                if (nmiPinsSignal && !nmiPrevPinsSignal)
+                    doNMI = true;
+                // IRQ level detection
+                byte irqPollI = (opcode == 0x40) ? flagI : prevFlagI;
+                irq_pending = (irqPollI == 0 && IRQLine);
+            }
+
             operationCycle = 0xFF; // will be incremented to 0 at end of cpu_step_one_cycle
             addressBus = r_PC;
-            cpuIsRead = true; // TriCNES: CPU_Read = true at instruction boundary
+            cpuIsRead = true;
         }
 
         // --- Operation helpers ---

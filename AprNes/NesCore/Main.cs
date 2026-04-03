@@ -584,29 +584,16 @@ namespace AprNes
                 }
                 else
                 {
-                    // NMI/IRQ polling at instruction boundary (TriCNES: PollInterrupts)
+                    // Act on interrupt flags set by PollInterrupts (called in CompleteOperation)
                     if (operationCycle == 0)
                     {
-                        nmiPrevPinsSignal = nmiPinsSignal;
-                        nmiPinsSignal = NMILine;
-                        if (nmiPinsSignal && !nmiPrevPinsSignal)
-                        { doNMI = true; }
+                        if (doNMI) { /* already set by CompleteOperation */ }
                         else if (irq_pending)
                         { irq_pending = false; doIRQ = true; }
                     }
 
-                    byte prevFlagI = flagI;
+                    prevFlagI = flagI;
                     cpu_step_one_cycle();
-
-                    // End-of-instruction: IRQ polling
-                    if (operationCycle == 0)
-                    {
-                        if (opcode != 0x00)
-                        {
-                            byte irqPollI = (opcode == 0x40) ? flagI : prevFlagI;
-                            irq_pending = (irqPollI == 0 && IRQLine);
-                        }
-                    }
                 }
 
                 // Mapper callback (TriCNES: at CPUClock==0, after _6502)
