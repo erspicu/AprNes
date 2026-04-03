@@ -179,19 +179,19 @@ namespace AprNes
         static void apuSoftReset()
         {
             apucycle = 0;
-            cpuCycleCount = 7;
 
             // Re-apply last $4017 value (nesdev: "at reset, $4017 rewritten with last value")
             ctrmode    = ((last4017Val & 0x80) != 0) ? 5 : 4;
             apuintflag = (last4017Val & 0x40) != 0;
-            if (apuintflag) statusframeint = false;
+            if (apuintflag) { statusframeint = false; irqLineCurrent = false; UpdateIRQLine(); }
             if (ctrmode == 5)
             {
                 apuQuarterFrame = true;
                 apuHalfFrame = true;
             }
+            // Deferred reset (same as $4017 write mechanism)
             apuFrameCounter = 0;
-            apuFrameCounterReset = 0xFF;
+            apuFrameCounterReset = (byte)(mcApuPutCycle ? 3 : 4);
 
             // 清除 IRQ flags
             statusframeint = false;
