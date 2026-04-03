@@ -203,6 +203,19 @@ namespace AprNes
         static bool NMILine = false;              // NMI level signal (set at CPUClock==8)
         static bool nmiPinsSignal = false;        // Latched NMILine at last instruction boundary
         static bool nmiPrevPinsSignal = false;    // Previous latch (for edge detection)
+
+        // TriCNES VBL latch pipeline: pendingVblank → ppuVSET → Latch1/Latch2 → isVblank
+        static bool ppuVSET = false;              // TriCNES: PPU_VSET
+        static bool ppuVSET_Latch1 = false;       // TriCNES: PPU_VSET_Latch1
+        static bool ppuVSET_Latch2 = false;       // TriCNES: PPU_VSET_Latch2
+
+        // TriCNES Sprite0 hit pipeline: pending → pending2 → actual (1.5 dot delay)
+        static bool pendingSprite0Hit2 = false;    // TriCNES: PPUStatus_PendingSpriteZeroHit2
+
+        // Delayed flag snapshots for $2002 split-timing read
+        static bool isSprite0hit_Delayed = false;  // TriCNES: PPUStatus_SpriteZeroHit_Delayed
+        static bool isSpriteOverflow_Delayed = false; // TriCNES: PPUStatus_SpriteOverflow_Delayed
+
         //https://wiki.nesdev.com/w/index.php/PPU_scrolling
 
         #region cycle-accurate PPU
@@ -552,19 +565,23 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_half_step()
         {
-            // VBL half-dot latch: promote pending → actual (TriCNES: PPU_PendingVBlank → PPUStatus_VBlank)
-            if (pendingVblank)
-            {
-                pendingVblank = false;
-                isVblank = true;
-            }
+            // ── VBL latch pipeline (TriCNES: _EmulateHalfPPU lines 1833-1840) ──
+            // Stage 2: pendingVblank → ppuVSET
+            ppuVSET = false;
+            if (pendingVblank) { pendingVblank = false; ppuVSET = true; }
+            // Stage 3: Latch2 = !Latch1 (from previous full step)
+            ppuVSET_Latch2 = !ppuVSET_Latch1;
 
-            // Sprite 0 hit half-dot latch: promote pending → actual
-            if (pendingSprite0Hit)
-            {
-                pendingSprite0Hit = false;
-                isSprite0hit = true;
-            }
+            // ── Sprite0 hit pipeline (TriCNES: 1.5 dot delay) ──
+            // Delayed snapshot for $2002 read (before promotion)
+            isSprite0hit_Delayed = isSprite0hit;
+            // Stage 2→actual
+            if (pendingSprite0Hit2) { pendingSprite0Hit2 = false; isSprite0hit = true; }
+            // Stage 1→2
+            if (pendingSprite0Hit) { pendingSprite0Hit = false; pendingSprite0Hit2 = true; }
+
+            // Sprite overflow delayed snapshot
+            isSpriteOverflow_Delayed = isSpriteOverflow;
 
             // $2007 state machine half-step tick (fully deferred)
             if (ppu2007SM < 9)
@@ -951,10 +968,15 @@ namespace AprNes
                 if (L == L_VBL_START)
                     pendingVblank = true;
                 else if (L == L_SPRITE_RESET)
-                    { isSprite0hit = isSpriteOverflow = false; pendingSprite0Hit = false; }
+                    { isSprite0hit = isSpriteOverflow = false; pendingSprite0Hit = false; pendingSprite0Hit2 = false; }
                 else if (L == L_VBL_END)
                     isVblank = false;
             }
+
+            // VBL latch Stage 1 (TriCNES: _EmulatePPU lines 1608-1616)
+            ppuVSET_Latch1 = !ppuVSET;
+            if (ppuVSET && !ppuVSET_Latch2)
+                isVblank = true;
 
             // NTSC odd frame dot skip (pre-render line, dot 339)
             if (scanline == preRenderLine && cx == 339)
@@ -1569,7 +1591,8 @@ namespace AprNes
                 vblFlag = false;        // Return VBL=0 to CPU
             }
 
-            openbus = (byte)((vblFlag ? 0x80 : 0) | ((isSprite0hit) ? 0x40 : 0) | ((isSpriteOverflow) ? 0x20 : 0) | (openbus & 0x1f));
+            // TriCNES: VBL read at start, sprite flags read at end (use delayed versions)
+            openbus = (byte)((vblFlag ? 0x80 : 0) | ((isSprite0hit_Delayed) ? 0x40 : 0) | ((isSpriteOverflow_Delayed) ? 0x20 : 0) | (openbus & 0x1f));
 
             isVblank = false;
             NMILine = false;           // Cancel NMI (VBL cleared → NMI condition no longer met)
