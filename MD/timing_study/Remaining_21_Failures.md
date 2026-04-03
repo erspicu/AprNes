@@ -2,7 +2,8 @@
 
 **日期**：2026-04-03
 **分支**：feature/ppu-high-precision  
-**當前**：153/174 (NTSC-only)
+**當前**：154/174 (NTSC-only)  
+**目標**：174/174（回歸 master 水準）
 
 ---
 
