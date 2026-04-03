@@ -408,8 +408,11 @@ namespace AprNes
                     _noiseOut = (lengthctr[3] > 0 && (_noiseLfsr & 1) == 0) ? 1 : 0;
                 }
 
+                // DMC clock (timer -2 per GET cycle, output, buffer→shifter, reload DMA)
+                clockdmc();
+
                 // DMC cooldown (TriCNES: CannotRunDMCDMARightNow -= 2 per GET)
-                if (dmcDmaCooldown > 0) dmcDmaCooldown--;
+                if (dmcDmaCooldown > 0) dmcDmaCooldown -= 2;
             }
             else
             {
@@ -426,10 +429,6 @@ namespace AprNes
             }
 
             // ── Both cycles ──
-
-            // DMC clock (timer -1 per cycle, output, buffer→shifter, reload DMA)
-            // TriCNES: -2 per GET cycle (same net rate as -1 per CPU cycle)
-            clockdmc();
 
             // DMC deferred $4015 status update
             if (dmcStatusDelay > 0)
@@ -677,12 +676,13 @@ namespace AprNes
         }
 
         // =====================================================================
-        // DMC clock — timer + output + buffer→shifter (GET cycle only)
-        // DMA trigger, cooldown, Load DMA, deferred $4015 handled in apu_step
+        // DMC clock — timer -2 per GET cycle (TriCNES model)
+        // Rate table values are in CPU cycles; -2 per GET = -1 per CPU cycle net rate
         // =====================================================================
         static void clockdmc()
         {
-            if (--dmctimer <= 0)
+            dmctimer -= 2;
+            if (dmctimer <= 0)
             {
                 dmctimer = dmcrate;
 
@@ -971,50 +971,33 @@ namespace AprNes
             if (lenCtrEnable[2] == 0) lengthctr[2] = 0;
             if (lenCtrEnable[3] == 0) lengthctr[3] = 0;
 
-            // Always set deferred status (TriCNES: APU_DelayedDMC4015)
-            // Parity: TriCNES sets 3/4 (PUT/GET), same-cycle decrement makes effective 2/3
-            // AprNes APU runs BEFORE CPU, no same-cycle decrement → set 2/3 directly
-            bool getCycle = (cpuCycleCount & 1) == 0;
+            // Deferred status (TriCNES: APU_DelayedDMC4015 = PutCycle ? 3 : 4)
             dmcDelayedEnable = dmcEnable;
-            dmcStatusDelay = getCycle ? 4 : 3;
+            dmcStatusDelay = mcApuPutCycle ? 3 : 4;
 
             if (dmcEnable)
             {
                 if (dmcsamplesleft == 0)
                 {
                     restartdmc();
-                    // TriCNES: DMCDMADelay = 2 (always when restarting)
                     dmcLoadDmaCountdown = 2;
                 }
 
-                // Implicit abort: TriCNES checks (timer==10 && !PutCycle) || (timer==8 && PutCycle)
-                // These are consecutive CPU cycles in TriCNES (timer decrements by 2 on GET cycles).
-                // In AprNes, clockdmc decrements by 1 every cycle, and timer values are
-                // offset by the 3-cycle pending→active conversion delay (bits counter run-out).
-                // Empirically verified: timer=8/9 with matching parity gives correct X=10/11 result.
-                if ((dmctimer == 8 && !getCycle) || (dmctimer == 9 && getCycle))
+                // Implicit abort (TriCNES: timer==10&&!PutCycle || timer==8&&PutCycle)
+                if ((dmctimer == 10 && !mcApuPutCycle) || (dmctimer == 8 && mcApuPutCycle))
                 {
                     dmcImplicitAbortPending = true;
                 }
             }
             else
             {
-                // Cancel pending Load DMA
                 dmcLoadDmaCountdown = 0;
 
-                // Explicit abort: extend delay if timer is at fire boundary
-                // TriCNES: (timer==2 && GET) || (timer==Rate && PUT) — covers 2-cycle window
-                // In AprNes (clockdmc already ran): timer==dmcrate means just fired,
-                // timer==1 means will fire next cycle. Both need extended delay.
-                if (dmctimer == dmcrate)
+                // Explicit abort: extend delay at fire boundary
+                // TriCNES: (timer==2&&!PutCycle) || (timer==Rate&&PutCycle)
+                if ((dmctimer == 2 && !mcApuPutCycle) || (dmctimer == dmcrate && mcApuPutCycle))
                 {
-                    // Just fired (TriCNES Rate&&PUT): effective delay=4
-                    dmcStatusDelay = 4;
-                }
-                else if (dmctimer == 1)
-                {
-                    // About to fire (TriCNES 2&&GET): effective delay=5
-                    dmcStatusDelay = 5;
+                    dmcStatusDelay = mcApuPutCycle ? 5 : 6;
                 }
             }
             statusdmcint = false;
