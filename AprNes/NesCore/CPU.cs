@@ -11,12 +11,9 @@ namespace AprNes
         static unsafe delegate*<void>[] opFnPtrs = new delegate*<void>[256];
 
         static public bool exit = false;
-        static bool irq_pending = false;
         static bool IRQLine = false;           // Latched from irqLineCurrent at CPUClock==5 (TriCNES: IRQLine)
         static bool irqLineCurrent = false;    // IRQ level detector (TriCNES: IRQ_LevelDetector)
         static bool cpuIsRead = true;          // R/W pin: true=read, false=write (TriCNES: CPU_Read)
-        static byte prevFlagI = 1;             // I flag captured at start of CPU cycle (for IRQ polling)
-        static bool pollCantDisableIRQ = false; // TriCNES: PollInterrupts_CantDisableIRQ (branch page-cross)
         static public bool statusmapperint = false;
         // Per-cycle state machine state
         static byte operationCycle = 0;   // 0 = opcode fetch, 1..N = subsequent cycles
@@ -115,37 +112,52 @@ namespace AprNes
         }
 
 
+        // TriCNES: CompleteOperation is minimal — no PollInterrupts inside
+        // Called directly ONLY by BRK handler (opcode 0x00) — which skips PollInterrupts at end
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void CompleteOperation()
+        static void CompleteOperation_NoPoll()
         {
-            // PollInterrupts at end of instruction (TriCNES: called before CompleteOperation)
-            // BRK/NMI/IRQ handler (opcode 0x00) does NOT poll at end (TriCNES line 4229)
-            if (opcode != 0x00)
-            {
-                // NMI edge detection (always runs)
-                nmiPrevPinsSignal = nmiPinsSignal;
-                nmiPinsSignal = NMILine;
-                if (nmiPinsSignal && !nmiPrevPinsSignal)
-                    doNMI = true;
-                // IRQ level detection
-                if (pollCantDisableIRQ)
-                {
-                    // TriCNES: PollInterrupts_CantDisableIRQ — only set if not already pending
-                    // Protects first poll's detection from being overridden
-                    if (!irq_pending)
-                        irq_pending = (prevFlagI == 0 && IRQLine);
-                    pollCantDisableIRQ = false;
-                }
-                else
-                {
-                    byte irqPollI = (opcode == 0x40) ? flagI : prevFlagI;
-                    irq_pending = (irqPollI == 0 && IRQLine);
-                }
-            }
-
             operationCycle = 0xFF;
             addressBus = r_PC;
             cpuIsRead = true;
+            ignoreH = false;
+        }
+
+        // Normal instruction completion: PollInterrupts + CompleteOperation (TriCNES model)
+        // All instructions EXCEPT BRK call this
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void CompleteOperation()
+        {
+            PollInterrupts();
+            operationCycle = 0xFF;
+            addressBus = r_PC;
+            cpuIsRead = true;
+            ignoreH = false;
+        }
+
+        // TriCNES: PollInterrupts — called explicitly by instruction handlers before CompleteOperation
+        // BRK (opcode 0x00) does NOT call this at end of handler (line 4228 comment)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void PollInterrupts()
+        {
+            nmiPrevPinsSignal = nmiPinsSignal;
+            nmiPinsSignal = NMILine;
+            if (nmiPinsSignal && !nmiPrevPinsSignal)
+                doNMI = true;
+            doIRQ = IRQLine && (flagI == 0);
+        }
+
+        // TriCNES: PollInterrupts_CantDisableIRQ — for branch page-cross
+        // Only sets DoIRQ if not already set (protects first poll)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void PollInterruptsCantDisableIRQ()
+        {
+            nmiPrevPinsSignal = nmiPinsSignal;
+            nmiPinsSignal = NMILine;
+            if (nmiPinsSignal && !nmiPrevPinsSignal)
+                doNMI = true;
+            if (!doIRQ)
+                doIRQ = IRQLine && (flagI == 0);
         }
 
         // --- Operation helpers ---
@@ -510,17 +522,11 @@ namespace AprNes
         {
             if (operationCycle == 1)
             {
+                // TriCNES: PollInterrupts at cycle 1 (before branch decision)
+                PollInterrupts();
                 GetImmediate();
-                if (!condition) CompleteOperation();
-                else
-                {
-                    // TriCNES: PollInterrupts at cycle 1 of taken branch
-                    nmiPrevPinsSignal = nmiPinsSignal;
-                    nmiPinsSignal = NMILine;
-                    if (nmiPinsSignal && !nmiPrevPinsSignal) doNMI = true;
-                    irq_pending = (prevFlagI == 0 && IRQLine);
-                    branchIrqSaved = IRQLine;
-                }
+                if (!condition) CompleteOperation_NoPoll(); // poll already done above
+                else branchIrqSaved = IRQLine;
             }
             else if (operationCycle == 2)
             {
@@ -531,16 +537,16 @@ namespace AprNes
                 if ((temporaryAddress & 0xFF00) == (r_PC & 0xFF00))
                 {
                     IRQLine = branchIrqSaved;
-                    pollCantDisableIRQ = true; // protect cycle 1's irq_pending
-                    CompleteOperation();
+                    CompleteOperation_NoPoll(); // cycle 1 poll is sufficient
                 }
             }
             else
             {
+                // TriCNES: PollInterrupts_CantDisableIRQ at page-cross cycle 3
+                PollInterruptsCantDisableIRQ();
                 CpuRead(addressBus); // dummy read (page fix)
                 r_PC = (ushort)((r_PC & 0xFF) | (temporaryAddress & 0xFF00));
-                pollCantDisableIRQ = true; // TriCNES: CantDisableIRQ at cycle 3
-                CompleteOperation();
+                CompleteOperation_NoPoll();
             }
         }
 
@@ -649,16 +655,8 @@ namespace AprNes
                         StackPush(pushed);
                     }
                     else { CpuRead((ushort)(0x100 | r_SP)); r_SP--; }
-                    // PollInterrupts at cycle 4 (TriCNES model):
-                    // Full edge detection for NMI (same as CompleteOperation PollInterrupts)
-                    {
-                        nmiPrevPinsSignal = nmiPinsSignal;
-                        nmiPinsSignal = NMILine;
-                        if (nmiPinsSignal && !nmiPrevPinsSignal)
-                            doNMI = true;
-                    }
-                    // IRQ level detection
-                    if (!doNMI && IRQLine && flagI == 0) { doIRQ = true; }
+                    // PollInterrupts at BRK cycle 4 (TriCNES: exact same as PollInterrupts())
+                    PollInterrupts();
                     break;
                 case 5:
                     if (doNMI) r_PC = (ushort)((r_PC & 0xFF00) | CpuRead(0xFFFA));
@@ -674,12 +672,12 @@ namespace AprNes
                     {
                         Console.WriteLine("soft reset !");
                         NMILine = false; nmiPinsSignal = false; nmiPrevPinsSignal = false;
-                        irq_pending = false; IRQLine = false; statusmapperint = false;
+                        IRQLine = false; statusmapperint = false;
                         apuSoftReset(); strobeWritePending = 0; P1_LastWrite = 0;
                     }
-                    CompleteOperation();
+                    CompleteOperation_NoPoll(); // BRK does NOT poll at end (TriCNES line 4228)
                     doReset = false; doNMI = false; doIRQ = false; doBRK = false; flagI = 1;
-                    IRQLine = false; // TriCNES: clear IRQLine after interrupt service
+                    IRQLine = false;
                     break;
             }
         }
@@ -1222,13 +1220,14 @@ namespace AprNes
         static void Op_9A() { r_SP = r_X; CpuRead(addressBus); CompleteOperation(); }
 
         // === Flag instructions ===
-        static void Op_18() { CpuRead(addressBus); flagC = 0; CompleteOperation(); }
-        static void Op_38() { CpuRead(addressBus); flagC = 1; CompleteOperation(); }
-        static void Op_58() { CpuRead(addressBus); flagI = 0; CompleteOperation(); }
-        static void Op_78() { CpuRead(addressBus); flagI = 1; CompleteOperation(); }
-        static void Op_D8() { CpuRead(addressBus); flagD = 0; CompleteOperation(); }
-        static void Op_F8() { CpuRead(addressBus); flagD = 1; CompleteOperation(); }
-        static void Op_B8() { CpuRead(addressBus); flagV = 0; CompleteOperation(); }
+        static void Op_18() { CpuRead(addressBus); PollInterrupts(); flagC = 0; CompleteOperation_NoPoll(); }
+        static void Op_38() { CpuRead(addressBus); PollInterrupts(); flagC = 1; CompleteOperation_NoPoll(); }
+        // TriCNES: PollInterrupts BEFORE flag change for all flag-set/clear instructions
+        static void Op_58() { CpuRead(addressBus); PollInterrupts(); flagI = 0; CompleteOperation_NoPoll(); }
+        static void Op_78() { CpuRead(addressBus); PollInterrupts(); flagI = 1; CompleteOperation_NoPoll(); }
+        static void Op_D8() { CpuRead(addressBus); PollInterrupts(); flagD = 0; CompleteOperation_NoPoll(); }
+        static void Op_F8() { CpuRead(addressBus); PollInterrupts(); flagD = 1; CompleteOperation_NoPoll(); }
+        static void Op_B8() { CpuRead(addressBus); PollInterrupts(); flagV = 0; CompleteOperation_NoPoll(); }
 
         // === Stack instructions ===
         static void Op_48() {
@@ -1244,10 +1243,10 @@ namespace AprNes
             else if (operationCycle == 2) { CpuRead((ushort)(0x100 | r_SP)); r_SP++; }
             else { r_A = CpuRead((ushort)(0x100 | r_SP)); SetNZ(r_A); CompleteOperation(); }
         }
-        static void Op_28() {
+        static void Op_28() { // PLP
             if (operationCycle < 2) CpuRead(addressBus);
             else if (operationCycle == 2) { CpuRead((ushort)(0x100 | r_SP)); r_SP++; }
-            else { SetFlag(CpuRead((ushort)(0x100 | r_SP))); CompleteOperation(); }
+            else { PollInterrupts(); SetFlag(CpuRead((ushort)(0x100 | r_SP))); CompleteOperation_NoPoll(); }
         }
 
         // === Branches ===

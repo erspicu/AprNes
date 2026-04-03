@@ -246,7 +246,7 @@ namespace AprNes
 
             // CPU interrupt state
             NMILine = false; nmiPinsSignal = false; nmiPrevPinsSignal = false;
-            irq_pending = false; IRQLine = false; irqLineCurrent = false;
+            IRQLine = false; irqLineCurrent = false;
             statusmapperint = false;
             doNMI = false; doIRQ = false; doReset = false; doBRK = false; softreset = false;
 
@@ -543,8 +543,6 @@ namespace AprNes
             Console.WriteLine("exit..");
         }
 
-        static bool nmi_just_deferred = false; // defer NMI by 1 instruction after BRK/NMI/IRQ handler
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void MasterClockTick()
         {
@@ -557,7 +555,6 @@ namespace AprNes
                 // CPU cycle housekeeping
                 cpuCycleCount++;
 
-
                 // DMA gate: steal cycle only on read cycles (TriCNES: CPU_Read gate)
                 if ((dmcDmaRunning || spriteDmaTransfer) && cpuIsRead)
                 {
@@ -565,21 +562,12 @@ namespace AprNes
                 }
                 else
                 {
-                    // Act on interrupt flags at instruction boundary
-                    if (operationCycle == 0)
-                    {
-                        if (doNMI && !nmi_just_deferred) { /* NMI already set by CompleteOperation */ }
-                        else if (nmi_just_deferred) { nmi_just_deferred = false; }
-                        else if (irq_pending)
-                        { irq_pending = false; doIRQ = true; }
-                    }
+                    // TriCNES model: doNMI/doIRQ set directly by PollInterrupts
+                    // (called in CompleteOperation of previous instruction)
+                    // No irq_pending conversion, no nmi_just_deferred — flags used directly
+                    // by cpu_step_one_cycle's operationCycle==0 block
 
-                    prevFlagI = flagI;
                     cpu_step_one_cycle();
-
-                    // After BRK/NMI/IRQ handler completes: defer NMI by 1 instruction
-                    if (operationCycle == 0 && opcode == 0x00 && doNMI)
-                        nmi_just_deferred = true;
                 }
 
                 // Mapper callback (TriCNES: at CPUClock==0, after _6502)
