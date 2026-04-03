@@ -1645,7 +1645,7 @@ namespace AprNes
             prevRenderingEnabled = newRenderingInstant;
 
             // Tier 2: Delayed mask flags (ShowBG/ShowSprites/Left8)
-            ppu2001UpdateDelay = 2; // TriCNES: always 2 (was phase 2=3, others=2)
+            ppu2001UpdateDelay = ((mcPpuClock & 3) == 2) ? 3 : 2; // TriCNES: phase 2=3, others=2
             ppu2001PendingValue = value;
 
             // Emphasis bits: independent delay (TriCNES: PPU_Update2001EmphasisBitsDelay)
