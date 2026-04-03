@@ -266,6 +266,7 @@ namespace AprNes
             flagN = 0; flagV = 0; flagD = 0; flagI = 1; flagZ = 0; flagC = 0;
             opcode = 0; operationCycle = 0;
             cpubus = 0; cpuBusAddr = 0; addressBus = 0; dl = 0; ignoreH = false;
+            cpuIsRead = true;
 
 
             // CPU interrupt state
@@ -576,8 +577,8 @@ namespace AprNes
                 cpuCycleCount++;
 
 
-                // DMA gate: if DMA pending, steal this cycle (TriCNES: _6502 DMA check)
-                if (dmcDmaRunning || spriteDmaTransfer)
+                // DMA gate: steal cycle only on read cycles (TriCNES: CPU_Read gate)
+                if ((dmcDmaRunning || spriteDmaTransfer) && cpuIsRead)
                 {
                     DmaOneCycle();
                 }

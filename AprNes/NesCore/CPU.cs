@@ -14,6 +14,7 @@ namespace AprNes
         static bool irq_pending = false;
         static bool IRQLine = false;           // Latched from irqLineCurrent at CPUClock==5 (TriCNES: IRQLine)
         static bool irqLineCurrent = false;    // IRQ level detector (TriCNES: IRQ_LevelDetector)
+        static bool cpuIsRead = true;          // R/W pin: true=read, false=write (TriCNES: CPU_Read)
         static public bool statusmapperint = false;
         // Per-cycle state machine state
         static byte operationCycle = 0;   // 0 = opcode fetch, 1..N = subsequent cycles
@@ -64,7 +65,7 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte CpuRead(ushort addr)
         {
-            cpuBusAddr = addr;
+            cpuBusAddr = addr; cpuIsRead = true;
             byte val;
             if (addr < 0x2000) { val = NES_MEM[addr & 0x7FF]; cpubus = val; }
             else { val = mem_read_fun[addr](addr); if (addr != 0x4015) cpubus = val; }
@@ -74,7 +75,7 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void CpuWrite(ushort addr, byte val)
         {
-            cpuBusAddr = addr;
+            cpuBusAddr = addr; cpuIsRead = false;
             // Implicit abort: DMA cancelled on write cycle (still in halt phase)
             if (dmcImplicitAbortActive && dmcDmaHalt)
             { dmcImplicitAbortActive = false; dmcDmaRunning = false; dmcDmaHalt = false; }
@@ -85,7 +86,7 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte CpuReadZP(byte addr)
         {
-            cpuBusAddr = addr;
+            cpuBusAddr = addr; cpuIsRead = true;
             byte val = NES_MEM[addr]; cpubus = val;
             return val;
         }
@@ -93,7 +94,7 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void CpuWriteZP(byte addr, byte val)
         {
-            cpuBusAddr = addr;
+            cpuBusAddr = addr; cpuIsRead = false;
             NES_MEM[addr] = val; cpubus = val;
         }
 
@@ -117,6 +118,7 @@ namespace AprNes
         {
             operationCycle = 0xFF; // will be incremented to 0 at end of cpu_step_one_cycle
             addressBus = r_PC;
+            cpuIsRead = true; // TriCNES: CPU_Read = true at instruction boundary
         }
 
         // --- Operation helpers ---
