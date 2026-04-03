@@ -359,7 +359,10 @@ namespace AprNes
         }
 
         // =====================================================================
-        // APU Step — 每個 CPU cycle 呼叫一次
+        // APU Step — TriCNES _EmulateAPU() order:
+        //   GET cycle: Pulse/Noise timers, DMC clock, DMC cooldown
+        //   PUT cycle: DMC Load DMA countdown
+        //   Both:      DMC $4015 delay, Triangle timer, Frame counter, Quarter/Half frame
         // =====================================================================
         static void apu_step()
         {
@@ -368,14 +371,97 @@ namespace AprNes
             lengthClockThisCycle[0] = lengthClockThisCycle[1] =
             lengthClockThisCycle[2] = lengthClockThisCycle[3] = 0;
 
-            // Snapshot lengthctr for $4015 reads (pre-step values, compensates tick-before-read)
+            // Snapshot lengthctr for $4015 reads (pre-step values)
             lengthctr_snapshot[0] = lengthctr[0];
             lengthctr_snapshot[1] = lengthctr[1];
             lengthctr_snapshot[2] = lengthctr[2];
             lengthctr_snapshot[3] = lengthctr[3];
 
-            // ── Frame Counter — TriCNES count-up model ──
-            // Deferred $4017 reset countdown
+            // ── GET cycle block (TriCNES: !APU_PutCycle) ──
+            if (!mcApuPutCycle)
+            {
+                // Pulse & Noise timers (every GET cycle = every 2 CPU cycles)
+                {
+                    int p0 = _pulsePeriod[0], p1 = _pulsePeriod[1];
+                    int d0 = _pulseDuty[0],   d1 = _pulseDuty[1];
+                    int lc0 = lengthctr[0],   lc1 = lengthctr[1];
+                    int sw0 = sweepsilence[0], sw1 = sweepsilence[1];
+
+                    if (--_pulseTimer[0] < 0)
+                    { _pulseTimer[0] = p0; _pulseSeq[0] = (_pulseSeq[0] + 1) & 7; }
+                    _pulseOut[0] = (p0 >= 8 && lc0 > 0 && sw0 == 0)
+                        ? DUTYLOOKUP[d0 * 8 + _pulseSeq[0]] : 0;
+
+                    if (--_pulseTimer[1] < 0)
+                    { _pulseTimer[1] = p1; _pulseSeq[1] = (_pulseSeq[1] + 1) & 7; }
+                    _pulseOut[1] = (p1 >= 8 && lc1 > 0 && sw1 == 0)
+                        ? DUTYLOOKUP[d1 * 8 + _pulseSeq[1]] : 0;
+
+                    if (--_noiseTimer < 0)
+                    {
+                        _noiseTimer = noiseperiod[_noisePeriodIdx] >> 1;
+                        int fb = _noiseMode
+                            ? ((_noiseLfsr & 1) ^ ((_noiseLfsr >> 6) & 1))
+                            : ((_noiseLfsr & 1) ^ ((_noiseLfsr >> 1) & 1));
+                        _noiseLfsr = (ushort)((_noiseLfsr >> 1) | (fb << 14));
+                    }
+                    _noiseOut = (lengthctr[3] > 0 && (_noiseLfsr & 1) == 0) ? 1 : 0;
+                }
+
+                // DMC cooldown (TriCNES: CannotRunDMCDMARightNow -= 2 per GET)
+                if (dmcDmaCooldown > 0) dmcDmaCooldown--;
+            }
+            else
+            {
+                // ── PUT cycle block (TriCNES: APU_PutCycle) ──
+
+                // DMC Load DMA countdown (from $4015 write)
+                // TriCNES: DMCDMADelay decrements on PUT cycles
+                if (dmcLoadDmaCountdown > 0)
+                {
+                    --dmcLoadDmaCountdown;
+                    if (dmcLoadDmaCountdown == 0 && dmcBufferEmpty && dmcsamplesleft > 0)
+                        dmcStartTransfer();
+                }
+            }
+
+            // ── Both cycles ──
+
+            // DMC clock (timer -1 per cycle, output, buffer→shifter, reload DMA)
+            // TriCNES: -2 per GET cycle (same net rate as -1 per CPU cycle)
+            clockdmc();
+
+            // DMC deferred $4015 status update
+            if (dmcStatusDelay > 0)
+            {
+                --dmcStatusDelay;
+                if (dmcStatusDelay == 0)
+                {
+                    dmcStatusEnabled = dmcDelayedEnable;
+                    if (!dmcDelayedEnable)
+                    {
+                        dmcsamplesleft = 0;
+                        dmcStopTransfer();
+                    }
+                }
+            }
+
+            // Triangle timer (every CPU cycle)
+            {
+                int triPeriod = _triPeriod;
+                int lc2 = lengthctr[2];
+                int linCtr = linearctr;
+                if (--_triTimer < 0)
+                {
+                    _triTimer = triPeriod;
+                    if (linCtr > 0 && lc2 > 0 && triPeriod >= 2)
+                        _triSeq = (_triSeq + 1) & 31;
+                }
+                _triOut = (linCtr > 0 && lc2 > 0 && triPeriod >= 2)
+                    ? TRI_SEQ[_triSeq] : 0;
+            }
+
+            // ── Frame Counter (TriCNES: after timers) ──
             if ((apuFrameCounterReset & 0x80) == 0)
             {
                 apuFrameCounterReset--;
@@ -389,7 +475,6 @@ namespace AprNes
 
             if (ctrmode == 5)
             {
-                // 5-step mode (NTSC: 7457/14913/22371/37281/37282; PAL: 8313/16627/24939/41565/41566)
                 switch (apuFrameCounter)
                 {
                     case 7457: apuQuarterFrame = true; break;
@@ -401,15 +486,12 @@ namespace AprNes
             }
             else
             {
-                // 4-step mode (NTSC: 7457/14913/22371/29828-29830; PAL: 8313/16627/24939/33252-33254)
                 switch (apuFrameCounter)
                 {
                     case 7457: apuQuarterFrame = true; break;
                     case 14913: apuQuarterFrame = true; apuHalfFrame = true; break;
                     case 22371: apuQuarterFrame = true; break;
-                    case 29828:
-                        statusframeint = true;
-                        break;
+                    case 29828: statusframeint = true; break;
                     case 29829:
                         apuQuarterFrame = true; apuHalfFrame = true;
                         statusframeint = true;
@@ -426,63 +508,6 @@ namespace AprNes
             if (apuQuarterFrame) { setenvelope(); setlinctr(); }
             if (apuHalfFrame) { setlength(); setsweep(); }
             if (apuQuarterFrame || apuHalfFrame) setvolumes();
-
-            // Pulse & Noise 計時器：每 2 個 CPU cycles 計數一次 (APU clock)
-            if ((apucycle & 1) == 0)
-            {
-                // Shadow read-only channel state into locals for JIT enregistration
-                int p0 = _pulsePeriod[0], p1 = _pulsePeriod[1];
-                int d0 = _pulseDuty[0],   d1 = _pulseDuty[1];
-                int lc0 = lengthctr[0],   lc1 = lengthctr[1];
-                int sw0 = sweepsilence[0], sw1 = sweepsilence[1];
-
-                // Pulse 1
-                if (--_pulseTimer[0] < 0)
-                {
-                    _pulseTimer[0] = p0;
-                    _pulseSeq[0]   = (_pulseSeq[0] + 1) & 7;
-                }
-                _pulseOut[0] = (p0 >= 8 && lc0 > 0 && sw0 == 0)
-                    ? DUTYLOOKUP[d0 * 8 + _pulseSeq[0]] : 0;
-
-                // Pulse 2
-                if (--_pulseTimer[1] < 0)
-                {
-                    _pulseTimer[1] = p1;
-                    _pulseSeq[1]   = (_pulseSeq[1] + 1) & 7;
-                }
-                _pulseOut[1] = (p1 >= 8 && lc1 > 0 && sw1 == 0)
-                    ? DUTYLOOKUP[d1 * 8 + _pulseSeq[1]] : 0;
-
-                // Noise
-                if (--_noiseTimer < 0)
-                {
-                    _noiseTimer = noiseperiod[_noisePeriodIdx] >> 1;
-                    int fb = _noiseMode
-                        ? ((_noiseLfsr & 1) ^ ((_noiseLfsr >> 6) & 1))
-                        : ((_noiseLfsr & 1) ^ ((_noiseLfsr >> 1) & 1));
-                    _noiseLfsr = (ushort)((_noiseLfsr >> 1) | (fb << 14));
-                }
-                _noiseOut = (lengthctr[3] > 0 && (_noiseLfsr & 1) == 0) ? 1 : 0;
-            }
-
-            // Triangle 計時器：每個 CPU cycle 計數一次
-            {
-                int triPeriod = _triPeriod;
-                int lc2 = lengthctr[2];
-                int linCtr = linearctr;
-                if (--_triTimer < 0)
-                {
-                    _triTimer = triPeriod;
-                    if (linCtr > 0 && lc2 > 0 && triPeriod >= 2)
-                        _triSeq = (_triSeq + 1) & 31;
-                }
-                _triOut = (linCtr > 0 && lc2 > 0 && triPeriod >= 2)
-                    ? TRI_SEQ[_triSeq] : 0;
-            }
-
-            // DMC
-            clockdmc();
 
             // 生成音效樣本
             // 為 Mode 0/1 計算相容的單一 mapperExpansionAudio 值
@@ -652,15 +677,15 @@ namespace AprNes
         }
 
         // =====================================================================
-        // DMC (Delta Modulation Channel)
+        // DMC clock — timer + output + buffer→shifter (GET cycle only)
+        // DMA trigger, cooldown, Load DMA, deferred $4015 handled in apu_step
         // =====================================================================
         static void clockdmc()
         {
             if (--dmctimer <= 0)
             {
-                dmctimer = dmcrate; // reload with current period
+                dmctimer = dmcrate;
 
-                // NES hardware order: output → shift → decrement → check zero
                 if (!dmcsilence)
                 {
                     dmcvalue += ((dmcshiftregister & 1) != 0) ? 2 : -2;
@@ -683,35 +708,10 @@ namespace AprNes
                 }
             }
 
-            // Don't trigger new DMA during active DMA
-            if (dmcDmaRunning) goto deferredStatus;
-
-            // TriCNES: CannotRunDMCDMARightNow cooldown (blocks back-to-back DMA)
-            if (dmcDmaCooldown > 0) dmcDmaCooldown--;
-
-            // Handle Load DMA countdown (scheduled DMA from $4015 write)
-            // TriCNES: DMCDMADelay=2, decremented on PUT cycles (_EmulateAPU else branch)
-            // Since our APU runs BEFORE CPU (TriCNES: after), we invert the parity:
-            // decrement on GET cycles to produce the correct 3/4 cycle delay.
-            if (dmcLoadDmaCountdown > 0)
+            // Reload DMA: buffer emptied → request DMA
+            if (!dmcDmaRunning && dmcBufferEmpty && (dmcsamplesleft > 0 || dmcImplicitAbortPending))
             {
-                bool getCycle = (cpuCycleCount & 1) == 0;
-                if (getCycle)
-                {
-                    --dmcLoadDmaCountdown;
-                    if (dmcLoadDmaCountdown == 0 && dmcBufferEmpty && dmcsamplesleft > 0)
-                        dmcStartTransfer();
-                }
-                goto deferredStatus;
-            }
-
-            // Reload DMA: buffer emptied by output unit → request DMA
-            // TriCNES order: DMA trigger BEFORE deferred status (lines 930-953 vs 983-993)
-            // This ensures a timer fire and deferred disable on the same cycle
-            // triggers DMA first, then applies the disable (zeroing dmcsamplesleft).
-            if (dmcBufferEmpty && (dmcsamplesleft > 0 || dmcImplicitAbortPending))
-            {
-                if (dmcDmaCooldown != 2) // block if just finished DMA
+                if (dmcDmaCooldown != 2)
                 {
                     if (dmcImplicitAbortPending)
                     {
@@ -719,26 +719,6 @@ namespace AprNes
                         dmcImplicitAbortPending = false;
                     }
                     dmcStartTransfer();
-                }
-            }
-
-        deferredStatus:
-            // Handle deferred $4015 status update (TriCNES: APU_DelayedDMC4015)
-            // Must decrement EVERY cycle, even during DMA (TriCNES: lines 983-993)
-            // Placed AFTER DMA trigger to match TriCNES ordering.
-            if (dmcStatusDelay > 0)
-            {
-                --dmcStatusDelay;
-                if (dmcStatusDelay == 0)
-                {
-                    dmcStatusEnabled = dmcDelayedEnable;
-                    if (!dmcDelayedEnable)
-                    {
-                        dmcsamplesleft = 0;
-                        dmcStopTransfer();
-                    }
-                    // Note: dmcDelayedEnable intentionally NOT cleared here.
-                    // It serves as "intent" for the DMA gate until the next $4015 write.
                 }
             }
         }
