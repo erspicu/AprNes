@@ -550,9 +550,6 @@ namespace AprNes
             {
                 mcCpuClock = masterPerCpu;
 
-                // CPU cycle housekeeping
-                cpuCycleCount++;
-
                 // DMA gate (TriCNES: exact gate condition from _6502 line 3974)
                 // DMC requires: DoDMCDMA && (APU_Status_DMC || ImplicitAbort) && CPU_Read
                 // OAM requires: DoOAMDMA && CPU_Read
@@ -571,6 +568,9 @@ namespace AprNes
 
                     cpu_step_one_cycle();
                 }
+
+                // TriCNES: totalCycles++ AFTER _6502 (not before)
+                cpuCycleCount++;
 
                 // Mapper callback (TriCNES: at CPUClock==0, after _6502)
                 if (!isFDS) MapperObj.CpuCycle();

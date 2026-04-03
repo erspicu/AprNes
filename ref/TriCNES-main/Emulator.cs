@@ -3984,9 +3984,9 @@ namespace TriCNES
                     IgnoreH = true;
                 }
 
-                if (DoOAMDMA && FirstCycleOfOAMDMA) // interrupt suppression. (There's probably a better way to implement this) if this is the first cycle of the OAM DMA...
+                if (DoOAMDMA && FirstCycleOfOAMDMA) // interrupt suppression
                 {
-                    FirstCycleOfOAMDMA = false; // disable this flag.
+                    FirstCycleOfOAMDMA = false;
                     if (!APU_PutCycle)
                     {
                         OAMDMA_Halt = true;

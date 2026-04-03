@@ -147,13 +147,13 @@ namespace AprNes
             return val;
         }
 
-        // TriCNES: Fetch(addressBus) — read from current CPU address bus
+        // TriCNES: Fetch(addressBus) — read from CPU address bus (PC, not last access target)
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void OamDmaHalted()  { DmaFetch(cpuBusAddr); }
+        static void OamDmaHalted()  { DmaFetch(addressBus); }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void DmcDmaHalted()  { DmaFetch(cpuBusAddr); }
+        static void DmcDmaHalted()  { DmaFetch(addressBus); }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void DmcDmaPut()     { DmaFetch(cpuBusAddr); }
+        static void DmcDmaPut()     { DmaFetch(addressBus); }
 
         // TriCNES: OAMDMA_Get — read source byte into latch
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -180,7 +180,7 @@ namespace AprNes
             }
             else
             {
-                DmaFetch(cpuBusAddr); // alignment cycle
+                DmaFetch(addressBus); // alignment cycle: Fetch(addressBus)
             }
         }
 
