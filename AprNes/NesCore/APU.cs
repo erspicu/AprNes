@@ -147,6 +147,8 @@ namespace AprNes
         static int[] lenCtrReloadValue = new int[4];     // deferred reload value
         // Halt read from register every APU cycle (TriCNES model)
         static byte* apuRegister;       // raw $4000-$400F register values (for halt readback)
+        // TriCNES: halt flags updated every APU cycle from apuRegister (not just at HalfFrame)
+        static bool lenctrHalt0, lenctrHalt1, lenctrHalt2, lenctrHalt3;
 
         // Linear counter (Triangle)
         static int linearctr  = 0;
@@ -504,6 +506,13 @@ namespace AprNes
             else { processLenCtrReloadNonHalf(); }
             setvolumes();
 
+            // TriCNES: halt flags updated from registers EVERY APU cycle (lines 1139-1142)
+            // Not just at HalfFrame — allows mid-frame halt changes to take effect next cycle
+            lenctrHalt0 = (apuRegister[0x0] & 0x20) != 0;
+            lenctrHalt1 = (apuRegister[0x4] & 0x20) != 0;
+            lenctrHalt2 = (apuRegister[0x8] & 0x80) != 0;
+            lenctrHalt3 = (apuRegister[0xC] & 0x20) != 0;
+
             // 生成音效樣本
             // 為 Mode 0/1 計算相容的單一 mapperExpansionAudio 值
             if (expansionChannelCount > 0 && AudioMode < 2)
@@ -610,14 +619,11 @@ namespace AprNes
             for (int i = 0; i < 4; i++)
                 if (lenCtrEnable[i] == 0) lengthctr[i] = 0;
             // 3. Decrement (guarded: !halt && !reloadFlag)
-            bool haltP1 = (apuRegister[0x0] & 0x20) != 0;
-            bool haltP2 = (apuRegister[0x4] & 0x20) != 0;
-            bool haltTri = (apuRegister[0x8] & 0x80) != 0;
-            bool haltNoi = (apuRegister[0xC] & 0x20) != 0;
-            if (lengthctr[0] > 0 && !haltP1 && !lenCtrReloadFlag[0]) lengthctr[0]--;
-            if (lengthctr[1] > 0 && !haltP2 && !lenCtrReloadFlag[1]) lengthctr[1]--;
-            if (lengthctr[2] > 0 && !haltTri && !lenCtrReloadFlag[2]) lengthctr[2]--;
-            if (lengthctr[3] > 0 && !haltNoi && !lenCtrReloadFlag[3]) lengthctr[3]--;
+            // Uses halt flags cached from previous APU cycle (TriCNES: updated every cycle at end)
+            if (lengthctr[0] > 0 && !lenctrHalt0 && !lenCtrReloadFlag[0]) lengthctr[0]--;
+            if (lengthctr[1] > 0 && !lenctrHalt1 && !lenCtrReloadFlag[1]) lengthctr[1]--;
+            if (lengthctr[2] > 0 && !lenctrHalt2 && !lenCtrReloadFlag[2]) lengthctr[2]--;
+            if (lengthctr[3] > 0 && !lenctrHalt3 && !lenCtrReloadFlag[3]) lengthctr[3]--;
             setvolumes();
         }
 
