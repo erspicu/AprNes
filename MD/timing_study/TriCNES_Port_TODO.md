@@ -2,7 +2,7 @@
 
 **日期**：2026-04-03
 **分支**：feature/ppu-high-precision
-**當前**：163/174
+**當前**：167/174
 **目標**：174/174（扣除 5 個 TriCNES 已知錯誤後 = 169/174）
 
 ---
@@ -32,14 +32,22 @@
 
 ## 待移植 — 11 個測試失敗對應的 4 個子系統
 
-### J. DMA OAM/DMC Cycle Count（影響 7 個測試）
-- **測試**：dma_2007_read, dma_2007_write, dma_4016_read, sprdma_and_dmc_dma ×2, irq_and_dma, cpu_interrupts(umbrella)
-- **現況**：per-cycle DmaOneCycle 架構正確，但 OAM+DMC 交互時的 cycle count 比 master 多 ~7 cycles
-- **根因分析**：
-  - DMA dummy read 的 $2007 state machine 互動（bus read 觸發 VRAM address increment）
-  - OAM/DMC 交互時的 halt/alignment 重設邏輯可能多了 extra cycles
-  - irq_and_dma: DMA 期間的 IRQ sampling 時機差異
-- **移植方向**：完整讀取 TriCNES 的 OAMDMA_Get/Put/Halted + DMCDMA_Get/Put/Halted，逐行對比 AprNes 的 OamDmaGet/Put/DmcDmaGet/DmaDummyRead，找出差異
+### J. ~~DMA OAM/DMC dispatch~~ ✅ DONE（+4: irq_and_dma, cpu_interrupts, sprite_overflow 2/4）
+- DMA gate 移至 MasterClockTick（TriCNES exact gate condition）
+- 6 helpers 完整移植，DmaFetch with $4016 masking
+- CpuReadRMW for RMW write-phase cpuIsRead=false
+- implicit abort restored
+
+### J2. PPU $2007 State Machine（影響 3 個測試）
+- **測試**：dma_2007_read, dma_2007_write, dma_4016_read
+- **現況**：AprNes ppu2007SM 是簡化版（9 states）
+- **TriCNES**：PPU_Data_StateMachine 有 mystery write, delayed buffer, early VRAM update, interrupted read-to-write 等完整狀態
+- **移植方向**：完整讀取 TriCNES $2007 state machine（lines 1322-1500），用 AprNes style 重寫
+
+### J3. DMA OAM+DMC Cycle Count（影響 2 個測試）
+- **測試**：sprdma_and_dmc_dma, sprdma_and_dmc_dma_512
+- **現況**：cycle count 528 vs expected ~514
+- **根因**：所有 DMA 組件已對齊 TriCNES，cycle count 差異可能來自 $2007 SM 或其他 PPU/CPU 互動
 
 ### I. MMC3 A12 Notification Timing（影響 2 個測試）
 - **測試**：mmc3_test/4-scanline_timing ×2
