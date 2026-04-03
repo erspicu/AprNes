@@ -2,7 +2,7 @@
 
 **日期**：2026-04-03
 **分支**：feature/ppu-high-precision
-**目前狀態**：150/174 — 架構 + 參數全部對齊 TriCNES ✅
+**目前狀態**：139/174 — 架構 + 參數全部對齊 TriCNES ✅（APU length counter timing 待調）
 
 ---
 
@@ -46,7 +46,11 @@
 ### 13. ~~DMC Rate Table~~ ✅ 已正確
 - AprNes NTSC [428,380,...] 與 TriCNES 一致（之前誤判為 PAL 值）
 
-### 14. APU Frame Counter Init — 暫不修改
-- AprNes 用 countdown reload 模型，TriCNES 用 count-up 比較模型
-- 結構差異大，單純改 init 值無法對齊，需要重寫 frame counter 架構
-- 留待後續獨立處理
+### 14. ~~APU Frame Counter~~ ✅ DONE（架構對齊）
+- countdown/reload 模型替換為 TriCNES count-up/switch 模型
+- framectrdiv → apuFrameCounter (count-up ushort)
+- frameReload4/5 → hardcoded switch (7457/14913/22371/29828-30/37281-82)
+- $4017 write: deferred reset (apuFrameCounterReset = 3 or 4 cycles)
+- IRQ: per-cycle 29828/29829/29830 三階段（取代 irqAssertCycles 機制）
+- 移除: framectrdiv, framectr, frameReload4/5, irqAssertCycles, frameIrqClearPending, clockframecounter()
+- 139/174（+3 recovered: irq_timing, branch_delays_irq, nmi_control。-11 APU length counter timing 待調）

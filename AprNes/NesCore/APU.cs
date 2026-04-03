@@ -113,17 +113,15 @@ namespace AprNes
         // =====================================================================
         static int apucycle = 0;
         static int* noiseperiod;
-        // Per-step reload values for frame counter (non-uniform, matching real NES NTSC timing)
-        // 4-step: steps fire at CPU cycles 7460, 14916, 22374, 29832 from $4017 write (+2 offset)
-        // 5-step: steps fire at CPU cycles 7460, 14916, 22374, 29832, 37284
-        static int* frameReload4;
-        static int* frameReload5;
-        static int framectrdiv = 7458;
+        // Frame counter — TriCNES count-up model
+        // Counter increments every CPU cycle; events fire at hardcoded positions via switch.
+        static ushort apuFrameCounter = 0;        // TriCNES: APU_Framecounter (count-up)
+        static byte apuFrameCounterReset = 0xFF;  // TriCNES: APU_FrameCounterReset (0xFF=inactive, 0-4=countdown)
+        static bool apuQuarterFrame = false;       // TriCNES: APU_QuarterFrameClock
+        static bool apuHalfFrame = false;          // TriCNES: APU_HalfFrameClock
+        static int ctrmode = 4;                    // 4=4-step, 5=5-step
         static bool apuintflag = true, statusdmcint = false, statusframeint = false;
-        static int irqAssertCycles = 0; // post-fire: assert IRQ flag for extra cycles after step 3
-        static bool frameIrqClearPending = false; // deferred $4015 read IRQ clear (fires on next APU "get" cycle)
-        static int framectr = 0, ctrmode = 4;
-        static byte last4017Val = 0;  // track last value written to $4017 for reset
+        static byte last4017Val = 0;
         static byte* lenCtrEnable;
         static byte* lengthClockThisCycle;
         static int* volume;
@@ -186,18 +184,13 @@ namespace AprNes
             ctrmode    = ((last4017Val & 0x80) != 0) ? 5 : 4;
             apuintflag = (last4017Val & 0x40) != 0;
             if (apuintflag) statusframeint = false;
-            framectr   = 0;
             if (ctrmode == 5)
             {
-                setenvelope();
-                setlinctr();
-                setlength();
-                setsweep();
-                setvolumes();
+                apuQuarterFrame = true;
+                apuHalfFrame = true;
             }
-            framectrdiv = (Region == RegionType.PAL) ? 8305 : 7449;
-            irqAssertCycles = 0;
-            frameIrqClearPending = false;
+            apuFrameCounter = 0;
+            apuFrameCounterReset = 0xFF;
 
             // 清除 IRQ flags
             statusframeint = false;
@@ -250,8 +243,6 @@ namespace AprNes
             if (SQUARELOOKUP == null) SQUARELOOKUP = (int*)Marshal.AllocHGlobal(sizeof(int) * 31);
             if (TNDLOOKUP    == null) TNDLOOKUP    = (int*)Marshal.AllocHGlobal(sizeof(int) * 203);
             if (noiseperiod  == null) noiseperiod  = (int*)Marshal.AllocHGlobal(sizeof(int) * 16);
-            if (frameReload4 == null) frameReload4 = (int*)Marshal.AllocHGlobal(sizeof(int) * 4);
-            if (frameReload5 == null) frameReload5 = (int*)Marshal.AllocHGlobal(sizeof(int) * 5);
             if (lengthctr    == null) lengthctr    = (int*)Marshal.AllocHGlobal(sizeof(int) * 4);
             if (lengthctr_snapshot == null) lengthctr_snapshot = (int*)Marshal.AllocHGlobal(sizeof(int) * 4);
             if (lenctrload   == null) lenctrload   = (int*)Marshal.AllocHGlobal(sizeof(int) * 32);
@@ -283,9 +274,6 @@ namespace AprNes
 
             if (Region == RegionType.PAL)
             {
-                frameReload4[0] = 8314; frameReload4[1] = 8314; frameReload4[2] = 8312; frameReload4[3] = 8314;
-                frameReload5[0] = 8314; frameReload5[1] = 8314; frameReload5[2] = 8312; frameReload5[3] = 8314; frameReload5[4] = 8312;
-
                 noiseperiod[0]=4; noiseperiod[1]=8; noiseperiod[2]=14; noiseperiod[3]=30;
                 noiseperiod[4]=60; noiseperiod[5]=88; noiseperiod[6]=118; noiseperiod[7]=148;
                 noiseperiod[8]=188; noiseperiod[9]=236; noiseperiod[10]=354; noiseperiod[11]=472;
@@ -298,9 +286,6 @@ namespace AprNes
             }
             else // NTSC and Dendy (Dendy uses NTSC APU tables)
             {
-                frameReload4[0] = 7458; frameReload4[1] = 7456; frameReload4[2] = 7458; frameReload4[3] = 7458;
-                frameReload5[0] = 7458; frameReload5[1] = 7456; frameReload5[2] = 7458; frameReload5[3] = 7458; frameReload5[4] = 7452;
-
                 noiseperiod[0]=4; noiseperiod[1]=8; noiseperiod[2]=16; noiseperiod[3]=32;
                 noiseperiod[4]=64; noiseperiod[5]=96; noiseperiod[6]=128; noiseperiod[7]=160;
                 noiseperiod[8]=202; noiseperiod[9]=254; noiseperiod[10]=380; noiseperiod[11]=508;
@@ -324,12 +309,12 @@ namespace AprNes
             for (int i = 0; i < 4; i++) { lenCtrEnable[i] = 1; lengthClockThisCycle[i] = 0; lenctrHalt[i] = 1; envConstVolume[i] = 1; envelopeStartFlag[i] = 0; }
             for (int i = 0; i < 2; i++) { sweepenable[i] = 0; sweepnegate[i] = 0; sweepsilence[i] = 0; sweepreload[i] = 0; }
 
-            // framectrdiv: base reload + 1(even jitter) - 9(power-on advance) - 1(tick-before-write compensation)
-            framectrdiv = (Region == RegionType.PAL) ? 8305 : 7449;
-            irqAssertCycles = 0;
+            apuFrameCounter = 0;
+            apuFrameCounterReset = 0xFF;
+            apuQuarterFrame = false;
+            apuHalfFrame = false;
             apucycle    = 0;
-            cpuCycleCount = 7;
-            framectr = 0; ctrmode = 4;
+            ctrmode = 4;
 
             // 聲道計時器重置
             _pulseTimer[0]  = _pulseTimer[1]  = 0;
@@ -403,34 +388,64 @@ namespace AprNes
             lengthctr_snapshot[2] = lengthctr[2];
             lengthctr_snapshot[3] = lengthctr[3];
 
-            // Deferred $4015 IRQ flag clear: fires on APU "get" cycle
-            // Must fire BEFORE frame counter assertion so re-assertion can override
-            if (frameIrqClearPending && (cpuCycleCount & 1) == 0)
+            // ── Frame Counter — TriCNES count-up model ──
+            // Deferred $4017 reset countdown
+            if ((apuFrameCounterReset & 0x80) == 0)
             {
-                statusframeint = false;
-                frameIrqClearPending = false;
-                UpdateIRQLine();
+                apuFrameCounterReset--;
+                if ((apuFrameCounterReset & 0x80) != 0)
+                    apuFrameCounter = 0;
             }
 
-            // Mode 0: IRQ post-fire (continues for 2 cycles after initial set)
-            // Flag is set unconditionally for first 2 cycles, then gated by apuintflag
-            if (irqAssertCycles > 0)
+            apuFrameCounter++;
+            apuQuarterFrame = false;
+            apuHalfFrame = false;
+
+            if (ctrmode == 5)
             {
-                statusframeint = true;
-                frameIrqClearPending = false; // cancel deferred clear — flag was just re-asserted
-                --irqAssertCycles;
-                // On the last assertion cycle, check if suppress flag clears it
-                if (irqAssertCycles == 0 && apuintflag)
-                    statusframeint = false;
-                UpdateIRQLine();
+                // 5-step mode (NTSC: 7457/14913/22371/37281/37282; PAL: 8313/16627/24939/41565/41566)
+                switch (apuFrameCounter)
+                {
+                    case 7457: apuQuarterFrame = true; break;
+                    case 14913: apuQuarterFrame = true; apuHalfFrame = true; break;
+                    case 22371: apuQuarterFrame = true; break;
+                    case 37281: apuQuarterFrame = true; apuHalfFrame = true; break;
+                    case 37282: apuFrameCounter = 0; break;
+                }
+            }
+            else
+            {
+                // 4-step mode (NTSC: 7457/14913/22371/29828-29830; PAL: 8313/16627/24939/33252-33254)
+                switch (apuFrameCounter)
+                {
+                    case 7457: apuQuarterFrame = true; break;
+                    case 14913: apuQuarterFrame = true; apuHalfFrame = true; break;
+                    case 22371: apuQuarterFrame = true; break;
+                    case 29828:
+                        if (Region != RegionType.Dendy) statusframeint = true;
+                        break;
+                    case 29829:
+                        apuQuarterFrame = true; apuHalfFrame = true;
+                        if (Region != RegionType.Dendy)
+                        {
+                            statusframeint = true;
+                            irqLineCurrent |= !apuintflag;
+                        }
+                        break;
+                    case 29830:
+                        if (Region != RegionType.Dendy)
+                        {
+                            statusframeint = !apuintflag;
+                            irqLineCurrent |= !apuintflag;
+                        }
+                        apuFrameCounter = 0;
+                        break;
+                }
             }
 
-            // Frame Counter：non-uniform step intervals matching real NES (~240Hz)
-            if (--framectrdiv <= 0)
-            {
-                clockframecounter(); // increments framectr
-                framectrdiv = (ctrmode == 4) ? frameReload4[framectr] : frameReload5[framectr];
-            }
+            if (apuQuarterFrame) { setenvelope(); setlinctr(); }
+            if (apuHalfFrame) { setlength(); setsweep(); }
+            if (apuQuarterFrame || apuHalfFrame) setvolumes();
 
             // Pulse & Noise 計時器：每 2 個 CPU cycles 計數一次 (APU clock)
             if ((apucycle & 1) == 0)
@@ -568,37 +583,6 @@ namespace AprNes
             }
         }
 
-        // =====================================================================
-        // Frame Counter — 驅動 Envelope、Length Counter、Sweep (~240Hz)
-        // =====================================================================
-        static void clockframecounter()
-        {
-            if ((ctrmode == 4) || (ctrmode == 5 && framectr != 3))
-            {
-                setenvelope();
-                setlinctr();
-            }
-            if ((ctrmode == 4 && (framectr == 1 || framectr == 3)) ||
-                (ctrmode == 5 && (framectr == 1 || framectr == 4)))
-            {
-                setlength();
-                setsweep();
-            }
-            if (framectr == 3 && ctrmode == 4 && Region != RegionType.Dendy)
-            {
-                // Frame IRQ flag is set unconditionally for 3 cycles (even when apuintflag=true)
-                // On the 3rd cycle, it's cleared if apuintflag is true
-                // Dendy: frame counter IRQ is completely disabled (UMC hardware bug)
-                statusframeint = true;
-                frameIrqClearPending = false; // cancel deferred clear — flag was just asserted
-                irqAssertCycles = 2; // 2 more cycles after this one (3 total)
-            }
-
-            ++framectr;
-            framectr %= ctrmode;
-            setvolumes();
-            UpdateIRQLine();
-        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void setvolumes()
@@ -860,7 +844,8 @@ namespace AprNes
             if (statusframeint)     status |= 0x40;
             if (statusdmcint)       status |= 0x80;
             status |= (byte)(cpubus & 0x20); // bit 5 is open bus (CPU data bus)
-            frameIrqClearPending = true;
+            statusframeint = false;
+            UpdateIRQLine();
             return status;
         }
 
