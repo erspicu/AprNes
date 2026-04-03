@@ -276,13 +276,8 @@ namespace AprNes
                         resizeScanline = true;
                         break;
                     case "--region":
-                        if (i + 1 < args.Length)
-                        {
-                            string r = args[++i].ToUpperInvariant();
-                            if (r == "PAL") NesCore.Region = NesCore.RegionType.PAL;
-                            else if (r == "DENDY") NesCore.Region = NesCore.RegionType.Dendy;
-                            else NesCore.Region = NesCore.RegionType.NTSC;
-                        }
+                        if (i + 1 < args.Length) i++; // consume arg, force NTSC
+                        NesCore.Region = NesCore.RegionType.NTSC;
                         break;
                 }
             }

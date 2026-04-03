@@ -68,7 +68,6 @@ namespace AprNes
         static public RegionType Region = RegionType.NTSC;
 
         // ── Region-dependent timing parameters (set by ApplyRegionProfile) ──
-        static int regionMode     = 0;        // 0=NTSC, 1=PAL, 2=Dendy
         static int preRenderLine  = 261;      // NTSC=261, PAL/Dendy=311
         static int nmiTriggerLine = 241;      // NTSC/PAL=241, Dendy=291
         static int totalScanlines = 262;      // NTSC=262, PAL/Dendy=312
@@ -79,39 +78,15 @@ namespace AprNes
 
         static void ApplyRegionProfile()
         {
-            if (Region == RegionType.PAL)
-            {
-                regionMode     = 1;
-                preRenderLine  = 311;
-                nmiTriggerLine = 241;
-                totalScanlines = 312;
-                masterPerCpu   = 16;
-                masterPerPpu   = 5;
-                cpuFreq        = 1662607.0;
-                FrameSeconds   = 1.0 / 50.0070;
-            }
-            else if (Region == RegionType.Dendy)
-            {
-                regionMode     = 2;
-                preRenderLine  = 311;
-                nmiTriggerLine = 291;
-                totalScanlines = 312;
-                masterPerCpu   = 15;
-                masterPerPpu   = 5;
-                cpuFreq        = 1773447.0;
-                FrameSeconds   = 1.0 / 50.0070;
-            }
-            else // NTSC
-            {
-                regionMode     = 0;
-                preRenderLine  = 261;
-                nmiTriggerLine = 241;
-                totalScanlines = 262;
-                masterPerCpu   = 12;
-                masterPerPpu   = 4;
-                cpuFreq        = 1789773.0;
-                FrameSeconds   = 1.0 / 60.0988;
-            }
+            // NTSC only — PAL/Dendy stripped for architecture validation phase
+            Region         = RegionType.NTSC;
+            preRenderLine  = 261;
+            nmiTriggerLine = 241;
+            totalScanlines = 262;
+            masterPerCpu   = 12;
+            masterPerPpu   = 4;
+            cpuFreq        = 1789773.0;
+            FrameSeconds   = 1.0 / 60.0988;
             // Precompute packed scanline event constants for unified ppu_step()
             L_VBL_START    = (nmiTriggerLine << 9) | 1;
             L_SPRITE_RESET = (preRenderLine << 9) | 1;

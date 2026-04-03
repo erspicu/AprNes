@@ -15,16 +15,8 @@ namespace AprNes
         // Fills NesColors (uint*) and default palette into ppu_ram[0x3F00..0x3F1F] (byte*)
         static void initPalette()
         {
-            if (Region == RegionType.PAL)
             {
-                // Generate PAL palette from 2C07 voltage levels + YUV decoding
-                generatePaletteFromVoltages(
-                    new float[] { -0.117f, 0.000f, 0.223f, 0.490f }, // lo levels
-                    new float[] {  0.306f, 0.543f, 0.741f, 1.000f }, // hi levels
-                    true); // YUV decoding
-            }
-            else
-            {
+                // NTSC only — PAL palette stripped for architecture validation
                 // NTSC hardcoded palette (verified with 174 blargg + 136 AccuracyCoin tests)
                 NesColors[ 0]=0xFF7C7C7C; NesColors[ 1]=0xFF0000FC; NesColors[ 2]=0xFF0000BC; NesColors[ 3]=0xFF4428BC;
                 NesColors[ 4]=0xFF940084; NesColors[ 5]=0xFFA80020; NesColors[ 6]=0xFFA81000; NesColors[ 7]=0xFF881400;
@@ -943,7 +935,7 @@ namespace AprNes
         // ═══════════════════════════════════════════════════════════════
         // Unified PPU step — region differences via precomputed parameters:
         //   preRenderLine, nmiTriggerLine, totalScanlines (set by ApplyRegionProfile)
-        //   NTSC odd frame skip: regionMode == 0
+        //   NTSC odd frame skip (always enabled — PAL/Dendy stripped)
         // ═══════════════════════════════════════════════════════════════
         static void ppu_step()
         {
@@ -965,7 +957,7 @@ namespace AprNes
             }
 
             // NTSC odd frame dot skip (pre-render line, dot 339)
-            if (regionMode == 0 && scanline == preRenderLine && cx == 339)
+            if (scanline == preRenderLine && cx == 339)
             {
                 oddSwap = !oddSwap;
                 if (!oddSwap && (ShowBackGround_Instant || ShowSprites_Instant))

@@ -272,30 +272,16 @@ namespace AprNes
             // Initialize region-dependent data arrays
             _cycPerSample = cpuFreq / APU_SAMPLE_RATE;
 
-            if (Region == RegionType.PAL)
-            {
-                noiseperiod[0]=4; noiseperiod[1]=8; noiseperiod[2]=14; noiseperiod[3]=30;
-                noiseperiod[4]=60; noiseperiod[5]=88; noiseperiod[6]=118; noiseperiod[7]=148;
-                noiseperiod[8]=188; noiseperiod[9]=236; noiseperiod[10]=354; noiseperiod[11]=472;
-                noiseperiod[12]=708; noiseperiod[13]=944; noiseperiod[14]=1890; noiseperiod[15]=3778;
+            // NTSC only — PAL tables stripped for architecture validation
+            noiseperiod[0]=4; noiseperiod[1]=8; noiseperiod[2]=16; noiseperiod[3]=32;
+            noiseperiod[4]=64; noiseperiod[5]=96; noiseperiod[6]=128; noiseperiod[7]=160;
+            noiseperiod[8]=202; noiseperiod[9]=254; noiseperiod[10]=380; noiseperiod[11]=508;
+            noiseperiod[12]=762; noiseperiod[13]=1016; noiseperiod[14]=2034; noiseperiod[15]=4068;
 
-                dmcperiods[0]=398; dmcperiods[1]=354; dmcperiods[2]=316; dmcperiods[3]=298;
-                dmcperiods[4]=276; dmcperiods[5]=236; dmcperiods[6]=210; dmcperiods[7]=198;
-                dmcperiods[8]=176; dmcperiods[9]=148; dmcperiods[10]=132; dmcperiods[11]=118;
-                dmcperiods[12]=98; dmcperiods[13]=78; dmcperiods[14]=66; dmcperiods[15]=50;
-            }
-            else // NTSC and Dendy (Dendy uses NTSC APU tables)
-            {
-                noiseperiod[0]=4; noiseperiod[1]=8; noiseperiod[2]=16; noiseperiod[3]=32;
-                noiseperiod[4]=64; noiseperiod[5]=96; noiseperiod[6]=128; noiseperiod[7]=160;
-                noiseperiod[8]=202; noiseperiod[9]=254; noiseperiod[10]=380; noiseperiod[11]=508;
-                noiseperiod[12]=762; noiseperiod[13]=1016; noiseperiod[14]=2034; noiseperiod[15]=4068;
-
-                dmcperiods[0]=428; dmcperiods[1]=380; dmcperiods[2]=340; dmcperiods[3]=320;
-                dmcperiods[4]=286; dmcperiods[5]=254; dmcperiods[6]=226; dmcperiods[7]=214;
-                dmcperiods[8]=190; dmcperiods[9]=160; dmcperiods[10]=142; dmcperiods[11]=128;
-                dmcperiods[12]=106; dmcperiods[13]=84; dmcperiods[14]=72; dmcperiods[15]=54;
-            }
+            dmcperiods[0]=428; dmcperiods[1]=380; dmcperiods[2]=340; dmcperiods[3]=320;
+            dmcperiods[4]=286; dmcperiods[5]=254; dmcperiods[6]=226; dmcperiods[7]=214;
+            dmcperiods[8]=190; dmcperiods[9]=160; dmcperiods[10]=142; dmcperiods[11]=128;
+            dmcperiods[12]=106; dmcperiods[13]=84; dmcperiods[14]=72; dmcperiods[15]=54;
 
             { int[] _lv = { 10,254,20,2,40,4,80,6,160,8,60,10,14,12,26,14,12,16,24,18,48,20,96,22,192,24,72,26,16,28,32,30 };
               for (int i = 0; i < 32; i++) lenctrload[i] = _lv[i]; }
@@ -422,22 +408,16 @@ namespace AprNes
                     case 14913: apuQuarterFrame = true; apuHalfFrame = true; break;
                     case 22371: apuQuarterFrame = true; break;
                     case 29828:
-                        if (Region != RegionType.Dendy) statusframeint = true;
+                        statusframeint = true;
                         break;
                     case 29829:
                         apuQuarterFrame = true; apuHalfFrame = true;
-                        if (Region != RegionType.Dendy)
-                        {
-                            statusframeint = true;
-                            irqLineCurrent |= !apuintflag;
-                        }
+                        statusframeint = true;
+                        irqLineCurrent |= !apuintflag;
                         break;
                     case 29830:
-                        if (Region != RegionType.Dendy)
-                        {
-                            statusframeint = !apuintflag;
-                            irqLineCurrent |= !apuintflag;
-                        }
+                        statusframeint = !apuintflag;
+                        irqLineCurrent |= !apuintflag;
                         apuFrameCounter = 0;
                         break;
                 }
