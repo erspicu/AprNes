@@ -302,8 +302,9 @@ namespace AprNes
             apucycle    = 0;
             ctrmode = 4;
             apuintflag = false;
-            // Power-on: pre-advance by 9 (7 reset cycles + 2 alignment)
-            apuFrameCounter = 9;
+            // Power-on: counter=0, APU advances naturally during BRK/RESET handler (7 cycles)
+            // No apuSoftReset at power-on — only on soft reset via SoftReset()
+            apuFrameCounter = 0;
             apuFrameCounterReset = 0xFF;
 
             // 聲道計時器重置

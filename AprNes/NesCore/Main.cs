@@ -237,7 +237,7 @@ namespace AprNes
         static void HardResetState()
         {
             // CPU registers (6502 power-up state)
-            r_A = 0; r_X = 0; r_Y = 0; r_SP = 0xFD;
+            r_A = 0; r_X = 0; r_Y = 0; r_SP = 0x00; // hardware: SP=0, BRK/RESET decrements to 0xFD
             flagN = 0; flagV = 0; flagD = 0; flagI = 1; flagZ = 0; flagC = 0;
             opcode = 0; operationCycle = 0;
             cpubus = 0; cpuBusAddr = 0; addressBus = 0; dl = 0; ignoreH = false;
@@ -248,7 +248,8 @@ namespace AprNes
             NMILine = false; nmiPinsSignal = false; nmiPrevPinsSignal = false;
             IRQLine = false; irqLineCurrent = false;
             statusmapperint = false;
-            doNMI = false; doIRQ = false; doReset = false; doBRK = false; softreset = false;
+            doNMI = false; doIRQ = false; doReset = true; doBRK = false; softreset = false;
+            // doReset=true: BRK/RESET handler reads reset vector via MasterClockTick
 
             // DMA state (TriCNES per-cycle model)
             dmcDmaRunning = false; dmcDmaHalt = false;
@@ -506,8 +507,7 @@ namespace AprNes
                 // AudioPlus 管線初始化
                 AudioPlus_Init();
 
-                // Read reset vector directly (APU pre-advance compensates for missing 7 reset cycles)
-                r_PC = (ushort)(mem_read_fun[0xfffc](0xfffc) | (mem_read_fun[0xfffd](0xfffd) << 8));
+                // Reset vector read by BRK/RESET handler through MasterClockTick (doReset=true)
 
 
             }

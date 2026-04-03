@@ -56,6 +56,9 @@ namespace AprNes
         {
             softreset = true;
             doReset = true;
+            // APU soft reset: re-apply last $4017 value BEFORE BRK/RESET handler runs
+            // TriCNES: Reset() applies APU state, then DoReset triggers the handler
+            apuSoftReset();
         }
 
         // --- Pure bus access functions ---
@@ -673,7 +676,8 @@ namespace AprNes
                         Console.WriteLine("soft reset !");
                         NMILine = false; nmiPinsSignal = false; nmiPrevPinsSignal = false;
                         IRQLine = false; statusmapperint = false;
-                        apuSoftReset(); strobeWritePending = 0; P1_LastWrite = 0;
+                        // apuSoftReset moved to SoftReset() — called BEFORE handler runs
+                        strobeWritePending = 0; P1_LastWrite = 0;
                     }
                     CompleteOperation_NoPoll(); // BRK does NOT poll at end (TriCNES line 4228)
                     doReset = false; doNMI = false; doIRQ = false; doBRK = false; flagI = 1;
