@@ -650,9 +650,14 @@ namespace AprNes
                     }
                     else { CpuRead((ushort)(0x100 | r_SP)); r_SP--; }
                     // PollInterrupts at cycle 4 (TriCNES model):
-                    // NMI edge detection — hijack to NMI vector if new edge arrived
-                    if (NMILine && !nmiPinsSignal) { doNMI = true; nmiPinsSignal = true; }
-                    // IRQ level detection — redirect to IRQ vector if IRQ active and not masked
+                    // Full edge detection for NMI (same as CompleteOperation PollInterrupts)
+                    {
+                        nmiPrevPinsSignal = nmiPinsSignal;
+                        nmiPinsSignal = NMILine;
+                        if (nmiPinsSignal && !nmiPrevPinsSignal)
+                            doNMI = true;
+                    }
+                    // IRQ level detection
                     if (!doNMI && IRQLine && flagI == 0) { doIRQ = true; }
                     break;
                 case 5:

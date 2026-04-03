@@ -543,6 +543,8 @@ namespace AprNes
             Console.WriteLine("exit..");
         }
 
+        static bool nmi_just_deferred = false; // defer NMI by 1 instruction after BRK/NMI/IRQ handler
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void MasterClockTick()
         {
@@ -563,16 +565,21 @@ namespace AprNes
                 }
                 else
                 {
-                    // Act on interrupt flags set by PollInterrupts (called in CompleteOperation)
+                    // Act on interrupt flags at instruction boundary
                     if (operationCycle == 0)
                     {
-                        if (doNMI) { /* already set by CompleteOperation */ }
+                        if (doNMI && !nmi_just_deferred) { /* NMI already set by CompleteOperation */ }
+                        else if (nmi_just_deferred) { nmi_just_deferred = false; }
                         else if (irq_pending)
                         { irq_pending = false; doIRQ = true; }
                     }
 
                     prevFlagI = flagI;
                     cpu_step_one_cycle();
+
+                    // After BRK/NMI/IRQ handler completes: defer NMI by 1 instruction
+                    if (operationCycle == 0 && opcode == 0x00 && doNMI)
+                        nmi_just_deferred = true;
                 }
 
                 // Mapper callback (TriCNES: at CPUClock==0, after _6502)
