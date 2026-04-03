@@ -268,6 +268,7 @@ namespace AprNes
             ppuVSET = false; ppuVSET_Latch1 = false; ppuVSET_Latch2 = false;
             pendingSprite0Hit2 = false;
             isSprite0hit_Delayed = false; isSpriteOverflow_Delayed = false;
+            ppu2002ReadPending = false;
 
             // PPU VRAM address / scroll
             vram_addr_internal = 0; vram_addr = 0; scrol_y = 0; FineX = 0;

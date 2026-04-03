@@ -977,6 +977,12 @@ namespace AprNes
             ppuVSET_Latch1 = !ppuVSET;
             if (ppuVSET && !ppuVSET_Latch2)
                 isVblank = true;
+            // Deferred $2002 VBL clear (TriCNES: PPU_Read2002 processed in _EmulatePPU)
+            if (ppu2002ReadPending)
+            {
+                ppu2002ReadPending = false;
+                isVblank = false;
+            }
 
             // NTSC odd frame dot skip (pre-render line, dot 339)
             if (scanline == preRenderLine && cx == 339)
@@ -1569,6 +1575,7 @@ namespace AprNes
 
         static bool pendingVblank = false; // half-dot VBL latch (TriCNES: PPU_PendingVBlank)
         static bool pendingSprite0Hit = false; // half-dot sprite 0 hit latch (TriCNES: PPUStatus_PendingSpriteZeroHit)
+        static bool ppu2002ReadPending = false; // TriCNES: PPU_Read2002 (deferred VBL clear)
 
         // Per-dot sprite compositing buffers (filled at cx==257, consumed per-dot in half-step)
         static uint* sprLineBuf;     // 256 entries: winning sprite color (NesColors[])
@@ -1594,8 +1601,8 @@ namespace AprNes
             // TriCNES: VBL read at start, sprite flags read at end (use delayed versions)
             openbus = (byte)((vblFlag ? 0x80 : 0) | ((isSprite0hit_Delayed) ? 0x40 : 0) | ((isSpriteOverflow_Delayed) ? 0x20 : 0) | (openbus & 0x1f));
 
-            isVblank = false;
-            NMILine = false;           // Cancel NMI (VBL cleared → NMI condition no longer met)
+            // TriCNES: deferred VBL clear via PPU_Read2002 flag (processed in ppu_step)
+            ppu2002ReadPending = true;
             vram_latch = false;
             return openbus;
         }
@@ -1619,7 +1626,7 @@ namespace AprNes
             ppu2007SM_addr = vram_addr;
             ppu2007SM_isRead = true;
             ppu2007SM = 0;
-            ppu2007SM_bufferLate = ((mcPpuClock & 3) <= 1);
+            ppu2007SM_bufferLate = ((mcCpuClock & 3) <= 1); // TriCNES: uses CPUClock phase
 
             openbus = result;
             open_bus_decay_timer = 77777;
