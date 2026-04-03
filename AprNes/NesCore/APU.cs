@@ -134,7 +134,6 @@ namespace AprNes
         static int dmcLoadDmaCountdown = 0;    // Load DMA scheduling delay (2-3 APU cycles)
         static int dmcStatusDelay = 0;         // Deferred $4015 status update countdown (TriCNES: APU_DelayedDMC4015)
         static bool dmcDelayedEnable = false;  // Pending DMC enable/disable value (TriCNES: APU_Status_DelayedDMC)
-        static bool dmcAbortDma = false;       // Abort flag for in-progress DMA (Mesen2: _abortDmcDma)
         static int dmcDmaCooldown = 0;         // TriCNES: CannotRunDMCDMARightNow (blocks new DMA for 2 cycles after completion)
         static bool dmcImplicitAbortPending = false;  // TriCNES: APU_SetImplicitAbortDMC4015
         static bool dmcImplicitAbortActive = false;   // TriCNES: APU_ImplicitAbortDMC4015
@@ -356,12 +355,12 @@ namespace AprNes
             dmcvalue = 0; dmcsamplelength = 1; dmcsamplesleft = 0;
             dmcstartaddr = 0xC000; dmcaddr = 0xC000; dmcbitsleft = 8;
             dmcsilence = true; dmcirq = false; dmcloop = false; dmcBufferEmpty = true;
-            dmcLoadDmaCountdown = 0; dmcStatusDelay = 0; dmcDelayedEnable = false; dmcAbortDma = false;
+            dmcLoadDmaCountdown = 0; dmcStatusDelay = 0; dmcDelayedEnable = false;
             dmcDmaRunning = false; dmcDmaHalt = false;
             dmcDmaCooldown = 0; dmcImplicitAbortPending = false; dmcImplicitAbortActive = false; dmcStatusEnabled = false;
             spriteDmaTransfer = false; spriteDmaOffset = 0;
             dmaOamHalt = false; dmaOamAligned = false; dmaFirstCycleOam = false;
-            dmaOamInternalBus = 0; dmaOamAddr = 0; dmaEnableInternalRegReads = false;
+            dmaOamInternalBus = 0; dmaOamAddr = 0;
         }
 
         // =====================================================================
@@ -761,12 +760,6 @@ namespace AprNes
             {
                 dmcDmaRunning = true;
                 dmcDmaHalt = true;
-                // Capture bus state for internal register conflict handling (only if no OAM DMA already running)
-                if (!spriteDmaTransfer)
-                {
-                    dmaPrevReadAddress = cpuBusAddr;
-                    dmaEnableInternalRegReads = ((cpuBusAddr & 0xFFE0) == 0x4000);
-                }
             }
         }
 
@@ -775,15 +768,10 @@ namespace AprNes
         {
             if (dmcDmaRunning)
             {
-                if (dmcDmaHalt) // Still in halt phase — cancel immediately
-                {
-                    dmcDmaRunning = false;
-                    dmcDmaHalt = false;
-                }
-                else // Past halt — deferred abort (picked up by DmaOneCycle gate)
-                {
-                    dmcAbortDma = true;
-                }
+                // TriCNES: gate condition handles abort (dmcStatusEnabled=false → gate fails)
+                // If still in halt phase, cancel immediately
+                dmcDmaRunning = false;
+                dmcDmaHalt = false;
             }
         }
 

@@ -27,10 +27,7 @@ namespace AprNes
         static bool dmcDmaRunning = false;      // DMC DMA fetch pending (TriCNES: DoDMCDMA)
         static bool dmcDmaHalt = false;         // DMC halt flag (TriCNES: DMCDMA_Halt)
 
-        // Shared DMA state
-        static ushort dmaPrevReadAddress = 0;   // Last DMA address (for $4016/$4017 tracking)
-        static bool dmaReadSkipBusUpdate;       // $4015 bus conflict: don't update cpubus
-        static bool dmaEnableInternalRegReads = false; // Captured at DMA start: CPU was in $4000-$401F
+        // (ProcessDmaRead removed — DMA now uses simple Fetch like TriCNES)
 
         // Master Clock timing (TriCNES model: per-master-clock execution)
         // NTSC: 21,477,272.73 Hz — CPU = master ÷ 12, PPU = master ÷ 4 (3:1)
@@ -53,27 +50,12 @@ namespace AprNes
         // ── Per-cycle DMA dispatch (TriCNES _6502() DMA gate model) ──
         // Called from MasterClockTick CPU gate — executes exactly ONE DMA cycle and returns.
         // PPU advances naturally via MasterClockTick (no StartCpuCycle needed).
+        // TriCNES _6502() DMA dispatch — exact port
+        // Gate condition checked in MasterClockTick before calling this.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void DmaOneCycle()
         {
-            // TriCNES gate: cancel DMC if status disabled (line 3974 gate equivalent)
-            if (dmcDmaRunning && !dmcStatusEnabled && !dmcDelayedEnable && !dmcImplicitAbortActive)
-            {
-                dmcDmaRunning = false;
-                dmcDmaHalt = false;
-                if (!spriteDmaTransfer) return;
-            }
-
-            // Absorb deferred abort (from dmcStopTransfer)
-            if (dmcAbortDma)
-            {
-                dmcDmaRunning = false;
-                dmcAbortDma = false;
-                dmcDmaHalt = false;
-                if (!spriteDmaTransfer) return;
-            }
-
-            // SH* opcodes: DMA during critical cycle makes H invisible (TriCNES: IgnoreH)
+            // SH* opcodes: DMA during critical cycle makes H invisible
             if ((opcode == 0x93 && operationCycle == 4) ||
                 (opcode == 0x9B && operationCycle == 3) ||
                 (opcode == 0x9C && operationCycle == 3) ||
@@ -81,7 +63,7 @@ namespace AprNes
                 (opcode == 0x9F && operationCycle == 3))
                 ignoreH = true;
 
-            // First cycle of OAM DMA: set halt if on get cycle (TriCNES: FirstCycleOfOAMDMA)
+            // FirstCycleOfOAMDMA: set halt if on GET cycle
             if (spriteDmaTransfer && dmaFirstCycleOam)
             {
                 dmaFirstCycleOam = false;
@@ -89,89 +71,83 @@ namespace AprNes
                     dmaOamHalt = true;
             }
 
-            if (mcApuPutCycle)  // ── Put cycle — OAM has priority ──
+            // ── PUT cycle (APU_PutCycle == true) — OAM has priority ──
+            if (mcApuPutCycle)
             {
                 if (dmcDmaRunning && spriteDmaTransfer)
                 {
-                    if (dmcDmaHalt && dmaOamHalt)     DmaDummyRead();    // Both halted: OAM priority (dummy)
-                    else if (!dmaOamHalt && dmcDmaHalt) OamDmaPut();      // OAM active, DMC halted
-                    else if (dmaOamHalt && !dmcDmaHalt) DmaDummyRead();   // OAM halted, DMC put = dummy
-                    else                                OamDmaPut();      // Both active: OAM priority
-                }
-                else if (dmcDmaRunning) DmaDummyRead(); // DMC put is always dummy read
-                else if (dmaOamHalt)    DmaDummyRead(); // OAM halted
-                else                    OamDmaPut();    // OAM active
-            }
-            else  // ── Get cycle — DMC has priority ──
-            {
-                if (dmcDmaRunning && spriteDmaTransfer)
-                {
-                    if (dmcDmaHalt && dmaOamHalt)       DmaDummyRead();                      // Both halted: DMC priority (dummy)
-                    else if (!dmaOamHalt && dmcDmaHalt)  OamDmaGet(dmaEnableInternalRegReads); // OAM active, DMC halted
-                    else if (dmaOamHalt && !dmcDmaHalt)  DmcDmaGet(dmaEnableInternalRegReads); // DMC active, OAM halted
-                    else                                 DmcDmaGet(dmaEnableInternalRegReads); // Both active: DMC priority
+                    if (dmcDmaHalt && dmaOamHalt)       OamDmaHalted();
+                    else if (!dmaOamHalt && dmcDmaHalt)  OamDmaPut();
+                    else if (dmaOamHalt && !dmcDmaHalt)  DmcDmaPut();
+                    else                                 OamDmaPut();
                 }
                 else if (dmcDmaRunning)
                 {
-                    if (dmcDmaHalt) DmaDummyRead();
-                    else            DmcDmaGet(dmaEnableInternalRegReads);
+                    if (dmcDmaHalt) DmcDmaHalted();
+                    else            DmcDmaPut();
                 }
                 else
                 {
-                    if (dmaOamHalt) DmaDummyRead();
-                    else            OamDmaGet(dmaEnableInternalRegReads);
+                    if (dmaOamHalt) OamDmaHalted();
+                    else            OamDmaPut();
+                }
+            }
+            // ── GET cycle (APU_PutCycle == false) — DMC has priority ──
+            else
+            {
+                if (dmcDmaRunning && spriteDmaTransfer)
+                {
+                    if (dmcDmaHalt && dmaOamHalt)       DmcDmaHalted();
+                    else if (!dmaOamHalt && dmcDmaHalt)  OamDmaGet();
+                    else if (dmaOamHalt && !dmcDmaHalt)  DmcDmaGet();
+                    else                                 DmcDmaGet();
+                }
+                else if (dmcDmaRunning)
+                {
+                    if (dmcDmaHalt) DmcDmaHalted();
+                    else            DmcDmaGet();
+                }
+                else
+                {
+                    if (dmaOamHalt) OamDmaHalted();
+                    else            OamDmaGet();
                 }
 
-                // Clear halt flags after get cycle (TriCNES model)
+                // Clear halt flags after GET cycle
                 dmcDmaHalt = false;
                 dmaOamHalt = false;
             }
-
-            // TriCNES: clear implicit abort after each DMA cycle (line 8758-8761)
-            // Implicit abort gives a 1-cycle phantom DMA (halt only) when no samples left.
-            if (dmcImplicitAbortActive)
-            {
-                dmcImplicitAbortActive = false;
-                if (dmcDmaRunning && dmcsamplesleft == 0)
-                {
-                    dmcDmaRunning = false;
-                    dmcDmaHalt = false;
-                }
-            }
         }
 
-        // ── DMA helper functions ──
+        // ── DMA helper functions (TriCNES exact port) ──
 
-        // Dummy read from current CPU bus address (halt/alignment cycles)
-        // TriCNES: Fetch(addressBus) — full bus read with all side effects
-        // No $4016/$4017 skip, no $2007 SM bypass
+        // TriCNES: Fetch(addressBus) — read from current CPU address bus
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void DmaDummyRead()
-        {
-            mem_read_fun[cpuBusAddr](cpuBusAddr);
-        }
+        static void OamDmaHalted()  { mem_read_fun[cpuBusAddr](cpuBusAddr); }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void DmcDmaHalted()  { mem_read_fun[cpuBusAddr](cpuBusAddr); }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void DmcDmaPut()     { mem_read_fun[cpuBusAddr](cpuBusAddr); }
 
-        // OAM DMA Get — read source byte into latch (TriCNES: OAMDMA_Get)
+        // TriCNES: OAMDMA_Get — read source byte into latch
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void OamDmaGet(bool enableInternalRegReads)
+        static void OamDmaGet()
         {
             ushort srcAddr = (ushort)(spriteDmaOffset * 0x100 + dmaOamAddr);
-            cpuBusAddr = srcAddr;
-            dmaOamInternalBus = ProcessDmaRead(srcAddr, enableInternalRegReads);
-            cpubus = dmaOamInternalBus;
             dmaOamAligned = true;
+            dmaOamInternalBus = mem_read_fun[srcAddr](srcAddr);
         }
 
-        // OAM DMA Put — write latched byte to OAM $2004 (TriCNES: OAMDMA_Put)
+        // TriCNES: OAMDMA_Put — write latched byte to OAM via $2004
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void OamDmaPut()
         {
             if (dmaOamAligned)
             {
-                cpuBusAddr = 0x2004;
+                // TriCNES: Store(OAM_InternalBus, 0x2004)
                 spr_ram[spr_ram_add++] = dmaOamInternalBus;
                 dmaOamAddr++;
-                if (dmaOamAddr == 0) // Overflow: 256 bytes transferred → DMA complete
+                if (dmaOamAddr == 0)
                 {
                     spriteDmaTransfer = false;
                     dmaOamAligned = false;
@@ -179,73 +155,21 @@ namespace AprNes
             }
             else
             {
-                DmaDummyRead(); // Alignment cycle (not yet in data phase)
+                mem_read_fun[cpuBusAddr](cpuBusAddr); // alignment cycle: Fetch(addressBus)
             }
         }
 
-        // DMC DMA Get — read sample byte, completes in one cycle (TriCNES: DMCDMA_Get)
+        // TriCNES: DMCDMA_Get — read one sample byte, complete DMC DMA
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void DmcDmaGet(bool enableInternalRegReads)
+        static void DmcDmaGet()
         {
             ushort dmcReadAddr = (ushort)dmcaddr;
-            byte val = ProcessDmaRead(dmcReadAddr, enableInternalRegReads);
-            if (!dmaReadSkipBusUpdate) cpubus = val;
+            byte val = mem_read_fun[dmcReadAddr](dmcReadAddr);
+            cpubus = val;
             dmcDmaRunning = false;
-            dmcDmaHalt = false;
-            dmcAbortDma = false;
+            dmaOamAligned = false;      // TriCNES: reset OAM alignment
+            dmcDmaCooldown = 2;         // TriCNES: CannotRunDMCDMARightNow
             dmcSetReadBuffer(val);
-            dmcDmaCooldown = 2; // TriCNES: CannotRunDMCDMARightNow
-            dmaOamAligned = false; // TriCNES: reset OAM alignment after DMC interleave
-        }
-
-        // ── DMA read with bus conflict handling ──
-
-        static byte ProcessDmaRead(ushort addr, bool enableInternalRegReads)
-        {
-            dmaReadSkipBusUpdate = false;
-            if (!enableInternalRegReads)
-            {
-                if (addr >= 0x4000 && addr <= 0x401F)
-                    return cpubus;
-                return mem_read_fun[addr](addr);
-            }
-            ushort internalAddr = (ushort)(0x4000 | (addr & 0x1F));
-            byte val;
-            switch (internalAddr)
-            {
-                case 0x4015:
-                    if (internalAddr != addr)
-                    {
-                        // TriCNES bus conflict: read ROM first, then construct $4015 value
-                        byte romVal = mem_read_fun[addr](addr);
-                        cpubus = romVal;  // set bus to ROM value
-                        val = IO_read(0x4015);  // apu_r_4015 uses cpubus & 0x20 for bit 5
-                        // TriCNES: "reading from $4015 can not affect the databus"
-                        // dataBus stays as ROM value; return status for DMA buffer only
-                        dmaReadSkipBusUpdate = true;
-                    }
-                    else
-                    {
-                        val = IO_read(0x4015);
-                    }
-                    break;
-                case 0x4016:
-                case 0x4017:
-                    if (internalAddr != addr)
-                    {
-                        // Bus conflict: read ROM first to set data bus,
-                        // then controller read uses cpubus for open bus bits
-                        cpubus = mem_read_fun[addr](addr);
-                    }
-                    if (dmaPrevReadAddress == internalAddr) val = cpubus;
-                    else val = IO_read(internalAddr);
-                    break;
-                default:
-                    val = mem_read_fun[addr](addr);
-                    break;
-            }
-            dmaPrevReadAddress = internalAddr;
-            return val;
         }
 
         static Action<ushort, byte>[] mem_write_fun = null;

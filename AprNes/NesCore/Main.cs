@@ -256,8 +256,6 @@ namespace AprNes
             spriteDmaTransfer = false; spriteDmaOffset = 0;
             dmaOamHalt = false; dmaOamAligned = false; dmaFirstCycleOam = false;
             dmaOamInternalBus = 0; dmaOamAddr = 0;
-            dmaPrevReadAddress = 0; dmaReadSkipBusUpdate = false;
-            dmaEnableInternalRegReads = false;
 
             // PPU control registers ($2000/$2001/$2002)
             BaseNameTableAddr = 0; VramaddrIncrement = 1;
@@ -555,8 +553,12 @@ namespace AprNes
                 // CPU cycle housekeeping
                 cpuCycleCount++;
 
-                // DMA gate: steal cycle only on read cycles (TriCNES: CPU_Read gate)
-                if ((dmcDmaRunning || spriteDmaTransfer) && cpuIsRead)
+                // DMA gate (TriCNES: exact gate condition from _6502 line 3974)
+                // DMC requires: DoDMCDMA && (APU_Status_DMC || ImplicitAbort) && CPU_Read
+                // OAM requires: DoOAMDMA && CPU_Read
+                bool dmcGate = dmcDmaRunning && (dmcStatusEnabled || dmcImplicitAbortActive) && cpuIsRead;
+                bool oamGate = spriteDmaTransfer && cpuIsRead;
+                if (dmcGate || oamGate)
                 {
                     DmaOneCycle();
                 }

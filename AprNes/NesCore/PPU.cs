@@ -1846,12 +1846,6 @@ namespace AprNes
             dmaFirstCycleOam = true;
             dmaOamAligned = false;
             dmaOamAddr = 0;
-            // Capture bus state for internal register conflict handling (only if no DMA already running)
-            if (!dmcDmaRunning)
-            {
-                dmaPrevReadAddress = cpuBusAddr;
-                dmaEnableInternalRegReads = ((cpuBusAddr & 0xFFE0) == 0x4000);
-            }
         }
     }
 }
