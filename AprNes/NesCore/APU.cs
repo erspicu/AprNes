@@ -295,12 +295,16 @@ namespace AprNes
             for (int i = 0; i < 16; i++) apuRegister[i] = 0;
             for (int i = 0; i < 2; i++) { sweepenable[i] = 0; sweepnegate[i] = 0; sweepsilence[i] = 0; sweepreload[i] = 0; }
 
-            apuFrameCounter = 0;
-            apuFrameCounterReset = 0xFF;
             apuQuarterFrame = false;
             apuHalfFrame = false;
             apucycle    = 0;
             ctrmode = 4;
+            apuintflag = false;
+            // Power-on: implicit $4017=$00 write (NES hardware)
+            // Pre-advance counter by CPU reset sequence (7 reset cycles + 2 alignment)
+            // Old model: framectrdiv = 7458 - 9 = 7449. New model: start counter at 9.
+            apuFrameCounter = 9;
+            apuFrameCounterReset = 0xFF;
 
             // 聲道計時器重置
             _pulseTimer[0]  = _pulseTimer[1]  = 0;
