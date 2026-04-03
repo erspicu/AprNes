@@ -302,7 +302,7 @@ namespace AprNes
             ppu_cycles_x = 0; scanline = -1; frame_count = 0;
             oddSwap = false; ppuRenderingEnabled = false; prevRenderingEnabled = false;
             ppuRenderingEnabled_EvalDelay = false;
-            mcCpuClock = 12; mcPpuClock = 0; mcApuPutCycle = false; // 0 = PPU fires immediately on first tick
+            mcCpuClock = 0; mcPpuClock = 0; mcApuPutCycle = false; // TriCNES: both default to 0
             spr_ram_add = 0;
 
             // PPU tile pipeline
@@ -614,32 +614,14 @@ namespace AprNes
                 else fds_CpuCycle();
             }
 
-            // ── APU step at CPUClock == 12 (TriCNES: independent gate after CPU reset) ──
-            // Fires same tick as CPU gate (mcCpuClock was just reset to masterPerCpu)
-            if (mcCpuClock == masterPerCpu)
-            {
-                apu_step();
-                mcApuPutCycle = !mcApuPutCycle;
-                if (strobeWritePending > 0) processStrobeWrite();
-            }
+            // ── Gate order matches TriCNES: CPU(0) → NMI(8) → PPU(0) → PPU_half(2) → IRQ(5) → APU(12) ──
 
-            // ── NMI evaluation at CPUClock == 8 (TriCNES: direct NMILine model) ──
+            // ── NMI evaluation at CPUClock == 8 ──
             if (mcCpuClock == 8)
             {
                 NMILine |= NMIable && isVblank;
                 if (operationCycle == 0 && !(isVblank && NMIable))
                     NMILine = false;
-            }
-
-            // ── IRQ level detection + Mapper M2 rise at CPUClock == 5 ──
-            // TriCNES: IRQLine = IRQ_LevelDetector; then re-assert APU frame IRQ; then mapper rise
-            if (mcCpuClock == 5)
-            {
-                IRQLine = irqLineCurrent;
-                // APU frame counter re-assertion (TriCNES: keep IRQ asserted while flag active)
-                if (statusframeint && !apuintflag)
-                    irqLineCurrent = true;
-                if (!isFDS) MapperObj.CpuClockRise();
             }
 
             // ── PPU full step at PPUClock == 0 ──
@@ -652,6 +634,23 @@ namespace AprNes
             // ── PPU half step ──
             if (mcPpuClock == (masterPerPpu >> 1))
                 ppu_half_step();
+
+            // ── IRQ level detection + Mapper M2 rise at CPUClock == 5 ──
+            if (mcCpuClock == 5)
+            {
+                IRQLine = irqLineCurrent;
+                if (statusframeint && !apuintflag)
+                    irqLineCurrent = true;
+                if (!isFDS) MapperObj.CpuClockRise();
+            }
+
+            // ── APU step at CPUClock == 12 (last gate, after PPU/IRQ) ──
+            if (mcCpuClock == masterPerCpu)
+            {
+                apu_step();
+                mcApuPutCycle = !mcApuPutCycle;
+                if (strobeWritePending > 0) processStrobeWrite();
+            }
 
             // ── Decrement all counters ──
             mcCpuClock--;

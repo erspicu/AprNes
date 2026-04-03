@@ -39,7 +39,7 @@ namespace AprNes
 
         // Per-master-clock dividers (TriCNES: CPUClock/PPUClock countdown timers)
         // Count DOWN to 0, component executes when counter reaches 0, then resets.
-        static int mcCpuClock = 12;   // CPU: 12→0 (execute at 0, reset to 12) [NTSC]
+        static int mcCpuClock = 0;    // TriCNES: defaults to 0 (CPU fires on first tick)
         static int mcPpuClock = 0;    // PPU: 4→0 (full step at 0, half step at 2)
         static bool mcApuPutCycle = false; // M2 phase (toggles every APU/CPU step)
 
