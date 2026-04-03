@@ -282,7 +282,7 @@ namespace AprNes
             ppu_cycles_x = 0; scanline = -1; frame_count = 0;
             oddSwap = false; ppuRenderingEnabled = false; prevRenderingEnabled = false;
             ppuRenderingEnabled_EvalDelay = false;
-            mcCpuClock = 0; mcPpuClock = 0; mcApuPutCycle = false; // TriCNES: both default to 0
+            mcCpuClock = 0; mcPpuClock = 0; mcApuPutCycle = false;
             spr_ram_add = 0;
 
             // PPU tile pipeline
