@@ -133,13 +133,27 @@ namespace AprNes
 
         // ── DMA helper functions (TriCNES exact port) ──
 
+        // DMA bus read — like TriCNES Fetch(), with OAM DMA $4016/$4017 masking
+        // TriCNES: if DoOAMDMA && dataPinsAreNotFloating, return dataBus instead of controller
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static byte DmaFetch(ushort addr)
+        {
+            byte val = mem_read_fun[addr](addr);
+            // TriCNES: $4016/$4017 reads during OAM DMA — side effects happen
+            // but return value is masked to old databus
+            if (spriteDmaTransfer && (addr == 0x4016 || addr == 0x4017))
+                return cpubus;
+            if (addr != 0x4015) cpubus = val;
+            return val;
+        }
+
         // TriCNES: Fetch(addressBus) — read from current CPU address bus
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void OamDmaHalted()  { mem_read_fun[cpuBusAddr](cpuBusAddr); }
+        static void OamDmaHalted()  { DmaFetch(cpuBusAddr); }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void DmcDmaHalted()  { mem_read_fun[cpuBusAddr](cpuBusAddr); }
+        static void DmcDmaHalted()  { DmaFetch(cpuBusAddr); }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void DmcDmaPut()     { mem_read_fun[cpuBusAddr](cpuBusAddr); }
+        static void DmcDmaPut()     { DmaFetch(cpuBusAddr); }
 
         // TriCNES: OAMDMA_Get — read source byte into latch
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -147,7 +161,7 @@ namespace AprNes
         {
             ushort srcAddr = (ushort)(spriteDmaOffset * 0x100 + dmaOamAddr);
             dmaOamAligned = true;
-            dmaOamInternalBus = mem_read_fun[srcAddr](srcAddr);
+            dmaOamInternalBus = DmaFetch(srcAddr);
         }
 
         // TriCNES: OAMDMA_Put — write latched byte to OAM via $2004
@@ -156,7 +170,6 @@ namespace AprNes
         {
             if (dmaOamAligned)
             {
-                // TriCNES: Store(OAM_InternalBus, 0x2004)
                 spr_ram[spr_ram_add++] = dmaOamInternalBus;
                 dmaOamAddr++;
                 if (dmaOamAddr == 0)
@@ -167,7 +180,7 @@ namespace AprNes
             }
             else
             {
-                mem_read_fun[cpuBusAddr](cpuBusAddr); // alignment cycle: Fetch(addressBus)
+                DmaFetch(cpuBusAddr); // alignment cycle
             }
         }
 
@@ -176,11 +189,10 @@ namespace AprNes
         static void DmcDmaGet()
         {
             ushort dmcReadAddr = (ushort)dmcaddr;
-            byte val = mem_read_fun[dmcReadAddr](dmcReadAddr);
-            cpubus = val;
+            byte val = DmaFetch(dmcReadAddr);
             dmcDmaRunning = false;
-            dmaOamAligned = false;      // TriCNES: reset OAM alignment
-            dmcDmaCooldown = 2;         // TriCNES: CannotRunDMCDMARightNow
+            dmaOamAligned = false;
+            dmcDmaCooldown = 2;
             dmcSetReadBuffer(val);
         }
 
