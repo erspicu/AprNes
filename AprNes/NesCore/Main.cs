@@ -236,8 +236,9 @@ namespace AprNes
 
         static void HardResetState()
         {
-            // CPU registers (6502 power-up state)
+            // CPU registers (6502 power-up state, TriCNES values)
             r_A = 0; r_X = 0; r_Y = 0; r_SP = 0x00; // hardware: SP=0, BRK/RESET decrements to 0xFD
+            r_PC = 0xFFFF; // TriCNES: nondeterministic, uses 0xFFFF (RESET handler reads vector)
             flagN = 0; flagV = 0; flagD = 0; flagI = 1; flagZ = 0; flagC = 0;
             opcode = 0; operationCycle = 0;
             cpubus = 0; cpuBusAddr = 0; addressBus = 0; dl = 0; ignoreH = false;
@@ -276,11 +277,11 @@ namespace AprNes
             ppu2006UpdateDelay = 0; ppu2006PendingAddr = 0;
             openbus = 0; open_bus_decay_timer = 77777;
 
-            // PPU scan position & frame state
-            ppu_cycles_x = 0; scanline = -1; frame_count = 0;
-            oddSwap = false; ppuRenderingEnabled = false; prevRenderingEnabled = false;
+            // PPU scan position & frame state (TriCNES power-on values)
+            ppu_cycles_x = 7; scanline = 0; frame_count = 0;  // TriCNES: PPU_Dot=7, PPU_Scanline=0
+            oddSwap = true; ppuRenderingEnabled = false; prevRenderingEnabled = false; // TriCNES: PPU_OddFrame=true
             ppuRenderingEnabled_EvalDelay = false;
-            mcCpuClock = 0; mcPpuClock = 0; mcApuPutCycle = false;
+            mcCpuClock = 0; mcPpuClock = 0; mcApuPutCycle = true; // TriCNES: APU_PutCycle=true at power-on
             spr_ram_add = 0;
 
             // PPU tile pipeline
@@ -555,19 +556,21 @@ namespace AprNes
                 // OAM requires: DoOAMDMA && CPU_Read
                 bool dmcGate = dmcDmaRunning && (dmcStatusEnabled || dmcImplicitAbortActive) && cpuIsRead;
                 bool oamGate = spriteDmaTransfer && cpuIsRead;
+
                 if (dmcGate || oamGate)
                 {
                     DmaOneCycle();
                 }
                 else
                 {
-                    // TriCNES model: doNMI/doIRQ set directly by PollInterrupts
-                    // (called in CompleteOperation of previous instruction)
-                    // No irq_pending conversion, no nmi_just_deferred — flags used directly
-                    // by cpu_step_one_cycle's operationCycle==0 block
-
                     cpu_step_one_cycle();
                 }
+
+                // TriCNES: implicit abort clear after every _6502 call (line 8783)
+                // If implicit abort was set but DMA gate didn't fire (e.g., write cycle),
+                // clear the flag — the abort "times out"
+                if (dmcDmaRunning && dmcImplicitAbortActive)
+                    dmcImplicitAbortActive = false;
 
                 // TriCNES: totalCycles++ AFTER _6502 (not before)
                 cpuCycleCount++;

@@ -349,8 +349,8 @@ namespace AprNes
             statusdmcint = false;
             UpdateIRQLine();
 
-            // DMC 完整重置
-            dmcrate = dmcperiods[0]; dmctimer = dmcrate;
+            // DMC 完整重置 (TriCNES: APU_ChannelTimer_DMC=1022 at power-on, APUAlignment=0)
+            dmcrate = dmcperiods[0]; dmctimer = 1022;
             dmcshiftregister = 0; dmcbuffer = 0;
             dmcvalue = 0; dmcsamplelength = 1; dmcsamplesleft = 0;
             dmcstartaddr = 0xC000; dmcaddr = 0xC000; dmcbitsleft = 8;
@@ -739,7 +739,11 @@ namespace AprNes
             }
 
             // Reload DMA: buffer emptied → request DMA
-            if (!dmcDmaRunning && dmcBufferEmpty && (dmcsamplesleft > 0 || dmcImplicitAbortPending))
+            // Guard: skip if dmcLoadDmaCountdown is active ($4015 restart pending) —
+            // TriCNES only triggers DMA from the timer path when bitsRemaining==0,
+            // and defers $4015-triggered DMA to the DMCDMADelay countdown.
+            if (!dmcDmaRunning && dmcBufferEmpty && (dmcsamplesleft > 0 || dmcImplicitAbortPending)
+                && dmcLoadDmaCountdown == 0)
             {
                 if (dmcDmaCooldown != 2)
                 {
