@@ -506,7 +506,7 @@ namespace AprNes
                 // AudioPlus 管線初始化
                 AudioPlus_Init();
 
-                //init cpu pc (read reset vector — no tick needed, boot cycles already counted)
+                // Read reset vector directly (APU pre-advance compensates for missing 7 reset cycles)
                 r_PC = (ushort)(mem_read_fun[0xfffc](0xfffc) | (mem_read_fun[0xfffd](0xfffd) << 8));
 
 

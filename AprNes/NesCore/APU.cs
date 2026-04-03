@@ -302,7 +302,7 @@ namespace AprNes
             apucycle    = 0;
             ctrmode = 4;
             apuintflag = false;
-            // Power-on: pre-advance counter by CPU reset sequence (7+2=9 cycles)
+            // Power-on: pre-advance by 9 (7 reset cycles + 2 alignment)
             apuFrameCounter = 9;
             apuFrameCounterReset = 0xFF;
 
