@@ -74,6 +74,16 @@ namespace AprNes
             return val;
         }
 
+        // TriCNES: RMW read phase — Fetch then CPU_Read=false
+        // After this read, remaining RMW cycles are "write" phase (DMA blocked)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static byte CpuReadRMW(ushort addr)
+        {
+            byte val = CpuRead(addr);
+            cpuIsRead = false; // TriCNES: CPU_Read = false after RMW read
+            return val;
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void CpuWrite(ushort addr, byte val)
         {
@@ -1024,7 +1034,7 @@ namespace AprNes
         // === BIT ===
         static void Op_24() {
             switch (operationCycle) { case 1: GetAddressZeroPage(); break;
-                case 2: dl = CpuRead(addressBus);
+                case 2: dl = CpuReadRMW(addressBus);
                     flagZ = (byte)(((r_A & dl) == 0) ? 1 : 0);
                     flagN = (byte)((dl & 0x80) >> 7);
                     flagV = (byte)((dl & 0x40) >> 6);
@@ -1032,7 +1042,7 @@ namespace AprNes
         }
         static void Op_2C() {
             switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
-                case 3: dl = CpuRead(addressBus);
+                case 3: dl = CpuReadRMW(addressBus);
                     flagZ = (byte)(((r_A & dl) == 0) ? 1 : 0);
                     flagN = (byte)((dl & 0x80) >> 7);
                     flagV = (byte)((dl & 0x40) >> 6);
@@ -1047,19 +1057,19 @@ namespace AprNes
         }
         static void Op_06() {
             if (operationCycle < 2) GetAddressZeroPage();
-            else if (operationCycle == 2) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 2) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 3) { CpuWrite(addressBus, dl); }
             else { Op_ASL_mem(addressBus); CompleteOperation(); }
         }
         static void Op_16() {
             if (operationCycle < 3) GetAddressZPOffX();
-            else if (operationCycle == 3) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_ASL_mem(addressBus); CompleteOperation(); }
         }
         static void Op_0E() {
             if (operationCycle < 3) GetAddressAbsolute();
-            else if (operationCycle == 3) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_ASL_mem(addressBus); CompleteOperation(); }
         }
@@ -1077,19 +1087,19 @@ namespace AprNes
         }
         static void Op_46() {
             if (operationCycle < 2) GetAddressZeroPage();
-            else if (operationCycle == 2) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 2) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 3) { CpuWrite(addressBus, dl); }
             else { Op_LSR_mem(addressBus); CompleteOperation(); }
         }
         static void Op_56() {
             if (operationCycle < 3) GetAddressZPOffX();
-            else if (operationCycle == 3) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_LSR_mem(addressBus); CompleteOperation(); }
         }
         static void Op_4E() {
             if (operationCycle < 3) GetAddressAbsolute();
-            else if (operationCycle == 3) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_LSR_mem(addressBus); CompleteOperation(); }
         }
@@ -1107,19 +1117,19 @@ namespace AprNes
         }
         static void Op_26() {
             if (operationCycle < 2) GetAddressZeroPage();
-            else if (operationCycle == 2) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 2) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 3) { CpuWrite(addressBus, dl); }
             else { Op_ROL_mem(addressBus); CompleteOperation(); }
         }
         static void Op_36() {
             if (operationCycle < 3) GetAddressZPOffX();
-            else if (operationCycle == 3) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_ROL_mem(addressBus); CompleteOperation(); }
         }
         static void Op_2E() {
             if (operationCycle < 3) GetAddressAbsolute();
-            else if (operationCycle == 3) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_ROL_mem(addressBus); CompleteOperation(); }
         }
@@ -1137,19 +1147,19 @@ namespace AprNes
         }
         static void Op_66() {
             if (operationCycle < 2) GetAddressZeroPage();
-            else if (operationCycle == 2) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 2) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 3) { CpuWrite(addressBus, dl); }
             else { Op_ROR_mem(addressBus); CompleteOperation(); }
         }
         static void Op_76() {
             if (operationCycle < 3) GetAddressZPOffX();
-            else if (operationCycle == 3) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_ROR_mem(addressBus); CompleteOperation(); }
         }
         static void Op_6E() {
             if (operationCycle < 3) GetAddressAbsolute();
-            else if (operationCycle == 3) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_ROR_mem(addressBus); CompleteOperation(); }
         }
@@ -1162,19 +1172,19 @@ namespace AprNes
         // === INC ===
         static void Op_E6() {
             if (operationCycle < 2) GetAddressZeroPage();
-            else if (operationCycle == 2) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 2) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 3) { CpuWrite(addressBus, dl); }
             else { Op_INC_mem(addressBus); CompleteOperation(); }
         }
         static void Op_F6() {
             if (operationCycle < 3) GetAddressZPOffX();
-            else if (operationCycle == 3) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_INC_mem(addressBus); CompleteOperation(); }
         }
         static void Op_EE() {
             if (operationCycle < 3) GetAddressAbsolute();
-            else if (operationCycle == 3) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_INC_mem(addressBus); CompleteOperation(); }
         }
@@ -1187,13 +1197,13 @@ namespace AprNes
         // === DEC ===
         static void Op_C6() {
             if (operationCycle < 2) GetAddressZeroPage();
-            else if (operationCycle == 2) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 2) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 3) { CpuWrite(addressBus, dl); }
             else { Op_DEC_mem(addressBus); CompleteOperation(); }
         }
         static void Op_D6() {
             if (operationCycle < 3) GetAddressZPOffX();
-            else if (operationCycle == 3) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_DEC_mem(addressBus); CompleteOperation(); }
         }
@@ -1370,19 +1380,19 @@ namespace AprNes
         // === SLO ===
         static void Op_07() {
             if (operationCycle < 2) GetAddressZeroPage();
-            else if (operationCycle == 2) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 2) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 3) { CpuWrite(addressBus, dl); }
             else { Op_SLO(addressBus); CompleteOperation(); }
         }
         static void Op_17() {
             if (operationCycle < 3) GetAddressZPOffX();
-            else if (operationCycle == 3) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_SLO(addressBus); CompleteOperation(); }
         }
         static void Op_0F() {
             if (operationCycle < 3) GetAddressAbsolute();
-            else if (operationCycle == 3) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_SLO(addressBus); CompleteOperation(); }
         }
@@ -1398,13 +1408,13 @@ namespace AprNes
         }
         static void Op_03() {
             if (operationCycle < 5) GetAddressIndOffX();
-            else if (operationCycle == 5) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 5) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 6) { CpuWrite(addressBus, dl); }
             else { Op_SLO(addressBus); CompleteOperation(); }
         }
         static void Op_13() {
             if (operationCycle < 5) GetAddressIndOffY(false);
-            else if (operationCycle == 5) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 5) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 6) { CpuWrite(addressBus, dl); }
             else { Op_SLO(addressBus); CompleteOperation(); }
         }
@@ -1412,19 +1422,19 @@ namespace AprNes
         // === RLA ===
         static void Op_27() {
             if (operationCycle < 2) GetAddressZeroPage();
-            else if (operationCycle == 2) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 2) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 3) { CpuWrite(addressBus, dl); }
             else { Op_RLA(addressBus); CompleteOperation(); }
         }
         static void Op_37() {
             if (operationCycle < 3) GetAddressZPOffX();
-            else if (operationCycle == 3) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_RLA(addressBus); CompleteOperation(); }
         }
         static void Op_2F() {
             if (operationCycle < 3) GetAddressAbsolute();
-            else if (operationCycle == 3) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_RLA(addressBus); CompleteOperation(); }
         }
@@ -1440,13 +1450,13 @@ namespace AprNes
         }
         static void Op_23() {
             if (operationCycle < 5) GetAddressIndOffX();
-            else if (operationCycle == 5) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 5) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 6) { CpuWrite(addressBus, dl); }
             else { Op_RLA(addressBus); CompleteOperation(); }
         }
         static void Op_33() {
             if (operationCycle < 5) GetAddressIndOffY(false);
-            else if (operationCycle == 5) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 5) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 6) { CpuWrite(addressBus, dl); }
             else { Op_RLA(addressBus); CompleteOperation(); }
         }
@@ -1454,19 +1464,19 @@ namespace AprNes
         // === SRE ===
         static void Op_47() {
             if (operationCycle < 2) GetAddressZeroPage();
-            else if (operationCycle == 2) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 2) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 3) { CpuWrite(addressBus, dl); }
             else { Op_SRE(addressBus); CompleteOperation(); }
         }
         static void Op_57() {
             if (operationCycle < 3) GetAddressZPOffX();
-            else if (operationCycle == 3) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_SRE(addressBus); CompleteOperation(); }
         }
         static void Op_4F() {
             if (operationCycle < 3) GetAddressAbsolute();
-            else if (operationCycle == 3) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_SRE(addressBus); CompleteOperation(); }
         }
@@ -1482,13 +1492,13 @@ namespace AprNes
         }
         static void Op_43() {
             if (operationCycle < 5) GetAddressIndOffX();
-            else if (operationCycle == 5) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 5) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 6) { CpuWrite(addressBus, dl); }
             else { Op_SRE(addressBus); CompleteOperation(); }
         }
         static void Op_53() {
             if (operationCycle < 5) GetAddressIndOffY(false);
-            else if (operationCycle == 5) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 5) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 6) { CpuWrite(addressBus, dl); }
             else { Op_SRE(addressBus); CompleteOperation(); }
         }
@@ -1496,19 +1506,19 @@ namespace AprNes
         // === RRA ===
         static void Op_67() {
             if (operationCycle < 2) GetAddressZeroPage();
-            else if (operationCycle == 2) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 2) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 3) { CpuWrite(addressBus, dl); }
             else { Op_RRA(addressBus); CompleteOperation(); }
         }
         static void Op_77() {
             if (operationCycle < 3) GetAddressZPOffX();
-            else if (operationCycle == 3) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_RRA(addressBus); CompleteOperation(); }
         }
         static void Op_6F() {
             if (operationCycle < 3) GetAddressAbsolute();
-            else if (operationCycle == 3) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_RRA(addressBus); CompleteOperation(); }
         }
@@ -1524,13 +1534,13 @@ namespace AprNes
         }
         static void Op_63() {
             if (operationCycle < 5) GetAddressIndOffX();
-            else if (operationCycle == 5) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 5) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 6) { CpuWrite(addressBus, dl); }
             else { Op_RRA(addressBus); CompleteOperation(); }
         }
         static void Op_73() {
             if (operationCycle < 5) GetAddressIndOffY(false);
-            else if (operationCycle == 5) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 5) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 6) { CpuWrite(addressBus, dl); }
             else { Op_RRA(addressBus); CompleteOperation(); }
         }
@@ -1582,19 +1592,19 @@ namespace AprNes
         // === DCP ===
         static void Op_C7() {
             if (operationCycle < 2) GetAddressZeroPage();
-            else if (operationCycle == 2) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 2) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 3) { CpuWrite(addressBus, dl); }
             else { Op_DCP(addressBus); CompleteOperation(); }
         }
         static void Op_D7() {
             if (operationCycle < 3) GetAddressZPOffX();
-            else if (operationCycle == 3) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_DCP(addressBus); CompleteOperation(); }
         }
         static void Op_CF() {
             if (operationCycle < 3) GetAddressAbsolute();
-            else if (operationCycle == 3) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_DCP(addressBus); CompleteOperation(); }
         }
@@ -1610,13 +1620,13 @@ namespace AprNes
         }
         static void Op_C3() {
             if (operationCycle < 5) GetAddressIndOffX();
-            else if (operationCycle == 5) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 5) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 6) { CpuWrite(addressBus, dl); }
             else { Op_DCP(addressBus); CompleteOperation(); }
         }
         static void Op_D3() {
             if (operationCycle < 5) GetAddressIndOffY(false);
-            else if (operationCycle == 5) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 5) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 6) { CpuWrite(addressBus, dl); }
             else { Op_DCP(addressBus); CompleteOperation(); }
         }
@@ -1624,19 +1634,19 @@ namespace AprNes
         // === ISC ===
         static void Op_E7() {
             if (operationCycle < 2) GetAddressZeroPage();
-            else if (operationCycle == 2) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 2) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 3) { CpuWrite(addressBus, dl); }
             else { Op_ISC(addressBus); CompleteOperation(); }
         }
         static void Op_F7() {
             if (operationCycle < 3) GetAddressZPOffX();
-            else if (operationCycle == 3) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_ISC(addressBus); CompleteOperation(); }
         }
         static void Op_EF() {
             if (operationCycle < 3) GetAddressAbsolute();
-            else if (operationCycle == 3) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_ISC(addressBus); CompleteOperation(); }
         }
