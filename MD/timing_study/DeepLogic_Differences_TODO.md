@@ -8,44 +8,16 @@
 
 ---
 
-## E. APU Length Counter 模型重構（影響 11 個測試）
+## E. ~~APU Length Counter 模型重構~~ ✅ DONE（139/174 零回歸）
 
-### E1. Length Counter Reload 機制
-- **AprNes**：$400x 寫入時**立即 reload** length counter
-- **TriCNES**：$400x 寫入設 **deferred reload flag**，在 HalfFrame 時才 reload（且僅當 counter==0）
-- **影響**：len_reload, len_timing, len_ctr
-
-### E2. Length Counter Decrement 順序
-- **AprNes**：簡單 decrement（`if (halt==0 && ctr>0) --ctr`）
-- **TriCNES**：**reload-first → decrement**。decrement 時檢查 `!reloadFlag`（防止同 cycle reload+decrement）
-- **影響**：len_ctr, len_timing, len_halt
-
-### E3. Halt Flag 更新時機
-- **AprNes**：只在 register write 時更新 halt
-- **TriCNES**：每次 HalfFrame 從 register 重新讀取 halt
-- **影響**：len_halt_timing
-
-### E4. $4015 Read Length Counter Snapshot
-- **AprNes**：apu_step 開頭 snapshot，$4015 讀 snapshot（pre-step 值）
-- **TriCNES**：直接讀當前值（無 snapshot）
-- **影響**：len_timing
-
-### E5. $4015 Write 立即 Zero
-- **AprNes**：$4015 write bit=0 → 立即 zero counter
-- **TriCNES**：$4015 write bit=0 → 在 HalfFrame 時 zero（deferred）
-- **影響**：len_ctr
-
-### E6. Soft Reset $4017 Re-apply
-- **AprNes**：soft reset 時如果 ctrmode==5，立即觸發 quarter+half frame
-- **TriCNES**：不在 soft reset 重新觸發
-- **影響**：reset_timing
-
-### 修正方向
-重寫 length counter 為 deferred reload flag 模型：
-- 4 個 channel 各自有 `reloadFlag` + `reloadValue`
-- HalfFrame 時：先 reload（if counter==0 && flag）→ 再 decrement（if !halt && !reloadFlag）
-- $4015 read 移除 snapshot，直接讀 current 值
-- $4015 write 不立即 zero，改設 disable flag，HalfFrame 時 zero
+- E1 ✅ deferred reload flag model（lenCtrReloadFlag/Value，register write 設 flag，HalfFrame reload if ctr==0）
+- E2 ✅ reload-first → status-zero → decrement (guarded by !reloadFlag)
+- E3 ✅ halt 從 apuRegister 每 HalfFrame 重新讀取
+- E4 ✅ $4015 read 移除 snapshot，直接讀 current 值
+- E5 待驗證：$4015 write 立即 zero 保留（TriCNES 在 HalfFrame zero，但需確認測試影響）
+- E6 待驗證：soft reset $4017 re-apply 保留
+- 移除：lenctrHalt, lengthClockThisCycle, lengthctr_snapshot
+- 新增：lenCtrReloadFlag[4], lenCtrReloadValue[4], apuRegister[16], processLenCtrReloadNonHalf()
 
 ---
 
