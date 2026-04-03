@@ -35,10 +35,10 @@
 - PPU 透過 MasterClockTick 自然推進（不再需要 StartCpuCycle）
 - APU 每個 DMA cycle 也正常執行（修正了舊模型 APU 在 DMA 期間暫停的 bug）
 
-### 4. VBL suppression ($2002 read timing)
-- **現況**：`SuppressVbl` 在 `ppu_r_2002` 中設定，條件是 `scanline == nmiTriggerLine && ppu_cycles_x == 1`
-- **問題**：假設 $2002 read 和 VBL set 在同一 dot 的特定相對位置。新模型中 CPU read 和 PPU dot 的相對位置不同
-- **影響 tests**：nmi_suppression
+### 4. ~~VBL suppression ($2002 read timing)~~ ✅ DONE
+- **已完成**：ppu_r_2002 在 VBL dot (sl=nmiTriggerLine, cx=1) 清除 pendingVblank
+- 不再設 SuppressVbl（VBL dot 已處理並清除該 flag，重設會影響下一幀）
+- 150/174 零回歸
 
 ### 5. ppuRenderingEnabled 更新時機
 - **現況**：在 `ppu_step_rendering()` 末尾更新（end-of-dot delay）
@@ -56,6 +56,6 @@
 1. ~~**DMA per-cycle dispatch**~~ ✅ DONE
 2. ~~**NMI direct line model**~~ ✅ DONE
 3. ~~**IRQ level detection at CPUClock==5**~~ ✅ DONE
-4. **VBL suppression dot 調整**
+4. ~~**VBL suppression dot 調整**~~ ✅ DONE
 5. **ppuRenderingEnabled 更新時機**
 6. ~~**移除 Start/EndCpuCycle**~~ ✅ DONE（隨 DMA 一起完成）

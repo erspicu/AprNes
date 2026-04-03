@@ -1633,10 +1633,13 @@ namespace AprNes
             bool vblFlag = isVblank;
 
             // VBL suppression at exact VBL set dot (sl=nmiTriggerLine, cx=1):
-            // VBL was just set by tick; suppress flag read and NMI
+            // PPU already set pendingVblank at this dot — clear it before half-step promotes it.
+            // Note: do NOT set SuppressVbl here — the VBL dot already cleared it, setting it
+            // would persist to the next frame and suppress VBL incorrectly.
             if (scanline == nmiTriggerLine && ppu_cycles_x == 1)
             {
-                vblFlag = false;
+                pendingVblank = false;  // Cancel pending VBL promotion
+                vblFlag = false;        // Return VBL=0 to CPU
             }
 
             openbus = (byte)((vblFlag ? 0x80 : 0) | ((isSprite0hit) ? 0x40 : 0) | ((isSpriteOverflow) ? 0x20 : 0) | (openbus & 0x1f));
