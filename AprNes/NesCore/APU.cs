@@ -461,9 +461,8 @@ namespace AprNes
             }
 
             apuFrameCounter++;
-            apuQuarterFrame = false;
-            apuHalfFrame = false;
 
+            // Frame counter switch: OR flags (preserve $4017-set flags)
             if (ctrmode == 5)
             {
                 switch (apuFrameCounter)
@@ -471,7 +470,7 @@ namespace AprNes
                     case 7457: apuQuarterFrame = true; break;
                     case 14913: apuQuarterFrame = true; apuHalfFrame = true; break;
                     case 22371: apuQuarterFrame = true; break;
-                    case 29829: break; // TriCNES: explicit no-op (5-step skips IRQ)
+                    case 29829: break;
                     case 37281: apuQuarterFrame = true; apuHalfFrame = true; break;
                     case 37282: apuFrameCounter = 0; break;
                 }
@@ -497,10 +496,11 @@ namespace AprNes
                 }
             }
 
-            if (apuQuarterFrame) { setenvelope(); setlinctr(); }
-            if (apuHalfFrame) { setlength(); setsweep(); }
-            else { processLenCtrReloadNonHalf(); } // TriCNES: unconditional reload on non-HalfFrame cycles
-            if (apuQuarterFrame || apuHalfFrame) setvolumes();
+            // Process quarter/half frame, then clear flags (TriCNES: clear inside processing)
+            if (apuQuarterFrame) { setenvelope(); setlinctr(); apuQuarterFrame = false; }
+            if (apuHalfFrame) { setlength(); setsweep(); apuHalfFrame = false; }
+            else { processLenCtrReloadNonHalf(); }
+            setvolumes();
 
             // 生成音效樣本
             // 為 Mode 0/1 計算相容的單一 mapperExpansionAudio 值
