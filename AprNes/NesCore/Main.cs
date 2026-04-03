@@ -68,9 +68,10 @@ namespace AprNes
         static public RegionType Region = RegionType.NTSC;
 
         // ── Region-dependent timing parameters (set by ApplyRegionProfile) ──
-        static int regionMode     = 0;        // 0=NTSC, 1=PAL, 2=Dendy (for hot-path if-else branching)
+        static int regionMode     = 0;        // 0=NTSC, 1=PAL, 2=Dendy
         static int preRenderLine  = 261;      // NTSC=261, PAL/Dendy=311
         static int nmiTriggerLine = 241;      // NTSC/PAL=241, Dendy=291
+        static int totalScanlines = 262;      // NTSC=262, PAL/Dendy=312
         static int masterPerCpu   = 12;       // NTSC=12, PAL=16, Dendy=15
         static int masterPerPpu   = 4;        // NTSC=4, PAL=5, Dendy=5
         static double cpuFreq          = 1789773.0;  // NTSC=1789773, PAL=1662607, Dendy=1773447
@@ -83,6 +84,7 @@ namespace AprNes
                 regionMode     = 1;
                 preRenderLine  = 311;
                 nmiTriggerLine = 241;
+                totalScanlines = 312;
                 masterPerCpu   = 16;
                 masterPerPpu   = 5;
                 cpuFreq        = 1662607.0;
@@ -93,6 +95,7 @@ namespace AprNes
                 regionMode     = 2;
                 preRenderLine  = 311;
                 nmiTriggerLine = 291;
+                totalScanlines = 312;
                 masterPerCpu   = 15;
                 masterPerPpu   = 5;
                 cpuFreq        = 1773447.0;
@@ -103,11 +106,16 @@ namespace AprNes
                 regionMode     = 0;
                 preRenderLine  = 261;
                 nmiTriggerLine = 241;
+                totalScanlines = 262;
                 masterPerCpu   = 12;
                 masterPerPpu   = 4;
                 cpuFreq        = 1789773.0;
                 FrameSeconds   = 1.0 / 60.0988;
             }
+            // Precompute packed scanline event constants for unified ppu_step()
+            L_VBL_START    = (nmiTriggerLine << 9) | 1;
+            L_SPRITE_RESET = (preRenderLine << 9) | 1;
+            L_VBL_END      = (preRenderLine << 9) | 2;
         }
 
         // ── AudioPlus 音訊引擎設定 ──────────────────────────────────
@@ -633,9 +641,7 @@ namespace AprNes
             if (mcPpuClock == 0)
             {
                 mcPpuClock = masterPerPpu;
-                if (regionMode == 0)      ppu_step_ntsc();
-                else if (regionMode == 1) ppu_step_pal();
-                else                      ppu_step_dendy();
+                ppu_step();
             }
 
             // ── PPU half step ──
