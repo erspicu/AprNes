@@ -580,8 +580,7 @@ namespace AprNes
             // Stage 1→2
             if (pendingSprite0Hit) { pendingSprite0Hit = false; pendingSprite0Hit2 = true; }
 
-            // Sprite overflow delayed snapshot
-            isSpriteOverflow_Delayed = isSpriteOverflow;
+            // Sprite overflow delayed snapshot moved to ppu_step() (TriCNES: _EmulatePPU line 1619)
 
             // $2007 state machine half-step tick (fully deferred)
             if (ppu2007SM < 9)
@@ -972,6 +971,9 @@ namespace AprNes
                 else if (L == L_VBL_END)
                     isVblank = false;
             }
+
+            // Sprite overflow delayed snapshot (TriCNES: _EmulatePPU line 1619, in full step)
+            isSpriteOverflow_Delayed = isSpriteOverflow;
 
             // VBL latch Stage 1 (TriCNES: _EmulatePPU lines 1608-1616)
             ppuVSET_Latch1 = !ppuVSET;
