@@ -143,14 +143,12 @@ namespace AprNes
         // ── DMA helper functions ──
 
         // Dummy read from current CPU bus address (halt/alignment cycles)
+        // TriCNES: Fetch(addressBus) — full bus read with all side effects
+        // No $4016/$4017 skip, no $2007 SM bypass
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void DmaDummyRead()
         {
-            if (cpuBusAddr != 0x4016 && cpuBusAddr != 0x4017)
-            {
-                ppu2007SM = 9;
-                mem_read_fun[cpuBusAddr](cpuBusAddr);
-            }
+            mem_read_fun[cpuBusAddr](cpuBusAddr);
         }
 
         // OAM DMA Get — read source byte into latch (TriCNES: OAMDMA_Get)
