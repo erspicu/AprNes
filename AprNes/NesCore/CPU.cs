@@ -1765,15 +1765,5 @@ namespace AprNes
             };
             Array.Copy(t, opFnPtrs, 256);
         }
-
-        // Legacy cpu_step() wrapper - runs one full instruction using the per-cycle model
-        static void cpu_step()
-        {
-            // Execute one full instruction — each CpuRead/CpuWrite advances the clock
-            do
-            {
-                cpu_step_one_cycle();
-            } while (operationCycle != 0);
-        }
     }
 }

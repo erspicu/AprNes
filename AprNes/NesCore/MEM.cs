@@ -9,11 +9,6 @@ namespace AprNes
 
         static ushort cpuBusAddr = 0;    // CPU current bus address (for DMC phantom reads)
 
-        // M2 phase tracking: true = PUT (M2 low, write phase), false = GET (M2 high, read phase)
-        // Derived from cpuCycleCount parity — represents the absolute M2 clock phase,
-        // independent of whether the current bus access is a read or write.
-        // DMA halt/alignment decisions depend on this phase.
-        static bool m2PhaseIsWrite = false;
 
         // ── DMA state — TriCNES per-cycle dispatch model ──
         // Each DmaOneCycle() call executes exactly ONE DMA cycle.

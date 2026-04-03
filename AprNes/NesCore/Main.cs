@@ -266,7 +266,7 @@ namespace AprNes
             flagN = 0; flagV = 0; flagD = 0; flagI = 1; flagZ = 0; flagC = 0;
             opcode = 0; operationCycle = 0;
             cpubus = 0; cpuBusAddr = 0; addressBus = 0; dl = 0; ignoreH = false;
-            m2PhaseIsWrite = false;
+
 
             // CPU interrupt state
             NMILine = false; nmiPinsSignal = false; nmiPrevPinsSignal = false;
@@ -574,7 +574,7 @@ namespace AprNes
 
                 // CPU cycle housekeeping
                 cpuCycleCount++;
-                m2PhaseIsWrite = (cpuCycleCount & 1) != 0;
+
 
                 // DMA gate: if DMA pending, steal this cycle (TriCNES: _6502 DMA check)
                 if (dmcDmaRunning || spriteDmaTransfer)
