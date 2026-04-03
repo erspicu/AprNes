@@ -117,6 +117,18 @@ namespace AprNes
                 dmcDmaHalt = false;
                 dmaOamHalt = false;
             }
+
+            // TriCNES: implicit abort — after each DMA cycle, if implicit abort active,
+            // clear flag and cancel DMC if no samples left (1-cycle phantom DMA)
+            if (dmcImplicitAbortActive)
+            {
+                dmcImplicitAbortActive = false;
+                if (dmcDmaRunning && dmcsamplesleft == 0)
+                {
+                    dmcDmaRunning = false;
+                    dmcDmaHalt = false;
+                }
+            }
         }
 
         // ── DMA helper functions (TriCNES exact port) ──
