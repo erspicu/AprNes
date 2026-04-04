@@ -1070,7 +1070,9 @@ namespace AprNes
 
             // renderingEnabled uses _Instant flags (Tier 1) for core PPU state
             // (odd frame skip, vram increment, tile fetch control, etc.)
-            renderingEnabled = ShowBackGround_Instant || ShowSprites_Instant;
+            // TriCNES: rendering gate uses DELAYED flags (PPU_Mask_ShowBackground/ShowSprites)
+            // Not instant flags. The 2-3 dot delay prevents false A12 edges at enable transition.
+            renderingEnabled = ShowBackGround || ShowSprites;
             cx = ppu_cycles_x;
 
             // At dot 0 of visible scanlines: precompute sprite 0 data for hit detection.
