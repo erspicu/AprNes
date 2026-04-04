@@ -538,9 +538,9 @@ namespace AprNes
                 int phase = cx & 7;
                 if (phase == 0) {
                     ioaddr = 0x2000 | (vram_addr & 0x0FFF);
-                    if (mapperA12IsMmc3) NotifyMapperA12(ioaddr); // NT addr A12=0 — MMC3 needs falling edge between tiles
                 } else if (phase == 1) {
                     ppuAddressBus = ioaddr;  // TriCNES: PPU_AddressBus set at phase 1 (NT fetch)
+                    if (mapperA12IsMmc3) NotifyMapperA12(ioaddr); // NT addr A12=0 — at data phase (TriCNES model)
                     if (ntChrOverrideEnabled)
                         NTVal = ntBankPtrs[(ioaddr >> 10) & 3][ioaddr & 0x3FF];
                     else
@@ -569,10 +569,10 @@ namespace AprNes
                         ioaddr = (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7);
                     else
                         ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
-                    if (mapperNeedsA12) NotifyMapperA12(ioaddr);  // CHR low addr — MMC3 + MMC2/MMC4
                 } else if (phase == 5) {
                     ppuAddressBus = ioaddr;  // TriCNES: PPU_AddressBus set at phase 5 (CHR low fetch)
                     ppuChrFetchA12 = (ioaddr >> 12) & 1;  // CHR-only A12 for MMC3 M2 filter
+                    if (mapperNeedsA12) NotifyMapperA12(ioaddr);  // CHR low — at data phase (TriCNES model)
                     if (extAttrEnabled && extAttrChrSize > 0)
                         lowTile = extAttrCHR[ioaddr % extAttrChrSize];
                     else
@@ -583,10 +583,10 @@ namespace AprNes
                         ioaddr = (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
                     else
                         ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
-                    if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(ioaddr);  // MMC2/MMC4 only: CHR high triggers latch
                 } else {
                     ppuAddressBus = ioaddr;  // TriCNES: PPU_AddressBus set at phase 7 (CHR high fetch)
                     ppuChrFetchA12 = (ioaddr >> 12) & 1;  // CHR-only A12 for MMC3 M2 filter
+                    if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(ioaddr);  // MMC2/MMC4: CHR high at data phase
                     if (extAttrEnabled && extAttrChrSize > 0)
                         highTile = extAttrCHR[ioaddr % extAttrChrSize];
                     else
@@ -643,8 +643,12 @@ namespace AprNes
                     int slot = (cx - 257) >> 3;
                     if (sprPhase == 0)
                     {
-                        // Dummy NT fetch (TriCNES: ShiftRegistersAndBitPlanes case 1)
+                        // Dummy NT fetch (TriCNES case 0: sets address)
                         ppuAddressBus = 0x2000 | (vram_addr & 0x0FFF);
+                    }
+                    else if (sprPhase == 1)
+                    {
+                        // A12 notify at data phase (TriCNES: addr set at case 0, detected at case 1)
                         if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus);
                     }
                     else if (sprPhase == 2)
@@ -657,18 +661,17 @@ namespace AprNes
                     {
                         // Read X position from secondary OAM (TriCNES case 3)
                         sprXPos[slot] = secondaryOAM[slot * 4 + 3];
-                        // MMC3: notify A12 at sprite CHR compute (master phase 3 timing)
-                        if (mapperA12IsMmc3) NotifyMapperA12(SpPatternTableAddr);
                     }
                     else if (sprPhase == 4)
                     {
-                        // Sprite CHR low address (TriCNES: GetSpriteAddress)
+                        // Sprite CHR low address (TriCNES case 4: GetSpriteAddress)
                         ppuAddressBus = ComputeSpritePatternAddr(slot);
                         ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
-                        if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(ppuAddressBus);
                     }
                     else if (sprPhase == 5)
                     {
+                        // A12 notify at data phase (TriCNES: addr set at case 4, detected at case 5)
+                        if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus);
                         // Fetch CHR low bitplane → shift register (TriCNES case 5)
                         int addr = ppuAddressBus; // address set at phase 4
                         byte tile = chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF];
@@ -677,13 +680,14 @@ namespace AprNes
                     }
                     else if (sprPhase == 6)
                     {
-                        // Sprite CHR high address = CHR low + 8
+                        // Sprite CHR high address = CHR low + 8 (TriCNES case 6)
                         ppuAddressBus = ComputeSpritePatternAddr(slot) + 8;
                         ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
-                        if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(ppuAddressBus); // MMC2/MMC4 only
                     }
                     else // sprPhase == 7
                     {
+                        // A12 notify at data phase (TriCNES: addr set at case 6, detected at case 7)
+                        if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(ppuAddressBus); // MMC2/MMC4 only
                         // Fetch CHR high bitplane → shift register (TriCNES case 7)
                         int addr = ppuAddressBus; // address set at phase 6
                         byte tile = chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF];
@@ -731,6 +735,10 @@ namespace AprNes
             if (cx == 336 || cx == 338)
             {
                 ppuAddressBus = 0x2000 | (vram_addr & 0x0FFF);
+            }
+            else if (cx == 337 || cx == 339)
+            {
+                // A12 notify 1 dot after address set (TriCNES: set at dot 336/338, PPUClock detects at end of dot)
                 if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus);
             }
             else if (cx == 340)
@@ -796,7 +804,9 @@ namespace AprNes
 
         static void NotifyMapperA12(int address)
         {
-            MapperObj.NotifyA12(address, scanline * 341 + ppu_cycles_x);
+            // +1: notification fires during rendering (pre-increment), but TriCNES detects
+            // in PPUClock which runs after PPU_Dot++ (post-increment). Align timestamps.
+            MapperObj.NotifyA12(address, scanline * 341 + ppu_cycles_x + 1);
         }
 
         // ── Half-step: runs AFTER each full ppu_step (mid-dot) ──
