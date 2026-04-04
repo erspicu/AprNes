@@ -65,15 +65,15 @@ namespace AprNes
             }
             else
             {
-                IRQCounter--;
+                // TriCNES: counter is byte, so 0-1 wraps to 255
+                IRQCounter = (IRQCounter - 1) & 0xFF;
                 if (IRQCounter == 0 && IRQ_enable)
                 {
                     NesCore.statusmapperint = true;
                     NesCore.UpdateIRQLine();
                 }
-                else if (IRQCounter == -1) // underflow: was 0, decremented past
+                else if (IRQCounter == 255) // byte underflow: was 0
                 {
-                    // Reload from latch (NESdev wiki: "counter == 0 → reload")
                     IRQCounter = IRQlatchVal;
                     if (IRQCounter == 0 && IRQ_enable)
                     {
