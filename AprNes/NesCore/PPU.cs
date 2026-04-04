@@ -608,9 +608,13 @@ namespace AprNes
             }
             else if (cx >= 257 && cx < 320)
             {
+                // TriCNES line 2823: PPUOAMAddress reset to 0 on EVERY dot 257-320
+                if (ShowBG_EvalDelay || ShowSpr_EvalDelay)
+                    spr_ram_add = 0;
+
                 if (cx == 257)
                 {
-                    CopyHoriV(); spr_ram_add = 0;
+                    CopyHoriV();
                     sprOam2Addr = 0; // 6.2: reset secondary OAM address (TriCNES: OAM2Address)
                     // MMC5 CHR A/B: switch to A set (sprites) at dot 257 (only in 8x16 mode)
                     if (chrABAutoSwitch && Spritesize8x16)
@@ -843,19 +847,6 @@ namespace AprNes
             if (pendingSprite0Hit2) { pendingSprite0Hit2 = false; isSprite0hit = true; }
             // Stage 1→2
             if (pendingSprite0Hit) { pendingSprite0Hit = false; pendingSprite0Hit2 = true; }
-
-            // P4-3: OAMBuffer update (TriCNES _EmulateHalfPPU lines 1842-1860)
-            // TriCNES: PPU_Mask_ShowBackground || PPU_Mask_ShowSprites (Tier 2 delayed flags)
-            if ((ShowBackGround || ShowSprites) && scanline >= 0 && scanline < 240)
-            {
-                int dot = ppu_cycles_x - 1;
-                if (dot == 0 || dot > 320)
-                    ppuOamBuffer = secondaryOAM[0];
-                else if (dot <= 64)
-                    ppuOamBuffer = 0xFF;
-                else // dots 65-320
-                    ppuOamBuffer = oamCopyBuffer;
-            }
 
             // $2007 state machine half-step tick
             Ppu2007SmTick();
@@ -1319,7 +1310,18 @@ namespace AprNes
             // cx is post-increment but rendering still uses pre-increment value internally
             ppu_step_rendering(cx - 1, re, preRenderLine);
 
-            // P4-3: OAMBuffer moved to ppu_half_step (TriCNES: _EmulateHalfPPU lines 1842-1860)
+            // P4-3: OAMBuffer update (TriCNES _EmulateHalfPPU lines 1842-1860)
+            // Note: TriCNES does this in half step, but keeping in full step for now to match timing
+            if ((ShowBackGround_Instant || ShowSprites_Instant) && scanline >= 0 && scanline < 240)
+            {
+                int dot = cx - 1;
+                if (dot == 0 || dot > 320)
+                    ppuOamBuffer = secondaryOAM[0];
+                else if (dot <= 64)
+                    ppuOamBuffer = 0xFF;
+                else // dots 65-320
+                    ppuOamBuffer = oamCopyBuffer;
+            }
 
             // NTSC odd frame dot skip (pre-render line, dot 339)
             if (scanline == preRenderLine && cx == 339)
@@ -1667,9 +1669,9 @@ namespace AprNes
                 }
             }
 
-            // TriCNES line 2627+2772: OAM2READ captured at PRE-increment address, assigned to latch at end
-            if (preIncSecOAMAddr < 0x20)
-                oamCopyBuffer = secondaryOAM[preIncSecOAMAddr];
+            // TriCNES line 2772: OAM2 readback after evaluation
+            if (secOAMAddr < 0x20)
+                oamCopyBuffer = secondaryOAM[secOAMAddr];
 
             // Update primary OAM read address (for $2003 visibility)
             spr_ram_add = (byte)((spriteEvalAddrL & 0x03) | (spriteEvalAddrH << 2));
@@ -2097,7 +2099,6 @@ namespace AprNes
                 MasterClockTick();
 
             // P4-3: return cached ppuOamBuffer during rendering (TriCNES ReadOAM line 9264-9271)
-            // ppuOamBuffer is updated per-dot in ppu_step half-cycle, not computed on-the-fly
             byte val;
             bool renderingOn = ShowBackGround_Instant || ShowSprites_Instant;
             if (scanline >= 0 && scanline < 240 && renderingOn)
