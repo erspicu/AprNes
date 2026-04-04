@@ -40,7 +40,11 @@ namespace AprNes
         {
             bool a12Now = (NesCore.ppuAddressBus & 0x1000) != 0;
             if (!NesCore.ppuA12Prev && a12Now && m2Filter == 3)
+            {
+                if (NesCore.frame_count <= 13)
+                    System.Console.Error.WriteLine($"A CLK SL={NesCore.scanline} cx={NesCore.ppu_cycles_x} bus={NesCore.ppuAddressBus:X4} m2={m2Filter} ctr={IRQCounter}");
                 Mapper04step_IRQ();
+            }
             if (a12Now)
                 m2Filter = 0;
         }
@@ -48,12 +52,15 @@ namespace AprNes
         public virtual void Mapper04step_IRQ()
         {
             // TriCNES model: reload only when ReloadIRQCounter flag set
+            // Counter is int — 0 decrements to -1 (no underflow to 255)
             if (IRQReset)
             {
                 IRQCounter = IRQlatchVal;
                 IRQReset = false;
                 if (IRQCounter == 0 && IRQ_enable)
                 {
+                    if (NesCore.frame_count <= 15)
+                        System.Console.Error.WriteLine($"A IRQ-RL SL={NesCore.scanline} cx={NesCore.ppu_cycles_x} F{NesCore.frame_count}");
                     NesCore.statusmapperint = true;
                     NesCore.UpdateIRQLine();
                 }
@@ -63,6 +70,8 @@ namespace AprNes
                 IRQCounter--; // byte: 0-1 wraps to 255
                 if (IRQCounter == 0 && IRQ_enable)
                 {
+                    if (NesCore.frame_count <= 15)
+                        System.Console.Error.WriteLine($"A IRQ-DEC0 SL={NesCore.scanline} cx={NesCore.ppu_cycles_x} F{NesCore.frame_count}");
                     NesCore.statusmapperint = true;
                     NesCore.UpdateIRQLine();
                 }
@@ -71,6 +80,8 @@ namespace AprNes
                     IRQCounter = IRQlatchVal;
                     if (IRQCounter == 0 && IRQ_enable)
                     {
+                        if (NesCore.frame_count <= 15)
+                            System.Console.Error.WriteLine($"A IRQ-UF SL={NesCore.scanline} cx={NesCore.ppu_cycles_x} F{NesCore.frame_count}");
                         NesCore.statusmapperint = true;
                         NesCore.UpdateIRQLine();
                     }
