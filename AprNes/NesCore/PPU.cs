@@ -527,7 +527,7 @@ namespace AprNes
         // sprites at phases 0 (garbage NT, A12=0) and 3 (sprite CHR, A12=sprite table bit12).
         static void ppu_rendering_tick(int cx, int preRenderLn)
         {
-            if ((cx < 256 && scanline != preRenderLn) || (cx >= 320 && cx < 336))
+            if (cx < 256 || (cx >= 320 && cx < 336))
             {
                 // MMC5 CHR A/B: ensure correct set at BG tile boundaries.
                 // Dot 0: initialize for this scanline (handles vblank→render transition).
@@ -542,7 +542,8 @@ namespace AprNes
                     ioaddr = 0x2000 | (vram_addr & 0x0FFF);
                 } else if (phase == 1) {
                     ppuAddressBus = ioaddr;  // TriCNES: PPU_AddressBus set at phase 1 (NT fetch)
-                    if (mapperA12IsMmc3) NotifyMapperA12(ioaddr); // NT addr A12=0 — at data phase (TriCNES model)
+                    // A12=0 (NT falling edge): always notify — keeps a12LowSince updated
+                    if (mapperA12IsMmc3) NotifyMapperA12(ioaddr);
                     if (ntChrOverrideEnabled)
                         NTVal = ntBankPtrs[(ioaddr >> 10) & 3][ioaddr & 0x3FF];
                     else
@@ -574,7 +575,10 @@ namespace AprNes
                 } else if (phase == 5) {
                     ppuAddressBus = ioaddr;  // TriCNES: PPU_AddressBus set at phase 5 (CHR low fetch)
                     ppuChrFetchA12 = (ioaddr >> 12) & 1;  // CHR-only A12 for MMC3 M2 filter
-                    if (mapperNeedsA12) NotifyMapperA12(ioaddr);  // CHR low — at data phase (TriCNES model)
+                    // A12=1 (CHR rising edge): suppress on pre-render dots 0-255 for MMC3
+                    // TriCNES M2 filter naturally blocks per-tile oscillation; AprNes elapsed filter can't
+                    if (mapperNeedsA12 && !(mapperA12IsMmc3 && scanline == preRenderLine && cx < 256))
+                        NotifyMapperA12(ioaddr);
                     if (extAttrEnabled && extAttrChrSize > 0)
                         lowTile = extAttrCHR[ioaddr % extAttrChrSize];
                     else
