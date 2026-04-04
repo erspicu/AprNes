@@ -871,7 +871,7 @@ namespace AprNes
             // Shift registers must also shift during prefetch (cx 320-335) and pre-render line
             // Otherwise attribute shift registers have stale data at dot 0
             bool inPrefetch = (cx >= 320 && cx < 336) && (scanline >= 0 || scanline == preRenderLine);
-            if (inPrefetch && ppuRenderingEnabled)
+            if (inPrefetch && (ShowBackGround || ShowSprites)) // TriCNES: Tier 2 delayed flags
             {
                 renderLow  <<= 1;
                 renderHigh = (ushort)((renderHigh << 1) | 1);
@@ -1110,10 +1110,12 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_step_rendering(int cx, bool renderingEnabled, int PRE_RENDER_LINE)
         {
-            if (ppuRenderingEnabled)
+            // TriCNES: shift registers gated by Tier 2 delayed flags (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites)
+            // NOT ppuRenderingEnabled (Tier 1 instant) — stale data must persist during enable/disable transition
+            if (ShowBackGround || ShowSprites)
             {
                 if ((scanline >= 0 && scanline < 240 && cx < 256)
-                    || ((scanline < 240 || scanline == PRE_RENDER_LINE) // ★ REGION
+                    || ((scanline < 240 || scanline == PRE_RENDER_LINE)
                         && cx >= 320 && cx < 336))
                 {
                     lowshift_s0 <<= 1;
