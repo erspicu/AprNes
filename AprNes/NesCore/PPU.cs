@@ -1282,10 +1282,12 @@ namespace AprNes
         {
             int cx; bool re;
             ppu_step_common(out cx, out re);
-            ppu_step_rendering(cx, re, preRenderLine);
+
+            // TriCNES order: deferred → scroll → dot++ → events → VBL → mapper → A12_Prev → rendering
+            // Key: PpuClock BEFORE rendering — mapper sees previous dot's ppuAddressBus
             ppu_cycles_x = ++cx;
 
-            // Scanline events: VBL set, sprite flag clear, VBL clear (only at cx<=2)
+            // Scanline events (post-increment cx)
             if (cx <= 2)
             {
                 int L = (scanline << 9) | cx;
@@ -1297,27 +1299,28 @@ namespace AprNes
                     isVblank = false;
             }
 
-            // TriCNES order: VBL latch (1608) → SpriteOverflow (1619) → MapperCallback (1627) → A12_Prev (1628)
-
-            // VBL latch Stage 1 (TriCNES: _EmulatePPU lines 1608-1616)
+            // VBL latch (TriCNES lines 1608-1616)
             ppuVSET_Latch1 = !ppuVSET;
             if (ppuVSET && !ppuVSET_Latch2)
                 isVblank = true;
-            // Deferred $2002 VBL clear (TriCNES: PPU_Read2002 processed in _EmulatePPU)
             if (ppu2002ReadPending)
             {
                 ppu2002ReadPending = false;
                 isVblank = false;
             }
 
-            // Sprite overflow delayed snapshot (TriCNES: _EmulatePPU line 1619)
+            // Sprite overflow delayed (TriCNES line 1619)
             isSpriteOverflow_Delayed = isSpriteOverflow;
 
-            // Mapper callback (TriCNES: PPU_MapperSpecificFunctions, line 1627)
+            // Mapper callback BEFORE rendering (TriCNES line 1627)
             MapperObj.PpuClock();
 
-            // A12_Prev capture AFTER mapper callback (TriCNES: line 1628)
+            // A12_Prev capture (TriCNES line 1628)
             ppuA12Prev = (ppuAddressBus & 0x1000) != 0;
+
+            // Rendering AFTER mapper callback (TriCNES lines 1644+)
+            // cx is post-increment but rendering still uses pre-increment value internally
+            ppu_step_rendering(cx - 1, re, preRenderLine);
 
             // P4-3: OAMBuffer half-cycle update (TriCNES _EmulateHalfPPU lines 1842-1860)
             // Updated per-dot; $2004 reads return this cached value during rendering
