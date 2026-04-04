@@ -538,6 +538,7 @@ namespace AprNes
                 int phase = cx & 7;
                 if (phase == 0) {
                     ioaddr = 0x2000 | (vram_addr & 0x0FFF);
+                    if (mapperA12IsMmc3) NotifyMapperA12(ioaddr); // NT addr A12=0 — MMC3 needs falling edge between tiles
                 } else if (phase == 1) {
                     ppuAddressBus = ioaddr;  // TriCNES: PPU_AddressBus set at phase 1 (NT fetch)
                     if (ntChrOverrideEnabled)
@@ -568,10 +569,10 @@ namespace AprNes
                         ioaddr = (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7);
                     else
                         ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
+                    if (mapperNeedsA12) NotifyMapperA12(ioaddr);  // CHR low addr — MMC3 + MMC2/MMC4
                 } else if (phase == 5) {
                     ppuAddressBus = ioaddr;  // TriCNES: PPU_AddressBus set at phase 5 (CHR low fetch)
                     ppuChrFetchA12 = (ioaddr >> 12) & 1;  // CHR-only A12 for MMC3 M2 filter
-                    if (mapperNeedsA12) NotifyMapperA12(ioaddr);  // MMC2/MMC4 only
                     if (extAttrEnabled && extAttrChrSize > 0)
                         lowTile = extAttrCHR[ioaddr % extAttrChrSize];
                     else
@@ -582,7 +583,7 @@ namespace AprNes
                         ioaddr = (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
                     else
                         ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
-                    if (mapperNeedsA12) NotifyMapperA12(ioaddr);  // MMC2/MMC4: CHR high triggers latch
+                    if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(ioaddr);  // MMC2/MMC4 only: CHR high triggers latch
                 } else {
                     ppuAddressBus = ioaddr;  // TriCNES: PPU_AddressBus set at phase 7 (CHR high fetch)
                     ppuChrFetchA12 = (ioaddr >> 12) & 1;  // CHR-only A12 for MMC3 M2 filter
@@ -656,13 +657,15 @@ namespace AprNes
                     {
                         // Read X position from secondary OAM (TriCNES case 3)
                         sprXPos[slot] = secondaryOAM[slot * 4 + 3];
+                        // MMC3: notify A12 at sprite CHR compute (master phase 3 timing)
+                        if (mapperA12IsMmc3) NotifyMapperA12(SpPatternTableAddr);
                     }
                     else if (sprPhase == 4)
                     {
                         // Sprite CHR low address (TriCNES: GetSpriteAddress)
                         ppuAddressBus = ComputeSpritePatternAddr(slot);
                         ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
-                        if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus);
+                        if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(ppuAddressBus);
                     }
                     else if (sprPhase == 5)
                     {
@@ -677,7 +680,7 @@ namespace AprNes
                         // Sprite CHR high address = CHR low + 8
                         ppuAddressBus = ComputeSpritePatternAddr(slot) + 8;
                         ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
-                        if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus);
+                        if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(ppuAddressBus); // MMC2/MMC4 only
                     }
                     else // sprPhase == 7
                     {
@@ -791,7 +794,6 @@ namespace AprNes
             return b;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void NotifyMapperA12(int address)
         {
             MapperObj.NotifyA12(address, scanline * 341 + ppu_cycles_x);
@@ -955,7 +957,10 @@ namespace AprNes
             {
                 int prevAddr = vram_addr;
                 vram_addr = ppu2006PendingAddr;
-                if (mapperNeedsA12) NotifyMapperA12(vram_addr);
+                ppuAddressBus = vram_addr; // TriCNES line 1272
+                // Notify A12 only outside active rendering — during rendering, tile fetch phases handle A12
+                bool inRendering = (ShowBackGround_Instant || ShowSprites_Instant) && (scanline < 240 || scanline == preRenderLine);
+                if (mapperNeedsA12 && !inRendering) NotifyMapperA12(vram_addr);
 
                 // P4-2: Palette corruption when leaving palette range
                 // TriCNES: if old addr >= $3F00 and new addr < $3F00, and low nibble != 0
