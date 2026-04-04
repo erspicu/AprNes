@@ -203,6 +203,7 @@ namespace AprNes
         static bool prevRenderingEnabled = false;
         static bool oamCorruptPending = false;          // Corruption recorded from disable, awaiting re-enable
         static bool oamCorruptSuppressed = false;       // Alignment 1,2 suppress corruption on re-enable
+        static int oamCorruptIndex = 0;                 // 6.5: TriCNES PPU_OAMCorruptionIndex (from OAM2Address)
 
         // P4-2: Palette corruption flags
         static bool paletteCorruptFromDisable = false;  // Rendering disabled during NT fetch with VRAM >= $3C00
@@ -1391,35 +1392,27 @@ namespace AprNes
         static int spriteOverflowCycle;
 
         // OAM corruption: mark which row gets corrupted when rendering is disabled mid-scanline
+        // 6.5: TriCNES OAM corruption model — uses OAM2Address as corruption index
         static void SetOamCorruptionFlags()
         {
-            if (ppu_cycles_x >= 0 && ppu_cycles_x < 64)
-            {
-                corruptOamRow[ppu_cycles_x >> 1] = 1;
-            }
-            else if (ppu_cycles_x >= 256 && ppu_cycles_x < 320)
-            {
-                int rel = ppu_cycles_x - 256;
-                int baseIdx = rel >> 3;
-                int offset = rel & 0x07;
-                if (offset > 3) offset = 3;
-                corruptOamRow[baseIdx * 4 + offset] = 1;
-            }
+            // TriCNES: PPU_OAMCorruptionIndex = OAM2Address
+            // Record which row to corrupt based on current sprite evaluation address
+            oamCorruptIndex = sprOam2Addr;
         }
 
-        // OAM corruption: copy first 8 bytes of OAM over each marked row
+        // OAM corruption: copy first 8 bytes of OAM over the corrupted row (TriCNES CorruptOAM)
         static unsafe void ProcessOamCorruption()
         {
-            long sourcePattern = *(long*)spr_ram;
-            for (int i = 1; i < 32; i++)
+            int idx = oamCorruptIndex;
+            if (idx >= 0x20) idx = 0; // TriCNES: wrap at 32
+            if (idx > 0)
             {
-                if (corruptOamRow[i] != 0)
-                {
-                    ((long*)spr_ram)[i] = sourcePattern;
-                    corruptOamRow[i] = 0;
-                }
+                // Copy row 0 (8 bytes) to corrupted row
+                for (int i = 0; i < 8; i++)
+                    spr_ram[idx * 8 + i] = spr_ram[i];
+                // Also corrupt secondary OAM (TriCNES: OAM2[index] = OAM2[0])
+                secondaryOAM[idx] = secondaryOAM[0];
             }
-            corruptOamRow[0] = 0;
         }
 
         // Pre-compute sprite 0 tile data for the current scanline so hit detection
@@ -2056,11 +2049,6 @@ namespace AprNes
 
                         if (!oamCorruptSuppressed)
                             ProcessOamCorruption();
-                        else
-                        {
-                            // Suppressed: just clear the flags without corrupting
-                            for (int i = 0; i < 32; i++) corruptOamRow[i] = 0;
-                        }
                         oamCorruptPending = false;
                         oamCorruptSuppressed = false;
 
