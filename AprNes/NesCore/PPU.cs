@@ -1570,6 +1570,7 @@ namespace AprNes
         {
             int height = Spritesize8x16 ? 16 : 8;
             int evalSL = scanline & 0xFF; // TriCNES: (PPU_Scanline & 0xFF) — wraps pre-render 261→5
+            int preIncSecOAMAddr = secOAMAddr; // TriCNES: OAM2READ captured BEFORE evaluation increments
 
             if (secOAMAddr >= 0x20)
             {
@@ -1636,8 +1637,9 @@ namespace AprNes
 
                     if (spriteInRange)
                     {
-                        // Sprite 0 detection: addrH==0 && addrL==0 means this is OAM entry 0's Y byte
-                        if (spriteEvalAddrH == 0 && spriteEvalAddrL == 0) sprite0Added = true;
+                        // TriCNES line 2655: sprite 0 detected by dot number, not OAM address
+                        // PPU_Dot==66 = first even (WRITE) tick = ppu_cycles_x==67
+                        if (ppu_cycles_x == 67) sprite0Added = true;
 
                         spriteEvalAddrL++;
                         secOAMAddr++;
@@ -1664,6 +1666,10 @@ namespace AprNes
                     }
                 }
             }
+
+            // TriCNES line 2627+2772: OAM2READ captured at PRE-increment address, assigned to latch at end
+            if (preIncSecOAMAddr < 0x20)
+                oamCopyBuffer = secondaryOAM[preIncSecOAMAddr];
 
             // Update primary OAM read address (for $2003 visibility)
             spr_ram_add = (byte)((spriteEvalAddrL & 0x03) | (spriteEvalAddrH << 2));
