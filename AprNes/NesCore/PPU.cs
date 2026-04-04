@@ -1024,16 +1024,36 @@ namespace AprNes
                 // Per-dot sprite evaluation (visible scanlines only)
                 if (AccuracyOptA)
                 {
-                    if (((scanline >= 0 && scanline < 240) || scanline == PRE_RENDER_LINE) && (ShowBG_EvalDelay || ShowSpr_EvalDelay))
+                    bool evalScanline = (scanline >= 0 && scanline < 240) || scanline == PRE_RENDER_LINE;
+
+                    // Dot 65: init OUTSIDE rendering gate (TriCNES line 2585-2588)
+                    if (evalScanline && cx == 65)
+                    {
+                        evalOam2Addr = 0;           // TriCNES: OAM2Address = 0 (always, even rendering off)
+                        nineObjectsOnLine = false;   // TriCNES: NineObjectsOnThisScanline = false
+                    }
+
+                    // TriCNES line 2590: gate uses INSTANT flags (ShowBackground_Instant || ShowSprites_Instant)
+                    if (evalScanline && (ShowBackGround_Instant || ShowSprites_Instant))
                     {
                         // Dots 1-64: clear secondary OAM (write $FF, 2 dots per byte)
+                        // TriCNES: pre-render line is read-only (reads SecOAM, doesn't write 0xFF)
                         if (cx >= 1 && cx <= 64)
                         {
-                            oamCopyBuffer = 0xFF;
-                            if ((cx & 1) == 0)
-                                secondaryOAM[(cx >> 1) - 1] = 0xFF;
+                            if (scanline == preRenderLine)
+                            {
+                                // Read-only on pre-render (TriCNES: SpriteEval_ReadOnly_PreRenderLine)
+                                oamCopyBuffer = secondaryOAM[(cx >> 1) & 0x1F]; // odd: read SecOAM
+                                // even: no write to SecOAM
+                            }
+                            else
+                            {
+                                oamCopyBuffer = 0xFF;
+                                if ((cx & 1) == 0)
+                                    secondaryOAM[(cx >> 1) - 1] = 0xFF;
+                            }
                         }
-                        // Dot 65: initialize + first tick (ODD=READ from OAM, TriCNES PPU_Dot=65)
+                        // Dot 65: eval init + first tick
                         else if (cx == 65)
                         {
                             sprite0_eval_addr = spr_ram_add;
