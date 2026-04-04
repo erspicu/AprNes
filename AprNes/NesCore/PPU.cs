@@ -844,6 +844,19 @@ namespace AprNes
             // Stage 1→2
             if (pendingSprite0Hit) { pendingSprite0Hit = false; pendingSprite0Hit2 = true; }
 
+            // P4-3: OAMBuffer update (TriCNES _EmulateHalfPPU lines 1842-1860)
+            // TriCNES: PPU_Mask_ShowBackground || PPU_Mask_ShowSprites (Tier 2 delayed flags)
+            if ((ShowBackGround || ShowSprites) && scanline >= 0 && scanline < 240)
+            {
+                int dot = ppu_cycles_x - 1;
+                if (dot == 0 || dot > 320)
+                    ppuOamBuffer = secondaryOAM[0];
+                else if (dot <= 64)
+                    ppuOamBuffer = 0xFF;
+                else // dots 65-320
+                    ppuOamBuffer = oamCopyBuffer;
+            }
+
             // $2007 state machine half-step tick
             Ppu2007SmTick();
 
@@ -1007,7 +1020,7 @@ namespace AprNes
                 // Per-dot sprite evaluation (visible scanlines only)
                 if (AccuracyOptA)
                 {
-                    if (scanline >= 0 && scanline < 240 && (ShowBG_EvalDelay || ShowSpr_EvalDelay))
+                    if (((scanline >= 0 && scanline < 240) || scanline == PRE_RENDER_LINE) && (ShowBG_EvalDelay || ShowSpr_EvalDelay))
                     {
                         // Dots 1-64: clear secondary OAM (write $FF, 2 dots per byte)
                         if (cx >= 1 && cx <= 64)
@@ -1016,13 +1029,14 @@ namespace AprNes
                             if ((cx & 1) == 0)
                                 secondaryOAM[(cx >> 1) - 1] = 0xFF;
                         }
-                        // Dot 65: initialize evaluation FSM (no tick — first tick at dot 66)
+                        // Dot 65: initialize + first tick (ODD=READ from OAM, TriCNES PPU_Dot=65)
                         else if (cx == 65)
                         {
                             sprite0_eval_addr = spr_ram_add;
                             SpriteEvalInit();
+                            SpriteEvalTick(); // ODD read: loads OAM[0].Y into oamCopyBuffer
                         }
-                        // Dots 66-256: per-dot evaluation (first READ at 66, first WRITE at 67)
+                        // Dots 66-256: per-dot evaluation (66=EVEN WRITE, 67=ODD READ, ...)
                         else if (cx >= 66 && cx <= 256)
                         {
                             SpriteEvalTick();
@@ -1084,13 +1098,11 @@ namespace AprNes
                     sprSlotCount = evalSpriteCount;
                     sprZeroInSlots = evalSprite0Visible;
                 }
-                // Pre-render line: TriCNES runs evaluation here too (PPU_Render_SpriteEvaluation),
-                // clearing PPU_NextScanlineContainsSpriteZero. AprNes doesn't run eval on pre-render,
-                // so explicitly clear sprZeroInSlots to prevent stale hits from the previous frame.
+                // Pre-render line: now runs evaluation (like TriCNES), so use eval results
                 else if (scanline == PRE_RENDER_LINE && cx == 257) // ★ REGION
                 {
-                    sprZeroInSlots = false;
-                    sprSlotCount = 0; // pre-render eval would produce 0 valid sprites for scanline 0
+                    sprSlotCount = evalSpriteCount;
+                    sprZeroInSlots = evalSprite0Visible;
                 }
 
                 // Pre-render line: compute pre-render sprite data at dot 257
@@ -1307,18 +1319,7 @@ namespace AprNes
             // cx is post-increment but rendering still uses pre-increment value internally
             ppu_step_rendering(cx - 1, re, preRenderLine);
 
-            // P4-3: OAMBuffer half-cycle update (TriCNES _EmulateHalfPPU lines 1842-1860)
-            // Updated per-dot; $2004 reads return this cached value during rendering
-            if ((ShowBackGround_Instant || ShowSprites_Instant) && scanline >= 0 && scanline < 240)
-            {
-                int dot = cx - 1; // cx already incremented — dot is the one just processed
-                if (dot == 0 || dot > 320)
-                    ppuOamBuffer = secondaryOAM[0];
-                else if (dot <= 64)
-                    ppuOamBuffer = 0xFF;
-                else // dots 65-320
-                    ppuOamBuffer = oamCopyBuffer;
-            }
+            // P4-3: OAMBuffer moved to ppu_half_step (TriCNES: _EmulateHalfPPU lines 1842-1860)
 
             // NTSC odd frame dot skip (pre-render line, dot 339)
             if (scanline == preRenderLine && cx == 339)
@@ -1544,17 +1545,19 @@ namespace AprNes
         }
 
         // Per-dot sprite evaluation: odd dots read, even dots write/check
+        // TriCNES uses (PPU_Dot & 1)==1 for odd. AprNes ppu_cycles_x = cx+1 (post-increment),
+        // so (ppu_cycles_x & 1)==0 aligns with TriCNES odd dots.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void SpriteEvalTick()
         {
-            bool isOdd = (ppu_cycles_x & 1) != 0;
+            bool isOdd = (ppu_cycles_x & 1) == 0; // ppu_cycles_x=cx+1, inverted to match TriCNES PPU_Dot parity
 
             if (isOdd)
             {
                 // Odd cycle: read from primary OAM
                 oamCopyBuffer = spr_ram[(byte)(spriteEvalAddrH * 4 + spriteEvalAddrL)];
-                // Attribute byte bits 2-4 don't exist in hardware; masked on internal bus
-                if (spriteEvalAddrL == 2) oamCopyBuffer &= 0xE3;
+                // TriCNES: attribute byte bits 3-4 masked during evaluation read (0xE7)
+                if (spriteEvalAddrL == 2) oamCopyBuffer &= 0xE7;
             }
             else
             {
@@ -1566,7 +1569,7 @@ namespace AprNes
         static void SpriteEvalWrite()
         {
             int height = Spritesize8x16 ? 16 : 8;
-            int evalSL = scanline;
+            int evalSL = scanline & 0xFF; // TriCNES: (PPU_Scanline & 0xFF) — wraps pre-render 261→5
 
             if (secOAMAddr >= 0x20)
             {
