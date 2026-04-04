@@ -26,6 +26,7 @@
         void CpuCycle();
         void CpuClockRise(); // M2 rising edge (TriCNES: CPUClockRise at master clock phase 5)
         void NotifyA12(int addr, int ppuAbsCycle);
+        void PpuClock(); // TriCNES: called every PPU dot at end of _EmulatePPU(), for A12 edge detection
         void Cleanup();
     }
 }

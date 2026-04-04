@@ -21,7 +21,9 @@
         bool IRQ_enable, IRQReset;
         int IRQlatchVal, IRQCounter;
         int BankReg;
-        int lastA12, a12LowSince, lastNotifyTime;
+        int lastA12;
+        int a12LowSince = -100;
+        int lastNotifyTime = -100;
         const int A12_FILTER = 16;
 
         int CHR0_Bankselect1k, CHR1_Bankselect1k, CHR2_Bankselect1k, CHR3_Bankselect1k;
@@ -84,6 +86,8 @@
             }
             lastA12 = a12;
         }
+
+        public void PpuClock() { }
 
         void ClockIRQ()
         {

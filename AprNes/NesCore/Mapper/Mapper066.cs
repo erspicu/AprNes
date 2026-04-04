@@ -58,6 +58,7 @@ namespace AprNes
         public void CpuClockRise() { }
         public MapperA12Mode A12NotifyMode => MapperA12Mode.None;
         public void NotifyA12(int addr, int ppuAbsCycle) { }
+        public void PpuClock() { }
             public void Cleanup() { }
 }
 }

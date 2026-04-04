@@ -60,6 +60,8 @@ namespace AprNes
             lastA12 = a12;
         }
 
+        public void PpuClock() { }
+
         public virtual void Mapper04step_IRQ()
         {
             // Clocked by PPU A12 rising edge, once per scanline when rendering is enabled.
@@ -130,7 +132,7 @@ namespace AprNes
                     else CHR_Bankmode = newCHRMode;
                 }
                 else if (address < 0xc000) *Vertical = ((value & 1) > 0) ? 0 : 1; //(0: vertical; 1: horizontal) $A000-$BFFF (Mirroring)
-                else if (address < 0xe000) IRQlatchVal = value;//$C000-$DFFF (IRQ latch) 
+                else if (address < 0xe000) IRQlatchVal = value;//$C000-$DFFF (IRQ latch)
                 else//$E000-$FFFF IRQ disable + acknowledge
                 {
                     IRQ_enable = false;
@@ -158,7 +160,7 @@ namespace AprNes
                 {
                     IRQReset = true; // reload counter from latch on next A12 rising edge
                 }
-                else IRQ_enable = true; //$E000-$FFFF (IRQ enable) 
+                else IRQ_enable = true; //$E000-$FFFF (IRQ enable)
             }
         }
 

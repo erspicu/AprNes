@@ -243,11 +243,16 @@ namespace AprNes
             }
         }
 
-        public void NotifyA12(int addr, int ppuAbsCycle)
+        public void NotifyA12(int addr, int ppuAbsCycle) { }
+
+        public void PpuClock()
         {
             if (irqCycleMode) return;
 
-            // Mesen2-style A12Watcher: accumulate cycles while A12 is low
+            int ppuAbsCycle = NesCore.scanline * 341 + NesCore.ppu_cycles_x;
+            int addr = NesCore.ppuAddressBus;
+
+            // Accumulate cycles while A12 is low
             if (a12CyclesDown > 0)
             {
                 if (a12LastCycle > ppuAbsCycle)

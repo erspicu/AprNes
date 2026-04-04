@@ -280,7 +280,8 @@ namespace AprNes
             // PPU scan position & frame state (TriCNES power-on values)
             ppu_cycles_x = 7; scanline = 0; frame_count = 0;  // TriCNES: PPU_Dot=7, PPU_Scanline=0
             oddSwap = true; ppuRenderingEnabled = false; prevRenderingEnabled = false; // TriCNES: PPU_OddFrame=true
-            ppuRenderingEnabled_EvalDelay = false;
+            ShowBG_EvalDelay = false; ShowSpr_EvalDelay = false;
+            commitCXinc = false; // deferred CXinc flag
             mcCpuClock = 0; mcPpuClock = 0; mcApuPutCycle = true; // TriCNES: APU_PutCycle=true at power-on
             spr_ram_add = 0;
 

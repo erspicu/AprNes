@@ -594,7 +594,8 @@ namespace AprNes
 
         public MapperA12Mode A12NotifyMode => MapperA12Mode.None; // MMC5 uses VRAM read notifications, not A12
 
-        public void NotifyA12(int addr, int ppuAbsCycle) { } // unused — all logic in NotifyVramRead
+        public void NotifyA12(int addr, int ppuAbsCycle) { }
+        public void PpuClock() { } // unused — all logic in NotifyVramRead
 
         // ================================================================
         //  Pre-sprite render CHR switch — called by PPU at dot 257 before RenderSpritesLine

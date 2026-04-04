@@ -104,6 +104,8 @@
             else if (addr >= 0x1FE8 && addr <= 0x1FEF)     { rightLatch = 1; needChrUpdate = true; }
         }
 
+        public void PpuClock() { }
+
         public byte MapperR_CHR(int address)
         {
             // $2007 reads: reflect current chrBankPtrs state (consistent with renderer)

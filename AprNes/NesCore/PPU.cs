@@ -170,7 +170,6 @@ namespace AprNes
         // $2005 delayed scroll update (TriCNES model: 1-2 PPU dots after CPU write)
         static int ppu2005UpdateDelay = 0;
         static byte ppu2005PendingValue = 0;
-        static bool ppu2005PendingIsSecond = false; // true = second write (Y scroll)
 
         // $2006 delayed t→v copy (TriCNES model: 3 PPU dots after CPU write)
         // Real hardware doesn't update vram_addr immediately on the second $2006 write;
@@ -179,6 +178,15 @@ namespace AprNes
         static int ppu2006PendingAddr = 0;
         static byte* spr_ram;
         static public byte* ppu_ram;
+
+        // TriCNES: PPU_AddressBus — persistent address bus, updated at tile fetch phases.
+        // Mapper's PpuClock() reads this every dot for A12 edge detection.
+        // Set at BG phases 1/3/5/7 (odd), sprite phases, garbage NT, and rendering-disabled.
+        static public int ppuAddressBus;
+        // CHR-fetch-only A12 state: updated ONLY at CHR pattern fetch phases (not NT/AT).
+        // Used by MMC3 M2 filter — the filter must not see NT/AT addresses ($2xxx, A12=1)
+        // because those brief A12=1 spikes during BG fetch would prevent filter saturation.
+        static public int ppuChrFetchA12;
 
         // OAM corruption: when rendering is disabled mid-scanline, the PPU's internal
         // secondary OAM addressing glitches and marks rows for corruption.
@@ -195,9 +203,16 @@ namespace AprNes
 
         static bool oddSwap = false;
         static bool ppuRenderingEnabled = false; // Tier 3: Delayed rendering enable (end of PPU dot)
-        static bool ppuRenderingEnabled_EvalDelay = false; // Tier 4: 1 extra cycle delay for sprite evaluation (TriCNES: _Delayed)
 
-        // CPU/PPU alignment: use (mcPpuClock & 3) from master clock divider
+        // Deferred commit: CXinc (TriCNES: PPU_Commit_PatternHighFetch → CXinc at next dot)
+        // In TriCNES, CHR high commit + CXinc fires at the NEXT full step (1 dot after phase 7).
+        static bool commitCXinc = false;
+
+        // Tier 4: Alignment-dependent delayed flags for sprite evaluation (TriCNES: _Delayed)
+        // Source: Tier 2 (ShowBackGround/ShowSprites), NOT Tier 1 (Instant).
+        // Updated before/after sprite eval depending on mcCpuClock & 3.
+        static bool ShowBG_EvalDelay = false;   // TriCNES: PPU_Mask_ShowBackground_Delayed
+        static bool ShowSpr_EvalDelay = false;  // TriCNES: PPU_Mask_ShowSprites_Delayed
 
         // TriCNES NMI model: level signal + edge detection at instruction boundary
         static bool NMILine = false;              // NMI level signal (set at CPUClock==8)
@@ -411,8 +426,8 @@ namespace AprNes
                 int phase = cx & 7;
                 if (phase == 0) {
                     ioaddr = 0x2000 | (vram_addr & 0x0FFF);
-                    if (mapperA12IsMmc3) NotifyMapperA12(ioaddr);  // NT addr, A12=0
                 } else if (phase == 1) {
+                    ppuAddressBus = ioaddr;  // TriCNES: PPU_AddressBus set at phase 1 (NT fetch)
                     if (ntChrOverrideEnabled)
                         NTVal = ntBankPtrs[(ioaddr >> 10) & 3][ioaddr & 0x3FF];
                     else
@@ -422,6 +437,7 @@ namespace AprNes
                 } else if (phase == 2) {
                     ioaddr = 0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07);
                 } else if (phase == 3) {
+                    ppuAddressBus = ioaddr;  // TriCNES: PPU_AddressBus set at phase 3 (AT fetch)
                     if (extAttrEnabled && extAttrNTOffset < 960) {
                         byte exVal = extAttrRAM[extAttrNTOffset];
                         extAttrChrBank = (exVal & 0x3F) | (extAttrChrUpperBits << 6);
@@ -440,8 +456,10 @@ namespace AprNes
                         ioaddr = (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7);
                     else
                         ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
-                    if (mapperNeedsA12) NotifyMapperA12(ioaddr);  // CHR low addr
                 } else if (phase == 5) {
+                    ppuAddressBus = ioaddr;  // TriCNES: PPU_AddressBus set at phase 5 (CHR low fetch)
+                    ppuChrFetchA12 = (ioaddr >> 12) & 1;  // CHR-only A12 for MMC3 M2 filter
+                    if (mapperNeedsA12) NotifyMapperA12(ioaddr);  // MMC2/MMC4 only
                     if (extAttrEnabled && extAttrChrSize > 0)
                         lowTile = extAttrCHR[ioaddr % extAttrChrSize];
                     else
@@ -452,8 +470,10 @@ namespace AprNes
                         ioaddr = (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
                     else
                         ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
-                    if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(ioaddr);  // MMC2/MMC4: CHR high triggers latch
+                    if (mapperNeedsA12) NotifyMapperA12(ioaddr);  // MMC2/MMC4: CHR high triggers latch
                 } else {
+                    ppuAddressBus = ioaddr;  // TriCNES: PPU_AddressBus set at phase 7 (CHR high fetch)
+                    ppuChrFetchA12 = (ioaddr >> 12) & 1;  // CHR-only A12 for MMC3 M2 filter
                     if (extAttrEnabled && extAttrChrSize > 0)
                         highTile = extAttrCHR[ioaddr % extAttrChrSize];
                     else
@@ -480,7 +500,8 @@ namespace AprNes
                     // Sync sprite 0 shadow registers
                     lowshift_s0  = (ushort)((lowshift_s0  & 0xFF00) | lowTile);
                     highshift_s0 = (ushort)((highshift_s0 & 0xFF00) | highTile);
-                    CXinc();
+                    // CXinc deferred to next dot's commit (TriCNES: PPU_Commit_PatternHighFetch)
+                    commitCXinc = true;
                 }
             }
             else if (cx == 256)
@@ -498,27 +519,38 @@ namespace AprNes
                 }
 
                 // Latch sprite size at dot 261 (sprite 0 CHR low fetch address).
-                // On real hardware, the Spritesize8x16 value at CHR fetch time determines
-                // tile addressing. Mid-HBlank $2000 writes after this dot won't affect
-                // the current scanline's sprite 0 tile data.
                 if (cx == 261) spriteSizeLatchedForFetch = Spritesize8x16;
 
-                if (mapperA12IsMmc3)
+                // TriCNES: sprite fetch uses same 8-phase address bus pattern as BG tiles.
+                // sprPhase 0 (dot&7=1): dummy NT addr, sprPhase 2 (dot&7=3): dummy AT addr,
+                // sprPhase 4 (dot&7=5): sprite CHR low addr, sprPhase 6 (dot&7=7): sprite CHR high addr.
                 {
-                    int phase = (cx - 257) & 7;
-                    if (phase == 0) NotifyMapperA12(0x2000);                // garbage NT addr, A12=0
-                    else if (phase == 3) NotifyMapperA12(SpPatternTableAddr); // sprite CHR addr (pre-output)
-                }
-                else if (mapperNeedsA12 && !mapperA12IsMmc3)
-                {
-                    // MMC2/MMC4: per-sprite CHR high address for right-latch detection
-                    int phase9 = (cx - 257) & 7;
-                    int slot9  = (cx - 257) >> 3;
-                    if (phase9 == 0) NotifyMapperA12(0x2000);
-                    else if (phase9 == 5 && slot9 < 8)
+                    int sprPhase = (cx - 257) & 7;
+                    int slot = (cx - 257) >> 3;
+                    if (sprPhase == 0)
                     {
-                        byte tileNum = secondaryOAM[slot9 * 4 + 1];
-                        NotifyMapperA12(SpPatternTableAddr | (tileNum << 4) | 8);
+                        // Dummy NT fetch (TriCNES: ShiftRegistersAndBitPlanes case 1)
+                        ppuAddressBus = 0x2000 | (vram_addr & 0x0FFF);
+                        if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus);
+                    }
+                    else if (sprPhase == 2)
+                    {
+                        // Dummy AT fetch (TriCNES: ShiftRegistersAndBitPlanes case 3)
+                        ppuAddressBus = 0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07);
+                    }
+                    else if (sprPhase == 4)
+                    {
+                        // Sprite CHR low address (TriCNES: GetSpriteAddress)
+                        ppuAddressBus = ComputeSpritePatternAddr(slot);
+                        ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
+                        if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus);
+                    }
+                    else if (sprPhase == 6)
+                    {
+                        // Sprite CHR high = CHR low + 8
+                        ppuAddressBus = ComputeSpritePatternAddr(slot) + 8;
+                        ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
+                        if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus);
                     }
                 }
                 // MMC5: per-fetch VRAM read notifications for sprite phase
@@ -542,15 +574,62 @@ namespace AprNes
                 vram_addr = (vram_addr & ~0x7BE0) | (vram_addr_internal & 0x7BE0);
             }
 
-            // Garbage NT fetches at dots 336-339: notify A12=0 to create falling edge
-            // after BG prefetch CHR (A12=1 for BG=$1000), needed for scanline-boundary timing
-            if (mapperNeedsA12 && cx == 336)
-                NotifyMapperA12(0x2000);
+            // Garbage NT fetches (dots 336-340): TriCNES PPU_Render_ShiftRegistersAndBitPlanes_DummyNT
+            // Dot 336/338: PPU_AddressBus = NT addr (A12=0); Dot 340: PPU_AddressBus = CHR pattern addr
+            if (cx == 336 || cx == 338)
+            {
+                ppuAddressBus = 0x2000 | (vram_addr & 0x0FFF);
+                if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus);
+            }
+            else if (cx == 340)
+            {
+                ppuAddressBus = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
+                ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
+            }
 
             // MMC5: garbage NT fetches at dots 337 and 339 (same NT address as first tile)
             // These create the 3-consecutive-identical-read pattern for scanline detection
             if (mmc5Ref != null && (cx == 337 || cx == 339))
                 mmc5Ref.NotifyVramRead(0x2000 | (vram_addr & 0x0FFF));
+        }
+
+        // TriCNES: PPU_SpriteEvaluation_GetSpriteAddress — compute sprite CHR pattern address
+        // for the given secondary OAM slot during sprite tile fetch (dots 257-320).
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static int ComputeSpritePatternAddr(int slot)
+        {
+            int sprY    = secondaryOAM[slot * 4];
+            int sprTile = secondaryOAM[slot * 4 + 1];
+            int sprAttr = secondaryOAM[slot * 4 + 2];
+            bool flipY  = (sprAttr & 0x80) != 0;
+            int row = (scanline & 0xFF) - sprY;  // TriCNES: (PPU_Scanline & 0xFF) - PPU_SpriteYposition
+
+            if (!Spritesize8x16)
+            {
+                // 8x8 sprites
+                int r = flipY ? ((7 - row) & 7) : (row & 7);
+                return SpPatternTableAddr | (sprTile << 4) | r;
+            }
+            else
+            {
+                // 8x16 sprites: bit 0 of tile selects pattern table
+                int table = (sprTile & 1) != 0 ? 0x1000 : 0;
+                int tileBase = (sprTile & 0xFE) << 4;
+                if (!flipY)
+                {
+                    if (row < 8)
+                        return table | tileBase | (row & 7);
+                    else
+                        return table | (tileBase + 16) | (row & 7);
+                }
+                else
+                {
+                    if (row < 8)
+                        return table | (tileBase + 16) | (7 - (row & 7));
+                    else
+                        return table | tileBase | (7 - (row & 7));
+                }
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -729,7 +808,8 @@ namespace AprNes
             if (ppu2005UpdateDelay > 0 && --ppu2005UpdateDelay == 0)
             {
                 byte v = ppu2005PendingValue;
-                if (ppu2005PendingIsSecond)
+                // TriCNES: latch checked at DELAY EXPIRY time, not write time (line 1291)
+                if (vram_latch)
                 {
                     scrol_y = v & 7;
                     vram_addr_internal = (vram_addr_internal & 0x0C1F) | ((v & 0x7) << 12) | ((v & 0xF8) << 2);
@@ -739,6 +819,7 @@ namespace AprNes
                     vram_addr_internal = (vram_addr_internal & 0x7fe0) | ((v & 0xf8) >> 3);
                     FineX = v & 0x07;
                 }
+                vram_latch = !vram_latch; // TriCNES: latch flipped in deferred handler (line 1302)
             }
 
             // $2000 delayed control update (TriCNES: all fields delayed 1-2 PPU cycles)
@@ -835,13 +916,30 @@ namespace AprNes
 
             if (scanline < 240 || scanline == PRE_RENDER_LINE) // ★ REGION
             {
+                // Deferred commit: CXinc from previous phase 7 (TriCNES: PPU_Commit_PatternHighFetch)
+                // Fires unconditionally — flag was set while rendering was enabled.
+                if (commitCXinc) { commitCXinc = false; CXinc(); }
+
                 if (ppuRenderingEnabled)
                     ppu_rendering_tick(cx, PRE_RENDER_LINE); // ★ REGION
+                else
+                {
+                    ppuAddressBus = vram_addr;  // TriCNES: address bus = v when rendering disabled (line 1676)
+                    ppuChrFetchA12 = (vram_addr >> 12) & 1;
+                }
+
+                // Alignment-dependent eval delay update (TriCNES: lines 1652-1658)
+                // Non-phase-3: update delayed flags BEFORE sprite eval (1 PPU cycle delay)
+                if ((mcCpuClock & 3) != 3)
+                {
+                    ShowBG_EvalDelay = ShowBackGround;
+                    ShowSpr_EvalDelay = ShowSprites;
+                }
 
                 // Per-dot sprite evaluation (visible scanlines only)
                 if (AccuracyOptA)
                 {
-                    if (scanline >= 0 && scanline < 240 && ppuRenderingEnabled_EvalDelay)
+                    if (scanline >= 0 && scanline < 240 && (ShowBG_EvalDelay || ShowSpr_EvalDelay))
                     {
                         // Dots 1-64: clear secondary OAM (write $FF, 2 dots per byte)
                         if (cx >= 1 && cx <= 64)
@@ -869,6 +967,14 @@ namespace AprNes
                     {
                         sprite0_eval_addr = spr_ram_add;
                     }
+                }
+
+                // Phase-3: update delayed flags AFTER sprite eval (2 PPU cycle delay)
+                // (TriCNES: lines 1667-1673)
+                if ((mcCpuClock & 3) == 3)
+                {
+                    ShowBG_EvalDelay = ShowBackGround;
+                    ShowSpr_EvalDelay = ShowSprites;
                 }
 
                 if (scanline >= 0 && scanline < 240)
@@ -923,7 +1029,6 @@ namespace AprNes
                 frame_count++;
                 if (AnalogEnabled) { Ntsc_SetFrameCount(frame_count); Crt_SetFrameCount(frame_count); }
             }
-            ppuRenderingEnabled_EvalDelay = ppuRenderingEnabled; // Tier 4: 1-cycle lag from Tier 3
             ppuRenderingEnabled = renderingEnabled;
         }
 
@@ -971,6 +1076,10 @@ namespace AprNes
                 else if (L == L_VBL_END)
                     isVblank = false;
             }
+
+            // TriCNES: PPU_MapperSpecificFunctions() — per-dot mapper callback for A12 edge detection.
+            // Called after rendering tick, before dot/scanline increment (matching TriCNES line 1627).
+            MapperObj.PpuClock();
 
             // Sprite overflow delayed snapshot (TriCNES: _EmulatePPU line 1619, in full step)
             isSpriteOverflow_Delayed = isSpriteOverflow;
@@ -1769,11 +1878,9 @@ namespace AprNes
             openbus = value;
             // Delayed scroll update (TriCNES: PPU_Update2005Delay = 1-2 cycles)
             ppu2005PendingValue = value;
-            ppu2005PendingIsSecond = vram_latch;
+            // TriCNES: latch NOT flipped here — deferred to delay handler (line 1302)
             // TriCNES: alignment 0,1,3=1cycle; alignment 2=2cycles
-            // TriCNES: case 0,3=1cycle; case 1,2=2cycles
             ppu2005UpdateDelay = ((mcPpuClock & 3) == 2) ? 2 : 1; // TriCNES: phase 2=2, others=1
-            vram_latch = !vram_latch;
         }
         static void ppu_w_2006(byte value)
         {
