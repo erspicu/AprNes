@@ -182,6 +182,7 @@ namespace AprNes
         // there's a ~4-5 PPU dot delay depending on CPU/PPU alignment.
         static int ppu2006UpdateDelay = 0;
         static int ppu2006PendingAddr = 0;
+        static bool copyV = false; // TriCNES: CopyV — $2006 delayed copy occurred this dot
         static byte* spr_ram;
         static public byte* ppu_ram;
 
@@ -989,15 +990,15 @@ namespace AprNes
             // $2007 state machine (fully deferred: buffer/write/increment)
             Ppu2007SmTick();
 
-            // $2006 delayed t→v copy
+            // $2006 delayed t→v copy (TriCNES lines 1263-1282)
+            copyV = false; // TriCNES: CopyV = false at start of each _EmulatePPU
             if (ppu2006UpdateDelay > 0 && --ppu2006UpdateDelay == 0)
             {
                 int prevAddr = vram_addr;
+                copyV = true; // TriCNES line 1270
                 vram_addr = ppu2006PendingAddr;
                 ppuAddressBus = vram_addr; // TriCNES line 1272
-                // Notify A12 only outside active rendering — during rendering, tile fetch phases handle A12
-                bool inRendering = (ShowBackGround_Instant || ShowSprites_Instant) && (scanline < 240 || scanline == preRenderLine);
-                if (mapperNeedsA12 && !inRendering) NotifyMapperA12(vram_addr);
+                // TriCNES does NOT explicitly notify mapper A12 here — PpuClock reads ppuAddressBus
 
                 // P4-2: Palette corruption when leaving palette range
                 // TriCNES: if old addr >= $3F00 and new addr < $3F00, and low nibble != 0
