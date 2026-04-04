@@ -527,7 +527,7 @@ namespace AprNes
         // sprites at phases 0 (garbage NT, A12=0) and 3 (sprite CHR, A12=sprite table bit12).
         static void ppu_rendering_tick(int cx, int preRenderLn)
         {
-            if (cx < 256 || (cx >= 320 && cx < 336))
+            if ((cx < 256 && scanline != preRenderLn) || (cx >= 320 && cx < 336))
             {
                 // MMC5 CHR A/B: ensure correct set at BG tile boundaries.
                 // Dot 0: initialize for this scanline (handles vblank→render transition).
@@ -835,8 +835,6 @@ namespace AprNes
 
         static void NotifyMapperA12(int address)
         {
-            // +1: notification fires during rendering (pre-increment), but TriCNES detects
-            // in PPUClock which runs after PPU_Dot++ (post-increment). Align timestamps.
             MapperObj.NotifyA12(address, scanline * 341 + ppu_cycles_x + 1);
         }
 
