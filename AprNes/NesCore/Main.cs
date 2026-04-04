@@ -313,6 +313,8 @@ namespace AprNes
 
             // JoyPad
             P1_LastWrite = 0; strobeWritePending = 0; strobeWriteValue = 0;
+            // DMA bus state
+            dataPinsNotFloating = false;
         }
 
         static public bool init(byte[] rom_bytes) //for Hard Reset effect

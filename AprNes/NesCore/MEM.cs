@@ -133,16 +133,33 @@ namespace AprNes
 
         // ── DMA helper functions (TriCNES exact port) ──
 
-        // DMA bus read — like TriCNES Fetch(), with OAM DMA $4016/$4017 masking
-        // TriCNES: if DoOAMDMA && dataPinsAreNotFloating, return dataBus instead of controller
+        // TriCNES: dataPinsAreNotFloating — tracks whether the data bus is actively driven.
+        // Set true when reading from RAM (<$2000) or ROM (>=$8000), false otherwise.
+        // Used for $4016/$4017 masking during OAM DMA: only mask when bus is driven.
+        static bool dataPinsNotFloating = false;
+
+        // DMA bus read — TriCNES Fetch() port with dataPinsAreNotFloating tracking
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte DmaFetch(ushort addr)
         {
-            byte val = mem_read_fun[addr](addr);
-            // TriCNES: $4016/$4017 reads during OAM DMA — side effects happen
-            // but return value is masked to old databus
+            dataPinsNotFloating = false;
+
+            // TriCNES: $4016/$4017 during OAM DMA — the controller register's
+            // shift is deferred in TriCNES (2-cycle counter model), so DMA reads
+            // don't cause multiple shifts. We skip the read handler entirely to
+            // avoid the shift side effect. Return cpubus (previous bus value).
             if (spriteDmaTransfer && (addr == 0x4016 || addr == 0x4017))
                 return cpubus;
+
+            byte val = mem_read_fun[addr](addr);
+
+            // TriCNES: reading from RAM or ROM drives the data bus
+            if (addr < 0x2000 || addr >= 0x8000)
+                dataPinsNotFloating = true;
+            // TriCNES: PPU registers ($2000-$3FFF) also drive the bus
+            else if (addr >= 0x2000 && addr < 0x4000)
+                dataPinsNotFloating = true;
+
             if (addr != 0x4015) cpubus = val;
             return val;
         }
