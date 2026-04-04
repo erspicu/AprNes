@@ -189,6 +189,7 @@ namespace AprNes
         // Mapper's PpuClock() reads this every dot for A12 edge detection.
         // Set at BG phases 1/3/5/7 (odd), sprite phases, garbage NT, and rendering-disabled.
         static public int ppuAddressBus;
+        static public bool ppuA12Prev; // TriCNES: PPU_A12_Prev — recorded at start of PPU cycle, checked by mapper at end
         // CHR-fetch-only A12 state: updated ONLY at CHR pattern fetch phases (not NT/AT).
         // Used by MMC3 M2 filter — the filter must not see NT/AT addresses ($2xxx, A12=1)
         // because those brief A12=1 spikes during BG fetch would prevent filter saturation.
@@ -951,6 +952,10 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_step_common(out int cx, out bool renderingEnabled)
         {
+            // TriCNES line 1628: record A12 state at START of PPU cycle (before any rendering)
+            // Mapper PPUClock() at END of cycle checks for 0→1 transition
+            ppuA12Prev = (ppuAddressBus & 0x1000) != 0;
+
             // $2007 state machine (fully deferred: buffer/write/increment)
             Ppu2007SmTick();
 
