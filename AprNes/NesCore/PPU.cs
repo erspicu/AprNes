@@ -264,6 +264,7 @@ namespace AprNes
 
         // TriCNES Sprite0 hit pipeline: pending → pending2 → actual (1.5 dot delay)
         static bool pendingSprite0Hit2 = false;    // TriCNES: PPUStatus_PendingSpriteZeroHit2
+        static bool canDetectSprite0Hit = true;    // TriCNES: PPU_CanDetectSpriteZeroHit — reset at pre-render, cleared on hit
 
         // Delayed flag snapshots for $2002 split-timing read
         static bool isSprite0hit_Delayed = false;  // TriCNES: PPUStatus_SpriteZeroHit_Delayed
@@ -477,24 +478,19 @@ namespace AprNes
         static byte NTVal = 0, ATVal = 0, lowTile = 0, highTile = 0;
         static int ioaddr = 0;
 
-        // ---- BG shift registers (16-bit, two tiles: high=current, low=next) ----
-        static ushort lowshift = 0, highshift = 0;
-
-        // ---- Per-dot render shift registers (TriCNES model: shifted left each dot) ----
-        // Unlike lowshift/highshift (batch, static between reloads),
-        // these shift left by 1 each half-step for per-dot pixel output.
-        // Reloaded at phase 7 (same data as main shift registers).
+        // ---- Per-dot render shift registers (TriCNES model: shifted left each half-step) ----
+        // Single set used for both pixel output and sprite 0 hit detection.
+        // Reloaded via deferred commit (phase 7 sets flag → next half-step loads).
         static ushort renderLow = 0, renderHigh = 0;
         // Per-dot attribute shift: shifted alongside render registers, serial-in from latch
         static ushort renderAttrLow = 0, renderAttrHigh = 0;
         // Attribute latch: 2-bit value from which bits are shifted in (TriCNES: PPU_AttributeLatchRegister)
         static byte attrLatch = 0;
-        // Phase 7 pre-reload latch: saves render registers BEFORE reload for correct last-pixel
-        static ushort halfStepRenderLow = 0, halfStepRenderHigh = 0;
-        static bool halfStepIsPhase7 = false;
 
-        // ---- Per-dot shifted BG registers for sprite 0 hit (serial in: 0=low, 1=high) ----
-        static ushort lowshift_s0 = 0, highshift_s0 = 0;
+        // Deferred shift register reload (TriCNES: PPU_Commit_LoadShiftRegisters)
+        // Phase 7 stores tile data here; next half-step commits into renderLow/renderHigh.
+        static byte pendingTileLow = 0, pendingTileHigh = 0;
+        static bool commitLoadShiftReg = false;
 
         // ---- Attribute 3-stage pipeline ----
         // Phase-3 shifts ATVal into p1; phase-7 render reads p3 (2 groups later).
@@ -597,24 +593,11 @@ namespace AprNes
                     // Palette cache update
                     if (scanline < 240 && cx < 256 && ppuRenderingEnabled)
                         RenderBGTile(cx);
-                    // Save pre-reload render state for half-step (phase 7 pixel)
-                    if (scanline < 240 && cx < 256)
-                    {
-                        halfStepRenderLow = renderLow;
-                        halfStepRenderHigh = renderHigh;
-                        halfStepIsPhase7 = true;
-                    }
-                    // Load main shift registers
-                    lowshift  = (ushort)((lowshift  << 8) | lowTile);
-                    highshift = (ushort)((highshift << 8) | highTile);
-                    // Reload per-dot render shift registers
-                    renderLow  = (ushort)((renderLow  & 0xFF00) | lowTile);
-                    renderHigh = (ushort)((renderHigh & 0xFF00) | highTile);
-                    // Attribute latch set at phase 3 (above); shift-in happens per-dot in half-step
-                    // No pre-fill needed — latch was already set 4 dots ago at phase 3
-                    // Sync sprite 0 shadow registers
-                    lowshift_s0  = (ushort)((lowshift_s0  & 0xFF00) | lowTile);
-                    highshift_s0 = (ushort)((highshift_s0 & 0xFF00) | highTile);
+                    // Deferred reload: store tile data, commit in next half-step
+                    // (TriCNES: PPU_Commit_LoadShiftRegisters model)
+                    pendingTileLow = lowTile;
+                    pendingTileHigh = highTile;
+                    commitLoadShiftReg = true;
                     // CXinc deferred to next dot's commit (TriCNES: PPU_Commit_PatternHighFetch)
                     commitCXinc = true;
                 }
@@ -748,12 +731,12 @@ namespace AprNes
                 vram_addr = (vram_addr & ~0x7BE0) | (vram_addr_internal & 0x7BE0);
             }
 
-            // Dot 339: initialize sprite X counters for next scanline's per-dot rendering
-            // (TriCNES: PPU_SpriteShifterCounter[i] = PPU_SpriteXposition[i])
+            // Dot 339: initialize sprite X counters (TriCNES line 2996-3009)
+            // When rendering enabled: counter = X position; when disabled: counter = 0
             if (cx == 339)
             {
                 for (int i = 0; i < 8; i++)
-                    sprXCounter[i] = sprXPos[i];
+                    sprXCounter[i] = (ShowSprites || ShowBackGround) ? sprXPos[i] : 0;
             }
 
             // Garbage NT fetches (dots 336-340): TriCNES PPU_Render_ShiftRegistersAndBitPlanes_DummyNT
@@ -861,99 +844,31 @@ namespace AprNes
             // Stage 1→2
             if (pendingSprite0Hit) { pendingSprite0Hit = false; pendingSprite0Hit2 = true; }
 
-            // Sprite overflow delayed snapshot moved to ppu_step() (TriCNES: _EmulatePPU line 1619)
-
             // $2007 state machine half-step tick
             Ppu2007SmTick();
 
             int cx = ppu_cycles_x - 1; // cx is the dot we just completed in ppu_step (already incremented)
 
-            // Shift registers must also shift during prefetch (cx 320-335) and pre-render line
-            // Otherwise attribute shift registers have stale data at dot 0
-            bool inPrefetch = (cx >= 320 && cx < 336) && (scanline >= 0 || scanline == preRenderLine);
-            if (inPrefetch && (ShowBackGround || ShowSprites)) // TriCNES: Tier 2 delayed flags
+            // ── BG shift registers: shift left 1 bit each half-step (TriCNES: PPU_UpdateShiftRegisters) ──
+            // Visible dots (0-256) + prefetch (320-335) on visible/pre-render scanlines
+            if ((scanline < 240 || scanline == preRenderLine)
+                && ((cx >= 0 && cx <= 256) || (cx >= 320 && cx < 336)))
             {
-                renderLow  <<= 1;
-                renderHigh = (ushort)((renderHigh << 1) | 1);
-                renderAttrLow  = (ushort)((renderAttrLow << 1) | (attrLatch & 1));
-                renderAttrHigh = (ushort)((renderAttrHigh << 1) | ((attrLatch >> 1) & 1));
-            }
-
-            if (cx < 0 || cx >= 256 || scanline < 0 || scanline >= 240)
-                return;
-
-            // ── 3-dot pixel pipeline shift (TriCNES P2-2) ──
-            prevPrevPrevDotColor = prevPrevDotColor; prevPrevDotColor = prevDotColor; prevDotColor = dotColor;
-            prevPrevPrevDotPalIdx = prevPrevDotPalIdx; prevPrevDotPalIdx = prevDotPalIdx; prevDotPalIdx = dotPalIdx;
-
-            // ── Compute composite color for current dot ──
-            int slot = (scanline << 8) + cx;
-            byte backdropIdx = (byte)(ppu_ram[0x3f00] & 0x3f);
-            uint compositeColor = NesColors[backdropIdx];
-            byte compositePalIdx = backdropIdx;
-            int bgPxVal = 0;
-
-            // BG pixel
-            if (ppuRenderingEnabled && ShowBackGround)
-            {
-                ushort rL, rH;
-                if (halfStepIsPhase7)
+                if (ShowBackGround || ShowSprites) // TriCNES: Tier 2 gate
                 {
-                    rL = halfStepRenderLow;
-                    rH = halfStepRenderHigh;
-                    halfStepIsPhase7 = false;
-                }
-                else
-                {
-                    rL = renderLow;
-                    rH = renderHigh;
-                }
-                int bit = 15 - FineX;
-                int bgPixel = ((rL >> bit) & 1) | (((rH >> bit) & 1) << 1);
-                int attrBits = (bit >= 8) ? bg_attr_p3 : bg_attr_p2;
-
-                renderLow  <<= 1;
-                renderHigh = (ushort)((renderHigh << 1) | 1);
-
-                bool masked = !ShowBgLeft8 && cx < 8;
-                bgPxVal = masked ? 0 : bgPixel;
-                Buffer_BG_array[slot] = bgPxVal;
-
-                if (!masked && bgPixel != 0)
-                {
-                    int baseAddr = 0x3f00 | (attrBits << 2);
-                    compositeColor = NesColors[ppu_ram[baseAddr + bgPixel] & 0x3f];
-                    compositePalIdx = (byte)(ppu_ram[baseAddr + bgPixel] & 0x3f);
+                    renderLow  <<= 1;
+                    renderHigh = (ushort)((renderHigh << 1) | 1);
+                    renderAttrLow  = (ushort)((renderAttrLow << 1) | (attrLatch & 1));
+                    renderAttrHigh = (ushort)((renderAttrHigh << 1) | ((attrLatch >> 1) & 1));
                 }
             }
 
-            // Sprite pixel (per-dot shift register output)
-            if (ppuRenderingEnabled)
+            // ── Deferred shift register reload (TriCNES: PPU_Render_CommitShiftRegistersAndBitPlanes_HalfDot) ──
+            if (commitLoadShiftReg)
             {
-                int winPx = 0, winPal = 0, winPri = 0;
-                for (int s = 0; s < 8; s++)
-                {
-                    if (sprXCounter[s] > 0) { sprXCounter[s]--; continue; }
-                    int px = ((sprShiftH[s] >> 7) << 1) | (sprShiftL[s] >> 7);
-                    sprShiftL[s] <<= 1;
-                    sprShiftH[s] <<= 1;
-                    if (px != 0 && winPx == 0)
-                    {
-                        winPx = px;
-                        winPal = sprFetchAttr[s] & 3;
-                        winPri = (sprFetchAttr[s] >> 5) & 1;
-                    }
-                }
-
-                if (winPx != 0 && ShowSprites && !(!ShowSprLeft8 && cx < 8))
-                {
-                    if (!ShowBackGround || bgPxVal == 0 || winPri == 0)
-                    {
-                        byte rawPal = (byte)(ppu_ram[0x3F10 | (winPal << 2) | winPx] & 0x3F);
-                        compositeColor = NesColors[rawPal];
-                        compositePalIdx = rawPal;
-                    }
-                }
+                commitLoadShiftReg = false;
+                renderLow  = (ushort)((renderLow  & 0xFF00) | pendingTileLow);
+                renderHigh = (ushort)((renderHigh & 0xFF00) | pendingTileHigh);
             }
 
             // P4-2: Palette corruption effect — only on alignment 2 (TriCNES: CorruptPalettes)
@@ -962,20 +877,7 @@ namespace AprNes
             {
                 paletteCorruptFromDisable = false;
                 paletteCorruptFromVAddr = false;
-                if ((mcCpuClock & 3) == 2)
-                {
-                    // TriCNES: complex per-color palette corruption — placeholder for future
-                    // At alignment 0 this path is unreachable; full CorruptPalettes deferred
-                }
             }
-
-            // Store current dot's composite in pipeline
-            dotColor = compositeColor;
-            dotPalIdx = compositePalIdx;
-
-            // ── Write 3-dot-delayed color to screen (TriCNES: DrawToScreen uses PrevPrevPrevDotColor) ──
-            ScreenBuf1x[slot] = prevPrevPrevDotColor;
-            if (AnalogEnabled) ntscScanBuf[cx] = prevPrevPrevDotPalIdx;
         }
 
         // ── Region-specialized PPU step functions ──
@@ -1071,58 +973,13 @@ namespace AprNes
             renderingEnabled = ShowBackGround_Instant || ShowSprites_Instant;
             cx = ppu_cycles_x;
 
-            // At dot 0 of visible scanlines: precompute sprite 0 data for hit detection.
-            // Must run BEFORE the hit check so sprite0_on_line is valid at dot 0.
-            // On real hardware, sprite evaluation happens during the previous scanline.
-            if (scanline >= 0 && scanline < 240 && cx == 0)
-                PrecomputeSprite0Line();
-
-            // Per-pixel sprite 0 hit detection using per-dot shifted shadow registers.
-            // Condition order: cheapest short-circuits first.
-            // sprite0_on_line / !isSprite0hit eliminate most scanlines instantly.
-            // Range check (cx in [sprite0_line_x, +8)) narrows to 8 dots from 256,
-            // avoiding the inner sprCol calculation for the other 248 dots per scanline.
-            if (sprite0_on_line && !isSprite0hit && !pendingSprite0Hit
-                && cx >= sprite0_line_x && cx < sprite0_line_x + 8
-                && cx < 256
-                && scanline >= 0 && scanline < 240
-                && ShowBackGround && ShowSprites)
-            {
-                bool inLeft8 = cx < 8;
-                if (!(!ShowBgLeft8 && inLeft8) && !(!ShowSprLeft8 && inLeft8) && cx != 255)
-                {
-                    int sprCol = cx - sprite0_line_x;
-                    int bit = 15 - FineX;
-                    int bgPixel = ((lowshift_s0 >> bit) & 1) | (((highshift_s0 >> bit) & 1) << 1);
-                    if (bgPixel != 0)
-                    {
-                        int loc_t = sprite0_flip_x ? (7 - sprCol) : sprCol;
-                        int mask = 1 << (7 - loc_t);
-                        int sprPx = (((sprite0_tile_high & mask) << 1) + (sprite0_tile_low & mask)) >> (7 - loc_t);
-                        if (sprPx != 0)
-                            pendingSprite0Hit = true; // promoted in half-step
-                    }
-                }
-            }
+            // Sprite 0 hit detection moved to CalculatePixel (TriCNES model: pixel-based, in full step)
         }
 
         // ★ REGION: shared rendering body — PRE_RENDER_LINE passed as hardcoded literal from each version
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_step_rendering(int cx, bool renderingEnabled, int PRE_RENDER_LINE)
         {
-            // TriCNES: shift registers gated by Tier 2 delayed flags (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites)
-            // NOT ppuRenderingEnabled (Tier 1 instant) — stale data must persist during enable/disable transition
-            if (ShowBackGround || ShowSprites)
-            {
-                if ((scanline >= 0 && scanline < 240 && cx < 256)
-                    || ((scanline < 240 || scanline == PRE_RENDER_LINE)
-                        && cx >= 320 && cx < 336))
-                {
-                    lowshift_s0 <<= 1;
-                    highshift_s0 = (ushort)((highshift_s0 << 1) | 1);
-                }
-            }
-
             // TriCNES line 1676: address bus = v when rendering disabled — ALL scanlines, not just visible
             if (!ppuRenderingEnabled)
             {
@@ -1159,14 +1016,13 @@ namespace AprNes
                             if ((cx & 1) == 0)
                                 secondaryOAM[(cx >> 1) - 1] = 0xFF;
                         }
-                        // Dot 65: initialize evaluation FSM
+                        // Dot 65: initialize evaluation FSM (no tick — first tick at dot 66)
                         else if (cx == 65)
                         {
                             sprite0_eval_addr = spr_ram_add;
                             SpriteEvalInit();
-                            SpriteEvalTick();
                         }
-                        // Dots 66-256: per-dot evaluation
+                        // Dots 66-256: per-dot evaluation (first READ at 66, first WRITE at 67)
                         else if (cx >= 66 && cx <= 256)
                         {
                             SpriteEvalTick();
@@ -1227,22 +1083,149 @@ namespace AprNes
                     if (mmc5Ref != null) mmc5Ref.PreSpriteRender();
                     sprSlotCount = evalSpriteCount;
                     sprZeroInSlots = evalSprite0Visible;
-                    // Analog mode: decode completed scanline (all 256 BG+sprite pixels done)
-                    if (AnalogEnabled)
-                        DecodeScanline(scanline, ntscScanBuf, ppuEmphasis);
                 }
-                // Pre-render line: sprite fetch also runs, use stale evalSpriteCount
+                // Pre-render line: TriCNES runs evaluation here too (PPU_Render_SpriteEvaluation),
+                // clearing PPU_NextScanlineContainsSpriteZero. AprNes doesn't run eval on pre-render,
+                // so explicitly clear sprZeroInSlots to prevent stale hits from the previous frame.
                 else if (scanline == PRE_RENDER_LINE && cx == 257) // ★ REGION
                 {
-                    // Secondary OAM has data from scanline 239's evaluation.
-                    // Tile fetch at 257-320 will read from it; sprites won't be visible
-                    // on scanline 0 via shift registers (X counters will be far offscreen).
+                    sprZeroInSlots = false;
+                    sprSlotCount = 0; // pre-render eval would produce 0 valid sprites for scanline 0
                 }
 
                 // Pre-render line: compute pre-render sprite data at dot 257
                 if (scanline == PRE_RENDER_LINE && cx == 257 && ppuRenderingEnabled) // ★ REGION
                     PrecomputePreRenderSprites();
 
+            }
+
+            // ── TriCNES CalculatePixel + UpdateSpriteShiftRegisters + DrawToScreen ──
+            // Runs every dot on visible scanlines. BG/sprite pixels read PRE-shift/PRE-decrement,
+            // then sprite counters decremented and shift registers shifted AFTER (TriCNES order).
+            if (scanline >= 0 && scanline < 240)
+            {
+                // 3-dot pipeline shift (TriCNES line 1724: runs every dot)
+                prevPrevPrevDotColor = prevPrevDotColor; prevPrevDotColor = prevDotColor; prevDotColor = dotColor;
+                prevPrevPrevDotPalIdx = prevPrevDotPalIdx; prevPrevDotPalIdx = prevDotPalIdx; prevDotPalIdx = dotPalIdx;
+
+                // CalculatePixel (cx 0-256, TriCNES: PPU_Dot 1-257)
+                if (cx <= 256)
+                {
+                    byte backdropIdx = (byte)(ppu_ram[0x3f00] & 0x3f);
+                    uint compositeColor = NesColors[backdropIdx];
+                    byte compositePalIdx = backdropIdx;
+                    int bgColor = 0;    // BG pixel value (0=transparent)
+                    int bgPalette = 0;  // BG attribute (palette index)
+
+                    // BG pixel (TriCNES line 3089: read shift regs BEFORE shift)
+                    if (cx < 256 && ShowBackGround && (cx >= 8 || ShowBgLeft8))
+                    {
+                        int bit = 15 - FineX;
+                        int col0 = (renderLow >> bit) & 1;
+                        int col1 = (renderHigh >> bit) & 1;
+                        bgColor = (col1 << 1) | col0;
+                        bgPalette = (bit >= 8) ? bg_attr_p3 : bg_attr_p2;
+                        if (bgColor == 0) bgPalette = 0; // color 0 mirrors backdrop
+                    }
+
+                    // Sprite pixel (TriCNES line 3111: read shift regs BEFORE decrement)
+                    int sprColor = 0, sprPalette = 0, sprSlot = -1;
+                    bool sprPriority = false;
+                    if (cx < 256 && ShowSprites && (cx >= 8 || ShowSprLeft8))
+                    {
+                        for (int s = 0; s < 8; s++)
+                        {
+                            if (sprXCounter[s] == 0 || skippedPreRenderDot341)
+                            {
+                                int px = ((sprShiftH[s] >> 7) << 1) | (sprShiftL[s] >> 7);
+                                if (px != 0 && sprColor == 0) // first opaque sprite wins
+                                {
+                                    sprColor = px;
+                                    sprPalette = (sprFetchAttr[s] & 3) | 4;
+                                    sprPriority = ((sprFetchAttr[s] >> 5) & 1) == 0; // 0 = front
+                                    sprSlot = s;
+                                }
+                            }
+                        }
+
+                        // Sprite 0 hit detection (TriCNES line 3145)
+                        if (canDetectSprite0Hit && sprSlot == 0 && sprZeroInSlots
+                            && ShowBackGround && ShowSprites
+                            && bgColor != 0 && sprColor != 0)
+                        {
+                            if ((ShowSprLeft8 || cx >= 8) && cx < 255)
+                            {
+                                pendingSprite0Hit = true;
+                                canDetectSprite0Hit = false;
+                            }
+                        }
+                        // Priority resolution (TriCNES line 3169)
+                        if (sprColor != 0 && ShowSprites)
+                        {
+                            if (bgColor == 0 || sprPriority)
+                            {
+                                bgColor = sprColor;
+                                bgPalette = sprPalette;
+                            }
+                        }
+                    }
+
+                    // Final color from palette RAM
+                    if ((ShowBackGround || ShowSprites) && cx < 256)
+                    {
+                        int palAddr = (bgPalette << 2) | bgColor;
+                        if (bgColor == 0) palAddr = 0; // backdrop mirror
+                        compositeColor = NesColors[ppu_ram[0x3f00 + palAddr] & 0x3f];
+                        compositePalIdx = (byte)(ppu_ram[0x3f00 + palAddr] & 0x3f);
+                    }
+                    else if (cx < 256)
+                    {
+                        // Rendering disabled: v pointing at palette RAM? (TriCNES line 3191)
+                        if ((vram_addr & 0x3F1F) >= 0x3F00)
+                        {
+                            int palAddr = vram_addr & 0x1F;
+                            if ((palAddr & 3) == 0) palAddr &= 0x0F;
+                            compositeColor = NesColors[ppu_ram[0x3f00 + palAddr] & 0x3f];
+                            compositePalIdx = (byte)(ppu_ram[0x3f00 + palAddr] & 0x3f);
+                        }
+                    }
+
+                    dotColor = compositeColor;
+                    dotPalIdx = compositePalIdx;
+                }
+
+                // UpdateSpriteShiftRegisters (TriCNES line 3718: AFTER CalculatePixel)
+                if (cx <= 256)
+                {
+                    for (int s = 0; s < 8; s++)
+                    {
+                        if (sprXCounter[s] > 0 && !skippedPreRenderDot341)
+                        {
+                            sprXCounter[s]--;
+                        }
+                        else
+                        {
+                            if (ShowSprites || ShowBackGround) // TriCNES: Tier 2 gate
+                            {
+                                sprShiftL[s] <<= 1;
+                                sprShiftH[s] <<= 1;
+                            }
+                        }
+                    }
+                }
+
+                // DrawToScreen: 3-dot delayed (TriCNES line 1878: PPU_Dot > 3 && PPU_Dot <= 259)
+                // cx 3-258 → screen position cx-3 (0-255)
+                if (cx >= 3 && cx <= 258)
+                {
+                    int pos = (scanline << 8) + (cx - 3);
+                    ScreenBuf1x[pos] = prevPrevPrevDotColor;
+                    if (AnalogEnabled) ntscScanBuf[cx - 3] = prevPrevPrevDotPalIdx;
+                }
+
+                // Analog mode: decode completed scanline after all 256 pixels written (cx 259)
+                if (AnalogEnabled && cx == 259)
+                    DecodeScanline(scanline, ntscScanBuf, ppuEmphasis);
             }
 
             if (scanline == 240 && cx == 1)
@@ -1296,7 +1279,7 @@ namespace AprNes
                 if (L == L_VBL_START)
                     pendingVblank = true;
                 else if (L == L_SPRITE_RESET)
-                    { isSprite0hit = isSpriteOverflow = false; pendingSprite0Hit = false; pendingSprite0Hit2 = false; }
+                    { isSprite0hit = isSpriteOverflow = false; pendingSprite0Hit = false; pendingSprite0Hit2 = false; canDetectSprite0Hit = true; }
                 else if (L == L_VBL_END)
                     isVblank = false;
             }
@@ -1650,8 +1633,8 @@ namespace AprNes
 
                     if (spriteInRange)
                     {
-                        // First in-range sprite at the very first evaluation is sprite 0
-                        if (ppu_cycles_x == 66) sprite0Added = true;
+                        // Sprite 0 detection: addrH==0 && addrL==0 means this is OAM entry 0's Y byte
+                        if (spriteEvalAddrH == 0 && spriteEvalAddrL == 0) sprite0Added = true;
 
                         spriteEvalAddrL++;
                         secOAMAddr++;
@@ -2059,12 +2042,7 @@ namespace AprNes
                         oamCorruptPending = false;
                         oamCorruptSuppressed = false;
 
-                        if (!sprite0_on_line && !isSprite0hit && ppu_cycles_x > 0)
-                        {
-                            PrecomputeSprite0Line();
-                            if (sprite0_on_line)
-                                sprite0_line_x = ppu_cycles_x;
-                        }
+                        // Sprite 0 hit now uses CalculatePixel model (no pre-computation needed)
                     }
                 }
             }

@@ -300,8 +300,8 @@ namespace AprNes
 
             // PPU tile pipeline
             NTVal = 0; ATVal = 0; lowTile = 0; highTile = 0; ioaddr = 0;
-            lowshift = 0; highshift = 0;
-            lowshift_s0 = 0; highshift_s0 = 0;
+            renderLow = 0; renderHigh = 0;
+            pendingTileLow = 0; pendingTileHigh = 0; commitLoadShiftReg = false;
             bg_attr_p1 = 0; bg_attr_p2 = 0; bg_attr_p3 = 0;
 
             // PPU sprite state
