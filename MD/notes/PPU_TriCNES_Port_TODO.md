@@ -12,6 +12,7 @@
 TriCNES 是目前唯一 AccuracyCoin 136/136 滿分的參考實作。AprNes 已移植其 master clock gate order、VBL/NMI pipeline、register delays、sprite evaluation FSM 等核心機制，並完成所有渲染管線與 edge case 的結構性移植。
 
 **進度統計**: 27 項 ✅ 完成 / 3 項 ⏸ 暫緩（純結構性差異，無可觀測影響）
+**DMA 重構**: 已完成 DMC timer model、Controller shift register、$2002/$2004 EmulateUntilEndOfRead
 **測試基線** (分支): blargg 171/174, AC 127/136（實驗分支允許回歸）
 
 ---
@@ -143,6 +144,38 @@ DrawToScreen 使用 PrevPrevPrevDotColor（3 dot delay）。
 
 ---
 
+## DMA 子系統重構 — 進行中
+
+### ✅ D1. dataPinsNotFloating Bus Tracking
+**TriCNES**: 追蹤 data bus 是否被主動驅動（RAM/ROM/PPU regs 驅動，其他 floating）。
+**已實作**: `dataPinsNotFloating` 欄位，DmaFetch 中根據地址範圍設定。
+
+### ✅ D2. OAM DMA $4016/$4017 Read Skip
+**TriCNES**: OAM DMA 讀取 $4016/$4017 時跳過 shift side effect，返回 cpubus。
+**已實作**: DmaFetch 中 `if (spriteDmaTransfer && (addr == 0x4016 || addr == 0x4017)) return cpubus;`
+
+### ✅ D3. DMC Timer Model — bitsRemaining==0 Unified Handler
+**TriCNES**: DMA trigger + implicit abort promotion + shifter load 全部在 bitsRemaining==0 handler 內。
+**已實作**: 移除獨立 reload block，移除 dmcBufferEmpty flag（TriCNES 不追蹤），shifter 永遠從 buffer 載入。
+
+### ✅ D4. DMC Load DMA ($4015) — Silent Guard + Shifter Load
+**TriCNES**: $4015 啟用 DMC 時只在 `APU_Silent` 時設定 DMCDMADelay。Delay 到期時載入 shifter + 清除 silence。
+**已實作**: `if (dmcsilence) { dmcLoadDmaCountdown = 2; }`，countdown fire 時 `dmcshiftregister = dmcbuffer; dmcsilence = false;`
+
+### ✅ D5. Controller Shift Register Model
+**TriCNES**: 8-bit parallel-to-serial shift register，MSB 先讀，2-cycle deferred shift（counter 在 APU step 遞減）。
+**已實作**: 完全重寫 JoyPad.cs — P1/P2_Port (button state) → P1/P2_ShiftRegister (shift regs) → P1/P2_ShiftCounter (defer)。ProcessControllerShift() 在 apu_step 頂部，ProcessControllerStrobe() 在 GET cycle。
+
+### ✅ D6. $2002/$2004 EmulateUntilEndOfRead
+**TriCNES**: 讀 $2002 時 VBL flag 在 read start 取樣，然後推進 7 master clocks (~1.75 PPU dots)，sprite flags 在 read end 取樣。$2004 也推進 7 master clocks 再讀 OAM。
+**已實作**: ppu_r_2002/ppu_r_2004 中 `for (int i = 0; i < 7; i++) MasterClockTick();`
+
+### 待做項目
+- DMC Implicit Abort Promotion 流程微調（目前已基本對齊，可能需要 edge case 修正）
+- DMA Gate Condition 精細化（cpuIsRead tracking + $4015 read 特殊處理）
+
+---
+
 ## 已完成的移植項目（完整列表）
 
 - ✅ Master Clock Gate Order (CPU→NMI→PPU→PPU_half→IRQ→APU)
@@ -172,3 +205,9 @@ DrawToScreen 使用 PrevPrevPrevDotColor（3 dot delay）。
 - ✅ Palette Corruption Detection ($2006 transition + rendering disable, alignment 2 gate)
 - ✅ Palette Corruption from Rendering Disable (NT fetch timing + VRAM addr ≥ $3C00)
 - ✅ SkippedPreRenderDot341 Flag (odd frame skip, clear at scanline 0 dot 2)
+- ✅ dataPinsNotFloating Bus Tracking (DMA bus driven state)
+- ✅ OAM DMA $4016/$4017 Read Skip (prevent shift side effects)
+- ✅ DMC Timer Model — bitsRemaining==0 Unified Handler (remove dmcBufferEmpty)
+- ✅ DMC Load DMA Silent Guard + Shifter Load ($4015 path)
+- ✅ Controller Shift Register Model (8-bit shift + 2-cycle defer + strobe)
+- ✅ $2002/$2004 EmulateUntilEndOfRead (7 master clock mid-read PPU advance)
