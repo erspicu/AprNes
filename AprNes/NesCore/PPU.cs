@@ -986,10 +986,6 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_step_common(out int cx, out bool renderingEnabled)
         {
-            // TriCNES line 1628: record A12 state at START of PPU cycle (before any rendering)
-            // Mapper PPUClock() at END of cycle checks for 0→1 transition
-            ppuA12Prev = (ppuAddressBus & 0x1000) != 0;
-
             // $2007 state machine (fully deferred: buffer/write/increment)
             Ppu2007SmTick();
 
@@ -1299,12 +1295,7 @@ namespace AprNes
                     isVblank = false;
             }
 
-            // TriCNES: PPU_MapperSpecificFunctions() — per-dot mapper callback for A12 edge detection.
-            // Called after rendering tick, before dot/scanline increment (matching TriCNES line 1627).
-            MapperObj.PpuClock();
-
-            // Sprite overflow delayed snapshot (TriCNES: _EmulatePPU line 1619, in full step)
-            isSpriteOverflow_Delayed = isSpriteOverflow;
+            // TriCNES order: VBL latch (1608) → SpriteOverflow (1619) → MapperCallback (1627) → A12_Prev (1628)
 
             // VBL latch Stage 1 (TriCNES: _EmulatePPU lines 1608-1616)
             ppuVSET_Latch1 = !ppuVSET;
@@ -1316,6 +1307,15 @@ namespace AprNes
                 ppu2002ReadPending = false;
                 isVblank = false;
             }
+
+            // Sprite overflow delayed snapshot (TriCNES: _EmulatePPU line 1619)
+            isSpriteOverflow_Delayed = isSpriteOverflow;
+
+            // Mapper callback (TriCNES: PPU_MapperSpecificFunctions, line 1627)
+            MapperObj.PpuClock();
+
+            // A12_Prev capture AFTER mapper callback (TriCNES: line 1628)
+            ppuA12Prev = (ppuAddressBus & 0x1000) != 0;
 
             // P4-3: OAMBuffer half-cycle update (TriCNES _EmulateHalfPPU lines 1842-1860)
             // Updated per-dot; $2004 reads return this cached value during rendering
