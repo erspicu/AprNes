@@ -1311,10 +1311,10 @@ namespace AprNes
             ppu_step_rendering(cx - 1, re, preRenderLine);
 
             // P4-3: OAMBuffer update (TriCNES _EmulateHalfPPU lines 1842-1860)
-            // Note: TriCNES does this in half step, but keeping in full step for now to match timing
             if ((ShowBackGround_Instant || ShowSprites_Instant) && scanline >= 0 && scanline < 240)
             {
                 int dot = cx - 1;
+
                 if (dot == 0 || dot > 320)
                     ppuOamBuffer = secondaryOAM[0];
                 else if (dot <= 64)
@@ -1669,9 +1669,9 @@ namespace AprNes
                 }
             }
 
-            // TriCNES line 2772: OAM2 readback after evaluation
-            if (secOAMAddr < 0x20)
-                oamCopyBuffer = secondaryOAM[secOAMAddr];
+            // TriCNES line 2627+2772: OAM2READ at pre-increment addr, assigned to latch at end
+            if (preIncSecOAMAddr < 0x20)
+                oamCopyBuffer = secondaryOAM[preIncSecOAMAddr];
 
             // Update primary OAM read address (for $2003 visibility)
             spr_ram_add = (byte)((spriteEvalAddrL & 0x03) | (spriteEvalAddrH << 2));
