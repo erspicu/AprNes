@@ -1021,54 +1021,62 @@ namespace AprNes
                     ShowSpr_EvalDelay = ShowSprites;
                 }
 
-                // Per-dot sprite evaluation (visible scanlines only)
+                // Per-dot sprite evaluation (visible + pre-render scanlines)
+                // TriCNES: clear phase uses DELAYED flags, eval phase uses INSTANT flags
                 if (AccuracyOptA)
                 {
                     bool evalScanline = (scanline >= 0 && scanline < 240) || scanline == PRE_RENDER_LINE;
+                    bool ro = scanline == preRenderLine; // SpriteEval_ReadOnly_PreRenderLine
 
-                    // Dot 65: init OUTSIDE rendering gate (TriCNES line 2585-2588)
-                    if (evalScanline && cx == 65)
+                    // ── Dots 1-64: clear secondary OAM — DELAYED flags gate (TriCNES line 2510/2541) ──
+                    if (evalScanline && cx >= 1 && cx <= 64 && (ShowBG_EvalDelay || ShowSpr_EvalDelay))
                     {
-                        evalOam2Addr = 0;           // TriCNES: OAM2Address = 0 (always, even rendering off)
-                        nineObjectsOnLine = false;   // TriCNES: NineObjectsOnThisScanline = false
+                        // Dot 1: reset eval state (TriCNES line 2520-2526)
+                        if (cx == 1)
+                        {
+                            evalOam2Addr = 0;
+                            evalOam2Full = false;
+                            evalTick = 0;
+                            evalOamOverflowed = false;
+                        }
+
+                        if ((cx & 1) != 0) // odd: set latch
+                        {
+                            oamCopyBuffer = ro ? secondaryOAM[evalOam2Addr] : (byte)0xFF;
+                        }
+                        else // even: write to SecOAM + advance OAM2Address
+                        {
+                            if (!ro)
+                                secondaryOAM[evalOam2Addr] = oamCopyBuffer;
+                            evalOam2Addr++;
+                            evalOam2Addr &= 0x1F;
+                        }
                     }
 
-                    // TriCNES line 2590: gate uses INSTANT flags (ShowBackground_Instant || ShowSprites_Instant)
-                    if (evalScanline && (ShowBackGround_Instant || ShowSprites_Instant))
+                    // ── Dot 65: init OUTSIDE rendering gate (TriCNES line 2585-2588) ──
+                    if (evalScanline && cx == 65)
                     {
-                        // Dots 1-64: clear secondary OAM (write $FF, 2 dots per byte)
-                        // TriCNES: pre-render line is read-only (reads SecOAM, doesn't write 0xFF)
-                        if (cx >= 1 && cx <= 64)
-                        {
-                            if (scanline == preRenderLine)
-                            {
-                                // Read-only on pre-render (TriCNES: SpriteEval_ReadOnly_PreRenderLine)
-                                oamCopyBuffer = secondaryOAM[(cx >> 1) & 0x1F]; // odd: read SecOAM
-                                // even: no write to SecOAM
-                            }
-                            else
-                            {
-                                oamCopyBuffer = 0xFF;
-                                if ((cx & 1) == 0)
-                                    secondaryOAM[(cx >> 1) - 1] = 0xFF;
-                            }
-                        }
-                        // Dot 65: eval init + first tick
-                        else if (cx == 65)
+                        evalOam2Addr = 0;
+                        nineObjectsOnLine = false;
+                    }
+
+                    // ── Dots 65-256: evaluation — INSTANT flags gate (TriCNES line 2590) ──
+                    if (evalScanline && cx >= 65 && cx <= 256 && (ShowBackGround_Instant || ShowSprites_Instant))
+                    {
+                        if (cx == 65)
                         {
                             sprite0_eval_addr = spr_ram_add;
                             SpriteEvalInit();
-                            SpriteEvalTick(); // ODD read: loads OAM[0].Y into oamCopyBuffer
+                            SpriteEvalTick();
                         }
-                        // Dots 66-256: per-dot evaluation (66=EVEN WRITE, 67=ODD READ, ...)
-                        else if (cx >= 66 && cx <= 256)
+                        else
                         {
                             SpriteEvalTick();
                             if (cx == 256) SpriteEvalEnd();
                         }
                     }
-                    // Pre-render line: save sprite0_eval_addr at dot 65
-                    else if (scanline == PRE_RENDER_LINE && cx == 65 && ppuRenderingEnabled) // ★ REGION
+                    // Pre-render line: save sprite0_eval_addr at dot 65 even if rendering off
+                    else if (ro && cx == 65 && ppuRenderingEnabled)
                     {
                         sprite0_eval_addr = spr_ram_add;
                     }
@@ -1388,7 +1396,8 @@ namespace AprNes
         static byte oamCopyBuffer;                  // Last byte read during evaluation (PPU_OAMLatch in TriCNES)
         static byte ppuOamBuffer;                   // P4-3: cached $2004 value, updated per-dot in half-step (TriCNES PPU_OAMBuffer)
         // TriCNES-aligned sprite evaluation state
-        static byte evalOamAddr;                    // TriCNES: PPUOAMAddress (flat 0-255 byte address)
+        // evalOamAddr is an ALIAS for spr_ram_add — TriCNES uses PPUOAMAddress directly as the register
+        static byte evalOamAddr { get { return spr_ram_add; } set { spr_ram_add = value; } }
         static byte evalOam2Addr;                   // TriCNES: OAM2Address (0-31, wraps with & 0x1F)
         static byte evalTick;                       // TriCNES: SpriteEvaluationTick (0-3)
         static bool evalOam2Full;                   // TriCNES: SecondaryOAMFull
@@ -1575,7 +1584,7 @@ namespace AprNes
             overflowBugCounter = 0;
             evalOamOverflowed = false;  // TriCNES: OAMAddressOverflowedDuringSpriteEvaluation = false
             nineObjectsOnLine = false;  // TriCNES: NineObjectsOnThisScanline = false
-            evalOamAddr = spr_ram_add;  // TriCNES: PPUOAMAddress (already set from $2003)
+            // evalOamAddr IS spr_ram_add (alias) — no init needed, PPUOAMAddress is the register itself
         }
 
         // Per-dot sprite evaluation: odd dots read, even dots write/check
@@ -1729,7 +1738,7 @@ namespace AprNes
                 oamCopyBuffer = secondaryOAM[evalOam2Addr]; // line 2785
             }
 
-            spr_ram_add = evalOamAddr;
+            // evalOamAddr IS spr_ram_add (alias) — no sync needed
         }
 
         // Finalize evaluation at dot 256
@@ -2156,8 +2165,9 @@ namespace AprNes
                 MasterClockTick();
 
             // P4-3: return cached ppuOamBuffer during rendering (TriCNES ReadOAM line 9264-9271)
+            // TriCNES: PPU_Mask_ShowBackground || PPU_Mask_ShowSprites (Tier 2 delayed)
             byte val;
-            bool renderingOn = ShowBackGround_Instant || ShowSprites_Instant;
+            bool renderingOn = ShowBackGround || ShowSprites;
             if (scanline >= 0 && scanline < 240 && renderingOn)
             {
                 val = ppuOamBuffer;
@@ -2165,7 +2175,7 @@ namespace AprNes
             else
             {
                 val = spr_ram[spr_ram_add];
-                if ((spr_ram_add & 3) == 2) val &= 0xE3; // attribute bits 2-4 always read 0
+                if ((spr_ram_add & 3) == 2) val &= 0xE3;
             }
             open_bus_decay_timer = 77777;
             return openbus = val;
