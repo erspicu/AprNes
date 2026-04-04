@@ -121,6 +121,7 @@ namespace AprNes
         static bool apuHalfFrame = false;          // TriCNES: APU_HalfFrameClock
         static int ctrmode = 4;                    // 4=4-step, 5=5-step
         static bool apuintflag = true, statusdmcint = false, statusframeint = false;
+        static bool clearingFrameInterrupt = false; // TriCNES: Clearing_APU_FrameInterrupt (deferred from $4015 read)
         static byte last4017Val = 0;
         static byte* lenCtrEnable;
         static int* volume;
@@ -347,6 +348,7 @@ namespace AprNes
             apuintflag = false;      // $4017=$00: IRQ 未禁止
             statusframeint = false;
             statusdmcint = false;
+            clearingFrameInterrupt = false;
             UpdateIRQLine();
 
             // DMC 完整重置 (TriCNES: APU_ChannelTimer_DMC=1022 at power-on, APUAlignment=0)
@@ -418,6 +420,15 @@ namespace AprNes
             else
             {
                 // ── PUT cycle block (TriCNES: APU_PutCycle) ──
+
+                // Deferred frame interrupt clear (TriCNES: Clearing_APU_FrameInterrupt)
+                if (clearingFrameInterrupt)
+                {
+                    clearingFrameInterrupt = false;
+                    statusframeint = false;
+                    irqLineCurrent = false;
+                    UpdateIRQLine();
+                }
 
                 // DMC Load DMA countdown (from $4015 write)
                 // TriCNES: DMCDMADelay decrements on PUT cycles
@@ -826,8 +837,8 @@ namespace AprNes
             if (statusframeint)     status |= 0x40;
             if (statusdmcint)       status |= 0x80;
             status |= (byte)(cpubus & 0x20); // bit 5 is open bus (CPU data bus)
-            statusframeint = false;
-            UpdateIRQLine();
+            // TriCNES: deferred frame interrupt clear (processed on next PUT cycle)
+            clearingFrameInterrupt = true;
             return status;
         }
 

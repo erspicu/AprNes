@@ -12,7 +12,7 @@
 TriCNES 是目前唯一 AccuracyCoin 136/136 滿分的參考實作。AprNes 已移植其 master clock gate order、VBL/NMI pipeline、register delays、sprite evaluation FSM 等核心機制，並完成所有渲染管線與 edge case 的結構性移植。
 
 **進度統計**: 27 項 ✅ 完成 / 3 項 ⏸ 暫緩（純結構性差異，無可觀測影響）
-**DMA 重構**: 已完成 DMC timer model、Controller shift register、$2002/$2004 EmulateUntilEndOfRead
+**DMA 重構**: ✅ 全部完成（D1-D7 + gate/abort/handler 全面驗證）
 **測試基線** (分支): blargg 171/174, AC 127/136（實驗分支允許回歸）
 
 ---
@@ -170,9 +170,15 @@ DrawToScreen 使用 PrevPrevPrevDotColor（3 dot delay）。
 **TriCNES**: 讀 $2002 時 VBL flag 在 read start 取樣，然後推進 7 master clocks (~1.75 PPU dots)，sprite flags 在 read end 取樣。$2004 也推進 7 master clocks 再讀 OAM。
 **已實作**: ppu_r_2002/ppu_r_2004 中 `for (int i = 0; i < 7; i++) MasterClockTick();`
 
-### 待做項目
-- DMC Implicit Abort Promotion 流程微調（目前已基本對齊，可能需要 edge case 修正）
-- DMA Gate Condition 精細化（cpuIsRead tracking + $4015 read 特殊處理）
+### ✅ D7. Deferred Frame Interrupt Clear ($4015 Read)
+**TriCNES**: $4015 讀取設 `Clearing_APU_FrameInterrupt = true`，在下一個 PUT cycle 才清除 `APU_Status_FrameInterrupt` + `IRQ_LevelDetector`。
+**已實作**: `clearingFrameInterrupt` flag，在 apu_step() PUT cycle 處理。
+
+### DMA 移植完成
+- DMA Gate Condition: 已驗證完全對齊（cpuIsRead ↔ CPU_Read, CompleteOperation 重置）
+- Implicit Abort: 已驗證完全對齊（DmaOneCycle 內 + MasterClockTick 後雙重清除）
+- $4014/$4015 Write Handler: 已驗證完全對齊
+- 所有 TriCNES DMA state variables 均有 AprNes 對應（12/12 映射完成）
 
 ---
 
@@ -211,3 +217,4 @@ DrawToScreen 使用 PrevPrevPrevDotColor（3 dot delay）。
 - ✅ DMC Load DMA Silent Guard + Shifter Load ($4015 path)
 - ✅ Controller Shift Register Model (8-bit shift + 2-cycle defer + strobe)
 - ✅ $2002/$2004 EmulateUntilEndOfRead (7 master clock mid-read PPU advance)
+- ✅ Deferred Frame Interrupt Clear ($4015 read → next PUT cycle)
