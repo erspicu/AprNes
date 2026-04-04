@@ -848,6 +848,19 @@ namespace AprNes
             // Stage 1→2
             if (pendingSprite0Hit) { pendingSprite0Hit = false; pendingSprite0Hit2 = true; }
 
+            // P4-3: OAMBuffer update (TriCNES _EmulateHalfPPU lines 1842-1860)
+            // Must be in half step — $2004 returns PPU_OAMBuffer which is updated AFTER full step eval
+            if ((ShowBackGround || ShowSprites) && scanline >= 0 && scanline < 240)
+            {
+                int dot = ppu_cycles_x - 1;
+                if (dot == 0 || dot > 320)
+                    ppuOamBuffer = secondaryOAM[0];
+                else if (dot <= 64)
+                    ppuOamBuffer = 0xFF;
+                else // dots 65-320
+                    ppuOamBuffer = oamCopyBuffer;
+            }
+
             // $2007 state machine half-step tick
             Ppu2007SmTick();
 
@@ -1310,18 +1323,7 @@ namespace AprNes
             // cx is post-increment but rendering still uses pre-increment value internally
             ppu_step_rendering(cx - 1, re, preRenderLine);
 
-            // P4-3: OAMBuffer update (TriCNES _EmulateHalfPPU lines 1842-1860)
-            if ((ShowBackGround_Instant || ShowSprites_Instant) && scanline >= 0 && scanline < 240)
-            {
-                int dot = cx - 1;
-
-                if (dot == 0 || dot > 320)
-                    ppuOamBuffer = secondaryOAM[0];
-                else if (dot <= 64)
-                    ppuOamBuffer = 0xFF;
-                else // dots 65-320
-                    ppuOamBuffer = oamCopyBuffer;
-            }
+            // P4-3: OAMBuffer moved to ppu_half_step (TriCNES _EmulateHalfPPU lines 1842-1860)
 
             // NTSC odd frame dot skip (pre-render line, dot 339)
             if (scanline == preRenderLine && cx == 339)
@@ -1572,7 +1574,6 @@ namespace AprNes
         {
             int height = Spritesize8x16 ? 16 : 8;
             int evalSL = scanline & 0xFF; // TriCNES: (PPU_Scanline & 0xFF) — wraps pre-render 261→5
-            int preIncSecOAMAddr = secOAMAddr; // TriCNES: OAM2READ captured BEFORE evaluation increments
 
             if (secOAMAddr >= 0x20)
             {
@@ -1669,9 +1670,8 @@ namespace AprNes
                 }
             }
 
-            // TriCNES line 2627+2772: OAM2READ at pre-increment addr, assigned to latch at end
-            if (preIncSecOAMAddr < 0x20)
-                oamCopyBuffer = secondaryOAM[preIncSecOAMAddr];
+            // TriCNES line 2772: PPU_OAMLatch = OAM2READ (no-op for normal writes, matters for SecOAMFull)
+            // Not needed in AprNes: overflow path already sets oamCopyBuffer from SecOAM.
 
             // Update primary OAM read address (for $2003 visibility)
             spr_ram_add = (byte)((spriteEvalAddrL & 0x03) | (spriteEvalAddrH << 2));
