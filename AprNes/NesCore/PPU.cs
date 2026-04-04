@@ -1580,68 +1580,71 @@ namespace AprNes
         }
 
         // TriCNES _EmulatePPU lines 2614-2785: even cycle sprite evaluation
-        // Restructured to match TriCNES with: evalOamAddr (PPUOAMAddress), evalOam2Addr (OAM2Address),
-        // evalTick (SpriteEvaluationTick), evalOam2Full (SecondaryOAMFull), evalOamOverflowed
+        // Full port with SpriteEval_ReadOnly_PreRenderLine guards and tick 3 pseudo range check
         static void SpriteEvalWrite()
         {
             int height = Spritesize8x16 ? 16 : 8;
             int evalSL = scanline & 0xFF; // TriCNES: (PPU_Scanline & 0xFF)
+            bool ro = scanline == preRenderLine; // TriCNES: SpriteEval_ReadOnly_PreRenderLine
 
             if (!evalOamOverflowed) // TriCNES line 2620
             {
-                byte preIncAddr = evalOamAddr; // TriCNES line 2622: PreIncVal
+                byte preIncAddr = evalOamAddr; // TriCNES line 2622
 
-                // Write to SecOAM if not full (TriCNES line 2623-2625)
-                if (!evalOam2Full)
+                // Write to SecOAM if not full AND not read-only (TriCNES line 2623)
+                if (!evalOam2Full && !ro)
                     secondaryOAM[evalOam2Addr] = oamCopyBuffer;
 
                 // Capture OAM2READ after write (TriCNES line 2627)
                 byte oam2Read = secondaryOAM[evalOam2Addr];
 
-                if (evalTick == 0) // tick 0: Y byte — range check (TriCNES line 2628)
+                if (evalTick == 0) // tick 0: Y byte (TriCNES line 2628)
                 {
-                    if (!nineObjectsOnLine
+                    if (!nineObjectsOnLine && !ro
                         && evalSL >= oamCopyBuffer && evalSL < oamCopyBuffer + height)
                     {
                         // In range (TriCNES line 2633)
                         if (!evalOam2Full)
                         {
-                            evalOamAddr++;       // PPUOAMAddress++ (line 2641)
-                            evalOam2Addr++;      // OAM2Address++ (line 2643)
+                            if (!ro) evalOamAddr++;       // line 2641
+                            evalOam2Addr++;               // line 2643
                             evalOam2Addr &= 0x1F;
                             if (evalOam2Addr == 0) evalOam2Full = true;
                         }
                         else
                         {
-                            // 9th+ sprite: overflow (TriCNES lines 2661-2668)
+                            // 9th+ sprite (TriCNES lines 2661-2668)
                             nineObjectsOnLine = true;
-                            evalOamAddr++;       // PPUOAMAddress++ (line 2663)
+                            evalOamAddr++;
                         }
-                        // Sprite 0 detection at dot 66 (TriCNES line 2655)
-                        if (ppu_cycles_x == 67) sprite0Added = true;
-                        evalTick++; // advance to tick 1 (TriCNES line 2671)
+                        // Sprite 0 at dot 66 (TriCNES line 2655 — inside !evalOam2Full branch)
+                        if (ppu_cycles_x == 67 && !evalOam2Full) sprite0Added = true;
+                        if (!ro) evalTick++; // line 2671
                     }
                     else
                     {
                         // Not in range (TriCNES line 2674)
                         if (ppu_cycles_x == 67) sprite0Added = false;
 
-                        if (evalOam2Full && !nineObjectsOnLine)
+                        if (!ro)
                         {
-                            // Overflow bug (TriCNES lines 2683-2693)
-                            if ((evalOamAddr & 0x3) == 3)
-                                evalOamAddr++;
+                            if (evalOam2Full && !nineObjectsOnLine)
+                            {
+                                // Overflow bug (TriCNES lines 2683-2693)
+                                if ((evalOamAddr & 0x3) == 3)
+                                    evalOamAddr++;
+                                else
+                                {
+                                    evalOamAddr += 4;
+                                    evalOamAddr++;
+                                }
+                            }
                             else
                             {
+                                // Normal skip (TriCNES lines 2695-2698)
                                 evalOamAddr += 4;
-                                evalOamAddr++;
+                                evalOamAddr &= 0xFC;
                             }
-                        }
-                        else
-                        {
-                            // Normal skip (TriCNES lines 2695-2698)
-                            evalOamAddr += 4;
-                            evalOamAddr &= 0xFC;
                         }
                     }
                 }
@@ -1650,44 +1653,62 @@ namespace AprNes
                     if (evalTick == 3) // tick 3: X byte (TriCNES line 2705)
                     {
                         // Pseudo range check on X byte (TriCNES lines 2710-2744)
-                        if (!evalOam2Full)
-                            evalOamAddr++; // +1 (line 2718 or 2736)
+                        bool xInRange = (evalSL - oamCopyBuffer >= 0) && (evalSL - oamCopyBuffer < height);
+                        if (xInRange)
+                        {
+                            if (!evalOam2Full)
+                            {
+                                if (!ro) evalOamAddr++; // line 2718
+                            }
+                            else
+                            {
+                                if (!ro) evalOamAddr += 4; // line 2725 (TriCNES code does +=4)
+                            }
+                        }
                         else
                         {
-                            evalOamAddr++;
-                            evalOamAddr &= 0xFC; // (line 2742-2743)
+                            if (!evalOam2Full)
+                            {
+                                if (!ro) { evalOamAddr++; evalOamAddr &= 0xFC; } // lines 2736-2737
+                            }
+                            else
+                            {
+                                evalOamAddr++; evalOamAddr &= 0xFC; // lines 2742-2743 (no ro guard!)
+                            }
                         }
                     }
                     else // ticks 1, 2 (TriCNES line 2747-2752)
                     {
-                        evalOamAddr++; // PPUOAMAddress++
+                        if (!ro) evalOamAddr++;
                     }
 
                     evalTick = (byte)((evalTick + 1) & 3); // line 2754-2755
 
-                    if (!evalOam2Full) // line 2756
+                    if (!evalOam2Full && !ro) // line 2756
                     {
                         evalOam2Addr++;       // line 2758
                         evalOam2Addr &= 0x1F; // line 2759
-                        if (evalOam2Addr == 0) evalOam2Full = true; // line 2760-2762
+                        if (evalOam2Addr == 0) evalOam2Full = true;
                     }
                 }
 
-                // Detect PPUOAMAddress overflow (TriCNES lines 2768-2770)
+                // Detect overflow (TriCNES lines 2768-2770)
                 if (evalOamAddr < preIncAddr && evalOamAddr < 4)
                     evalOamOverflowed = true;
 
                 // PPU_OAMLatch = OAM2READ (TriCNES line 2772)
                 oamCopyBuffer = oam2Read;
             }
-            else // OAMAddressOverflowedDuringSpriteEvaluation (TriCNES line 2774)
+            else // OAMAddressOverflowed (TriCNES line 2774)
             {
-                evalOamAddr += 4;
-                evalOamAddr &= 0xFC;
-                oamCopyBuffer = secondaryOAM[evalOam2Addr]; // TriCNES line 2785
+                if (!ro)
+                {
+                    evalOamAddr += 4;
+                    evalOamAddr &= 0xFC;
+                }
+                oamCopyBuffer = secondaryOAM[evalOam2Addr]; // line 2785
             }
 
-            // Update $2003 visible address (TriCNES: PPUOAMAddress is the register itself)
             spr_ram_add = evalOamAddr;
         }
 
