@@ -1847,23 +1847,28 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ppu_r_2002()
         {
+            // ── Start of read: VBL flag sampled immediately ──
             bool vblFlag = isVblank;
 
             // VBL suppression at exact VBL set dot (sl=nmiTriggerLine, cx=1):
             // PPU already set pendingVblank at this dot — clear it before half-step promotes it.
-            // Note: do NOT set SuppressVbl here — the VBL dot already cleared it, setting it
-            // would persist to the next frame and suppress VBL incorrectly.
             if (scanline == nmiTriggerLine && ppu_cycles_x == 1)
             {
                 pendingVblank = false;  // Cancel pending VBL promotion
                 vblFlag = false;        // Return VBL=0 to CPU
             }
 
-            // TriCNES: VBL read at start, sprite flags read at end (use delayed versions)
-            openbus = (byte)((vblFlag ? 0x80 : 0) | ((isSprite0hit_Delayed) ? 0x40 : 0) | ((isSpriteOverflow_Delayed) ? 0x20 : 0) | (openbus & 0x1f));
-
             // TriCNES: deferred VBL clear via PPU_Read2002 flag (processed in ppu_step)
             ppu2002ReadPending = true;
+
+            // ── EmulateUntilEndOfRead: advance 7 master clocks (~1.75 PPU dots) ──
+            // TriCNES: PPU advances mid-read so sprite flags reflect end-of-read state
+            for (int i = 0; i < 7; i++)
+                MasterClockTick();
+
+            // ── End of read: sprite flags sampled after PPU advancement ──
+            openbus = (byte)((vblFlag ? 0x80 : 0) | ((isSprite0hit_Delayed) ? 0x40 : 0) | ((isSpriteOverflow_Delayed) ? 0x20 : 0) | (openbus & 0x1f));
+
             vram_latch = false;
             return openbus;
         }
@@ -2012,6 +2017,10 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ppu_r_2004()
         {
+            // TriCNES: EmulateUntilEndOfRead — advance 7 master clocks before OAM read
+            for (int i = 0; i < 7; i++)
+                MasterClockTick();
+
             byte val;
             bool renderingOn = ShowBackGround_Instant || ShowSprites_Instant;
             if (scanline >= 0 && scanline < 240 && renderingOn)

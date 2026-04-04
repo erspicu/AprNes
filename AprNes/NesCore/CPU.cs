@@ -687,7 +687,8 @@ namespace AprNes
                         NMILine = false; nmiPinsSignal = false; nmiPrevPinsSignal = false;
                         IRQLine = false; statusmapperint = false;
                         // apuSoftReset moved to SoftReset() — called BEFORE handler runs
-                        strobeWritePending = 0; P1_LastWrite = 0;
+                        controllerStrobing = false; controllerStrobed = false;
+                        P1_ShiftCounter = 0; P2_ShiftCounter = 0;
                     }
                     CompleteOperation_NoPoll(); // BRK does NOT poll at end (TriCNES line 4228)
                     doReset = false; doNMI = false; doIRQ = false; doBRK = false; flagI = 1;

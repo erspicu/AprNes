@@ -130,7 +130,7 @@ namespace AprNes
         static int dmcrate = 0x36, dmctimer = 0x36, dmcshiftregister = 0, dmcbuffer = 0,
                    dmcvalue = 0, dmcsamplelength = 1, dmcsamplesleft = 0,
                    dmcstartaddr = 0xc000, dmcaddr = 0xc000, dmcbitsleft = 8;
-        static bool dmcsilence = true, dmcirq = false, dmcloop = false, dmcBufferEmpty = true;
+        static bool dmcsilence = true, dmcirq = false, dmcloop = false;
         static int dmcLoadDmaCountdown = 0;    // Load DMA scheduling delay (2-3 APU cycles)
         static int dmcStatusDelay = 0;         // Deferred $4015 status update countdown (TriCNES: APU_DelayedDMC4015)
         static bool dmcDelayedEnable = false;  // Pending DMC enable/disable value (TriCNES: APU_Status_DelayedDMC)
@@ -354,7 +354,7 @@ namespace AprNes
             dmcshiftregister = 0; dmcbuffer = 0;
             dmcvalue = 0; dmcsamplelength = 1; dmcsamplesleft = 0;
             dmcstartaddr = 0xC000; dmcaddr = 0xC000; dmcbitsleft = 8;
-            dmcsilence = true; dmcirq = false; dmcloop = false; dmcBufferEmpty = true;
+            dmcsilence = true; dmcirq = false; dmcloop = false;
             dmcLoadDmaCountdown = 0; dmcStatusDelay = 0; dmcDelayedEnable = false;
             dmcDmaRunning = false; dmcDmaHalt = false;
             dmcDmaCooldown = 0; dmcImplicitAbortPending = false; dmcImplicitAbortActive = false; dmcStatusEnabled = false;
@@ -373,9 +373,14 @@ namespace AprNes
         {
             apucycle++;
 
+            // Controller shift processing (TriCNES: top of _EmulateAPU, before GET/PUT split)
+            ProcessControllerShift();
+
             // ── GET cycle block (TriCNES: !APU_PutCycle) ──
             if (!mcApuPutCycle)
             {
+                // Controller strobe reload (TriCNES: GET cycle = transitioning to PUT)
+                ProcessControllerStrobe();
                 // Pulse & Noise timers (every GET cycle = every 2 CPU cycles)
                 {
                     int p0 = _pulsePeriod[0], p1 = _pulsePeriod[1];
@@ -419,8 +424,14 @@ namespace AprNes
                 if (dmcLoadDmaCountdown > 0)
                 {
                     --dmcLoadDmaCountdown;
-                    if (dmcLoadDmaCountdown == 0 && dmcBufferEmpty && dmcsamplesleft > 0)
-                        dmcStartTransfer();
+                    // TriCNES: if delay expired and DMA not already running, start + load shifter
+                    if (dmcLoadDmaCountdown == 0 && !dmcDmaRunning)
+                    {
+                        dmcDmaRunning = true;
+                        dmcDmaHalt = true;
+                        dmcshiftregister = dmcbuffer;
+                        dmcsilence = false;
+                    }
                 }
             }
 
@@ -727,43 +738,31 @@ namespace AprNes
                 if (dmcbitsleft <= 0)
                 {
                     dmcbitsleft = 8;
-                    if (dmcBufferEmpty)
-                        dmcsilence = true;
+
+                    // TriCNES model: DMA trigger + shifter load inside bitsRemaining==0
+                    if (dmcsamplesleft > 0 || dmcImplicitAbortPending)
+                    {
+                        // Start DMA if not already running and no cooldown
+                        if (!dmcDmaRunning && dmcDmaCooldown != 2)
+                        {
+                            dmcDmaRunning = true;
+                            dmcDmaHalt = true;
+                        }
+                        // Promote implicit abort
+                        if (dmcImplicitAbortPending)
+                        {
+                            dmcImplicitAbortActive = true;
+                            dmcImplicitAbortPending = false;
+                        }
+                        // Always load shifter from buffer (TriCNES: no bufferEmpty check)
+                        dmcshiftregister = dmcbuffer;
+                        dmcsilence = false;
+                    }
                     else
                     {
-                        dmcsilence        = false;
-                        dmcshiftregister  = dmcbuffer;
-                        dmcBufferEmpty    = true;
+                        dmcsilence = true;
                     }
                 }
-            }
-
-            // Reload DMA: buffer emptied → request DMA
-            // Guard: skip if dmcLoadDmaCountdown is active ($4015 restart pending) —
-            // TriCNES only triggers DMA from the timer path when bitsRemaining==0,
-            // and defers $4015-triggered DMA to the DMCDMADelay countdown.
-            if (!dmcDmaRunning && dmcBufferEmpty && (dmcsamplesleft > 0 || dmcImplicitAbortPending)
-                && dmcLoadDmaCountdown == 0)
-            {
-                if (dmcDmaCooldown != 2)
-                {
-                    if (dmcImplicitAbortPending)
-                    {
-                        dmcImplicitAbortActive = true;
-                        dmcImplicitAbortPending = false;
-                    }
-                    dmcStartTransfer();
-                }
-            }
-        }
-
-        // Request DMC DMA — TriCNES per-cycle model (starts with halt flag)
-        static void dmcStartTransfer()
-        {
-            if (!dmcDmaRunning && (dmcBufferEmpty && dmcsamplesleft > 0 || dmcImplicitAbortActive))
-            {
-                dmcDmaRunning = true;
-                dmcDmaHalt = true;
             }
         }
 
@@ -785,7 +784,6 @@ namespace AprNes
         static void dmcSetReadBuffer(byte val)
         {
             dmcbuffer = val;
-            dmcBufferEmpty = false;
             dmcaddr++;
             if (dmcaddr > 0xffff) dmcaddr = 0x8000;
             if (dmcsamplesleft > 0)
@@ -1004,7 +1002,11 @@ namespace AprNes
                 if (dmcsamplesleft == 0)
                 {
                     restartdmc();
-                    dmcLoadDmaCountdown = 2;
+                    // TriCNES: only start Load DMA if currently silent
+                    if (dmcsilence)
+                    {
+                        dmcLoadDmaCountdown = 2;
+                    }
                 }
 
                 // Implicit abort (TriCNES: timer==10&&!PutCycle || timer==8&&PutCycle)

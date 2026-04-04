@@ -327,8 +327,7 @@ namespace AprNes
                 secondaryOAM     = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
                 corruptOamRow    = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
                 ppu_ram          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 0x4000);
-                P1_joypad_status = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
-                P2_joypad_status = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
+                // P1_joypad_status/P2_joypad_status removed — shift register model uses static bytes
                 NES_MEM          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 65536);
 
                 // Init the CHR-RAM shim mapper (needed for PPU function pointer setup)
@@ -351,8 +350,8 @@ namespace AprNes
                 for (int i = 0; i < 16384; i++) ppu_ram[i] = 0;
                 for (int i = 0; i < 256; i++) spr_ram[i] = 0;
                 for (int i = 0; i < 32; i++) { secondaryOAM[i] = 0; corruptOamRow[i] = 0; }
-                for (int i = 0; i < 8; i++) P1_joypad_status[i] = 0x40;
-                for (int i = 0; i < 8; i++) P2_joypad_status[i] = 0x40;
+                P1_Port = 0; P2_Port = 0;
+                P1_ShiftRegister = 0; P2_ShiftRegister = 0;
                 for (int i = 0; i < 65536; i++) NES_MEM[i] = 0;
 
                 HardResetState();

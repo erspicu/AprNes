@@ -206,8 +206,7 @@ namespace AprNes
             if (secondaryOAM != null) { Marshal.FreeHGlobal((IntPtr)secondaryOAM); secondaryOAM = null; }
             if (corruptOamRow!= null) { Marshal.FreeHGlobal((IntPtr)corruptOamRow);corruptOamRow= null; }
             if (ppu_ram      != null) { Marshal.FreeHGlobal((IntPtr)ppu_ram);      ppu_ram      = null; }
-            if (P1_joypad_status != null) { Marshal.FreeHGlobal((IntPtr)P1_joypad_status); P1_joypad_status = null; }
-            if (P2_joypad_status != null) { Marshal.FreeHGlobal((IntPtr)P2_joypad_status); P2_joypad_status = null; }
+            // P1_joypad_status/P2_joypad_status removed — shift register model uses static bytes
             if (NES_MEM      != null) { Marshal.FreeHGlobal((IntPtr)NES_MEM);      NES_MEM      = null; }
             if (Vertical           != null) { Marshal.FreeHGlobal((IntPtr)Vertical);           Vertical           = null; }
             if (AnalogScreenBuf     != null) { Marshal.FreeHGlobal((IntPtr)AnalogScreenBuf);     AnalogScreenBuf     = null; AnalogBufSize = 0; }
@@ -311,8 +310,10 @@ namespace AprNes
             prerender_sprite0_flip_x = false;
             spriteOverflowCycle = 0;
 
-            // JoyPad
-            P1_LastWrite = 0; strobeWritePending = 0; strobeWriteValue = 0;
+            // JoyPad (TriCNES shift register model)
+            P1_ShiftRegister = 0; P2_ShiftRegister = 0;
+            P1_ShiftCounter = 0; P2_ShiftCounter = 0;
+            controllerStrobing = false; controllerStrobed = false;
             // DMA bus state
             dataPinsNotFloating = false;
         }
@@ -449,8 +450,7 @@ namespace AprNes
                 secondaryOAM     = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
                 corruptOamRow    = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
                 ppu_ram          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 0x4000);
-                P1_joypad_status = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
-                P2_joypad_status = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
+                // P1_joypad_status/P2_joypad_status removed — shift register model uses static bytes
                 NES_MEM          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 65536);
 
                 // Compute PRG+CHR CRC32 (skip 16-byte iNES header, matching Mesen2 DB format)
@@ -495,8 +495,8 @@ namespace AprNes
                 for (int i = 0; i < 16384; i++) ppu_ram[i] = 0;
                 for (int i = 0; i < 256; i++) spr_ram[i] = 0;
                 for (int i = 0; i < 32; i++) { secondaryOAM[i] = 0; corruptOamRow[i] = 0; }
-                for (int i = 0; i < 8; i++) P1_joypad_status[i] = 0x40;
-                for (int i = 0; i < 8; i++) P2_joypad_status[i] = 0x40;
+                P1_Port = 0; P2_Port = 0;
+                P1_ShiftRegister = 0; P2_ShiftRegister = 0;
                 for (int i = 0; i < 65536; i++) NES_MEM[i] = 0;
 
                 ApplyRegionProfile(); // set timing parameters before any subsystem init
@@ -630,7 +630,7 @@ namespace AprNes
             {
                 apu_step();
                 mcApuPutCycle = !mcApuPutCycle;
-                if (strobeWritePending > 0) processStrobeWrite();
+                // processStrobeWrite removed — TriCNES shift register model uses ProcessControllerShift/Strobe in apu_step
             }
 
             // ── Decrement all counters ──

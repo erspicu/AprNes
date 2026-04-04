@@ -4,88 +4,137 @@ namespace AprNes
 {
     unsafe public partial class NesCore
     {
-        static byte* P1_joypad_status;
-        static byte P1_StrobeState = 0;
+        // TriCNES controller model: 8-bit shift register + 2-cycle deferred shift
+        // Button layout: bit 7=A (MSB, read first), bit 6=B, ..., bit 0=Right (LSB, read last)
 
-        static byte* P2_joypad_status;
-        static byte P2_StrobeState = 0;
+        // Current button state (set by UI thread, loaded into shift register during strobe)
+        static byte P1_Port = 0;
+        static byte P2_Port = 0;
+
+        // 8-bit parallel-to-serial shift registers
+        // MSB is read first; after shift left, bit 0 is filled with 1
+        static byte P1_ShiftRegister = 0;
+        static byte P2_ShiftRegister = 0;
+
+        // 2-cycle delay counters (TriCNES: Controller1ShiftCounter/Controller2ShiftCounter)
+        // Set to 2 on read, decremented in APU step; shift occurs when counter reaches 0
+        static byte P1_ShiftCounter = 0;
+        static byte P2_ShiftCounter = 0;
+
+        // Strobe state (TriCNES: APU_ControllerPortsStrobing / APU_ControllerPortsStrobed)
+        static bool controllerStrobing = false;   // $4016 bit 0 — while true, shift registers reload
+        static bool controllerStrobed = false;     // Whether strobe has been processed this frame
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static public void P1_ButtonPress(byte v)
         {
             if (v > 7) return;
-            P1_joypad_status[v] = 0x41;
+            P1_Port |= (byte)(0x80 >> v);  // bit 7=button 0 (A), bit 0=button 7 (Right)
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static public void P1_ButtonUnPress(byte v)
         {
             if (v > 7) return;
-            P1_joypad_status[v] = 0x40;
+            P1_Port &= (byte)~(0x80 >> v);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static public void P2_ButtonPress(byte v)
         {
             if (v > 7) return;
-            P2_joypad_status[v] = 0x41;
+            P2_Port |= (byte)(0x80 >> v);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static public void P2_ButtonUnPress(byte v)
         {
             if (v > 7) return;
-            P2_joypad_status[v] = 0x40;
+            P2_Port &= (byte)~(0x80 >> v);
         }
 
-        static byte P1_r = 0;
-
+        // TriCNES: read from shift register (MSB → D0), set 2-cycle shift delay
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static public byte gamepad_r_4016()
         {
-            if (P1_StrobeState < 8) P1_r = P1_joypad_status[P1_StrobeState];
-            else P1_r = 1; // After 8 buttons, shift register returns D0=1 (NES hardware)
-            P1_StrobeState++;
-            if (P1_StrobeState == 24) P1_StrobeState = 0;
-            return (byte)((P1_r & 0x1F) | (cpubus & 0xE0)); // upper 3 bits are CPU open bus
+            byte d0 = (byte)((P1_ShiftRegister & 0x80) == 0 ? 0 : 1);
+            P1_ShiftCounter = 2;
+            controllerStrobed = false;  // allows rapid A-button streaming while strobed
+            return (byte)(d0 | (cpubus & 0xE0)); // D0 = button, D5-D7 = CPU open bus
         }
-
-        static byte P2_r = 0;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static public byte gamepad_r_4017()
         {
-            if (P2_StrobeState < 8) P2_r = P2_joypad_status[P2_StrobeState];
-            else P2_r = 1; // After 8 buttons, shift register returns D0=1 (NES hardware)
-            P2_StrobeState++;
-            if (P2_StrobeState == 24) P2_StrobeState = 0;
-            return (byte)((P2_r & 0x1F) | (cpubus & 0xE0)); // upper 3 bits are CPU open bus
+            byte d0 = (byte)((P2_ShiftRegister & 0x80) == 0 ? 0 : 1);
+            P2_ShiftCounter = 2;
+            controllerStrobed = false;
+            return (byte)(d0 | (cpubus & 0xE0));
         }
 
-        static byte P1_LastWrite = 0;
-        static int strobeWritePending = 0;
-        static byte strobeWriteValue = 0;
-
-        // Deferred $4016 write processing: OUT pins update at start of PUT cycles (Mesen2 model)
+        // TriCNES: shift processing in APU step (every CPU cycle)
+        // Called from apu_step() — handles both strobing and deferred shift
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void processStrobeWrite()
+        static void ProcessControllerShift()
         {
-            if (strobeWritePending > 0 && --strobeWritePending == 0)
+            if (!controllerStrobing)
             {
-                if ((P1_LastWrite & 1) == 1 && (strobeWriteValue & 1) == 0)
+                // Not strobing: process deferred shifts
+                if (P1_ShiftCounter > 0)
                 {
-                    P1_StrobeState = 0;
-                    P2_StrobeState = 0; // $4016 strobe resets both controllers
+                    P1_ShiftCounter--;
+                    if (P1_ShiftCounter == 0)
+                    {
+                        P1_ShiftRegister <<= 1;
+                        P1_ShiftRegister |= 1; // fill bit 0 with 1 (open bus / pull-up)
+                    }
                 }
-                P1_LastWrite = strobeWriteValue;
+                if (P2_ShiftCounter > 0)
+                {
+                    P2_ShiftCounter--;
+                    if (P2_ShiftCounter == 0)
+                    {
+                        P2_ShiftRegister <<= 1;
+                        P2_ShiftRegister |= 1;
+                    }
+                }
+            }
+            else
+            {
+                // Strobing: reset shift counters (TriCNES behavior)
+                P1_ShiftCounter = 0;
+                P2_ShiftCounter = 0;
             }
         }
 
+        // TriCNES: strobe reload in APU GET cycle (transition to PUT)
+        // Called from apu_step() GET cycle block
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void ProcessControllerStrobe()
+        {
+            if (controllerStrobing)
+            {
+                if (!controllerStrobed)
+                {
+                    controllerStrobed = true;
+                    // Load shift registers from current button state
+                    P1_ShiftRegister = P1_Port;
+                    P2_ShiftRegister = P2_Port;
+                }
+            }
+            else
+            {
+                controllerStrobed = false;
+            }
+        }
+
+        // $4016 write — set strobe flag (TriCNES: immediate, not deferred)
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static public void gamepad_w_4016(byte val)
         {
-            strobeWriteValue = val;
-            strobeWritePending = (cpuCycleCount & 1) == 0 ? 1 : 2;
+            controllerStrobing = (val & 1) != 0;
+            if (!controllerStrobing)
+                controllerStrobed = false;
         }
     }
 }
