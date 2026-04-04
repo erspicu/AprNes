@@ -91,8 +91,10 @@ namespace AprNes
             // Implicit abort: DMA cancelled on write cycle (still in halt phase)
             if (dmcImplicitAbortActive && dmcDmaHalt)
             { dmcImplicitAbortActive = false; dmcDmaRunning = false; dmcDmaHalt = false; }
-            cpubus = val;
+            // P3-1: cpubus updated AFTER handler — during handler, cpubus holds last READ value
+            // This matches TriCNES dataBus vs In distinction ($2000 glitch depends on this)
             mem_write_fun[addr](addr, val);
+            cpubus = val;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

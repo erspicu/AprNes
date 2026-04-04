@@ -11,7 +11,7 @@
 
 TriCNES 是目前唯一 AccuracyCoin 136/136 滿分的參考實作。AprNes 已移植其 master clock gate order、VBL/NMI pipeline、register delays、sprite evaluation FSM 等核心機制，並完成所有渲染管線與 edge case 的結構性移植。
 
-**進度統計**: 27 項 ✅ 完成 / 3 項 ⏸ 暫緩（純結構性差異，無可觀測影響）
+**進度統計**: 30 項 ✅ 完成 / 0 項 ⏸ 暫緩 — **全部完成**
 **DMA 重構**: ✅ 全部完成（D1-D7 + gate/abort/handler 全面驗證）
 **測試基線** (分支): blargg 171/174, AC 127/136（實驗分支允許回歸）
 
@@ -73,13 +73,12 @@ DrawToScreen 使用 PrevPrevPrevDotColor（3 dot delay）。
 
 ---
 
-## Phase 3: Register 精確度 — 1/3 完成, 2 暫緩
+## Phase 3: Register 精確度 — ✅ 全部完成
 
-### ⏸ P3-1. $2000 DataBus Glitch (1-cycle open bus)
-**優先級**: 低-中 → **暫緩**（structural only, dataBus == In at write time）
+### ✅ P3-1. $2000 DataBus Glitch (1-cycle open bus)
+**優先級**: 低-中 → **已實作**
 **TriCNES**: $2000 寫入時，某些欄位在第 1 個 PPU cycle 使用 `dataBus`（CPU data bus）而非 `Input` 值。Alignment 0,1 可見此 glitch（2 cycle delay），Alignment 2,3 下一個 cycle 就修正。
-**AprNes 現狀**: 所有欄位立即使用正確值。
-**暫緩原因**: 分析確認 AprNes 中 dataBus == In（寫入值就是 CPU bus 值），glitch 無法被觀察到，純結構性差異。
+**已實作**: CpuWrite() 中 `cpubus = val` 移至 write handler 之後（handler 執行期間 cpubus 保持上次 READ 值）。ppu_w_2000 中 glitch-affected fields（bits 0-1 NT, bit 2 increment, bit 5 sprite size）使用 `cpubus`，非 glitch fields（NMI, pattern table addr）使用 `value`。Delayed handler 以正確值修正。
 
 **參考**: `ref/TriCNES-main/Emulator.cs` lines 9466-9499
 
@@ -90,20 +89,19 @@ DrawToScreen 使用 PrevPrevPrevDotColor（3 dot delay）。
 
 **參考**: `ref/TriCNES-main/Emulator.cs` lines 9615-9642, 1286-1304
 
-### ⏸ P3-3. $2007 State Machine Mystery Write Completion
-**優先級**: 低-中 → **暫緩**（no test ROMs exercise this）
+### ✅ P3-3. $2007 State Machine Mystery Write Completion
+**優先級**: 低-中 → **已實作**
 **TriCNES**: $2007 有 9 個 state (0-8, idle=9) + alignment-specific mystery write：
 - RMW instruction 對 $2007: state 3/6 時 混合 address high byte + written low byte
-- Phase 1-3: 額外 mystery write
+- Phase 1-3: 額外 mystery write at post-increment address
 - State 8: interrupted read-to-write 的 deferred write + extra increment
-**AprNes 現狀**: 有 8+ state SM + interrupted read-to-write，alignment 行為部分完整。
-**暫緩原因**: 沒有已知測試 ROM 能觸發 mystery write alignment 差異。
+**已實作**: 完整 TriCNES SM model — 5 個新 flags (`performMysteryWrite`, `normalWriteBehavior`, `updateVramAddrEarly`, `readDelayed`, `mysteryAddr`)。State 3: NormalWriteBehavior guard + mystery $YYZZ rewrite。State 4: UpdateVRAMAddressEarly double increment + alignment-gated mystery write (mcCpuClock & 3 != 0)。State 8: alignment gate。$2007 read: consecutive read (SM==3 && isRead) with per-phase behavior。$2007 write: SM==3||6 consecutive detection + NormalWriteBehavior flag。SM tick 抽出 `Ppu2007SmTick()` 共享方法（消除 half-step/full-step 重複）。
 
 **參考**: `ref/TriCNES-main/Emulator.cs` lines 1322-1496, 8968-9047, 9675-9719
 
 ---
 
-## Phase 4: Edge Cases — ✅ 全部完成（含結構性移植）
+## Phase 4: Edge Cases — ✅ 全部完成
 
 ### ✅ P4-1. OAM Corruption Per-Alignment Suppression
 **優先級**: 低 → **已實作**（alignment gate 結構就位，alignment 0 下行為與舊版等價）
@@ -121,11 +119,10 @@ DrawToScreen 使用 PrevPrevPrevDotColor（3 dot delay）。
 
 **參考**: `ref/TriCNES-main/Emulator.cs` lines 1273-1282, 9538-9545, 3207-3217
 
-### ⏸ P4-3. $2004 OAMBuffer Half-Cycle Updates
-**優先級**: 低 → **保持現狀**
-**TriCNES**: `PPU_OAMBuffer` 在 half-step 中根據 dot 區間更新。
-**AprNes 現狀**: 在 `ppu_r_2004()` 中根據 ppu_cycles_x 直接計算，功能等價但時序可能差 0.5 dot。
-**保持原因**: 功能等價，差異僅 0.5 dot，無測試可觀察。
+### ✅ P4-3. $2004 OAMBuffer Half-Cycle Updates
+**優先級**: 低 → **已實作**
+**TriCNES**: `PPU_OAMBuffer` 在 half-step 中根據 dot 區間更新（dot 0/321+: secondaryOAM[0], dot 1-64: 0xFF, dot 65-320: PPU_OAMLatch）。$2004 read 返回 cached buffer。
+**已實作**: `ppuOamBuffer` 欄位，在 ppu_step() VSET latch 後更新（per-dot, visible scanlines only）。ppu_r_2004() 在 rendering 期間直接返回 `ppuOamBuffer`（移除 on-the-fly computation）。
 
 ### ✅ P4-4. Odd Frame Skip Side Effects (SkippedPreRenderDot341)
 **優先級**: 低 → **已實作**（flag + clear logic 就位）
@@ -133,14 +130,6 @@ DrawToScreen 使用 PrevPrevPrevDotColor（3 dot delay）。
 **已實作**: `skippedPreRenderDot341` static bool，odd frame skip 時設 true，scanline 0 dot 2 清除。Sprite shifter / dummy NT 的 side effects 依賴 per-dot sprite rendering (P2-3)，已可配合使用。
 
 **參考**: `ref/TriCNES-main/Emulator.cs` lines 1629-1643
-
----
-
-## 暫緩項目共同分析
-
-3 個暫緩項目歸為 1 類：
-
-1. **無可觀測差異** (P3-1, P3-3, P4-3): 結構性差異或無測試 ROM 覆蓋。AprNes 中 dataBus == In、$2007 mystery write 無測試觸發、$2004 buffer 功能等價。
 
 ---
 
@@ -218,3 +207,6 @@ DrawToScreen 使用 PrevPrevPrevDotColor（3 dot delay）。
 - ✅ Controller Shift Register Model (8-bit shift + 2-cycle defer + strobe)
 - ✅ $2002/$2004 EmulateUntilEndOfRead (7 master clock mid-read PPU advance)
 - ✅ Deferred Frame Interrupt Clear ($4015 read → next PUT cycle)
+- ✅ $2000 DataBus Glitch (cpubus for glitch-affected fields, value for non-glitch)
+- ✅ $2007 Mystery Write Complete (NormalWriteBehavior + mystery $YYZZ + alignment gate + consecutive reads)
+- ✅ $2004 OAMBuffer Half-Cycle (ppuOamBuffer per-dot update, cached read)

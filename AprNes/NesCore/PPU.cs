@@ -145,13 +145,19 @@ namespace AprNes
         static bool vram_latch = false;
         static byte ppu_2007_buffer = 0;
         // $2007 state machine (TriCNES model: PPU_Data_StateMachine)
-        // States: 9=idle, 0=just accessed, 1=buffer update, 3=write execute, 4=increment
+        // States: 9=idle, 0=just accessed, 1=buffer update, 3=write execute, 4=increment, 8=deferred write
         static int ppu2007SM = 9;
         static bool ppu2007SM_isRead = false;
         static byte ppu2007SM_writeValue = 0;
         static bool ppu2007SM_bufferLate = false; // alignment: buffer updated at state 4 instead of 1
         static int ppu2007SM_addr = 0; // vram_addr snapshot at time of access
         static bool ppu2007SM_interruptedReadToWrite = false; // TriCNES: write during active read SM
+        // P3-3: Mystery write flags (TriCNES consecutive $2007 access model)
+        static bool ppu2007SM_performMysteryWrite = false;   // TriCNES: PPU_Data_StateMachine_PerformMysteryWrite
+        static bool ppu2007SM_normalWriteBehavior = false;   // TriCNES: PPU_Data_StateMachine_NormalWriteBehavior
+        static bool ppu2007SM_updateVramAddrEarly = false;   // TriCNES: PPU_Data_StateMachine_UpdateVRAMAddressEarly
+        static bool ppu2007SM_readDelayed = false;           // TriCNES: PPU_Data_StateMachine_Read_Delayed
+        static ushort ppu2007SM_mysteryAddr = 0;             // TriCNES: PPU_VRAM_MysteryAddress
 
         // $2000 delayed control update (TriCNES: PPU_Update2000Delay, 1-2 PPU cycles)
         // ALL fields delayed: NMI enable, pattern table, sprite size, nametable, increment
@@ -360,6 +366,91 @@ namespace AprNes
                 vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x7FFF);
             }
             if (mapperNeedsA12) NotifyMapperA12(vram_addr);
+        }
+
+        // P3-3: $2007 state machine tick — called from both ppu_half_step and ppu_step_common
+        // TriCNES: PPU_Data_StateMachine logic in _EmulatePPU (lines 1322-1496)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Ppu2007SmTick()
+        {
+            if (ppu2007SM >= 9) return;
+
+            if (ppu2007SM == 1 && ppu2007SM_isRead && !ppu2007SM_bufferLate)
+            {
+                int a = ppu2007SM_addr & 0x3FFF;
+                ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a);
+            }
+            else if (ppu2007SM == 3)
+            {
+                // TriCNES lines 1351-1396: NormalWriteBehavior vs MysteryWrite
+                if (ppu2007SM_normalWriteBehavior)
+                {
+                    ppu2007SM_normalWriteBehavior = false;
+                    if (!ppu2007SM_isRead || !ppu2007SM_readDelayed)
+                        PpuBusWrite(ppu2007SM_addr, ppu2007SM_writeValue);
+                }
+                else if (!ppu2007SM_isRead && ppu2007SM_performMysteryWrite)
+                {
+                    // Mystery write: $YYZZ address rewrite (TriCNES lines 1367-1394)
+                    if (ppu2007SM_mysteryAddr >= 0x3F00)
+                    {
+                        PpuBusWrite((ushort)(ppu2007SM_addr & 0x2FFF), (byte)ppu2007SM_mysteryAddr);
+                    }
+                    else
+                    {
+                        PpuBusWrite(ppu2007SM_mysteryAddr, (byte)ppu2007SM_mysteryAddr);
+                        PpuBusWrite((ushort)ppu2007SM_addr, (byte)ppu2007SM_addr);
+                    }
+                }
+            }
+            else if (ppu2007SM == 4)
+            {
+                // Buffer late update
+                if (ppu2007SM_isRead && ppu2007SM_bufferLate)
+                {
+                    int a = ppu2007SM_addr & 0x3FFF;
+                    ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a);
+                    ppu2007SM_bufferLate = false;
+                }
+                // TriCNES lines 1416-1436: UpdateVRAMAddressEarly (double increment)
+                if (ppu2007SM_updateVramAddrEarly)
+                {
+                    ppu2007SM_updateVramAddrEarly = false;
+                    vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x3FFF);
+                    if (ppu2007SM_isRead)
+                    {
+                        int a = vram_addr & 0x3FFF;
+                        ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a);
+                    }
+                    // "And then the VRAM address is updated again!" — by Increment2007 below
+                }
+                // Normal increment (rendering scroll or +1/+32)
+                Increment2007();
+                // TriCNES lines 1457-1474: Mystery write at post-increment address
+                if ((!ppu2007SM_isRead || !ppu2007SM_readDelayed) && ppu2007SM_performMysteryWrite)
+                {
+                    if ((mcCpuClock & 3) != 0) // alignment gate: phases 1,2,3 only
+                    {
+                        int a = vram_addr & 0x3FFF;
+                        if (a >= 0x3F00)
+                            PpuBusWrite((ushort)(a & 0x2FFF), ppu2007SM_writeValue);
+                        else
+                            PpuBusWrite((ushort)a, ppu2007SM_writeValue);
+                    }
+                }
+                ppu2007SM_isRead = ppu2007SM_readDelayed;
+                ppu2007SM_performMysteryWrite = false;
+            }
+            else if (ppu2007SM == 8 && ppu2007SM_interruptedReadToWrite)
+            {
+                // TriCNES lines 1483-1495: alignment gate + simple increment
+                if ((mcCpuClock & 3) != 0)
+                    PpuBusWrite(ppu2007SM_addr, ppu2007SM_writeValue);
+                ppu2007SM_interruptedReadToWrite = false;
+                vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x3FFF);
+                if (mapperNeedsA12) NotifyMapperA12(vram_addr);
+            }
+            ppu2007SM++;
         }
 
         // hori(v) = hori(t)
@@ -737,37 +828,8 @@ namespace AprNes
 
             // Sprite overflow delayed snapshot moved to ppu_step() (TriCNES: _EmulatePPU line 1619)
 
-            // $2007 state machine half-step tick (fully deferred)
-            if (ppu2007SM < 9)
-            {
-                if (ppu2007SM == 1 && ppu2007SM_isRead && !ppu2007SM_bufferLate)
-                {
-                    int a = ppu2007SM_addr & 0x3FFF;
-                    ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a);
-                }
-                else if (ppu2007SM == 3 && !ppu2007SM_isRead)
-                {
-                    PpuBusWrite(ppu2007SM_addr, ppu2007SM_writeValue);
-                }
-                else if (ppu2007SM == 4)
-                {
-                    if (ppu2007SM_isRead && ppu2007SM_bufferLate)
-                    {
-                        int a = ppu2007SM_addr & 0x3FFF;
-                        ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a);
-                        ppu2007SM_bufferLate = false;
-                    }
-                    Increment2007();
-                }
-                else if (ppu2007SM == 8 && ppu2007SM_interruptedReadToWrite)
-                {
-                    // State 8: interrupted read-to-write — deferred write + extra increment
-                    PpuBusWrite(ppu2007SM_addr, ppu2007SM_writeValue);
-                    ppu2007SM_interruptedReadToWrite = false;
-                    Increment2007(); // extra increment
-                }
-                ppu2007SM++;
-            }
+            // $2007 state machine half-step tick
+            Ppu2007SmTick();
 
             int cx = ppu_cycles_x - 1; // cx is the dot we just completed in ppu_step (already incremented)
 
@@ -890,35 +952,7 @@ namespace AprNes
         static void ppu_step_common(out int cx, out bool renderingEnabled)
         {
             // $2007 state machine (fully deferred: buffer/write/increment)
-            if (ppu2007SM < 9)
-            {
-                if (ppu2007SM == 1 && ppu2007SM_isRead && !ppu2007SM_bufferLate)
-                {
-                    int a = ppu2007SM_addr & 0x3FFF;
-                    ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a);
-                }
-                else if (ppu2007SM == 3 && !ppu2007SM_isRead)
-                {
-                    PpuBusWrite(ppu2007SM_addr, ppu2007SM_writeValue);
-                }
-                else if (ppu2007SM == 4)
-                {
-                    if (ppu2007SM_isRead && ppu2007SM_bufferLate)
-                    {
-                        int a = ppu2007SM_addr & 0x3FFF;
-                        ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a);
-                        ppu2007SM_bufferLate = false;
-                    }
-                    Increment2007();
-                }
-                else if (ppu2007SM == 8 && ppu2007SM_interruptedReadToWrite)
-                {
-                    PpuBusWrite(ppu2007SM_addr, ppu2007SM_writeValue);
-                    ppu2007SM_interruptedReadToWrite = false;
-                    Increment2007();
-                }
-                ppu2007SM++;
-            }
+            Ppu2007SmTick();
 
             // $2006 delayed t→v copy
             if (ppu2006UpdateDelay > 0 && --ppu2006UpdateDelay == 0)
@@ -1241,6 +1275,19 @@ namespace AprNes
                 isVblank = false;
             }
 
+            // P4-3: OAMBuffer half-cycle update (TriCNES _EmulateHalfPPU lines 1842-1860)
+            // Updated per-dot; $2004 reads return this cached value during rendering
+            if ((ShowBackGround_Instant || ShowSprites_Instant) && scanline >= 0 && scanline < 240)
+            {
+                int dot = cx - 1; // cx already incremented — dot is the one just processed
+                if (dot == 0 || dot > 320)
+                    ppuOamBuffer = secondaryOAM[0];
+                else if (dot <= 64)
+                    ppuOamBuffer = 0xFF;
+                else // dots 65-320
+                    ppuOamBuffer = oamCopyBuffer;
+            }
+
             // NTSC odd frame dot skip (pre-render line, dot 339)
             if (scanline == preRenderLine && cx == 339)
             {
@@ -1281,7 +1328,8 @@ namespace AprNes
 
         // ========== Secondary OAM and Per-dot Sprite Evaluation FSM ==========
         static byte* secondaryOAM; // 8 sprites × 4 bytes
-        static byte oamCopyBuffer;                  // Last byte read during evaluation ($2004 returns this)
+        static byte oamCopyBuffer;                  // Last byte read during evaluation (PPU_OAMLatch in TriCNES)
+        static byte ppuOamBuffer;                   // P4-3: cached $2004 value, updated per-dot in half-step (TriCNES PPU_OAMBuffer)
         static byte spriteEvalAddrH;                // Primary OAM sprite index (0-63)
         static byte spriteEvalAddrL;                // Byte offset within sprite (0-3)
         static byte secOAMAddr;                     // Write position in secondary OAM (0-31)
@@ -1876,23 +1924,57 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ppu_r_2007()
         {
-            // Back-to-back $2007 access: if SM still running, return openbus
-            if (ppu2007SM < 9)
-                return openbus;
-
-            int addr = vram_addr & 0x3FFF;
             byte result;
 
-            if (addr >= 0x3F00)
-                result = (byte)((openbus & 0xC0) | (PpuBusRead(addr) & 0x3F));
+            // P3-3: Consecutive read handling (TriCNES lines 8972-9025)
+            if (ppu2007SM == 3 && ppu2007SM_isRead)
+            {
+                // Alignment-specific behavior during back-to-back reads (RMW on $2007)
+                int phase = mcPpuClock; // TriCNES: PPUClock
+                if (phase == 0)
+                {
+                    result = ppu_2007_buffer;
+                }
+                else if (phase == 1)
+                {
+                    ppu2007SM_updateVramAddrEarly = true;
+                    result = ppu_2007_buffer;
+                }
+                else if (phase == 2)
+                {
+                    ppu2007SM_updateVramAddrEarly = true;
+                    result = (byte)(vram_addr & 0xFF);
+                }
+                else // phase == 3
+                {
+                    ppu2007SM_updateVramAddrEarly = true;
+                    if ((vram_addr & 0x3FFF) >= 0x2000)
+                        result = ppu_2007_buffer;
+                    else
+                        result = (byte)(vram_addr & 0xFF);
+                }
+            }
             else
-                result = ppu_2007_buffer;
+            {
+                // Normal read (TriCNES lines 9011-9025)
+                int addr = vram_addr & 0x3FFF;
+                if (addr >= 0x3F00)
+                    result = (byte)((openbus & 0xC0) | (PpuBusRead(addr) & 0x3F));
+                else
+                    result = ppu_2007_buffer;
+            }
 
-            // Fully deferred: buffer update at state 1/4, increment at state 4
+            // SM start (only from idle) — TriCNES lines 9027-9040
+            if (ppu2007SM >= 9)
+            {
+                ppu2007SM = 0;
+                ppu2007SM_bufferLate = ((mcCpuClock & 3) <= 1);
+            }
+            // If SM active (consecutive read), don't restart — it continues from current state
+
             ppu2007SM_addr = vram_addr;
             ppu2007SM_isRead = true;
-            ppu2007SM = 0;
-            ppu2007SM_bufferLate = ((mcCpuClock & 3) <= 1); // TriCNES: uses CPUClock phase
+            ppu2007SM_readDelayed = true;
 
             openbus = result;
             open_bus_decay_timer = 77777;
@@ -1907,14 +1989,17 @@ namespace AprNes
             openbus = value;
 
             // TriCNES model: IMMEDIATE application + delayed re-application
-            // All fields applied immediately (pattern table, NMI enable, etc.)
-            vram_addr_internal = (ushort)((vram_addr_internal & 0x73ff) | ((value & 3) << 10));
-            BaseNameTableAddr = 0x2000 | ((value & 3) << 10);
-            VramaddrIncrement = ((value & 4) > 0) ? 32 : 1;
+            // P3-1: DataBus glitch — some fields use cpubus (last READ value, not written value)
+            // for 1-2 PPU cycles. The delayed handler fixes them with the correct value.
+            // Glitch-affected fields (TriCNES uses dataBus):
+            vram_addr_internal = (ushort)((vram_addr_internal & 0x73ff) | ((cpubus & 3) << 10));
+            BaseNameTableAddr = 0x2000 | ((cpubus & 3) << 10);
+            VramaddrIncrement = ((cpubus & 4) > 0) ? 32 : 1;
+            Spritesize8x16 = ((cpubus & 0x20) > 0);
+            // Non-glitch fields (TriCNES uses In directly):
             NMIable = ((value & 0x80) > 0);
             SpPatternTableAddr = ((value & 8) > 0) ? 0x1000 : 0;
             BgPatternTableAddr = ((value & 0x10) > 0) ? 0x1000 : 0;
-            Spritesize8x16 = ((value & 0x20) > 0);
 
             // TriCNES: NMILine clearing is NOT done here — it's handled by CPUClock==8 gate
             // (NMILine cleared at operationCycle==0 when !(isVblank && NMIable))
@@ -2021,37 +2106,13 @@ namespace AprNes
             for (int i = 0; i < 7; i++)
                 MasterClockTick();
 
+            // P4-3: return cached ppuOamBuffer during rendering (TriCNES ReadOAM line 9264-9271)
+            // ppuOamBuffer is updated per-dot in ppu_step half-cycle, not computed on-the-fly
             byte val;
             bool renderingOn = ShowBackGround_Instant || ShowSprites_Instant;
             if (scanline >= 0 && scanline < 240 && renderingOn)
             {
-                // Timing offset: tick() processes 3 PPU dots BEFORE the bus read,
-                // so at cx=N the last processed dot was N-1. Shift ranges by +1.
-                if (ppu_cycles_x >= 2 && ppu_cycles_x <= 65)
-                {
-                    // Secondary OAM clear phase (hardware dots 1-64): always $FF
-                    val = 0xFF;
-                }
-                else if (ppu_cycles_x >= 66 && ppu_cycles_x <= 257)
-                {
-                    // Sprite evaluation phase (hardware dots 65-256): last byte read from primary OAM
-                    val = oamCopyBuffer;
-                }
-                else if (ppu_cycles_x >= 258 && ppu_cycles_x <= 321)
-                {
-                    // Sprite tile fetch (hardware dots 257-320): reads from secondary OAM
-                    // Pattern per 8-dot group: Y, tile, attr, X, X, X, X, X
-                    int offset = ppu_cycles_x - 258;
-                    int spriteIdx = offset >> 3;
-                    int step = offset & 0x07;
-                    int byteIdx = step > 3 ? 3 : step;
-                    val = secondaryOAM[spriteIdx * 4 + byteIdx];
-                }
-                else
-                {
-                    // Dots 0-1 and 322-340: return oamCopyBuffer
-                    val = oamCopyBuffer;
-                }
+                val = ppuOamBuffer;
             }
             else
             {
@@ -2095,43 +2156,42 @@ namespace AprNes
         {
             openbus = value;
             open_bus_decay_timer = 77777;
+            ppu2007SM_writeValue = value;
 
-            // Back-to-back $2007 access detection
-            if (ppu2007SM < 9)
+            // P3-3: TriCNES $2007 write model (lines 9675-9717)
+            if (ppu2007SM == 3 || ppu2007SM == 6) // consecutive access
             {
-                if (ppu2007SM_isRead)
-                {
-                    // Interrupted read-to-write: write deferred to state 8 (TriCNES model)
-                    ppu2007SM_interruptedReadToWrite = true;
-                    ppu2007SM_writeValue = value;
-                    ppu2007SM_addr = vram_addr;
-                    ppu2007SM_isRead = false;
-                    return; // don't restart SM — let it continue to state 8
-                }
+                // Mystery address: high byte from vram_addr, low byte from written value
+                ushort addr = (ushort)(vram_addr & 0x3FFF);
+                ppu2007SM_mysteryAddr = (ushort)((addr & 0xFF00) | value);
+
+                if (!ppu2007SM_isRead)
+                    ppu2007SM_performMysteryWrite = true;  // write-write: mystery write
                 else
-                {
-                    // Mystery write: consecutive writes (RMW instruction)
-                    int addr = vram_addr & 0x3FFF;
-                    int mysteryAddr = (addr & 0xFF00) | value;
-                    if (mysteryAddr < 0x3F00)
-                    {
-                        PpuBusWrite(mysteryAddr, value);
-                        PpuBusWrite(addr, (byte)(addr & 0xFF));
-                    }
-                    else
-                        PpuBusWrite(addr & 0x2FFF, value);
-                }
+                    ppu2007SM_interruptedReadToWrite = true; // read-write: deferred to state 8
+            }
+            else
+            {
+                // Not consecutive — normal write behavior
+                ppu2007SM_normalWriteBehavior = true;
             }
 
-            // Fully deferred: write at state 3, increment at state 4
-            ppu2007SM_writeValue = value;
-            ppu2007SM_addr = vram_addr;
-            ppu2007SM_isRead = false;
-            ppu2007SM_interruptedReadToWrite = false;
-            if (ppu2007SM >= 9)
-                ppu2007SM = 3;
+            if (ppu2007SM != 3)
+            {
+                // Restart SM
+                if (ppu2007SM >= 9)
+                    ppu2007SM = 3;   // idle → write starts at state 3
+                else
+                    ppu2007SM = 0;   // interrupting → restart from 0
+                ppu2007SM_isRead = false;
+            }
             else
-                ppu2007SM = 0;
+            {
+                // SM at 3 (consecutive): don't restart, just mark as write
+                ppu2007SM_readDelayed = false;
+            }
+
+            ppu2007SM_addr = vram_addr;
         }
 
         static void ppu_w_4014(byte value)//DMA , fixex 2017.01.16 pass sprite_ram test
