@@ -282,6 +282,18 @@ namespace AprNes
             oddSwap = true; ppuRenderingEnabled = false; prevRenderingEnabled = false; // TriCNES: PPU_OddFrame=true
             ShowBG_EvalDelay = false; ShowSpr_EvalDelay = false;
             commitCXinc = false; // deferred CXinc flag
+            // Per-sprite shift registers
+            for (int i = 0; i < 8; i++)
+            { sprShiftL[i] = 0; sprShiftH[i] = 0; sprXCounter[i] = 0; sprFetchAttr[i] = 0; sprXPos[i] = 0; }
+            sprSlotCount = 0; sprZeroInSlots = false;
+            // 3-dot pixel pipeline
+            dotColor = prevDotColor = prevPrevDotColor = prevPrevPrevDotColor = 0;
+            dotPalIdx = prevDotPalIdx = prevPrevDotPalIdx = prevPrevPrevDotPalIdx = 0;
+            skippedPreRenderDot341 = false;
+            // P4-1: OAM corruption alignment suppression
+            oamCorruptPending = false; oamCorruptSuppressed = false;
+            // P4-2: Palette corruption
+            paletteCorruptFromDisable = false; paletteCorruptFromVAddr = false;
             mcCpuClock = 0; mcPpuClock = 0; mcApuPutCycle = true; // TriCNES: APU_PutCycle=true at power-on
             spr_ram_add = 0;
 

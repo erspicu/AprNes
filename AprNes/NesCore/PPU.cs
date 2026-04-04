@@ -188,12 +188,18 @@ namespace AprNes
         // because those brief A12=1 spikes during BG fetch would prevent filter saturation.
         static public int ppuChrFetchA12;
 
-        // OAM corruption: when rendering is disabled mid-scanline, the PPU's internal
-        // secondary OAM addressing glitches and marks rows for corruption.
-        // When rendering re-enables (or at next frame start), first 8 bytes of OAM
-        // are copied over each marked row.
-        static byte* corruptOamRow; // 32 bytes, 0=clean 1=corrupt
+        // P4-1: TriCNES-style per-alignment OAM corruption model
+        // When rendering disabled mid-scanline → capture corruption index from secOAMAddr.
+        // When rendering re-enabled → apply corruption (copy row 0 over target row),
+        // UNLESS alignment 1 or 2 suppresses it.
+        static byte* corruptOamRow; // 32 bytes (legacy, kept for allocation)
         static bool prevRenderingEnabled = false;
+        static bool oamCorruptPending = false;          // Corruption recorded from disable, awaiting re-enable
+        static bool oamCorruptSuppressed = false;       // Alignment 1,2 suppress corruption on re-enable
+
+        // P4-2: Palette corruption flags
+        static bool paletteCorruptFromDisable = false;  // Rendering disabled during NT fetch with VRAM >= $3C00
+        static bool paletteCorruptFromVAddr = false;    // $2006 palette→non-palette transition
         static public uint* ScreenBuf1x;
         static uint* NesColors; //, targetSize;
         static int* Buffer_BG_array;
@@ -213,6 +219,29 @@ namespace AprNes
         // Updated before/after sprite eval depending on mcCpuClock & 3.
         static bool ShowBG_EvalDelay = false;   // TriCNES: PPU_Mask_ShowBackground_Delayed
         static bool ShowSpr_EvalDelay = false;  // TriCNES: PPU_Mask_ShowSprites_Delayed
+
+        // ── Per-sprite shift registers (TriCNES P2-3: per-dot sprite rendering) ──
+        // Filled at dots 257-320 from secondary OAM tile fetch, rendered at dots 1-256.
+        // TriCNES: PPU_SpriteShiftRegisterL/H, PPU_SpriteShifterCounter, PPU_SpriteAttribute
+        static byte[] sprShiftL = new byte[8];       // Low bitplane shift register
+        static byte[] sprShiftH = new byte[8];       // High bitplane shift register
+        static int[] sprXCounter = new int[8];        // X position countdown (>0=waiting, 0=shifting)
+        static byte[] sprFetchAttr = new byte[8];     // Attribute byte per slot (palette, priority, flip)
+        static byte[] sprXPos = new byte[8];           // X position per slot (for counter init at dot 339)
+        static int sprSlotCount = 0;                   // Number of valid sprites fetched (from evalSpriteCount)
+        static bool sprZeroInSlots = false;            // Sprite 0 is in slot 0
+
+        // ── 3-dot pixel output pipeline (TriCNES P2-2) ──
+        // TriCNES: PrevPrevPrevDotColor → PrevPrevDotColor → PrevDotColor → DotColor
+        // DrawToScreen uses PrevPrevPrevDotColor (3 dot delay).
+        // Pipeline stores composite (BG+sprite) color and palette index.
+        static uint dotColor = 0, prevDotColor = 0, prevPrevDotColor = 0, prevPrevPrevDotColor = 0;
+        static byte dotPalIdx = 0, prevDotPalIdx = 0, prevPrevDotPalIdx = 0, prevPrevPrevDotPalIdx = 0;
+
+        // ── P4-4: Odd frame skip side effects ──
+        // TriCNES: SkippedPreRenderDot341 — set when odd frame skip occurs,
+        // persists until scanline 0 dot 2, affects sprite shifter and dummy NT.
+        static bool skippedPreRenderDot341 = false;
 
         // TriCNES NMI model: level signal + edge detection at instruction boundary
         static bool NMILine = false;              // NMI level signal (set at CPUClock==8)
@@ -522,8 +551,9 @@ namespace AprNes
                 if (cx == 261) spriteSizeLatchedForFetch = Spritesize8x16;
 
                 // TriCNES: sprite fetch uses same 8-phase address bus pattern as BG tiles.
-                // sprPhase 0 (dot&7=1): dummy NT addr, sprPhase 2 (dot&7=3): dummy AT addr,
-                // sprPhase 4 (dot&7=5): sprite CHR low addr, sprPhase 6 (dot&7=7): sprite CHR high addr.
+                // Phase 0: dummy NT addr, Phase 2: dummy AT addr + read attr,
+                // Phase 3: read X position, Phase 4: CHR low addr, Phase 5: fetch CHR low,
+                // Phase 6: CHR high addr, Phase 7: fetch CHR high.
                 {
                     int sprPhase = (cx - 257) & 7;
                     int slot = (cx - 257) >> 3;
@@ -535,8 +565,14 @@ namespace AprNes
                     }
                     else if (sprPhase == 2)
                     {
-                        // Dummy AT fetch (TriCNES: ShiftRegistersAndBitPlanes case 3)
+                        // Dummy AT fetch + read attribute from secondary OAM
                         ppuAddressBus = 0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07);
+                        sprFetchAttr[slot] = secondaryOAM[slot * 4 + 2];
+                    }
+                    else if (sprPhase == 3)
+                    {
+                        // Read X position from secondary OAM (TriCNES case 3)
+                        sprXPos[slot] = secondaryOAM[slot * 4 + 3];
                     }
                     else if (sprPhase == 4)
                     {
@@ -545,12 +581,34 @@ namespace AprNes
                         ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
                         if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus);
                     }
+                    else if (sprPhase == 5)
+                    {
+                        // Fetch CHR low bitplane → shift register (TriCNES case 5)
+                        int addr = ppuAddressBus; // address set at phase 4
+                        byte tile = chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF];
+                        bool flipH = (sprFetchAttr[slot] & 0x40) != 0;
+                        sprShiftL[slot] = flipH ? FlipByte(tile) : tile;
+                    }
                     else if (sprPhase == 6)
                     {
-                        // Sprite CHR high = CHR low + 8
+                        // Sprite CHR high address = CHR low + 8
                         ppuAddressBus = ComputeSpritePatternAddr(slot) + 8;
                         ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
                         if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus);
+                    }
+                    else // sprPhase == 7
+                    {
+                        // Fetch CHR high bitplane → shift register (TriCNES case 7)
+                        int addr = ppuAddressBus; // address set at phase 6
+                        byte tile = chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF];
+                        bool flipH = (sprFetchAttr[slot] & 0x40) != 0;
+                        sprShiftH[slot] = flipH ? FlipByte(tile) : tile;
+                        // Clear shift registers for empty slots (Y=0xFF from secondary OAM clear)
+                        if (slot >= sprSlotCount)
+                        {
+                            sprShiftL[slot] = 0;
+                            sprShiftH[slot] = 0;
+                        }
                     }
                 }
                 // MMC5: per-fetch VRAM read notifications for sprite phase
@@ -572,6 +630,14 @@ namespace AprNes
             if (scanline == preRenderLn && cx >= 280 && cx <= 304)
             {
                 vram_addr = (vram_addr & ~0x7BE0) | (vram_addr_internal & 0x7BE0);
+            }
+
+            // Dot 339: initialize sprite X counters for next scanline's per-dot rendering
+            // (TriCNES: PPU_SpriteShifterCounter[i] = PPU_SpriteXposition[i])
+            if (cx == 339)
+            {
+                for (int i = 0; i < 8; i++)
+                    sprXCounter[i] = sprXPos[i];
             }
 
             // Garbage NT fetches (dots 336-340): TriCNES PPU_Render_ShiftRegistersAndBitPlanes_DummyNT
@@ -630,6 +696,16 @@ namespace AprNes
                         return table | tileBase | (7 - (row & 7));
                 }
             }
+        }
+
+        // Reverse bits in a byte (for sprite horizontal flip at tile load time)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static byte FlipByte(byte b)
+        {
+            b = (byte)(((b & 0xF0) >> 4) | ((b & 0x0F) << 4));
+            b = (byte)(((b & 0xCC) >> 2) | ((b & 0x33) << 2));
+            b = (byte)(((b & 0xAA) >> 1) | ((b & 0x55) << 1));
+            return b;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -709,10 +785,20 @@ namespace AprNes
             if (cx < 0 || cx >= 256 || scanline < 0 || scanline >= 240)
                 return;
 
-            // Per-dot BG pixel output using per-dot render shift registers
+            // ── 3-dot pixel pipeline shift (TriCNES P2-2) ──
+            prevPrevPrevDotColor = prevPrevDotColor; prevPrevDotColor = prevDotColor; prevDotColor = dotColor;
+            prevPrevPrevDotPalIdx = prevPrevDotPalIdx; prevPrevDotPalIdx = prevDotPalIdx; prevDotPalIdx = dotPalIdx;
+
+            // ── Compute composite color for current dot ──
+            int slot = (scanline << 8) + cx;
+            byte backdropIdx = (byte)(ppu_ram[0x3f00] & 0x3f);
+            uint compositeColor = NesColors[backdropIdx];
+            byte compositePalIdx = backdropIdx;
+            int bgPxVal = 0;
+
+            // BG pixel
             if (ppuRenderingEnabled && ShowBackGround)
             {
-                // At phase 7, use pre-reload latch
                 ushort rL, rH;
                 if (halfStepIsPhase7)
                 {
@@ -727,35 +813,72 @@ namespace AprNes
                 }
                 int bit = 15 - FineX;
                 int bgPixel = ((rL >> bit) & 1) | (((rH >> bit) & 1) << 1);
-
-                // Attribute from pipeline (proven correct)
                 int attrBits = (bit >= 8) ? bg_attr_p3 : bg_attr_p2;
 
-                // Shift pattern registers (attribute handled by pipeline, not shift register)
                 renderLow  <<= 1;
                 renderHigh = (ushort)((renderHigh << 1) | 1);
 
                 bool masked = !ShowBgLeft8 && cx < 8;
-                int slot = (scanline << 8) + cx;
-                Buffer_BG_array[slot] = masked ? 0 : bgPixel;
+                bgPxVal = masked ? 0 : bgPixel;
+                Buffer_BG_array[slot] = bgPxVal;
 
-                int baseAddr = 0x3f00 | (attrBits << 2);
-                uint bgColor = NesColors[ppu_ram[0x3f00] & 0x3f];
-                uint color = (masked || bgPixel == 0)
-                    ? bgColor
-                    : NesColors[ppu_ram[baseAddr + bgPixel] & 0x3f];
-                ScreenBuf1x[slot] = color;
-
-                // NTSC analog: write palette index
-                if (AnalogEnabled)
+                if (!masked && bgPixel != 0)
                 {
-                    ntscScanBuf[cx] = (masked || bgPixel == 0)
-                        ? (byte)(ppu_ram[0x3f00] & 0x3f)
-                        : (byte)(ppu_ram[baseAddr + bgPixel] & 0x3f);
+                    int baseAddr = 0x3f00 | (attrBits << 2);
+                    compositeColor = NesColors[ppu_ram[baseAddr + bgPixel] & 0x3f];
+                    compositePalIdx = (byte)(ppu_ram[baseAddr + bgPixel] & 0x3f);
+                }
+            }
+
+            // Sprite pixel (per-dot shift register output)
+            if (ppuRenderingEnabled)
+            {
+                int winPx = 0, winPal = 0, winPri = 0;
+                for (int s = 0; s < 8; s++)
+                {
+                    if (sprXCounter[s] > 0) { sprXCounter[s]--; continue; }
+                    int px = ((sprShiftH[s] >> 7) << 1) | (sprShiftL[s] >> 7);
+                    sprShiftL[s] <<= 1;
+                    sprShiftH[s] <<= 1;
+                    if (px != 0 && winPx == 0)
+                    {
+                        winPx = px;
+                        winPal = sprFetchAttr[s] & 3;
+                        winPri = (sprFetchAttr[s] >> 5) & 1;
+                    }
                 }
 
+                if (winPx != 0 && ShowSprites && !(!ShowSprLeft8 && cx < 8))
+                {
+                    if (!ShowBackGround || bgPxVal == 0 || winPri == 0)
+                    {
+                        byte rawPal = (byte)(ppu_ram[0x3F10 | (winPal << 2) | winPx] & 0x3F);
+                        compositeColor = NesColors[rawPal];
+                        compositePalIdx = rawPal;
+                    }
+                }
             }
-            // TriCNES: shift registers do NOT shift when rendering is disabled
+
+            // P4-2: Palette corruption effect — only on alignment 2 (TriCNES: CorruptPalettes)
+            // At alignment 0 (AprNes fixed), this never fires. Structural placeholder.
+            if (paletteCorruptFromDisable || paletteCorruptFromVAddr)
+            {
+                paletteCorruptFromDisable = false;
+                paletteCorruptFromVAddr = false;
+                if ((mcCpuClock & 3) == 2)
+                {
+                    // TriCNES: complex per-color palette corruption — placeholder for future
+                    // At alignment 0 this path is unreachable; full CorruptPalettes deferred
+                }
+            }
+
+            // Store current dot's composite in pipeline
+            dotColor = compositeColor;
+            dotPalIdx = compositePalIdx;
+
+            // ── Write 3-dot-delayed color to screen (TriCNES: DrawToScreen uses PrevPrevPrevDotColor) ──
+            ScreenBuf1x[slot] = prevPrevPrevDotColor;
+            if (AnalogEnabled) ntscScanBuf[cx] = prevPrevPrevDotPalIdx;
         }
 
         // ── Region-specialized PPU step functions ──
@@ -800,8 +923,20 @@ namespace AprNes
             // $2006 delayed t→v copy
             if (ppu2006UpdateDelay > 0 && --ppu2006UpdateDelay == 0)
             {
+                int prevAddr = vram_addr;
                 vram_addr = ppu2006PendingAddr;
                 if (mapperNeedsA12) NotifyMapperA12(vram_addr);
+
+                // P4-2: Palette corruption when leaving palette range
+                // TriCNES: if old addr >= $3F00 and new addr < $3F00, and low nibble != 0
+                if ((prevAddr & 0x3FFF) >= 0x3F00 && (vram_addr & 0x3FFF) < 0x3F00)
+                {
+                    if (scanline >= 0 && scanline < 240 && ppu_cycles_x <= 256)
+                    {
+                        if ((prevAddr & 0xF) != 0)
+                            paletteCorruptFromVAddr = true;
+                    }
+                }
             }
 
             // $2005 delayed scroll update
@@ -1008,13 +1143,24 @@ namespace AprNes
 
                 }
 
-                // Sprite rendering at dot 257 — batch composite over BG
-                // (per-dot compositing requires sprite buffer before dot 0, which isn't possible
-                //  because sprite tiles must be fetched with correct CHR banks at dot 257+)
+                // Dot 257: initialize per-dot sprite shift register state
+                // Sprite tiles are fetched at dots 257-320 into shift registers,
+                // X counters set at dot 339, rendered per-dot at dots 1-256 next scanline.
                 if (scanline >= 0 && scanline < 240 && cx == 257)
                 {
                     if (mmc5Ref != null) mmc5Ref.PreSpriteRender();
-                    RenderSpritesLine_Batch();
+                    sprSlotCount = evalSpriteCount;
+                    sprZeroInSlots = evalSprite0Visible;
+                    // Analog mode: decode completed scanline (all 256 BG+sprite pixels done)
+                    if (AnalogEnabled)
+                        DecodeScanline(scanline, ntscScanBuf, ppuEmphasis);
+                }
+                // Pre-render line: sprite fetch also runs, use stale evalSpriteCount
+                else if (scanline == PRE_RENDER_LINE && cx == 257) // ★ REGION
+                {
+                    // Secondary OAM has data from scanline 239's evaluation.
+                    // Tile fetch at 257-320 will read from it; sprites won't be visible
+                    // on scanline 0 via shift registers (X counters will be far offscreen).
                 }
 
                 // Pre-render line: compute pre-render sprite data at dot 257
@@ -1104,8 +1250,14 @@ namespace AprNes
                     if (mmc5Ref != null)
                         mmc5Ref.NotifyVramRead(0x2000 | (vram_addr & 0x0FFF));
                     ppu_cycles_x = ++cx;
+                    // P4-4: TriCNES SkippedPreRenderDot341 — persists until scanline 0, dot 2
+                    skippedPreRenderDot341 = true;
                 }
             }
+
+            // P4-4: Clear SkippedPreRenderDot341 at scanline 0, dot 2 (TriCNES line 1643)
+            if (skippedPreRenderDot341 && scanline == 0 && cx == 2)
+                skippedPreRenderDot341 = false;
 
             if (cx == 341)
             {
@@ -1154,12 +1306,10 @@ namespace AprNes
         {
             if (ppu_cycles_x >= 0 && ppu_cycles_x < 64)
             {
-                // Secondary OAM clear phase: every 2 dots shifts corruption down 1 row
                 corruptOamRow[ppu_cycles_x >> 1] = 1;
             }
             else if (ppu_cycles_x >= 256 && ppu_cycles_x < 320)
             {
-                // Sprite tile fetch phase: 8-dot segments
                 int rel = ppu_cycles_x - 256;
                 int baseIdx = rel >> 3;
                 int offset = rel & 0x07;
@@ -1169,10 +1319,9 @@ namespace AprNes
         }
 
         // OAM corruption: copy first 8 bytes of OAM over each marked row
-        // Optimized: single long (8-byte) read/write replaces inner byte loop
         static unsafe void ProcessOamCorruption()
         {
-            long sourcePattern = *(long*)spr_ram; // row 0: first 8 bytes
+            long sourcePattern = *(long*)spr_ram;
             for (int i = 1; i < 32; i++)
             {
                 if (corruptOamRow[i] != 0)
@@ -1345,6 +1494,7 @@ namespace AprNes
         static void SpriteEvalWrite()
         {
             int height = Spritesize8x16 ? 16 : 8;
+            int evalSL = scanline;
 
             if (secOAMAddr >= 0x20)
             {
@@ -1378,7 +1528,7 @@ namespace AprNes
                 else
                 {
                     // Check in-range for overflow bug (reads wrong byte offset)
-                    if (scanline >= oamCopyBuffer && scanline < oamCopyBuffer + height)
+                    if (evalSL >= oamCopyBuffer && evalSL < oamCopyBuffer + height)
                         spriteInRange = true;
                     // Advance both H and L (hardware bug: L increments on miss)
                     spriteEvalAddrH = (byte)((spriteEvalAddrH + 1) & 0x3F);
@@ -1391,7 +1541,7 @@ namespace AprNes
                 // Check in-range if not already tracking
                 if (!spriteInRange)
                 {
-                    if (scanline >= oamCopyBuffer && scanline < oamCopyBuffer + height)
+                    if (evalSL >= oamCopyBuffer && evalSL < oamCopyBuffer + height)
                         spriteInRange = !oamCopyDone;
                 }
 
@@ -1778,22 +1928,52 @@ namespace AprNes
             ShowBackGround_Instant = (value & 0x08) != 0;
             ShowSprites_Instant    = (value & 0x10) != 0;
 
-            // OAM corruption uses instant flags
+            // P4-1: OAM corruption with per-alignment suppression (TriCNES model)
             bool newRenderingInstant = ShowBackGround_Instant || ShowSprites_Instant;
-            if (prevRenderingEnabled != newRenderingInstant && scanline >= 0 && scanline < 240)
+            if (prevRenderingEnabled != newRenderingInstant)
             {
-                if (newRenderingInstant)
+                bool outsideVblank = scanline >= 0 && (scanline < 240 || scanline == preRenderLine);
+                if (outsideVblank)
                 {
-                    ProcessOamCorruption();
-                    if (!sprite0_on_line && !isSprite0hit && ppu_cycles_x > 0)
+                    if (!newRenderingInstant)
                     {
-                        PrecomputeSprite0Line();
-                        if (sprite0_on_line)
-                            sprite0_line_x = ppu_cycles_x;
+                        // Disabling rendering — mark rows for corruption
+                        SetOamCorruptionFlags();
+                        oamCorruptPending = true;
+
+                        // P4-2: Palette corruption when disabling during first 2 dots of NT fetch
+                        if ((ppu_cycles_x & 7) < 2 && ppu_cycles_x <= 250)
+                        {
+                            if ((vram_addr & 0x3FFF) >= 0x3C00)
+                                paletteCorruptFromDisable = true;
+                        }
+                    }
+                    else
+                    {
+                        // Re-enabling rendering — apply corruption with alignment gate
+                        // TriCNES: alignment 1,2 suppress corruption on re-enable
+                        int alignment = mcCpuClock & 3;
+                        if (oamCorruptPending && (alignment == 1 || alignment == 2))
+                            oamCorruptSuppressed = true;
+
+                        if (!oamCorruptSuppressed)
+                            ProcessOamCorruption();
+                        else
+                        {
+                            // Suppressed: just clear the flags without corrupting
+                            for (int i = 0; i < 32; i++) corruptOamRow[i] = 0;
+                        }
+                        oamCorruptPending = false;
+                        oamCorruptSuppressed = false;
+
+                        if (!sprite0_on_line && !isSprite0hit && ppu_cycles_x > 0)
+                        {
+                            PrecomputeSprite0Line();
+                            if (sprite0_on_line)
+                                sprite0_line_x = ppu_cycles_x;
+                        }
                     }
                 }
-                else
-                    SetOamCorruptionFlags();
             }
             prevRenderingEnabled = newRenderingInstant;
 
