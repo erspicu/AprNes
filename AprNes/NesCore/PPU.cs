@@ -1367,14 +1367,22 @@ namespace AprNes
         static byte* secondaryOAM; // 8 sprites × 4 bytes
         static byte oamCopyBuffer;                  // Last byte read during evaluation (PPU_OAMLatch in TriCNES)
         static byte ppuOamBuffer;                   // P4-3: cached $2004 value, updated per-dot in half-step (TriCNES PPU_OAMBuffer)
-        static byte spriteEvalAddrH;                // Primary OAM sprite index (0-63)
-        static byte spriteEvalAddrL;                // Byte offset within sprite (0-3)
-        static byte secOAMAddr;                     // Write position in secondary OAM (0-31)
-        static bool spriteInRange;                  // Current sprite Y is in range
-        static bool sprite0Added;                   // First evaluated sprite was in range
-        static bool oamCopyDone;                    // Evaluation wrapped around all 64 sprites
-        static byte overflowBugCounter;             // For sprite overflow hardware bug
+        // TriCNES-aligned sprite evaluation state
+        static byte evalOamAddr;                    // TriCNES: PPUOAMAddress (flat 0-255 byte address)
+        static byte evalOam2Addr;                   // TriCNES: OAM2Address (0-31, wraps with & 0x1F)
+        static byte evalTick;                       // TriCNES: SpriteEvaluationTick (0-3)
+        static bool evalOam2Full;                   // TriCNES: SecondaryOAMFull
+        static bool evalOamOverflowed;              // TriCNES: OAMAddressOverflowedDuringSpriteEvaluation
+        static bool spriteInRange;                  // TriCNES: PPU_OAMEvaluationObjectInRange
+        static bool sprite0Added;                   // TriCNES: PPU_NextScanlineContainsSpriteZero
+        static bool nineObjectsOnLine;              // TriCNES: NineObjectsOnThisScanline
         static int evalSpriteCount;                 // Number of sprites found (0-8)
+        // Legacy aliases for code that still references old names
+        static byte spriteEvalAddrH { get { return (byte)(evalOamAddr >> 2); } }
+        static byte spriteEvalAddrL { get { return (byte)(evalOamAddr & 3); } }
+        static byte secOAMAddr { get { return evalOam2Addr; } set { evalOam2Addr = value; } }
+        static bool oamCopyDone { get { return evalOamOverflowed; } set { evalOamOverflowed = value; } }
+        static byte overflowBugCounter;             // For sprite overflow hardware bug
         static bool evalSprite0Visible;             // Sprite 0 found in secondary OAM
 
         // Pre-render line sprite data (loaded at pre-render dot 257 for scanline 0)
@@ -1541,11 +1549,13 @@ namespace AprNes
         {
             sprite0Added = false;
             spriteInRange = false;
-            secOAMAddr = 0;
+            evalOam2Addr = 0;           // TriCNES: OAM2Address = 0 at dot 65
+            evalOam2Full = false;       // TriCNES: SecondaryOAMFull = false
+            evalTick = 0;              // TriCNES: SpriteEvaluationTick = 0
             overflowBugCounter = 0;
-            oamCopyDone = false;
-            spriteEvalAddrH = (byte)((spr_ram_add >> 2) & 0x3F);
-            spriteEvalAddrL = (byte)(spr_ram_add & 0x03);
+            evalOamOverflowed = false;  // TriCNES: OAMAddressOverflowedDuringSpriteEvaluation = false
+            nineObjectsOnLine = false;  // TriCNES: NineObjectsOnThisScanline = false
+            evalOamAddr = spr_ram_add;  // TriCNES: PPUOAMAddress (already set from $2003)
         }
 
         // Per-dot sprite evaluation: odd dots read, even dots write/check
@@ -1558,10 +1568,9 @@ namespace AprNes
 
             if (isOdd)
             {
-                // Odd cycle: read from primary OAM
-                oamCopyBuffer = spr_ram[(byte)(spriteEvalAddrH * 4 + spriteEvalAddrL)];
-                // TriCNES: attribute byte bits 3-4 masked during evaluation read (0xE7)
-                if (spriteEvalAddrL == 2) oamCopyBuffer &= 0xE7;
+                // Odd cycle: read from primary OAM (TriCNES line 2595)
+                oamCopyBuffer = spr_ram[evalOamAddr];
+                if ((evalOamAddr & 3) == 2) oamCopyBuffer &= 0xE7; // TriCNES: bits 3-4 masked
             }
             else
             {
@@ -1570,111 +1579,116 @@ namespace AprNes
             }
         }
 
+        // TriCNES _EmulatePPU lines 2614-2785: even cycle sprite evaluation
+        // Restructured to match TriCNES with: evalOamAddr (PPUOAMAddress), evalOam2Addr (OAM2Address),
+        // evalTick (SpriteEvaluationTick), evalOam2Full (SecondaryOAMFull), evalOamOverflowed
         static void SpriteEvalWrite()
         {
             int height = Spritesize8x16 ? 16 : 8;
-            int evalSL = scanline & 0xFF; // TriCNES: (PPU_Scanline & 0xFF) — wraps pre-render 261→5
+            int evalSL = scanline & 0xFF; // TriCNES: (PPU_Scanline & 0xFF)
 
-            if (secOAMAddr >= 0x20)
+            if (!evalOamOverflowed) // TriCNES line 2620
             {
-                // Secondary OAM full
-                oamCopyBuffer = secondaryOAM[secOAMAddr & 0x1F]; // read instead of write
+                byte preIncAddr = evalOamAddr; // TriCNES line 2622: PreIncVal
 
-                if (oamCopyDone)
-                {
-                    // Already found 8+ sprites, just advance
-                    spriteEvalAddrH = (byte)((spriteEvalAddrH + 1) & 0x3F);
-                    spriteEvalAddrL = 0;
-                }
-                else if (spriteInRange)
-                {
-                    // Found 9th+ sprite: overflow flag set by PrecomputeOverflow() at exact cycle
-                    spriteEvalAddrL++;
-                    if (spriteEvalAddrL >= 4)
-                    {
-                        spriteEvalAddrH = (byte)((spriteEvalAddrH + 1) & 0x3F);
-                        spriteEvalAddrL = 0;
-                    }
-                    if (overflowBugCounter == 0)
-                        overflowBugCounter = 3;
-                    else if (--overflowBugCounter == 0)
-                    {
-                        oamCopyDone = true;
-                        spriteEvalAddrL = 0;
-                    }
-                    spriteInRange = false; // reset for next check
-                }
-                else
-                {
-                    // Check in-range for overflow bug (reads wrong byte offset)
-                    if (evalSL >= oamCopyBuffer && evalSL < oamCopyBuffer + height)
-                        spriteInRange = true;
-                    // Advance both H and L (hardware bug: L increments on miss)
-                    spriteEvalAddrH = (byte)((spriteEvalAddrH + 1) & 0x3F);
-                    spriteEvalAddrL = (byte)((spriteEvalAddrL + 1) & 0x03);
-                    if (spriteEvalAddrH == 0) oamCopyDone = true;
-                }
-            }
-            else
-            {
-                // Check in-range if not already tracking
-                if (!spriteInRange)
-                {
-                    if (evalSL >= oamCopyBuffer && evalSL < oamCopyBuffer + height)
-                        spriteInRange = !oamCopyDone;
-                }
+                // Write to SecOAM if not full (TriCNES line 2623-2625)
+                if (!evalOam2Full)
+                    secondaryOAM[evalOam2Addr] = oamCopyBuffer;
 
-                if (oamCopyDone)
-                {
-                    // All 64 sprites checked, fewer than 8 in range:
-                    // even dots read from secondary OAM into oamCopyBuffer (no write)
-                    oamCopyBuffer = secondaryOAM[secOAMAddr];
-                    // Still advance through primary OAM (hardware continues cycling)
-                    spriteEvalAddrH = (byte)((spriteEvalAddrH + 1) & 0x3F);
-                    spriteEvalAddrL = 0;
-                }
-                else
-                {
-                    // Write to secondary OAM (attribute already masked at read time)
-                    secondaryOAM[secOAMAddr] = oamCopyBuffer;
+                // Capture OAM2READ after write (TriCNES line 2627)
+                byte oam2Read = secondaryOAM[evalOam2Addr];
 
-                    if (spriteInRange)
+                if (evalTick == 0) // tick 0: Y byte — range check (TriCNES line 2628)
+                {
+                    if (!nineObjectsOnLine
+                        && evalSL >= oamCopyBuffer && evalSL < oamCopyBuffer + height)
                     {
-                        // TriCNES line 2655: sprite 0 detected by dot number, not OAM address
-                        // PPU_Dot==66 = first even (WRITE) tick = ppu_cycles_x==67
+                        // In range (TriCNES line 2633)
+                        if (!evalOam2Full)
+                        {
+                            evalOamAddr++;       // PPUOAMAddress++ (line 2641)
+                            evalOam2Addr++;      // OAM2Address++ (line 2643)
+                            evalOam2Addr &= 0x1F;
+                            if (evalOam2Addr == 0) evalOam2Full = true;
+                        }
+                        else
+                        {
+                            // 9th+ sprite: overflow (TriCNES lines 2661-2668)
+                            nineObjectsOnLine = true;
+                            evalOamAddr++;       // PPUOAMAddress++ (line 2663)
+                        }
+                        // Sprite 0 detection at dot 66 (TriCNES line 2655)
                         if (ppu_cycles_x == 67) sprite0Added = true;
-
-                        spriteEvalAddrL++;
-                        secOAMAddr++;
-
-                        if (spriteEvalAddrL >= 4)
-                        {
-                            spriteEvalAddrH = (byte)((spriteEvalAddrH + 1) & 0x3F);
-                            spriteEvalAddrL = 0;
-                            if (spriteEvalAddrH == 0) oamCopyDone = true;
-                        }
-
-                        if ((secOAMAddr & 0x03) == 0)
-                        {
-                            // Done copying 4 bytes of this sprite
-                            spriteInRange = false;
-                        }
+                        evalTick++; // advance to tick 1 (TriCNES line 2671)
                     }
                     else
                     {
-                        // Not in range: skip to next sprite
-                        spriteEvalAddrH = (byte)((spriteEvalAddrH + 1) & 0x3F);
-                        spriteEvalAddrL = 0;
-                        if (spriteEvalAddrH == 0) oamCopyDone = true;
+                        // Not in range (TriCNES line 2674)
+                        if (ppu_cycles_x == 67) sprite0Added = false;
+
+                        if (evalOam2Full && !nineObjectsOnLine)
+                        {
+                            // Overflow bug (TriCNES lines 2683-2693)
+                            if ((evalOamAddr & 0x3) == 3)
+                                evalOamAddr++;
+                            else
+                            {
+                                evalOamAddr += 4;
+                                evalOamAddr++;
+                            }
+                        }
+                        else
+                        {
+                            // Normal skip (TriCNES lines 2695-2698)
+                            evalOamAddr += 4;
+                            evalOamAddr &= 0xFC;
+                        }
                     }
                 }
+                else // ticks 1, 2, 3 (TriCNES line 2703)
+                {
+                    if (evalTick == 3) // tick 3: X byte (TriCNES line 2705)
+                    {
+                        // Pseudo range check on X byte (TriCNES lines 2710-2744)
+                        if (!evalOam2Full)
+                            evalOamAddr++; // +1 (line 2718 or 2736)
+                        else
+                        {
+                            evalOamAddr++;
+                            evalOamAddr &= 0xFC; // (line 2742-2743)
+                        }
+                    }
+                    else // ticks 1, 2 (TriCNES line 2747-2752)
+                    {
+                        evalOamAddr++; // PPUOAMAddress++
+                    }
+
+                    evalTick = (byte)((evalTick + 1) & 3); // line 2754-2755
+
+                    if (!evalOam2Full) // line 2756
+                    {
+                        evalOam2Addr++;       // line 2758
+                        evalOam2Addr &= 0x1F; // line 2759
+                        if (evalOam2Addr == 0) evalOam2Full = true; // line 2760-2762
+                    }
+                }
+
+                // Detect PPUOAMAddress overflow (TriCNES lines 2768-2770)
+                if (evalOamAddr < preIncAddr && evalOamAddr < 4)
+                    evalOamOverflowed = true;
+
+                // PPU_OAMLatch = OAM2READ (TriCNES line 2772)
+                oamCopyBuffer = oam2Read;
+            }
+            else // OAMAddressOverflowedDuringSpriteEvaluation (TriCNES line 2774)
+            {
+                evalOamAddr += 4;
+                evalOamAddr &= 0xFC;
+                oamCopyBuffer = secondaryOAM[evalOam2Addr]; // TriCNES line 2785
             }
 
-            // TriCNES line 2772: PPU_OAMLatch = OAM2READ (no-op for normal writes, matters for SecOAMFull)
-            // Not needed in AprNes: overflow path already sets oamCopyBuffer from SecOAM.
-
-            // Update primary OAM read address (for $2003 visibility)
-            spr_ram_add = (byte)((spriteEvalAddrL & 0x03) | (spriteEvalAddrH << 2));
+            // Update $2003 visible address (TriCNES: PPUOAMAddress is the register itself)
+            spr_ram_add = evalOamAddr;
         }
 
         // Finalize evaluation at dot 256
@@ -1682,7 +1696,9 @@ namespace AprNes
         static void SpriteEvalEnd()
         {
             evalSprite0Visible = sprite0Added;
-            evalSpriteCount = (secOAMAddr + 3) >> 2;
+            // Count sprites: evalOam2Addr is the SecOAM write position.
+            // If evalOam2Full, we had 8 sprites (evalOam2Addr wrapped to 0).
+            evalSpriteCount = evalOam2Full ? 8 : (evalOam2Addr + 3) >> 2;
             if (evalSpriteCount > 8) evalSpriteCount = 8;
         }
 
@@ -2108,7 +2124,7 @@ namespace AprNes
             else
             {
                 val = spr_ram[spr_ram_add];
-                if ((spr_ram_add & 3) == 2) val &= 0xE3; // mask unimplemented bits of attribute byte
+                if ((spr_ram_add & 3) == 2) val &= 0xE3; // attribute bits 2-4 always read 0
             }
             open_bus_decay_timer = 77777;
             return openbus = val;
