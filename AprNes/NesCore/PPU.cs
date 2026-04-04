@@ -542,8 +542,7 @@ namespace AprNes
                     ioaddr = 0x2000 | (vram_addr & 0x0FFF);
                 } else if (phase == 1) {
                     ppuAddressBus = ioaddr;  // TriCNES: PPU_AddressBus set at phase 1 (NT fetch)
-                    // A12=0 (NT falling edge): always notify — keeps a12LowSince updated
-                    if (mapperA12IsMmc3) NotifyMapperA12(ioaddr);
+                    if (mapperA12IsMmc3) NotifyMapperA12(ioaddr); // NT addr A12=0 — at data phase (TriCNES model)
                     if (ntChrOverrideEnabled)
                         NTVal = ntBankPtrs[(ioaddr >> 10) & 3][ioaddr & 0x3FF];
                     else
@@ -575,10 +574,7 @@ namespace AprNes
                 } else if (phase == 5) {
                     ppuAddressBus = ioaddr;  // TriCNES: PPU_AddressBus set at phase 5 (CHR low fetch)
                     ppuChrFetchA12 = (ioaddr >> 12) & 1;  // CHR-only A12 for MMC3 M2 filter
-                    // A12=1 (CHR rising edge): suppress on pre-render dots 0-255 for MMC3
-                    // TriCNES M2 filter naturally blocks per-tile oscillation; AprNes elapsed filter can't
-                    if (mapperNeedsA12 && !(mapperA12IsMmc3 && scanline == preRenderLine && cx < 256))
-                        NotifyMapperA12(ioaddr);
+                    if (mapperNeedsA12) NotifyMapperA12(ioaddr);  // CHR low — at data phase (TriCNES model)
                     if (extAttrEnabled && extAttrChrSize > 0)
                         lowTile = extAttrCHR[ioaddr % extAttrChrSize];
                     else
@@ -839,6 +835,8 @@ namespace AprNes
 
         static void NotifyMapperA12(int address)
         {
+            // +1: notification fires during rendering (pre-increment), but TriCNES detects
+            // in PPUClock which runs after PPU_Dot++ (post-increment). Align timestamps.
             MapperObj.NotifyA12(address, scanline * 341 + ppu_cycles_x + 1);
         }
 
