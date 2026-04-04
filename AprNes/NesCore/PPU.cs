@@ -1121,6 +1121,13 @@ namespace AprNes
                 }
             }
 
+            // TriCNES line 1676: address bus = v when rendering disabled — ALL scanlines, not just visible
+            if (!ppuRenderingEnabled)
+            {
+                ppuAddressBus = vram_addr;
+                ppuChrFetchA12 = (vram_addr >> 12) & 1;
+            }
+
             if (scanline < 240 || scanline == PRE_RENDER_LINE) // ★ REGION
             {
                 // Deferred commit: CXinc from previous phase 7 (TriCNES: PPU_Commit_PatternHighFetch)
@@ -1129,11 +1136,6 @@ namespace AprNes
 
                 if (ppuRenderingEnabled)
                     ppu_rendering_tick(cx, PRE_RENDER_LINE); // ★ REGION
-                else
-                {
-                    ppuAddressBus = vram_addr;  // TriCNES: address bus = v when rendering disabled (line 1676)
-                    ppuChrFetchA12 = (vram_addr >> 12) & 1;
-                }
 
                 // Alignment-dependent eval delay update (TriCNES: lines 1652-1658)
                 // Non-phase-3: update delayed flags BEFORE sprite eval (1 PPU cycle delay)

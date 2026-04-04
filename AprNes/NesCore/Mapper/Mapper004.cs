@@ -59,6 +59,8 @@ namespace AprNes
                 IRQReset = false;
                 if (IRQCounter == 0 && IRQ_enable)
                 {
+                    if (NesCore.frame_count <= 15)
+                        System.Console.Error.WriteLine($"A IRQ-RL SL={NesCore.scanline} cx={NesCore.ppu_cycles_x} F{NesCore.frame_count}");
                     NesCore.statusmapperint = true;
                     NesCore.UpdateIRQLine();
                 }
@@ -68,6 +70,8 @@ namespace AprNes
                 IRQCounter--; // byte: 0-1 wraps to 255
                 if (IRQCounter == 0 && IRQ_enable)
                 {
+                    if (NesCore.frame_count <= 15)
+                        System.Console.Error.WriteLine($"A IRQ-DEC0 SL={NesCore.scanline} cx={NesCore.ppu_cycles_x} F{NesCore.frame_count}");
                     NesCore.statusmapperint = true;
                     NesCore.UpdateIRQLine();
                 }
@@ -76,6 +80,8 @@ namespace AprNes
                     IRQCounter = IRQlatchVal;
                     if (IRQCounter == 0 && IRQ_enable)
                     {
+                        if (NesCore.frame_count <= 15)
+                            System.Console.Error.WriteLine($"A IRQ-UF SL={NesCore.scanline} cx={NesCore.ppu_cycles_x} F{NesCore.frame_count}");
                         NesCore.statusmapperint = true;
                         NesCore.UpdateIRQLine();
                     }
