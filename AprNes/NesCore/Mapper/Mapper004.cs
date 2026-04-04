@@ -11,7 +11,7 @@ namespace AprNes
         int* Vertical;
 
         protected bool IRQ_enable = false, IRQReset = false;
-        protected int IRQlatchVal = 0, IRQCounter = 0;
+        protected byte IRQlatchVal = 0, IRQCounter = 0; // TriCNES: byte type (0-1 wraps to 255)
         int BankReg = 0;
 
         // TriCNES M2 filter model for A12 rising edge detection
@@ -65,8 +65,7 @@ namespace AprNes
             }
             else
             {
-                // TriCNES: counter is byte, so 0-1 wraps to 255
-                IRQCounter = (IRQCounter - 1) & 0xFF;
+                IRQCounter--; // byte: 0-1 wraps to 255
                 if (IRQCounter == 0 && IRQ_enable)
                 {
                     NesCore.statusmapperint = true;
