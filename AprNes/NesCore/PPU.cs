@@ -1145,8 +1145,8 @@ namespace AprNes
                 prevPrevPrevDotColor = prevPrevDotColor; prevPrevDotColor = prevDotColor; prevDotColor = dotColor;
                 prevPrevPrevDotPalIdx = prevPrevDotPalIdx; prevPrevDotPalIdx = prevDotPalIdx; prevDotPalIdx = dotPalIdx;
 
-                // CalculatePixel: TriCNES PPU_Dot > 0 && PPU_Dot <= 257
-                if (cx > 0 && cx <= 257)
+                // TriCNES: if (PPU_Dot > 0 && PPU_Dot <= 257) — CalculatePixel + UpdateSprite + DrawToScreen
+                if (cx > 0 && cx <= 257) // outer gate for ALL pixel operations
                 {
                     byte backdropIdx = (byte)(ppu_ram[0x3f00] & 0x3f);
                     uint compositeColor = NesColors[backdropIdx];
@@ -1227,9 +1227,9 @@ namespace AprNes
 
                     dotColor = compositeColor;
                     dotPalIdx = compositePalIdx;
-                }
+                } // end CalculatePixel inner (cx <= 257 visible+border)
 
-                // UpdateSpriteShiftRegisters (TriCNES line 3718: AFTER CalculatePixel)
+                // UpdateSpriteShiftRegisters (TriCNES line 3718: PPU_Dot <= 256)
                 if (cx <= 256)
                 {
                     for (int s = 0; s < 8; s++)
@@ -1240,7 +1240,7 @@ namespace AprNes
                         }
                         else
                         {
-                            if (ShowSprites || ShowBackGround) // TriCNES: Tier 2 gate
+                            if (ShowSprites || ShowBackGround)
                             {
                                 sprShiftL[s] <<= 1;
                                 sprShiftH[s] <<= 1;
@@ -1257,10 +1257,9 @@ namespace AprNes
                     if (AnalogEnabled) ntscScanBuf[cx - 4] = prevPrevPrevDotPalIdx;
                 }
 
-                // Analog decode after last pixel (PPU_Dot=260)
                 if (AnalogEnabled && cx == 260)
                     DecodeScanline(scanline, ntscScanBuf, ppuEmphasis);
-            }
+            } // end outer gate (cx > 0 && cx <= 257)
 
             if (scanline == 240 && cx == 1)
             {
@@ -1313,7 +1312,7 @@ namespace AprNes
                 ppu_cycles_x = cx = 0;
             }
 
-            // Scanline events (post-wrap cx)
+            // ── Events (TriCNES lines 1532-1606) ──
             if (cx <= 2)
             {
                 int L = (scanline << 9) | cx;
@@ -1324,8 +1323,11 @@ namespace AprNes
                 else if (L == L_VBL_END)
                     isVblank = false;
             }
+            // TriCNES line 1582-1584: OddFrame toggle at scanline 260 dot 340
+            if (scanline == 260 && cx == 340)
+                oddSwap = !oddSwap;
 
-            // VBL latch (TriCNES lines 1608-1616)
+            // ── VBL latch (TriCNES lines 1608-1616) ──
             ppuVSET_Latch1 = !ppuVSET;
             if (ppuVSET && !ppuVSET_Latch2)
                 isVblank = true;
@@ -1338,25 +1340,24 @@ namespace AprNes
             // Sprite overflow delayed (TriCNES line 1619)
             isSpriteOverflow_Delayed = isSpriteOverflow;
 
-            // Mapper callback BEFORE rendering (TriCNES line 1627)
+            // Mapper (TriCNES line 1627)
             MapperObj.PpuClock();
 
-            // A12_Prev capture (TriCNES line 1628)
+            // A12_Prev (TriCNES line 1628)
             ppuA12Prev = (ppuAddressBus & 0x1000) != 0;
 
-            // NTSC odd frame skip: TriCNES PPU_Dot=340, BEFORE rendering (line 1629-1643)
-            if (scanline == preRenderLine && cx == 339)
+            // ── Odd frame skip (TriCNES lines 1629-1637, AFTER mapper, BEFORE rendering) ──
+            // Uses oddSwap (toggled at SL260), NOT toggled here
+            if (oddSwap && (ShowBackGround_Instant || ShowSprites_Instant)
+                && scanline == preRenderLine && cx == 340)
             {
-                oddSwap = !oddSwap;
-                if (!oddSwap && (ShowBackGround_Instant || ShowSprites_Instant))
-                {
-                    if (mmc5Ref != null)
-                        mmc5Ref.NotifyVramRead(0x2000 | (vram_addr & 0x0FFF));
-                    scanline = 0;
-                    ppu_cycles_x = cx = 0;
-                    skippedPreRenderDot341 = true;
-                }
+                if (mmc5Ref != null)
+                    mmc5Ref.NotifyVramRead(0x2000 | (vram_addr & 0x0FFF));
+                scanline = 0;
+                ppu_cycles_x = cx = 0;
+                skippedPreRenderDot341 = true;
             }
+            // TriCNES line 1640-1642
             if (skippedPreRenderDot341 && scanline == 0 && cx == 2)
                 skippedPreRenderDot341 = false;
 
@@ -1524,7 +1525,7 @@ namespace AprNes
             if (!ShowBackGround && !ShowSprites) return;
 
             int height = Spritesize8x16 ? 15 : 7;
-            int evalCycle = 65;
+            int evalCycle = 66; // PPU_Dot based (was 65 with old cx=PPU_Dot-1)
             int foundCount = 0;
             int m = 0; // byte offset for overflow bug
 
