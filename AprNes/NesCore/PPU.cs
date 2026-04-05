@@ -682,6 +682,14 @@ namespace AprNes
                             sprShiftL[slot] = flipH ? FlipByte(tile) : tile;
                             if (slot >= sprSlotCount) sprShiftL[slot] = 0;
                         }
+                        // TriCNES line 2926: in-range check (pre-render line uses scanline 5 via & 0xFF)
+                        {
+                            int sprY = secondaryOAM[slot * 4];
+                            int h = Spritesize8x16 ? 16 : 8;
+                            int diff = (scanline & 0xFF) - sprY;
+                            if (!(diff >= 0 && diff < h))
+                                sprShiftL[slot] = 0;
+                        }
                     }
                     else if (sprPhase == 6)
                     {
@@ -703,6 +711,14 @@ namespace AprNes
                             bool flipH = (sprFetchAttr[slot] & 0x40) != 0;
                             sprShiftH[slot] = flipH ? FlipByte(tile) : tile;
                             if (slot >= sprSlotCount) sprShiftH[slot] = 0;
+                        }
+                        // TriCNES line 2961: in-range check (same as case 5)
+                        {
+                            int sprY = secondaryOAM[slot * 4];
+                            int h = Spritesize8x16 ? 16 : 8;
+                            int diff = (scanline & 0xFF) - sprY;
+                            if (!(diff >= 0 && diff < h))
+                                sprShiftH[slot] = 0;
                         }
                         evalOam2Addr++;
                     }
