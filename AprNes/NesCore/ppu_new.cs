@@ -367,8 +367,134 @@ namespace AprNes
 
             // ══════════════════════════════════════════════════════
             // Phase 5: Pipeline + commit + tile fetch + pixel + draw
+            // (TriCNES lines 1724-1807)
             // ══════════════════════════════════════════════════════
-            // TODO: Phase 5
+
+            // ── Pipeline shift (TriCNES line 1724: ALL scanlines, ALL dots, OUTSIDE any gate) ──
+            prevPrevPrevDotColor = prevPrevDotColor; prevPrevDotColor = prevDotColor; prevDotColor = dotColor;
+            prevPrevPrevDotPalIdx = prevPrevDotPalIdx; prevPrevDotPalIdx = prevDotPalIdx; prevDotPalIdx = dotPalIdx;
+
+            // ── CommitShiftRegistersAndBitPlanes — UNGATED (TriCNES line 1727) ──
+            if (commitNTFetch) { commitNTFetch = false; NTVal = renderTemp; }
+            if (commitATFetch)
+            {
+                commitATFetch = false;
+                byte atRaw = renderTemp;
+                if (extAttrEnabled && extAttrNTOffset < 960) {
+                    byte exVal = extAttrRAM[extAttrNTOffset];
+                    extAttrChrBank = (exVal & 0x3F) | (extAttrChrUpperBits << 6);
+                    ATVal = (byte)((exVal >> 6) & 3);
+                } else {
+                    ATVal = (byte)((atRaw >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
+                }
+                pendingAttrLatch = ATVal;
+            }
+            if (commitPatLowFetch) { commitPatLowFetch = false; pendingTileLow = renderTemp; }
+            if (commitPatHighFetch) { commitPatHighFetch = false; pendingTileHigh = renderTemp; CXinc(); }
+
+            // ── Tile fetch + CalculatePixel + UpdateSpriteShift (TriCNES lines 1728-1751) ──
+            if (scanline < 240 || scanline == preRenderLine)
+            {
+                // BG tile fetch (TriCNES line 1730-1735)
+                if ((cx >= 0 && cx < 257) || (cx > 320 && cx <= 336))
+                {
+                    if (ShowBackGround || ShowSprites) // Tier 2
+                    {
+                        // PPU_Render_ShiftRegistersAndBitPlanes — 8-phase tile fetch
+                        int phase = cx & 7;
+                        if (phase == 0) { ioaddr = 0x2000 | (vram_addr & 0x0FFF); }
+                        else if (phase == 1) { ppuAddressBus = ioaddr; if (mapperA12IsMmc3) NotifyMapperA12(ioaddr); renderTemp = PpuBusRead(ioaddr); commitNTFetch = true; if (extAttrEnabled) extAttrNTOffset = (ushort)(ioaddr & 0x3FF); if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ioaddr); }
+                        else if (phase == 2) { ioaddr = 0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07); }
+                        else if (phase == 3) { ppuAddressBus = ioaddr; renderTemp = PpuBusRead(ioaddr); commitATFetch = true; if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ioaddr); }
+                        else if (phase == 4) { ioaddr = (extAttrEnabled && extAttrChrSize > 0) ? (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7) : BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7); }
+                        else if (phase == 5) { ppuAddressBus = ioaddr; ppuChrFetchA12 = (ioaddr >> 12) & 1; if (mapperNeedsA12) NotifyMapperA12(ioaddr); renderTemp = PpuBusRead(ioaddr); commitPatLowFetch = true; if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ioaddr); }
+                        else if (phase == 6) { ioaddr = (extAttrEnabled && extAttrChrSize > 0) ? (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8 : BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8; }
+                        else { ppuAddressBus = ioaddr; ppuChrFetchA12 = (ioaddr >> 12) & 1; if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(ioaddr); renderTemp = PpuBusRead(ioaddr); commitPatHighFetch = true; if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ioaddr); if (scanline < 240 && cx < 257 && ppuRenderingEnabled) RenderBGTile(cx); }
+
+                        // MMC5 CHR A/B switch at first tile of each group
+                        if ((cx == 1 || cx == 321) && chrABAutoSwitch) { byte*[] src = Spritesize8x16 ? (chrBGUseASet ? chrBankPtrsA : chrBankPtrsB) : chrBankPtrsA; for (int i = 0; i < 8; i++) chrBankPtrs[i] = src[i]; }
+                    }
+                }
+
+                // CalculatePixel + UpdateSpriteShift (TriCNES lines 1745-1751)
+                if (cx > 0 && cx <= 257)
+                {
+                    if (scanline < 240) // visible scanlines only for CalculatePixel
+                    {
+                        // ── CalculatePixel (TriCNES line 3073) ──
+                        byte backdropIdx = (byte)(ppu_ram[0x3f00] & 0x3f);
+                        uint compositeColor = NesColors[backdropIdx];
+                        byte compositePalIdx = backdropIdx;
+                        int bgColor = 0, bgPalette = 0;
+
+                        if (cx <= 256 && ShowBackGround && (cx > 8 || ShowBgLeft8))
+                        {
+                            int bit = 15 - FineX;
+                            bgColor = (((renderHigh >> bit) & 1) << 1) | ((renderLow >> bit) & 1);
+                            bgPalette = (bit >= 8) ? bg_attr_p3 : bg_attr_p2;
+                            if (bgColor == 0) bgPalette = 0;
+                        }
+
+                        int sprColor = 0, sprPalette = 0, sprSlot = -1;
+                        bool sprPriority = false;
+                        if (cx <= 256 && ShowSprites && (cx > 8 || ShowSprLeft8))
+                        {
+                            for (int s = 0; s < 8; s++)
+                            {
+                                if (sprXCounter[s] == 0 || skippedPreRenderDot341)
+                                {
+                                    int px = ((sprShiftH[s] >> 7) << 1) | (sprShiftL[s] >> 7);
+                                    if (px != 0 && sprColor == 0)
+                                    { sprColor = px; sprPalette = (sprFetchAttr[s] & 3) | 4; sprPriority = ((sprFetchAttr[s] >> 5) & 1) == 0; sprSlot = s; }
+                                }
+                            }
+
+                            if (canDetectSprite0Hit && sprSlot == 0 && sprZeroInSlots && ShowBackGround && ShowSprites && bgColor != 0 && sprColor != 0)
+                            { if ((ShowSprLeft8 || cx > 8) && cx < 256) { pendingSprite0Hit = true; canDetectSprite0Hit = false; } }
+
+                            if (sprColor != 0 && ShowSprites) { if (bgColor == 0 || sprPriority) { bgColor = sprColor; bgPalette = sprPalette; } }
+                        }
+
+                        if ((ShowBackGround || ShowSprites) && cx <= 256)
+                        { int pa = (bgPalette << 2) | bgColor; if (bgColor == 0) pa = 0; compositeColor = NesColors[ppu_ram[0x3f00 + pa] & 0x3f]; compositePalIdx = (byte)(ppu_ram[0x3f00 + pa] & 0x3f); }
+                        else if (cx <= 256) { if ((vram_addr & 0x3F1F) >= 0x3F00) { int pa = vram_addr & 0x1F; if ((pa & 3) == 0) pa &= 0x0F; compositeColor = NesColors[ppu_ram[0x3f00 + pa] & 0x3f]; compositePalIdx = (byte)(ppu_ram[0x3f00 + pa] & 0x3f); } }
+
+                        dotColor = compositeColor;
+                        dotPalIdx = compositePalIdx;
+                    }
+
+                    // ── UpdateSpriteShiftRegisters (TriCNES line 3718, inside PPU_Dot>0 && <=257 block) ──
+                    if (cx <= 256)
+                    {
+                        for (int s = 0; s < 8; s++)
+                        {
+                            if (sprXCounter[s] > 0 && !skippedPreRenderDot341) sprXCounter[s]--;
+                            else { if (ShowSprites || ShowBackGround) { sprShiftL[s] <<= 1; sprShiftH[s] <<= 1; } }
+                        }
+                    }
+                }
+            }
+
+            // ── DrawToScreen (TriCNES line 1764) ──
+            if (scanline >= 0 && scanline < 240)
+            {
+                if (cx >= 4 && cx <= 259)
+                {
+                    int pos = (scanline << 8) + (cx - 4);
+                    ScreenBuf1x[pos] = prevPrevPrevDotColor;
+                    if (AnalogEnabled) ntscScanBuf[cx - 4] = prevPrevPrevDotPalIdx;
+                }
+                if (AnalogEnabled && cx == 260)
+                    DecodeScanline(scanline, ntscScanBuf, ppuEmphasis);
+            }
+
+            // ── Frame render at SL240 cx1 ──
+            if (scanline == 240 && cx == 1)
+            {
+                RenderScreen();
+                frame_count++;
+                if (AnalogEnabled) { Ntsc_SetFrameCount(frame_count); Crt_SetFrameCount(frame_count); }
+            }
 
             // ── End of dot: update ppuRenderingEnabled ──
             ppuRenderingEnabled = ShowBackGround_Instant || ShowSprites_Instant;
@@ -381,8 +507,66 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_half_step_new()
         {
-            // ── Phase 6: BG shift + commit + tile half + VBL/Spr0 pipeline ──
-            // TODO: Phase 6
+            int hsDot = ppu_cycles_x; // post-increment PPU_Dot
+
+            // ── BG shift register shift (TriCNES line 1818: PPU_UpdateShiftRegisters) ──
+            if ((scanline < 240 || scanline == preRenderLine)
+                && ((hsDot > 0 && hsDot <= 257) || (hsDot > 320 && hsDot <= 336)))
+            {
+                if (ShowBackGround || ShowSprites) // Tier 2
+                {
+                    renderLow  <<= 1;
+                    renderHigh = (ushort)((renderHigh << 1) | 1);
+                    renderAttrLow  = (ushort)((renderAttrLow << 1) | (attrLatch & 1));
+                    renderAttrHigh = (ushort)((renderAttrHigh << 1) | ((attrLatch >> 1) & 1));
+                }
+            }
+
+            // ── CommitShiftRegistersAndBitPlanes_HalfDot — UNGATED (TriCNES line 1822) ──
+            if (commitLoadShiftReg)
+            {
+                commitLoadShiftReg = false;
+                renderLow  = (ushort)((renderLow  & 0xFF00) | pendingTileLow);
+                renderHigh = (ushort)((renderHigh & 0xFF00) | pendingTileHigh);
+                attrLatch = pendingAttrLatch; // TriCNES: PPU_AttributeLatchRegister = PPU_Attribute
+            }
+
+            // ── Half-step tile fetch (TriCNES line 1829: PPU_Render_ShiftRegistersAndBitPlanes_HalfDot) ──
+            if ((scanline < 240 || scanline == preRenderLine)
+                && ((hsDot >= 0 && hsDot < 257) || (hsDot >= 320 && hsDot < 336)))
+            {
+                if (ShowBackGround || ShowSprites) // Tier 2
+                {
+                    if ((hsDot & 7) == 7)
+                        commitLoadShiftReg = true;
+                }
+            }
+
+            // ── VBL latch half-step (TriCNES lines 1833-1840) ──
+            ppuVSET = false;
+            if (pendingVblank) { pendingVblank = false; ppuVSET = true; }
+            ppuVSET_Latch2 = !ppuVSET_Latch1;
+
+            // ── OAM buffer update (TriCNES lines 1842-1860) ──
+            if ((ShowBackGround || ShowSprites) && scanline >= 0 && scanline < 240)
+            {
+                if (hsDot == 0 || hsDot > 320) ppuOamBuffer = secondaryOAM[0];
+                else if (hsDot > 0 && hsDot <= 64) ppuOamBuffer = 0xFF;
+                else if (hsDot <= 256) ppuOamBuffer = oamCopyBuffer;
+                else ppuOamBuffer = oamCopyBuffer; // 257-320
+            }
+
+            // ── Sprite0 hit pipeline (TriCNES lines 1862-1872) ──
+            isSprite0hit_Delayed = isSprite0hit;
+            if (pendingSprite0Hit2) { pendingSprite0Hit2 = false; isSprite0hit = true; }
+            if (pendingSprite0Hit) { pendingSprite0Hit = false; pendingSprite0Hit2 = true; }
+
+            // ── $2007 state machine half-step tick ──
+            Ppu2007SmTick();
+
+            // ── P4-2: Palette corruption placeholder ──
+            if (paletteCorruptFromDisable || paletteCorruptFromVAddr)
+            { paletteCorruptFromDisable = false; paletteCorruptFromVAddr = false; }
         }
     }
 }
