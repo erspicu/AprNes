@@ -192,9 +192,178 @@ namespace AprNes
                 skippedPreRenderDot341 = false;
 
             // ══════════════════════════════════════════════════════
-            // Phase 4: Eval delay + sprite eval + $2001 update
+            // Phase 4: Eval delay + sprite eval + $2001 + emphasis
+            // (TriCNES lines 1652-1722)
             // ══════════════════════════════════════════════════════
-            // TODO: Phase 4
+
+            // ── Eval delay: non-phase-3 (TriCNES lines 1653-1658) ──
+            if ((mcCpuClock & 3) != 3)
+            {
+                ShowBG_EvalDelay = ShowBackGround;
+                ShowSpr_EvalDelay = ShowSprites;
+            }
+
+            // ── Sprite evaluation (TriCNES line 1664, inside scanline gate) ──
+            if (scanline < 240 || scanline == preRenderLine)
+            {
+                // Per-dot sprite evaluation (existing AccuracyOptA code)
+                // TODO Phase 7: port PPU_Render_SpriteEvaluation from TriCNES
+                // For now, call existing sprite eval logic inline:
+                if (AccuracyOptA)
+                {
+                    bool evalScanline = (scanline >= 0 && scanline < 240) || scanline == preRenderLine;
+                    bool ro = scanline == preRenderLine;
+                    int evalDot = ppu_cycles_x; // post-increment PPU_Dot
+
+                    // Dots 0-64: clear secondary OAM (Tier 4 gate)
+                    if (evalScanline && evalDot >= 0 && evalDot <= 64 && (ShowBG_EvalDelay || ShowSpr_EvalDelay))
+                    {
+                        if (evalDot == 1) { evalOam2Addr = 0; evalOam2Full = false; evalTick = 0; evalOamOverflowed = false; }
+                        if ((evalDot & 1) != 0) { oamCopyBuffer = ro ? secondaryOAM[evalOam2Addr] : (byte)0xFF; }
+                        else if (evalDot > 0) { if (!ro) secondaryOAM[evalOam2Addr] = oamCopyBuffer; evalOam2Addr++; evalOam2Addr &= 0x1F; }
+                    }
+
+                    // Dot 65: init (outside rendering gate)
+                    if (evalScanline && evalDot == 65) { evalOam2Addr = 0; nineObjectsOnLine = false; }
+
+                    // Dots 65-256: evaluation (Tier 1 Instant gate)
+                    if (evalScanline && evalDot >= 65 && evalDot <= 256 && (ShowBackGround_Instant || ShowSprites_Instant))
+                    {
+                        if (evalDot == 65) { sprite0_eval_addr = spr_ram_add; SpriteEvalInit(); SpriteEvalTick(); }
+                        else { SpriteEvalTick(); if (evalDot == 256) SpriteEvalEnd(); }
+                    }
+                    else if (ro && evalDot == 65 && ppuRenderingEnabled) { sprite0_eval_addr = spr_ram_add; }
+
+                    // Dots 257-320: sprite fetch (Tier 4 gate, includes dummy BG fetch)
+                    if (evalDot >= 257 && evalDot <= 320)
+                    {
+                        if (ShowBG_EvalDelay || ShowSpr_EvalDelay) spr_ram_add = 0;
+                        if (evalDot == 257) evalOam2Addr = 0;
+                        if (evalDot == 262) spriteSizeLatchedForFetch = Spritesize8x16;
+
+                        int sprPhase = (evalDot - 257) & 7;
+                        int slot = (evalDot - 257) >> 3;
+                        bool sprFetchEnabled = ShowBG_EvalDelay || ShowSpr_EvalDelay;
+
+                        // Dummy BG fetch (cases 0-3)
+                        if (sprPhase <= 3)
+                        {
+                            int bgPhase = evalDot & 7;
+                            if (bgPhase == 1) ppuAddressBus = (ushort)(0x2000 | (vram_addr & 0x0FFF));
+                            else if (bgPhase == 3) ppuAddressBus = (ushort)(0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07));
+                        }
+
+                        // OAM2 reads + sprite tile fetch
+                        if (sprPhase == 0) { if (sprFetchEnabled) oamCopyBuffer = secondaryOAM[evalOam2Addr]; evalOam2Addr++; }
+                        else if (sprPhase == 1) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus); } evalOam2Addr++; }
+                        else if (sprPhase == 2) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; sprFetchAttr[slot] = oamCopyBuffer; } evalOam2Addr++; }
+                        else if (sprPhase == 3) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; sprXPos[slot] = oamCopyBuffer; } }
+                        else if (sprPhase == 4) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; ppuAddressBus = ComputeSpritePatternAddr(slot); ppuChrFetchA12 = (ppuAddressBus >> 12) & 1; } }
+                        else if (sprPhase == 5)
+                        {
+                            if (sprFetchEnabled)
+                            {
+                                oamCopyBuffer = secondaryOAM[evalOam2Addr];
+                                if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus);
+                                int addr = ppuAddressBus; byte tile = chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF];
+                                sprShiftL[slot] = (sprFetchAttr[slot] & 0x40) != 0 ? FlipByte(tile) : tile;
+                                if (slot >= sprSlotCount) sprShiftL[slot] = 0;
+                            }
+                            // TriCNES in-range check (line 2926)
+                            { int sprY = secondaryOAM[slot * 4]; int h = Spritesize8x16 ? 16 : 8; int diff = (scanline & 0xFF) - sprY; if (!(diff >= 0 && diff < h)) sprShiftL[slot] = 0; }
+                        }
+                        else if (sprPhase == 6) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; ppuAddressBus = ComputeSpritePatternAddr(slot) + 8; ppuChrFetchA12 = (ppuAddressBus >> 12) & 1; } }
+                        else // sprPhase == 7
+                        {
+                            if (sprFetchEnabled)
+                            {
+                                oamCopyBuffer = secondaryOAM[evalOam2Addr];
+                                if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(ppuAddressBus);
+                                int addr = ppuAddressBus; byte tile = chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF];
+                                sprShiftH[slot] = (sprFetchAttr[slot] & 0x40) != 0 ? FlipByte(tile) : tile;
+                                if (slot >= sprSlotCount) sprShiftH[slot] = 0;
+                            }
+                            // TriCNES in-range check (line 2961)
+                            { int sprY = secondaryOAM[slot * 4]; int h = Spritesize8x16 ? 16 : 8; int diff = (scanline & 0xFF) - sprY; if (!(diff >= 0 && diff < h)) sprShiftH[slot] = 0; }
+                            evalOam2Addr++;
+                        }
+
+                        if (mmc5Ref != null) { if (sprPhase == 1) mmc5Ref.NotifyVramRead(0x2000); else if (sprPhase == 3) mmc5Ref.NotifyVramRead(0x23C0); else if (sprPhase == 5) mmc5Ref.NotifyVramRead(SpPatternTableAddr); else if (sprPhase == 7) mmc5Ref.NotifyVramRead(SpPatternTableAddr | 8); }
+                    }
+
+                    // Dot 321 equivalent
+                    if (evalDot == 322 && scanline < 240 && (ShowBackGround_Instant || ShowSprites_Instant))
+                        oamCopyBuffer = secondaryOAM[0];
+
+                    // Dot 257: copy sprite slot count
+                    if (scanline >= 0 && scanline < 240 && evalDot == 257) { sprSlotCount = evalSpriteCount; sprZeroInSlots = evalSprite0Visible; }
+                    else if (scanline == preRenderLine && evalDot == 257) { sprSlotCount = evalSpriteCount; sprZeroInSlots = evalSprite0Visible; }
+                    if (scanline == preRenderLine && evalDot == 257 && ppuRenderingEnabled) PrecomputePreRenderSprites();
+
+                    // Dot 339: X counter init
+                    if (evalDot == 339)
+                    {
+                        for (int i = 0; i < 8; i++)
+                            sprXCounter[i] = (ShowSprites || ShowBackGround) ? sprXPos[i] : 0;
+                    }
+
+                    // Garbage NT fetch (dots 336-340)
+                    if (evalDot == 336 || evalDot == 338) { ppuAddressBus = 0x2000 | (vram_addr & 0x0FFF); PpuBusRead(ppuAddressBus); }
+                    else if (evalDot == 337 || evalDot == 339) { NTVal = ppu_ram[CIRAMAddr(ppuAddressBus)]; if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus); }
+                    else if (evalDot == 340) { ppuAddressBus = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7); ppuChrFetchA12 = (ppuAddressBus >> 12) & 1; }
+
+                    if (mmc5Ref != null && (evalDot == 337 || evalDot == 339)) mmc5Ref.NotifyVramRead(0x2000 | (vram_addr & 0x0FFF));
+
+                    // Per-cycle sprite overflow
+                    if (scanline >= 0 && scanline < 240)
+                    {
+                        if (evalDot == 1)
+                        {
+                            int scanOff = scanline << 8;
+                            int* bgp = Buffer_BG_array + scanOff;
+                            for (int* bge = bgp + 256; bgp < bge; bgp++) *bgp = 0;
+                            { uint bgColor = NesColors[ppu_ram[0x3f00] & 0x3f]; uint* sp = ScreenBuf1x + scanOff; for (uint* se = sp + 256; sp < se; sp++) *sp = bgColor; if (AnalogEnabled) { byte bgIdx = (byte)(ppu_ram[0x3f00] & 0x3f); for (int i = 0; i < 256; i++) ntscScanBuf[i] = bgIdx; } }
+                            PrecomputeOverflow();
+                        }
+                        if (spriteOverflowCycle >= 0 && evalDot == spriteOverflowCycle) isSpriteOverflow = true;
+                    }
+                }
+            }
+
+            // ── Eval delay: phase-3 (TriCNES lines 1667-1673) ──
+            if ((mcCpuClock & 3) == 3)
+            {
+                ShowBG_EvalDelay = ShowBackGround;
+                ShowSpr_EvalDelay = ShowSprites;
+            }
+
+            // ── ppuAddressBus = vram_addr when rendering disabled (TriCNES line 1674) ──
+            if (!ShowBackGround && !ShowSprites)
+            {
+                ppuAddressBus = vram_addr;
+                ppuChrFetchA12 = (vram_addr >> 12) & 1;
+            }
+
+            // ── $2001 delayed mask update (TriCNES lines 1681-1694) ──
+            if (ppu2001UpdateDelay > 0 && --ppu2001UpdateDelay == 0)
+            {
+                ShowBgLeft8    = (ppu2001PendingValue & 0x02) != 0;
+                ShowSprLeft8   = (ppu2001PendingValue & 0x04) != 0;
+                ShowBackGround = (ppu2001PendingValue & 0x08) != 0;
+                ShowSprites    = (ppu2001PendingValue & 0x10) != 0;
+                // TriCNES line 1691: re-sync Instant flags to Delayed
+                ShowBackGround_Instant = ShowBackGround;
+                ShowSprites_Instant = ShowSprites;
+            }
+
+            // ── $2001 emphasis delay (TriCNES lines 1712-1722) ──
+            if (ppu2001EmphasisDelay > 0 && --ppu2001EmphasisDelay == 0)
+            {
+                byte v = ppu2001EmphasisPending;
+                ppuEmphasis = (byte)((v >> 5) & 0x7);
+                if (Region != RegionType.NTSC)
+                    ppuEmphasis = (byte)((ppuEmphasis & 0x4) | ((ppuEmphasis & 1) << 1) | ((ppuEmphasis >> 1) & 1));
+            }
 
             // ══════════════════════════════════════════════════════
             // Phase 5: Pipeline + commit + tile fetch + pixel + draw
