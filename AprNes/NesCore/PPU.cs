@@ -2055,7 +2055,8 @@ namespace AprNes
             openbus = (byte)(vblBit | ((isSprite0hit_Delayed ? 0x40 : 0) | (isSpriteOverflow_Delayed ? 0x20 : 0)) | (openbus & 0x1f));
 
             vram_latch = false;
-            for (int i = 5; i < 8; i++) open_bus_decay_timer = 77777; // TriCNES: PPUBusDecay refresh
+            // TriCNES refreshes PPUBusDecay[5..7] (per-bit). AprNes uses single timer — don't refresh here.
+            // The high 3 bits (flags) are freshly written; low 5 bits retain existing open bus decay.
             return openbus;
         }
 
