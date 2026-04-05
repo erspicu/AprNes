@@ -1307,11 +1307,20 @@ namespace AprNes
             int cx; bool re;
             ppu_step_common(out cx, out re);
 
-            // TriCNES order: deferred → scroll → dot++ → events → VBL → mapper → A12_Prev → rendering
-            // Key: PpuClock BEFORE rendering — mapper sees previous dot's ppuAddressBus
+            // TriCNES order: deferred → scroll → dot++ → WRAP → events → VBL → mapper → A12_Prev → rendering
             ppu_cycles_x = ++cx;
 
-            // Scanline events (post-increment cx)
+            // Scanline wrap — BEFORE events/mapper (TriCNES: PPU_Dot > 340 → wrap, then events)
+            bool wrapDot = false;
+            if (cx == 341)
+            {
+                if (++scanline == totalScanlines)
+                { scanline = 0; if (ShowBackGround_Instant || ShowSprites_Instant) ProcessOamCorruption(); }
+                ppu_cycles_x = cx = 0;
+                wrapDot = true;
+            }
+
+            // Scanline events (post-wrap cx)
             if (cx <= 2)
             {
                 int L = (scanline << 9) | cx;
@@ -1343,8 +1352,9 @@ namespace AprNes
             ppuA12Prev = (ppuAddressBus & 0x1000) != 0;
 
             // Rendering AFTER mapper callback (TriCNES lines 1644+)
-            // cx is post-increment but rendering still uses pre-increment value internally
-            ppu_step_rendering(cx - 1, re, preRenderLine);
+            // Skip rendering on wrap dot (cx=0 after wrap → cx-1=-1 is invalid)
+            if (!wrapDot)
+                ppu_step_rendering(cx - 1, re, preRenderLine);
 
             // P4-3: OAMBuffer in ppu_half_step only (TriCNES _EmulateHalfPPU)
 
@@ -1366,12 +1376,7 @@ namespace AprNes
             if (skippedPreRenderDot341 && scanline == 0 && cx == 2)
                 skippedPreRenderDot341 = false;
 
-            if (cx == 341)
-            {
-                if (++scanline == totalScanlines)
-                { scanline = 0; if (ShowBackGround_Instant || ShowSprites_Instant) ProcessOamCorruption(); }
-                ppu_cycles_x = 0;
-            }
+            // Scanline wrap moved to before events (TriCNES order)
         }
 
         #endregion
