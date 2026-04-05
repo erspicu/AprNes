@@ -1351,7 +1351,7 @@ namespace AprNes
             // cx is post-increment but rendering still uses pre-increment value internally
             ppu_step_rendering(cx - 1, re, preRenderLine);
 
-            // P4-3: OAMBuffer moved to ppu_half_step (TriCNES _EmulateHalfPPU lines 1842-1860)
+            // P4-3: OAMBuffer in ppu_half_step only (TriCNES _EmulateHalfPPU)
 
             // NTSC odd frame dot skip (pre-render line, dot 339)
             if (scanline == preRenderLine && cx == 339)
@@ -2164,8 +2164,6 @@ namespace AprNes
             for (int i = 0; i < 7; i++)
                 MasterClockTick();
 
-            // P4-3: return cached ppuOamBuffer during rendering (TriCNES ReadOAM line 9264-9271)
-            // TriCNES: PPU_Mask_ShowBackground || PPU_Mask_ShowSprites (Tier 2 delayed)
             byte val;
             bool renderingOn = ShowBackGround || ShowSprites;
             if (scanline >= 0 && scanline < 240 && renderingOn)
