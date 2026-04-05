@@ -97,7 +97,103 @@ namespace AprNes
             }
 
             // ── $2007 state machine (TriCNES lines 1322-1496) ──
-            Ppu2007SmTick();
+            // Single-tick per PPU dot (TriCNES model — NOT double-tick)
+            if (ppu2007SM < 9)
+            {
+                if (ppu2007SM == 1)
+                {
+                    if (ppu2007SM_isRead && !ppu2007SM_bufferLate)
+                    {
+                        int a = ppu2007SM_addr;
+                        ppuAddressBus = a;
+                        ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a & 0x3FFF);
+                    }
+                }
+                else if (ppu2007SM == 3)
+                {
+                    if (ppu2007SM_normalWriteBehavior)
+                    {
+                        ppu2007SM_normalWriteBehavior = false;
+                        if (!ppu2007SM_isRead || !ppu2007SM_readDelayed)
+                        {
+                            ppuAddressBus = vram_addr;
+                            PpuBusWrite(ppuAddressBus, ppu2007SM_writeValue);
+                        }
+                    }
+                    else if (!ppu2007SM_isRead && ppu2007SM_performMysteryWrite)
+                    {
+                        if (ppu2007SM_mysteryAddr >= 0x3F00)
+                        {
+                            PpuBusWrite((ushort)(vram_addr & 0x2FFF), (byte)ppu2007SM_mysteryAddr);
+                            ppuAddressBus = vram_addr;
+                        }
+                        else
+                        {
+                            PpuBusWrite(ppu2007SM_mysteryAddr, (byte)ppu2007SM_mysteryAddr);
+                            PpuBusWrite((ushort)vram_addr, (byte)vram_addr);
+                            ppuAddressBus = vram_addr;
+                        }
+                    }
+                }
+                else if (ppu2007SM == 4)
+                {
+                    if (ppu2007SM_isRead && ppu2007SM_bufferLate)
+                    {
+                        int a = vram_addr;
+                        ppuAddressBus = a;
+                        ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a & 0x3FFF);
+                    }
+                    if (ppu2007SM_updateVramAddrEarly)
+                    {
+                        ppu2007SM_updateVramAddrEarly = false;
+                        vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x3FFF);
+                        ppuAddressBus = vram_addr;
+                        if (ppu2007SM_isRead)
+                        {
+                            int a = vram_addr;
+                            ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a & 0x3FFF);
+                        }
+                    }
+                    // vram_addr increment (TriCNES lines 1440-1451)
+                    if ((ShowBackGround || ShowSprites) && (scanline < 240 || scanline == preRenderLine))
+                    {
+                        CXinc(); Yinc(); // rendering: both X and Y increment
+                    }
+                    else
+                    {
+                        vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x3FFF);
+                    }
+                    ppuAddressBus = vram_addr;
+                    if (mapperNeedsA12) NotifyMapperA12(vram_addr);
+                    // mystery write after increment (TriCNES lines 1457-1474)
+                    if (!ppu2007SM_isRead || !ppu2007SM_readDelayed)
+                    {
+                        if (ppu2007SM_performMysteryWrite)
+                        {
+                            if ((mcCpuClock & 3) != 0)
+                            {
+                                int a = ppuAddressBus;
+                                if ((a & 0x3FFF) >= 0x3F00)
+                                    PpuBusWrite((ushort)(a & 0x2FFF), ppu2007SM_writeValue);
+                                else
+                                    PpuBusWrite((ushort)a, ppu2007SM_writeValue);
+                            }
+                        }
+                    }
+                    ppu2007SM_isRead = ppu2007SM_readDelayed;
+                    ppu2007SM_performMysteryWrite = false;
+                }
+                ppu2007SM++;
+            }
+            if (ppu2007SM == 8 && ppu2007SM_interruptedReadToWrite)
+            {
+                if ((mcCpuClock & 3) != 0)
+                    PpuBusWrite((ushort)ppuAddressBus, ppu2007SM_writeValue);
+                ppu2007SM_interruptedReadToWrite = false;
+                vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x3FFF);
+                ppuAddressBus = vram_addr;
+                if (mapperNeedsA12) NotifyMapperA12(vram_addr);
+            }
 
             // Open bus decay (AprNes-specific, runs every dot)
             if (--open_bus_decay_timer == 0) { open_bus_decay_timer = 77777; openbus = 0; }
