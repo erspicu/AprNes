@@ -486,6 +486,7 @@ namespace AprNes
         static ushort renderAttrLow = 0, renderAttrHigh = 0;
         // Attribute latch: 2-bit value from which bits are shifted in (TriCNES: PPU_AttributeLatchRegister)
         static byte attrLatch = 0;
+        static byte pendingAttrLatch = 0; // TriCNES: PPU_Attribute → committed to attrLatch at load time
 
         // Deferred shift register reload (TriCNES: PPU_Commit_LoadShiftRegisters)
         // Flag set at HALF step phase 7 (not full step), committed at NEXT half step.
@@ -558,8 +559,9 @@ namespace AprNes
                         ATVal = (byte)((ppu_ram[CIRAMAddr(ioaddr)] >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
                     }
                     bg_attr_p3 = bg_attr_p2; bg_attr_p2 = bg_attr_p1; bg_attr_p1 = ATVal;
-                    // Update attribute latch at phase 3 (TriCNES: PPU_AttributeLatchRegister = PPU_Attribute)
-                    attrLatch = ATVal;
+                    // Store pending attribute (TriCNES: PPU_Attribute updated at commit,
+                    // attrLatch updated at LoadShiftRegisters in half step)
+                    pendingAttrLatch = ATVal;
                     if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ioaddr);
                 } else if (phase == 4) {
                     if (extAttrEnabled && extAttrChrSize > 0)
@@ -875,6 +877,7 @@ namespace AprNes
                 commitLoadShiftReg = false;
                 renderLow  = (ushort)((renderLow  & 0xFF00) | pendingTileLow);
                 renderHigh = (ushort)((renderHigh & 0xFF00) | pendingTileHigh);
+                attrLatch = pendingAttrLatch; // TriCNES: PPU_AttributeLatchRegister = PPU_Attribute (line 3750)
             }
 
             // ── Half-step tile fetch (TriCNES: PPU_Render_ShiftRegistersAndBitPlanes_HalfDot, line 3604) ──
