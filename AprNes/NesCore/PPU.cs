@@ -866,12 +866,12 @@ namespace AprNes
             // $2007 state machine half-step tick
             Ppu2007SmTick();
 
-            int cx = ppu_cycles_x - 1; // cx is the dot we just completed in ppu_step (already incremented)
+            int hsDot = ppu_cycles_x; // post-increment, matches TriCNES PPU_Dot in _EmulateHalfPPU
 
             // ── BG shift registers: shift left 1 bit each half-step (TriCNES: PPU_UpdateShiftRegisters) ──
-            // Visible dots (0-256) + prefetch (320-335) on visible/pre-render scanlines
+            // TriCNES line 1814: (PPU_Dot > 0 && PPU_Dot <= 257) || (PPU_Dot > 320 && PPU_Dot <= 336)
             if ((scanline < 240 || scanline == preRenderLine)
-                && ((cx >= 0 && cx <= 256) || (cx >= 320 && cx < 336)))
+                && ((hsDot > 0 && hsDot <= 257) || (hsDot > 320 && hsDot <= 336)))
             {
                 if (ShowBackGround || ShowSprites) // TriCNES: Tier 2 gate
                 {
