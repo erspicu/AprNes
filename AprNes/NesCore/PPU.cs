@@ -2158,6 +2158,9 @@ namespace AprNes
             }
             else
             {
+                // TriCNES line 9600-9602: attribute byte (offset 2) masked on write
+                if ((spr_ram_add & 3) == 2)
+                    value &= 0xE3; // bits 2-4 don't exist in hardware
                 spr_ram[spr_ram_add++] = value;
             }
         }
@@ -2180,8 +2183,6 @@ namespace AprNes
                 val = spr_ram[spr_ram_add];
                 if ((spr_ram_add & 3) == 2) val &= 0xE3;
             }
-                System.IO.File.AppendAllText("temp/aprnes_r2004.txt",
-                    $"cyc={cpuCycleCount} sl={scanline} dot={ppu_cycles_x} val=0x{val:X2} latch=0x{oamCopyBuffer:X2} ppuClk={mcPpuClock}\n");
             open_bus_decay_timer = 77777;
             return openbus = val;
         }
