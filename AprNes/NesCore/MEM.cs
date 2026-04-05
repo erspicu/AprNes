@@ -138,46 +138,80 @@ namespace AprNes
         // Used for $4016/$4017 masking during OAM DMA: only mask when bus is driven.
         static bool dataPinsNotFloating = false;
 
-        // DMA bus read — TriCNES Fetch() port with dataPinsAreNotFloating tracking
-        // + bus conflict overlay (TriCNES Fetch line 9058):
-        //   Gate: addressBus in $4000-$401F (APU chip selected by CPU bus latch)
-        //   Register: addr & 0x1F (actual fetch address determines which register)
+        // DMA bus read — TriCNES Fetch() exact port
+        // Main path: ROM/RAM/PPU through handlers; $4000-$401F → open bus (MapperFetch)
+        // Bus conflict: addressBus gates APU chip; addr & 0x1F selects register
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte DmaFetch(ushort addr)
         {
             dataPinsNotFloating = false;
+            byte val;
 
-            // TriCNES: $4016/$4017 during OAM DMA — skip IO_read to avoid
-            // shift side effect from main path. Bus conflict overlay handles it.
-            if (spriteDmaTransfer && (addr == 0x4016 || addr == 0x4017))
+            // ── Main read path (TriCNES Fetch) ──
+            if (addr >= 0x8000)
             {
-                if (addressBus >= 0x4000 && addressBus <= 0x401F)
-                {
-                    if (addr == 0x4016) P1_ShiftCounter = 2;
-                    else                P2_ShiftCounter = 2;
-                    controllerStrobed = false;
-                }
-                return cpubus;
+                val = mem_read_fun[addr](addr);
+                dataPinsNotFloating = true;
+            }
+            else if (addr < 0x2000)
+            {
+                val = NES_MEM[addr & 0x7FF];
+                dataPinsNotFloating = true;
+            }
+            else if (addr < 0x4000)
+            {
+                val = mem_read_fun[addr](addr); // PPU $2000-$3FFF
+                dataPinsNotFloating = true;
+            }
+            else if (addr >= 0x4020)
+            {
+                val = mem_read_fun[addr](addr); // Mapper $4020+
+            }
+            else
+            {
+                // $4000-$401F: open bus (TriCNES MapperFetch → no APU side effects)
+                val = cpubus;
             }
 
-            byte val = mem_read_fun[addr](addr);
-
-            // TriCNES: reading from RAM or ROM drives the data bus
-            if (addr < 0x2000 || addr >= 0x8000)
-                dataPinsNotFloating = true;
-            else if (addr >= 0x2000 && addr < 0x4000)
-                dataPinsNotFloating = true;
-
-            // Bus conflict overlay: gate on addressBus, register on addr & 0x1F
-            // This catches DMA GET reads from ROM where (addr & 0x1F) == 0x16/0x17
+            // ── Bus conflict (TriCNES Fetch line 9058) ──
             if (addressBus >= 0x4000 && addressBus <= 0x401F)
             {
                 byte reg = (byte)(addr & 0x1F);
-                if (reg == 0x16)      { P1_ShiftCounter = 2; controllerStrobed = false; }
-                else if (reg == 0x17) { P2_ShiftCounter = 2; controllerStrobed = false; }
+                if (reg == 0x15)
+                {
+                    byte status = (byte)(val & 0x20);
+                    if (statusdmcint)   status |= 0x80;
+                    if (statusframeint) status |= 0x40;
+                    if (dmcsamplesleft > 0 && dmcDelayedEnable) status |= 0x10;
+                    if (lengthctr[3] > 0) status |= 0x08;
+                    if (lengthctr[2] > 0) status |= 0x04;
+                    if (lengthctr[1] > 0) status |= 0x02;
+                    if (lengthctr[0] > 0) status |= 0x01;
+                    clearingFrameInterrupt = true;
+                    cpubus = val;
+                    return status;
+                }
+                else if (reg == 0x16 || reg == 0x17)
+                {
+                    byte ctrlData;
+                    if (reg == 0x16)
+                    {
+                        ctrlData = (byte)(((P1_ShiftRegister & 0x80) != 0 ? 1 : 0) | (val & 0xE0));
+                        P1_ShiftCounter = 2;
+                    }
+                    else
+                    {
+                        ctrlData = (byte)(((P2_ShiftRegister & 0x80) != 0 ? 1 : 0) | (val & 0xE0));
+                        P2_ShiftCounter = 2;
+                    }
+                    controllerStrobed = false;
+                    if (spriteDmaTransfer && dataPinsNotFloating)
+                        { cpubus = val; return val; }
+                    val = ctrlData;
+                }
             }
 
-            if (addr != 0x4015) cpubus = val;
+            cpubus = val;
             return val;
         }
 
