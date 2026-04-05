@@ -455,6 +455,7 @@ namespace AprNes
 
                             if (canDetectSprite0Hit && sprSlot == 0 && sprZeroInSlots && ShowBackGround && ShowSprites && bgColor != 0 && sprColor != 0)
                             { if ((ShowSprLeft8 || cx > 8) && cx < 256) { pendingSprite0Hit = true; canDetectSprite0Hit = false; } }
+                            // DEBUG removed
 
                             // DEBUG removed
 
