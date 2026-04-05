@@ -625,7 +625,10 @@ namespace AprNes
                     int sprPhase = (spriteDot - 257) & 7;
                     int slot = (spriteDot - 257) >> 3;
 
-                    // Cases 0-3: dummy BG fetch (sets ppuAddressBus to NT/AT addresses)
+                    // Cases 0-3: dummy BG fetch (TriCNES calls PPU_Render_ShiftRegistersAndBitPlanes)
+                    // Sets ppuAddressBus for A12 detection. Commit flags NOT set here because
+                    // TriCNES's single shared PPU_RenderTemp is overwritten by each phase;
+                    // in AprNes the commit chain from regular fetch would be corrupted.
                     if (sprPhase <= 3)
                     {
                         int bgPhase = spriteDot & 7;
@@ -1016,7 +1019,7 @@ namespace AprNes
             if (commitATFetch)
             {
                 commitATFetch = false;
-                // TriCNES: decode attribute from PPU_RenderTemp using current vram_addr
+                // TriCNES: PPU_Attribute = decoded from PPU_RenderTemp
                 byte atRaw = renderTemp;
                 if (extAttrEnabled && extAttrNTOffset < 960) {
                     byte exVal = extAttrRAM[extAttrNTOffset];
@@ -1025,7 +1028,8 @@ namespace AprNes
                 } else {
                     ATVal = (byte)((atRaw >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
                 }
-                bg_attr_p3 = bg_attr_p2; bg_attr_p2 = bg_attr_p1; bg_attr_p1 = ATVal;
+                // NOTE: bg_attr_p3/p2/p1 pipeline shifted at FETCH time (phase 3), not commit time.
+                // This is AprNes-specific — keeps palette cache correct even with dummy fetch commits.
                 pendingAttrLatch = ATVal;
             }
             if (commitPatLowFetch) { commitPatLowFetch = false; pendingTileLow = renderTemp; }
