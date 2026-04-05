@@ -488,12 +488,9 @@ namespace AprNes
         static byte attrLatch = 0;
 
         // Deferred shift register reload (TriCNES: PPU_Commit_LoadShiftRegisters)
-        // Phase 7 sets staged flag → same-dot half step promotes to ready → NEXT half step loads.
-        // This 1-half-step delay matches TriCNES: PPU_Commit_LoadShiftRegisters set at HalfDot phase 7,
-        // committed at the NEXT HalfDot's CommitShiftRegistersAndBitPlanes_HalfDot.
+        // Flag set at HALF step phase 7 (not full step), committed at NEXT half step.
         static byte pendingTileLow = 0, pendingTileHigh = 0;
-        static bool commitLoadShiftRegStaged = false;  // set at full step phase 7
-        static bool commitLoadShiftReg = false;         // promoted at half step, committed next half step
+        static bool commitLoadShiftReg = false;
 
         // ---- Attribute 3-stage pipeline ----
         // Phase-3 shifts ATVal into p1; phase-7 render reads p3 (2 groups later).
@@ -595,11 +592,10 @@ namespace AprNes
                     // Palette cache update
                     if (scanline < 240 && cx < 257 && ppuRenderingEnabled)
                         RenderBGTile(cx);
-                    // Deferred reload: store tile data, commit in next half-step
-                    // (TriCNES: PPU_Commit_LoadShiftRegisters model)
+                    // Store tile data for half-step reload
+                    // commitLoadShiftReg is set in ppu_half_step at phase 7 (TriCNES model)
                     pendingTileLow = lowTile;
                     pendingTileHigh = highTile;
-                    commitLoadShiftRegStaged = true;
                     // CXinc deferred to next dot's commit (TriCNES: PPU_Commit_PatternHighFetch)
                     commitCXinc = true;
                 }
@@ -874,15 +870,25 @@ namespace AprNes
             }
 
             // ── Deferred shift register reload (TriCNES: PPU_Render_CommitShiftRegistersAndBitPlanes_HalfDot) ──
-            // Commit ready flag (from previous half step's promotion)
             if (commitLoadShiftReg)
             {
                 commitLoadShiftReg = false;
                 renderLow  = (ushort)((renderLow  & 0xFF00) | pendingTileLow);
                 renderHigh = (ushort)((renderHigh & 0xFF00) | pendingTileHigh);
             }
-            // Promote staged → ready (TriCNES: set at HalfDot phase 7, committed NEXT HalfDot)
-            if (commitLoadShiftRegStaged) { commitLoadShiftRegStaged = false; commitLoadShiftReg = true; }
+
+            // ── Half-step tile fetch (TriCNES: PPU_Render_ShiftRegistersAndBitPlanes_HalfDot, line 3604) ──
+            // Sets commitLoadShiftReg at phase 7, committed at NEXT half step.
+            // Range: PPU_Dot >= 0 && PPU_Dot < 257 || PPU_Dot >= 320 && PPU_Dot < 336
+            if ((scanline < 240 || scanline == preRenderLine)
+                && ((hsDot >= 0 && hsDot < 257) || (hsDot >= 320 && hsDot < 336)))
+            {
+                if (ShowBackGround || ShowSprites)
+                {
+                    if ((hsDot & 7) == 7)
+                        commitLoadShiftReg = true;
+                }
+            }
 
             // P4-2: Palette corruption effect — only on alignment 2 (TriCNES: CorruptPalettes)
             // At alignment 0 (AprNes fixed), this never fires. Structural placeholder.
@@ -1001,12 +1007,12 @@ namespace AprNes
                 ppuChrFetchA12 = (vram_addr >> 12) & 1;
             }
 
+            // Deferred commit: CXinc from previous phase 7 (TriCNES: PPU_Commit_PatternHighFetch)
+            // TriCNES line 1727: CommitShiftRegistersAndBitPlanes runs OUTSIDE scanline gate
+            if (commitCXinc) { commitCXinc = false; CXinc(); }
+
             if (scanline < 240 || scanline == PRE_RENDER_LINE) // ★ REGION
             {
-                // Deferred commit: CXinc from previous phase 7 (TriCNES: PPU_Commit_PatternHighFetch)
-                // Fires unconditionally — flag was set while rendering was enabled.
-                if (commitCXinc) { commitCXinc = false; CXinc(); }
-
                 if (ppuRenderingEnabled)
                     ppu_rendering_tick(cx, PRE_RENDER_LINE); // ★ REGION
 
@@ -1142,15 +1148,15 @@ namespace AprNes
 
             }
 
+            // 3-dot pipeline shift (TriCNES line 1724: runs EVERY dot, ALL scanlines — OUTSIDE any gate)
+            prevPrevPrevDotColor = prevPrevDotColor; prevPrevDotColor = prevDotColor; prevDotColor = dotColor;
+            prevPrevPrevDotPalIdx = prevPrevDotPalIdx; prevPrevDotPalIdx = prevDotPalIdx; prevDotPalIdx = dotPalIdx;
+
             // ── TriCNES CalculatePixel + UpdateSpriteShiftRegisters + DrawToScreen ──
             // Runs every dot on visible scanlines. BG/sprite pixels read PRE-shift/PRE-decrement,
             // then sprite counters decremented and shift registers shifted AFTER (TriCNES order).
             if (scanline >= 0 && scanline < 240)
             {
-                // 3-dot pipeline shift (TriCNES line 1724: runs every dot)
-                prevPrevPrevDotColor = prevPrevDotColor; prevPrevDotColor = prevDotColor; prevDotColor = dotColor;
-                prevPrevPrevDotPalIdx = prevPrevDotPalIdx; prevPrevDotPalIdx = prevDotPalIdx; prevDotPalIdx = dotPalIdx;
-
                 // TriCNES: if (PPU_Dot > 0 && PPU_Dot <= 257) — CalculatePixel + UpdateSprite + DrawToScreen
                 if (cx > 0 && cx <= 257) // outer gate for ALL pixel operations
                 {
