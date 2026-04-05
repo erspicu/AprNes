@@ -618,6 +618,8 @@ namespace AprNes
             // ── Sprite fetch: driven by ppu_cycles_x (= PPU_Dot, post-increment) ──
             // Independent from tile fetch if-else chain. Allows sprite fetch case 0
             // to run on the SAME physical dot as Yinc (TriCNES: both at D=256→257).
+            // TriCNES: gated by (ShowBackground_Delayed || ShowSprites_Delayed)
+            if (ppuRenderingEnabled)
             {
                 int spriteDot = ppu_cycles_x; // = PPU_Dot (post-increment)
                 if (spriteDot >= 257 && spriteDot <= 320)
@@ -712,7 +714,7 @@ namespace AprNes
                         else if (sprPhase == 7) mmc5Ref.NotifyVramRead(SpPatternTableAddr | 8);
                     }
                 }
-            }
+            } // end ppuRenderingEnabled sprite fetch gate
 
             // Dot 321 equivalent (ppu_cycles_x = 322)
             if (ppu_cycles_x == 322 && scanline < 240 && (ShowBackGround_Instant || ShowSprites_Instant))
