@@ -488,8 +488,17 @@ namespace AprNes
         static byte attrLatch = 0;
         static byte pendingAttrLatch = 0; // TriCNES: PPU_Attribute → committed to attrLatch at load time
 
+        // TriCNES commit chain (PPU_RenderTemp + commit flags)
+        // Full step: tile fetch stores to renderTemp, sets commit flags
+        // NEXT full step: CommitShiftRegistersAndBitPlanes processes flags (UNGATED)
+        // Half step: CommitShiftRegistersAndBitPlanes_HalfDot loads shift registers
+        static byte renderTemp = 0;             // TriCNES: PPU_RenderTemp
+        static bool commitNTFetch = false;       // TriCNES: PPU_Commit_NametableFetch
+        static bool commitATFetch = false;       // TriCNES: PPU_Commit_AttributeFetch
+        static bool commitPatLowFetch = false;   // TriCNES: PPU_Commit_PatternLowFetch
+        static bool commitPatHighFetch = false;  // TriCNES: PPU_Commit_PatternHighFetch
+
         // Deferred shift register reload (TriCNES: PPU_Commit_LoadShiftRegisters)
-        // Flag set at HALF step phase 7 (not full step), committed at NEXT half step.
         static byte pendingTileLow = 0, pendingTileHigh = 0;
         static bool commitLoadShiftReg = false;
 
@@ -533,35 +542,25 @@ namespace AprNes
                     byte*[] src = Spritesize8x16 ? (chrBGUseASet ? chrBankPtrsA : chrBankPtrsB) : chrBankPtrsA;
                     for (int i = 0; i < 8; i++) chrBankPtrs[i] = src[i];
                 }
+                // TriCNES tile fetch: PPU_Render_ShiftRegistersAndBitPlanes (line 3555)
+                // Each odd phase fetches via FetchPPU, stores to PPU_RenderTemp, sets commit flag.
+                // Commit processed at NEXT dot's CommitShiftRegistersAndBitPlanes (UNGATED).
                 int phase = cx & 7;
                 if (phase == 0) {
                     ioaddr = 0x2000 | (vram_addr & 0x0FFF);
                 } else if (phase == 1) {
-                    ppuAddressBus = ioaddr;  // TriCNES: PPU_AddressBus set at phase 1 (NT fetch)
-                    if (mapperA12IsMmc3) NotifyMapperA12(ioaddr); // NT addr A12=0 — at data phase (TriCNES model)
-                    if (ntChrOverrideEnabled)
-                        NTVal = ntBankPtrs[(ioaddr >> 10) & 3][ioaddr & 0x3FF];
-                    else
-                        NTVal = ppu_ram[CIRAMAddr(ioaddr)];
+                    ppuAddressBus = ioaddr;
+                    if (mapperA12IsMmc3) NotifyMapperA12(ioaddr);
+                    renderTemp = PpuBusRead(ioaddr); // TriCNES: PPU_RenderTemp = FetchPPU(addr)
+                    commitNTFetch = true;
                     if (extAttrEnabled) extAttrNTOffset = (ushort)(ioaddr & 0x3FF);
                     if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ioaddr);
                 } else if (phase == 2) {
                     ioaddr = 0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07);
                 } else if (phase == 3) {
-                    ppuAddressBus = ioaddr;  // TriCNES: PPU_AddressBus set at phase 3 (AT fetch)
-                    if (extAttrEnabled && extAttrNTOffset < 960) {
-                        byte exVal = extAttrRAM[extAttrNTOffset];
-                        extAttrChrBank = (exVal & 0x3F) | (extAttrChrUpperBits << 6);
-                        ATVal = (byte)((exVal >> 6) & 3);
-                    } else if (ntChrOverrideEnabled) {
-                        ATVal = (byte)((ntBankPtrs[(ioaddr >> 10) & 3][ioaddr & 0x3FF] >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
-                    } else {
-                        ATVal = (byte)((ppu_ram[CIRAMAddr(ioaddr)] >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
-                    }
-                    bg_attr_p3 = bg_attr_p2; bg_attr_p2 = bg_attr_p1; bg_attr_p1 = ATVal;
-                    // Store pending attribute (TriCNES: PPU_Attribute updated at commit,
-                    // attrLatch updated at LoadShiftRegisters in half step)
-                    pendingAttrLatch = ATVal;
+                    ppuAddressBus = ioaddr;
+                    renderTemp = PpuBusRead(ioaddr); // TriCNES: PPU_RenderTemp = FetchPPU(addr)
+                    commitATFetch = true;
                     if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ioaddr);
                 } else if (phase == 4) {
                     if (extAttrEnabled && extAttrChrSize > 0)
@@ -569,37 +568,27 @@ namespace AprNes
                     else
                         ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
                 } else if (phase == 5) {
-                    ppuAddressBus = ioaddr;  // TriCNES: PPU_AddressBus set at phase 5 (CHR low fetch)
-                    ppuChrFetchA12 = (ioaddr >> 12) & 1;  // CHR-only A12 for MMC3 M2 filter
-                    if (mapperNeedsA12) NotifyMapperA12(ioaddr);  // CHR low — at data phase (TriCNES model)
-                    if (extAttrEnabled && extAttrChrSize > 0)
-                        lowTile = extAttrCHR[ioaddr % extAttrChrSize];
-                    else
-                        lowTile = chrBankPtrs[(ioaddr >> 10) & 7][ioaddr & 0x3FF];
+                    ppuAddressBus = ioaddr;
+                    ppuChrFetchA12 = (ioaddr >> 12) & 1;
+                    if (mapperNeedsA12) NotifyMapperA12(ioaddr);
+                    renderTemp = PpuBusRead(ioaddr); // TriCNES: PPU_RenderTemp = FetchPPU(addr)
+                    commitPatLowFetch = true;
                     if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ioaddr);
                 } else if (phase == 6) {
                     if (extAttrEnabled && extAttrChrSize > 0)
                         ioaddr = (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
                     else
                         ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
-                } else {
-                    ppuAddressBus = ioaddr;  // TriCNES: PPU_AddressBus set at phase 7 (CHR high fetch)
-                    ppuChrFetchA12 = (ioaddr >> 12) & 1;  // CHR-only A12 for MMC3 M2 filter
-                    if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(ioaddr);  // MMC2/MMC4: CHR high at data phase
-                    if (extAttrEnabled && extAttrChrSize > 0)
-                        highTile = extAttrCHR[ioaddr % extAttrChrSize];
-                    else
-                        highTile = chrBankPtrs[(ioaddr >> 10) & 7][ioaddr & 0x3FF];
+                } else { // phase == 7
+                    ppuAddressBus = ioaddr;
+                    ppuChrFetchA12 = (ioaddr >> 12) & 1;
+                    if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(ioaddr);
+                    renderTemp = PpuBusRead(ioaddr); // TriCNES: PPU_RenderTemp = FetchPPU(addr)
+                    commitPatHighFetch = true;
                     if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ioaddr);
-                    // Palette cache update
+                    // Palette cache update (AprNes-specific optimization)
                     if (scanline < 240 && cx < 257 && ppuRenderingEnabled)
                         RenderBGTile(cx);
-                    // Store tile data for half-step reload
-                    // commitLoadShiftReg is set in ppu_half_step at phase 7 (TriCNES model)
-                    pendingTileLow = lowTile;
-                    pendingTileHigh = highTile;
-                    // CXinc deferred to next dot's commit (TriCNES: PPU_Commit_PatternHighFetch)
-                    commitCXinc = true;
                 }
             }
             else if (cx == 257) // TriCNES D=256 → Yinc
@@ -617,8 +606,7 @@ namespace AprNes
             // ── Sprite fetch: driven by ppu_cycles_x (= PPU_Dot, post-increment) ──
             // Independent from tile fetch if-else chain. Allows sprite fetch case 0
             // to run on the SAME physical dot as Yinc (TriCNES: both at D=256→257).
-            // TriCNES: gated by (ShowBackground_Delayed || ShowSprites_Delayed)
-            if (ppuRenderingEnabled)
+            // TriCNES: sprite fetch gated by Tier 4 eval-delayed flags (lines 2860-2970)
             {
                 int spriteDot = ppu_cycles_x; // = PPU_Dot (post-increment)
                 if (spriteDot >= 257 && spriteDot <= 320)
@@ -648,59 +636,71 @@ namespace AprNes
                     }
 
                     // OAM2 reads + sprite tile fetch
+                    // TriCNES: each case gated by Tier 4 (ShowBackground_Delayed || ShowSprites_Delayed)
+                    // OAM2Address increments are OUTSIDE the gate (always run)
+                    bool sprFetchEnabled = ShowBG_EvalDelay || ShowSpr_EvalDelay;
                     if (sprPhase == 0)
                     {
-                        oamCopyBuffer = secondaryOAM[evalOam2Addr];
+                        if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; }
                         evalOam2Addr++;
                     }
                     else if (sprPhase == 1)
                     {
-                        oamCopyBuffer = secondaryOAM[evalOam2Addr];
-                        if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus);
+                        if (sprFetchEnabled)
+                        {
+                            oamCopyBuffer = secondaryOAM[evalOam2Addr];
+                            if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus);
+                        }
                         evalOam2Addr++;
                     }
                     else if (sprPhase == 2)
                     {
-                        oamCopyBuffer = secondaryOAM[evalOam2Addr];
-                        sprFetchAttr[slot] = oamCopyBuffer;
+                        if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; sprFetchAttr[slot] = oamCopyBuffer; }
                         evalOam2Addr++;
                     }
                     else if (sprPhase == 3)
                     {
-                        oamCopyBuffer = secondaryOAM[evalOam2Addr];
-                        sprXPos[slot] = oamCopyBuffer;
+                        if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; sprXPos[slot] = oamCopyBuffer; }
+                        // OAM2Address NOT incremented until case 7 (TriCNES)
                     }
                     else if (sprPhase == 4)
                     {
-                        oamCopyBuffer = secondaryOAM[evalOam2Addr];
-                        ppuAddressBus = ComputeSpritePatternAddr(slot);
-                        ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
+                        if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; ppuAddressBus = ComputeSpritePatternAddr(slot); ppuChrFetchA12 = (ppuAddressBus >> 12) & 1; }
                     }
                     else if (sprPhase == 5)
                     {
-                        oamCopyBuffer = secondaryOAM[evalOam2Addr];
-                        if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus);
-                        int addr = ppuAddressBus;
-                        byte tile = chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF];
-                        bool flipH = (sprFetchAttr[slot] & 0x40) != 0;
-                        sprShiftL[slot] = flipH ? FlipByte(tile) : tile;
-                        if (slot >= sprSlotCount) sprShiftL[slot] = 0;
+                        if (sprFetchEnabled)
+                        {
+                            oamCopyBuffer = secondaryOAM[evalOam2Addr];
+                            if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus);
+                            int addr = ppuAddressBus;
+                            byte tile = chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF];
+                            bool flipH = (sprFetchAttr[slot] & 0x40) != 0;
+                            sprShiftL[slot] = flipH ? FlipByte(tile) : tile;
+                            if (slot >= sprSlotCount) sprShiftL[slot] = 0;
+                        }
                     }
                     else if (sprPhase == 6)
                     {
-                        oamCopyBuffer = secondaryOAM[evalOam2Addr];
-                        ppuAddressBus = ComputeSpritePatternAddr(slot) + 8;
-                        ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
+                        if (sprFetchEnabled)
+                        {
+                            oamCopyBuffer = secondaryOAM[evalOam2Addr];
+                            ppuAddressBus = ComputeSpritePatternAddr(slot) + 8;
+                            ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
+                        }
                     }
                     else // sprPhase == 7
                     {
-                        oamCopyBuffer = secondaryOAM[evalOam2Addr];
-                        if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(ppuAddressBus);
-                        int addr = ppuAddressBus;
-                        byte tile = chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF];
-                        bool flipH = (sprFetchAttr[slot] & 0x40) != 0;
-                        sprShiftH[slot] = flipH ? FlipByte(tile) : tile;
-                        if (slot >= sprSlotCount) sprShiftH[slot] = 0;
+                        if (sprFetchEnabled)
+                        {
+                            oamCopyBuffer = secondaryOAM[evalOam2Addr];
+                            if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(ppuAddressBus);
+                            int addr = ppuAddressBus;
+                            byte tile = chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF];
+                            bool flipH = (sprFetchAttr[slot] & 0x40) != 0;
+                            sprShiftH[slot] = flipH ? FlipByte(tile) : tile;
+                            if (slot >= sprSlotCount) sprShiftH[slot] = 0;
+                        }
                         evalOam2Addr++;
                     }
 
@@ -1010,13 +1010,31 @@ namespace AprNes
                 ppuChrFetchA12 = (vram_addr >> 12) & 1;
             }
 
-            // Deferred commit: CXinc from previous phase 7 (TriCNES: PPU_Commit_PatternHighFetch)
-            // TriCNES line 1727: CommitShiftRegistersAndBitPlanes runs OUTSIDE scanline gate
-            if (commitCXinc) { commitCXinc = false; CXinc(); }
+            // TriCNES line 1727: CommitShiftRegistersAndBitPlanes — UNGATED, runs every dot
+            // Processes commit flags from PREVIOUS dot's tile fetch.
+            if (commitNTFetch) { commitNTFetch = false; NTVal = renderTemp; }
+            if (commitATFetch)
+            {
+                commitATFetch = false;
+                // TriCNES: decode attribute from PPU_RenderTemp using current vram_addr
+                byte atRaw = renderTemp;
+                if (extAttrEnabled && extAttrNTOffset < 960) {
+                    byte exVal = extAttrRAM[extAttrNTOffset];
+                    extAttrChrBank = (exVal & 0x3F) | (extAttrChrUpperBits << 6);
+                    ATVal = (byte)((exVal >> 6) & 3);
+                } else {
+                    ATVal = (byte)((atRaw >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
+                }
+                bg_attr_p3 = bg_attr_p2; bg_attr_p2 = bg_attr_p1; bg_attr_p1 = ATVal;
+                pendingAttrLatch = ATVal;
+            }
+            if (commitPatLowFetch) { commitPatLowFetch = false; pendingTileLow = renderTemp; }
+            if (commitPatHighFetch) { commitPatHighFetch = false; pendingTileHigh = renderTemp; CXinc(); }
 
             if (scanline < 240 || scanline == PRE_RENDER_LINE) // ★ REGION
             {
-                if (ppuRenderingEnabled)
+                // TriCNES line 1732: tile fetch gated by Tier 2 delayed flags (NOT ppuRenderingEnabled/Tier 3)
+                if (ShowBackGround || ShowSprites)
                     ppu_rendering_tick(cx, PRE_RENDER_LINE); // ★ REGION
 
                 // Alignment-dependent eval delay update (TriCNES: lines 1652-1658)
