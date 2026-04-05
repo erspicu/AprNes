@@ -243,6 +243,8 @@ namespace AprNes
                 byte dmaVal = dmaOamInternalBus;
                 if ((spr_ram_add & 3) == 2) dmaVal &= 0xE3;
                 spr_ram[spr_ram_add++] = dmaVal;
+                // TriCNES Store() line 9471: dataBus = Input (every write updates the bus)
+                cpubus = dmaOamInternalBus;
                 dmaOamAddr++;
                 if (dmaOamAddr == 0)
                 {

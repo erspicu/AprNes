@@ -71,7 +71,10 @@ namespace AprNes
             byte val;
             if (addr < 0x2000) { val = NES_MEM[addr & 0x7FF]; cpubus = val; }
             else { val = mem_read_fun[addr](addr); if (addr != 0x4015) cpubus = val; }
-
+            // DEBUG
+            if (addr >= 0x3FFE && addr <= 0x4002)
+                System.IO.File.AppendAllText(@"C:\ai_project\AprNes\temp\t5.log",
+                    $"R ${addr:X4}=0x{val:X2} PC=${r_PC:X4} cyc={cpuCycleCount} op={opcode:X2} oc={operationCycle}\n");
             return val;
         }
 

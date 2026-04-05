@@ -750,6 +750,7 @@ namespace AprNes
                 {
                     dmcbitsleft = 8;
 
+
                     // TriCNES model: DMA trigger + shifter load inside bitsRemaining==0
                     if (dmcsamplesleft > 0 || dmcImplicitAbortPending)
                     {
