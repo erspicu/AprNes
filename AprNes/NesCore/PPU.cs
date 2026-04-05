@@ -849,15 +849,17 @@ namespace AprNes
             if (pendingSprite0Hit) { pendingSprite0Hit = false; pendingSprite0Hit2 = true; }
 
             // P4-3: OAMBuffer update (TriCNES _EmulateHalfPPU lines 1842-1860)
-            // Must be in half step — $2004 returns PPU_OAMBuffer which is updated AFTER full step eval
+            // Uses ppu_cycles_x (post-increment) to match TriCNES PPU_Dot (also post-increment)
             if ((ShowBackGround || ShowSprites) && scanline >= 0 && scanline < 240)
             {
-                int dot = ppu_cycles_x - 1;
+                int dot = ppu_cycles_x; // TriCNES: PPU_Dot (post-increment in _EmulatePPU)
                 if (dot == 0 || dot > 320)
                     ppuOamBuffer = secondaryOAM[0];
-                else if (dot <= 64)
+                else if (dot > 0 && dot <= 64)
                     ppuOamBuffer = 0xFF;
-                else // dots 65-320
+                else if (dot <= 256)
+                    ppuOamBuffer = oamCopyBuffer;
+                else // dots 257-320
                     ppuOamBuffer = oamCopyBuffer;
             }
 
