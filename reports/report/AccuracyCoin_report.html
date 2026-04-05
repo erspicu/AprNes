@@ -44,25 +44,22 @@ tr:hover td { background:#1e2a5e; }
 </head>
 <body>
 <h1>AccuracyCoin Report - AprNes</h1>
-<div class="meta">Generated: 2026-04-05 11:20 | ROM: AccuracyCoin.nes (Mapper 0/NROM) | Method: page-by-page</div>
+<div class="meta">Generated: 2026-04-06 01:19 | ROM: AccuracyCoin.nes (Mapper 0/NROM) | Method: page-by-page</div>
 
 <div class="summary">
-  <div class="stat"><div class="num pass-c">130</div><div class="lbl">PASS</div></div>
-  <div class="stat"><div class="num fail-c">6</div><div class="lbl">FAIL</div></div>
+  <div class="stat"><div class="num pass-c">133</div><div class="lbl">PASS</div></div>
+  <div class="stat"><div class="num fail-c">3</div><div class="lbl">FAIL</div></div>
   <div class="stat"><div class="num skip-c">0</div><div class="lbl">SKIP</div></div>
   <div class="stat"><div class="num notrun-c">0</div><div class="lbl">N/A</div></div>
   <div class="stat"><div class="num">136</div><div class="lbl">TOTAL</div></div>
 </div>
 <img src="screenshots-ac/ac_summary.webp" alt="AccuracyCoin Summary" class="ss-summary" loading="lazy">
 <div style="background:#2a1e1e;border:1px solid #f44336;border-radius:8px;padding:12px 16px;margin-bottom:24px;font-size:.9em">
-<h3 style="color:#ef9a9a;margin:0 0 8px">Remaining 6 Failures</h3>
+<h3 style="color:#ef9a9a;margin:0 0 8px">Remaining 3 Failures</h3>
 <table style="margin:0"><tr><th>Page</th><th>Test</th><th>Error</th></tr>
 <tr><td>P13</td><td>DMC DMA Bus Conflicts</td><td><span class="badge fail">FAIL (err 2)</span></td></tr>
 <tr><td>P14</td><td>APU Register Activation</td><td><span class="badge fail">FAIL (err 4)</span></td></tr>
-<tr><td>P14</td><td>Controller Clocking</td><td><span class="badge fail">FAIL (err 6)</span></td></tr>
-<tr><td>P18</td><td>$2002 flag clear timing</td><td><span class="badge fail">FAIL (err 1)</span></td></tr>
-<tr><td>P18</td><td>Misaligned OAM behavior</td><td><span class="badge fail">FAIL (err 1)</span></td></tr>
-<tr><td>P19</td><td>$2004 Stress Test</td><td><span class="badge fail">FAIL (err 3)</span></td></tr>
+<tr><td>P18</td><td>OAM Corruption</td><td><span class="badge fail">FAIL (err 3)</span></td></tr>
 </table>
 </div>
 
@@ -306,7 +303,7 @@ tr:hover td { background:#1e2a5e; }
 <div class="suite">
   <div class="suite-header">
     <span>Page 14: APU Tests</span>
-    <span class="suite-stats"><span class="pass-c">7 PASS</span> | <span class="fail-c">2 FAIL</span></span>
+    <span class="suite-stats"><span class="pass-c">8 PASS</span> | <span class="fail-c">1 FAIL</span></span>
   </div>
   <img src="screenshots-ac/ac_page_14.webp" alt="APU Tests" class="ss" loading="lazy">
   <table>
@@ -319,7 +316,7 @@ tr:hover td { background:#1e2a5e; }
     <tr><td>6</td><td>Delta Modulation Channel</td><td><span class="badge pass">PASS</span></td><td class="addr">$046A=01</td></tr>
     <tr><td>7</td><td>APU Register Activation</td><td><span class="badge fail">FAIL (err 4)</span></td><td class="addr">$045C=12</td></tr>
     <tr><td>8</td><td>Controller Strobing</td><td><span class="badge pass">PASS</span></td><td class="addr">$045F=01</td></tr>
-    <tr><td>9</td><td>Controller Clocking</td><td><span class="badge fail">FAIL (err 6)</span></td><td class="addr">$047A=1A</td></tr>
+    <tr><td>9</td><td>Controller Clocking</td><td><span class="badge pass">PASS</span></td><td class="addr">$047A=05</td></tr>
   </table>
 </div>
 
@@ -375,19 +372,19 @@ tr:hover td { background:#1e2a5e; }
 <div class="suite">
   <div class="suite-header">
     <span>Page 18: Sprite Evaluation</span>
-    <span class="suite-stats"><span class="pass-c">7 PASS</span> | <span class="fail-c">2 FAIL</span></span>
+    <span class="suite-stats"><span class="pass-c">8 PASS</span> | <span class="fail-c">1 FAIL</span></span>
   </div>
   <img src="screenshots-ac/ac_page_18.webp" alt="Sprite Evaluation" class="ss" loading="lazy">
   <table>
     <tr><th>#</th><th>Test</th><th>Result</th><th>Addr</th></tr>
     <tr><td>1</td><td>Sprite overflow behavior</td><td><span class="badge pass">PASS</span></td><td class="addr">$0459=01</td></tr>
     <tr><td>2</td><td>Sprite 0 Hit behavior</td><td><span class="badge pass">PASS</span></td><td class="addr">$0457=01</td></tr>
-    <tr><td>3</td><td>$2002 flag clear timing</td><td><span class="badge fail">FAIL (err 1)</span></td><td class="addr">$048D=06</td></tr>
+    <tr><td>3</td><td>$2002 flag clear timing</td><td><span class="badge pass">PASS</span></td><td class="addr">$048D=01</td></tr>
     <tr><td>4</td><td>Suddenly Resize Sprite</td><td><span class="badge pass">PASS</span></td><td class="addr">$0489=01</td></tr>
     <tr><td>5</td><td>Arbitrary Sprite zero</td><td><span class="badge pass">PASS</span></td><td class="addr">$0458=01</td></tr>
-    <tr><td>6</td><td>Misaligned OAM behavior</td><td><span class="badge fail">FAIL (err 1)</span></td><td class="addr">$045A=06</td></tr>
+    <tr><td>6</td><td>Misaligned OAM behavior</td><td><span class="badge pass">PASS</span></td><td class="addr">$045A=01</td></tr>
     <tr><td>7</td><td>Address $2004 behavior</td><td><span class="badge pass">PASS</span></td><td class="addr">$045B=01</td></tr>
-    <tr><td>8</td><td>OAM Corruption</td><td><span class="badge pass">PASS</span></td><td class="addr">$047B=01</td></tr>
+    <tr><td>8</td><td>OAM Corruption</td><td><span class="badge fail">FAIL (err 3)</span></td><td class="addr">$047B=0E</td></tr>
     <tr><td>9</td><td>INC $4014</td><td><span class="badge pass">PASS</span></td><td class="addr">$0480=01</td></tr>
   </table>
 </div>
@@ -395,7 +392,7 @@ tr:hover td { background:#1e2a5e; }
 <div class="suite">
   <div class="suite-header">
     <span>Page 19: PPU Misc.</span>
-    <span class="suite-stats"><span class="pass-c">5 PASS</span> | <span class="fail-c">1 FAIL</span></span>
+    <span class="suite-stats"><span class="pass-c">6 PASS</span></span>
   </div>
   <img src="screenshots-ac/ac_page_19.webp" alt="PPU Misc." class="ss" loading="lazy">
   <table>
@@ -405,7 +402,7 @@ tr:hover td { background:#1e2a5e; }
     <tr><td>3</td><td>Stale BG Shift Registers</td><td><span class="badge pass">PASS</span></td><td class="addr">$0483=01</td></tr>
     <tr><td>4</td><td>BG Serial In</td><td><span class="badge pass">PASS</span></td><td class="addr">$0487=01</td></tr>
     <tr><td>5</td><td>Sprites On Scanline 0</td><td><span class="badge pass">PASS</span></td><td class="addr">$0484=05</td></tr>
-    <tr><td>6</td><td>$2004 Stress Test</td><td><span class="badge fail">FAIL (err 3)</span></td><td class="addr">$048C=0E</td></tr>
+    <tr><td>6</td><td>$2004 Stress Test</td><td><span class="badge pass">PASS</span></td><td class="addr">$048C=01</td></tr>
   </table>
 </div>
 

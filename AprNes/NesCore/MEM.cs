@@ -139,26 +139,43 @@ namespace AprNes
         static bool dataPinsNotFloating = false;
 
         // DMA bus read — TriCNES Fetch() port with dataPinsAreNotFloating tracking
+        // + bus conflict overlay (TriCNES Fetch line 9058):
+        //   Gate: addressBus in $4000-$401F (APU chip selected by CPU bus latch)
+        //   Register: addr & 0x1F (actual fetch address determines which register)
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte DmaFetch(ushort addr)
         {
             dataPinsNotFloating = false;
 
-            // TriCNES: $4016/$4017 during OAM DMA — the controller register's
-            // shift is deferred in TriCNES (2-cycle counter model), so DMA reads
-            // don't cause multiple shifts. We skip the read handler entirely to
-            // avoid the shift side effect. Return cpubus (previous bus value).
+            // TriCNES: $4016/$4017 during OAM DMA — skip IO_read to avoid
+            // shift side effect from main path. Bus conflict overlay handles it.
             if (spriteDmaTransfer && (addr == 0x4016 || addr == 0x4017))
+            {
+                if (addressBus >= 0x4000 && addressBus <= 0x401F)
+                {
+                    if (addr == 0x4016) P1_ShiftCounter = 2;
+                    else                P2_ShiftCounter = 2;
+                    controllerStrobed = false;
+                }
                 return cpubus;
+            }
 
             byte val = mem_read_fun[addr](addr);
 
             // TriCNES: reading from RAM or ROM drives the data bus
             if (addr < 0x2000 || addr >= 0x8000)
                 dataPinsNotFloating = true;
-            // TriCNES: PPU registers ($2000-$3FFF) also drive the bus
             else if (addr >= 0x2000 && addr < 0x4000)
                 dataPinsNotFloating = true;
+
+            // Bus conflict overlay: gate on addressBus, register on addr & 0x1F
+            // This catches DMA GET reads from ROM where (addr & 0x1F) == 0x16/0x17
+            if (addressBus >= 0x4000 && addressBus <= 0x401F)
+            {
+                byte reg = (byte)(addr & 0x1F);
+                if (reg == 0x16)      { P1_ShiftCounter = 2; controllerStrobed = false; }
+                else if (reg == 0x17) { P2_ShiftCounter = 2; controllerStrobed = false; }
+            }
 
             if (addr != 0x4015) cpubus = val;
             return val;
