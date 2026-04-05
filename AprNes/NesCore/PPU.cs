@@ -2063,24 +2063,52 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ppu_r_2007()
         {
-            // Back-to-back $2007 access: if SM still running, return openbus
-            if (ppu2007SM < 9)
-                return openbus;
-
-            int addr = vram_addr & 0x3FFF;
+            // TriCNES lines 8968-9047: $2007 read handler (single-tick SM)
             byte result;
 
-            if (addr >= 0x3F00)
-                result = (byte)((openbus & 0xC0) | (PpuBusRead(addr) & 0x3F));
+            // Consecutive read detection: SM==3 && isRead
+            if (ppu2007SM == 3 && ppu2007SM_isRead)
+            {
+                // Alignment-specific behavior (TriCNES lines 8975-9009)
+                int phase = mcPpuClock & 3; // maps to PPUClock
+                // mcPpuClock: 0↔PPU0, 3↔PPU1, 2↔PPU2, 1↔PPU3
+                int ppuPhase = (mcPpuClock == 0) ? 0 : (mcPpuClock == 3) ? 1 : (mcPpuClock == 2) ? 2 : 3;
+                if (ppuPhase == 0) { result = ppu_2007_buffer; }
+                else if (ppuPhase == 1) { ppu2007SM_updateVramAddrEarly = true; result = ppu_2007_buffer; }
+                else if (ppuPhase == 2) { ppu2007SM_updateVramAddrEarly = true; result = (byte)(vram_addr & 0xFF); }
+                else { ppu2007SM_updateVramAddrEarly = true; result = (vram_addr >= 0x2000) ? ppu_2007_buffer : (byte)(vram_addr & 0xFF); }
+            }
             else
-                result = ppu_2007_buffer;
+            {
+                // Normal read
+                if (vram_addr >= 0x3F00)
+                {
+                    ppuAddressBus = vram_addr;
+                    result = PpuBusRead(vram_addr & 0x3FFF);
+                    // Palette read: result has palette data, but open bus bits 6-7
+                    result = (byte)((openbus & 0xC0) | (result & 0x3F));
+                }
+                else
+                {
+                    result = ppu_2007_buffer;
+                }
+            }
 
-            // Fully deferred: buffer update at state 1/4, increment at state 4
-            ppu2007SM_addr = vram_addr;
+            // Start SM if idle, or restart if interrupted
+            if (ppu2007SM >= 9)
+            {
+                ppu2007SM = 0;
+                // Alignment-dependent: buffer updated late on phases 0/1
+                int ppuPhase = (mcPpuClock == 0) ? 0 : (mcPpuClock == 3) ? 1 : (mcPpuClock == 2) ? 2 : 3;
+                ppu2007SM_bufferLate = (ppuPhase <= 1);
+                // DMC DMA edge case (TriCNES line 9036-9039)
+                if (dmcDmaRunning && (dmcStatusEnabled || dmcImplicitAbortActive))
+                    vram_addr = (ushort)((vram_addr + 1) & 0x3FFF);
+            }
+
             ppu2007SM_isRead = true;
             ppu2007SM_readDelayed = true;
-            ppu2007SM = 0;
-            ppu2007SM_bufferLate = ((mcCpuClock & 3) <= 1); // TriCNES: uses CPUClock phase
+            ppu2007SM_addr = vram_addr;
 
             openbus = result;
             open_bus_decay_timer = 77777;
@@ -2253,17 +2281,15 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_w_2007(byte value)
         {
+            // TriCNES lines 9683-9727: $2007 write handler (single-tick SM)
             openbus = value;
             open_bus_decay_timer = 77777;
             ppu2007SM_writeValue = value;
 
-            // P3-3: TriCNES $2007 write model (lines 9675-9717)
-            // TriCNES checks SM==3||6 (single-tick). AprNes double-ticks → SM==6 = 1 CPU cycle.
-            if (ppu2007SM == 6) // consecutive access (1 CPU cycle with double-tick)
+            // Consecutive access detection: SM==3 (1 CPU cycle) or SM==6 (2 CPU cycles)
+            if (ppu2007SM == 3 || ppu2007SM == 6)
             {
-                ushort addr = (ushort)(vram_addr & 0x3FFF);
-                ppu2007SM_mysteryAddr = (ushort)((addr & 0xFF00) | value);
-
+                ppu2007SM_mysteryAddr = (ushort)((vram_addr & 0xFF00) | value);
                 if (!ppu2007SM_isRead)
                     ppu2007SM_performMysteryWrite = true;
                 else
@@ -2274,12 +2300,12 @@ namespace AprNes
                 ppu2007SM_normalWriteBehavior = true;
             }
 
-            if (ppu2007SM != 6)
+            if (ppu2007SM != 3)
             {
                 if (ppu2007SM >= 9)
-                    ppu2007SM = 3;
+                    ppu2007SM = 3; // standard write: start at state 3 (write executes next tick)
                 else
-                    ppu2007SM = 0;
+                    ppu2007SM = 0; // interrupted: restart from 0
                 ppu2007SM_isRead = false;
             }
             else
