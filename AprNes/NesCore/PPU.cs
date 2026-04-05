@@ -521,14 +521,13 @@ namespace AprNes
         // BG tiles fetched at cycles 0-255 (visible) and 320-335 (next-scanline prefetch).
         // A12 notifications: BG at phases 0 (NT addr, A12=0) and 4 (CHR low addr, A12=BG table bit12),
         // sprites at phases 0 (garbage NT, A12=0) and 3 (sprite CHR, A12=sprite table bit12).
+        // cx = PPU_Dot (post-increment, direct TriCNES match)
         static void ppu_rendering_tick(int cx, int preRenderLn)
         {
-            if (cx < 256 || (cx >= 320 && cx < 336))
+            // Tile fetch: TriCNES PPU_Dot < 257 || PPU_Dot > 320 && PPU_Dot <= 336
+            if (cx < 257 || (cx > 320 && cx <= 336))
             {
-                // MMC5 CHR A/B: ensure correct set at BG tile boundaries.
-                // Dot 0: initialize for this scanline (handles vblank→render transition).
-                // Dot 320: switch back to BG after sprite fetches.
-                if ((cx == 0 || cx == 320) && chrABAutoSwitch)
+                if ((cx == 1 || cx == 321) && chrABAutoSwitch)
                 {
                     byte*[] src = Spritesize8x16 ? (chrBGUseASet ? chrBankPtrsA : chrBankPtrsB) : chrBankPtrsA;
                     for (int i = 0; i < 8; i++) chrBankPtrs[i] = src[i];
@@ -591,7 +590,7 @@ namespace AprNes
                         highTile = chrBankPtrs[(ioaddr >> 10) & 7][ioaddr & 0x3FF];
                     if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ioaddr);
                     // Palette cache update
-                    if (scanline < 240 && cx < 256 && ppuRenderingEnabled)
+                    if (scanline < 240 && cx < 257 && ppuRenderingEnabled)
                         RenderBGTile(cx);
                     // Deferred reload: store tile data, commit in next half-step
                     // (TriCNES: PPU_Commit_LoadShiftRegisters model)
@@ -602,13 +601,12 @@ namespace AprNes
                     commitCXinc = true;
                 }
             }
-            else if (cx == 256)
+            else if (cx == 257) // TriCNES D=256 → Yinc
             {
                 Yinc();
             }
-            else if (cx == 257)
+            else if (cx == 258) // TriCNES D=257 → CopyHoriV
             {
-                // TriCNES pre-increment: CopyHoriV at D=257
                 CopyHoriV();
                 // MMC5 CHR A/B: switch to A set (sprites) at dot 257
                 if (chrABAutoSwitch && Spritesize8x16)
@@ -720,8 +718,8 @@ namespace AprNes
             if (ppu_cycles_x == 322 && scanline < 240 && (ShowBackGround_Instant || ShowSprites_Instant))
                 oamCopyBuffer = secondaryOAM[0];
 
-            // Pre-render scanline: continuous vert(v) = vert(t) copy at cycles 280-304
-            if (scanline == preRenderLn && cx >= 280 && cx <= 304)
+            // TriCNES D=280-304 → cx=281-305
+            if (scanline == preRenderLn && cx >= 281 && cx <= 305)
             {
                 vram_addr = (vram_addr & ~0x7BE0) | (vram_addr_internal & 0x7BE0);
             }
@@ -1089,7 +1087,7 @@ namespace AprNes
                 {
                     // At start of each visible scanline: always zero Buffer_BG_array to prevent
                     // stale data from prior frames causing incorrect sprite priority decisions.
-                    if (cx == 0)
+                    if (cx == 1) // PPU_Dot=1: first dot of new scanline
                     {
                         int scanOff = scanline << 8;
                         int* bgp = Buffer_BG_array + scanOff;
@@ -1147,58 +1145,57 @@ namespace AprNes
                 prevPrevPrevDotColor = prevPrevDotColor; prevPrevDotColor = prevDotColor; prevDotColor = dotColor;
                 prevPrevPrevDotPalIdx = prevPrevDotPalIdx; prevPrevDotPalIdx = prevDotPalIdx; prevDotPalIdx = dotPalIdx;
 
-                // CalculatePixel (cx 0-256, TriCNES: PPU_Dot 1-257)
-                if (cx <= 256)
+                // CalculatePixel: TriCNES PPU_Dot > 0 && PPU_Dot <= 257
+                if (cx > 0 && cx <= 257)
                 {
                     byte backdropIdx = (byte)(ppu_ram[0x3f00] & 0x3f);
                     uint compositeColor = NesColors[backdropIdx];
                     byte compositePalIdx = backdropIdx;
-                    int bgColor = 0;    // BG pixel value (0=transparent)
-                    int bgPalette = 0;  // BG attribute (palette index)
+                    int bgColor = 0;
+                    int bgPalette = 0;
 
-                    // BG pixel (TriCNES line 3089: read shift regs BEFORE shift)
-                    if (cx < 256 && ShowBackGround && (cx >= 8 || ShowBgLeft8))
+                    // BG pixel: TriCNES PPU_Dot <= 256 && (PPU_Dot > 8 || mask)
+                    if (cx <= 256 && ShowBackGround && (cx > 8 || ShowBgLeft8))
                     {
                         int bit = 15 - FineX;
                         int col0 = (renderLow >> bit) & 1;
                         int col1 = (renderHigh >> bit) & 1;
                         bgColor = (col1 << 1) | col0;
                         bgPalette = (bit >= 8) ? bg_attr_p3 : bg_attr_p2;
-                        if (bgColor == 0) bgPalette = 0; // color 0 mirrors backdrop
+                        if (bgColor == 0) bgPalette = 0;
                     }
 
-                    // Sprite pixel (TriCNES line 3111: read shift regs BEFORE decrement)
+                    // Sprite pixel: TriCNES PPU_Dot <= 256 && (PPU_Dot > 8 || mask)
                     int sprColor = 0, sprPalette = 0, sprSlot = -1;
                     bool sprPriority = false;
-                    if (cx < 256 && ShowSprites && (cx >= 8 || ShowSprLeft8))
+                    if (cx <= 256 && ShowSprites && (cx > 8 || ShowSprLeft8))
                     {
                         for (int s = 0; s < 8; s++)
                         {
                             if (sprXCounter[s] == 0 || skippedPreRenderDot341)
                             {
                                 int px = ((sprShiftH[s] >> 7) << 1) | (sprShiftL[s] >> 7);
-                                if (px != 0 && sprColor == 0) // first opaque sprite wins
+                                if (px != 0 && sprColor == 0)
                                 {
                                     sprColor = px;
                                     sprPalette = (sprFetchAttr[s] & 3) | 4;
-                                    sprPriority = ((sprFetchAttr[s] >> 5) & 1) == 0; // 0 = front
+                                    sprPriority = ((sprFetchAttr[s] >> 5) & 1) == 0;
                                     sprSlot = s;
                                 }
                             }
                         }
 
-                        // Sprite 0 hit detection (TriCNES line 3145)
+                        // Sprite 0 hit: TriCNES PPU_Dot > 8 && PPU_Dot < 256
                         if (canDetectSprite0Hit && sprSlot == 0 && sprZeroInSlots
                             && ShowBackGround && ShowSprites
                             && bgColor != 0 && sprColor != 0)
                         {
-                            if ((ShowSprLeft8 || cx >= 8) && cx < 255)
+                            if ((ShowSprLeft8 || cx > 8) && cx < 256)
                             {
                                 pendingSprite0Hit = true;
                                 canDetectSprite0Hit = false;
                             }
                         }
-                        // Priority resolution (TriCNES line 3169)
                         if (sprColor != 0 && ShowSprites)
                         {
                             if (bgColor == 0 || sprPriority)
@@ -1209,17 +1206,16 @@ namespace AprNes
                         }
                     }
 
-                    // Final color from palette RAM
-                    if ((ShowBackGround || ShowSprites) && cx < 256)
+                    // Final color: PPU_Dot <= 256
+                    if ((ShowBackGround || ShowSprites) && cx <= 256)
                     {
                         int palAddr = (bgPalette << 2) | bgColor;
-                        if (bgColor == 0) palAddr = 0; // backdrop mirror
+                        if (bgColor == 0) palAddr = 0;
                         compositeColor = NesColors[ppu_ram[0x3f00 + palAddr] & 0x3f];
                         compositePalIdx = (byte)(ppu_ram[0x3f00 + palAddr] & 0x3f);
                     }
-                    else if (cx < 256)
+                    else if (cx <= 256)
                     {
-                        // Rendering disabled: v pointing at palette RAM? (TriCNES line 3191)
                         if ((vram_addr & 0x3F1F) >= 0x3F00)
                         {
                             int palAddr = vram_addr & 0x1F;
@@ -1253,17 +1249,16 @@ namespace AprNes
                     }
                 }
 
-                // DrawToScreen: 3-dot delayed (TriCNES line 1878: PPU_Dot > 3 && PPU_Dot <= 259)
-                // cx 3-258 → screen position cx-3 (0-255)
-                if (cx >= 3 && cx <= 258)
+                // DrawToScreen: TriCNES PPU_Dot > 3 && PPU_Dot <= 259
+                if (cx >= 4 && cx <= 259)
                 {
-                    int pos = (scanline << 8) + (cx - 3);
+                    int pos = (scanline << 8) + (cx - 4);
                     ScreenBuf1x[pos] = prevPrevPrevDotColor;
-                    if (AnalogEnabled) ntscScanBuf[cx - 3] = prevPrevPrevDotPalIdx;
+                    if (AnalogEnabled) ntscScanBuf[cx - 4] = prevPrevPrevDotPalIdx;
                 }
 
-                // Analog mode: decode completed scanline after all 256 pixels written (cx 259)
-                if (AnalogEnabled && cx == 259)
+                // Analog decode after last pixel (PPU_Dot=260)
+                if (AnalogEnabled && cx == 260)
                     DecodeScanline(scanline, ntscScanBuf, ppuEmphasis);
             }
 
@@ -1310,14 +1305,12 @@ namespace AprNes
             // TriCNES order: deferred → scroll → dot++ → WRAP → events → VBL → mapper → A12_Prev → rendering
             ppu_cycles_x = ++cx;
 
-            // Scanline wrap — BEFORE events/mapper (TriCNES: PPU_Dot > 340 → wrap, then events)
-            bool wrapDot = false;
+            // Scanline wrap — BEFORE events/mapper (TriCNES: PPU_Dot > 340 → wrap)
             if (cx == 341)
             {
                 if (++scanline == totalScanlines)
                 { scanline = 0; if (ShowBackGround_Instant || ShowSprites_Instant) ProcessOamCorruption(); }
                 ppu_cycles_x = cx = 0;
-                wrapDot = true;
             }
 
             // Scanline events (post-wrap cx)
@@ -1351,23 +1344,22 @@ namespace AprNes
             // A12_Prev capture (TriCNES line 1628)
             ppuA12Prev = (ppuAddressBus & 0x1000) != 0;
 
-            // Rendering AFTER mapper callback (TriCNES lines 1644+)
-            // Skip rendering on wrap dot (cx=0 after wrap → cx-1=-1 is invalid)
-            if (!wrapDot)
-                ppu_step_rendering(cx - 1, re, preRenderLine);
+            // Rendering — cx = PPU_Dot (direct TriCNES match)
+            ppu_step_rendering(cx, re, preRenderLine);
 
             // P4-3: OAMBuffer in ppu_half_step only (TriCNES _EmulateHalfPPU)
 
-            // NTSC odd frame dot skip (pre-render line, dot 339)
-            if (scanline == preRenderLine && cx == 339)
+            // NTSC odd frame dot skip: TriCNES PPU_Dot=340
+            if (scanline == preRenderLine && cx == 340)
             {
                 oddSwap = !oddSwap;
                 if (!oddSwap && (ShowBackGround_Instant || ShowSprites_Instant))
                 {
                     if (mmc5Ref != null)
                         mmc5Ref.NotifyVramRead(0x2000 | (vram_addr & 0x0FFF));
-                    ppu_cycles_x = ++cx;
-                    // P4-4: TriCNES SkippedPreRenderDot341 — persists until scanline 0, dot 2
+                    // TriCNES: PPU_Scanline=0; PPU_Dot=0; (direct jump, not increment)
+                    scanline = 0;
+                    ppu_cycles_x = cx = 0;
                     skippedPreRenderDot341 = true;
                 }
             }
