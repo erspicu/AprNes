@@ -17,7 +17,7 @@ namespace AprNes
         // ════════════════════════════════════════════════════════════════
         // Toggle: set to true in Main.cs to use new PPU step
         // ════════════════════════════════════════════════════════════════
-        static bool useNewPpuStep = false;
+        static bool useNewPpuStep = true;
 
         // TriCNES: CopyV flag — set when $2006 delayed copy fires, used for scroll conflict detection
         static bool copyV = false;
@@ -98,6 +98,9 @@ namespace AprNes
 
             // ── $2007 state machine (TriCNES lines 1322-1496) ──
             Ppu2007SmTick();
+
+            // Open bus decay (AprNes-specific, runs every dot)
+            if (--open_bus_decay_timer == 0) { open_bus_decay_timer = 77777; openbus = 0; }
 
             // ══════════════════════════════════════════════════════
             // Scroll increments — PRE-increment (TriCNES lines 1498-1516)
