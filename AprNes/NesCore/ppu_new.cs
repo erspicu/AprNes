@@ -568,8 +568,7 @@ namespace AprNes
             if (pendingSprite0Hit2) { pendingSprite0Hit2 = false; isSprite0hit = true; }
             if (pendingSprite0Hit) { pendingSprite0Hit = false; pendingSprite0Hit2 = true; }
 
-            // ── $2007 state machine half-step tick ──
-            Ppu2007SmTick();
+            // TriCNES: NO $2007 SM tick in half step — only in full step
 
             // ── P4-2: Palette corruption placeholder ──
             if (paletteCorruptFromDisable || paletteCorruptFromVAddr)
