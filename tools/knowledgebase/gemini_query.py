@@ -5,9 +5,9 @@ import http.client
 import sys
 
 def load_config():
-    config_path = os.path.join(os.path.dirname(__file__), 'config.json')
+    config_path = r'C:\key\config.json'
     if not os.path.exists(config_path):
-        print(f"Error: {config_path} not found. Please create it from config.json.example.")
+        print(f"Error: {config_path} not found. Please create it with api_key and model fields.")
         sys.exit(1)
     with open(config_path, 'r', encoding='utf-8') as f:
         return json.load(f)

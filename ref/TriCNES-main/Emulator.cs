@@ -9261,10 +9261,18 @@ namespace TriCNES
             return;
         }
 
+        int _r2004LogCount = 0;
         byte ReadOAM()
         {
             if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) && PPU_Scanline < 240)
             {
+                // LOG: first 30 $2004 reads during rendering
+                if (totalCycles > 100000 && _r2004LogCount < 30)
+                {
+                    _r2004LogCount++;
+                    System.IO.File.AppendAllText(@"C:\ai_project\AprNes\temp\tricnes_r2004.txt",
+                        $"cyc={totalCycles} sl={PPU_Scanline} dot={PPU_Dot} val=0x{PPU_OAMBuffer:X2} latch=0x{PPU_OAMLatch:X2} oam2Addr={OAM2Address} oam2Full={SecondaryOAMFull} ovf={OAMAddressOverflowedDuringSpriteEvaluation} secOAM={OAM2[0]:X2},{OAM2[1]:X2},{OAM2[2]:X2},{OAM2[3]:X2},{OAM2[4]:X2}\n");
+                }
                 return PPU_OAMBuffer;
             }
             return OAM[PPUOAMAddress];

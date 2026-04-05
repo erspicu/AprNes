@@ -1,0 +1,50 @@
+gemini-2.5-flash : Stable version of Gemini 2.5 Flash, our mid-size multimodal model that supports up to 1 million tokens, released in June of 2025.
+gemini-2.5-pro : Stable release (June 17th, 2025) of Gemini 2.5 Pro
+gemini-2.0-flash : Gemini 2.0 Flash
+gemini-2.0-flash-001 : Stable version of Gemini 2.0 Flash, our fast and versatile multimodal model for scaling across diverse tasks, released in January of 2025.
+gemini-2.0-flash-lite-001 : Stable version of Gemini 2.0 Flash-Lite
+gemini-2.0-flash-lite : Gemini 2.0 Flash-Lite
+gemini-2.5-flash-preview-tts : Gemini 2.5 Flash Preview TTS
+gemini-2.5-pro-preview-tts : Gemini 2.5 Pro Preview TTS
+gemma-3-1b-it : 
+gemma-3-4b-it : 
+gemma-3-12b-it : 
+gemma-3-27b-it : 
+gemma-3n-e4b-it : 
+gemma-3n-e2b-it : 
+gemma-4-26b-a4b-it : Gemma 4 26B A4B IT
+gemma-4-31b-it : Gemma 4 31B IT
+gemini-flash-latest : Latest release of Gemini Flash
+gemini-flash-lite-latest : Latest release of Gemini Flash-Lite
+gemini-pro-latest : Latest release of Gemini Pro
+gemini-2.5-flash-lite : Stable version of Gemini 2.5 Flash-Lite, released in July of 2025
+gemini-2.5-flash-image : Gemini 2.5 Flash Preview Image
+gemini-3-pro-preview : Gemini 3 Pro Preview
+gemini-3-flash-preview : Gemini 3 Flash Preview
+gemini-3.1-pro-preview : Gemini 3.1 Pro Preview
+gemini-3.1-pro-preview-customtools : Gemini 3.1 Pro Preview optimized for custom tool usage
+gemini-3.1-flash-lite-preview : Gemini 3.1 Flash Lite Preview
+gemini-3-pro-image-preview : Gemini 3 Pro Image Preview
+nano-banana-pro-preview : Gemini 3 Pro Image Preview
+gemini-3.1-flash-image-preview : Gemini 3.1 Flash Image Preview.
+lyria-3-clip-preview : Lyria 3 30s model Preview
+lyria-3-pro-preview : Lyria 3 Pro Preview
+gemini-robotics-er-1.5-preview : Gemini Robotics-ER 1.5 Preview
+gemini-2.5-computer-use-preview-10-2025 : Gemini 2.5 Computer Use Preview 10-2025
+deep-research-pro-preview-12-2025 : Preview release (December 12th, 2025) of Deep Research Pro
+gemini-embedding-001 : Obtain a distributed representation of a text.
+gemini-embedding-2-preview : Obtain a distributed representation of multimodal content.
+aqa : Model trained to return answers to questions that are grounded in provided sources, along with estimating answerable probability.
+imagen-4.0-generate-001 : Vertex served Imagen 4.0 model
+imagen-4.0-ultra-generate-001 : Vertex served Imagen 4.0 ultra model
+imagen-4.0-fast-generate-001 : Vertex served Imagen 4.0 Fast model
+veo-2.0-generate-001 : Vertex served Veo 2 model. Access to this model requires billing to be enabled on the associated Google Cloud Platform account. Please visit https://console.cloud.google.com/billing to enable it.
+veo-3.0-generate-001 : Veo 3
+veo-3.0-fast-generate-001 : Veo 3 fast
+veo-3.1-generate-preview : Veo 3.1
+veo-3.1-fast-generate-preview : Veo 3.1 fast
+veo-3.1-lite-generate-preview : Veo 3.1 lite
+gemini-2.5-flash-native-audio-latest : Latest release of Gemini 2.5 Flash Native Audio
+gemini-2.5-flash-native-audio-preview-09-2025 : Gemini 2.5 Flash Native Audio Preview 09-2025
+gemini-2.5-flash-native-audio-preview-12-2025 : Gemini 2.5 Flash Native Audio Preview 12-2025
+gemini-3.1-flash-live-preview : Gemini 3.1 Flash Live Preview
