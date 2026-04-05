@@ -609,7 +609,8 @@ namespace AprNes
             else if (cx >= 257 && cx < 320)
             {
                 // TriCNES line 2823: PPUOAMAddress reset to 0 on EVERY dot 257-320
-                if (ShowBG_EvalDelay || ShowSpr_EvalDelay)
+                // Use ppu_cycles_x (= PPU_Dot) for boundary — cx is PPU_Dot-1
+                if (ppu_cycles_x >= 257 && ppu_cycles_x <= 320 && (ShowBG_EvalDelay || ShowSpr_EvalDelay))
                     spr_ram_add = 0;
 
                 if (cx == 257)
@@ -1029,12 +1030,14 @@ namespace AprNes
                 {
                     bool evalScanline = (scanline >= 0 && scanline < 240) || scanline == PRE_RENDER_LINE;
                     bool ro = scanline == preRenderLine; // SpriteEval_ReadOnly_PreRenderLine
+                    // Eval uses PPU_Dot (= ppu_cycles_x) for boundaries — independent of cx
+                    int evalDot = ppu_cycles_x; // = PPU_Dot (TriCNES: post-increment)
 
-                    // ── Dots 1-64: clear secondary OAM — DELAYED flags gate (TriCNES line 2510/2541) ──
-                    if (evalScanline && cx >= 1 && cx <= 64 && (ShowBG_EvalDelay || ShowSpr_EvalDelay))
+                    // ── Dots 0-64: clear secondary OAM — DELAYED flags gate (TriCNES line 2510/2541) ──
+                    if (evalScanline && evalDot >= 0 && evalDot <= 64 && (ShowBG_EvalDelay || ShowSpr_EvalDelay))
                     {
                         // Dot 1: reset eval state (TriCNES line 2520-2526)
-                        if (cx == 1)
+                        if (evalDot == 1)
                         {
                             evalOam2Addr = 0;
                             evalOam2Full = false;
@@ -1042,11 +1045,11 @@ namespace AprNes
                             evalOamOverflowed = false;
                         }
 
-                        if ((cx & 1) != 0) // odd: set latch
+                        if ((evalDot & 1) != 0) // odd (TriCNES: PPU_Dot & 1 == 1)
                         {
                             oamCopyBuffer = ro ? secondaryOAM[evalOam2Addr] : (byte)0xFF;
                         }
-                        else // even: write to SecOAM + advance OAM2Address
+                        else if (evalDot > 0) // even > 0: write + advance
                         {
                             if (!ro)
                                 secondaryOAM[evalOam2Addr] = oamCopyBuffer;
@@ -1056,16 +1059,16 @@ namespace AprNes
                     }
 
                     // ── Dot 65: init OUTSIDE rendering gate (TriCNES line 2585-2588) ──
-                    if (evalScanline && cx == 65)
+                    if (evalScanline && evalDot == 65)
                     {
                         evalOam2Addr = 0;
                         nineObjectsOnLine = false;
                     }
 
                     // ── Dots 65-256: evaluation — INSTANT flags gate (TriCNES line 2590) ──
-                    if (evalScanline && cx >= 65 && cx <= 256 && (ShowBackGround_Instant || ShowSprites_Instant))
+                    if (evalScanline && evalDot >= 65 && evalDot <= 256 && (ShowBackGround_Instant || ShowSprites_Instant))
                     {
-                        if (cx == 65)
+                        if (evalDot == 65)
                         {
                             sprite0_eval_addr = spr_ram_add;
                             SpriteEvalInit();
@@ -1074,11 +1077,11 @@ namespace AprNes
                         else
                         {
                             SpriteEvalTick();
-                            if (cx == 256) SpriteEvalEnd();
+                            if (evalDot == 256) SpriteEvalEnd();
                         }
                     }
                     // Pre-render line: save sprite0_eval_addr at dot 65 even if rendering off
-                    else if (ro && cx == 65 && ppuRenderingEnabled)
+                    else if (ro && evalDot == 65 && ppuRenderingEnabled)
                     {
                         sprite0_eval_addr = spr_ram_add;
                     }
@@ -1595,7 +1598,7 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void SpriteEvalTick()
         {
-            bool isOdd = (ppu_cycles_x & 1) == 0; // ppu_cycles_x=cx+1, inverted to match TriCNES PPU_Dot parity
+            bool isOdd = (ppu_cycles_x & 1) != 0; // eval uses ppu_cycles_x = PPU_Dot, direct parity match
 
             if (isOdd)
             {
@@ -1649,13 +1652,13 @@ namespace AprNes
                             evalOamAddr++;
                         }
                         // Sprite 0 at dot 66 (TriCNES line 2655 — inside !evalOam2Full branch)
-                        if (ppu_cycles_x == 67 && !evalOam2Full) sprite0Added = true;
+                        if (ppu_cycles_x == 66 && !evalOam2Full) sprite0Added = true;
                         if (!ro) evalTick++; // line 2671
                     }
                     else
                     {
                         // Not in range (TriCNES line 2674)
-                        if (ppu_cycles_x == 67) sprite0Added = false;
+                        if (ppu_cycles_x == 66) sprite0Added = false;
 
                         if (!ro)
                         {
@@ -2177,6 +2180,8 @@ namespace AprNes
                 val = spr_ram[spr_ram_add];
                 if ((spr_ram_add & 3) == 2) val &= 0xE3;
             }
+                System.IO.File.AppendAllText("temp/aprnes_r2004.txt",
+                    $"cyc={cpuCycleCount} sl={scanline} dot={ppu_cycles_x} val=0x{val:X2} latch=0x{oamCopyBuffer:X2} ppuClk={mcPpuClock}\n");
             open_bus_decay_timer = 77777;
             return openbus = val;
         }
