@@ -501,15 +501,42 @@ namespace AprNes
                     if (ShowBackGround || ShowSprites) // Tier 2
                     {
                         // PPU_Render_ShiftRegistersAndBitPlanes — 8-phase tile fetch
+                        // TriCNES: EACH phase independently computes its address
+                        // (no dependency on ioaddr from previous phase — critical for prefetch at dot 321
+                        //  where phase 0 at dot 320 is out of range)
                         int phase = cx & 7;
+                        int ntAddr, atAddr, chrAddr;
                         if (phase == 0) { ioaddr = 0x2000 | (vram_addr & 0x0FFF); }
-                        else if (phase == 1) { ppuAddressBus = ioaddr; if (mapperA12IsMmc3) NotifyMapperA12(ioaddr); renderTemp = PpuBusRead(ioaddr); commitNTFetch = true; if (extAttrEnabled) extAttrNTOffset = (ushort)(ioaddr & 0x3FF); if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ioaddr); }
+                        else if (phase == 1) {
+                            ntAddr = 0x2000 | (vram_addr & 0x0FFF);
+                            ppuAddressBus = ntAddr; if (mapperA12IsMmc3) NotifyMapperA12(ntAddr);
+                            renderTemp = PpuBusRead(ntAddr); commitNTFetch = true;
+                            if (extAttrEnabled) extAttrNTOffset = (ushort)(ntAddr & 0x3FF);
+                            if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ntAddr);
+                        }
                         else if (phase == 2) { ioaddr = 0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07); }
-                        else if (phase == 3) { ppuAddressBus = ioaddr; renderTemp = PpuBusRead(ioaddr); commitATFetch = true; if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ioaddr); }
+                        else if (phase == 3) {
+                            atAddr = 0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07);
+                            ppuAddressBus = atAddr; renderTemp = PpuBusRead(atAddr); commitATFetch = true;
+                            if (mmc5Ref != null) mmc5Ref.NotifyVramRead(atAddr);
+                        }
                         else if (phase == 4) { ioaddr = (extAttrEnabled && extAttrChrSize > 0) ? (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7) : BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7); }
-                        else if (phase == 5) { ppuAddressBus = ioaddr; ppuChrFetchA12 = (ioaddr >> 12) & 1; if (mapperNeedsA12) NotifyMapperA12(ioaddr); renderTemp = PpuBusRead(ioaddr); commitPatLowFetch = true; if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ioaddr); }
+                        else if (phase == 5) {
+                            chrAddr = (extAttrEnabled && extAttrChrSize > 0) ? (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7) : BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
+                            ppuAddressBus = chrAddr; ppuChrFetchA12 = (chrAddr >> 12) & 1;
+                            if (mapperNeedsA12) NotifyMapperA12(chrAddr);
+                            renderTemp = PpuBusRead(chrAddr); commitPatLowFetch = true;
+                            if (mmc5Ref != null) mmc5Ref.NotifyVramRead(chrAddr);
+                        }
                         else if (phase == 6) { ioaddr = (extAttrEnabled && extAttrChrSize > 0) ? (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8 : BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8; }
-                        else { ppuAddressBus = ioaddr; ppuChrFetchA12 = (ioaddr >> 12) & 1; if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(ioaddr); renderTemp = PpuBusRead(ioaddr); commitPatHighFetch = true; if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ioaddr); if (scanline < 240 && cx < 257 && ppuRenderingEnabled) RenderBGTile(cx); }
+                        else { // phase 7
+                            chrAddr = (extAttrEnabled && extAttrChrSize > 0) ? (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8 : BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
+                            ppuAddressBus = chrAddr; ppuChrFetchA12 = (chrAddr >> 12) & 1;
+                            if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(chrAddr);
+                            renderTemp = PpuBusRead(chrAddr); commitPatHighFetch = true;
+                            if (mmc5Ref != null) mmc5Ref.NotifyVramRead(chrAddr);
+                            if (scanline < 240 && cx < 257 && ppuRenderingEnabled) RenderBGTile(cx);
+                        }
 
                         // MMC5 CHR A/B switch at first tile of each group
                         if ((cx == 1 || cx == 321) && chrABAutoSwitch) { byte*[] src = Spritesize8x16 ? (chrBGUseASet ? chrBankPtrsA : chrBankPtrsB) : chrBankPtrsA; for (int i = 0; i < 8; i++) chrBankPtrs[i] = src[i]; }
