@@ -2117,7 +2117,8 @@ namespace AprNes
 
             // Delayed re-application (TriCNES: fixes open bus glitch after 1-2 PPU cycles)
             ppu2000PendingValue = value;
-            ppu2000UpdateDelay = ((mcPpuClock & 3) <= 1) ? 2 : 1;
+            // TriCNES: PPUClock 0,1=2; PPUClock 2,3=1. mcPpuClock 0↔PPU0, 3↔PPU1, 2↔PPU2, 1↔PPU3
+            ppu2000UpdateDelay = ((mcPpuClock & 3) == 0 || (mcPpuClock & 3) == 3) ? 2 : 1;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
