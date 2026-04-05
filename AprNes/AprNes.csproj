@@ -191,6 +191,7 @@
     <Compile Include="NesCore\NTSC_CRT\Ntsc.cs" />
     <Compile Include="NesCore\NTSC_CRT\CrtScreen.cs" />
     <Compile Include="NesCore\PPU.cs" />
+    <Compile Include="NesCore\ppu_new.cs" />
     <Compile Include="NesCore\TestRunnerCore.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="TestRunner.cs" />

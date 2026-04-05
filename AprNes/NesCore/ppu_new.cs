@@ -139,10 +139,35 @@ namespace AprNes
             // Phase 3: Events (TriCNES lines 1532-1606)
             // All use POST-increment cx (= PPU_Dot after ++)
             // ══════════════════════════════════════════════════════
-            // TODO: Phase 3
+            if (scanline == nmiTriggerLine) // 241
+            {
+                if (cx == 0) pendingVblank = true;
+                // cx == 1: FrameAdvance (emulator-specific, not PPU logic)
+            }
+            else if (scanline == 260 && cx == 340)
+            {
+                oddSwap = !oddSwap;
+            }
+            else if (scanline == preRenderLine && cx == 1)
+            {
+                isVblank = false;
+                canDetectSprite0Hit = true;
+                isSprite0hit = false;
+                isSpriteOverflow = false;
+                isSprite0hit_Delayed = false;
+                pendingSprite0Hit = false;
+                pendingSprite0Hit2 = false;
+            }
 
-            // ── VSET latch (TriCNES lines 1608-1620) ──
-            // TODO: Phase 3
+            // ── VSET latch pipeline (TriCNES lines 1608-1618) ──
+            ppuVSET_Latch1 = !ppuVSET;
+            if (ppuVSET && !ppuVSET_Latch2)
+                isVblank = true;
+            if (ppu2002ReadPending)
+            {
+                ppu2002ReadPending = false;
+                isVblank = false;
+            }
 
             // ── Sprite overflow delayed (TriCNES line 1619) ──
             isSpriteOverflow_Delayed = isSpriteOverflow;
@@ -152,7 +177,19 @@ namespace AprNes
             ppuA12Prev = (ppuAddressBus & 0x1000) != 0;
 
             // ── Odd frame skip (TriCNES lines 1629-1643) ──
-            // TODO: Phase 3
+            if (oddSwap && (ShowBackGround || ShowSprites)) // Tier 2 delayed flags
+            {
+                if (scanline == preRenderLine && cx == 340)
+                {
+                    if (mmc5Ref != null)
+                        mmc5Ref.NotifyVramRead(0x2000 | (vram_addr & 0x0FFF));
+                    scanline = 0;
+                    ppu_cycles_x = cx = 0;
+                    skippedPreRenderDot341 = true;
+                }
+            }
+            if (oddSwap && (ShowBackGround || ShowSprites) && scanline == 0 && cx == 2)
+                skippedPreRenderDot341 = false;
 
             // ══════════════════════════════════════════════════════
             // Phase 4: Eval delay + sprite eval + $2001 update
