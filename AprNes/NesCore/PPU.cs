@@ -606,128 +606,116 @@ namespace AprNes
             {
                 Yinc();
             }
-            else if (cx >= 257 && cx < 320)
+            else if (cx == 257)
             {
-                // TriCNES line 2823: PPUOAMAddress reset to 0 on EVERY dot 257-320
-                // Use ppu_cycles_x (= PPU_Dot) for boundary — cx is PPU_Dot-1
-                if (ppu_cycles_x >= 257 && ppu_cycles_x <= 320 && (ShowBG_EvalDelay || ShowSpr_EvalDelay))
-                    spr_ram_add = 0;
+                // TriCNES pre-increment: CopyHoriV at D=257
+                CopyHoriV();
+                // MMC5 CHR A/B: switch to A set (sprites) at dot 257
+                if (chrABAutoSwitch && Spritesize8x16)
+                    for (int i = 0; i < 8; i++) chrBankPtrs[i] = chrBankPtrsA[i];
+            }
 
-                if (cx == 257)
+            // ── Sprite fetch: driven by ppu_cycles_x (= PPU_Dot, post-increment) ──
+            // Independent from tile fetch if-else chain. Allows sprite fetch case 0
+            // to run on the SAME physical dot as Yinc (TriCNES: both at D=256→257).
+            {
+                int spriteDot = ppu_cycles_x; // = PPU_Dot (post-increment)
+                if (spriteDot >= 257 && spriteDot <= 320)
                 {
-                    CopyHoriV();
-                    evalOam2Addr = 0; // TriCNES line 2828: OAM2Address = 0
-                    // MMC5 CHR A/B: switch to A set (sprites) at dot 257 (only in 8x16 mode)
-                    if (chrABAutoSwitch && Spritesize8x16)
-                        for (int i = 0; i < 8; i++) chrBankPtrs[i] = chrBankPtrsA[i];
-                }
+                    // TriCNES line 2823: PPUOAMAddress reset every dot 257-320
+                    if (ShowBG_EvalDelay || ShowSpr_EvalDelay)
+                        spr_ram_add = 0;
 
-                // Latch sprite size at dot 261 (sprite 0 CHR low fetch address).
-                if (cx == 261) spriteSizeLatchedForFetch = Spritesize8x16;
+                    // TriCNES line 2828: OAM2Address=0, SpriteEvaluationTick=0 at dot 257
+                    if (spriteDot == 257)
+                        evalOam2Addr = 0;
 
-                // TriCNES sprite fetch model:
-                // Cases 0-3: read OAM2 (Y, tile, attr, X) + call BG fetch (dummy NT/AT)
-                // Cases 4-7: compute/fetch sprite CHR low/high
-                {
-                    int sprPhase = (cx - 257) & 7;
-                    int slot = (cx - 257) >> 3;
+                    // Latch sprite size at dot 262 (= cx 261 equivalent)
+                    if (spriteDot == 262) spriteSizeLatchedForFetch = Spritesize8x16;
 
-                    // 6.4: Cases 0-3 call PPU_Render_ShiftRegistersAndBitPlanes() in TriCNES,
-                    // which executes BG fetch logic for (PPU_Dot & 7). This sets ppuAddressBus
-                    // to NT/AT addresses via the same BG fetch circuit.
+                    int sprPhase = (spriteDot - 257) & 7;
+                    int slot = (spriteDot - 257) >> 3;
+
+                    // Cases 0-3: dummy BG fetch (sets ppuAddressBus to NT/AT addresses)
                     if (sprPhase <= 3)
                     {
-                        int bgPhase = cx & 7; // TriCNES: PPU_Dot & 7 (dot 257→1, 258→2, 259→3, 260→4)
-                        // BG case 1: NT addr → ppuAddressBus (A12=0)
+                        int bgPhase = spriteDot & 7;
                         if (bgPhase == 1)
                             ppuAddressBus = (ushort)(0x2000 | (vram_addr & 0x0FFF));
-                        // BG case 3: AT addr → ppuAddressBus (A12=0)
                         else if (bgPhase == 3)
                             ppuAddressBus = (ushort)(0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07));
-                        // BG cases 2,4: no-op (TriCNES does nothing)
                     }
 
-                    // 6.2: OAM2 reads via tracked address (TriCNES: OAM2[OAM2Address])
+                    // OAM2 reads + sprite tile fetch
                     if (sprPhase == 0)
                     {
-                        // TriCNES case 0: read Y (address already set by BG fetch above)
-                        oamCopyBuffer = secondaryOAM[evalOam2Addr]; // 6.2: tracked OAM2 address
+                        oamCopyBuffer = secondaryOAM[evalOam2Addr];
                         evalOam2Addr++;
                     }
                     else if (sprPhase == 1)
                     {
-                        // TriCNES case 1: read tile pattern
                         oamCopyBuffer = secondaryOAM[evalOam2Addr];
-                        // A12 notify at data phase (BG case 2 is no-op, so notify from previous bus state)
                         if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus);
                         evalOam2Addr++;
                     }
                     else if (sprPhase == 2)
                     {
-                        // TriCNES case 2: read attribute
                         oamCopyBuffer = secondaryOAM[evalOam2Addr];
                         sprFetchAttr[slot] = oamCopyBuffer;
                         evalOam2Addr++;
                     }
                     else if (sprPhase == 3)
                     {
-                        // TriCNES case 3: read X position (OAM2Address NOT incremented until case 7)
                         oamCopyBuffer = secondaryOAM[evalOam2Addr];
                         sprXPos[slot] = oamCopyBuffer;
                     }
                     else if (sprPhase == 4)
                     {
-                        // TriCNES case 4: read X again + GetSpriteAddress
                         oamCopyBuffer = secondaryOAM[evalOam2Addr];
                         ppuAddressBus = ComputeSpritePatternAddr(slot);
                         ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
                     }
                     else if (sprPhase == 5)
                     {
-                        // TriCNES case 5: read X again + fetch CHR low
                         oamCopyBuffer = secondaryOAM[evalOam2Addr];
                         if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus);
                         int addr = ppuAddressBus;
                         byte tile = chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF];
                         bool flipH = (sprFetchAttr[slot] & 0x40) != 0;
                         sprShiftL[slot] = flipH ? FlipByte(tile) : tile;
-                        // 6.3: in-range check at CHR fetch (TriCNES checks here)
                         if (slot >= sprSlotCount) sprShiftL[slot] = 0;
                     }
                     else if (sprPhase == 6)
                     {
-                        // TriCNES case 6: read X again + GetSpriteAddress + addr+8
                         oamCopyBuffer = secondaryOAM[evalOam2Addr];
                         ppuAddressBus = ComputeSpritePatternAddr(slot) + 8;
                         ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
                     }
                     else // sprPhase == 7
                     {
-                        // TriCNES case 7: read X again + fetch CHR high + advance OAM2Address
                         oamCopyBuffer = secondaryOAM[evalOam2Addr];
                         if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(ppuAddressBus);
                         int addr = ppuAddressBus;
                         byte tile = chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF];
                         bool flipH = (sprFetchAttr[slot] & 0x40) != 0;
                         sprShiftH[slot] = flipH ? FlipByte(tile) : tile;
-                        // 6.3: in-range check at CHR fetch (TriCNES checks here)
                         if (slot >= sprSlotCount) sprShiftH[slot] = 0;
-                        evalOam2Addr++; // TriCNES: OAM2Address only increments at case 7
+                        evalOam2Addr++;
                     }
-                }
-                // MMC5: per-fetch VRAM read notifications for sprite phase
-                if (mmc5Ref != null)
-                {
-                    int phaseM5 = (cx - 257) & 7;
-                    if (phaseM5 == 1) mmc5Ref.NotifyVramRead(0x2000);        // garbage NT
-                    else if (phaseM5 == 3) mmc5Ref.NotifyVramRead(0x23C0);   // garbage AT
-                    else if (phaseM5 == 5) mmc5Ref.NotifyVramRead(SpPatternTableAddr);       // CHR low
-                    else if (phaseM5 == 7) mmc5Ref.NotifyVramRead(SpPatternTableAddr | 8);   // CHR high
+
+                    // MMC5 notifications
+                    if (mmc5Ref != null)
+                    {
+                        if (sprPhase == 1) mmc5Ref.NotifyVramRead(0x2000);
+                        else if (sprPhase == 3) mmc5Ref.NotifyVramRead(0x23C0);
+                        else if (sprPhase == 5) mmc5Ref.NotifyVramRead(SpPatternTableAddr);
+                        else if (sprPhase == 7) mmc5Ref.NotifyVramRead(SpPatternTableAddr | 8);
+                    }
                 }
             }
 
-            // Dot 321: latch secondary OAM[0] into oamCopyBuffer for dots 321-340
-            if (cx == 321 && scanline < 240 && (ShowBackGround_Instant || ShowSprites_Instant))
+            // Dot 321 equivalent (ppu_cycles_x = 322)
+            if (ppu_cycles_x == 322 && scanline < 240 && (ShowBackGround_Instant || ShowSprites_Instant))
                 oamCopyBuffer = secondaryOAM[0];
 
             // Pre-render scanline: continuous vert(v) = vert(t) copy at cycles 280-304
