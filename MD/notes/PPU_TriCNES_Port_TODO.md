@@ -7,6 +7,33 @@
 
 ## 來源: `ref/TriCNES-main/Emulator.cs`
 
+## 前置確認 ✅
+- [x] Master clock 模型已一致：MasterClockTick 的 gate order = CPU(0)→NMI(8)→PPU(0)→PPU_half(2)→IRQ(5)→APU(12)
+- [x] CpuWrite 直接寫入 register（不經過 tick），CPU 在 PPU 之前執行 → write-before-tick ✅
+- [x] 不需要改 MEM.cs，delay 值可直接用 TriCNES 原始值
+- [x] IO.cs（ppu_w_2000/2001/2005/2006）的 delay 設定用 mcPpuClock 對應正確
+- [x] ppu_r_2002/2004: EmulateUntilEndOfRead（7 master ticks）與 TriCNES 一致
+- [x] DMA (OAM/DMC): 由 DmaOneCycle 處理，透過 master clock 與 PPU 互動，不受影響
+- [x] APU: mcCpuClock==12，不受 PPU port 影響
+- [x] NMI/IRQ: 在 master tick 正確位置（8/5），PPU 只需正確設定 flag
+
+## 影響範圍評估
+**需要替換的：**
+- `ppu_step()` + `ppu_step_common()` + `ppu_step_rendering()` + `ppu_rendering_tick()` → `ppu_step_new()`
+- `ppu_half_step()` → `ppu_half_step_new()`
+- 所有子函數（tile fetch, sprite eval, CalculatePixel, etc.）
+
+**不需要改動的：**
+- Main.cs MasterClockTick — 不動
+- MEM.cs — 不動
+- IO.cs — register handlers 保留，可能微調配合新 state 變數
+- CPU.cs — 不動
+- APU.cs — 不動
+- Mapper/*.cs — 不動（PpuClock/CpuClockRise 介面不變）
+- ppu_w_2000/2001/2005/2006 — delay 設定保留，countdown 移入 ppu_step_new
+- ppu_r_2002/2004/2007 — 保留（含 EmulateUntilEndOfRead）
+- $2007 state machine — 搬入 ppu_step_new 對應位置，邏輯不變
+
 ---
 
 ## Phase 1: 骨架
