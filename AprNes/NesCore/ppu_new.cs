@@ -229,8 +229,6 @@ namespace AprNes
                 if (scanline > 261)
                 {
                     scanline = 0;
-                    if (ShowBackGround_Instant || ShowSprites_Instant)
-                        ProcessOamCorruption();
                 }
             }
 
@@ -295,6 +293,24 @@ namespace AprNes
             // (TriCNES lines 1652-1722)
             // ══════════════════════════════════════════════════════
 
+            // ── Delayed OAM corruption (TriCNES lines 1695-1711) ──
+            if (oamCorruptDelay > 0)
+            {
+                --oamCorruptDelay;
+                if (oamCorruptDelay == 0)
+                {
+                    // Delay expired: check if rendering was disabled outside VBlank
+                    if (oamCorruptWasRendering && (oamCorrupt2001Value & 0x08) == 0 && (oamCorrupt2001Value & 0x10) == 0)
+                    {
+                        if (scanline < 240 || scanline == preRenderLine)
+                        {
+                            if (!oamCorruptPending)
+                                oamCorruptDisabledFlag = true;
+                        }
+                    }
+                }
+            }
+
             // ── Eval delay: non-phase-3 (TriCNES lines 1653-1658) ──
             if ((mcCpuClock & 3) != 3)
             {
@@ -305,6 +321,23 @@ namespace AprNes
             // ── Sprite evaluation (TriCNES line 1664, inside scanline gate) ──
             if (scanline < 240 || scanline == preRenderLine)
             {
+                // TriCNES line 2491-2501: OAM corruption on first rendered dot after re-enable
+                if ((ShowBackGround_Instant || ShowSprites_Instant) && oamCorruptPending)
+                {
+                    oamCorruptPending = false;
+                    if (!oamCorruptSuppressed)
+                        ProcessOamCorruption();
+                    oamCorruptSuppressed = false;
+                }
+
+                // TriCNES line 2528-2534: capture corruption index when delayed flag fires
+                if (oamCorruptDisabledFlag)
+                {
+                    oamCorruptDisabledFlag = false;
+                    oamCorruptPending = true;
+                    oamCorruptIndex = evalOam2Addr; // capture at current sprite eval position
+                }
+
                 // Per-dot sprite evaluation (existing AccuracyOptA code)
                 // TODO Phase 7: port PPU_Render_SpriteEvaluation from TriCNES
                 // For now, call existing sprite eval logic inline:

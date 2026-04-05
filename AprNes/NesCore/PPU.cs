@@ -205,6 +205,12 @@ namespace AprNes
         static bool oamCorruptSuppressed = false;       // Alignment 1,2 suppress corruption on re-enable
         static int oamCorruptIndex = 0;                 // 6.5: TriCNES PPU_OAMCorruptionIndex (from OAM2Address)
 
+        // TriCNES delayed OAM corruption model (PPU_Update2001OAMCorruptionDelay)
+        static int oamCorruptDelay = 0;                 // Countdown (PPU cycles) before corruption disable flag fires
+        static bool oamCorruptWasRendering = false;     // TriCNES: PPU_WasRenderingBefore2001Write
+        static byte oamCorrupt2001Value = 0;            // TriCNES: PPU_Update2001Value
+        static bool oamCorruptDisabledFlag = false;     // TriCNES: PPU_OAMCorruptionRenderingDisabledOutOfVBlank
+
         // P4-2: Palette corruption flags
         static bool paletteCorruptFromDisable = false;  // Rendering disabled during NT fetch with VRAM >= $3C00
         static bool paletteCorruptFromVAddr = false;    // $2006 palette→non-palette transition
@@ -1362,7 +1368,7 @@ namespace AprNes
             if (cx == 341)
             {
                 if (++scanline == totalScanlines)
-                { scanline = 0; if (ShowBackGround_Instant || ShowSprites_Instant) ProcessOamCorruption(); }
+                { scanline = 0; }
                 ppu_cycles_x = cx = 0;
             }
 
@@ -2153,8 +2159,18 @@ namespace AprNes
             ShowBackGround_Instant = (value & 0x08) != 0;
             ShowSprites_Instant    = (value & 0x10) != 0;
 
-            // P4-1: OAM corruption with per-alignment suppression (TriCNES model)
+            // P4-1: TriCNES delayed OAM corruption model
             bool newRenderingInstant = ShowBackGround_Instant || ShowSprites_Instant;
+            // Record state for delayed corruption check
+            oamCorruptWasRendering = prevRenderingEnabled;
+            oamCorrupt2001Value = value;
+            // Set delay based on alignment (TriCNES line 9518-9527)
+            switch (mcPpuClock & 3)
+            {
+                case 0: case 3: oamCorruptDelay = 2; break;
+                case 1: case 2: oamCorruptDelay = 3; break;
+            }
+
             if (prevRenderingEnabled != newRenderingInstant)
             {
                 bool outsideVblank = scanline >= 0 && (scanline < 240 || scanline == preRenderLine);
@@ -2162,29 +2178,20 @@ namespace AprNes
                 {
                     if (!newRenderingInstant)
                     {
-                        // Disabling rendering — mark rows for corruption
-                        SetOamCorruptionFlags();
-                        oamCorruptPending = true;
-
-                        // P4-2: Palette corruption when disabling during first 2 dots of NT fetch
+                        // Disabling: palette corruption (immediate, TriCNES line 9546)
                         if ((ppu_cycles_x & 7) < 2 && ppu_cycles_x <= 250)
                         {
                             if ((vram_addr & 0x3FFF) >= 0x3C00)
                                 paletteCorruptFromDisable = true;
                         }
+                        // OAM corruption: deferred to delay expiry (NOT immediate)
                     }
                     else
                     {
-                        // Re-enabling rendering — apply corruption with alignment gate
-                        // TriCNES: alignment 1,2 suppress corruption on re-enable
-                        int alignment = mcCpuClock & 3;
+                        // Re-enabling rendering — suppression gate (TriCNES line 9564)
+                        int alignment = mcPpuClock & 3;
                         if (oamCorruptPending && (alignment == 1 || alignment == 2))
                             oamCorruptSuppressed = true;
-
-                        if (!oamCorruptSuppressed)
-                            ProcessOamCorruption();
-                        oamCorruptPending = false;
-                        oamCorruptSuppressed = false;
 
                         // Sprite 0 hit now uses CalculatePixel model (no pre-computation needed)
                     }

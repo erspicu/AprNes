@@ -291,8 +291,9 @@ namespace AprNes
             dotColor = prevDotColor = prevPrevDotColor = prevPrevPrevDotColor = 0;
             dotPalIdx = prevDotPalIdx = prevPrevDotPalIdx = prevPrevPrevDotPalIdx = 0;
             skippedPreRenderDot341 = false;
-            // P4-1: OAM corruption alignment suppression
+            // P4-1: OAM corruption
             oamCorruptPending = false; oamCorruptSuppressed = false;
+            oamCorruptDelay = 0; oamCorruptDisabledFlag = false;
             // P4-2: Palette corruption
             paletteCorruptFromDisable = false; paletteCorruptFromVAddr = false;
             mcCpuClock = 0; mcPpuClock = 0; mcApuPutCycle = true; // TriCNES: APU_PutCycle=true at power-on
