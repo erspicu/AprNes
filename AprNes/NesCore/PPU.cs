@@ -1344,29 +1344,24 @@ namespace AprNes
             // A12_Prev capture (TriCNES line 1628)
             ppuA12Prev = (ppuAddressBus & 0x1000) != 0;
 
-            // Rendering — cx = PPU_Dot (direct TriCNES match)
-            ppu_step_rendering(cx, re, preRenderLine);
-
-            // P4-3: OAMBuffer in ppu_half_step only (TriCNES _EmulateHalfPPU)
-
-            // NTSC odd frame dot skip: TriCNES PPU_Dot=340
-            if (scanline == preRenderLine && cx == 340)
+            // NTSC odd frame skip: TriCNES PPU_Dot=340, BEFORE rendering (line 1629-1643)
+            if (scanline == preRenderLine && cx == 339)
             {
                 oddSwap = !oddSwap;
                 if (!oddSwap && (ShowBackGround_Instant || ShowSprites_Instant))
                 {
                     if (mmc5Ref != null)
                         mmc5Ref.NotifyVramRead(0x2000 | (vram_addr & 0x0FFF));
-                    // TriCNES: PPU_Scanline=0; PPU_Dot=0; (direct jump, not increment)
                     scanline = 0;
                     ppu_cycles_x = cx = 0;
                     skippedPreRenderDot341 = true;
                 }
             }
-
-            // P4-4: Clear SkippedPreRenderDot341 at scanline 0, dot 2 (TriCNES line 1643)
             if (skippedPreRenderDot341 && scanline == 0 && cx == 2)
                 skippedPreRenderDot341 = false;
+
+            // Rendering — cx = PPU_Dot (direct TriCNES match)
+            ppu_step_rendering(cx, re, preRenderLine);
 
             // Scanline wrap moved to before events (TriCNES order)
         }
