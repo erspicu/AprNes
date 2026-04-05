@@ -144,7 +144,7 @@ namespace AprNes
             // ══════════════════════════════════════════════════════
             if (scanline == nmiTriggerLine) // 241
             {
-                if (cx == 0) pendingVblank = true;
+                if (cx == 1) pendingVblank = true; // TEST: dot 1 instead of TriCNES dot 0
                 // cx == 1: FrameAdvance (emulator-specific, not PPU logic)
             }
             else if (scanline == 260 && cx == 340)
