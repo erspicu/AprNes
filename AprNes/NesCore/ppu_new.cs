@@ -373,6 +373,7 @@ namespace AprNes
             // (TriCNES lines 1724-1807)
             // ══════════════════════════════════════════════════════
 
+
             // ── Pipeline shift (TriCNES line 1724: ALL scanlines, ALL dots, OUTSIDE any gate) ──
             prevPrevPrevDotColor = prevPrevDotColor; prevPrevDotColor = prevDotColor; prevDotColor = dotColor;
             prevPrevPrevDotPalIdx = prevPrevDotPalIdx; prevPrevDotPalIdx = prevDotPalIdx; prevDotPalIdx = dotPalIdx;
@@ -454,6 +455,8 @@ namespace AprNes
 
                             if (canDetectSprite0Hit && sprSlot == 0 && sprZeroInSlots && ShowBackGround && ShowSprites && bgColor != 0 && sprColor != 0)
                             { if ((ShowSprLeft8 || cx > 8) && cx < 256) { pendingSprite0Hit = true; canDetectSprite0Hit = false; } }
+
+                            // DEBUG removed
 
                             if (sprColor != 0 && ShowSprites) { if (bgColor == 0 || sprPriority) { bgColor = sprColor; bgPalette = sprPalette; } }
                         }

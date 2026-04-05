@@ -61,7 +61,7 @@ namespace AprNes
 
         // Accuracy option: per-dot secondary OAM evaluation FSM (dots 1-64 clear, 65-256 evaluate)
         // true = full hardware accuracy; false = skip FSM for ~13% performance gain (no test failures)
-        static public bool AccuracyOptA = false;
+        static public bool AccuracyOptA = true; // hardcoded for ppu-tricnes-port testing
 
         // TV system region
         public enum RegionType { NTSC, PAL, Dendy }
