@@ -41,8 +41,6 @@ namespace AprNes
             bool a12Now = (NesCore.ppuAddressBus & 0x1000) != 0;
             if (!NesCore.ppuA12Prev && a12Now && m2Filter == 3)
             {
-                if (NesCore.frame_count <= 13)
-                    System.Console.Error.WriteLine($"A CLK SL={NesCore.scanline} cx={NesCore.ppu_cycles_x} bus={NesCore.ppuAddressBus:X4} m2={m2Filter} ctr={IRQCounter}");
                 Mapper04step_IRQ();
             }
             if (a12Now)

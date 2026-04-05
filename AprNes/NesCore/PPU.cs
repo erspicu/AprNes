@@ -488,9 +488,12 @@ namespace AprNes
         static byte attrLatch = 0;
 
         // Deferred shift register reload (TriCNES: PPU_Commit_LoadShiftRegisters)
-        // Phase 7 stores tile data here; next half-step commits into renderLow/renderHigh.
+        // Phase 7 sets staged flag → same-dot half step promotes to ready → NEXT half step loads.
+        // This 1-half-step delay matches TriCNES: PPU_Commit_LoadShiftRegisters set at HalfDot phase 7,
+        // committed at the NEXT HalfDot's CommitShiftRegistersAndBitPlanes_HalfDot.
         static byte pendingTileLow = 0, pendingTileHigh = 0;
-        static bool commitLoadShiftReg = false;
+        static bool commitLoadShiftRegStaged = false;  // set at full step phase 7
+        static bool commitLoadShiftReg = false;         // promoted at half step, committed next half step
 
         // ---- Attribute 3-stage pipeline ----
         // Phase-3 shifts ATVal into p1; phase-7 render reads p3 (2 groups later).
@@ -596,7 +599,7 @@ namespace AprNes
                     // (TriCNES: PPU_Commit_LoadShiftRegisters model)
                     pendingTileLow = lowTile;
                     pendingTileHigh = highTile;
-                    commitLoadShiftReg = true;
+                    commitLoadShiftRegStaged = true;
                     // CXinc deferred to next dot's commit (TriCNES: PPU_Commit_PatternHighFetch)
                     commitCXinc = true;
                 }
@@ -811,9 +814,8 @@ namespace AprNes
 
         static void NotifyMapperA12(int address)
         {
-            // +1: notification fires during rendering (pre-increment), but TriCNES detects
-            // in PPUClock which runs after PPU_Dot++ (post-increment). Align timestamps.
-            MapperObj.NotifyA12(address, scanline * 341 + ppu_cycles_x + 1);
+            // cx = PPU_Dot (post-increment), ppu_cycles_x = cx. Timestamp matches TriCNES.
+            MapperObj.NotifyA12(address, scanline * 341 + ppu_cycles_x);
         }
 
         // ── Half-step: runs AFTER each full ppu_step (mid-dot) ──
@@ -872,12 +874,15 @@ namespace AprNes
             }
 
             // ── Deferred shift register reload (TriCNES: PPU_Render_CommitShiftRegistersAndBitPlanes_HalfDot) ──
+            // Commit ready flag (from previous half step's promotion)
             if (commitLoadShiftReg)
             {
                 commitLoadShiftReg = false;
                 renderLow  = (ushort)((renderLow  & 0xFF00) | pendingTileLow);
                 renderHigh = (ushort)((renderHigh & 0xFF00) | pendingTileHigh);
             }
+            // Promote staged → ready (TriCNES: set at HalfDot phase 7, committed NEXT HalfDot)
+            if (commitLoadShiftRegStaged) { commitLoadShiftRegStaged = false; commitLoadShiftReg = true; }
 
             // P4-2: Palette corruption effect — only on alignment 2 (TriCNES: CorruptPalettes)
             // At alignment 0 (AprNes fixed), this never fires. Structural placeholder.
@@ -988,8 +993,9 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_step_rendering(int cx, bool renderingEnabled, int PRE_RENDER_LINE)
         {
-            // TriCNES line 1676: address bus = v when rendering disabled — ALL scanlines, not just visible
-            if (!ppuRenderingEnabled)
+            // TriCNES line 1674: address bus = v when rendering disabled — ALL scanlines
+            // Uses Tier 2 delayed flags (TriCNES: PPU_Mask_ShowBackground/ShowSprites)
+            if (!ShowBackGround && !ShowSprites)
             {
                 ppuAddressBus = vram_addr;
                 ppuChrFetchA12 = (vram_addr >> 12) & 1;
@@ -1230,7 +1236,8 @@ namespace AprNes
                 } // end CalculatePixel inner (cx <= 257 visible+border)
 
                 // UpdateSpriteShiftRegisters (TriCNES line 3718: PPU_Dot <= 256)
-                if (cx <= 256)
+                // Must match TriCNES outer gate: PPU_Dot > 0 (excludes dot 0 after scanline wrap)
+                if (cx > 0 && cx <= 256)
                 {
                     for (int s = 0; s < 8; s++)
                     {
@@ -1348,7 +1355,8 @@ namespace AprNes
 
             // ── Odd frame skip (TriCNES lines 1629-1637, AFTER mapper, BEFORE rendering) ──
             // Uses oddSwap (toggled at SL260), NOT toggled here
-            if (oddSwap && (ShowBackGround_Instant || ShowSprites_Instant)
+            // TriCNES uses delayed flags (PPU_Mask_ShowBackground/Sprites), not Instant
+            if (oddSwap && (ShowBackGround || ShowSprites)
                 && scanline == preRenderLine && cx == 340)
             {
                 if (mmc5Ref != null)
