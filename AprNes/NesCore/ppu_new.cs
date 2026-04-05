@@ -558,7 +558,9 @@ namespace AprNes
                         {
                             int bit = 15 - FineX;
                             bgColor = (((renderHigh >> bit) & 1) << 1) | ((renderLow >> bit) & 1);
-                            bgPalette = (bit >= 8) ? bg_attr_p3 : bg_attr_p2;
+                            // TriCNES: attribute from shift registers at bit (7 - FineX)
+                            { int ab = 7 - FineX;
+                              bgPalette = (((renderAttrHigh >> ab) & 1) << 1) | ((renderAttrLow >> ab) & 1); }
                             if (bgColor == 0) bgPalette = 0;
                         }
 
