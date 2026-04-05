@@ -616,7 +616,7 @@ namespace AprNes
                 if (cx == 257)
                 {
                     CopyHoriV();
-                    evalOam2Addr = 0; // 6.2: reset secondary OAM address (TriCNES: OAM2Address)
+                    evalOam2Addr = 0; // TriCNES line 2828: OAM2Address = 0
                     // MMC5 CHR A/B: switch to A set (sprites) at dot 257 (only in 8x16 mode)
                     if (chrABAutoSwitch && Spritesize8x16)
                         for (int i = 0; i < 8; i++) chrBankPtrs[i] = chrBankPtrsA[i];
