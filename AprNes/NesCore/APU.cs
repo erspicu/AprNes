@@ -113,9 +113,13 @@ namespace AprNes
         // =====================================================================
         static int apucycle = 0;
         static int* noiseperiod;
-        // Frame counter — TriCNES count-up model
-        // Counter increments every CPU cycle; events fire at hardcoded positions via switch.
-        static ushort apuFrameCounter = 0;        // TriCNES: APU_Framecounter (count-up)
+        // Frame counter — count-up model with region-dependent thresholds
+        // Counter increments every CPU cycle; events fire at threshold positions.
+        // NTSC: 7457/14913/22371/29828-29830 (4-step), +37281/37282 (5-step)
+        // PAL:  8313/16627/24939/33251-33253 (4-step), +41565/41566 (5-step)
+        static int[] fc4step = new int[6]; // [Q0, QH1, Q2, IRQ3a, QH_IRQ3b, IRQ_RESET3c]
+        static int[] fc5step = new int[6]; // [Q0, QH1, Q2, skip3, QH4, RESET5]
+        static ushort apuFrameCounter = 0;        // count-up counter
         static byte apuFrameCounterReset = 0xFF;  // TriCNES: APU_FrameCounterReset (0xFF=inactive, 0-4=countdown)
         static bool apuQuarterFrame = false;       // TriCNES: APU_QuarterFrameClock
         static bool apuHalfFrame = false;          // TriCNES: APU_HalfFrameClock
@@ -272,6 +276,18 @@ namespace AprNes
 
             // Initialize region-dependent data arrays
             _cycPerSample = cpuFreq / APU_SAMPLE_RATE;
+
+            // Frame counter thresholds (count-up positions)
+            if (Region == RegionType.PAL)
+            {
+                fc4step[0]=8313; fc4step[1]=16627; fc4step[2]=24939; fc4step[3]=33252; fc4step[4]=33253; fc4step[5]=33254;
+                fc5step[0]=8313; fc5step[1]=16627; fc5step[2]=24939; fc5step[3]=33253; fc5step[4]=41565; fc5step[5]=41566;
+            }
+            else // NTSC and Dendy
+            {
+                fc4step[0]=7457; fc4step[1]=14913; fc4step[2]=22371; fc4step[3]=29828; fc4step[4]=29829; fc4step[5]=29830;
+                fc5step[0]=7457; fc5step[1]=14913; fc5step[2]=22371; fc5step[3]=29829; fc5step[4]=37281; fc5step[5]=37282;
+            }
 
             if (Region == RegionType.PAL)
             {
@@ -502,37 +518,34 @@ namespace AprNes
 
             apuFrameCounter++;
 
-            // Frame counter switch: OR flags (preserve $4017-set flags)
+            // Frame counter: region-dependent thresholds via fc4step/fc5step arrays
+            int fc = apuFrameCounter;
             if (ctrmode == 5)
             {
-                switch (apuFrameCounter)
-                {
-                    case 7457: apuQuarterFrame = true; break;
-                    case 14913: apuQuarterFrame = true; apuHalfFrame = true; break;
-                    case 22371: apuQuarterFrame = true; break;
-                    case 29829: break;
-                    case 37281: apuQuarterFrame = true; apuHalfFrame = true; break;
-                    case 37282: apuFrameCounter = 0; break;
-                }
+                if      (fc == fc5step[0]) apuQuarterFrame = true;
+                else if (fc == fc5step[1]) { apuQuarterFrame = true; apuHalfFrame = true; }
+                else if (fc == fc5step[2]) apuQuarterFrame = true;
+                else if (fc == fc5step[3]) { } // skip
+                else if (fc == fc5step[4]) { apuQuarterFrame = true; apuHalfFrame = true; }
+                else if (fc == fc5step[5]) apuFrameCounter = 0;
             }
             else
             {
-                switch (apuFrameCounter)
+                if      (fc == fc4step[0]) apuQuarterFrame = true;
+                else if (fc == fc4step[1]) { apuQuarterFrame = true; apuHalfFrame = true; }
+                else if (fc == fc4step[2]) apuQuarterFrame = true;
+                else if (fc == fc4step[3]) statusframeint = true;
+                else if (fc == fc4step[4])
                 {
-                    case 7457: apuQuarterFrame = true; break;
-                    case 14913: apuQuarterFrame = true; apuHalfFrame = true; break;
-                    case 22371: apuQuarterFrame = true; break;
-                    case 29828: statusframeint = true; break;
-                    case 29829:
-                        apuQuarterFrame = true; apuHalfFrame = true;
-                        statusframeint = true;
-                        irqLineCurrent |= !apuintflag;
-                        break;
-                    case 29830:
-                        statusframeint = !apuintflag;
-                        irqLineCurrent |= !apuintflag;
-                        apuFrameCounter = 0;
-                        break;
+                    apuQuarterFrame = true; apuHalfFrame = true;
+                    statusframeint = true;
+                    irqLineCurrent |= !apuintflag;
+                }
+                else if (fc == fc4step[5])
+                {
+                    statusframeint = !apuintflag;
+                    irqLineCurrent |= !apuintflag;
+                    apuFrameCounter = 0;
                 }
             }
 
