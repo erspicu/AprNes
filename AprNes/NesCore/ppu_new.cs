@@ -187,8 +187,9 @@ namespace AprNes
             }
             if (ppu2007SM == 8 && ppu2007SM_interruptedReadToWrite)
             {
-                if ((mcCpuClock & 3) != 0)
-                    PpuBusWrite((ushort)ppuAddressBus, ppu2007SM_writeValue);
+                // Fix: TriCNES skips write on phase 0 ((CPUClock & 3) != 0), but this
+                // prevents STA $2007,X from working. Remove phase gate for this path.
+                PpuBusWrite((ushort)ppuAddressBus, ppu2007SM_writeValue);
                 ppu2007SM_interruptedReadToWrite = false;
                 vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x3FFF);
                 ppuAddressBus = vram_addr;
