@@ -107,7 +107,7 @@ See `adapters/AprNesAdapter/` for a complete reference implementation.
 
 ## Reference Project: AprNes
 
-[AprNes](https://github.com/erspicu/AprNes) is a cycle-accurate NES emulator that achieves **184/184 blargg (NTSC+PAL) + 136/136 AccuracyCoin** perfect scores. It serves as the reference implementation for this framework.
+[AprNes](https://github.com/erspicu/AprNes) is a cycle-accurate NES emulator that achieves **184/184 blargg (NTSC+PAL)** perfect score. It serves as the reference implementation for this framework.
 
 ### How AprNes Integrates the Framework
 
@@ -216,7 +216,6 @@ python unittest/run_tests.py --exe AprNes/bin/Debug/AprNes.exe --suite ppu_vbl_n
 |-----------|-------|--------|
 | Blargg NTSC | 174 | **174/174 PASS** |
 | Blargg PAL | 10 | **10/10 PASS** |
-| AccuracyCoin | 136 | **136/136 PASS** |
 
 ---
 
