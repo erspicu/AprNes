@@ -74,7 +74,7 @@ namespace AprNes
             }
 
             // ── $2007 state machine (extracted for I-Cache isolation) ──
-            if (ppu2007SM < 9 || (ppu2007SM == 8 && ppu2007SM_interruptedReadToWrite))
+            if (ppu2007SM < 9)
                 Process2007StateMachine();
 
             // Open bus decay (AprNes-specific, runs every dot)
@@ -547,105 +547,78 @@ namespace AprNes
         // ════════════════════════════════════════════════════════════════
         static void Process2007StateMachine()
         {
-            if (ppu2007SM < 9)
+            int sm = ppu2007SM++;
+
+            if (sm == 1)
             {
-                if (ppu2007SM == 1)
+                if (ppu2007SM_isRead && !ppu2007SM_bufferLate)
                 {
-                    if (ppu2007SM_isRead && !ppu2007SM_bufferLate)
-                    {
-                        int a = ppu2007SM_addr;
-                        ppuAddressBus = a;
-                        ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a & 0x3FFF);
-                    }
+                    ppuAddressBus = ppu2007SM_addr;
+                    ppu_2007_buffer = PpuBusRead(ppu2007SM_addr >= 0x3F00 ? ppu2007SM_addr & 0x2FFF : ppu2007SM_addr & 0x3FFF);
                 }
-                else if (ppu2007SM == 3)
+            }
+            else if (sm == 3)
+            {
+                if (ppu2007SM_normalWriteBehavior)
                 {
-                    if (ppu2007SM_normalWriteBehavior)
-                    {
-                        ppu2007SM_normalWriteBehavior = false;
-                        if (!ppu2007SM_isRead || !ppu2007SM_readDelayed)
-                        {
-                            ppuAddressBus = vram_addr;
-                            PpuBusWrite(ppuAddressBus, ppu2007SM_writeValue);
-                        }
-                    }
-                    else if (!ppu2007SM_isRead && ppu2007SM_performMysteryWrite)
-                    {
-                        if (ppu2007SM_mysteryAddr >= 0x3F00)
-                        {
-                            PpuBusWrite((ushort)(vram_addr & 0x2FFF), (byte)ppu2007SM_mysteryAddr);
-                            ppuAddressBus = vram_addr;
-                        }
-                        else
-                        {
-                            PpuBusWrite(ppu2007SM_mysteryAddr, (byte)ppu2007SM_mysteryAddr);
-                            PpuBusWrite((ushort)vram_addr, (byte)vram_addr);
-                            ppuAddressBus = vram_addr;
-                        }
-                    }
-                }
-                else if (ppu2007SM == 4)
-                {
-                    if (ppu2007SM_isRead && ppu2007SM_bufferLate)
-                    {
-                        int a = vram_addr;
-                        ppuAddressBus = a;
-                        ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a & 0x3FFF);
-                    }
-                    if (ppu2007SM_updateVramAddrEarly)
-                    {
-                        ppu2007SM_updateVramAddrEarly = false;
-                        vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x3FFF);
-                        ppuAddressBus = vram_addr;
-                        if (ppu2007SM_isRead)
-                        {
-                            int a = vram_addr;
-                            ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a & 0x3FFF);
-                        }
-                    }
-                    if ((ShowBackGround || ShowSprites) && (scanline < 240 || scanline == preRenderLine))
-                    { CXinc(); Yinc(); }
-                    else
-                    { vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x3FFF); }
-                    ppuAddressBus = vram_addr;
-                    if (mapperNeedsA12) NotifyMapperA12(vram_addr);
+                    ppu2007SM_normalWriteBehavior = false;
                     if (!ppu2007SM_isRead || !ppu2007SM_readDelayed)
                     {
-                        if (ppu2007SM_performMysteryWrite && ((mcCpuClock & 3) != 0))
-                        {
-                            int a = ppuAddressBus;
-                            if ((a & 0x3FFF) >= 0x3F00) PpuBusWrite((ushort)(a & 0x2FFF), ppu2007SM_writeValue);
-                            else PpuBusWrite((ushort)a, ppu2007SM_writeValue);
-                        }
+                        ppuAddressBus = vram_addr;
+                        PpuBusWrite(vram_addr, ppu2007SM_writeValue);
                     }
-                    ppu2007SM_isRead = ppu2007SM_readDelayed;
-                    ppu2007SM_performMysteryWrite = false;
                 }
-                ppu2007SM++;
+                else if (!ppu2007SM_isRead && ppu2007SM_performMysteryWrite)
+                {
+                    ppuAddressBus = vram_addr;
+                    if (ppu2007SM_mysteryAddr >= 0x3F00)
+                        PpuBusWrite(vram_addr & 0x2FFF, (byte)ppu2007SM_mysteryAddr);
+                    else
+                    {
+                        PpuBusWrite(ppu2007SM_mysteryAddr, (byte)ppu2007SM_mysteryAddr);
+                        PpuBusWrite(vram_addr, (byte)vram_addr);
+                    }
+                }
             }
-            if (ppu2007SM == 8 && ppu2007SM_interruptedReadToWrite)
+            else if (sm == 4)
             {
-                PpuBusWrite((ushort)ppuAddressBus, ppu2007SM_writeValue);
+                if (ppu2007SM_isRead && ppu2007SM_bufferLate)
+                {
+                    ppuAddressBus = vram_addr;
+                    ppu_2007_buffer = PpuBusRead(vram_addr >= 0x3F00 ? vram_addr & 0x2FFF : vram_addr & 0x3FFF);
+                }
+                if (ppu2007SM_updateVramAddrEarly)
+                {
+                    ppu2007SM_updateVramAddrEarly = false;
+                    vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x3FFF);
+                    ppuAddressBus = vram_addr;
+                    if (ppu2007SM_isRead)
+                        ppu_2007_buffer = PpuBusRead(vram_addr >= 0x3F00 ? vram_addr & 0x2FFF : vram_addr & 0x3FFF);
+                }
+                if ((ShowBackGround || ShowSprites) && (scanline < 240 || scanline == preRenderLine))
+                { CXinc(); Yinc(); }
+                else
+                { vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x3FFF); }
+                ppuAddressBus = vram_addr;
+                if (mapperNeedsA12) NotifyMapperA12(vram_addr);
+                if (!ppu2007SM_isRead || !ppu2007SM_readDelayed)
+                {
+                    if (ppu2007SM_performMysteryWrite && (mcCpuClock & 3) != 0)
+                    {
+                        int a = ppuAddressBus;
+                        PpuBusWrite(a >= 0x3F00 ? a & 0x2FFF : a & 0x3FFF, ppu2007SM_writeValue);
+                    }
+                }
+                ppu2007SM_isRead = ppu2007SM_readDelayed;
+                ppu2007SM_performMysteryWrite = false;
+            }
+            else if (sm == 7 && ppu2007SM_interruptedReadToWrite)
+            {
+                PpuBusWrite(ppuAddressBus, ppu2007SM_writeValue);
                 ppu2007SM_interruptedReadToWrite = false;
                 vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x3FFF);
                 ppuAddressBus = vram_addr;
                 if (mapperNeedsA12) NotifyMapperA12(vram_addr);
-            }
-        }
-
-        // ════════════════════════════════════════════════════════════════
-        // Sprite pixel evaluation — inlined for unrolled loop
-        // ════════════════════════════════════════════════════════════════
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void EvaluateSingleSprite(int s, ref int sprColor, ref int sprPalette, ref bool sprPriority, ref int sprSlot)
-        {
-            int px = ((sprShiftH[s] >> 7) << 1) | (sprShiftL[s] >> 7);
-            if (px != 0 && sprColor == 0)
-            {
-                sprColor = px;
-                sprPalette = (sprFetchAttr[s] & 3) | 4;
-                sprPriority = ((sprFetchAttr[s] >> 5) & 1) == 0;
-                sprSlot = s;
             }
         }
 
