@@ -20,7 +20,6 @@ namespace AprNes
         // useNewPpuStep removed — always use new PPU step
 
         // TriCNES: CopyV flag — set when $2006 delayed copy fires, used for scroll conflict detection
-        static bool copyV = false;
 
         // ════════════════════════════════════════════════════════════════
         // _EmulatePPU — full PPU step (called at mcPpuClock == 0)
@@ -36,14 +35,12 @@ namespace AprNes
             // ══════════════════════════════════════════════════════
 
             // ── $2006 delayed t→v copy (TriCNES lines 1263-1284) ──
-            copyV = false;
             if (ppu2006UpdateDelay > 0)
             {
                 ppu2006UpdateDelay--;
                 if (ppu2006UpdateDelay == 0)
                 {
                     int prevAddr = vram_addr;
-                    copyV = true;
                     vram_addr = ppu2006PendingAddr;
                     ppuAddressBus = vram_addr;
                     // P4-2: Palette corruption when leaving palette range

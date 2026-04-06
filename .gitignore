@@ -198,3 +198,4 @@ etc/
 # Temp working directories
 temp2/
 tools/knowledgebase/config.json
+tools/send_mail.py

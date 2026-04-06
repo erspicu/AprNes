@@ -270,7 +270,7 @@ namespace AprNes
             ppu2002ReadPending = false;
 
             // PPU VRAM address / scroll
-            vram_addr_internal = 0; vram_addr = 0; scrol_y = 0; FineX = 0;
+            vram_addr_internal = 0; vram_addr = 0; FineX = 0;
             vram_latch = false;
             ppu_2007_buffer = 0; ppu2007SM = 9;
             ppu2007SM_performMysteryWrite = false; ppu2007SM_normalWriteBehavior = false;
@@ -282,7 +282,7 @@ namespace AprNes
             ppu_cycles_x = 7; scanline = 0; frame_count = 0;  // TriCNES: PPU_Dot=7, PPU_Scanline=0
             oddSwap = true; ppuRenderingEnabled = false; prevRenderingEnabled = false; // TriCNES: PPU_OddFrame=true
             ShowBG_EvalDelay = false; ShowSpr_EvalDelay = false;
-            commitCXinc = false; // deferred CXinc flag
+            // deferred CXinc flag
             // Per-sprite shift registers
             for (int i = 0; i < 8; i++)
             { sprShiftL[i] = 0; sprShiftH[i] = 0; sprXCounter[i] = 0; sprFetchAttr[i] = 0; sprXPos[i] = 0; }
@@ -300,15 +300,13 @@ namespace AprNes
             spr_ram_add = 0;
 
             // PPU tile pipeline
-            NTVal = 0; ATVal = 0; lowTile = 0; highTile = 0; ioaddr = 0;
+            NTVal = 0; ATVal = 0; ioaddr = 0;
             renderLow = 0; renderHigh = 0;
             pendingTileLow = 0; pendingTileHigh = 0; commitLoadShiftReg = false;
-            bg_attr_p1 = 0; bg_attr_p2 = 0; bg_attr_p3 = 0;
+            bg_attr_p2 = 0; bg_attr_p3 = 0;
 
             // PPU sprite state
-            sprite0_on_line = false; sprite0_line_x = 0;
-            sprite0_tile_low = 0; sprite0_tile_high = 0; sprite0_flip_x = false;
-            prerender_sprite0_valid = false; prerender_sprite0_x = 0;
+prerender_sprite0_x = 0;
             prerender_sprite0_tile_low = 0; prerender_sprite0_tile_high = 0;
             prerender_sprite0_flip_x = false;
             spriteOverflowCycle = 0;
