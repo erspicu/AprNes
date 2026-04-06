@@ -219,13 +219,9 @@ namespace AprNes
         static bool oamCorruptDisabledFlag = false;     // TriCNES: PPU_OAMCorruptionRenderingDisabledOutOfVBlank
 
         // P4-2: Palette corruption flags
-        static bool paletteCorruptFromDisable = false;  // Rendering disabled during NT fetch with VRAM >= $3C00
-        static bool paletteCorruptFromVAddr = false;    // $2006 palette→non-palette transition
         static public uint* ScreenBuf1x;
         static uint* NesColors; //, targetSize;
         static int* Buffer_BG_array;
-        static uint* palCacheR; // 4 pre-computed palette colors for renderAttr
-        static uint* palCacheN; // 4 pre-computed palette colors for nextAttr
         static byte spr_ram_add = 0;
 
         static bool oddSwap = false;
@@ -516,28 +512,8 @@ namespace AprNes
         // ---- Attribute 3-stage pipeline ----
         // Phase-3 shifts ATVal into p1; phase-7 render reads p3 (2 groups later).
         // This correctly delays attribute by 2 fetch groups with no index drift.
-        static byte bg_attr_p2 = 0, bg_attr_p3 = 0;
 
-        // Phase 7 tile reload (pixel output moved to ppu_half_step per-dot)
-        // Only updates palette caches — shift register reload happens in ppu_rendering_tick phase 7.
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void RenderBGTile(int cx)
-        {
-            // Palette caches still needed for ppu_half_step pixel output
-            byte renderAttr = bg_attr_p3;
-            byte nextAttr   = bg_attr_p2;
-            int baseAddrR = 0x3f00 | (renderAttr << 2);
-            int baseAddrN = 0x3f00 | (nextAttr   << 2);
-            uint bgColor = NesColors[ppu_ram[0x3f00] & 0x3f];
-            palCacheR[0] = palCacheN[0] = bgColor;
-            palCacheR[1] = NesColors[ppu_ram[baseAddrR + 1] & 0x3f];
-            palCacheR[2] = NesColors[ppu_ram[baseAddrR + 2] & 0x3f];
-            palCacheR[3] = NesColors[ppu_ram[baseAddrR + 3] & 0x3f];
-            palCacheN[1] = NesColors[ppu_ram[baseAddrN + 1] & 0x3f];
-            palCacheN[2] = NesColors[ppu_ram[baseAddrN + 2] & 0x3f];
-            palCacheN[3] = NesColors[ppu_ram[baseAddrN + 3] & 0x3f];
-            // Pixel output is now done per-dot in ppu_half_step()
-        }
+        // (per-dot rendering reads palette directly from ppu_ram + NesColors)
 
 
 
@@ -686,42 +662,40 @@ namespace AprNes
         // Simulates NES sprite evaluation timing (dots 65-256) with the hardware
         // overflow bug: after finding 8 sprites, byte offset m cycles 0→1→2→3,
         // reading tile/attr/X bytes as Y coordinates.
+        // Split-loop + unsigned range check optimization
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void PrecomputeOverflow()
         {
             spriteOverflowCycle = -1;
             if (!ShowBackGround && !ShowSprites) return;
 
-            int height = Spritesize8x16 ? 15 : 7;
-            int evalCycle = 66; // PPU_Dot based (was 65 with old cx=PPU_Dot-1)
-            int foundCount = 0;
-            int m = 0; // byte offset for overflow bug
+            uint height = Spritesize8x16 ? 15u : 7u;
+            int evalCycle = 66;
+            int n = 0;
 
-            for (int n = 0; n < 64 && evalCycle <= 256; n++)
+            // Phase 1: find first 8 sprites (normal evaluation, no m offset)
+            int foundCount = 0;
+            for (; n < 64 && evalCycle <= 256; n++)
             {
-                if (foundCount < 8)
+                uint diff = (uint)(scanline - spr_ram[n << 2]);
+                if (diff <= height)
                 {
-                    // Normal evaluation: always read byte 0 (Y)
-                    int oam_y = spr_ram[n << 2];
-                    if (scanline >= oam_y && scanline - oam_y <= height)
-                    {
-                        foundCount++;
-                        evalCycle += 8; // in-range: 2 read + 6 copy
-                    }
-                    else
-                    {
-                        evalCycle += 2; // not in range
-                    }
+                    evalCycle += 8;
+                    if (++foundCount == 8) { n++; break; }
                 }
                 else
+                    evalCycle += 2;
+            }
+
+            // Phase 2: overflow bug evaluation (byte offset m cycles 0,1,2,3)
+            if (foundCount == 8)
+            {
+                int m = 0;
+                for (; n < 64 && evalCycle <= 256; n++)
                 {
-                    // Overflow bug evaluation: read byte m (cycles through 0,1,2,3)
-                    int oam_y = spr_ram[(n << 2) + m];
-                    if (scanline >= oam_y && scanline - oam_y <= height)
-                    {
-                        spriteOverflowCycle = evalCycle;
-                        return;
-                    }
-                    m = (m + 1) & 3; // bug: increment byte offset on miss
+                    uint diff = (uint)(scanline - spr_ram[(n << 2) + m]);
+                    if (diff <= height) { spriteOverflowCycle = evalCycle; return; }
+                    m = (m + 1) & 3;
                     evalCycle += 2;
                 }
             }
@@ -1077,13 +1051,8 @@ namespace AprNes
                 {
                     if (!newRenderingInstant)
                     {
-                        // Disabling: palette corruption (immediate, TriCNES line 9546)
-                        if ((ppu_cycles_x & 7) < 2 && ppu_cycles_x <= 250)
-                        {
-                            if ((vram_addr & 0x3FFF) >= 0x3C00)
-                                paletteCorruptFromDisable = true;
-                        }
                         // OAM corruption: deferred to delay expiry (NOT immediate)
+                        // (palette corruption placeholder removed — no reader)
                     }
                     else
                     {

@@ -73,10 +73,20 @@ TriCNES 移植（per-dot PPU step + full bus conflict + OAM corruption delay mod
 | #004 bit7 fast-check | 92.21 | +5.8% |
 | #005 unsafe arrays | 94.27 | +8.1% |
 | #007 PreRender bitwise | 94.65 | +8.6% |
-| **#008 MasterClockTick opt** | **94.53** | **+8.4%** |
+| #008 MasterClockTick opt | 94.53 | +8.4% |
+| #009 half-step opt | 95.71 | +9.8% |
+| #010 $2007 SM optimize | 94.64 | +8.5% |
+| **#011 dead code removal** | **95.75** | **+9.8%** |
 
-**最終結果**: 87.19 → **94.53 FPS (+8.4%)**
-**vs master**: 264.45 → 94.53 = -64.3%
+**最終結果**: 87.19 → **95.75 FPS (+9.8%)**
+**vs master**: 264.45 → 95.75 = -63.8%
+
+### #011 Dead Code Removal Details
+- Removed `RenderBGTile()` — palette cache computed every 8 dots but never read
+- Removed `palCacheR` / `palCacheN` pointer fields + alloc/free
+- Removed `bg_attr_p2` / `bg_attr_p3` fields (only read by RenderBGTile)
+- Removed `paletteCorruptFromDisable` / `paletteCorruptFromVAddr` (write-only placeholders)
+- Added `PrecomputeOverflow()` loop splitting + unsigned range check
 
 > 注意：#008 數據波動較大（Run2=96.36, Run3=92.69），平均 94.53 與 #007 的 94.65 在誤差範圍內。
 > 互斥分支 + batch 的結構改善是正確方向，效能差異需更多樣本確認。

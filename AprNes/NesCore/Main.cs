@@ -220,8 +220,6 @@ namespace AprNes
             if (ScreenBuf1x  != null) { Marshal.FreeHGlobal((IntPtr)ScreenBuf1x);  ScreenBuf1x  = null; }
             if (Buffer_BG_array != null) { Marshal.FreeHGlobal((IntPtr)Buffer_BG_array); Buffer_BG_array = null; }
             if (NesColors    != null) { Marshal.FreeHGlobal((IntPtr)NesColors);    NesColors    = null; }
-            if (palCacheR    != null) { Marshal.FreeHGlobal((IntPtr)palCacheR);    palCacheR    = null; }
-            if (palCacheN    != null) { Marshal.FreeHGlobal((IntPtr)palCacheN);    palCacheN    = null; }
             if (spr_ram      != null) { Marshal.FreeHGlobal((IntPtr)spr_ram);      spr_ram      = null; }
             if (secondaryOAM != null) { Marshal.FreeHGlobal((IntPtr)secondaryOAM); secondaryOAM = null; }
             if (corruptOamRow!= null) { Marshal.FreeHGlobal((IntPtr)corruptOamRow);corruptOamRow= null; }
@@ -319,7 +317,6 @@ namespace AprNes
             oamCorruptPending = false; oamCorruptSuppressed = false;
             oamCorruptDelay = 0; oamCorruptDisabledFlag = false;
             // P4-2: Palette corruption
-            paletteCorruptFromDisable = false; paletteCorruptFromVAddr = false;
             mcCpuClock = 0; mcPpuClock = 0; mcApuPutCycle = true; // TriCNES: APU_PutCycle=true at power-on
             spr_ram_add = 0;
 
@@ -327,7 +324,6 @@ namespace AprNes
             NTVal = 0; ATVal = 0; ioaddr = 0;
             renderLow = 0; renderHigh = 0;
             pendingTileLow = 0; pendingTileHigh = 0; commitLoadShiftReg = false;
-            bg_attr_p2 = 0; bg_attr_p3 = 0;
 
             // PPU sprite state
 prerender_sprite0_x = 0;
@@ -465,8 +461,6 @@ prerender_sprite0_x = 0;
                 }
                 Buffer_BG_array  = (int* )Marshal.AllocHGlobal(sizeof(int)  * 61440);
                 NesColors        = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 64);
-                palCacheR        = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 4);
-                palCacheN        = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 4);
                 sprLineBuf       = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 256);
                 sprLinePri       = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
                 sprLineSet       = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);

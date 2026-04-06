@@ -41,7 +41,6 @@ namespace AprNes
                 ppuAddressBus = vram_addr;
                 if ((prevAddr & 0x3FFF) >= 0x3F00 && (vram_addr & 0x3FFF) < 0x3F00)
                     if (scanline < 240 && cx <= 256 && (prevAddr & 0xF) != 0)
-                        paletteCorruptFromVAddr = true;
                 if (mapperNeedsA12 && !((ShowBackGround_Instant || ShowSprites_Instant) && (scanline < 240 || scanline == preRenderLine)))
                     NotifyMapperA12(vram_addr);
             }
@@ -440,7 +439,7 @@ namespace AprNes
                             if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(chrAddr);
                             renderTemp = PpuBusRead(chrAddr); commitPatHighFetch = true;
                             if (mmc5Ref != null) mmc5Ref.NotifyVramRead(chrAddr);
-                            if (scanline < 240 && cx < 257 && ppuRenderingEnabled) RenderBGTile(cx);
+                            // RenderBGTile removed — palCacheR/N are dead code in per-dot rendering
                         }
 
                         // MMC5 CHR A/B switch at first tile of each group
@@ -672,10 +671,6 @@ namespace AprNes
             isSprite0hit_Delayed = isSprite0hit;
             if (pendingSprite0Hit2) { pendingSprite0Hit2 = false; isSprite0hit = true; }
             if (pendingSprite0Hit)  { pendingSprite0Hit  = false; pendingSprite0Hit2 = true; }
-
-            // ── Palette corruption (unconditional write — no branch penalty) ──
-            paletteCorruptFromDisable = false;
-            paletteCorruptFromVAddr = false;
         }
     }
 }
