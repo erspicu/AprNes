@@ -853,62 +853,39 @@ namespace AprNes
             if (evalSpriteCount > 8) evalSpriteCount = 8;
         }
 
-        // Pre-render line: check secondary OAM entries against (261 & 255) = 5
-        // and store sprite 0 data for scanline 0 rendering
+        // Pre-render line: sprite 0 data for scanline 0 — bitwise address computation
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void PrecomputePreRenderSprites()
         {
-            int effectiveScanline = preRenderLine & 255; // NTSC: 261&255=5, PAL: 311&255=55
-            int height = Spritesize8x16 ? 16 : 8;
-
-            // Check first entry in secondary OAM (potential sprite 0)
             byte sprY = secondaryOAM[0];
-            if (sprY >= 240) return; // $FF or invalid
+            if (sprY >= 240) return;
 
-            if (effectiveScanline >= sprY && effectiveScanline < sprY + height)
+            int line = (preRenderLine & 255) - sprY;
+            int height = Spritesize8x16 ? 16 : 8;
+            if (line < 0 || line >= height) return;
+
+            byte sprTile = secondaryOAM[1];
+            byte sprAttr = secondaryOAM[2];
+            prerender_sprite0_x = secondaryOAM[3];
+            prerender_sprite0_flip_x = (sprAttr & 0x40) != 0;
+
+            int addr;
+            if (!Spritesize8x16)
             {
-                byte sprTile = secondaryOAM[1];
-                byte sprAttr = secondaryOAM[2];
-                byte sprX = secondaryOAM[3];
-
-
-                prerender_sprite0_x = sprX;
-                prerender_sprite0_flip_x = (sprAttr & 0x40) != 0;
-
-                int line = effectiveScanline - sprY;
-                int offset, tile_th_t, line_t;
-                byte tile_th;
-
-                if (Spritesize8x16)
-                {
-                    tile_th = (byte)(sprTile & 0xfe);
-                    offset = (sprTile & 1) != 0 ? 256 : 0;
-                }
-                else
-                {
-                    tile_th = sprTile;
-                    offset = SpPatternTableAddr >> 4;
-                }
-
-                if (line <= 7)
-                {
-                    tile_th_t = tile_th + offset;
-                }
-                else
-                {
-                    tile_th_t = tile_th + offset + 1;
-                    line -= 8;
-                }
-
-                if ((sprAttr & 0x80) != 0)
-                {
-                    line_t = 7 - line;
-                    if (Spritesize8x16) tile_th_t ^= 1;
-                }
-                else line_t = line;
-
-                { int a = (tile_th_t << 4) | (line_t + 8); prerender_sprite0_tile_high = chrBankPtrs[(a >> 10) & 7][a & 0x3FF]; }
-                { int a = (tile_th_t << 4) | line_t;       prerender_sprite0_tile_low  = chrBankPtrs[(a >> 10) & 7][a & 0x3FF]; }
+                int r = ((sprAttr & 0x80) != 0) ? (7 - line) : line;
+                addr = SpPatternTableAddr | (sprTile << 4) | r;
             }
+            else
+            {
+                if ((sprAttr & 0x80) != 0) line = 15 - line;
+                // Branchless 8x16: bank from bit0, base tile from bits7-1,
+                // (line & 8) << 1 auto-selects bottom half, (line & 7) = fine Y
+                addr = ((sprTile & 1) << 12) | ((sprTile & 0xFE) << 4) | ((line & 8) << 1) | (line & 7);
+            }
+
+            prerender_sprite0_tile_low  = chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF];
+            int addrH = addr + 8;
+            prerender_sprite0_tile_high = chrBankPtrs[(addrH >> 10) & 7][addrH & 0x3FF];
         }
 
 
