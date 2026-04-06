@@ -121,15 +121,7 @@ namespace AprNes
                 NesCore.Region = NesCore.RegionType.NTSC;
             }
 
-            // --accuracy flag overrides everything (including validation default)
-            for (int i = 0; i < args.Length - 1; i++)
-            {
-                if (args[i] == "--accuracy")
-                {
-                    string flags = args[i + 1].ToUpper();
-                    break;
-                }
-            }
+            // --accuracy flag: no longer used (AccuracyOptA removed, per-dot eval always active)
 
             // ── perf mode: --perf <rom> [seconds] [note] ──
             {

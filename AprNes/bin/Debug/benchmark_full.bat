@@ -5,7 +5,7 @@ title AprNes Full Pipeline Benchmark
 
 :: ============================================================
 :: AprNes Full Pipeline Benchmark
-:: Tests: NTSC + AccuracyOptA + Audio Mode 2 (Modern Stereo)
+:: Tests: NTSC + Audio Mode 2 (Modern Stereo)
 ::        + Analog + Ultra Analog + CRT
 :: Resolutions: 2x, 4x, 6x, 8x (20s each, 30s cooldown)
 :: ============================================================
@@ -20,7 +20,7 @@ set COOL_SEC=30
 echo ============================================================
 echo   AprNes Full Pipeline Benchmark
 echo   ROM: ny2011.nes
-echo   Config: NTSC / AccuracyOptA=ON / Audio Mode 2 (Modern)
+echo   Config: NTSC / Audio Mode 2 (Modern)
 echo           Analog + Ultra Analog + CRT
 echo   Duration: %TEST_SEC%s per run, %COOL_SEC%s cooldown
 echo ============================================================
@@ -28,7 +28,7 @@ echo.
 
 :: ── Phase 0: JIT Warmup ──
 echo [Phase 0] JIT Warmup (%JIT_SEC%s, result discarded)
-"%EXE%" --rom "%ROM%" --benchmark %JIT_SEC% --region NTSC --accuracy A --audio-dsp --audio-mode 2 --ultra-analog --crt --analog-size 2 > "%TMPFILE%" 2>&1
+"%EXE%" --rom "%ROM%" --benchmark %JIT_SEC% --region NTSC --audio-dsp --audio-mode 2 --ultra-analog --crt --analog-size 2 > "%TMPFILE%" 2>&1
 for /f "tokens=7" %%f in ('findstr "BENCHMARK:" "%TMPFILE%"') do set "FPS_JIT=%%f"
 echo   JIT warmup: %FPS_JIT% FPS (discarded)
 echo.
@@ -48,7 +48,7 @@ for %%S in (2 4 6 8) do (
     echo ============================================================
 
     echo --- Running %TEST_SEC%s ---
-    "%EXE%" --rom "%ROM%" --benchmark %TEST_SEC% --region NTSC --accuracy A --audio-dsp --audio-mode 2 --ultra-analog --crt --analog-size %%S > "%TMPFILE%" 2>&1
+    "%EXE%" --rom "%ROM%" --benchmark %TEST_SEC% --region NTSC --audio-dsp --audio-mode 2 --ultra-analog --crt --analog-size %%S > "%TMPFILE%" 2>&1
     for /f "tokens=7" %%f in ('findstr "BENCHMARK:" "%TMPFILE%"') do set "FPS_%%S=%%f"
 
     echo   Result: !FPS_%%S! FPS
@@ -73,7 +73,6 @@ echo ============================================================
 echo.
 echo   Configuration:
 echo     Region:       NTSC
-echo     AccuracyOptA: ON (per-dot secondary OAM evaluation)
 echo     Audio:        Mode 2 (Modern Stereo)
 echo     Video:        Analog + Ultra Analog + CRT
 echo     Test ROM:     ny2011.nes
