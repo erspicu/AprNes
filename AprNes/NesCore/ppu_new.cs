@@ -25,7 +25,6 @@ namespace AprNes
         // _EmulatePPU — full PPU step (called at mcPpuClock == 0)
         // TriCNES: Emulator.cs line 1256
         // ════════════════════════════════════════════════════════════════
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_step_new()
         {
             int cx = ppu_cycles_x; // local alias, PRE-increment value
@@ -35,35 +34,21 @@ namespace AprNes
             // ══════════════════════════════════════════════════════
 
             // ── $2006 delayed t→v copy (TriCNES lines 1263-1284) ──
-            if (ppu2006UpdateDelay > 0)
+            if (ppu2006UpdateDelay != 0 && --ppu2006UpdateDelay == 0)
             {
-                ppu2006UpdateDelay--;
-                if (ppu2006UpdateDelay == 0)
-                {
-                    int prevAddr = vram_addr;
-                    vram_addr = ppu2006PendingAddr;
-                    ppuAddressBus = vram_addr;
-                    // P4-2: Palette corruption when leaving palette range
-                    if ((prevAddr & 0x3FFF) >= 0x3F00 && (vram_addr & 0x3FFF) < 0x3F00)
-                    {
-                        if (scanline < 240 && cx <= 256)
-                        {
-                            if ((prevAddr & 0xF) != 0)
-                                paletteCorruptFromVAddr = true;
-                        }
-                    }
-                    // A12 notify outside active rendering
-                    if (mapperNeedsA12 && !((ShowBackGround_Instant || ShowSprites_Instant) && (scanline < 240 || scanline == preRenderLine)))
-                        NotifyMapperA12(vram_addr);
-                }
+                int prevAddr = vram_addr;
+                vram_addr = ppu2006PendingAddr;
+                ppuAddressBus = vram_addr;
+                if ((prevAddr & 0x3FFF) >= 0x3F00 && (vram_addr & 0x3FFF) < 0x3F00)
+                    if (scanline < 240 && cx <= 256 && (prevAddr & 0xF) != 0)
+                        paletteCorruptFromVAddr = true;
+                if (mapperNeedsA12 && !((ShowBackGround_Instant || ShowSprites_Instant) && (scanline < 240 || scanline == preRenderLine)))
+                    NotifyMapperA12(vram_addr);
             }
 
             // ── $2005 delayed scroll (TriCNES lines 1286-1304) ──
-            if (ppu2005UpdateDelay > 0)
+            if (ppu2005UpdateDelay != 0 && --ppu2005UpdateDelay == 0)
             {
-                ppu2005UpdateDelay--;
-                if (ppu2005UpdateDelay == 0)
-                {
                     byte v = ppu2005PendingValue;
                     if (!vram_latch) // first write
                     {
@@ -74,23 +59,18 @@ namespace AprNes
                     {
                         vram_addr_internal = (vram_addr_internal & 0x0C1F) | ((v & 0x7) << 12) | ((v & 0xF8) << 2);
                     }
-                    vram_latch = !vram_latch;
-                }
+                vram_latch = !vram_latch;
             }
 
             // ── $2000 delayed control (TriCNES lines 1306-1320) ──
-            if (ppu2000UpdateDelay > 0)
+            if (ppu2000UpdateDelay != 0 && --ppu2000UpdateDelay == 0)
             {
-                ppu2000UpdateDelay--;
-                if (ppu2000UpdateDelay == 0)
-                {
                     NMIable = (ppu2000PendingValue & 0x80) != 0;
                     VramaddrIncrement = (ppu2000PendingValue & 0x04) != 0 ? 32 : 1;
                     Spritesize8x16 = (ppu2000PendingValue & 0x20) != 0;
                     SpPatternTableAddr = (ppu2000PendingValue & 0x08) != 0 ? 0x1000 : 0;
                     BgPatternTableAddr = (ppu2000PendingValue & 0x10) != 0 ? 0x1000 : 0;
-                    vram_addr_internal = (ushort)((vram_addr_internal & 0x73FF) | ((ppu2000PendingValue & 3) << 10));
-                }
+                vram_addr_internal = (ushort)((vram_addr_internal & 0x73FF) | ((ppu2000PendingValue & 3) << 10));
             }
 
             // ── $2007 state machine (TriCNES lines 1322-1496) ──
@@ -293,21 +273,11 @@ namespace AprNes
             // ══════════════════════════════════════════════════════
 
             // ── Delayed OAM corruption (TriCNES lines 1695-1711) ──
-            if (oamCorruptDelay > 0)
+            if (oamCorruptDelay != 0 && --oamCorruptDelay == 0)
             {
-                --oamCorruptDelay;
-                if (oamCorruptDelay == 0)
-                {
-                    // Delay expired: check if rendering was disabled outside VBlank
-                    if (oamCorruptWasRendering && (oamCorrupt2001Value & 0x08) == 0 && (oamCorrupt2001Value & 0x10) == 0)
-                    {
-                        if (scanline < 240 || scanline == preRenderLine)
-                        {
-                            if (!oamCorruptPending)
-                                oamCorruptDisabledFlag = true;
-                        }
-                    }
-                }
+                if (oamCorruptWasRendering && (oamCorrupt2001Value & 0x18) == 0)
+                    if ((scanline < 240 || scanline == preRenderLine) && !oamCorruptPending)
+                        oamCorruptDisabledFlag = true;
             }
 
             // ── Eval delay: non-phase-3 (TriCNES lines 1653-1658) ──

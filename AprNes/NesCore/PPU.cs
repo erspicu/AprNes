@@ -342,7 +342,6 @@ namespace AprNes
             return ppu_ram[(addr & ((addr & 0x03) == 0 ? 0x0C : 0x1F)) + 0x3F00];
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void PpuBusWrite(int addr, byte val)
         {
             addr &= 0x3FFF;
@@ -521,6 +520,7 @@ namespace AprNes
 
         // Phase 7 tile reload (pixel output moved to ppu_half_step per-dot)
         // Only updates palette caches — shift register reload happens in ppu_rendering_tick phase 7.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void RenderBGTile(int cx)
         {
             // Palette caches still needed for ppu_half_step pixel output
@@ -543,7 +543,6 @@ namespace AprNes
 
         // TriCNES: PPU_SpriteEvaluation_GetSpriteAddress — compute sprite CHR pattern address
         // for the given secondary OAM slot during sprite tile fetch (dots 257-320).
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static int ComputeSpritePatternAddr(int slot)
         {
             int sprY    = secondaryOAM[slot * 4];
@@ -1021,7 +1020,6 @@ namespace AprNes
         static byte* sprLineSet;     // 256 entries: 1=sprite pixel present, 0=empty
         static byte* sprLinePalIdx;  // 256 entries: raw palette index (for NTSC analog)
         //ref http://wiki.nesdev.com/w/index.php/PPU_scrolling
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ppu_r_2002()
         {
             // TriCNES line 8937-8949: $2002 read
@@ -1045,7 +1043,6 @@ namespace AprNes
             return openbus;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ppu_r_2007()
         {
             // TriCNES lines 8968-9047: $2007 read handler (single-tick SM)
@@ -1129,7 +1126,6 @@ namespace AprNes
             ppu2000UpdateDelay = ((mcPpuClock & 3) == 0 || (mcPpuClock & 3) == 3) ? 2 : 1;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_w_2001(byte value)
         {
             openbus = value;
@@ -1214,7 +1210,6 @@ namespace AprNes
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ppu_r_2004()
         {
             // TriCNES: EmulateUntilEndOfRead — advance 7 master clocks before OAM read
@@ -1264,7 +1259,6 @@ namespace AprNes
             vram_latch = !vram_latch;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_w_2007(byte value)
         {
             // TriCNES lines 9683-9727: $2007 write handler (single-tick SM)
