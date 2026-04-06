@@ -71,6 +71,7 @@ namespace AprNes
         static int nmiTriggerLine = 241;      // NTSC/PAL=241, Dendy=291
         static int masterPerCpu   = 12;       // NTSC=12, PAL=16, Dendy=15
         static int masterPerPpu   = 4;        // NTSC=4, PAL=5, Dendy=5
+        static int masterPerPpuHalf = 2;      // masterPerPpu >> 1 (pre-computed)
         static double cpuFreq          = 1789773.0;  // NTSC=1789773, PAL=1662607, Dendy=1773447
         static public double FrameSeconds = 1.0 / 60.0988; // NTSC=1/60.0988, PAL/Dendy=1/50.0070
 
@@ -82,6 +83,7 @@ namespace AprNes
                 nmiTriggerLine = 241;      // PAL VBL starts at same scanline as NTSC
                 masterPerCpu   = 16;
                 masterPerPpu   = 5;
+                masterPerPpuHalf = 2;
                 cpuFreq        = 1662607.0;
                 FrameSeconds   = 1.0 / 50.0070;
             }
@@ -91,6 +93,7 @@ namespace AprNes
                 nmiTriggerLine = 291;      // Dendy: 51 extra post-render idle lines
                 masterPerCpu   = 15;
                 masterPerPpu   = 5;
+                masterPerPpuHalf = 2;
                 cpuFreq        = 1773447.0;
                 FrameSeconds   = 1.0 / 50.0070;
             }
@@ -100,6 +103,7 @@ namespace AprNes
                 nmiTriggerLine = 241;
                 masterPerCpu   = 12;
                 masterPerPpu   = 4;
+                masterPerPpuHalf = 2;
                 cpuFreq        = 1789773.0;
                 FrameSeconds   = 1.0 / 60.0988;
             }
@@ -576,75 +580,57 @@ prerender_sprite0_x = 0;
 
         static public void run()
         {
-            // Per-master-clock loop. PPU's RenderScreen() calls _event.WaitOne()
-            // at VBL, which blocks until UI/test-runner sets the event.
+            // Batched execution: check exit every ~1364 master ticks (≈1 scanline)
+            // Reduces volatile memory barrier overhead by ~99.9%
             while (!exit)
-                MasterClockTick();
+            {
+                for (int batch = 0; batch < 1364; batch++)
+                    MasterClockTick();
+            }
             Console.WriteLine("exit..");
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void MasterClockTick()
         {
-            // ── CPU gate: one CPU cycle at countdown == 0 ──
-            // TriCNES: if (CPUClock == 0) { CPUClock = 12; _6502(); }
+            // ── CPU(0) / NMI(8) — mutually exclusive ──
             if (mcCpuClock == 0)
             {
                 mcCpuClock = masterPerCpu;
 
-                // DMA gate (TriCNES: exact gate condition from _6502 line 3974)
-                // DMC requires: DoDMCDMA && (APU_Status_DMC || ImplicitAbort) && CPU_Read
-                // OAM requires: DoOAMDMA && CPU_Read
-                bool dmcGate = dmcDmaRunning && (dmcStatusEnabled || dmcImplicitAbortActive) && cpuIsRead;
-                bool oamGate = spriteDmaTransfer && cpuIsRead;
-
-                if (dmcGate || oamGate)
-                {
+                if ((dmcDmaRunning && (dmcStatusEnabled || dmcImplicitAbortActive) && cpuIsRead) ||
+                    (spriteDmaTransfer && cpuIsRead))
                     DmaOneCycle();
-                }
                 else
-                {
                     cpu_step_one_cycle();
-                }
 
-                // TriCNES: implicit abort clear after every _6502 call (line 8783)
-                // If implicit abort was set but DMA gate didn't fire (e.g., write cycle),
-                // clear the flag — the abort "times out"
                 if (dmcDmaRunning && dmcImplicitAbortActive)
                     dmcImplicitAbortActive = false;
 
-                // TriCNES: totalCycles++ AFTER _6502 (not before)
                 cpuCycleCount++;
 
-                // Mapper callback (TriCNES: at CPUClock==0, after _6502)
                 if (!isFDS) MapperObj.CpuCycle();
                 else fds_CpuCycle();
             }
-
-            // ── Gate order matches TriCNES: CPU(0) → NMI(8) → PPU(0) → PPU_half(2) → IRQ(5) → APU(12) ──
-
-            // ── NMI evaluation at CPUClock == 8 ──
-            if (mcCpuClock == 8)
+            else if (mcCpuClock == 8)
             {
                 NMILine |= NMIable && isVblank;
                 if (operationCycle == 0 && !(isVblank && NMIable))
                     NMILine = false;
             }
 
-            // ── PPU full step at PPUClock == 0 ──
+            // ── PPU full(0) / half(masterPerPpuHalf) — mutually exclusive ──
             if (mcPpuClock == 0)
             {
                 mcPpuClock = masterPerPpu;
                 ppu_step_new();
             }
-
-            // ── PPU half step ──
-            if (mcPpuClock == (masterPerPpu >> 1))
+            else if (mcPpuClock == masterPerPpuHalf)
             {
                 ppu_half_step_new();
             }
 
-            // ── IRQ level detection + Mapper M2 rise at CPUClock == 5 ──
+            // ── IRQ(5) / APU(masterPerCpu) — mutually exclusive ──
             if (mcCpuClock == 5)
             {
                 IRQLine = irqLineCurrent;
@@ -652,13 +638,10 @@ prerender_sprite0_x = 0;
                     irqLineCurrent = true;
                 if (!isFDS) MapperObj.CpuClockRise();
             }
-
-            // ── APU step at CPUClock == 12 (last gate, after PPU/IRQ) ──
-            if (mcCpuClock == masterPerCpu)
+            else if (mcCpuClock == masterPerCpu)
             {
                 apu_step();
                 mcApuPutCycle = !mcApuPutCycle;
-                // processStrobeWrite removed — TriCNES shift register model uses ProcessControllerShift/Strobe in apu_step
             }
 
             // ── Decrement all counters ──

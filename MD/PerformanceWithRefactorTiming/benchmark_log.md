@@ -55,4 +55,32 @@ TriCNES 移植（per-dot PPU step + full bus conflict + OAM corruption delay mod
 
 ---
 
+## #003-#008 Cumulative Optimizations
+- **日期**: 2026-04-07
+- **Branch**: feature/performance-optimization
+- **變更摘要**:
+  - #003: $2007 SM 提取為獨立方法 + sprite loop unrolling with goto
+  - #004: Sprite bit7 fast-check `(H|L) >= 128`
+  - #005: Sprite arrays 轉 unsafe pointer（Marshal.AllocHGlobal）
+  - #006: SpriteEvalTick + SpriteEvalWrite 合併（guard clauses + compressed ops）
+  - #007: PrecomputePreRenderSprites bitwise 地址計算
+  - #008: MasterClockTick 互斥分支 + run() batch execution + masterPerPpuHalf 預計算
+
+| Optimization | FPS | vs Baseline |
+|---|---|---|
+| #001 Baseline | 87.19 | — |
+| #002 Scanline partition | 90.92 | +4.3% |
+| #004 bit7 fast-check | 92.21 | +5.8% |
+| #005 unsafe arrays | 94.27 | +8.1% |
+| #007 PreRender bitwise | 94.65 | +8.6% |
+| **#008 MasterClockTick opt** | **94.53** | **+8.4%** |
+
+**最終結果**: 87.19 → **94.53 FPS (+8.4%)**
+**vs master**: 264.45 → 94.53 = -64.3%
+
+> 注意：#008 數據波動較大（Run2=96.36, Run3=92.69），平均 94.53 與 #007 的 94.65 在誤差範圍內。
+> 互斥分支 + batch 的結構改善是正確方向，效能差異需更多樣本確認。
+
+---
+
 *後續優化紀錄將依序添加於此。每筆包含：日期、commit、變更摘要、FPS 數據、與 baseline 比較。*
