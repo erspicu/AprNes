@@ -653,65 +653,56 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_half_step_new()
         {
-            int hsDot = ppu_cycles_x; // post-increment PPU_Dot
+            int hsDot = ppu_cycles_x;
+            bool isRendering = ShowBackGround || ShowSprites;
+            bool isActiveScanline = scanline < 240 || scanline == preRenderLine;
 
-            // ── BG shift register shift (TriCNES line 1818: PPU_UpdateShiftRegisters) ──
-            if ((scanline < 240 || scanline == preRenderLine)
+            // ── BG shift register shift ──
+            if (isActiveScanline && isRendering
                 && ((hsDot > 0 && hsDot <= 257) || (hsDot > 320 && hsDot <= 336)))
             {
-                if (ShowBackGround || ShowSprites) // Tier 2
-                {
-                    renderLow  <<= 1;
-                    renderHigh = (ushort)((renderHigh << 1) | 1);
-                    renderAttrLow  = (ushort)((renderAttrLow << 1) | (attrLatch & 1));
-                    renderAttrHigh = (ushort)((renderAttrHigh << 1) | ((attrLatch >> 1) & 1));
-                }
+                renderLow  <<= 1;
+                renderHigh = (ushort)((renderHigh << 1) | 1);
+                renderAttrLow  = (ushort)((renderAttrLow << 1) | (attrLatch & 1));
+                renderAttrHigh = (ushort)((renderAttrHigh << 1) | ((attrLatch >> 1) & 1));
             }
 
-            // ── CommitShiftRegistersAndBitPlanes_HalfDot — UNGATED (TriCNES line 1822) ──
+            // ── CommitShiftRegistersAndBitPlanes_HalfDot — UNGATED (must run BEFORE fetch) ──
             if (commitLoadShiftReg)
             {
                 commitLoadShiftReg = false;
                 renderLow  = (ushort)((renderLow  & 0xFF00) | pendingTileLow);
                 renderHigh = (ushort)((renderHigh & 0xFF00) | pendingTileHigh);
-                attrLatch = pendingAttrLatch; // TriCNES: PPU_AttributeLatchRegister = PPU_Attribute
+                attrLatch  = pendingAttrLatch;
             }
 
-            // ── Half-step tile fetch (TriCNES line 1829: PPU_Render_ShiftRegistersAndBitPlanes_HalfDot) ──
-            if ((scanline < 240 || scanline == preRenderLine)
-                && ((hsDot >= 0 && hsDot < 257) || (hsDot >= 320 && hsDot < 336)))
-            {
-                if (ShowBackGround || ShowSprites) // Tier 2
-                {
-                    if ((hsDot & 7) == 7)
-                        commitLoadShiftReg = true;
-                }
-            }
+            // ── Half-step tile fetch (AFTER commit — sets flag for NEXT half step) ──
+            if (isActiveScanline && isRendering
+                && ((hsDot >= 0 && hsDot < 257) || (hsDot >= 320 && hsDot < 336))
+                && (hsDot & 7) == 7)
+                commitLoadShiftReg = true;
 
-            // ── VBL latch half-step (TriCNES lines 1833-1840) ──
-            ppuVSET = false;
-            if (pendingVblank) { pendingVblank = false; ppuVSET = true; }
+            // ── VBL latch half-step (branchless) ──
+            ppuVSET = pendingVblank;
+            pendingVblank = false;
             ppuVSET_Latch2 = !ppuVSET_Latch1;
 
-            // ── OAM buffer update (TriCNES lines 1842-1860) ──
-            if ((ShowBackGround || ShowSprites) && scanline >= 0 && scanline < 240)
+            // ── OAM buffer update (redundant branch eliminated) ──
+            if (isRendering && scanline >= 0 && scanline < 240)
             {
                 if (hsDot == 0 || hsDot > 320) ppuOamBuffer = secondaryOAM[0];
-                else if (hsDot > 0 && hsDot <= 64) ppuOamBuffer = 0xFF;
-                else if (hsDot <= 256) ppuOamBuffer = oamCopyBuffer;
-                else ppuOamBuffer = oamCopyBuffer; // 257-320
+                else if (hsDot <= 64)          ppuOamBuffer = 0xFF;
+                else                           ppuOamBuffer = oamCopyBuffer;
             }
 
-            // ── Sprite0 hit pipeline (TriCNES lines 1862-1872) ──
+            // ── Sprite0 hit pipeline ──
             isSprite0hit_Delayed = isSprite0hit;
             if (pendingSprite0Hit2) { pendingSprite0Hit2 = false; isSprite0hit = true; }
-            if (pendingSprite0Hit) { pendingSprite0Hit = false; pendingSprite0Hit2 = true; }
+            if (pendingSprite0Hit)  { pendingSprite0Hit  = false; pendingSprite0Hit2 = true; }
 
-            // TriCNES: NO $2007 SM tick in half step — only in full step
-
-            // ── P4-2: Palette corruption placeholder ──
-            if (paletteCorruptFromDisable || paletteCorruptFromVAddr)
-            { paletteCorruptFromDisable = false; paletteCorruptFromVAddr = false; }
+            // ── Palette corruption (unconditional write — no branch penalty) ──
+            paletteCorruptFromDisable = false;
+            paletteCorruptFromVAddr = false;
         }
     }
 }

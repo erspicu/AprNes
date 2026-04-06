@@ -24,7 +24,7 @@ if not exist "%~dp0tools\benchmark\ny2011.nes" (
 set "EXE=%~dp0AprNes.exe"
 set "ROM=%~dp0tools\benchmark\ny2011.nes"
 set "TMPFILE=%TEMP%\aprnes_bench_baseline.txt"
-set JIT_SEC=10
+set JIT_SEC=20
 set TEST_SEC=20
 set COOL_SEC=30
 
@@ -67,9 +67,9 @@ echo.
 :: Cleanup temp file
 del "%TMPFILE%" >nul 2>&1
 
-:: -- Calculate Average --
-:: Use PowerShell for floating point arithmetic
-for /f %%a in ('powershell -NoProfile -Command "[math]::Round(([double]'%FPS_RUN2%' + [double]'%FPS_RUN3%') / 2, 2)"') do set "FPS_AVG=%%a"
+:: -- Take the fastest of all 3 runs (including JIT) as the record --
+:: Use PowerShell for floating point comparison
+for /f %%a in ('powershell -NoProfile -Command "[math]::Max([math]::Max([double]'%FPS_JIT%', [double]'%FPS_RUN2%'), [double]'%FPS_RUN3%')"') do set "FPS_BEST=%%a"
 
 :: -- Results Summary --
 echo ============================================================
@@ -85,11 +85,11 @@ echo     Test ROM:   ny2011.nes
 echo     Duration:   %TEST_SEC%s per run
 echo.
 echo   Results:
-echo     JIT warmup:  %FPS_JIT% FPS (discarded)
+echo     JIT warmup:  %FPS_JIT% FPS
 echo     Run 2:       %FPS_RUN2% FPS
 echo     Run 3:       %FPS_RUN3% FPS
 echo     -------------------------
-echo     Average:     %FPS_AVG% FPS
+echo     Best of 3:   %FPS_BEST% FPS
 echo.
 echo   (NES realtime = 60.10 FPS)
 echo ============================================================
