@@ -7,11 +7,13 @@ namespace AprNesAdapter
     /// <summary>
     /// Reference adapter: wraps AprNes's static NesCore into IEmulatorCore.
     /// Single-instance only (NesCore is entirely static).
+    /// Uses the same VideoOutput + _event.Set() pattern as TestRunnerCore.
     /// </summary>
     public unsafe class AprNesEmulatorCore : IEmulatorCore
     {
         private volatile bool _frameCompleted;
         private Thread _emuThread;
+        private bool _hooked;
 
         public void SetRegion(NesRegion region)
         {
@@ -36,34 +38,41 @@ namespace AprNesAdapter
             catch { return false; }
         }
 
+        private void OnVideoOutput(object sender, EventArgs e)
+        {
+            _frameCompleted = true;
+            // Resume NesCore from _event.WaitOne() inside RenderScreen
+            // (it will loop back and block again at the next WaitOne)
+        }
+
         public void RunOneFrame()
         {
-            _frameCompleted = false;
-            EventHandler handler = null;
-            handler = (s, e) =>
+            // Hook once, keep across all frames
+            if (!_hooked)
             {
-                _frameCompleted = true;
-                AprNes.NesCore.exit = true;
-            };
-            AprNes.NesCore.VideoOutput += handler;
-            AprNes.NesCore.exit = false;
+                AprNes.NesCore.VideoOutput += OnVideoOutput;
+                _hooked = true;
+            }
 
-            // Run on a separate thread (NesCore.run() blocks until exit=true)
+            _frameCompleted = false;
+
+            // Start emulation thread on first call
             if (_emuThread == null || !_emuThread.IsAlive)
             {
+                AprNes.NesCore.exit = false;
                 _emuThread = new Thread(() => AprNes.NesCore.run()) { IsBackground = true };
                 _emuThread.Start();
-            }
-            else
-            {
-                AprNes.NesCore._event.Set(); // resume from VBlank wait
+                // First frame: run() enters loop → RenderScreen → VideoOutput → _event.WaitOne()
+                // Wait for first VideoOutput to fire
+                while (!_frameCompleted)
+                    Thread.Sleep(0);
+                return;
             }
 
-            // Wait for frame completion
+            // Subsequent frames: signal _event to resume, wait for VideoOutput
+            AprNes.NesCore._event.Set();
             while (!_frameCompleted)
                 Thread.Sleep(0);
-
-            AprNes.NesCore.VideoOutput -= handler;
         }
 
         public void SoftReset()
@@ -110,7 +119,9 @@ namespace AprNesAdapter
         public void Dispose()
         {
             AprNes.NesCore.exit = true;
-            _emuThread?.Join(1000);
+            AprNes.NesCore._event.Set(); // unblock WaitOne() so run() can check exit
+            _emuThread?.Join(2000);
+            if (_hooked) { AprNes.NesCore.VideoOutput -= OnVideoOutput; _hooked = false; }
         }
     }
 }

@@ -2,14 +2,96 @@ using System;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Linq;
+using NesTestFramework;
 
 namespace AprNes
 {
     unsafe static class TestRunner
     {
+        /// <summary>
+        /// Check if args represent a simple blargg test (--rom + --wait-result only).
+        /// If so, use the NesTestFramework BlarggTestRunner for a clean interface demo.
+        /// </summary>
+        static int? TryFrameworkPath(string[] args)
+        {
+            // Only activate for simple: --rom X --wait-result [--max-wait N] [--region R]
+            // Skip if any advanced features are requested
+            string[] advancedFlags = { "--screenshot", "--timed-screenshots", "--benchmark",
+                "--analog", "--ultra-analog", "--crt", "--dump-ac-results", "--dump-debug",
+                "--log", "--time", "--input", "--expected-crc", "--pass-on-stable",
+                "--accuracy", "--soft-reset", "--audio-dsp", "--audio-mode" };
+
+            if (!args.Contains("--wait-result")) return null;
+            if (args.Any(a => advancedFlags.Contains(a))) return null;
+
+            // Parse minimal args
+            string romPath = null;
+            int maxWait = 15;
+            NesRegion region = NesRegion.NTSC;
+
+            for (int i = 0; i < args.Length; i++)
+            {
+                switch (args[i])
+                {
+                    case "--rom": if (i + 1 < args.Length) romPath = args[++i]; break;
+                    case "--max-wait": if (i + 1 < args.Length) int.TryParse(args[++i], out maxWait); break;
+                    case "--region":
+                        if (i + 1 < args.Length)
+                        {
+                            string r = args[++i].ToLowerInvariant();
+                            if (r == "pal") region = NesRegion.PAL;
+                            else if (r == "dendy") region = NesRegion.Dendy;
+                        }
+                        break;
+                }
+            }
+
+            if (romPath == null || !File.Exists(romPath)) return null;
+
+            // Build a TestDefinition from the args
+            string suite = Path.GetDirectoryName(romPath);
+            string rom = Path.GetFileName(romPath);
+            var test = new TestDefinition(suite ?? ".", rom, maxWait, region);
+
+            // Use framework
+            using (var emu = new AprNesAdapter.AprNesEmulatorCore())
+            {
+                var runner = new BlarggTestRunner(emu);
+                // RunTest expects romDir + suite/rom, but we have the full path.
+                // Override: pass parent dir as romDir, suite=".", rom=filename won't work.
+                // Instead, pass the dir containing the ROM as romDir with suite="."
+                string romDir = Path.GetDirectoryName(Path.GetFullPath(romPath));
+                test.Suite = ".";
+                test.Rom = rom;
+
+                var result = runner.RunTest(test, romDir);
+
+                string name = Path.GetFileNameWithoutExtension(rom);
+                if (result.Passed)
+                {
+                    Console.WriteLine($"PASS | {rom} | {name}");
+                    Console.WriteLine($"\n{result.ResultText}");
+                    return 0;
+                }
+                else
+                {
+                    Console.WriteLine($"FAIL({result.ResultCode}) | {rom} | ({result.DetectionMethod}: {result.ResultText})");
+                    return result.ResultCode == 0 ? 1 : result.ResultCode;
+                }
+            }
+        }
+
         public static int Run(string[] args)
         {
-            // Wire up platform-specific delegates
+            // Use NesTestFramework path when explicitly requested via --use-framework
+            if (args.Contains("--use-framework"))
+            {
+                var fwResult = TryFrameworkPath(args);
+                if (fwResult.HasValue) return fwResult.Value;
+            }
+
+            // Fall back to full-featured TestRunnerCore for advanced scenarios
             TestRunnerCore.GetBaseDirectoryFn = () =>
                 Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
             TestRunnerCore.SaveScreenshotFn = SaveScreenshot;

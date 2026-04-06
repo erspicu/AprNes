@@ -193,6 +193,11 @@
     <Compile Include="NesCore\PPU.cs" />
     <Compile Include="NesCore\ppu_new.cs" />
     <Compile Include="NesCore\TestRunnerCore.cs" />
+    <Compile Include="..\unittest\NesTestFramework\IEmulatorCore.cs" Link="NesTestFramework\IEmulatorCore.cs" />
+    <Compile Include="..\unittest\NesTestFramework\BlarggTestRunner.cs" Link="NesTestFramework\BlarggTestRunner.cs" />
+    <Compile Include="..\unittest\NesTestFramework\TestCatalog.cs" Link="NesTestFramework\TestCatalog.cs" />
+    <Compile Include="..\unittest\NesTestFramework\TestResult.cs" Link="NesTestFramework\TestResult.cs" />
+    <Compile Include="..\unittest\adapters\AprNesAdapter\AprNesAdapter.cs" Link="NesTestFramework\AprNesAdapter.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="TestRunner.cs" />
     <Compile Include="tool\WaveOutPlayer.cs" />
