@@ -224,7 +224,7 @@ namespace AprNes
             {
                 ppu_cycles_x = cx = 0;
                 scanline++;
-                if (scanline > 261)
+                if (scanline > preRenderLine)
                 {
                     scanline = 0;
                 }
@@ -239,7 +239,7 @@ namespace AprNes
                 if (cx == 0) pendingVblank = true; // TriCNES: PPU_Dot == 0
                 // cx == 1: FrameAdvance (emulator-specific, not PPU logic)
             }
-            else if (scanline == 260 && cx == 340)
+            else if (scanline == (preRenderLine - 1) && cx == 340)
             {
                 oddSwap = !oddSwap;
             }
@@ -272,7 +272,8 @@ namespace AprNes
             ppuA12Prev = (ppuAddressBus & 0x1000) != 0;
 
             // ── Odd frame skip (TriCNES lines 1629-1643) ──
-            if (oddSwap && (ShowBackGround || ShowSprites)) // Tier 2 delayed flags
+            // PAL/Dendy: no dot skip (PAL phase alternation eliminates dot crawl naturally)
+            if (Region == RegionType.NTSC && oddSwap && (ShowBackGround || ShowSprites))
             {
                 if (scanline == preRenderLine && cx == 340)
                 {

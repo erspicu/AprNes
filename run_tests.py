@@ -15,11 +15,11 @@ ROMBASE = os.path.join(SCRIPT_DIR, "nes-test-roms-master", "checked")
 def build_test_list():
     """Return list of (suite, rom, extra_args_str) tuples."""
     tests = []
-    def a(suite, rom, extra="--max-wait 8"):
+    def a(suite, rom, extra="--max-wait 15"):
         tests.append((suite, rom, extra))
 
-    W = "--max-wait 20"       # singles: complete in <3s, 20s is generous
-    WM = "--max-wait 40"      # merged ROMs: up to 6s solo, need headroom under parallel load
+    W = "--max-wait 30"       # singles: complete in <3s, generous headroom under parallel load
+    WM = "--max-wait 50"      # merged ROMs: up to 6s solo, need extra headroom
 
     for r in ["dmc.nes","noise.nes","square.nes","triangle.nes"]:
         a("apu_mixer", r, W)
@@ -108,7 +108,7 @@ def run_one(idx, suite, rom, extra, exe, rombase, accuracy_flags=None):
         cmd += ["--accuracy", accuracy_flags]
     try:
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        stdout_b, stderr_b = proc.communicate(timeout=30)
+        stdout_b, stderr_b = proc.communicate(timeout=60)
         stdout_s = stdout_b.decode("utf-8", errors="replace")
         if proc.returncode == 0:
             return (idx, "PASS", name, "")
@@ -125,7 +125,7 @@ def run_one(idx, suite, rom, extra, exe, rombase, accuracy_flags=None):
 
 def main():
     parser = argparse.ArgumentParser(description="Run NES test ROMs")
-    parser.add_argument("-j", "--jobs", type=int, default=10, help="Parallel threads (default: 10)")
+    parser.add_argument("-j", "--jobs", type=int, default=6, help="Parallel threads (default: 6)")
     parser.add_argument("--accuracy", type=str, default=None, help="Accuracy flags e.g. ABCDEF (all on) or BCDEF (A off)")
     args = parser.parse_args()
 

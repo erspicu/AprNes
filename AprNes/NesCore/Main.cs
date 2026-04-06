@@ -78,16 +78,37 @@ namespace AprNes
 
         static void ApplyRegionProfile()
         {
-            // NTSC only — PAL/Dendy stripped for architecture validation phase
-            Region         = RegionType.NTSC;
-            preRenderLine  = 261;
-            nmiTriggerLine = 241;
-            totalScanlines = 262;
-            masterPerCpu   = 12;
-            masterPerPpu   = 4;
-            cpuFreq        = 1789773.0;
-            FrameSeconds   = 1.0 / 60.0988;
-            // Precompute packed scanline event constants for unified ppu_step()
+            if (Region == RegionType.PAL)
+            {
+                totalScanlines = 312;
+                preRenderLine  = 311;
+                nmiTriggerLine = 241;      // PAL VBL starts at same scanline as NTSC
+                masterPerCpu   = 16;
+                masterPerPpu   = 5;
+                cpuFreq        = 1662607.0;
+                FrameSeconds   = 1.0 / 50.0070;
+            }
+            else if (Region == RegionType.Dendy)
+            {
+                totalScanlines = 312;
+                preRenderLine  = 311;
+                nmiTriggerLine = 291;      // Dendy: 51 extra post-render idle lines
+                masterPerCpu   = 15;
+                masterPerPpu   = 5;
+                cpuFreq        = 1773447.0;
+                FrameSeconds   = 1.0 / 50.0070;
+            }
+            else // NTSC
+            {
+                totalScanlines = 262;
+                preRenderLine  = 261;
+                nmiTriggerLine = 241;
+                masterPerCpu   = 12;
+                masterPerPpu   = 4;
+                cpuFreq        = 1789773.0;
+                FrameSeconds   = 1.0 / 60.0988;
+            }
+            // Precompute packed scanline event constants
             L_VBL_START    = (nmiTriggerLine << 9) | 1;
             L_SPRITE_RESET = (preRenderLine << 9) | 1;
             L_VBL_END      = (preRenderLine << 9) | 2;

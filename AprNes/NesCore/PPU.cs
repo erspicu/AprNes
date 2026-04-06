@@ -15,9 +15,17 @@ namespace AprNes
         // Fills NesColors (uint*) and default palette into ppu_ram[0x3F00..0x3F1F] (byte*)
         static void initPalette()
         {
+            if (Region == RegionType.PAL)
             {
-                // NTSC only — PAL palette stripped for architecture validation
-                // NTSC hardcoded palette (verified with 174 blargg + 136 AccuracyCoin tests)
+                // PAL palette from 2C07 voltage levels + YUV decoding
+                generatePaletteFromVoltages(
+                    new float[] { -0.117f, 0.000f, 0.223f, 0.490f },
+                    new float[] {  0.306f, 0.543f, 0.741f, 1.000f },
+                    true);
+            }
+            else
+            {
+                // NTSC/Dendy hardcoded palette (verified with 174 blargg + 136 AccuracyCoin tests)
                 NesColors[ 0]=0xFF7C7C7C; NesColors[ 1]=0xFF0000FC; NesColors[ 2]=0xFF0000BC; NesColors[ 3]=0xFF4428BC;
                 NesColors[ 4]=0xFF940084; NesColors[ 5]=0xFFA80020; NesColors[ 6]=0xFFA81000; NesColors[ 7]=0xFF881400;
                 NesColors[ 8]=0xFF503000; NesColors[ 9]=0xFF007800; NesColors[10]=0xFF006800; NesColors[11]=0xFF005800;
@@ -35,7 +43,6 @@ namespace AprNes
                 NesColors[56]=0xFFF8D878; NesColors[57]=0xFFD8F878; NesColors[58]=0xFFB8F8B8; NesColors[59]=0xFFB8F8D8;
                 NesColors[60]=0xFF00FCFC; NesColors[61]=0xFFF8D8F8; NesColors[62]=0xFF000000; NesColors[63]=0xFF000000;
             }
-
         }
 
         /// <summary>
