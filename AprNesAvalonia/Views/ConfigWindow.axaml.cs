@@ -116,7 +116,6 @@ public partial class ConfigWindow : Window
         LblLanguage.Text       = L("cfg_language", "Language");
         LblEmulation.Text      = L("cfg_emulation", "Emulation");
         ChkLimitFps.Content    = L("cfg_limit_fps", "Limit FPS");
-        ChkAccuracyOptA.Content = L("cfg_accuracy_opta", "AccuracyOptA (per-dot sprite evaluation)");
         LblScreenshotPath.Text = L("cfg_screenshot_path", "Screenshot Path (Shift+P)");
         BtnBrowseScreenshot.Content = L("browse", "Browse...");
         LblRecording.Text      = L("cfg_recording", "Recording");
@@ -196,7 +195,6 @@ public partial class ConfigWindow : Window
 
         // General
         ChkLimitFps.IsChecked     = _ini.GetBool("LimitFPS", false);
-        ChkAccuracyOptA.IsChecked = _ini.GetBool("AccuracyOptA", true);
         TxtScreenshotPath.Text    = _ini.Get("CaptureScreenPath", "");
 
         string lang = _ini.Get("Lang", "zh-tw");
@@ -274,7 +272,6 @@ public partial class ConfigWindow : Window
 
         // General
         _ini.Set("LimitFPS",         ChkLimitFps.IsChecked == true ? "1" : "0");
-        _ini.Set("AccuracyOptA",     ChkAccuracyOptA.IsChecked == true ? "1" : "0");
         _ini.Set("CaptureScreenPath", TxtScreenshotPath.Text ?? "");
 
         // Recording

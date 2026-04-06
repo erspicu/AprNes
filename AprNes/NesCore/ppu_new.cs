@@ -337,11 +337,7 @@ namespace AprNes
                     oamCorruptIndex = evalOam2Addr; // capture at current sprite eval position
                 }
 
-                // Per-dot sprite evaluation (existing AccuracyOptA code)
-                // TODO Phase 7: port PPU_Render_SpriteEvaluation from TriCNES
-                // For now, call existing sprite eval logic inline:
-                if (AccuracyOptA)
-                {
+                // Per-dot sprite evaluation
                     bool evalScanline = (scanline >= 0 && scanline < 240) || scanline == preRenderLine;
                     bool ro = scanline == preRenderLine;
                     int evalDot = ppu_cycles_x; // post-increment PPU_Dot
@@ -458,7 +454,6 @@ namespace AprNes
                         }
                         if (spriteOverflowCycle >= 0 && evalDot == spriteOverflowCycle) isSpriteOverflow = true;
                     }
-                }
             }
 
             // ── Eval delay: phase-3 (TriCNES lines 1667-1673) ──

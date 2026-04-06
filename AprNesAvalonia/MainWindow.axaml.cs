@@ -25,7 +25,6 @@ public partial class MainWindow : Window
     private bool _soundEnabled;
     private bool _ultraAnalogEnabled;
     private bool _limitFPS;
-    private bool _accuracyOptA = true;
     private bool _isFullscreen;
     private string _currentRegion = "NTSC";
 
@@ -98,12 +97,10 @@ public partial class MainWindow : Window
             _ini.GetInt("key_LEFT",   37),
             _ini.GetInt("key_RIGHT",  39));
 
-        _accuracyOptA = _ini.GetBool("AccuracyOptA", true);
         _limitFPS     = _ini.GetBool("LimitFPS",     false);
         _soundEnabled = _ini.GetBool("Sound",        false);
         _currentRegion = _ini.Get("Region", "NTSC");
 
-        AprNes.NesCore.AccuracyOptA = _accuracyOptA;
         AprNes.NesCore.LimitFPS     = _limitFPS;
         ApplyRegionToNesCore(_currentRegion);
 
@@ -252,7 +249,6 @@ public partial class MainWindow : Window
             "UltraAnalog=0",
             "crt=1",
             // Emulation
-            "AccuracyOptA=1",
             "Region=NTSC",
             // Capture paths
             $"CaptureScreenPath={Path.Combine(basePath, "Captures", "Screenshots")}",
@@ -490,9 +486,7 @@ public partial class MainWindow : Window
     private void UpdateMenuStates()
     {
         string limitText = L("menu_limit_fps", "Limit FPS");
-        string optaText  = L("menu_accuracy_opta", "AccuracyOptA");
         MenuLimitFPS.Header     = _limitFPS     ? "✓ " + limitText : "  " + limitText;
-        MenuAccuracyOptA.Header = _accuracyOptA ? "✓ " + optaText  : "  " + optaText;
 
         string soundText = _soundEnabled ? L("menu_sound_on", "Sound: ON") : L("menu_sound_off", "Sound: OFF");
         MenuSound.Header = soundText;
@@ -771,15 +765,6 @@ public partial class MainWindow : Window
         _limitFPS = !_limitFPS;
         AprNes.NesCore.LimitFPS = _limitFPS;
         _ini.Set("LimitFPS", _limitFPS ? "1" : "0");
-        _ini.Save();
-        UpdateMenuStates();
-    }
-
-    private void MenuAccuracyOptA_Click(object? sender, RoutedEventArgs e)
-    {
-        _accuracyOptA = !_accuracyOptA;
-        AprNes.NesCore.AccuracyOptA = _accuracyOptA;
-        _ini.Set("AccuracyOptA", _accuracyOptA ? "1" : "0");
         _ini.Save();
         UpdateMenuStates();
     }

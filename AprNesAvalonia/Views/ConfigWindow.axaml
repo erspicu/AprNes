@@ -234,7 +234,6 @@
                     <StackPanel Spacing="6">
                         <TextBlock x:Name="LblEmulation" Text="Emulation" FontWeight="Bold"/>
                         <CheckBox x:Name="ChkLimitFps" Content="Limit FPS"/>
-                        <CheckBox x:Name="ChkAccuracyOptA" Content="AccuracyOptA (per-dot sprite evaluation)"/>
                     </StackPanel>
 
                     <Separator/>

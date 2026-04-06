@@ -42,8 +42,6 @@
                 <Separator />
                 <MenuItem x:Name="MenuLimitFPS" Header="Limit FPS"
                           Click="MenuLimitFPS_Click" />
-                <MenuItem x:Name="MenuAccuracyOptA" Header="AccuracyOptA"
-                          Click="MenuAccuracyOptA_Click" />
             </MenuItem>
 
             <!-- View -->

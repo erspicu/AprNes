@@ -77,7 +77,6 @@
             this.AudioModeLab = new System.Windows.Forms.Label();
             this.AudioMode = new System.Windows.Forms.ComboBox();
             this.SoundcheckBox = new System.Windows.Forms.CheckBox();
-            this.perdotFSM = new System.Windows.Forms.CheckBox();
             this.useAnalog = new System.Windows.Forms.CheckBox();
             this.ultraAnalog = new System.Windows.Forms.CheckBox();
             this.VideoInputLab = new System.Windows.Forms.Label();
@@ -745,15 +744,7 @@
             this.SoundcheckBox.UseVisualStyleBackColor = true;
             this.SoundcheckBox.CheckedChanged += new System.EventHandler(this.SoundcheckBox_CheckedChanged);
             // 
-            // perdotFSM
             // 
-            this.perdotFSM.AutoSize = true;
-            this.perdotFSM.Location = new System.Drawing.Point(891, 342);
-            this.perdotFSM.Name = "perdotFSM";
-            this.perdotFSM.Size = new System.Drawing.Size(320, 22);
-            this.perdotFSM.TabIndex = 23;
-            this.perdotFSM.Text = "Per-dot Secondary OAM Evaluation FSM";
-            this.perdotFSM.UseVisualStyleBackColor = true;
             // 
             // useAnalog
             // 
@@ -1446,7 +1437,6 @@
             this.Controls.Add(this.choose_dir);
             this.Controls.Add(this.label9);
             this.Controls.Add(this.screen_path);
-            this.Controls.Add(this.perdotFSM);
             this.Controls.Add(this.LimitFPS_checkBox);
             this.Controls.Add(this.groupBox1);
             this.DoubleBuffered = true;
@@ -1524,7 +1514,6 @@
         private System.Windows.Forms.TrackBar SoundtrackBar;
         private System.Windows.Forms.GroupBox groupBox5;
         private System.Windows.Forms.CheckBox SoundcheckBox;
-        private System.Windows.Forms.CheckBox perdotFSM;
         private System.Windows.Forms.Label label_analogSize;
         private System.Windows.Forms.ComboBox comboBox_analogSize;
         private System.Windows.Forms.CheckBox useAnalog;

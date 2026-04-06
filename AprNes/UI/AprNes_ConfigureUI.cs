@@ -139,7 +139,6 @@ namespace AprNes
             groupBox1.Text   = LangStr("keypad");
             groupBox2.Text   = LangStr("joypad");
             LimitFPS_checkBox.Text = LangStr("limitfps");
-            perdotFSM.Text   = LangStr("perdotFSM");
             label18.Text     = LangStr("langchoose");
             label9.Text      = LangStr("capture_path");
             label36.Text     = LangStr("video_output_folder");
@@ -379,7 +378,6 @@ namespace AprNes
             NesCore.AudioMode = AudioMode.SelectedIndex;
 
             // Accuracy 設定寫入並立即生效
-            NesCore.AccuracyOptA = perdotFSM.Checked;
 
             AprNesUI.GetInstance().AppConfigure["CaptureScreenPath"] = screen_path.Text;
             AprNesUI.GetInstance().AppConfigure["CaptureVideoPath"] = textBox17.Text;
@@ -828,7 +826,6 @@ namespace AprNes
             UpdateSoundUI();
 
             // Accuracy 設定載入
-            perdotFSM.Checked = NesCore.AccuracyOptA;
 
             // ── Analog 設定載入 ──────────────────────────────────────────────
             useAnalog.Checked   = NesCore.AnalogEnabled;
