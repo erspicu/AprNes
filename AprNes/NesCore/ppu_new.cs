@@ -210,6 +210,10 @@ namespace AprNes
                 }
             }
 
+            // Cache active scanline flag (visible 0-239 or pre-render)
+            // VBlank scanlines (240-260) skip all rendering logic below
+            bool isActiveScanline = scanline < 240 || scanline == preRenderLine;
+
             // ══════════════════════════════════════════════════════
             // Phase 3: Events (TriCNES lines 1532-1606)
             // All use POST-increment cx (= PPU_Dot after ++)
@@ -276,7 +280,7 @@ namespace AprNes
             if (oamCorruptDelay != 0 && --oamCorruptDelay == 0)
             {
                 if (oamCorruptWasRendering && (oamCorrupt2001Value & 0x18) == 0)
-                    if ((scanline < 240 || scanline == preRenderLine) && !oamCorruptPending)
+                    if (isActiveScanline && !oamCorruptPending)
                         oamCorruptDisabledFlag = true;
             }
 
@@ -288,7 +292,7 @@ namespace AprNes
             }
 
             // ── Sprite evaluation (TriCNES line 1664, inside scanline gate) ──
-            if (scanline < 240 || scanline == preRenderLine)
+            if (isActiveScanline)
             {
                 // TriCNES line 2491-2501: OAM corruption on first rendered dot after re-enable
                 if ((ShowBackGround_Instant || ShowSprites_Instant) && oamCorruptPending)
@@ -490,7 +494,7 @@ namespace AprNes
             if (commitPatHighFetch) { commitPatHighFetch = false; pendingTileHigh = renderTemp; CXinc(); }
 
             // ── Tile fetch + CalculatePixel + UpdateSpriteShift (TriCNES lines 1728-1751) ──
-            if (scanline < 240 || scanline == preRenderLine)
+            if (isActiveScanline)
             {
                 // BG tile fetch (TriCNES line 1730-1735)
                 if ((cx >= 0 && cx < 257) || (cx > 320 && cx <= 336))

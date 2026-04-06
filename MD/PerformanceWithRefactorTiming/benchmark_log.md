@@ -34,4 +34,25 @@ TriCNES 移植（per-dot PPU step + full bus conflict + OAM corruption delay mod
 
 ---
 
+## #002 AggressiveInlining cleanup + Delay counter + Scanline partitioning
+- **日期**: 2026-04-07
+- **Branch**: feature/performance-optimization
+- **變更**:
+  - 移除 8 個過大/低頻 method 的 AggressiveInlining（ppu_step_new, register handlers）
+  - 加入 RenderBGTile 的 AggressiveInlining（16 行 hot path）
+  - Delay counter 改為 branch-prediction-friendly 模式（`!= 0 && --x == 0`）
+  - **Scanline partitioning**: cache `isActiveScanline` bool，VBlank 期間跳過 sprite eval + tile fetch + pixel calc + draw 整個 rendering pipeline
+
+| Run | Frames | Duration | FPS |
+|-----|--------|----------|-----|
+| JIT (discarded) | 913 | 10.01s | 91.25 |
+| Run 2 | 1794 | 20.01s | **89.66** |
+| Run 3 | 1844 | 20.01s | **92.18** |
+| **Average** | — | — | **90.92** |
+
+**vs #001 baseline**: 87.19 → 90.92 = **+4.3%**
+**vs master**: 264.45 → 90.92 = -65.6%
+
+---
+
 *後續優化紀錄將依序添加於此。每筆包含：日期、commit、變更摘要、FPS 數據、與 baseline 比較。*
