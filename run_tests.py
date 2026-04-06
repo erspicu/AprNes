@@ -93,6 +93,11 @@ def build_test_list():
     for r in ["1.frame_basics.nes","2.vbl_timing.nes","3.even_odd_frames.nes","4.vbl_clear_timing.nes","5.nmi_suppression.nes","6.nmi_disable.nes","7.nmi_timing.nes"]:
         a("vbl_nmi_timing", r, W)
 
+    # ── PAL region tests (--region PAL) ──
+    WP = W + " --region PAL"
+    for r in ["01.len_ctr.nes","02.len_table.nes","03.irq_flag.nes","04.clock_jitter.nes","05.len_timing_mode0.nes","06.len_timing_mode1.nes","07.irq_flag_timing.nes","08.irq_timing.nes","10.len_halt_timing.nes","11.len_reload_timing.nes"]:
+        a("pal_apu_tests", r, WP)
+
     return tests
 
 
