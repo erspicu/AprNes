@@ -243,11 +243,11 @@ namespace AprNes
         // ── Per-sprite shift registers (TriCNES P2-3: per-dot sprite rendering) ──
         // Filled at dots 257-320 from secondary OAM tile fetch, rendered at dots 1-256.
         // TriCNES: PPU_SpriteShiftRegisterL/H, PPU_SpriteShifterCounter, PPU_SpriteAttribute
-        static byte[] sprShiftL = new byte[8];       // Low bitplane shift register
-        static byte[] sprShiftH = new byte[8];       // High bitplane shift register
-        static int[] sprXCounter = new int[8];        // X position countdown (>0=waiting, 0=shifting)
-        static byte[] sprFetchAttr = new byte[8];     // Attribute byte per slot (palette, priority, flip)
-        static byte[] sprXPos = new byte[8];           // X position per slot (for counter init at dot 339)
+        static byte* sprShiftL;       // Low bitplane shift register
+        static byte* sprShiftH;       // High bitplane shift register
+        static int* sprXCounter;        // X position countdown (>0=waiting, 0=shifting)
+        static byte* sprFetchAttr;     // Attribute byte per slot (palette, priority, flip)
+        static byte* sprXPos;           // X position per slot (for counter init at dot 339)
         static int sprSlotCount = 0;                   // Number of valid sprites fetched (from evalSpriteCount)
         // sprOam2Addr removed — unified into evalOam2Addr (TriCNES: single OAM2Address)
         static bool sprZeroInSlots = false;            // Sprite 0 is in slot 0
@@ -622,7 +622,6 @@ namespace AprNes
 
         // ═══════════════════════════════════════════════════════════════
         // Unified PPU step — region differences via precomputed parameters:
-        //   preRenderLine, nmiTriggerLine, totalScanlines (set by ApplyRegionProfile)
         //   NTSC odd frame skip (always enabled — PAL/Dendy stripped)
         // ═══════════════════════════════════════════════════════════════
 

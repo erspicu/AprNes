@@ -327,6 +327,11 @@ namespace AprNes
                 secondaryOAM     = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
                 corruptOamRow    = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
                 ppu_ram          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 0x4000);
+                sprShiftL        = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
+                sprShiftH        = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
+                sprXCounter      = (int* )Marshal.AllocHGlobal(sizeof(int)  * 8);
+                sprFetchAttr     = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
+                sprXPos          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 // P1_joypad_status/P2_joypad_status removed — shift register model uses static bytes
                 NES_MEM          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 65536);
 

@@ -69,7 +69,6 @@ namespace AprNes
         // ── Region-dependent timing parameters (set by ApplyRegionProfile) ──
         static int preRenderLine  = 261;      // NTSC=261, PAL/Dendy=311
         static int nmiTriggerLine = 241;      // NTSC/PAL=241, Dendy=291
-        static int totalScanlines = 262;      // NTSC=262, PAL/Dendy=312
         static int masterPerCpu   = 12;       // NTSC=12, PAL=16, Dendy=15
         static int masterPerPpu   = 4;        // NTSC=4, PAL=5, Dendy=5
         static double cpuFreq          = 1789773.0;  // NTSC=1789773, PAL=1662607, Dendy=1773447
@@ -79,7 +78,6 @@ namespace AprNes
         {
             if (Region == RegionType.PAL)
             {
-                totalScanlines = 312;
                 preRenderLine  = 311;
                 nmiTriggerLine = 241;      // PAL VBL starts at same scanline as NTSC
                 masterPerCpu   = 16;
@@ -89,7 +87,6 @@ namespace AprNes
             }
             else if (Region == RegionType.Dendy)
             {
-                totalScanlines = 312;
                 preRenderLine  = 311;
                 nmiTriggerLine = 291;      // Dendy: 51 extra post-render idle lines
                 masterPerCpu   = 15;
@@ -99,7 +96,6 @@ namespace AprNes
             }
             else // NTSC
             {
-                totalScanlines = 262;
                 preRenderLine  = 261;
                 nmiTriggerLine = 241;
                 masterPerCpu   = 12;
@@ -226,7 +222,11 @@ namespace AprNes
             if (secondaryOAM != null) { Marshal.FreeHGlobal((IntPtr)secondaryOAM); secondaryOAM = null; }
             if (corruptOamRow!= null) { Marshal.FreeHGlobal((IntPtr)corruptOamRow);corruptOamRow= null; }
             if (ppu_ram      != null) { Marshal.FreeHGlobal((IntPtr)ppu_ram);      ppu_ram      = null; }
-            // P1_joypad_status/P2_joypad_status removed — shift register model uses static bytes
+            if (sprShiftL    != null) { Marshal.FreeHGlobal((IntPtr)sprShiftL);    sprShiftL    = null; }
+            if (sprShiftH    != null) { Marshal.FreeHGlobal((IntPtr)sprShiftH);    sprShiftH    = null; }
+            if (sprXCounter  != null) { Marshal.FreeHGlobal((IntPtr)sprXCounter);  sprXCounter  = null; }
+            if (sprFetchAttr != null) { Marshal.FreeHGlobal((IntPtr)sprFetchAttr); sprFetchAttr = null; }
+            if (sprXPos      != null) { Marshal.FreeHGlobal((IntPtr)sprXPos);      sprXPos      = null; }
             if (NES_MEM      != null) { Marshal.FreeHGlobal((IntPtr)NES_MEM);      NES_MEM      = null; }
             if (Vertical           != null) { Marshal.FreeHGlobal((IntPtr)Vertical);           Vertical           = null; }
             if (AnalogScreenBuf     != null) { Marshal.FreeHGlobal((IntPtr)AnalogScreenBuf);     AnalogScreenBuf     = null; AnalogBufSize = 0; }
@@ -471,6 +471,11 @@ prerender_sprite0_x = 0;
                 secondaryOAM     = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
                 corruptOamRow    = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
                 ppu_ram          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 0x4000);
+                sprShiftL        = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
+                sprShiftH        = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
+                sprXCounter      = (int* )Marshal.AllocHGlobal(sizeof(int)  * 8);
+                sprFetchAttr     = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
+                sprXPos          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 // P1_joypad_status/P2_joypad_status removed — shift register model uses static bytes
                 NES_MEM          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 65536);
 
