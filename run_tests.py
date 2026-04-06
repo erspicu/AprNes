@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 EXE = os.path.join(SCRIPT_DIR, "AprNes", "bin", "Debug", "AprNes.exe")
-ROMBASE = os.path.join(SCRIPT_DIR, "nes-test-roms-master", "checked")
+ROMBASE = os.path.join(SCRIPT_DIR, "unittest", "roms")
 
 def build_test_list():
     """Return list of (suite, rom, extra_args_str) tuples."""
