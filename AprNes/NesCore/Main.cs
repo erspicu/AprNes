@@ -612,13 +612,13 @@ namespace AprNes
             if (mcPpuClock == 0)
             {
                 mcPpuClock = masterPerPpu;
-                if (useNewPpuStep) ppu_step_new(); else ppu_step();
+                ppu_step_new();
             }
 
             // ── PPU half step ──
             if (mcPpuClock == (masterPerPpu >> 1))
             {
-                if (useNewPpuStep) ppu_half_step_new(); else ppu_half_step();
+                ppu_half_step_new();
             }
 
             // ── IRQ level detection + Mapper M2 rise at CPUClock == 5 ──

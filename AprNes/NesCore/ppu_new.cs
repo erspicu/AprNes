@@ -17,7 +17,7 @@ namespace AprNes
         // ════════════════════════════════════════════════════════════════
         // Toggle: set to true in Main.cs to use new PPU step
         // ════════════════════════════════════════════════════════════════
-        static bool useNewPpuStep = true;
+        // useNewPpuStep removed — always use new PPU step
 
         // TriCNES: CopyV flag — set when $2006 delayed copy fires, used for scroll conflict detection
         static bool copyV = false;
