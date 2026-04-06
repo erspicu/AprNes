@@ -473,15 +473,15 @@ namespace AprNes
                         bool sprPriority = false;
                         if (cx <= 256 && ShowSprites && (cx > 8 || ShowSprLeft8))
                         {
-                            // Sprite loop unrolled — early exit on first opaque sprite
-                            if (sprXCounter[0] == 0 || skippedPreRenderDot341) { EvaluateSingleSprite(0, ref sprColor, ref sprPalette, ref sprPriority, ref sprSlot); if (sprColor != 0) goto SpriteFound; }
-                            if (sprXCounter[1] == 0 || skippedPreRenderDot341) { EvaluateSingleSprite(1, ref sprColor, ref sprPalette, ref sprPriority, ref sprSlot); if (sprColor != 0) goto SpriteFound; }
-                            if (sprXCounter[2] == 0 || skippedPreRenderDot341) { EvaluateSingleSprite(2, ref sprColor, ref sprPalette, ref sprPriority, ref sprSlot); if (sprColor != 0) goto SpriteFound; }
-                            if (sprXCounter[3] == 0 || skippedPreRenderDot341) { EvaluateSingleSprite(3, ref sprColor, ref sprPalette, ref sprPriority, ref sprSlot); if (sprColor != 0) goto SpriteFound; }
-                            if (sprXCounter[4] == 0 || skippedPreRenderDot341) { EvaluateSingleSprite(4, ref sprColor, ref sprPalette, ref sprPriority, ref sprSlot); if (sprColor != 0) goto SpriteFound; }
-                            if (sprXCounter[5] == 0 || skippedPreRenderDot341) { EvaluateSingleSprite(5, ref sprColor, ref sprPalette, ref sprPriority, ref sprSlot); if (sprColor != 0) goto SpriteFound; }
-                            if (sprXCounter[6] == 0 || skippedPreRenderDot341) { EvaluateSingleSprite(6, ref sprColor, ref sprPalette, ref sprPriority, ref sprSlot); if (sprColor != 0) goto SpriteFound; }
-                            if (sprXCounter[7] == 0 || skippedPreRenderDot341) { EvaluateSingleSprite(7, ref sprColor, ref sprPalette, ref sprPriority, ref sprSlot); }
+                            // Sprite loop fully unrolled — no method call, no ref overhead
+                            if (sprXCounter[0] == 0 || skippedPreRenderDot341) { int px = ((sprShiftH[0] >> 7) << 1) | (sprShiftL[0] >> 7); if (px != 0) { sprColor = px; sprPalette = (sprFetchAttr[0] & 3) | 4; sprPriority = ((sprFetchAttr[0] >> 5) & 1) == 0; sprSlot = 0; goto SpriteFound; } }
+                            if (sprXCounter[1] == 0 || skippedPreRenderDot341) { int px = ((sprShiftH[1] >> 7) << 1) | (sprShiftL[1] >> 7); if (px != 0) { sprColor = px; sprPalette = (sprFetchAttr[1] & 3) | 4; sprPriority = ((sprFetchAttr[1] >> 5) & 1) == 0; sprSlot = 1; goto SpriteFound; } }
+                            if (sprXCounter[2] == 0 || skippedPreRenderDot341) { int px = ((sprShiftH[2] >> 7) << 1) | (sprShiftL[2] >> 7); if (px != 0) { sprColor = px; sprPalette = (sprFetchAttr[2] & 3) | 4; sprPriority = ((sprFetchAttr[2] >> 5) & 1) == 0; sprSlot = 2; goto SpriteFound; } }
+                            if (sprXCounter[3] == 0 || skippedPreRenderDot341) { int px = ((sprShiftH[3] >> 7) << 1) | (sprShiftL[3] >> 7); if (px != 0) { sprColor = px; sprPalette = (sprFetchAttr[3] & 3) | 4; sprPriority = ((sprFetchAttr[3] >> 5) & 1) == 0; sprSlot = 3; goto SpriteFound; } }
+                            if (sprXCounter[4] == 0 || skippedPreRenderDot341) { int px = ((sprShiftH[4] >> 7) << 1) | (sprShiftL[4] >> 7); if (px != 0) { sprColor = px; sprPalette = (sprFetchAttr[4] & 3) | 4; sprPriority = ((sprFetchAttr[4] >> 5) & 1) == 0; sprSlot = 4; goto SpriteFound; } }
+                            if (sprXCounter[5] == 0 || skippedPreRenderDot341) { int px = ((sprShiftH[5] >> 7) << 1) | (sprShiftL[5] >> 7); if (px != 0) { sprColor = px; sprPalette = (sprFetchAttr[5] & 3) | 4; sprPriority = ((sprFetchAttr[5] >> 5) & 1) == 0; sprSlot = 5; goto SpriteFound; } }
+                            if (sprXCounter[6] == 0 || skippedPreRenderDot341) { int px = ((sprShiftH[6] >> 7) << 1) | (sprShiftL[6] >> 7); if (px != 0) { sprColor = px; sprPalette = (sprFetchAttr[6] & 3) | 4; sprPriority = ((sprFetchAttr[6] >> 5) & 1) == 0; sprSlot = 6; goto SpriteFound; } }
+                            if (sprXCounter[7] == 0 || skippedPreRenderDot341) { int px = ((sprShiftH[7] >> 7) << 1) | (sprShiftL[7] >> 7); if (px != 0) { sprColor = px; sprPalette = (sprFetchAttr[7] & 3) | 4; sprPriority = ((sprFetchAttr[7] >> 5) & 1) == 0; sprSlot = 7; } }
                             SpriteFound:
 
                             if (canDetectSprite0Hit && sprSlot == 0 && sprZeroInSlots && ShowBackGround && ShowSprites && bgColor != 0 && sprColor != 0)
