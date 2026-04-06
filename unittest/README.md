@@ -83,11 +83,12 @@ unittest/
         BlarggTestRunner.cs      # Protocol engine
         TestCatalog.cs           # 184 test definitions
         TestResult.cs            # Result types
+    run_tests.py                 # Universal CLI harness
     adapters/
         AprNesAdapter/           # Reference: wraps AprNes static NesCore
     examples/
         minimal_adapter.cs       # Skeleton for new adapters
-    roms/                        # Test ROM directory (symlink or copy)
+    roms/                        # Complete test ROM collection (184 ROMs + sources)
 ```
 
 ## Writing an Adapter
@@ -101,6 +102,123 @@ unittest/
    - `SetP1Buttons()` is called before each `RunOneFrame()`
 
 See `adapters/AprNesAdapter/` for a complete reference implementation.
+
+---
+
+## Reference Project: AprNes
+
+[AprNes](https://github.com/erspicu/AprNes) is a cycle-accurate NES emulator that achieves **184/184 blargg (NTSC+PAL) + 136/136 AccuracyCoin** perfect scores. It serves as the reference implementation for this framework.
+
+### How AprNes Integrates the Framework
+
+AprNes compiles the framework source files directly (no separate DLL):
+
+```xml
+<!-- AprNes.csproj -->
+<Compile Include="..\unittest\NesTestFramework\IEmulatorCore.cs" />
+<Compile Include="..\unittest\NesTestFramework\BlarggTestRunner.cs" />
+<Compile Include="..\unittest\NesTestFramework\TestCatalog.cs" />
+<Compile Include="..\unittest\NesTestFramework\TestResult.cs" />
+<Compile Include="..\unittest\adapters\AprNesAdapter\AprNesAdapter.cs" />
+```
+
+### Dual-Path Architecture
+
+AprNes uses two test execution paths:
+
+| Path | When | Engine | Status |
+|------|------|--------|--------|
+| **Default** | `--wait-result` | TestRunnerCore (full-featured, AprNes-specific) | 184/184 verified |
+| **Framework** | `--wait-result --use-framework` | BlarggTestRunner + AprNesAdapter | Interface demo |
+
+```bash
+# Default path (TestRunnerCore — production use)
+AprNes.exe --rom test.nes --wait-result --max-wait 15
+
+# Framework path (BlarggTestRunner — demonstrates IEmulatorCore)
+AprNes.exe --rom test.nes --wait-result --max-wait 15 --use-framework
+
+# With region
+AprNes.exe --rom pal_test.nes --wait-result --max-wait 15 --region PAL
+```
+
+### AprNesAdapter Implementation Notes
+
+AprNes's core (`NesCore`) uses **all-static fields** — no instances. The adapter wraps this into the `IEmulatorCore` interface:
+
+```csharp
+public unsafe class AprNesEmulatorCore : IEmulatorCore
+{
+    public void SetRegion(NesRegion region)
+    {
+        NesCore.Region = region switch {
+            NesRegion.PAL => NesCore.RegionType.PAL,
+            NesRegion.Dendy => NesCore.RegionType.Dendy,
+            _ => NesCore.RegionType.NTSC
+        };
+    }
+
+    public bool LoadRom(byte[] romData)
+    {
+        NesCore.HeadlessMode = true;
+        NesCore.AudioEnabled = false;
+        NesCore.init(romData);
+        return true;
+    }
+
+    public byte ReadCpuMemory(ushort address) => NesCore.NES_MEM[address];
+
+    public void GetNametable0(byte[] buffer)
+    {
+        for (int i = 0; i < 960; i++)
+            buffer[i] = NesCore.ppu_ram[0x2000 + i];
+    }
+
+    // ... see adapters/AprNesAdapter/AprNesAdapter.cs for full implementation
+}
+```
+
+**Key challenge**: `NesCore.run()` is a blocking loop. The adapter uses a persistent background thread with `VideoOutput` event + `_event.Set()` synchronization to implement per-frame stepping:
+
+```
+RunOneFrame() flow:
+1. First call: start NesCore.run() on background thread
+2. NesCore runs → RenderScreen() → fires VideoOutput → _event.WaitOne() blocks
+3. Adapter's VideoOutput handler sets _frameCompleted = true
+4. Subsequent calls: _event.Set() unblocks NesCore → next frame → repeat
+5. Dispose(): exit=true + _event.Set() to cleanly terminate
+```
+
+**Limitation**: NesCore is entirely static, so only one instance can exist per process. Parallel test execution requires spawning separate processes (which `run_tests.py` handles naturally).
+
+### Running Tests Against AprNes
+
+```bash
+# Via the project's own test runner (184 tests, uses unittest/roms/)
+python run_tests.py -j 6
+
+# Via the universal framework harness
+python unittest/run_tests.py --exe AprNes/bin/Debug/AprNes.exe -j 6
+
+# JSON output for CI
+python unittest/run_tests.py --exe AprNes/bin/Debug/AprNes.exe --json
+
+# NTSC only
+python unittest/run_tests.py --exe AprNes/bin/Debug/AprNes.exe --ntsc-only
+
+# Single suite
+python unittest/run_tests.py --exe AprNes/bin/Debug/AprNes.exe --suite ppu_vbl_nmi
+```
+
+### AprNes Test Results
+
+| Test Suite | Count | Result |
+|-----------|-------|--------|
+| Blargg NTSC | 174 | **174/174 PASS** |
+| Blargg PAL | 10 | **10/10 PASS** |
+| AccuracyCoin | 136 | **136/136 PASS** |
+
+---
 
 ## License
 
