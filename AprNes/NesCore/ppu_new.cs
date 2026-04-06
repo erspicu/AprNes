@@ -73,105 +73,9 @@ namespace AprNes
                 vram_addr_internal = (ushort)((vram_addr_internal & 0x73FF) | ((ppu2000PendingValue & 3) << 10));
             }
 
-            // ── $2007 state machine (TriCNES lines 1322-1496) ──
-            // Single-tick per PPU dot (TriCNES model — NOT double-tick)
-            if (ppu2007SM < 9)
-            {
-                if (ppu2007SM == 1)
-                {
-                    if (ppu2007SM_isRead && !ppu2007SM_bufferLate)
-                    {
-                        int a = ppu2007SM_addr;
-                        ppuAddressBus = a;
-                        ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a & 0x3FFF);
-                    }
-                }
-                else if (ppu2007SM == 3)
-                {
-                    if (ppu2007SM_normalWriteBehavior)
-                    {
-                        ppu2007SM_normalWriteBehavior = false;
-                        if (!ppu2007SM_isRead || !ppu2007SM_readDelayed)
-                        {
-                            ppuAddressBus = vram_addr;
-                            PpuBusWrite(ppuAddressBus, ppu2007SM_writeValue);
-                        }
-                    }
-                    else if (!ppu2007SM_isRead && ppu2007SM_performMysteryWrite)
-                    {
-                        if (ppu2007SM_mysteryAddr >= 0x3F00)
-                        {
-                            PpuBusWrite((ushort)(vram_addr & 0x2FFF), (byte)ppu2007SM_mysteryAddr);
-                            ppuAddressBus = vram_addr;
-                        }
-                        else
-                        {
-                            PpuBusWrite(ppu2007SM_mysteryAddr, (byte)ppu2007SM_mysteryAddr);
-                            PpuBusWrite((ushort)vram_addr, (byte)vram_addr);
-                            ppuAddressBus = vram_addr;
-                        }
-                    }
-                }
-                else if (ppu2007SM == 4)
-                {
-                    if (ppu2007SM_isRead && ppu2007SM_bufferLate)
-                    {
-                        int a = vram_addr;
-                        ppuAddressBus = a;
-                        ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a & 0x3FFF);
-                    }
-                    if (ppu2007SM_updateVramAddrEarly)
-                    {
-                        ppu2007SM_updateVramAddrEarly = false;
-                        vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x3FFF);
-                        ppuAddressBus = vram_addr;
-                        if (ppu2007SM_isRead)
-                        {
-                            int a = vram_addr;
-                            ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a & 0x3FFF);
-                        }
-                    }
-                    // vram_addr increment (TriCNES lines 1440-1451)
-                    if ((ShowBackGround || ShowSprites) && (scanline < 240 || scanline == preRenderLine))
-                    {
-                        CXinc(); Yinc(); // rendering: both X and Y increment
-                    }
-                    else
-                    {
-                        vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x3FFF);
-                    }
-                    ppuAddressBus = vram_addr;
-                    if (mapperNeedsA12) NotifyMapperA12(vram_addr);
-                    // mystery write after increment (TriCNES lines 1457-1474)
-                    if (!ppu2007SM_isRead || !ppu2007SM_readDelayed)
-                    {
-                        if (ppu2007SM_performMysteryWrite)
-                        {
-                            if ((mcCpuClock & 3) != 0)
-                            {
-                                int a = ppuAddressBus;
-                                if ((a & 0x3FFF) >= 0x3F00)
-                                    PpuBusWrite((ushort)(a & 0x2FFF), ppu2007SM_writeValue);
-                                else
-                                    PpuBusWrite((ushort)a, ppu2007SM_writeValue);
-                            }
-                        }
-                    }
-                    ppu2007SM_isRead = ppu2007SM_readDelayed;
-                    ppu2007SM_performMysteryWrite = false;
-                }
-                ppu2007SM++;
-            }
-            if (ppu2007SM == 8 && ppu2007SM_interruptedReadToWrite)
-            {
-                // Fix: TriCNES skips write on phase 0 ((CPUClock & 3) != 0), but this
-                // prevents STA $2007,X from working. Remove phase gate for this path.
-                PpuBusWrite((ushort)ppuAddressBus, ppu2007SM_writeValue);
-                ppu2007SM_interruptedReadToWrite = false;
-                vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x3FFF);
-                ppuAddressBus = vram_addr;
-                if (mapperNeedsA12) NotifyMapperA12(vram_addr);
-            }
+            // ── $2007 state machine (extracted for I-Cache isolation) ──
+            if (ppu2007SM < 9 || (ppu2007SM == 8 && ppu2007SM_interruptedReadToWrite))
+                Process2007StateMachine();
 
             // Open bus decay (AprNes-specific, runs every dot)
             if (--open_bus_decay_timer == 0) { open_bus_decay_timer = 77777; openbus = 0; }
@@ -569,15 +473,16 @@ namespace AprNes
                         bool sprPriority = false;
                         if (cx <= 256 && ShowSprites && (cx > 8 || ShowSprLeft8))
                         {
-                            for (int s = 0; s < 8; s++)
-                            {
-                                if (sprXCounter[s] == 0 || skippedPreRenderDot341)
-                                {
-                                    int px = ((sprShiftH[s] >> 7) << 1) | (sprShiftL[s] >> 7);
-                                    if (px != 0 && sprColor == 0)
-                                    { sprColor = px; sprPalette = (sprFetchAttr[s] & 3) | 4; sprPriority = ((sprFetchAttr[s] >> 5) & 1) == 0; sprSlot = s; }
-                                }
-                            }
+                            // Sprite loop unrolled — early exit on first opaque sprite
+                            if (sprXCounter[0] == 0 || skippedPreRenderDot341) { EvaluateSingleSprite(0, ref sprColor, ref sprPalette, ref sprPriority, ref sprSlot); if (sprColor != 0) goto SpriteFound; }
+                            if (sprXCounter[1] == 0 || skippedPreRenderDot341) { EvaluateSingleSprite(1, ref sprColor, ref sprPalette, ref sprPriority, ref sprSlot); if (sprColor != 0) goto SpriteFound; }
+                            if (sprXCounter[2] == 0 || skippedPreRenderDot341) { EvaluateSingleSprite(2, ref sprColor, ref sprPalette, ref sprPriority, ref sprSlot); if (sprColor != 0) goto SpriteFound; }
+                            if (sprXCounter[3] == 0 || skippedPreRenderDot341) { EvaluateSingleSprite(3, ref sprColor, ref sprPalette, ref sprPriority, ref sprSlot); if (sprColor != 0) goto SpriteFound; }
+                            if (sprXCounter[4] == 0 || skippedPreRenderDot341) { EvaluateSingleSprite(4, ref sprColor, ref sprPalette, ref sprPriority, ref sprSlot); if (sprColor != 0) goto SpriteFound; }
+                            if (sprXCounter[5] == 0 || skippedPreRenderDot341) { EvaluateSingleSprite(5, ref sprColor, ref sprPalette, ref sprPriority, ref sprSlot); if (sprColor != 0) goto SpriteFound; }
+                            if (sprXCounter[6] == 0 || skippedPreRenderDot341) { EvaluateSingleSprite(6, ref sprColor, ref sprPalette, ref sprPriority, ref sprSlot); if (sprColor != 0) goto SpriteFound; }
+                            if (sprXCounter[7] == 0 || skippedPreRenderDot341) { EvaluateSingleSprite(7, ref sprColor, ref sprPalette, ref sprPriority, ref sprSlot); }
+                            SpriteFound:
 
                             if (canDetectSprite0Hit && sprSlot == 0 && sprZeroInSlots && ShowBackGround && ShowSprites && bgColor != 0 && sprColor != 0)
                             { if ((ShowSprLeft8 || cx > 8) && cx < 256) { pendingSprite0Hit = true; canDetectSprite0Hit = false; } }
@@ -636,6 +541,114 @@ namespace AprNes
         // ════════════════════════════════════════════════════════════════
         // _EmulateHalfPPU — half PPU step (called at mcPpuClock == 2)
         // TriCNES: Emulator.cs line 1809
+        // ════════════════════════════════════════════════════════════════
+        // $2007 State Machine — extracted from ppu_step_new for I-Cache isolation
+        // Only active when ppu2007SM < 9 (after $2007 read/write, ~9 dots max)
+        // ════════════════════════════════════════════════════════════════
+        static void Process2007StateMachine()
+        {
+            if (ppu2007SM < 9)
+            {
+                if (ppu2007SM == 1)
+                {
+                    if (ppu2007SM_isRead && !ppu2007SM_bufferLate)
+                    {
+                        int a = ppu2007SM_addr;
+                        ppuAddressBus = a;
+                        ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a & 0x3FFF);
+                    }
+                }
+                else if (ppu2007SM == 3)
+                {
+                    if (ppu2007SM_normalWriteBehavior)
+                    {
+                        ppu2007SM_normalWriteBehavior = false;
+                        if (!ppu2007SM_isRead || !ppu2007SM_readDelayed)
+                        {
+                            ppuAddressBus = vram_addr;
+                            PpuBusWrite(ppuAddressBus, ppu2007SM_writeValue);
+                        }
+                    }
+                    else if (!ppu2007SM_isRead && ppu2007SM_performMysteryWrite)
+                    {
+                        if (ppu2007SM_mysteryAddr >= 0x3F00)
+                        {
+                            PpuBusWrite((ushort)(vram_addr & 0x2FFF), (byte)ppu2007SM_mysteryAddr);
+                            ppuAddressBus = vram_addr;
+                        }
+                        else
+                        {
+                            PpuBusWrite(ppu2007SM_mysteryAddr, (byte)ppu2007SM_mysteryAddr);
+                            PpuBusWrite((ushort)vram_addr, (byte)vram_addr);
+                            ppuAddressBus = vram_addr;
+                        }
+                    }
+                }
+                else if (ppu2007SM == 4)
+                {
+                    if (ppu2007SM_isRead && ppu2007SM_bufferLate)
+                    {
+                        int a = vram_addr;
+                        ppuAddressBus = a;
+                        ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a & 0x3FFF);
+                    }
+                    if (ppu2007SM_updateVramAddrEarly)
+                    {
+                        ppu2007SM_updateVramAddrEarly = false;
+                        vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x3FFF);
+                        ppuAddressBus = vram_addr;
+                        if (ppu2007SM_isRead)
+                        {
+                            int a = vram_addr;
+                            ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a & 0x3FFF);
+                        }
+                    }
+                    if ((ShowBackGround || ShowSprites) && (scanline < 240 || scanline == preRenderLine))
+                    { CXinc(); Yinc(); }
+                    else
+                    { vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x3FFF); }
+                    ppuAddressBus = vram_addr;
+                    if (mapperNeedsA12) NotifyMapperA12(vram_addr);
+                    if (!ppu2007SM_isRead || !ppu2007SM_readDelayed)
+                    {
+                        if (ppu2007SM_performMysteryWrite && ((mcCpuClock & 3) != 0))
+                        {
+                            int a = ppuAddressBus;
+                            if ((a & 0x3FFF) >= 0x3F00) PpuBusWrite((ushort)(a & 0x2FFF), ppu2007SM_writeValue);
+                            else PpuBusWrite((ushort)a, ppu2007SM_writeValue);
+                        }
+                    }
+                    ppu2007SM_isRead = ppu2007SM_readDelayed;
+                    ppu2007SM_performMysteryWrite = false;
+                }
+                ppu2007SM++;
+            }
+            if (ppu2007SM == 8 && ppu2007SM_interruptedReadToWrite)
+            {
+                PpuBusWrite((ushort)ppuAddressBus, ppu2007SM_writeValue);
+                ppu2007SM_interruptedReadToWrite = false;
+                vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x3FFF);
+                ppuAddressBus = vram_addr;
+                if (mapperNeedsA12) NotifyMapperA12(vram_addr);
+            }
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // Sprite pixel evaluation — inlined for unrolled loop
+        // ════════════════════════════════════════════════════════════════
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void EvaluateSingleSprite(int s, ref int sprColor, ref int sprPalette, ref bool sprPriority, ref int sprSlot)
+        {
+            int px = ((sprShiftH[s] >> 7) << 1) | (sprShiftL[s] >> 7);
+            if (px != 0 && sprColor == 0)
+            {
+                sprColor = px;
+                sprPalette = (sprFetchAttr[s] & 3) | 4;
+                sprPriority = ((sprFetchAttr[s] >> 5) & 1) == 0;
+                sprSlot = s;
+            }
+        }
+
         // ════════════════════════════════════════════════════════════════
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_half_step_new()
