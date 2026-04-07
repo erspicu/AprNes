@@ -93,4 +93,44 @@ TriCNES 移植（per-dot PPU step + full bus conflict + OAM corruption delay mod
 
 ---
 
+## #012-#019 Cumulative Optimizations (未逐筆記錄)
+- **日期**: 2026-04-07
+- **Branch**: feature/performance-optimization
+- **變更摘要**:
+  - #012: branchless ComputeSpritePatternAddr + FlipByte LUT — 96.25 FPS
+  - #013: APU hot-path — flatten FC thresholds + bitmask channels
+  - #014: generateSample float optimization + PrecomputeOverflow pointer iteration
+  - #015: bitwise magic for CXinc/Yinc/PpuBusRead/Write/Increment2007
+  - #016: branchless CIRAMAddr MUX via magic number 0xF0AC
+  - #017: hot-path #1-#5 — APU fast-path + sprite mask + palette cache + tile fetch dead phase removal + shift register int
+  - #018: branchless SetNZ/ADC/SBC/PollInterrupts + switch→if-else in CPU Op_XX + branchless JoyPad
+  - #019: branchless OAM attribute mask + flatten DmaOneCycle + SWAR OAM copy + palette mirror patch
+
+> 此區間因未逐次記錄 benchmark，僅保留 commit message 中的部分數據。最後一筆 PerfView profile 分析見 d49f3fb。
+
+---
+
+## #020 Phase 4 extraction + SWAR sprite shift + scanline init + local caching
+- **日期**: 2026-04-07
+- **Branch**: feature/performance-optimization @ d49f3fb (uncommitted)
+- **狀態**: 184/184 NTSC+PAL (零回歸)
+- **變更**:
+  1. **Phase 4 sprite eval 抽離**: ~140 行密集的 sprite eval/fetch/scanline init 從 `ppu_step_new()` 移至 `PpuPhase4_SpriteEvalAndInit()` (`[NoInlining]`)，主方法體縮減 ~25%，幫助 JIT 優化 Phase 5 hot path
+  2. **SWAR sprite shift registers**: 當所有 8 個 `sprXCounter` 為 0 時，用 `ulong` 一條指令完成 8 個 shift register 位移（`& 0xFEFEFEFEFEFEFEFE` mask 防止 byte 邊界溢出）
+  3. **SWAR scanline init**: `Buffer_BG_array` 清零和 `ScreenBuf1x` 填色改用 `ulong*` 批量操作（128 次取代 256 次）
+  4. **Local variable caching**: `ShowBackGround`/`ShowSprites` 在 Phase 5 入口快取為本地變數，減少靜態欄位重複存取
+
+| Run | Frames | Duration | FPS |
+|-----|--------|----------|-----|
+| JIT (discarded) | 2011 | 20.00s | 100.53 |
+| Run 2 | 2038 | 20.01s | **101.86** |
+| Run 3 | 2032 | 20.01s | **101.56** |
+| **Best of 3** | — | — | **101.86** |
+
+**vs #011 (last recorded)**: 95.75 → 101.86 = **+6.4%** (含 #012-#019 未記錄的優化)
+**vs #001 baseline**: 87.19 → 101.86 = **+16.8%**
+**vs master**: 264.45 → 101.86 = -61.5%
+
+---
+
 *後續優化紀錄將依序添加於此。每筆包含：日期、commit、變更摘要、FPS 數據、與 baseline 比較。*
