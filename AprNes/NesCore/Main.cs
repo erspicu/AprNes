@@ -575,7 +575,6 @@ prerender_sprite0_x = 0;
         static public void run()
         {
             // Batched execution: check exit every ~1364 master ticks (≈1 scanline)
-            // Reduces volatile memory barrier overhead by ~99.9%
             while (!exit)
             {
                 for (int batch = 0; batch < 1364; batch++)
