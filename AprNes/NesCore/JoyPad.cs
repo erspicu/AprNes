@@ -57,19 +57,17 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static public byte gamepad_r_4016()
         {
-            byte d0 = (byte)((P1_ShiftRegister & 0x80) == 0 ? 0 : 1);
             P1_ShiftCounter = 2;
-            controllerStrobed = false;  // allows rapid A-button streaming while strobed
-            return (byte)(d0 | (cpubus & 0xE0)); // D0 = button, D5-D7 = CPU open bus
+            controllerStrobed = false;
+            return (byte)((P1_ShiftRegister >> 7) | (cpubus & 0xE0));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static public byte gamepad_r_4017()
         {
-            byte d0 = (byte)((P2_ShiftRegister & 0x80) == 0 ? 0 : 1);
             P2_ShiftCounter = 2;
             controllerStrobed = false;
-            return (byte)(d0 | (cpubus & 0xE0));
+            return (byte)((P2_ShiftRegister >> 7) | (cpubus & 0xE0));
         }
 
         // TriCNES: shift processing in APU step (every CPU cycle)
@@ -77,34 +75,18 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ProcessControllerShift()
         {
-            if (!controllerStrobing)
+            if (controllerStrobing)
             {
-                // Not strobing: process deferred shifts
-                if (P1_ShiftCounter > 0)
-                {
-                    P1_ShiftCounter--;
-                    if (P1_ShiftCounter == 0)
-                    {
-                        P1_ShiftRegister <<= 1;
-                        P1_ShiftRegister |= 1; // fill bit 0 with 1 (open bus / pull-up)
-                    }
-                }
-                if (P2_ShiftCounter > 0)
-                {
-                    P2_ShiftCounter--;
-                    if (P2_ShiftCounter == 0)
-                    {
-                        P2_ShiftRegister <<= 1;
-                        P2_ShiftRegister |= 1;
-                    }
-                }
-            }
-            else
-            {
-                // Strobing: reset shift counters (TriCNES behavior)
                 P1_ShiftCounter = 0;
                 P2_ShiftCounter = 0;
+                return;
             }
+
+            if (P1_ShiftCounter != 0 && --P1_ShiftCounter == 0)
+                P1_ShiftRegister = (byte)((P1_ShiftRegister << 1) | 1);
+
+            if (P2_ShiftCounter != 0 && --P2_ShiftCounter == 0)
+                P2_ShiftRegister = (byte)((P2_ShiftRegister << 1) | 1);
         }
 
         // TriCNES: strobe reload in APU GET cycle (transition to PUT)
