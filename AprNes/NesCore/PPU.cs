@@ -511,49 +511,45 @@ namespace AprNes
         // for the given secondary OAM slot during sprite tile fetch (dots 257-320).
         static int ComputeSpritePatternAddr(int slot)
         {
-            int sprY    = secondaryOAM[slot * 4];
-            int sprTile = secondaryOAM[slot * 4 + 1];
-            int sprAttr = secondaryOAM[slot * 4 + 2];
-            bool flipY  = (sprAttr & 0x80) != 0;
-            int row = (scanline & 0xFF) - sprY;  // TriCNES: (PPU_Scanline & 0xFF) - PPU_SpriteYposition
+            int offset  = slot << 2;
+            int sprY    = secondaryOAM[offset];
+            int sprTile = secondaryOAM[offset + 1];
+            int sprAttr = secondaryOAM[offset + 2];
+            int row = (scanline & 0xFF) - sprY;
 
             if (!Spritesize8x16)
             {
-                // 8x8 sprites
-                int r = flipY ? ((7 - row) & 7) : (row & 7);
-                return SpPatternTableAddr | (sprTile << 4) | r;
+                // 8x8: branchless Y-flip via XOR mask
+                // -(sprAttr >> 7) = 0 (no flip) or -1 (flip); & 7 → 0 or 7; row ^= 7 = 7-row
+                row ^= -(sprAttr >> 7) & 7;
+                return SpPatternTableAddr | (sprTile << 4) | (row & 7);
             }
             else
             {
-                // 8x16 sprites: bit 0 of tile selects pattern table
-                int table = (sprTile & 1) != 0 ? 0x1000 : 0;
-                int tileBase = (sprTile & 0xFE) << 4;
-                if (!flipY)
-                {
-                    if (row < 8)
-                        return table | tileBase | (row & 7);
-                    else
-                        return table | (tileBase + 16) | (row & 7);
-                }
-                else
-                {
-                    if (row < 8)
-                        return table | (tileBase + 16) | (7 - (row & 7));
-                    else
-                        return table | tileBase | (7 - (row & 7));
-                }
+                // 8x16: branchless flip + bitwise tile half selection
+                row ^= -(sprAttr >> 7) & 15;
+                return ((sprTile & 1) << 12) | ((sprTile & 0xFE) << 4) | ((row & 8) << 1) | (row & 7);
             }
         }
 
-        // Reverse bits in a byte (for sprite horizontal flip at tile load time)
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static byte FlipByte(byte b)
+        // Reverse bits in a byte — 256-byte LUT (L1-resident, 1 read vs 12 ALU ops)
+        static readonly byte[] FlipTable = GenerateFlipTable();
+        static byte[] GenerateFlipTable()
         {
-            b = (byte)(((b & 0xF0) >> 4) | ((b & 0x0F) << 4));
-            b = (byte)(((b & 0xCC) >> 2) | ((b & 0x33) << 2));
-            b = (byte)(((b & 0xAA) >> 1) | ((b & 0x55) << 1));
-            return b;
+            byte[] t = new byte[256];
+            for (int i = 0; i < 256; i++)
+            {
+                int v = i;
+                v = ((v & 0xF0) >> 4) | ((v & 0x0F) << 4);
+                v = ((v & 0xCC) >> 2) | ((v & 0x33) << 2);
+                v = ((v & 0xAA) >> 1) | ((v & 0x55) << 1);
+                t[i] = (byte)v;
+            }
+            return t;
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static byte FlipByte(byte b) => FlipTable[b];
 
         static void NotifyMapperA12(int address)
         {
