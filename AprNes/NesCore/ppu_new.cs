@@ -304,11 +304,16 @@ namespace AprNes
                     else if (scanline == preRenderLine && evalDot == 257) { sprSlotCount = evalSpriteCount; sprZeroInSlots = evalSprite0Visible; }
                     if (scanline == preRenderLine && evalDot == 257 && ppuRenderingEnabled) PrecomputePreRenderSprites();
 
-                    // Dot 339: X counter init
+                    // Dot 339: X counter init + sprite active flag
                     if (evalDot == 339)
                     {
+                        bool anyActive = false;
                         for (int i = 0; i < 8; i++)
+                        {
                             sprXCounter[i] = (ShowSprites || ShowBackGround) ? sprXPos[i] : 0;
+                            if ((sprShiftH[i] | sprShiftL[i]) != 0) anyActive = true;
+                        }
+                        spriteAnyActive = anyActive;
                     }
 
                     // Garbage NT fetch (dots 336-340)
@@ -326,7 +331,7 @@ namespace AprNes
                             int scanOff = scanline << 8;
                             int* bgp = Buffer_BG_array + scanOff;
                             for (int* bge = bgp + 256; bgp < bge; bgp++) *bgp = 0;
-                            { uint bgColor = NesColors[ppu_ram[0x3f00] & 0x3f]; uint* sp = ScreenBuf1x + scanOff; for (uint* se = sp + 256; sp < se; sp++) *sp = bgColor; if (AnalogEnabled) { byte bgIdx = (byte)(ppu_ram[0x3f00] & 0x3f); for (int i = 0; i < 256; i++) ntscScanBuf[i] = bgIdx; } }
+                            { uint bgColor = palCache[0]; uint* sp = ScreenBuf1x + scanOff; for (uint* se = sp + 256; sp < se; sp++) *sp = bgColor; if (AnalogEnabled) { byte bgIdx = (byte)(ppu_ram[0x3f00] & 0x3f); for (int i = 0; i < 256; i++) ntscScanBuf[i] = bgIdx; } }
                             PrecomputeOverflow();
                         }
                         if (spriteOverflowCycle >= 0 && evalDot == spriteOverflowCycle) isSpriteOverflow = true;
@@ -454,7 +459,7 @@ namespace AprNes
                     {
                         // ── CalculatePixel (TriCNES line 3073) ──
                         byte backdropIdx = (byte)(ppu_ram[0x3f00] & 0x3f);
-                        uint compositeColor = NesColors[backdropIdx];
+                        uint compositeColor = palCache[0];
                         byte compositePalIdx = backdropIdx;
                         int bgColor = 0, bgPalette = 0;
 
@@ -470,7 +475,7 @@ namespace AprNes
 
                         int sprColor = 0, sprPalette = 0, sprSlot = -1;
                         bool sprPriority = false;
-                        if (cx <= 256 && ShowSprites && (cx > 8 || ShowSprLeft8))
+                        if (cx <= 256 && ShowSprites && (cx > 8 || ShowSprLeft8) && spriteAnyActive)
                         {
                             // Sprite loop fully unrolled — (H|L)>=128 fast-checks bit7 without shift
                             if (sprXCounter[0] == 0 || skippedPreRenderDot341) { if ((sprShiftH[0] | sprShiftL[0]) >= 128) { sprColor = ((sprShiftH[0] >> 7) << 1) | (sprShiftL[0] >> 7); sprPalette = (sprFetchAttr[0] & 3) | 4; sprPriority = ((sprFetchAttr[0] >> 5) & 1) == 0; sprSlot = 0; goto SpriteFound; } }
@@ -493,7 +498,7 @@ namespace AprNes
                         }
 
                         if ((ShowBackGround || ShowSprites) && cx <= 256)
-                        { int pa = (bgPalette << 2) | bgColor; if (bgColor == 0) pa = 0; compositeColor = NesColors[ppu_ram[0x3f00 + pa] & 0x3f]; compositePalIdx = (byte)(ppu_ram[0x3f00 + pa] & 0x3f); }
+                        { int pa = (bgPalette << 2) | bgColor; if (bgColor == 0) pa = 0; compositeColor = palCache[pa]; compositePalIdx = (byte)(ppu_ram[0x3f00 + pa] & 0x3f); }
                         else if (cx <= 256) { if ((vram_addr & 0x3F1F) >= 0x3F00) { int pa = vram_addr & 0x1F; if ((pa & 3) == 0) pa &= 0x0F; compositeColor = NesColors[ppu_ram[0x3f00 + pa] & 0x3f]; compositePalIdx = (byte)(ppu_ram[0x3f00 + pa] & 0x3f); } }
 
                         dotColor = compositeColor;

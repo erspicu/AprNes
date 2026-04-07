@@ -119,6 +119,7 @@ namespace AprNes
             ppu_ram[0x3F14]=0x00; ppu_ram[0x3F15]=0x04; ppu_ram[0x3F16]=0x00; ppu_ram[0x3F17]=0x14;
             ppu_ram[0x3F18]=0x08; ppu_ram[0x3F19]=0x3A; ppu_ram[0x3F1A]=0x00; ppu_ram[0x3F1B]=0x02;
             ppu_ram[0x3F1C]=0x00; ppu_ram[0x3F1D]=0x20; ppu_ram[0x3F1E]=0x2C; ppu_ram[0x3F1F]=0x08;
+            RebuildPaletteCache();
         }
 
         //ppu ctrl 0x2000
@@ -245,6 +246,10 @@ namespace AprNes
         static byte* sprFetchAttr;     // Attribute byte per slot (palette, priority, flip)
         static byte* sprXPos;           // X position per slot (for counter init at dot 339)
         static int sprSlotCount = 0;                   // Number of valid sprites fetched (from evalSpriteCount)
+        static bool spriteAnyActive = false;            // Fast-path: any sprite has non-zero shift data
+
+        // Palette cache: 32-entry (mirrors NES palette RAM layout), rebuilt on palette write
+        static uint* palCache;  // NesColors[ppu_ram[0x3F00+i] & 0x3F] for i=0..31
         // sprOam2Addr removed — unified into evalOam2Addr (TriCNES: single OAM2Address)
         static bool sprZeroInSlots = false;            // Sprite 0 is in slot 0
 
@@ -354,6 +359,19 @@ namespace AprNes
             {
                 int pa = addr & 0x1F; if ((pa & 3) == 0) pa &= 0x0F;
                 ppu_ram[0x3F00 + pa] = val;
+                RebuildPaletteCache();
+            }
+        }
+
+        // Rebuild 32-entry palette color cache (called on palette write — rare, ~1-100x/frame)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void RebuildPaletteCache()
+        {
+            if (palCache == null) return;
+            for (int i = 0; i < 32; i++)
+            {
+                int pa = i; if ((pa & 3) == 0) pa &= 0x0F;
+                palCache[i] = NesColors[ppu_ram[0x3F00 + pa] & 0x3F];
             }
         }
 

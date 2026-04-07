@@ -427,22 +427,17 @@ namespace AprNes
             {
                 // Controller strobe reload (TriCNES: GET cycle = transitioning to PUT)
                 ProcessControllerStrobe();
-                // Pulse & Noise timers (every GET cycle = every 2 CPU cycles)
+                // Pulse & Noise timers — silent channel fast-path
                 {
-                    int p0 = _pulsePeriod[0], p1 = _pulsePeriod[1];
-                    int d0 = _pulseDuty[0],   d1 = _pulseDuty[1];
-                    int lc0 = lengthctr[0],   lc1 = lengthctr[1];
-                    int sw0 = sweepsilence[0], sw1 = sweepsilence[1];
+                    int p0 = _pulsePeriod[0], lc0 = lengthctr[0];
+                    if (--_pulseTimer[0] < 0) { _pulseTimer[0] = p0; _pulseSeq[0] = (_pulseSeq[0] + 1) & 7; }
+                    _pulseOut[0] = (lc0 > 0 && p0 >= 8 && sweepsilence[0] == 0)
+                        ? DUTYLOOKUP[_pulseDuty[0] * 8 + _pulseSeq[0]] : 0;
 
-                    if (--_pulseTimer[0] < 0)
-                    { _pulseTimer[0] = p0; _pulseSeq[0] = (_pulseSeq[0] + 1) & 7; }
-                    _pulseOut[0] = (p0 >= 8 && lc0 > 0 && sw0 == 0)
-                        ? DUTYLOOKUP[d0 * 8 + _pulseSeq[0]] : 0;
-
-                    if (--_pulseTimer[1] < 0)
-                    { _pulseTimer[1] = p1; _pulseSeq[1] = (_pulseSeq[1] + 1) & 7; }
-                    _pulseOut[1] = (p1 >= 8 && lc1 > 0 && sw1 == 0)
-                        ? DUTYLOOKUP[d1 * 8 + _pulseSeq[1]] : 0;
+                    int p1 = _pulsePeriod[1], lc1 = lengthctr[1];
+                    if (--_pulseTimer[1] < 0) { _pulseTimer[1] = p1; _pulseSeq[1] = (_pulseSeq[1] + 1) & 7; }
+                    _pulseOut[1] = (lc1 > 0 && p1 >= 8 && sweepsilence[1] == 0)
+                        ? DUTYLOOKUP[_pulseDuty[1] * 8 + _pulseSeq[1]] : 0;
 
                     if (--_noiseTimer < 0)
                     {

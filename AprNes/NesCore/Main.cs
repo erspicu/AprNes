@@ -469,6 +469,7 @@ prerender_sprite0_x = 0;
                 secondaryOAM     = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
                 corruptOamRow    = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
                 ppu_ram          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 0x4000);
+                palCache         = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 32);
                 sprShiftL        = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 sprShiftH        = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 sprXCounter      = (int* )Marshal.AllocHGlobal(sizeof(int)  * 8);
