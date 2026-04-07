@@ -56,64 +56,38 @@ namespace AprNes
         static void DmaOneCycle()
         {
             // SH* opcodes: DMA during critical cycle makes H invisible
-            if ((opcode == 0x93 && operationCycle == 4) ||
-                (opcode == 0x9B && operationCycle == 3) ||
-                (opcode == 0x9C && operationCycle == 3) ||
-                (opcode == 0x9E && operationCycle == 3) ||
-                (opcode == 0x9F && operationCycle == 3))
-                ignoreH = true;
+            if (opcode >= 0x93)
+            {
+                if (operationCycle == 3 && (opcode == 0x9B || opcode == 0x9C || opcode == 0x9E || opcode == 0x9F))
+                    ignoreH = true;
+                else if (operationCycle == 4 && opcode == 0x93)
+                    ignoreH = true;
+            }
 
             // FirstCycleOfOAMDMA: set halt if on GET cycle
-            if (spriteDmaTransfer && dmaFirstCycleOam)
+            if (dmaFirstCycleOam && spriteDmaTransfer)
             {
                 dmaFirstCycleOam = false;
                 if (!mcApuPutCycle)
                     dmaOamHalt = true;
             }
 
-            // ── PUT cycle (APU_PutCycle == true) — OAM has priority ──
+            // ── PUT cycle — OAM has priority ──
             if (mcApuPutCycle)
             {
-                if (dmcDmaRunning && spriteDmaTransfer)
-                {
-                    if (dmcDmaHalt && dmaOamHalt)       OamDmaHalted();
-                    else if (!dmaOamHalt && dmcDmaHalt)  OamDmaPut();
-                    else if (dmaOamHalt && !dmcDmaHalt)  DmcDmaPut();
-                    else                                 OamDmaPut();
-                }
-                else if (dmcDmaRunning)
-                {
-                    if (dmcDmaHalt) DmcDmaHalted();
-                    else            DmcDmaPut();
-                }
-                else
-                {
-                    if (dmaOamHalt) OamDmaHalted();
-                    else            OamDmaPut();
-                }
+                if (spriteDmaTransfer && !dmaOamHalt)      OamDmaPut();
+                else if (dmcDmaRunning && !dmcDmaHalt)     DmcDmaPut();
+                else if (spriteDmaTransfer)                OamDmaHalted();
+                else if (dmcDmaRunning)                    DmcDmaHalted();
             }
-            // ── GET cycle (APU_PutCycle == false) — DMC has priority ──
+            // ── GET cycle — DMC has priority ──
             else
             {
-                if (dmcDmaRunning && spriteDmaTransfer)
-                {
-                    if (dmcDmaHalt && dmaOamHalt)       DmcDmaHalted();
-                    else if (!dmaOamHalt && dmcDmaHalt)  OamDmaGet();
-                    else if (dmaOamHalt && !dmcDmaHalt)  DmcDmaGet();
-                    else                                 DmcDmaGet();
-                }
-                else if (dmcDmaRunning)
-                {
-                    if (dmcDmaHalt) DmcDmaHalted();
-                    else            DmcDmaGet();
-                }
-                else
-                {
-                    if (dmaOamHalt) OamDmaHalted();
-                    else            OamDmaGet();
-                }
+                if (dmcDmaRunning && !dmcDmaHalt)          DmcDmaGet();
+                else if (spriteDmaTransfer && !dmaOamHalt) OamDmaGet();
+                else if (dmcDmaRunning)                    DmcDmaHalted();
+                else if (spriteDmaTransfer)                OamDmaHalted();
 
-                // Clear halt flags after GET cycle
                 dmcDmaHalt = false;
                 dmaOamHalt = false;
             }
