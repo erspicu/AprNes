@@ -98,6 +98,8 @@
             else if (addr >= 0x1FE8 && addr <= 0x1FEF) { rightLatch = 1; needChrUpdate = true; }
         }
 
+        public void PpuClock() { }
+
         public byte MapperR_CHR(int address)
         {
             return NesCore.chrBankPtrs[(address >> 10) & 7][address & 0x3FF];
@@ -107,6 +109,7 @@
 
         public void MapperW_CHR(int addr, byte val) { }  // CHR-ROM only, no writes
         public void CpuCycle() { }
+        public void CpuClockRise() { }
         public MapperA12Mode A12NotifyMode => MapperA12Mode.MMC2_4;
             public void Cleanup() { }
 }

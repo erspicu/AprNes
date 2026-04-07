@@ -38,7 +38,9 @@ namespace AprNes
         }
 
         public void CpuCycle() { }
+        public void CpuClockRise() { }
         public void NotifyA12(int addr, int ppuAbsCycle) { }
+        public void PpuClock() { }
         public void Cleanup() { }
     }
 }

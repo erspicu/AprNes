@@ -67,27 +67,24 @@ namespace AprNes
                 else if (addr == 0x4016) gamepad_w_4016(val);
                 else if (addr == 0x4017)
                 {
-                    last4017Val    = val;
-                    ctrmode        = ((val & 0x80) != 0) ? 5 : 4;
-                    apuintflag     = (val & 0x40) != 0;
-                    if (apuintflag) statusframeint = false;
-                    UpdateIRQLine();
-                    framectr       = 0;
-                    irqAssertCycles = 0;
-                    int jitter = 2 + (apucycle & 1);
+                    // TriCNES $4017 write model
+                    last4017Val = val;
+                    ctrmode = ((val & 0x80) != 0) ? 5 : 4;
+                    apuintflag = (val & 0x40) != 0;
                     if (ctrmode == 5)
                     {
-                        setenvelope();
-                        setlinctr();
-                        setlength();
-                        setsweep();
-                        setvolumes();
-                        framectrdiv = frameReload5[0] + jitter - 1;
+                        // 5-step: immediate quarter + half frame (deferred via flags)
+                        apuHalfFrame = true;
+                        apuQuarterFrame = true;
                     }
-                    else
+                    if (apuintflag)
                     {
-                        framectrdiv = frameReload4[0] + jitter - 1;
+                        statusframeint = false;
+                        irqLineCurrent = false;
+                        UpdateIRQLine();
                     }
+                    // Deferred reset: 3 cycles if put cycle, 4 if get cycle (TriCNES)
+                    apuFrameCounterReset = (byte)(mcApuPutCycle ? 3 : 4);
                 }
             }
         }

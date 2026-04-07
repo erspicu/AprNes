@@ -65,7 +65,6 @@
             this._menuEmulationRegionDendy = new System.Windows.Forms.ToolStripMenuItem();
             this._menuEmulationSep1 = new System.Windows.Forms.ToolStripSeparator();
             this._menuEmulationLimitFps = new System.Windows.Forms.ToolStripMenuItem();
-            this._menuEmulationPerdotFSM = new System.Windows.Forms.ToolStripMenuItem();
             this._menuView = new System.Windows.Forms.ToolStripMenuItem();
             this._menuViewToggleFullScreen = new System.Windows.Forms.ToolStripMenuItem();
             this._menuViewSep1 = new System.Windows.Forms.ToolStripSeparator();
@@ -311,8 +310,7 @@
             this._menuEmulationHardReset,
             this._menuEmulationSep1,
             this._menuEmulationRegion,
-            this._menuEmulationLimitFps,
-            this._menuEmulationPerdotFSM});
+            this._menuEmulationLimitFps});
             this._menuEmulation.Name = "_menuEmulation";
             this._menuEmulation.Size = new System.Drawing.Size(113, 27);
             this._menuEmulation.Text = "Emulation";
@@ -378,13 +376,7 @@
             this._menuEmulationLimitFps.Text = "Limit FPS";
             this._menuEmulationLimitFps.Click += new System.EventHandler(this._menuEmulationLimitFps_Click);
             // 
-            // _menuEmulationPerdotFSM
             // 
-            this._menuEmulationPerdotFSM.CheckOnClick = true;
-            this._menuEmulationPerdotFSM.Name = "_menuEmulationPerdotFSM";
-            this._menuEmulationPerdotFSM.Size = new System.Drawing.Size(265, 34);
-            this._menuEmulationPerdotFSM.Text = "Per-dot OAM FSM";
-            this._menuEmulationPerdotFSM.Click += new System.EventHandler(this._menuEmulationPerdotFSM_Click);
             // 
             // _menuView
             // 
@@ -582,7 +574,6 @@
         private System.Windows.Forms.ToolStripMenuItem _menuEmulationRegionDendy;
         private System.Windows.Forms.ToolStripSeparator _menuEmulationSep1;
         private System.Windows.Forms.ToolStripMenuItem _menuEmulationLimitFps;
-        private System.Windows.Forms.ToolStripMenuItem _menuEmulationPerdotFSM;
         private System.Windows.Forms.ToolStripMenuItem _menuView;
         private System.Windows.Forms.ToolStripMenuItem _menuViewToggleFullScreen;
         private System.Windows.Forms.ToolStripSeparator _menuViewSep1;

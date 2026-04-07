@@ -1,0 +1,523 @@
+<!DOCTYPE html><html class="client-js" lang="en" dir="ltr"><head>
+<meta charset="UTF-8">
+<title>RAMBO-1 - NESdev Wiki</title>
+<script>document.documentElement.className="client-js";RLCONF={"wgBreakFrames":false,"wgSeparatorTransformTable":["",""],"wgDigitTransformTable":["",""],"wgDefaultDateFormat":"dmy","wgMonthNames":["","January","February","March","April","May","June","July","August","September","October","November","December"],"wgRequestId":"acp99fDqYfduhhbkkFh9ugAAAYU","wgCanonicalNamespace":"","wgCanonicalSpecialPageName":false,"wgNamespaceNumber":0,"wgPageName":"RAMBO-1","wgTitle":"RAMBO-1","wgCurRevisionId":10921,"wgRevisionId":10921,"wgArticleId":1014,"wgIsArticle":true,"wgIsRedirect":false,"wgAction":"view","wgUserName":null,"wgUserGroups":["*"],"wgCategories":["In NesCartDB","ASIC mappers","MMC3-like mappers","Mappers with scanline IRQs","Mappers with cycle IRQs"],"wgPageViewLanguage":"en","wgPageContentLanguage":"en","wgPageContentModel":"wikitext","wgRelevantPageName":"RAMBO-1","wgRelevantArticleId":1014,"wgIsProbablyEditable":false,"wgRelevantPageIsProbablyEditable":false,"wgRestrictionEdit":[],"wgRestrictionMove":[],"wgCheckUserClientHintsHeadersJsApi":["brands","architecture","bitness","fullVersionList","mobile","model","platform","platformVersion"]};
+RLSTATE={"site.styles":"ready","user.styles":"ready","user":"ready","user.options":"loading","skins.monobook.styles":"ready"};RLPAGEMODULES=["site","mediawiki.page.ready","mediawiki.toc","skins.monobook.scripts","ext.checkUser.clientHints"];</script>
+<script>(RLQ=window.RLQ||[]).push(function(){mw.loader.impl(function(){return["user.options@12s5i",function($,jQuery,require,module){mw.user.tokens.set({"patrolToken":"+\\","watchToken":"+\\","csrfToken":"+\\"});
+}];});});</script>
+<link rel="stylesheet" href="/w/load.php?lang=en&amp;modules=skins.monobook.styles&amp;only=styles&amp;skin=monobook">
+<script async="" src="/w/load.php?lang=en&amp;modules=startup&amp;only=scripts&amp;raw=1&amp;skin=monobook"></script>
+<style>
+.oo-ui-icon-alert,.mw-ui-icon-alert:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E alert %3C/title%3E%3Cpath d=%22M11.53 2.3A1.85 1.85 0 0 0 10 1.21 1.85 1.85 0 0 0 8.48 2.3L.36 16.36C-.48 17.81.21 19 1.88 19h16.24c1.67 0 2.36-1.19 1.52-2.64zM11 16H9v-2h2zm0-4H9V6h2z%22/%3E%3C/svg%3E")}.oo-ui-image-invert.oo-ui-icon-alert,.mw-ui-icon-alert-invert:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E alert %3C/title%3E%3Cg fill=%22%23fff%22%3E%3Cpath d=%22M11.53 2.3A1.85 1.85 0 0 0 10 1.21 1.85 1.85 0 0 0 8.48 2.3L.36 16.36C-.48 17.81.21 19 1.88 19h16.24c1.67 0 2.36-1.19 1.52-2.64zM11 16H9v-2h2zm0-4H9V6h2z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-image-progressive.oo-ui-icon-alert,.mw-ui-icon-alert-progressive:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E alert %3C/title%3E%3Cg fill=%22%2336c%22%3E%3Cpath d=%22M11.53 2.3A1.85 1.85 0 0 0 10 1.21 1.85 1.85 0 0 0 8.48 2.3L.36 16.36C-.48 17.81.21 19 1.88 19h16.24c1.67 0 2.36-1.19 1.52-2.64zM11 16H9v-2h2zm0-4H9V6h2z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-icon-bell,.mw-ui-icon-bell:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E bell %3C/title%3E%3Cpath d=%22M16 7a5.38 5.38 0 0 0-4.46-4.85C11.6 1.46 11.53 0 10 0S8.4 1.46 8.46 2.15A5.38 5.38 0 0 0 4 7v6l-2 2v1h16v-1l-2-2zm-6 13a3 3 0 0 0 3-3H7a3 3 0 0 0 3 3%22/%3E%3C/svg%3E")}.oo-ui-image-invert.oo-ui-icon-bell,.mw-ui-icon-bell-invert:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E bell %3C/title%3E%3Cg fill=%22%23fff%22%3E%3Cpath d=%22M16 7a5.38 5.38 0 0 0-4.46-4.85C11.6 1.46 11.53 0 10 0S8.4 1.46 8.46 2.15A5.38 5.38 0 0 0 4 7v6l-2 2v1h16v-1l-2-2zm-6 13a3 3 0 0 0 3-3H7a3 3 0 0 0 3 3%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-image-progressive.oo-ui-icon-bell,.mw-ui-icon-bell-progressive:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E bell %3C/title%3E%3Cg fill=%22%2336c%22%3E%3Cpath d=%22M16 7a5.38 5.38 0 0 0-4.46-4.85C11.6 1.46 11.53 0 10 0S8.4 1.46 8.46 2.15A5.38 5.38 0 0 0 4 7v6l-2 2v1h16v-1l-2-2zm-6 13a3 3 0 0 0 3-3H7a3 3 0 0 0 3 3%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-icon-bellOutline,.mw-ui-icon-bellOutline:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E bell %3C/title%3E%3Cpath d=%22M11.5 2.19C14.09 2.86 16 5.2 16 8v6l2 2v1H2v-1l2-2V8c0-2.8 1.91-5.14 4.5-5.81V1.5C8.5.67 9.17 0 10 0s1.5.67 1.5 1.5zM10 4C7.79 4 6 5.79 6 8v7h8V8c0-2.21-1.79-4-4-4M8 18h4c0 1.1-.9 2-2 2s-2-.9-2-2%22/%3E%3C/svg%3E")}.oo-ui-image-invert.oo-ui-icon-bellOutline,.mw-ui-icon-bellOutline-invert:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E bell %3C/title%3E%3Cg fill=%22%23fff%22%3E%3Cpath d=%22M11.5 2.19C14.09 2.86 16 5.2 16 8v6l2 2v1H2v-1l2-2V8c0-2.8 1.91-5.14 4.5-5.81V1.5C8.5.67 9.17 0 10 0s1.5.67 1.5 1.5zM10 4C7.79 4 6 5.79 6 8v7h8V8c0-2.21-1.79-4-4-4M8 18h4c0 1.1-.9 2-2 2s-2-.9-2-2%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-image-progressive.oo-ui-icon-bellOutline,.mw-ui-icon-bellOutline-progressive:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E bell %3C/title%3E%3Cg fill=%22%2336c%22%3E%3Cpath d=%22M11.5 2.19C14.09 2.86 16 5.2 16 8v6l2 2v1H2v-1l2-2V8c0-2.8 1.91-5.14 4.5-5.81V1.5C8.5.67 9.17 0 10 0s1.5.67 1.5 1.5zM10 4C7.79 4 6 5.79 6 8v7h8V8c0-2.21-1.79-4-4-4M8 18h4c0 1.1-.9 2-2 2s-2-.9-2-2%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-icon-error,.mw-ui-icon-error:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E error %3C/title%3E%3Cpath d=%22M13.728 1H6.272L1 6.272v7.456L6.272 19h7.456L19 13.728V6.272zM11 15H9v-2h2zm0-4H9V5h2z%22/%3E%3C/svg%3E")}.oo-ui-image-invert.oo-ui-icon-error,.mw-ui-icon-error-invert:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E error %3C/title%3E%3Cg fill=%22%23fff%22%3E%3Cpath d=%22M13.728 1H6.272L1 6.272v7.456L6.272 19h7.456L19 13.728V6.272zM11 15H9v-2h2zm0-4H9V5h2z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-image-progressive.oo-ui-icon-error,.mw-ui-icon-error-progressive:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E error %3C/title%3E%3Cg fill=%22%2336c%22%3E%3Cpath d=%22M13.728 1H6.272L1 6.272v7.456L6.272 19h7.456L19 13.728V6.272zM11 15H9v-2h2zm0-4H9V5h2z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-icon-message,.mw-ui-icon-message:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E message %3C/title%3E%3Cpath d=%22M0 8v8a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-10 4z%22/%3E%3Cpath d=%22M2 2a2 2 0 0 0-2 2v2l10 4 10-4V4a2 2 0 0 0-2-2z%22/%3E%3C/svg%3E")}.oo-ui-image-invert.oo-ui-icon-message,.mw-ui-icon-message-invert:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E message %3C/title%3E%3Cg fill=%22%23fff%22%3E%3Cpath d=%22M0 8v8a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-10 4z%22/%3E%3Cpath d=%22M2 2a2 2 0 0 0-2 2v2l10 4 10-4V4a2 2 0 0 0-2-2z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-image-progressive.oo-ui-icon-message,.mw-ui-icon-message-progressive:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E message %3C/title%3E%3Cg fill=%22%2336c%22%3E%3Cpath d=%22M0 8v8a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-10 4z%22/%3E%3Cpath d=%22M2 2a2 2 0 0 0-2 2v2l10 4 10-4V4a2 2 0 0 0-2-2z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-icon-notice,.mw-ui-icon-notice:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E notice %3C/title%3E%3Cpath d=%22M10 0a10 10 0 1 0 10 10A10 10 0 0 0 10 0m1 16H9v-2h2zm0-4H9V4h2z%22/%3E%3C/svg%3E")}.oo-ui-image-invert.oo-ui-icon-notice,.mw-ui-icon-notice-invert:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E notice %3C/title%3E%3Cg fill=%22%23fff%22%3E%3Cpath d=%22M10 0a10 10 0 1 0 10 10A10 10 0 0 0 10 0m1 16H9v-2h2zm0-4H9V4h2z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-image-progressive.oo-ui-icon-notice,.mw-ui-icon-notice-progressive:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E notice %3C/title%3E%3Cg fill=%22%2336c%22%3E%3Cpath d=%22M10 0a10 10 0 1 0 10 10A10 10 0 0 0 10 0m1 16H9v-2h2zm0-4H9V4h2z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-icon-speechBubble,.mw-ui-icon-speechBubble:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E speech bubble %3C/title%3E%3Cpath d=%22M6 14H0v6z%22/%3E%3Crect width=%2220%22 height=%2216%22 rx=%222%22/%3E%3C/svg%3E")}.oo-ui-image-invert.oo-ui-icon-speechBubble,.mw-ui-icon-speechBubble-invert:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E speech bubble %3C/title%3E%3Cg fill=%22%23fff%22%3E%3Cpath d=%22M6 14H0v6z%22/%3E%3Crect width=%2220%22 height=%2216%22 rx=%222%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-image-progressive.oo-ui-icon-speechBubble,.mw-ui-icon-speechBubble-progressive:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E speech bubble %3C/title%3E%3Cg fill=%22%2336c%22%3E%3Cpath d=%22M6 14H0v6z%22/%3E%3Crect width=%2220%22 height=%2216%22 rx=%222%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-icon-speechBubbleAdd,.mw-ui-icon-speechBubbleAdd:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E add speech bubble %3C/title%3E%3Cpath d=%22M3 1a2 2 0 0 0-2 2v16l4-4h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm12 8h-4v4H9V9H5V7h4V3h2v4h4z%22/%3E%3C/svg%3E")}.oo-ui-image-invert.oo-ui-icon-speechBubbleAdd,.mw-ui-icon-speechBubbleAdd-invert:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E add speech bubble %3C/title%3E%3Cg fill=%22%23fff%22%3E%3Cpath d=%22M3 1a2 2 0 0 0-2 2v16l4-4h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm12 8h-4v4H9V9H5V7h4V3h2v4h4z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-image-progressive.oo-ui-icon-speechBubbleAdd,.mw-ui-icon-speechBubbleAdd-progressive:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E add speech bubble %3C/title%3E%3Cg fill=%22%2336c%22%3E%3Cpath d=%22M3 1a2 2 0 0 0-2 2v16l4-4h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm12 8h-4v4H9V9H5V7h4V3h2v4h4z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-icon-speechBubbles,.mw-ui-icon-speechBubbles:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E speech bubbles %3C/title%3E%3Cpath d=%22M17 4v7a2 2 0 0 1-2 2H4v1a2 2 0 0 0 2 2h10l4 4V6a2 2 0 0 0-2-2zM6 10H0v6z%22/%3E%3Crect width=%2216%22 height=%2212%22 rx=%222%22/%3E%3C/svg%3E")}.oo-ui-image-invert.oo-ui-icon-speechBubbles,.mw-ui-icon-speechBubbles-invert:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E speech bubbles %3C/title%3E%3Cg fill=%22%23fff%22%3E%3Cpath d=%22M17 4v7a2 2 0 0 1-2 2H4v1a2 2 0 0 0 2 2h10l4 4V6a2 2 0 0 0-2-2zM6 10H0v6z%22/%3E%3Crect width=%2216%22 height=%2212%22 rx=%222%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-image-progressive.oo-ui-icon-speechBubbles,.mw-ui-icon-speechBubbles-progressive:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E speech bubbles %3C/title%3E%3Cg fill=%22%2336c%22%3E%3Cpath d=%22M17 4v7a2 2 0 0 1-2 2H4v1a2 2 0 0 0 2 2h10l4 4V6a2 2 0 0 0-2-2zM6 10H0v6z%22/%3E%3Crect width=%2216%22 height=%2212%22 rx=%222%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-icon-success,.mw-ui-icon-success:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E success %3C/title%3E%3Cpath d=%22M10 20a10 10 0 0 1 0-20 10 10 0 1 1 0 20m-2-5 9-8.5L15.5 5 8 12 4.5 8.5 3 10z%22/%3E%3C/svg%3E")}.oo-ui-image-invert.oo-ui-icon-success,.mw-ui-icon-success-invert:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E success %3C/title%3E%3Cg fill=%22%23fff%22%3E%3Cpath d=%22M10 20a10 10 0 0 1 0-20 10 10 0 1 1 0 20m-2-5 9-8.5L15.5 5 8 12 4.5 8.5 3 10z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-image-progressive.oo-ui-icon-success,.mw-ui-icon-success-progressive:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E success %3C/title%3E%3Cg fill=%22%2336c%22%3E%3Cpath d=%22M10 20a10 10 0 0 1 0-20 10 10 0 1 1 0 20m-2-5 9-8.5L15.5 5 8 12 4.5 8.5 3 10z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-icon-tray,.mw-ui-icon-tray:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E tray %3C/title%3E%3Cpath d=%22M3 1a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm14 12h-4l-1 2H8l-1-2H3V3h14z%22/%3E%3C/svg%3E")}.oo-ui-image-invert.oo-ui-icon-tray,.mw-ui-icon-tray-invert:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E tray %3C/title%3E%3Cg fill=%22%23fff%22%3E%3Cpath d=%22M3 1a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm14 12h-4l-1 2H8l-1-2H3V3h14z%22/%3E%3C/g%3E%3C/svg%3E")}.oo-ui-image-progressive.oo-ui-icon-tray,.mw-ui-icon-tray-progressive:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22%3E%3Ctitle%3E tray %3C/title%3E%3Cg fill=%22%2336c%22%3E%3Cpath d=%22M3 1a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm14 12h-4l-1 2H8l-1-2H3V3h14z%22/%3E%3C/g%3E%3C/svg%3E")}
+@media screen {
+	.toctoggle{-webkit-user-select:none;-moz-user-select:none;user-select:none;font-size:94%}}
+#mw-teleport-target{position:absolute;z-index:450}#mw-teleport-target{font-size:1.28em; }</style><style>
+@media screen and (max-width:550px){body.skin--responsive{       }body.skin--responsive :root{--font-size-x-small:0.625rem; --font-size-small:0.75rem;--font-size-medium:0.875rem;--font-size-large:1rem;--font-size-x-large:1.125rem;--font-size-xx-large:1.375rem;--font-size-xxx-large:1.625rem;--line-height-x-small:1.125rem; --line-height-small:1.25rem;--line-height-medium:1.375rem;--line-height-large:1.625rem;--line-height-x-large:1.75rem;--line-height-xx-large:2rem;--line-height-xxx-large:2.25rem;--line-height-content:1.5714285; }body.skin--responsive #p-search-mobilejs,body.skin--responsive #p-tb-mobilejs,body.skin--responsive #p-lang-mobilejs,body.skin--responsive #t-contributions{display:none}body.skin--responsive #sidebar #p-tb,body.skin--responsive #sidebar #p-lang,body.skin--responsive #sidebar #p-search{display:block}body.skin--responsive #p-cactions:not(.mobile-menu-active),body.skin--responsive #p-personal:not(.mobile-menu-active),body.skin--responsive #p-tb:not(.mobile-menu-active),body.skin--responsive #p-lang:not(.mobile-menu-active),body.skin--responsive #sidebar-mobilejs:not(.mobile-menu-active){display:block;position:absolute !important; clip:rect(1px,1px,1px,1px);width:1px;height:1px;margin:-1px;border:0;padding:0;overflow:hidden}body.skin--responsive .mobile-menu-active{position:absolute;top:2em;left:0;z-index:10000;background:#fff;border:solid 1px #fabd23;border-left:0;padding:2em 2em 0 1.5em;font-size:125%}body.skin--responsive .mobile-menu-active *[id^='ca-nstab-'],body.skin--responsive .mobile-menu-active #ca-talk,body.skin--responsive .mobile-menu-active #ca-edit{display:block;position:absolute !important; clip:rect(1px,1px,1px,1px);width:1px;height:1px;margin:-1px;border:0;padding:0;overflow:hidden}body.skin--responsive .mobile-menu-active ul{padding-top:1em}body.skin--responsive .mobile-menu-active li{white-space:nowrap}body.skin--responsive .mobile-menu-active a{display:block;padding:0.65em 0}body.skin--responsive .mobile-menu-active a.feedlink{padding-left:16px}body.skin--responsive .mobile-menu-active h3:first-child{margin-right:2em}body.skin--responsive .mobile-menu-active .mw-portlet > div,body.skin--responsive .mobile-menu-active .pBody{margin-bottom:2em}body.skin--responsive .mobile-menu-active .mobile-close-button{width:20px;height:20px;background-image:url(/w/skins/MonoBook/resources/images/icon-close.svg?09057);background-position:0 0;background-repeat:no-repeat;position:absolute;top:1em;right:0.75em;cursor:pointer}body.skin--responsive .menus-cover{display:none;top:0;left:0;width:100%;height:100%;z-index:9999}body.skin--responsive .menus-cover.visible{display:block}body.skin--responsive #menus-cover{position:fixed;opacity:0.45;background-color:#fff}body.skin--responsive #menus-cover-background{position:absolute;background-color:#f9f9f9;background-image:url(/w/skins/MonoBook/resources/images/headbg.svg?1797e);background-position:0 0;background-repeat:no-repeat;opacity:0.55}body.skin--responsive #p-cactions-mobile li#ca-edit-mobile a{background-image:url(/w/skins/MonoBook/resources/images/icon-edit.svg?fbba8)}body.skin--responsive #p-cactions-mobile li#t-contributions-mobile a{background-image:url(/w/skins/MonoBook/resources/images/icon-user.svg?e00d0)}body.skin--responsive .mobile-menu-active a.mw-echo-alert{padding-left:1em;padding-right:1em}body.skin--responsive #echo-hack-badges{list-style:none;margin:0;position:absolute;top:1px;left:1.5em;pointer-events:none}body.skin--responsive #echo-hack-badges li{white-space:nowrap}body.skin--responsive #echo-hack-badges #pt-notifications-alert .mw-echo-notifications-badge,body.skin--responsive #echo-hack-badges #pt-notifications-notice .mw-echo-notifications-badge{width:1.9em;overflow:hidden;height:16;top:0;color:transparent}body.skin--responsive #echo-hack-badges #pt-notifications-alert .mw-echo-notifications-badge::before,body.skin--responsive #echo-hack-badges #pt-notifications-notice .mw-echo-notifications-badge::before{display:none}body.skin--responsive #echo-hack-badges #pt-notifications-alert .mw-echo-notifications-badge::after,body.skin--responsive #echo-hack-badges #pt-notifications-notice .mw-echo-notifications-badge::after{left:0;top:0}}</style><meta name="ResourceLoaderDynamicStyles" content="">
+<link rel="stylesheet" href="/w/load.php?lang=en&amp;modules=site.styles&amp;only=styles&amp;skin=monobook">
+<meta name="generator" content="MediaWiki 1.45.1">
+<meta name="robots" content="max-image-preview:standard">
+<meta name="format-detection" content="telephone=no">
+<meta name="description" content="For the mapper used in the game &quot;Rambo&quot;, see UxROM.
+The Tengen RAMBO-1 is an ASIC mapper, canonically designated as mapper 64. This mapper is basically Tengen's version of the MMC3, but with some extra features. The RAMBO-1 came as a 40-pin PDIP. A variant with different mirroring control is mapper 158...">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, minimum-scale=0.25, maximum-scale=5.0">
+<link rel="search" type="application/opensearchdescription+xml" href="/w/rest.php/v1/search" title="NESdev Wiki (en)">
+<link rel="EditURI" type="application/rsd+xml" href="https://www.nesdev.org/w/api.php?action=rsd">
+<link rel="alternate" type="application/atom+xml" title="NESdev Wiki Atom feed" href="/w/index.php?title=Special:RecentChanges&amp;feed=atom">
+	<meta property="og:type" content="article">
+
+	<meta property="og:site_name" content="NESdev Wiki">
+
+	<meta property="og:title" content="RAMBO-1">
+
+	<meta property="og:description" content="For the mapper used in the game &quot;Rambo&quot;, see UxROM.
+The Tengen RAMBO-1 is an ASIC mapper, canonically designated as mapper 64. This mapper is basically Tengen's version of the MMC3, but with some extra features. The RAMBO-1 came as a 40-pin PDIP. A variant with different mirroring control is mapper 158...">
+
+	<meta property="og:url" content="https://www.nesdev.org/wiki/RAMBO-1">
+
+</head>
+<body class="mediawiki ltr sitedir-ltr mw-hide-empty-elt ns-0 ns-subject page-RAMBO-1 rootpage-RAMBO-1 skin-monobook action-view skin--responsive"><div id="globalWrapper">
+	<div id="column-content">
+		<div id="content" class="mw-body" role="main">
+			<a id="top"></a>
+			<div id="siteNotice"></div>
+			<div class="mw-indicators">
+			</div>
+			<h1 id="firstHeading" class="firstHeading mw-first-heading"><span class="mw-page-title-main">RAMBO-1</span></h1>
+			<div id="bodyContent" class="monobook-body">
+				<div id="siteSub">From NESdev Wiki</div>
+				<div id="contentSub"><div id="mw-content-subtitle"></div></div>
+				
+				<div id="jump-to-nav"></div><a href="#column-one" class="mw-jump-link">Jump to navigation</a><a href="#searchInput" class="mw-jump-link">Jump to search</a>
+				<!-- start content -->
+				<div id="mw-content-text" class="mw-body-content"><div class="mw-content-ltr mw-parser-output" lang="en" dir="ltr"><div class="infobox">
+<div style="text-align: center"><b>RAMBO-1</b>
+</div>
+<table class="oddf0">
+
+<tbody><tr>
+<td><b>Company</b>
+</td>
+<td>Tengen
+</td></tr>
+<tr>
+<td><b>Games</b>
+</td>
+<td><a rel="nofollow" class="external text" href="https://nescartdb.com/search/advanced?ines=64">5 in NesCartDB</a>
+</td></tr>
+<tr>
+<td><b>Complexity</b>
+</td>
+<td>ASIC
+</td></tr>
+<tr>
+<td><b>Boards</b>
+</td>
+<td>800032
+</td></tr>
+<tr>
+<td><b>Pinout</b>
+</td>
+<td><a href="/wiki/Tengen_RAMBO-1_pinout" title="Tengen RAMBO-1 pinout">Tengen RAMBO-1 pinout</a>
+</td></tr>
+<tr>
+<td><b>PRG ROM capacity</b>
+</td>
+<td>256K
+</td></tr>
+<tr>
+<td><b>PRG ROM window</b>
+</td>
+<td>3×8K + 8K fixed
+</td></tr>
+<tr>
+<td><b>PRG RAM capacity</b>
+</td>
+<td>None
+</td></tr>
+<tr>
+<td><b>CHR capacity</b>
+</td>
+<td>256K
+</td></tr>
+<tr>
+<td><b>CHR window</b>
+</td>
+<td>1Kx8 or 2Kx2 + 1Kx4
+</td></tr>
+<tr>
+<td><b><a href="/wiki/Mirroring#Nametable_Mirroring" title="Mirroring">Nametable arrangement</a></b>
+</td>
+<td>H or V, switchable
+</td></tr>
+<tr>
+<td><b><a href="/wiki/Bus_conflict" title="Bus conflict">Bus conflicts</a></b>
+</td>
+<td>No
+</td></tr>
+<tr>
+<td><b>IRQ</b>
+</td>
+<td>Yes
+</td></tr>
+<tr>
+<td><b>Audio</b>
+</td>
+<td>No
+</td></tr>
+<tr>
+<td><b>iNES <a href="/wiki/Mapper" title="Mapper">mappers</a></b>
+</td>
+<td><a href="/wiki/INES_Mapper_064" class="mw-redirect" title="INES Mapper 064">064</a>, <a href="/wiki/INES_Mapper_158" title="INES Mapper 158">158</a>
+</td></tr></tbody></table>
+</div>
+<div class="infobox">
+<div style="text-align: center"><b>NESCartDB</b></div>
+<table class="oddf0">
+
+<tbody><tr>
+<td><a rel="nofollow" class="external text" href="https://nescartdb.com/search/advanced?ines=64">iNES 064</a>
+</td></tr>
+<tr>
+<td><a rel="nofollow" class="external text" href="https://nescartdb.com/search/advanced?unif=TENGEN-800032">800032</a>
+</td></tr>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</tbody></table>
+</div>
+<dl><dd><i>For the mapper used in the game "Rambo", see <a href="/wiki/UxROM" title="UxROM">UxROM</a>.</i></dd></dl>
+<p>The <b>Tengen RAMBO-1</b> is an <a href="/wiki/Category:ASIC_mappers" title="Category:ASIC mappers">ASIC</a> <a href="/wiki/MMC" class="mw-redirect" title="MMC">mapper</a>, canonically designated as <b>mapper 64</b>. This mapper is basically Tengen's version of the <a href="/wiki/MMC3" title="MMC3">MMC3</a>, but with some extra features. The RAMBO-1 came as a <a href="/wiki/Tengen_RAMBO-1_pinout" title="Tengen RAMBO-1 pinout">40-pin PDIP</a>. A variant with different mirroring control is <a href="/wiki/INES_Mapper_158" title="INES Mapper 158">mapper 158</a>.
+</p><p>Example games:
+</p>
+<ul><li><i>Klax</i></li>
+<li><i>Skull and Crossbones</i></li>
+<li><i>Shinobi</i></li>
+<li><i>Rolling Thunder</i></li>
+<li><i>Hard Drivin' (prototype)</i></li></ul>
+<div id="toc" class="toc" role="navigation" aria-labelledby="mw-toc-heading"><input type="checkbox" role="button" id="toctogglecheckbox" class="toctogglecheckbox" style="display:none" aria-label="Hide the table of contents"><div class="toctitle" lang="en" dir="ltr"><h2 id="mw-toc-heading">Contents</h2><span class="toctogglespan"><label class="toctogglelabel" for="toctogglecheckbox"></label></span></div>
+<ul>
+<li class="toclevel-1 tocsection-1"><a href="#Banks"><span class="tocnumber">1</span> <span class="toctext">Banks</span></a></li>
+<li class="toclevel-1 tocsection-2"><a href="#Registers"><span class="tocnumber">2</span> <span class="toctext">Registers</span></a>
+<ul>
+<li class="toclevel-2 tocsection-3"><a href="#Bank_select_($8000-$9FFE,_even)"><span class="tocnumber">2.1</span> <span class="toctext">Bank select ($8000-$9FFE, even)</span></a>
+<ul>
+<li class="toclevel-3 tocsection-4"><a href="#CHR_Banks"><span class="tocnumber">2.1.1</span> <span class="toctext">CHR Banks</span></a></li>
+<li class="toclevel-3 tocsection-5"><a href="#PRG_Banks"><span class="tocnumber">2.1.2</span> <span class="toctext">PRG Banks</span></a></li>
+</ul>
+</li>
+<li class="toclevel-2 tocsection-6"><a href="#Bank_data_($8001-$9FFF,_odd)"><span class="tocnumber">2.2</span> <span class="toctext">Bank data ($8001-$9FFF, odd)</span></a></li>
+<li class="toclevel-2 tocsection-7"><a href="#Mirroring_($A000-$BFFE,_even)"><span class="tocnumber">2.3</span> <span class="toctext">Mirroring ($A000-$BFFE, even)</span></a></li>
+<li class="toclevel-2 tocsection-8"><a href="#Unknown_($A001-$BFFF,_odd)"><span class="tocnumber">2.4</span> <span class="toctext">Unknown ($A001-$BFFF, odd)</span></a></li>
+</ul>
+</li>
+<li class="toclevel-1 tocsection-9"><a href="#IRQ_registers"><span class="tocnumber">3</span> <span class="toctext">IRQ registers</span></a>
+<ul>
+<li class="toclevel-2 tocsection-10"><a href="#IRQ_latch_($C000-$DFFE,_even)"><span class="tocnumber">3.1</span> <span class="toctext">IRQ latch ($C000-$DFFE, even)</span></a></li>
+<li class="toclevel-2 tocsection-11"><a href="#IRQ_mode_select_/_reload_($C001-$DFFF,_odd)"><span class="tocnumber">3.2</span> <span class="toctext">IRQ mode select / reload ($C001-$DFFF, odd)</span></a></li>
+<li class="toclevel-2 tocsection-12"><a href="#IRQ_acknowledge_/_disable_($E000-$FFFE,_even)"><span class="tocnumber">3.3</span> <span class="toctext">IRQ acknowledge / disable ($E000-$FFFE, even)</span></a></li>
+<li class="toclevel-2 tocsection-13"><a href="#IRQ_enable_($E001-$FFFF,_odd)"><span class="tocnumber">3.4</span> <span class="toctext">IRQ enable ($E001-$FFFF, odd)</span></a></li>
+</ul>
+</li>
+<li class="toclevel-1 tocsection-14"><a href="#IRQ_counter_operation"><span class="tocnumber">4</span> <span class="toctext">IRQ counter operation</span></a></li>
+<li class="toclevel-1 tocsection-15"><a href="#Variants"><span class="tocnumber">5</span> <span class="toctext">Variants</span></a></li>
+<li class="toclevel-1 tocsection-16"><a href="#See_also"><span class="tocnumber">6</span> <span class="toctext">See also</span></a></li>
+</ul>
+</div>
+
+<div class="mw-heading mw-heading2"><h2 id="Banks">Banks</h2></div>
+<ul><li>CPU $8000-$9FFF: 8 KiB switchable PRG ROM bank</li>
+<li>CPU $A000-$BFFF: 8 KiB switchable PRG ROM bank</li>
+<li>CPU $C000-$DFFF: 8 KiB switchable PRG ROM bank</li>
+<li>CPU $E000-$FFFF: 8 KiB PRG ROM bank, fixed to the last bank</li>
+<li>PPU -- Three selectable configurations:
+<ol><li>1 KiB switchable CHR banks at $0000, $0400, $0800, $0C00, $1000, $1400, $1800, $1C00</li>
+<li>2 KiB switchable CHR banks at $0000, $0800; 1 KiB switchable CHR banks at $1000, $1400, $1800, $1C00</li>
+<li>2 KiB switchable CHR banks at $1000, $1800; 1 KiB switchable CHR banks at $0000, $0400, $0800, $0C00</li></ol></li></ul>
+<div class="mw-heading mw-heading2"><h2 id="Registers">Registers</h2></div>
+<p>The RAMBO-1 has four pairs of registers at $8000-$9FFF, $A000-$BFFF, $C000-$DFFF, and $E000-$FFFF - even addresses ($8000, $8002, etc.) select the low register and odd addresses ($8001, $8003, etc.) select the high register in each pair.
+</p>
+<div class="mw-heading mw-heading3"><h3 id="Bank_select_($8000-$9FFE,_even)"><span id="Bank_select_.28.248000-.249FFE.2C_even.29"></span>Bank select ($8000-$9FFE, even)</h3></div>
+<pre>7  bit  0
+---- ----
+CPKx RRRR
+|||  ||||
+|||  ++++- Specify which bank register to update on next write to Bank Data register
+|||          0000: R0: Select 2 (K=0) or 1 (K=1) KiB CHR bank at PPU $0000 (or $1000)
+|||          0001: R1: Select 2 (K=0) or 1 (K=1) KiB CHR bank at PPU $0800 (or $1800)
+|||          0010: R2: Select 1 KiB CHR bank at PPU $1000-$13FF (or $0000-$03FF)
+|||          0011: R3: Select 1 KiB CHR bank at PPU $1400-$17FF (or $0400-$07FF)
+|||          0100: R4: Select 1 KiB CHR bank at PPU $1800-$1BFF (or $0800-$0BFF)
+|||          0101: R5: Select 1 KiB CHR bank at PPU $1C00-$1FFF (or $0C00-$0FFF)
+|||          0110: R6: Select 8 KiB PRG ROM bank at $8000-$9FFF (or $C000-$DFFF)
+|||          0111: R7: Select 8 KiB PRG ROM bank at $A000-$BFFF
+|||          1000: R8: If K=1, Select 1 KiB CHR bank at PPU $0400 (or $1400)
+|||          1001: R9: If K=1, Select 1 KiB CHR bank at PPU $0C00 (or $1C00)
+|||          1111: RF: Select 8 KiB PRG ROM bank at $C000-$DFFF (or $8000-$9FFF)
+||+------- Full 1 KiB CHR bank mode  0: two 2 KiB banks at $0000-$0FFF (or $1000-$1FFF)
+||                                   1: four 1 KiB banks at $0000-$0FFF (or $1000-$1FFF)
+|+-------- PRG ROM bank mode  0: $8000-$9FFF uses bank selected with R6
+|                                $A000-$BFFF uses bank selected with R7
+|                                $C000-$DFFF uses bank selected with RF
+|                             1: $8000-$9FFF uses bank selected with RF
+|                                $A000-$BFFF uses bank selected with R7
+|                                $C000-$DFFF uses bank selected with R6
++--------- CHR A12 inversion  0: two 2 KiB banks (or four 1 KiB banks) at $0000-$0FFF
+                                 four 1 KiB banks at $1000-$1FFF
+                              1: two 2 KiB banks (or four 1 KiB banks) at $1000-$1FFF
+                                 four 1 KiB banks at $0000-$0FFF
+</pre>
+<div class="mw-heading mw-heading4"><h4 id="CHR_Banks">CHR Banks</h4></div>
+<table class="wikitable">
+<tbody><tr>
+<th>When $8000 &amp; $80</th>
+<th>is $00</th>
+<th>is $80
+</th></tr>
+<tr>
+<th>PPU Bank</th>
+<th colspan="2">Value of RAMBO-1 register
+</th></tr>
+<tr>
+<td>$0000-$03FF</td>
+<td>R0</td>
+<td>R2
+</td></tr>
+<tr>
+<td>$0400-$07FF</td>
+<td>K=0: R0<br>K=1: R8</td>
+<td>R3
+</td></tr>
+<tr>
+<td>$0800-$0BFF</td>
+<td>R1</td>
+<td>R4
+</td></tr>
+<tr>
+<td>$0C00-$0FFF</td>
+<td>K=0: R1<br>K=1: R9</td>
+<td>R5
+</td></tr>
+<tr>
+<td>$1000-$13FF</td>
+<td>R2</td>
+<td>R0
+</td></tr>
+<tr>
+<td>$1400-$17FF</td>
+<td>R3</td>
+<td>K=0: R0<br>K=1: R8
+</td></tr>
+<tr>
+<td>$1800-$1BFF</td>
+<td>R4</td>
+<td>R1
+</td></tr>
+<tr>
+<td>$1C00-$1FFF</td>
+<td>R5</td>
+<td>K=0: R1<br>K=1: R9
+</td></tr></tbody></table>
+<p>With 2KiB banks (where K=0), only even-numbered CHR banks can be selected. The lowest bit in the register is ignored and instead passes PPU A10 directly through to CHR A10.
+</p>
+<div class="mw-heading mw-heading4"><h4 id="PRG_Banks">PRG Banks</h4></div>
+<p>Because the values in R6, R7, RF, and $8000 are unspecified at power on, the reset vector must point into $E000-$FFFF, and code must initialize these before jumping out of $E000-$FFFF.
+</p>
+<table class="wikitable">
+<tbody><tr>
+<th>When $8000 &amp; $40</th>
+<th>is $00</th>
+<th>is $40
+</th></tr>
+<tr>
+<th>CPU Bank</th>
+<th colspan="2">Value of RAMBO-1 register
+</th></tr>
+<tr>
+<td>$8000-$9FFF</td>
+<td>R6</td>
+<td>RF
+</td></tr>
+<tr>
+<td>$A000-$BFFF</td>
+<td>R7</td>
+<td>R7
+</td></tr>
+<tr>
+<td>$C000-$DFFF</td>
+<td>RF</td>
+<td>R6
+</td></tr>
+<tr>
+<td>$E000-$FFFF</td>
+<td>(-1)</td>
+<td>(-1)
+</td></tr></tbody></table>
+<ul><li>(-1)&nbsp;: the last bank</li></ul>
+<div class="mw-heading mw-heading3"><h3 id="Bank_data_($8001-$9FFF,_odd)"><span id="Bank_data_.28.248001-.249FFF.2C_odd.29"></span>Bank data ($8001-$9FFF, odd)</h3></div>
+<p>All eight bits are used for a new value for the bank based on last value written to Bank select register (as mentioned above)
+</p>
+<div class="mw-heading mw-heading3"><h3 id="Mirroring_($A000-$BFFE,_even)"><span id="Mirroring_.28.24A000-.24BFFE.2C_even.29"></span>Mirroring ($A000-$BFFE, even)</h3></div>
+<pre>7  bit  0
+---- ----
+xxxx xxxM
+        |
+        +- <a href="/wiki/Mirroring" title="Mirroring">Mirroring</a> (0: vertical; 1: horizontal)
+</pre>
+<p>This applies to <b>mapper 64</b> only (see <a href="#Variants">Variants</a> below).
+</p>
+<div class="mw-heading mw-heading3"><h3 id="Unknown_($A001-$BFFF,_odd)"><span id="Unknown_.28.24A001-.24BFFF.2C_odd.29"></span>Unknown ($A001-$BFFF, odd)</h3></div>
+<p>This register is either not implemented or has undiscovered functionality on RAMBO-1.  The MMC3/MMC6 equivalent of this register controls external and internal PRG-RAM access.  There is not presently any reason to believe that RAMBO-1 has any support for PRG-RAM.
+</p>
+<div class="mw-heading mw-heading2"><h2 id="IRQ_registers">IRQ registers</h2></div>
+<div class="mw-heading mw-heading3"><h3 id="IRQ_latch_($C000-$DFFE,_even)"><span id="IRQ_latch_.28.24C000-.24DFFE.2C_even.29"></span>IRQ latch ($C000-$DFFE, even)</h3></div>
+<p>All eight bits of this register specifies the IRQ counter reload value. When the IRQ counter is zero (or a reload is requested through $C001), this value will be copied into the IRQ counter at the end of the current scanline.
+</p>
+<div class="mw-heading mw-heading3"><h3 id="IRQ_mode_select_/_reload_($C001-$DFFF,_odd)"><span id="IRQ_mode_select_.2F_reload_.28.24C001-.24DFFF.2C_odd.29"></span>IRQ mode select / reload ($C001-$DFFF, odd)</h3></div>
+<pre>7  bit  0
+---- ----
+xxxx xxxM
+        |
+        +- IRQ mode select (0: Scanline Mode, 1: CPU Cycle Mode)
+</pre>
+<p>Writing to this register also clears the IRQ counter so that it will be reloaded at next clock, or the next scanline, depending on the selected mode. This also resets the prescaler in cycle mode, so the next clock will occur 4 cycles later.
+</p>
+<div class="mw-heading mw-heading3"><h3 id="IRQ_acknowledge_/_disable_($E000-$FFFE,_even)"><span id="IRQ_acknowledge_.2F_disable_.28.24E000-.24FFFE.2C_even.29"></span>IRQ acknowledge / disable ($E000-$FFFE, even)</h3></div>
+<p>Writing any value to this register will disable counter interrupts AND acknowledge any pending interrupts.
+</p>
+<div class="mw-heading mw-heading3"><h3 id="IRQ_enable_($E001-$FFFF,_odd)"><span id="IRQ_enable_.28.24E001-.24FFFF.2C_odd.29"></span>IRQ enable ($E001-$FFFF, odd)</h3></div>
+<p>Writing any value to this register will enable counter interrupts.  Note that writing to this register does not acknowledge the IRQ if already set.
+</p>
+<div class="mw-heading mw-heading2"><h2 id="IRQ_counter_operation">IRQ counter operation</h2></div>
+<p>There are two IRQ modes: PPU A12 mode (also known as <i>scanline mode</i>) and CPU cycle mode.
+</p><p>In <i>scanline mode</i>, the counter is clocked using a very similar method to that used by the <a href="/wiki/MMC3" title="MMC3">MMC3</a> and follows the same restrictions. In comparison to the <a href="/wiki/MMC3" title="MMC3">MMC3</a>, the actual interrupt triggers slightly later. Specifically, it is delayed until <a rel="nofollow" class="external text" href="http://forums.nesdev.org/viewtopic.php?p=117323#p117323">M2 falls twice after the PPU A12 rise</a> that would have triggered the MMC3 interrupt.
+</p><p>In <i>CPU cycle mode</i>, the counter is clocked every 4 CPU cycles. The actual interrupt triggers <a rel="nofollow" class="external text" href="http://forums.nesdev.org/viewtopic.php?p=117461#p117461">one M2 cycle later</a> than one would naively expect.
+</p><p>Whichever IRQ mode is being used, the counter behaves the following way:
+</p><p><b>When the IRQ is clocked by <i>scanline</i> or <i>CPU cycle</i> modes:</b>
+</p>
+<ul><li><b>IF</b> $C001 was written to after previous clock:
+<ul><li>reload IRQ counter with IRQ reload value; if non zero, this value is <b>ORed with 1</b> (see notes).</li></ul></li>
+<li><b>ELSE IF</b> IRQ counter is 0:
+<ul><li>reload IRQ counter with IRQ reload value.</li></ul></li>
+<li><b>ELSE</b>
+<ul><li>Decrement IRQ counter by 1.</li></ul></li>
+<li>If IRQ counter is now 0 <b>AND</b> IRQs are enabled:
+<ul><li>trigger IRQ after 4 CPU cycles.</li></ul></li></ul>
+<p><b>Notes:</b> 
+</p>
+<ul><li>It's still unknown how the extra kick works. <i>Klax</i> still requires <b>+1</b> to run perfectly.</li>
+<li>Most emulators run <i>Skull &amp; Crossbones</i> with a glitched scanline on the "Continue" screen OR during the game (score bar).</li></ul>
+<p>Following these rules in scanline counter mode has demonstrated accurate behavior, but this needs to be refined and merged with the description above:
+</p>
+<pre>On M2 falling edge:
+   If PA12 = 0:
+       If 4-bit counter &lt; 16: 4-bit counter++.
+       else keep the same value.
+   If PA12 = 1:
+       If 4-bit counter = 16: Clock the 8-bit counter.
+       Always reset 4-bit counter to 0.
+
+On 8-bit counter clock:
+   If value = 0:
+       If IRQ is enabled, trigger IRQ (wait 1 more cycle before doing that though, regardless of PA12 next cycle...)
+       Always reload counter with value in $C000.
+   Else value--.
+
+On Write to $C001 (reset):
+   Reload 8-bit counter with value in $C000
+   Set 4-bit counter to 17.
+</pre>
+<div class="mw-heading mw-heading2"><h2 id="Variants">Variants</h2></div>
+<p><a href="/wiki/INES_Mapper_158" title="INES Mapper 158">Mapper 158</a>, used for <i>Alien Syndrome</i>, has mirroring like <a href="/wiki/INES_Mapper_118" title="INES Mapper 118">mapper 118</a> (<a href="/wiki/TLSROM" title="TLSROM">TLSROM</a>), where CIRAM A10 is connected to CHR A17, and bit 7 of each CHR bank mapped into PPU $0000-$0FFF controls which page of CIRAM is used for the corresponding nametable in $2000-$2FFF.
+</p>
+<div class="mw-heading mw-heading2"><h2 id="See_also">See also</h2></div>
+<ul><li><a rel="nofollow" class="external text" href="http://www.romhacking.net/documents/362/">NES Mapper List</a> by Disch</li>
+<li><a rel="nofollow" class="external text" href="http://nesdev.org/mappers.zip">Comprehensive NES Mapper Document</a> by \Firebug\, information about mapper's initial state is inaccurate.</li></ul>
+<!-- 
+NewPP limit report
+Cached time: 20260330014059
+Cache expiry: 86400
+Reduced expiry: false
+Complications: [show‐toc]
+CPU time usage: 0.073 seconds
+Real time usage: 0.094 seconds
+Preprocessor visited node count: 318/1000000
+Revision size: 9347/2097152 bytes
+Post‐expand include size: 1802/2097152 bytes
+Template argument size: 402/2097152 bytes
+Highest expansion depth: 11/100
+Expensive parser function count: 0/100
+Unstrip recursion depth: 0/20
+Unstrip post‐expand size: 0/5000000 bytes
+-->
+<!--
+Transclusion expansion time report (%,ms,calls,template)
+100.00%   37.084      1 -total
+ 75.88%   28.139      1 Template:Nesdbbox
+ 56.96%   21.124      2 Template:Nesdblink
+ 32.75%   12.144      6 Template:Strip_whitespace
+ 23.71%    8.792      1 Template:Infobox_iNES_mapper
+  9.90%    3.670      6 Template:Strip_whitespace/1
+-->
+
+<!-- Saved in parser cache with key nesdev_db-wiki_:pcache:1014:|#|:idhash:canonical and timestamp 20260330014059 and revision id 10921. Rendering was triggered because: page_view
+ -->
+</div>
+<div class="printfooter" data-nosnippet="">Retrieved from "<a dir="ltr" href="https://www.nesdev.org/w/index.php?title=RAMBO-1&amp;oldid=10921">https://www.nesdev.org/w/index.php?title=RAMBO-1&amp;oldid=10921</a>"</div></div>
+				<div id="catlinks" class="catlinks" data-mw="interface"><div id="mw-normal-catlinks" class="mw-normal-catlinks"><a href="/wiki/Special:Categories" title="Special:Categories">Categories</a>: <ul><li><a href="/wiki/Category:In_NesCartDB" title="Category:In NesCartDB">In NesCartDB</a></li><li><a href="/wiki/Category:ASIC_mappers" title="Category:ASIC mappers">ASIC mappers</a></li><li><a href="/wiki/Category:MMC3-like_mappers" title="Category:MMC3-like mappers">MMC3-like mappers</a></li><li><a href="/wiki/Category:Mappers_with_scanline_IRQs" title="Category:Mappers with scanline IRQs">Mappers with scanline IRQs</a></li><li><a href="/wiki/Category:Mappers_with_cycle_IRQs" title="Category:Mappers with cycle IRQs">Mappers with cycle IRQs</a></li></ul></div></div>
+				<!-- end content -->
+				<div class="visualClear"></div>
+			</div>
+		</div>
+		<div class="visualClear"></div>
+	</div>
+	<div id="column-one">
+		<h2>Navigation menu</h2>
+		<div role="navigation" class="portlet" id="p-cactions" aria-labelledby="p-cactions-label">
+			<h3 id="p-cactions-label">Page actions</h3>
+			<div class="pBody">
+				<ul>
+				<li id="ca-nstab-main" class="selected mw-list-item"><a href="/wiki/RAMBO-1" title="View the content page [alt-c]" accesskey="c">Page</a></li><li id="ca-talk" class="mw-list-item"><a href="/wiki/Talk:RAMBO-1" rel="discussion" title="Discussion about the content page [alt-t]" accesskey="t">Discussion</a></li><li id="ca-view" class="selected mw-list-item"><a href="/wiki/RAMBO-1">Read</a></li><li id="ca-viewsource" class="mw-list-item"><a href="/w/index.php?title=RAMBO-1&amp;action=edit" title="This page is protected.
+You can view its source [alt-e]" accesskey="e">View source</a></li><li id="ca-history" class="mw-list-item"><a href="/w/index.php?title=RAMBO-1&amp;action=history" title="Past revisions of this page [alt-h]" accesskey="h">History</a></li>
+				
+				</ul>
+			</div>
+		</div>
+		
+<div role="navigation" class="portlet mw-portlet mw-portlet-cactions-mobile" id="p-cactions-mobile" aria-labelledby="p-cactions-mobile-label">
+	<h3 id="p-cactions-mobile-label">Page actions</h3>
+	<div class="pBody">
+		<ul><li id="main-mobile" class="selected mw-list-item"><a href="/wiki/RAMBO-1" title="Page">Page</a></li><li id="talk-mobile" class="mw-list-item"><a href="/wiki/Talk:RAMBO-1" title="Discussion">Discussion</a></li><li id="ca-more" class="mw-list-item"><a href="#p-cactions">More</a></li><li id="ca-tools" class="mw-list-item"><a href="#p-tb" title="Tools">Tools</a></li></ul>
+		
+	</div>
+</div>
+
+		<div role="navigation" class="portlet" id="p-personal" aria-labelledby="p-personal-label">
+			<h3 id="p-personal-label">Personal tools</h3>
+			<div class="pBody">
+				<ul>
+				<li id="pt-createaccount" class="mw-list-item"><a href="/w/index.php?title=Special:CreateAccount&amp;returnto=RAMBO-1" title="You are encouraged to create an account and log in; however, it is not mandatory">Create account</a></li><li id="pt-login" class="mw-list-item"><a href="/w/index.php?title=Special:UserLogin&amp;returnto=RAMBO-1" title="You are encouraged to log in; however, it is not mandatory [alt-o]" accesskey="o">Log in</a></li>
+				</ul>
+			</div>
+		</div>
+		<div class="portlet" id="p-logo" role="banner">
+			<a href="/wiki/Nesdev_Wiki" class="mw-wiki-logo"></a>
+		</div>
+		<div id="sidebar">
+		
+<div role="navigation" class="portlet mw-portlet mw-portlet-navigation" id="p-navigation" aria-labelledby="p-navigation-label">
+	<h3 id="p-navigation-label">Navigation</h3>
+	<div class="pBody">
+		<ul><li id="n-Wiki-main-page" class="mw-list-item"><a href="/wiki/Nesdev_Wiki">Wiki main page</a></li><li id="n-NES-reference-guide" class="mw-list-item"><a href="/wiki/NES_reference_guide">NES reference guide</a></li><li id="n-Programming-guide" class="mw-list-item"><a href="/wiki/Programming_guide">Programming guide</a></li><li id="n-Projects" class="mw-list-item"><a href="/wiki/Projects">Projects</a></li><li id="n-Offline-wiki-snapshot" class="mw-list-item"><a rel="nofollow" href="https://archive.org/details/NesDevWiki">Offline wiki snapshot</a></li><li id="n-NESdev-Forums" class="mw-list-item"><a rel="nofollow" href="https://forums.nesdev.org/">NESdev Forums</a></li><li id="n-NESdev-Discord" class="mw-list-item"><a rel="nofollow" href="https://discord.gg/SddKcS6ehE">NESdev Discord</a></li><li id="n-recentchanges" class="mw-list-item"><a href="/wiki/Special:RecentChanges" title="A list of recent changes in the wiki [alt-r]" accesskey="r">Recent changes</a></li></ul>
+		
+	</div>
+</div>
+
+		<div role="search" class="portlet" id="p-search">
+			<h3 id="p-search-label"><label for="searchInput">Search</label></h3>
+			<div class="pBody" id="searchBody">
+				<form action="/w/index.php" id="searchform"><input type="hidden" value="Special:Search" name="title"><input type="search" name="search" placeholder="Search NESdev Wiki" aria-label="Search NESdev Wiki" autocapitalize="sentences" spellcheck="false" title="Search NESdev Wiki [alt-f]" accesskey="f" id="searchInput"><input type="submit" name="go" value="Go" title="Go to a page with this exact name if it exists" class="searchButton" id="searchButton"> <input type="submit" name="fulltext" value="Search" title="Search the pages for this text" class="searchButton mw-fallbackSearchButton" id="mw-searchButton"></form>
+			</div>
+		</div>
+		
+<div role="navigation" class="portlet mw-portlet mw-portlet-tb" id="p-tb" aria-labelledby="p-tb-label">
+	<h3 id="p-tb-label">Tools</h3>
+	<div class="pBody">
+		<ul><li id="t-whatlinkshere" class="mw-list-item"><a href="/wiki/Special:WhatLinksHere/RAMBO-1" title="A list of all wiki pages that link here [alt-j]" accesskey="j">What links here</a></li><li id="t-recentchangeslinked" class="mw-list-item"><a href="/wiki/Special:RecentChangesLinked/RAMBO-1" rel="nofollow" title="Recent changes in pages linked from this page [alt-k]" accesskey="k">Related changes</a></li><li id="t-print" class="mw-list-item"><a href="javascript:print();" rel="alternate" title="Printable version of this page [alt-p]" accesskey="p">Printable version</a></li><li id="t-permalink" class="mw-list-item"><a href="https://www.nesdev.org/w/index.php?title=RAMBO-1&amp;oldid=10921" title="Permanent link to this revision of this page">Permanent link</a></li><li id="t-info" class="mw-list-item"><a href="/w/index.php?title=RAMBO-1&amp;action=info" title="More information about this page">Page information</a></li><li id="n-Special-Pages" class="mw-list-item"><a href="/wiki/Special:SpecialPages">Special Pages</a></li></ul>
+		
+	</div>
+</div>
+
+		
+		</div>
+		<a href="#sidebar" title="Jump to navigation" class="menu-toggle" id="sidebar-toggle"></a>
+		<a href="#p-personal" title="user tools" class="menu-toggle" id="p-personal-toggle"></a>
+		<a href="#globalWrapper" title="back to top" class="menu-toggle" id="globalWrapper-toggle"></a>
+	</div>
+	<!-- end of the left (by default at least) column -->
+	<div class="visualClear"></div>
+	<div id="footer" class="mw-footer" role="contentinfo">
+		<div id="f-poweredbyico" class="footer-icons">
+			<a href="https://www.mediawiki.org/" class="cdx-button cdx-button--fake-button cdx-button--size-large cdx-button--fake-button--enabled"><picture><source media="(min-width: 500px)" srcset="/w/resources/assets/poweredby_mediawiki.svg" width="88" height="31"><img src="/w/resources/assets/mediawiki_compact.svg" alt="Powered by MediaWiki" lang="en" width="25" height="25" loading="lazy"></picture></a>
+		</div>
+		<ul id="f-list">
+			<li id="lastmod"> This page was last edited on 7 March 2021, at 13:48.</li>
+			<li id="privacy"><a href="/wiki/Nesdev_wiki:Privacy_policy">Privacy policy</a></li><li id="about"><a href="/wiki/Nesdev_wiki:About">About NESdev Wiki</a></li><li id="disclaimers"><a href="/wiki/Nesdev_wiki:General_disclaimer">Disclaimers</a></li>
+		</ul>
+	</div>
+</div>
+<script>(RLQ=window.RLQ||[]).push(function(){mw.config.set({"wgBackendResponseTime":158,"wgPageParseReport":{"limitreport":{"cputime":"0.073","walltime":"0.094","ppvisitednodes":{"value":318,"limit":1000000},"revisionsize":{"value":9347,"limit":2097152},"postexpandincludesize":{"value":1802,"limit":2097152},"templateargumentsize":{"value":402,"limit":2097152},"expansiondepth":{"value":11,"limit":100},"expensivefunctioncount":{"value":0,"limit":100},"unstrip-depth":{"value":0,"limit":20},"unstrip-size":{"value":0,"limit":5000000},"timingprofile":["100.00%   37.084      1 -total"," 75.88%   28.139      1 Template:Nesdbbox"," 56.96%   21.124      2 Template:Nesdblink"," 32.75%   12.144      6 Template:Strip_whitespace"," 23.71%    8.792      1 Template:Infobox_iNES_mapper","  9.90%    3.670      6 Template:Strip_whitespace/1"]},"cachereport":{"timestamp":"20260330014059","ttl":86400,"transientcontent":false}}});});</script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9e478add7c5aa9a7',t:'MTc3NDg3ODE5Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><iframe height="1" width="1" style="position: absolute; top: 0px; left: 0px; border: none; visibility: hidden;"></iframe><script defer="" src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon="{&quot;version&quot;:&quot;2024.11.0&quot;,&quot;token&quot;:&quot;6c2a51884de146568600589c93ac5eda&quot;,&quot;r&quot;:1,&quot;server_timing&quot;:{&quot;name&quot;:{&quot;cfCacheStatus&quot;:true,&quot;cfEdge&quot;:true,&quot;cfExtPri&quot;:true,&quot;cfL4&quot;:true,&quot;cfOrigin&quot;:true,&quot;cfSpeedBrain&quot;:true},&quot;location_startswith&quot;:null}}" crossorigin="anonymous"></script>
+
+<div id="mw-teleport-target"></div></body></html>

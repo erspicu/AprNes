@@ -51,8 +51,10 @@
         public void MapperW_CHR(int addr, byte val) { ppu_ram[addr] = val; }
         public void Reset() { }
         public void CpuCycle() { }
+        public void CpuClockRise() { }
         public MapperA12Mode A12NotifyMode => MapperA12Mode.None;
         public void NotifyA12(int addr, int ppuAbsCycle) { }
+        public void PpuClock() { }
             public void Cleanup() { }
 }
 }

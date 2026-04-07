@@ -11,14 +11,11 @@ namespace AprNes
         int* Vertical;
 
         protected bool IRQ_enable = false, IRQReset = false;
-        protected int IRQlatchVal = 0, IRQCounter = 0;
+        protected byte IRQlatchVal = 0, IRQCounter = 0; // TriCNES: byte type (0-1 wraps to 255)
         int BankReg = 0;
 
-        // A12 rising-edge tracking for IRQ clocking
-        int lastA12 = 0;
-        int a12LowSince = -100;  // PPU absolute cycle when A12 last went low
-        int lastNotifyTime = -100;  // PPU absolute cycle of last A12 notification
-        const int A12_FILTER = 16;
+        // TriCNES M2 filter model for A12 rising edge detection
+        int m2Filter = 0;
         int CHR0_Bankselect1k = 0, CHR1_Bankselect1k = 0, CHR2_Bankselect1k = 0, CHR3_Bankselect1k = 0;
         int CHR0_Bankselect2k = 0, CHR1_Bankselect2k = 0;
         int PRG0_Bankselect = 0, PRG1_Bankselect = 0;
@@ -28,56 +25,59 @@ namespace AprNes
         public void MapperW_CHR(int addr, byte val) { if (CHR_ROM_count == 0) ppu_ram[addr] = val; }
         public void Reset() { }
         public void CpuCycle() { }
+        public void CpuClockRise()
+        {
+            if ((NesCore.ppuAddressBus & 0x1000) == 0)
+            {
+                if (m2Filter < 3) m2Filter++;
+            }
+        }
         public MapperA12Mode A12NotifyMode => MapperA12Mode.MMC3;
 
-        public void NotifyA12(int address, int ppuAbsCycle)
+        public void NotifyA12(int address, int ppuAbsCycle) { }
+
+        public void PpuClock()
         {
-            int a12 = (address >> 12) & 1;
-
-            // How long since the last A12 notification (detects VBL gaps)
-            int sinceLast = ppuAbsCycle - lastNotifyTime;
-            if (sinceLast < 0) sinceLast += 341 * 262;
-            lastNotifyTime = ppuAbsCycle;
-
-            if (a12 != 0 && lastA12 == 0)
+            bool a12Now = (NesCore.ppuAddressBus & 0x1000) != 0;
+            if (!NesCore.ppuA12Prev && a12Now && m2Filter == 3)
             {
-                // Rising edge 0→1: clock IRQ counter if A12 was low long enough
-                int elapsed = ppuAbsCycle - a12LowSince;
-                if (elapsed < 0) elapsed += 341 * 262;
-                if (elapsed >= A12_FILTER)
-                    Mapper04step_IRQ();
+                Mapper04step_IRQ();
             }
-            else if (a12 == 0 && lastA12 != 0)
-            {
-                // Falling edge 1→0: record when A12 went low.
-                // But only if notifications have been continuous (within same rendering period).
-                // After a long gap (VBL), A12 was already low on the bus, so the old
-                // a12LowSince is more accurate — don't reset it.
-                if (sinceLast < 341)
-                    a12LowSince = ppuAbsCycle;
-            }
-            lastA12 = a12;
+            if (a12Now)
+                m2Filter = 0;
         }
 
         public virtual void Mapper04step_IRQ()
         {
-            // Clocked by PPU A12 rising edge, once per scanline when rendering is enabled.
-            // If counter==0 or reload requested: reload from latch, then check for IRQ.
-            // Otherwise decrement, then check for IRQ.
-            if (IRQCounter == 0 || IRQReset)
+            // TriCNES model: reload only when ReloadIRQCounter flag set
+            // Counter is int — 0 decrements to -1 (no underflow to 255)
+            if (IRQReset)
             {
                 IRQCounter = IRQlatchVal;
                 IRQReset = false;
+                if (IRQCounter == 0 && IRQ_enable)
+                {
+                    NesCore.statusmapperint = true;
+                    NesCore.UpdateIRQLine();
+                }
             }
             else
             {
-                IRQCounter--;
-            }
-
-            if (IRQCounter == 0 && IRQ_enable)
-            {
-                NesCore.statusmapperint = true; // assert /IRQ line, polled at instruction boundary
-                NesCore.UpdateIRQLine();
+                IRQCounter--; // byte: 0-1 wraps to 255
+                if (IRQCounter == 0 && IRQ_enable)
+                {
+                    NesCore.statusmapperint = true;
+                    NesCore.UpdateIRQLine();
+                }
+                else if (IRQCounter == 255) // byte underflow: was 0
+                {
+                    IRQCounter = IRQlatchVal;
+                    if (IRQCounter == 0 && IRQ_enable)
+                    {
+                        NesCore.statusmapperint = true;
+                        NesCore.UpdateIRQLine();
+                    }
+                }
             }
         }
 
@@ -129,7 +129,7 @@ namespace AprNes
                     else CHR_Bankmode = newCHRMode;
                 }
                 else if (address < 0xc000) *Vertical = ((value & 1) > 0) ? 0 : 1; //(0: vertical; 1: horizontal) $A000-$BFFF (Mirroring)
-                else if (address < 0xe000) IRQlatchVal = value;//$C000-$DFFF (IRQ latch) 
+                else if (address < 0xe000) IRQlatchVal = value;//$C000-$DFFF (IRQ latch)
                 else//$E000-$FFFF IRQ disable + acknowledge
                 {
                     IRQ_enable = false;
@@ -155,9 +155,11 @@ namespace AprNes
                 else if (address < 0xc000) return; //$A000-$BFFF (PRG RAM protect) nothing do
                 else if (address < 0xe000)//$C000-$DFFF (IRQ reload)
                 {
-                    IRQReset = true; // reload counter from latch on next A12 rising edge
+                    // TriCNES: $C001 sets counter to 0xFF AND sets reload flag
+                    IRQCounter = 0xFF;
+                    IRQReset = true;
                 }
-                else IRQ_enable = true; //$E000-$FFFF (IRQ enable) 
+                else IRQ_enable = true; //$E000-$FFFF (IRQ enable)
             }
         }
 

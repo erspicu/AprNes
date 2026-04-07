@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 
@@ -60,17 +61,17 @@ namespace AprNes
 
         // Accuracy option: per-dot secondary OAM evaluation FSM (dots 1-64 clear, 65-256 evaluate)
         // true = full hardware accuracy; false = skip FSM for ~13% performance gain (no test failures)
-        static public bool AccuracyOptA = false;
 
         // TV system region
         public enum RegionType { NTSC, PAL, Dendy }
         static public RegionType Region = RegionType.NTSC;
 
         // ── Region-dependent timing parameters (set by ApplyRegionProfile) ──
-        static int regionMode     = 0;        // 0=NTSC, 1=PAL, 2=Dendy (for hot-path if-else branching)
         static int preRenderLine  = 261;      // NTSC=261, PAL/Dendy=311
         static int nmiTriggerLine = 241;      // NTSC/PAL=241, Dendy=291
         static int masterPerCpu   = 12;       // NTSC=12, PAL=16, Dendy=15
+        static int masterPerPpu   = 4;        // NTSC=4, PAL=5, Dendy=5
+        static int masterPerPpuHalf = 2;      // masterPerPpu >> 1 (pre-computed)
         static double cpuFreq          = 1789773.0;  // NTSC=1789773, PAL=1662607, Dendy=1773447
         static public double FrameSeconds = 1.0 / 60.0988; // NTSC=1/60.0988, PAL/Dendy=1/50.0070
 
@@ -78,31 +79,38 @@ namespace AprNes
         {
             if (Region == RegionType.PAL)
             {
-                regionMode     = 1;
                 preRenderLine  = 311;
-                nmiTriggerLine = 241;
+                nmiTriggerLine = 241;      // PAL VBL starts at same scanline as NTSC
                 masterPerCpu   = 16;
+                masterPerPpu   = 5;
+                masterPerPpuHalf = 2;
                 cpuFreq        = 1662607.0;
                 FrameSeconds   = 1.0 / 50.0070;
             }
             else if (Region == RegionType.Dendy)
             {
-                regionMode     = 2;
                 preRenderLine  = 311;
-                nmiTriggerLine = 291;   // 51 lines post-render idle (240-290), NMI at 291
-                masterPerCpu   = 15;    // PAL master clock ÷15
-                cpuFreq        = 1773447.0; // 26601712 / 15
+                nmiTriggerLine = 291;      // Dendy: 51 extra post-render idle lines
+                masterPerCpu   = 15;
+                masterPerPpu   = 5;
+                masterPerPpuHalf = 2;
+                cpuFreq        = 1773447.0;
                 FrameSeconds   = 1.0 / 50.0070;
             }
             else // NTSC
             {
-                regionMode     = 0;
                 preRenderLine  = 261;
                 nmiTriggerLine = 241;
                 masterPerCpu   = 12;
+                masterPerPpu   = 4;
+                masterPerPpuHalf = 2;
                 cpuFreq        = 1789773.0;
                 FrameSeconds   = 1.0 / 60.0988;
             }
+            // Precompute packed scanline event constants
+            L_VBL_START    = (nmiTriggerLine << 9) | 1;
+            L_SPRITE_RESET = (preRenderLine << 9) | 1;
+            L_VBL_END      = (preRenderLine << 9) | 2;
         }
 
         // ── AudioPlus 音訊引擎設定 ──────────────────────────────────
@@ -212,14 +220,15 @@ namespace AprNes
             if (ScreenBuf1x  != null) { Marshal.FreeHGlobal((IntPtr)ScreenBuf1x);  ScreenBuf1x  = null; }
             if (Buffer_BG_array != null) { Marshal.FreeHGlobal((IntPtr)Buffer_BG_array); Buffer_BG_array = null; }
             if (NesColors    != null) { Marshal.FreeHGlobal((IntPtr)NesColors);    NesColors    = null; }
-            if (palCacheR    != null) { Marshal.FreeHGlobal((IntPtr)palCacheR);    palCacheR    = null; }
-            if (palCacheN    != null) { Marshal.FreeHGlobal((IntPtr)palCacheN);    palCacheN    = null; }
             if (spr_ram      != null) { Marshal.FreeHGlobal((IntPtr)spr_ram);      spr_ram      = null; }
             if (secondaryOAM != null) { Marshal.FreeHGlobal((IntPtr)secondaryOAM); secondaryOAM = null; }
             if (corruptOamRow!= null) { Marshal.FreeHGlobal((IntPtr)corruptOamRow);corruptOamRow= null; }
             if (ppu_ram      != null) { Marshal.FreeHGlobal((IntPtr)ppu_ram);      ppu_ram      = null; }
-            if (P1_joypad_status != null) { Marshal.FreeHGlobal((IntPtr)P1_joypad_status); P1_joypad_status = null; }
-            if (P2_joypad_status != null) { Marshal.FreeHGlobal((IntPtr)P2_joypad_status); P2_joypad_status = null; }
+            if (sprShiftL    != null) { Marshal.FreeHGlobal((IntPtr)sprShiftL);    sprShiftL    = null; }
+            if (sprShiftH    != null) { Marshal.FreeHGlobal((IntPtr)sprShiftH);    sprShiftH    = null; }
+            if (sprXCounter  != null) { Marshal.FreeHGlobal((IntPtr)sprXCounter);  sprXCounter  = null; }
+            if (sprFetchAttr != null) { Marshal.FreeHGlobal((IntPtr)sprFetchAttr); sprFetchAttr = null; }
+            if (sprXPos      != null) { Marshal.FreeHGlobal((IntPtr)sprXPos);      sprXPos      = null; }
             if (NES_MEM      != null) { Marshal.FreeHGlobal((IntPtr)NES_MEM);      NES_MEM      = null; }
             if (Vertical           != null) { Marshal.FreeHGlobal((IntPtr)Vertical);           Vertical           = null; }
             if (AnalogScreenBuf     != null) { Marshal.FreeHGlobal((IntPtr)AnalogScreenBuf);     AnalogScreenBuf     = null; AnalogBufSize = 0; }
@@ -248,23 +257,27 @@ namespace AprNes
 
         static void HardResetState()
         {
-            // CPU registers (6502 power-up state)
-            r_A = 0; r_X = 0; r_Y = 0; r_SP = 0xFD;
+            // CPU registers (6502 power-up state, TriCNES values)
+            r_A = 0; r_X = 0; r_Y = 0; r_SP = 0x00; // hardware: SP=0, BRK/RESET decrements to 0xFD
+            r_PC = 0xFFFF; // TriCNES: nondeterministic, uses 0xFFFF (RESET handler reads vector)
             flagN = 0; flagV = 0; flagD = 0; flagI = 1; flagZ = 0; flagC = 0;
             opcode = 0; operationCycle = 0;
             cpubus = 0; cpuBusAddr = 0; addressBus = 0; dl = 0; ignoreH = false;
-            m2PhaseIsWrite = false;
+            cpuIsRead = true;
+
 
             // CPU interrupt state
-            nmi_pending = false; nmi_delay_cycle = -1; nmi_output_prev = false;
-            irq_pending = false; irqLinePrev = false; irqLineCurrent = false;
+            NMILine = false; nmiPinsSignal = false; nmiPrevPinsSignal = false;
+            IRQLine = false; irqLineCurrent = false;
             statusmapperint = false;
-            doNMI = false; doIRQ = false; doReset = false; doBRK = false; softreset = false;
+            doNMI = false; doIRQ = false; doReset = true; doBRK = false; softreset = false;
+            // doReset=true: BRK/RESET handler reads reset vector via MasterClockTick
 
-            // DMA state
-            dmaNeedHalt = false; dmcNeedDummyRead = false; dmcDmaRunning = false;
+            // DMA state (TriCNES per-cycle model)
+            dmcDmaRunning = false; dmcDmaHalt = false;
             spriteDmaTransfer = false; spriteDmaOffset = 0;
-            dmaPrevReadAddress = 0; dmaReadSkipBusUpdate = false;
+            dmaOamHalt = false; dmaOamAligned = false; dmaFirstCycleOam = false;
+            dmaOamInternalBus = 0; dmaOamAddr = 0;
 
             // PPU control registers ($2000/$2001/$2002)
             BaseNameTableAddr = 0; VramaddrIncrement = 1;
@@ -273,36 +286,56 @@ namespace AprNes
             ShowBackGround = false; ShowSprites = false;
             ShowBgLeft8 = true; ShowSprLeft8 = true;
             isSpriteOverflow = false; isSprite0hit = false; isVblank = false;
-            SuppressVbl = false;
+            ppuVSET = false; ppuVSET_Latch1 = false; ppuVSET_Latch2 = false;
+            pendingSprite0Hit2 = false;
+            isSprite0hit_Delayed = false; isSpriteOverflow_Delayed = false;
+            ppu2002ReadPending = false;
 
             // PPU VRAM address / scroll
-            vram_addr_internal = 0; vram_addr = 0; scrol_y = 0; FineX = 0;
+            vram_addr_internal = 0; vram_addr = 0; FineX = 0;
             vram_latch = false;
-            ppu_2007_buffer = 0; ppu_2007_temp = 0; ppu2007ReadCooldown = 0;
+            ppu_2007_buffer = 0; ppu2007SM = 9;
+            ppu2007SM_performMysteryWrite = false; ppu2007SM_normalWriteBehavior = false;
+            ppu2007SM_updateVramAddrEarly = false; ppu2007SM_readDelayed = false; ppu2007SM_mysteryAddr = 0;
             ppu2006UpdateDelay = 0; ppu2006PendingAddr = 0;
             openbus = 0; open_bus_decay_timer = 77777;
 
-            // PPU scan position & frame state
-            ppu_cycles_x = 0; scanline = -1; frame_count = 0;
-            oddSwap = false; ppuRenderingEnabled = false; prevRenderingEnabled = false;
+            // PPU scan position & frame state (TriCNES power-on values)
+            ppu_cycles_x = 7; scanline = 0; frame_count = 0;  // TriCNES: PPU_Dot=7, PPU_Scanline=0
+            oddSwap = true; ppuRenderingEnabled = false; prevRenderingEnabled = false; // TriCNES: PPU_OddFrame=true
+            ShowBG_EvalDelay = false; ShowSpr_EvalDelay = false;
+            // deferred CXinc flag
+            // Per-sprite shift registers
+            for (int i = 0; i < 8; i++)
+            { sprShiftL[i] = 0; sprShiftH[i] = 0; sprXCounter[i] = 0; sprFetchAttr[i] = 0; sprXPos[i] = 0; }
+            sprSlotCount = 0; sprZeroInSlots = false;
+            // 3-dot pixel pipeline
+            dotColor = prevDotColor = prevPrevDotColor = prevPrevPrevDotColor = 0;
+            dotPalIdx = prevDotPalIdx = prevPrevDotPalIdx = prevPrevPrevDotPalIdx = 0;
+            skippedPreRenderDot341 = false;
+            // P4-1: OAM corruption
+            oamCorruptPending = false; oamCorruptSuppressed = false;
+            oamCorruptDelay = 0; oamCorruptDisabledFlag = false;
+            // P4-2: Palette corruption
+            mcCpuClock = 0; mcPpuClock = 0; mcApuPutCycle = true; // TriCNES: APU_PutCycle=true at power-on
             spr_ram_add = 0;
 
             // PPU tile pipeline
-            NTVal = 0; ATVal = 0; lowTile = 0; highTile = 0; ioaddr = 0;
-            lowshift = 0; highshift = 0;
-            lowshift_s0 = 0; highshift_s0 = 0;
-            bg_attr_p1 = 0; bg_attr_p2 = 0; bg_attr_p3 = 0;
+            renderLow = 0; renderHigh = 0;
+            pendingTileLow = 0; pendingTileHigh = 0; commitLoadShiftReg = false;
 
             // PPU sprite state
-            sprite0_on_line = false; sprite0_line_x = 0;
-            sprite0_tile_low = 0; sprite0_tile_high = 0; sprite0_flip_x = false;
-            prerender_sprite0_valid = false; prerender_sprite0_x = 0;
+prerender_sprite0_x = 0;
             prerender_sprite0_tile_low = 0; prerender_sprite0_tile_high = 0;
             prerender_sprite0_flip_x = false;
             spriteOverflowCycle = 0;
 
-            // JoyPad
-            P1_LastWrite = 0; strobeWritePending = 0; strobeWriteValue = 0;
+            // JoyPad (TriCNES shift register model)
+            P1_ShiftRegister = 0; P2_ShiftRegister = 0;
+            P1_ShiftCounter = 0; P2_ShiftCounter = 0;
+            controllerStrobing = false; controllerStrobed = false;
+            // DMA bus state
+            dataPinsNotFloating = false;
         }
 
         static public bool init(byte[] rom_bytes) //for Hard Reset effect
@@ -427,14 +460,21 @@ namespace AprNes
                 }
                 Buffer_BG_array  = (int* )Marshal.AllocHGlobal(sizeof(int)  * 61440);
                 NesColors        = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 64);
-                palCacheR        = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 4);
-                palCacheN        = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 4);
+                sprLineBuf       = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 256);
+                sprLinePri       = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
+                sprLineSet       = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
+                sprLinePalIdx    = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
                 spr_ram          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
                 secondaryOAM     = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
                 corruptOamRow    = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
                 ppu_ram          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 0x4000);
-                P1_joypad_status = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
-                P2_joypad_status = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
+                palCache         = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 32);
+                sprShiftL        = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
+                sprShiftH        = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
+                sprXCounter      = (int* )Marshal.AllocHGlobal(sizeof(int)  * 8);
+                sprFetchAttr     = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
+                sprXPos          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
+                // P1_joypad_status/P2_joypad_status removed — shift register model uses static bytes
                 NES_MEM          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 65536);
 
                 // Compute PRG+CHR CRC32 (skip 16-byte iNES header, matching Mesen2 DB format)
@@ -479,8 +519,8 @@ namespace AprNes
                 for (int i = 0; i < 16384; i++) ppu_ram[i] = 0;
                 for (int i = 0; i < 256; i++) spr_ram[i] = 0;
                 for (int i = 0; i < 32; i++) { secondaryOAM[i] = 0; corruptOamRow[i] = 0; }
-                for (int i = 0; i < 8; i++) P1_joypad_status[i] = 0x40;
-                for (int i = 0; i < 8; i++) P2_joypad_status[i] = 0x40;
+                P1_Port = 0; P2_Port = 0;
+                P1_ShiftRegister = 0; P2_ShiftRegister = 0;
                 for (int i = 0; i < 65536; i++) NES_MEM[i] = 0;
 
                 ApplyRegionProfile(); // set timing parameters before any subsystem init
@@ -499,14 +539,13 @@ namespace AprNes
                 init_function();
                 InitOpHandlers();
 
-                //init APU & audio output (must be before reset vector read so tick() can run)
+                //init APU & audio output (must be before reset vector read)
                 initAPU();
 
                 // AudioPlus 管線初始化
                 AudioPlus_Init();
 
-                //init cpu pc (read reset vector — no tick needed, boot cycles already counted)
-                r_PC = (ushort)(mem_read_fun[0xfffc](0xfffc) | (mem_read_fun[0xfffd](0xfffd) << 8));
+                // Reset vector read by BRK/RESET handler through MasterClockTick (doReset=true)
 
 
             }
@@ -530,44 +569,77 @@ namespace AprNes
             return buf;
         }
 
+        // Per-master-clock main loop (TriCNES _EmulatorCore model)
+        // CPU/PPU/APU each gated by their own countdown timer.
+
         static public void run()
         {
-            bool nmi_just_deferred = false;
+            // Batched execution: check exit every ~1364 master ticks (≈1 scanline)
             while (!exit)
             {
-                // === Interrupt service point (before instruction fetch) ===
-                if (nmi_pending && !nmi_just_deferred)
-                {
-                    nmi_pending = false;
-                    doNMI = true;
-                    irq_pending = false; // NMI handler sets I=1; IRQ re-polled after RTI
-                }
-                else if (nmi_just_deferred)
-                {
-                    // Deferred NMI: skip this iteration, let 1 instruction run first
-                    nmi_just_deferred = false;
-                }
-                else if (irq_pending)
-                {
-                    irq_pending = false;
-                    doIRQ = true;
-                }
-
-                byte prevFlagI_run = flagI; // capture I flag before instruction for IRQ delay
-                cpu_step();
-
-                // BRK/NMI/IRQ: NMI arising during sequence → defer 1 instruction
-                if (opcode == 0x00 && nmi_pending)
-                    nmi_just_deferred = true;
-
-                // === IRQ polling (end of instruction, for next instruction) ===
-                if (opcode != 0x00)
-                {
-                    byte irqPollI = (opcode == 0x40) ? flagI : prevFlagI_run;
-                    irq_pending = (irqPollI == 0 && irqLinePrev);
-                }
+                for (int batch = 0; batch < 1364; batch++)
+                    MasterClockTick();
             }
             Console.WriteLine("exit..");
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void MasterClockTick()
+        {
+            // ── CPU(0) / NMI(8) — mutually exclusive ──
+            if (mcCpuClock == 0)
+            {
+                mcCpuClock = masterPerCpu;
+
+                if ((dmcDmaRunning && (dmcStatusEnabled || dmcImplicitAbortActive) && cpuIsRead) ||
+                    (spriteDmaTransfer && cpuIsRead))
+                    DmaOneCycle();
+                else
+                    cpu_step_one_cycle();
+
+                if (dmcDmaRunning && dmcImplicitAbortActive)
+                    dmcImplicitAbortActive = false;
+
+                cpuCycleCount++;
+
+                if (!isFDS) MapperObj.CpuCycle();
+                else fds_CpuCycle();
+            }
+            else if (mcCpuClock == 8)
+            {
+                NMILine |= NMIable && isVblank;
+                if (operationCycle == 0 && !(isVblank && NMIable))
+                    NMILine = false;
+            }
+
+            // ── PPU full(0) / half(masterPerPpuHalf) — mutually exclusive ──
+            if (mcPpuClock == 0)
+            {
+                mcPpuClock = masterPerPpu;
+                ppu_step_new();
+            }
+            else if (mcPpuClock == masterPerPpuHalf)
+            {
+                ppu_half_step_new();
+            }
+
+            // ── IRQ(5) / APU(masterPerCpu) — mutually exclusive ──
+            if (mcCpuClock == 5)
+            {
+                IRQLine = irqLineCurrent;
+                if (statusframeint && !apuintflag)
+                    irqLineCurrent = true;
+                if (!isFDS) MapperObj.CpuClockRise();
+            }
+            else if (mcCpuClock == masterPerCpu)
+            {
+                apu_step();
+                mcApuPutCycle = !mcApuPutCycle;
+            }
+
+            // ── Decrement all counters ──
+            mcCpuClock--;
+            mcPpuClock--;
         }
     }
 

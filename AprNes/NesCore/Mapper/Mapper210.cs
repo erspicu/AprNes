@@ -22,6 +22,7 @@
 
         public MapperA12Mode A12NotifyMode => MapperA12Mode.None;
         public void NotifyA12(int addr, int ppuAbsCycle) { }
+        public void PpuClock() { }
 
         public void MapperInit(byte* _PRG_ROM, byte* _CHR_ROM, byte* _ppu_ram,
             int _PRG_ROM_count, int _CHR_ROM_count, int* _Vertical)
@@ -44,6 +45,7 @@
         public byte MapperR_RAM(ushort address) { return NesCore.NES_MEM[address]; }
         public void MapperW_RAM(ushort address, byte value) { NesCore.NES_MEM[address] = value; }
         public void CpuCycle() { }
+        public void CpuClockRise() { }
 
         public void MapperW_PRG(ushort address, byte value)
         {

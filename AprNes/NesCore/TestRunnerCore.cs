@@ -108,9 +108,7 @@ namespace AprNes
                 foreach (string line in File.ReadAllLines(iniPath))
                 {
                     string[] kv = line.Split(new char[] { '=' }, 2);
-                    if (kv.Length == 2 && kv[0].Trim() == "AccuracyOptA")
                     {
-                        NesCore.AccuracyOptA = kv[1].Trim() != "0";
                         break;
                     }
                 }
@@ -120,20 +118,10 @@ namespace AprNes
             bool isValidation = Array.Exists(args, a => a == "--wait-result" || a == "--dump-ac-results");
             if (isValidation)
             {
-                NesCore.AccuracyOptA = true;
                 NesCore.Region = NesCore.RegionType.NTSC;
             }
 
-            // --accuracy flag overrides everything (including validation default)
-            for (int i = 0; i < args.Length - 1; i++)
-            {
-                if (args[i] == "--accuracy")
-                {
-                    string flags = args[i + 1].ToUpper();
-                    NesCore.AccuracyOptA = flags.IndexOf('A') >= 0;
-                    break;
-                }
-            }
+            // --accuracy flag: no longer used (AccuracyOptA removed, per-dot eval always active)
 
             // ── perf mode: --perf <rom> [seconds] [note] ──
             {
@@ -278,9 +266,9 @@ namespace AprNes
                     case "--region":
                         if (i + 1 < args.Length)
                         {
-                            string r = args[++i].ToUpperInvariant();
-                            if (r == "PAL") NesCore.Region = NesCore.RegionType.PAL;
-                            else if (r == "DENDY") NesCore.Region = NesCore.RegionType.Dendy;
+                            string rg = args[++i].ToLowerInvariant();
+                            if (rg == "pal") NesCore.Region = NesCore.RegionType.PAL;
+                            else if (rg == "dendy") NesCore.Region = NesCore.RegionType.Dendy;
                             else NesCore.Region = NesCore.RegionType.NTSC;
                         }
                         break;
@@ -295,6 +283,7 @@ namespace AprNes
                 Console.Error.WriteLine("       [--dump-ac-results] [--log <results.log>]");
                 Console.Error.WriteLine("       [--benchmark <seconds>] [--resize-stage1 <filter>] [--resize-stage2 <filter>] [--scanline]");
                 Console.Error.WriteLine("       [--analog] [--ultra-analog] [--analog-output <AV|RF|SVIDEO>] [--analog-size <N>] [--crt]");
+                Console.Error.WriteLine("       [--region <NTSC|PAL|Dendy>]");
                 Console.Error.WriteLine("       [--audio-dsp] [--audio-mode <0|1|2>] [--region <NTSC|PAL|DENDY>]");
                 Console.Error.WriteLine("       [--perf <rom> [seconds] [note]]");
                 Console.Error.WriteLine("  Filter specs: xbrz_2..xbrz_6, scalex_2, scalex_3, nn_2..nn_N, none");

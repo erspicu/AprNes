@@ -10,16 +10,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 EXE = os.path.join(SCRIPT_DIR, "AprNes", "bin", "Debug", "AprNes.exe")
-ROMBASE = os.path.join(SCRIPT_DIR, "nes-test-roms-master", "checked")
+ROMBASE = os.path.join(SCRIPT_DIR, "unittest", "roms")
 
 def build_test_list():
     """Return list of (suite, rom, extra_args_str) tuples."""
     tests = []
-    def a(suite, rom, extra="--max-wait 8"):
+    def a(suite, rom, extra="--max-wait 15"):
         tests.append((suite, rom, extra))
 
-    W = "--max-wait 20"       # singles: complete in <3s, 20s is generous
-    WM = "--max-wait 40"      # merged ROMs: up to 6s solo, need headroom under parallel load
+    W = "--max-wait 30"       # singles: complete in <3s, generous headroom under parallel load
+    WM = "--max-wait 50"      # merged ROMs: up to 6s solo, need extra headroom
 
     for r in ["dmc.nes","noise.nes","square.nes","triangle.nes"]:
         a("apu_mixer", r, W)
@@ -93,6 +93,11 @@ def build_test_list():
     for r in ["1.frame_basics.nes","2.vbl_timing.nes","3.even_odd_frames.nes","4.vbl_clear_timing.nes","5.nmi_suppression.nes","6.nmi_disable.nes","7.nmi_timing.nes"]:
         a("vbl_nmi_timing", r, W)
 
+    # ── PAL region tests (--region PAL) ──
+    WP = W + " --region PAL"
+    for r in ["01.len_ctr.nes","02.len_table.nes","03.irq_flag.nes","04.clock_jitter.nes","05.len_timing_mode0.nes","06.len_timing_mode1.nes","07.irq_flag_timing.nes","08.irq_timing.nes","10.len_halt_timing.nes","11.len_reload_timing.nes"]:
+        a("pal_apu_tests", r, WP)
+
     return tests
 
 
@@ -108,7 +113,7 @@ def run_one(idx, suite, rom, extra, exe, rombase, accuracy_flags=None):
         cmd += ["--accuracy", accuracy_flags]
     try:
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        stdout_b, stderr_b = proc.communicate(timeout=30)
+        stdout_b, stderr_b = proc.communicate(timeout=60)
         stdout_s = stdout_b.decode("utf-8", errors="replace")
         if proc.returncode == 0:
             return (idx, "PASS", name, "")
@@ -125,7 +130,7 @@ def run_one(idx, suite, rom, extra, exe, rombase, accuracy_flags=None):
 
 def main():
     parser = argparse.ArgumentParser(description="Run NES test ROMs")
-    parser.add_argument("-j", "--jobs", type=int, default=10, help="Parallel threads (default: 10)")
+    parser.add_argument("-j", "--jobs", type=int, default=6, help="Parallel threads (default: 6)")
     parser.add_argument("--accuracy", type=str, default=None, help="Accuracy flags e.g. ABCDEF (all on) or BCDEF (A off)")
     args = parser.parse_args()
 

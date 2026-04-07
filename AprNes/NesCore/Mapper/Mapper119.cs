@@ -20,7 +20,9 @@ namespace AprNes
         bool IRQ_enable, IRQReset;
         int IRQlatchVal, IRQCounter;
         int BankReg;
-        int lastA12, a12LowSince, lastNotifyTime;
+        int lastA12;
+        int a12LowSince = -100;
+        int lastNotifyTime = -100;
         const int A12_FILTER = 16;
 
         int chr2k_0, chr2k_1;              // 2KB CHR bank registers (R0, R1)
@@ -60,6 +62,7 @@ namespace AprNes
         public void MapperW_RAM(ushort address, byte value) { NES_MEM[address] = value; }
         public byte MapperR_RAM(ushort address) { return NES_MEM[address]; }
         public void CpuCycle() { }
+        public void CpuClockRise() { }
 
         public void NotifyA12(int address, int ppuAbsCycle)
         {
@@ -82,6 +85,8 @@ namespace AprNes
             }
             lastA12 = a12;
         }
+
+        public void PpuClock() { }
 
         void ClockIRQ()
         {

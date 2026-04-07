@@ -220,6 +220,8 @@
         }
 
         public void NotifyA12(int addr, int ppuAbsCycle) { }
+        public void PpuClock() { }
+        public void CpuClockRise() { }
             public void Cleanup() { }
 }
 }

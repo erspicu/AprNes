@@ -147,7 +147,6 @@ namespace AprNes
             _menuEmulationHardReset.Text = "Hard Reset";
             _menuEmulationRegion.Text = LangINI.Get(lang, "region", "Region");
             _menuEmulationLimitFps.Text = LangINI.lang_table[lang]["limitfps"];
-            _menuEmulationPerdotFSM.Text = LangINI.lang_table[lang]["perdotFSM"];
             _menuView.Text = LangINI.Get(lang, "menu_view", "View");
             _menuViewToggleFullScreen.Text = LangINI.lang_table[lang]["fullscreen"];
             _menuViewSound.Text = NesCore.AudioEnabled
@@ -501,8 +500,6 @@ namespace AprNes
             LoadAudioPlusIni();
 
             // 讀取 Accuracy 選項設定 (預設全開)
-            NesCore.AccuracyOptA = !AppConfigure.ContainsKey("AccuracyOptA") || AppConfigure["AccuracyOptA"] != "0";
-            _menuEmulationPerdotFSM.Checked = NesCore.AccuracyOptA;
 
             // 讀取 Region 設定 (預設 NTSC)
             if (AppConfigure.ContainsKey("Region"))
@@ -715,7 +712,6 @@ namespace AprNes
             AppConfigure["ScreenFull"] = ScreenCenterFull.ToString();
             AppConfigure["Sound"] = NesCore.AudioEnabled ? "1" : "0";
             AppConfigure["Volume"] = NesCore.Volume.ToString();
-            AppConfigure["AccuracyOptA"] = NesCore.AccuracyOptA ? "1" : "0";
             AppConfigure["AudioMode"] = NesCore.AudioMode.ToString();
             SaveAudioPlusIni();
             AppConfigure["crt"] = NesCore.CrtEnabled ? "1" : "0";
@@ -1022,6 +1018,7 @@ namespace AprNes
             {
                 NesCore.ChannelVolume[i] = ReadInt("ChVol_" + nesChKeys[i], 70, 0, 100);
                 NesCore.ChannelEnabled[i] = !cfg.ContainsKey("ChEn_" + nesChKeys[i]) || cfg["ChEn_" + nesChKeys[i]] != "0";
+                NesCore.SyncChannelEnableMask();
             }
             // Expansion channel volumes: per-chip keys (ChVol_VRC6_0, ChVol_N163_0, etc.)
             string[] chipPrefixes = { "", "VRC6", "VRC7", "N163", "S5B", "MMC5", "FDS" };
@@ -2156,13 +2153,6 @@ public string GetRomInfo()
         {
             LimitFPS = _menuEmulationLimitFps.Checked;
             AppConfigure["LimitFPS"] = LimitFPS ? "1" : "0";
-            Configure_Write();
-        }
-
-        private void _menuEmulationPerdotFSM_Click(object sender, EventArgs e)
-        {
-            NesCore.AccuracyOptA = _menuEmulationPerdotFSM.Checked;
-            AppConfigure["AccuracyOptA"] = NesCore.AccuracyOptA ? "1" : "0";
             Configure_Write();
         }
 

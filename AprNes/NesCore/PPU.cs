@@ -17,15 +17,15 @@ namespace AprNes
         {
             if (Region == RegionType.PAL)
             {
-                // Generate PAL palette from 2C07 voltage levels + YUV decoding
+                // PAL palette from 2C07 voltage levels + YUV decoding
                 generatePaletteFromVoltages(
-                    new float[] { -0.117f, 0.000f, 0.223f, 0.490f }, // lo levels
-                    new float[] {  0.306f, 0.543f, 0.741f, 1.000f }, // hi levels
-                    true); // YUV decoding
+                    new float[] { -0.117f, 0.000f, 0.223f, 0.490f },
+                    new float[] {  0.306f, 0.543f, 0.741f, 1.000f },
+                    true);
             }
             else
             {
-                // NTSC hardcoded palette (verified with 174 blargg + 136 AccuracyCoin tests)
+                // NTSC/Dendy hardcoded palette (verified with 174 blargg + 136 AccuracyCoin tests)
                 NesColors[ 0]=0xFF7C7C7C; NesColors[ 1]=0xFF0000FC; NesColors[ 2]=0xFF0000BC; NesColors[ 3]=0xFF4428BC;
                 NesColors[ 4]=0xFF940084; NesColors[ 5]=0xFFA80020; NesColors[ 6]=0xFFA81000; NesColors[ 7]=0xFF881400;
                 NesColors[ 8]=0xFF503000; NesColors[ 9]=0xFF007800; NesColors[10]=0xFF006800; NesColors[11]=0xFF005800;
@@ -43,7 +43,6 @@ namespace AprNes
                 NesColors[56]=0xFFF8D878; NesColors[57]=0xFFD8F878; NesColors[58]=0xFFB8F8B8; NesColors[59]=0xFFB8F8D8;
                 NesColors[60]=0xFF00FCFC; NesColors[61]=0xFFF8D8F8; NesColors[62]=0xFF000000; NesColors[63]=0xFF000000;
             }
-
         }
 
         /// <summary>
@@ -120,6 +119,7 @@ namespace AprNes
             ppu_ram[0x3F14]=0x00; ppu_ram[0x3F15]=0x04; ppu_ram[0x3F16]=0x00; ppu_ram[0x3F17]=0x14;
             ppu_ram[0x3F18]=0x08; ppu_ram[0x3F19]=0x3A; ppu_ram[0x3F1A]=0x00; ppu_ram[0x3F1B]=0x02;
             ppu_ram[0x3F1C]=0x00; ppu_ram[0x3F1D]=0x20; ppu_ram[0x3F1E]=0x2C; ppu_ram[0x3F1F]=0x08;
+            RebuildPaletteCache();
         }
 
         //ppu ctrl 0x2000
@@ -127,9 +127,15 @@ namespace AprNes
         static public bool Spritesize8x16 = false;
         static bool NMIable = false;
 
-        //ppu mask 0x2001
-        public static bool ShowBackGround = false, ShowSprites = false;
-        static bool ShowBgLeft8 = true, ShowSprLeft8 = true; // bit1/bit2: show in leftmost 8 pixels
+        //ppu mask 0x2001 — four-tier flag system (TriCNES model)
+        // Tier 1: _Instant — set immediately on $2001 write. Used for: odd frame skip, OAM corruption,
+        //         renderingEnabled (core PPU state), vram increment, sprite 0 re-eval
+        // Tier 2: ShowBackGround/ShowSprites — delayed by ppu2001UpdateDelay (2-3 PPU cycles).
+        //         Used for: pixel rendering, backdrop fill, sprite compositing
+        // Tier 3: ppuRenderingEnabled — end-of-dot delay of Tier 1. Used for: tile fetch, sprite eval
+        public static bool ShowBackGround = false, ShowSprites = false; // Tier 2 (delayed)
+        static bool ShowBackGround_Instant = false, ShowSprites_Instant = false; // Tier 1 (immediate)
+        static bool ShowBgLeft8 = true, ShowSprLeft8 = true; // bit1/bit2 (delayed with $2001)
         static byte ppuEmphasis = 0; // $2001[7:5] emphasis bits (for NTSC signal amplitude)
 
         // NTSC 類比模式：每條掃描線的原始調色盤索引緩衝區（256 bytes，0x00-0x3F）
@@ -143,15 +149,41 @@ namespace AprNes
         //ppu status 0x2002.
         static bool isSpriteOverflow = false, isSprite0hit = false, isVblank = false;
 
-        static int vram_addr_internal = 0, vram_addr = 0, scrol_y = 0, FineX = 0;
+        static int vram_addr_internal = 0, vram_addr = 0, FineX = 0;
         static bool vram_latch = false;
-        static byte ppu_2007_buffer = 0, ppu_2007_temp = 0;
-        static int ppu2007ReadCooldown = 0; // 6 PPU dots cooldown after $2007 read (Mesen2: _ignoreVramRead)
+        static byte ppu_2007_buffer = 0;
+        // $2007 state machine (TriCNES model: PPU_Data_StateMachine)
+        // States: 9=idle, 0=just accessed, 1=buffer update, 3=write execute, 4=increment, 8=deferred write
+        static int ppu2007SM = 9;
+        static bool ppu2007SM_isRead = false;
+        static byte ppu2007SM_writeValue = 0;
+        static bool ppu2007SM_bufferLate = false; // alignment: buffer updated at state 4 instead of 1
+        static int ppu2007SM_addr = 0; // vram_addr snapshot at time of access
+        static bool ppu2007SM_interruptedReadToWrite = false; // TriCNES: write during active read SM
+        // P3-3: Mystery write flags (TriCNES consecutive $2007 access model)
+        static bool ppu2007SM_performMysteryWrite = false;   // TriCNES: PPU_Data_StateMachine_PerformMysteryWrite
+        static bool ppu2007SM_normalWriteBehavior = false;   // TriCNES: PPU_Data_StateMachine_NormalWriteBehavior
+        static bool ppu2007SM_updateVramAddrEarly = false;   // TriCNES: PPU_Data_StateMachine_UpdateVRAMAddressEarly
+        static bool ppu2007SM_readDelayed = false;           // TriCNES: PPU_Data_StateMachine_Read_Delayed
+        static ushort ppu2007SM_mysteryAddr = 0;             // TriCNES: PPU_VRAM_MysteryAddress
+
+        // $2000 delayed control update (TriCNES: PPU_Update2000Delay, 1-2 PPU cycles)
+        // ALL fields delayed: NMI enable, pattern table, sprite size, nametable, increment
+        static int ppu2000UpdateDelay = 0;
+        static byte ppu2000PendingValue = 0;
+
+        // $2001 delayed mask update (TriCNES: PPU_Update2001Delay, 2-3 PPU cycles)
+        // _Instant flags set immediately; ShowBackGround/ShowSprites applied after delay
+        static int ppu2001UpdateDelay = 0;
+        static byte ppu2001PendingValue = 0;
+        // Emphasis bits have independent delay (TriCNES: PPU_Update2001EmphasisBitsDelay)
+        // Alignment 0,3: 2 cycles; Alignment 1,2: 1 cycle (with immediate Greyscale+Blue at align 0,3)
+        static int ppu2001EmphasisDelay = 0;
+        static byte ppu2001EmphasisPending = 0;
 
         // $2005 delayed scroll update (TriCNES model: 1-2 PPU dots after CPU write)
         static int ppu2005UpdateDelay = 0;
         static byte ppu2005PendingValue = 0;
-        static bool ppu2005PendingIsSecond = false; // true = second write (Y scroll)
 
         // $2006 delayed t→v copy (TriCNES model: 3 PPU dots after CPU write)
         // Real hardware doesn't update vram_addr immediately on the second $2006 write;
@@ -161,24 +193,96 @@ namespace AprNes
         static byte* spr_ram;
         static public byte* ppu_ram;
 
-        // OAM corruption: when rendering is disabled mid-scanline, the PPU's internal
-        // secondary OAM addressing glitches and marks rows for corruption.
-        // When rendering re-enables (or at next frame start), first 8 bytes of OAM
-        // are copied over each marked row.
-        static byte* corruptOamRow; // 32 bytes, 0=clean 1=corrupt
+        // TriCNES: PPU_AddressBus — persistent address bus, updated at tile fetch phases.
+        // Mapper's PpuClock() reads this every dot for A12 edge detection.
+        // Set at BG phases 1/3/5/7 (odd), sprite phases, garbage NT, and rendering-disabled.
+        static public int ppuAddressBus;
+        static public bool ppuA12Prev; // TriCNES: PPU_A12_Prev — recorded at start of PPU cycle, checked by mapper at end
+        // CHR-fetch-only A12 state: updated ONLY at CHR pattern fetch phases (not NT/AT).
+        // Used by MMC3 M2 filter — the filter must not see NT/AT addresses ($2xxx, A12=1)
+        // because those brief A12=1 spikes during BG fetch would prevent filter saturation.
+        static public int ppuChrFetchA12;
+
+        // P4-1: TriCNES-style per-alignment OAM corruption model
+        // When rendering disabled mid-scanline → capture corruption index from secOAMAddr.
+        // When rendering re-enabled → apply corruption (copy row 0 over target row),
+        // UNLESS alignment 1 or 2 suppresses it.
+        static byte* corruptOamRow; // 32 bytes (legacy, kept for allocation)
         static bool prevRenderingEnabled = false;
+        static bool oamCorruptPending = false;          // Corruption recorded from disable, awaiting re-enable
+        static bool oamCorruptSuppressed = false;       // Alignment 1,2 suppress corruption on re-enable
+        static int oamCorruptIndex = 0;                 // 6.5: TriCNES PPU_OAMCorruptionIndex (from OAM2Address)
+
+        // TriCNES delayed OAM corruption model (PPU_Update2001OAMCorruptionDelay)
+        static int oamCorruptDelay = 0;                 // Countdown (PPU cycles) before corruption disable flag fires
+        static bool oamCorruptWasRendering = false;     // TriCNES: PPU_WasRenderingBefore2001Write
+        static byte oamCorrupt2001Value = 0;            // TriCNES: PPU_Update2001Value
+        static bool oamCorruptDisabledFlag = false;     // TriCNES: PPU_OAMCorruptionRenderingDisabledOutOfVBlank
+
+        // P4-2: Palette corruption flags
         static public uint* ScreenBuf1x;
         static uint* NesColors; //, targetSize;
         static int* Buffer_BG_array;
-        static uint* palCacheR; // 4 pre-computed palette colors for renderAttr
-        static uint* palCacheN; // 4 pre-computed palette colors for nextAttr
         static byte spr_ram_add = 0;
 
         static bool oddSwap = false;
-        static bool ppuRenderingEnabled = false; // Delayed rendering enable (Mesen2 model: updated at end of PPU dot)
-        static bool nmi_output_prev = false;  // NMI edge detection: previous NMI output level
-        static long nmi_delay_cycle = -1;     // CPU cycle that detected NMI edge (-1 = inactive)
-                                              // Promotes to nmi_pending when cpuCycleCount > nmi_delay_cycle
+        static bool ppuRenderingEnabled = false; // Tier 3: Delayed rendering enable (end of PPU dot)
+
+        // Deferred commit: CXinc (TriCNES: PPU_Commit_PatternHighFetch → CXinc at next dot)
+        // In TriCNES, CHR high commit + CXinc fires at the NEXT full step (1 dot after phase 7).
+
+        // Tier 4: Alignment-dependent delayed flags for sprite evaluation (TriCNES: _Delayed)
+        // Source: Tier 2 (ShowBackGround/ShowSprites), NOT Tier 1 (Instant).
+        // Updated before/after sprite eval depending on mcCpuClock & 3.
+        static bool ShowBG_EvalDelay = false;   // TriCNES: PPU_Mask_ShowBackground_Delayed
+        static bool ShowSpr_EvalDelay = false;  // TriCNES: PPU_Mask_ShowSprites_Delayed
+
+        // ── Per-sprite shift registers (TriCNES P2-3: per-dot sprite rendering) ──
+        // Filled at dots 257-320 from secondary OAM tile fetch, rendered at dots 1-256.
+        // TriCNES: PPU_SpriteShiftRegisterL/H, PPU_SpriteShifterCounter, PPU_SpriteAttribute
+        static byte* sprShiftL;       // Low bitplane shift register
+        static byte* sprShiftH;       // High bitplane shift register
+        static int* sprXCounter;        // X position countdown (>0=waiting, 0=shifting)
+        static byte* sprFetchAttr;     // Attribute byte per slot (palette, priority, flip)
+        static byte* sprXPos;           // X position per slot (for counter init at dot 339)
+        static int sprSlotCount = 0;                   // Number of valid sprites fetched (from evalSpriteCount)
+        static bool spriteAnyActive = false;            // Fast-path: any sprite has non-zero shift data
+
+        // Palette cache: 32-entry (mirrors NES palette RAM layout), rebuilt on palette write
+        static uint* palCache;  // NesColors[ppu_ram[0x3F00+i] & 0x3F] for i=0..31
+        // sprOam2Addr removed — unified into evalOam2Addr (TriCNES: single OAM2Address)
+        static bool sprZeroInSlots = false;            // Sprite 0 is in slot 0
+
+        // ── 3-dot pixel output pipeline (TriCNES P2-2) ──
+        // TriCNES: PrevPrevPrevDotColor → PrevPrevDotColor → PrevDotColor → DotColor
+        // DrawToScreen uses PrevPrevPrevDotColor (3 dot delay).
+        // Pipeline stores composite (BG+sprite) color and palette index.
+        static uint dotColor = 0, prevDotColor = 0, prevPrevDotColor = 0, prevPrevPrevDotColor = 0;
+        static byte dotPalIdx = 0, prevDotPalIdx = 0, prevPrevDotPalIdx = 0, prevPrevPrevDotPalIdx = 0;
+
+        // ── P4-4: Odd frame skip side effects ──
+        // TriCNES: SkippedPreRenderDot341 — set when odd frame skip occurs,
+        // persists until scanline 0 dot 2, affects sprite shifter and dummy NT.
+        static bool skippedPreRenderDot341 = false;
+
+        // TriCNES NMI model: level signal + edge detection at instruction boundary
+        static bool NMILine = false;              // NMI level signal (set at CPUClock==8)
+        static bool nmiPinsSignal = false;        // Latched NMILine at last instruction boundary
+        static bool nmiPrevPinsSignal = false;    // Previous latch (for edge detection)
+
+        // TriCNES VBL latch pipeline: pendingVblank → ppuVSET → Latch1/Latch2 → isVblank
+        static bool ppuVSET = false;              // TriCNES: PPU_VSET
+        static bool ppuVSET_Latch1 = false;       // TriCNES: PPU_VSET_Latch1
+        static bool ppuVSET_Latch2 = false;       // TriCNES: PPU_VSET_Latch2
+
+        // TriCNES Sprite0 hit pipeline: pending → pending2 → actual (1.5 dot delay)
+        static bool pendingSprite0Hit2 = false;    // TriCNES: PPUStatus_PendingSpriteZeroHit2
+        static bool canDetectSprite0Hit = true;    // TriCNES: PPU_CanDetectSpriteZeroHit — reset at pre-render, cleared on hit
+
+        // Delayed flag snapshots for $2002 split-timing read
+        static bool isSprite0hit_Delayed = false;  // TriCNES: PPUStatus_SpriteZeroHit_Delayed
+        static bool isSpriteOverflow_Delayed = false; // TriCNES: PPUStatus_SpriteOverflow_Delayed
+
         //https://wiki.nesdev.com/w/index.php/PPU_scrolling
 
         #region cycle-accurate PPU
@@ -188,10 +292,7 @@ namespace AprNes
         static void CXinc()
         {
             if ((vram_addr & 0x001F) == 31)
-            {
-                vram_addr &= ~0x001F;
-                vram_addr ^= 0x0400;
-            }
+                vram_addr ^= 0x041F; // clear low 5 bits + flip NT bit in one XOR
             else
                 vram_addr += 1;
         }
@@ -205,34 +306,172 @@ namespace AprNes
             else
             {
                 vram_addr &= ~0x7000;
-                int y = (vram_addr & 0x03E0) >> 5;
-                if (y == 29)
-                {
-                    y = 0;
-                    vram_addr ^= 0x0800;
-                }
-                else if (y == 31)
-                    y = 0;
+                int y = vram_addr & 0x03E0; // no shift — work in bit position directly
+                if (y == 0x03A0)      // 29 << 5
+                { vram_addr ^= 0x0800; vram_addr &= ~0x03E0; }
+                else if (y == 0x03E0) // 31 << 5
+                { vram_addr &= ~0x03E0; }
                 else
-                    y += 1;
-                vram_addr = (vram_addr & ~0x03E0) | (y << 5);
+                { vram_addr += 0x0020; } // 1 << 5
             }
+        }
+
+        // ── Raw PPU bus read/write (no $2007 register side effects) ──
+        // Used by ppu_r_2007/ppu_w_2007 and future $2007 state machine.
+        // Tile fetch uses chrBankPtrs/ppu_ram directly (not these functions).
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static byte PpuBusRead(int addr)
+        {
+            addr &= 0x3FFF;
+            if (addr < 0x2000)
+                return MapperObj.MapperR_CHR(addr);
+            if (addr < 0x3F00)
+            {
+                int nt_addr = addr & 0x2FFF;
+                return ntChrOverrideEnabled
+                    ? ntBankPtrs[(nt_addr >> 10) & 3][nt_addr & 0x3FF]
+                    : ppu_ram[CIRAMAddr(nt_addr)];
+            }
+            // Palette ($3F00-$3FFF): mirrored, transparent-mirrored
+            { int pa = addr & 0x1F; if ((pa & 3) == 0) pa &= 0x0F; return ppu_ram[0x3F00 + pa]; }
+        }
+
+        static void PpuBusWrite(int addr, byte val)
+        {
+            addr &= 0x3FFF;
+            if (addr < 0x2000)
+            {
+                MapperObj.MapperW_CHR(addr, val);
+            }
+            else if (addr < 0x3F00)
+            {
+                int nt_addr = addr & 0x2FFF;
+                if (ntChrOverrideEnabled)
+                {
+                    int slot = (nt_addr >> 10) & 3;
+                    if (ntBankWritable[slot])
+                        ntBankPtrs[slot][nt_addr & 0x3FF] = val;
+                }
+                else
+                    ppu_ram[CIRAMAddr(nt_addr)] = val;
+            }
+            else
+            {
+                int pa = addr & 0x1F; if ((pa & 3) == 0) pa &= 0x0F;
+                ppu_ram[0x3F00 + pa] = val;
+                RebuildPaletteCache();
+            }
+        }
+
+        // Rebuild 32-entry palette color cache (called on palette write — rare, ~1-100x/frame)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void RebuildPaletteCache()
+        {
+            if (palCache == null) return;
+            uint* cache = palCache;
+            byte* ram = ppu_ram + 0x3F00;
+            uint* colors = NesColors;
+
+            for (int i = 0; i < 32; i++)
+                cache[i] = colors[ram[i] & 0x3F];
+
+            // Mirror patch: sprite transparent colors → BG transparent colors
+            cache[16] = cache[0];
+            cache[20] = cache[4];
+            cache[24] = cache[8];
+            cache[28] = cache[12];
         }
 
         // $2007 access increment: during rendering → CXinc + Yinc; otherwise → +1/+32
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void Increment2007()
         {
-            if ((ShowBackGround || ShowSprites) && (scanline < 240 || scanline == preRenderLine))
+            if ((ShowBackGround_Instant || ShowSprites_Instant) && (scanline < 240 || scanline == preRenderLine))
             {
                 CXinc();
                 Yinc();
             }
             else
             {
-                vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x7FFF);
+                vram_addr = (vram_addr + VramaddrIncrement) & 0x7FFF;
             }
             if (mapperNeedsA12) NotifyMapperA12(vram_addr);
+        }
+
+        // P3-3: $2007 state machine tick — called from both ppu_half_step and ppu_step_common
+        // TriCNES: PPU_Data_StateMachine logic in _EmulatePPU (lines 1322-1496)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Ppu2007SmTick()
+        {
+            if (ppu2007SM >= 9) return;
+
+            if (ppu2007SM == 1 && ppu2007SM_isRead && !ppu2007SM_bufferLate)
+            {
+                int a = ppu2007SM_addr & 0x3FFF;
+                ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a);
+            }
+            else if (ppu2007SM == 3)
+            {
+                // P3-3: NormalWriteBehavior vs MysteryWrite (TriCNES lines 1351-1396)
+                if (ppu2007SM_normalWriteBehavior)
+                {
+                    ppu2007SM_normalWriteBehavior = false;
+                    if (!ppu2007SM_isRead || !ppu2007SM_readDelayed)
+                        PpuBusWrite(ppu2007SM_addr, ppu2007SM_writeValue);
+                }
+                else if (!ppu2007SM_isRead && ppu2007SM_performMysteryWrite)
+                {
+                    if (ppu2007SM_mysteryAddr >= 0x3F00)
+                        PpuBusWrite((ushort)(ppu2007SM_addr & 0x2FFF), (byte)ppu2007SM_mysteryAddr);
+                    else
+                    {
+                        PpuBusWrite(ppu2007SM_mysteryAddr, (byte)ppu2007SM_mysteryAddr);
+                        PpuBusWrite((ushort)ppu2007SM_addr, (byte)ppu2007SM_addr);
+                    }
+                }
+            }
+            else if (ppu2007SM == 4)
+            {
+                if (ppu2007SM_isRead && ppu2007SM_bufferLate)
+                {
+                    int a = ppu2007SM_addr & 0x3FFF;
+                    ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a);
+                    ppu2007SM_bufferLate = false;
+                }
+                if (ppu2007SM_updateVramAddrEarly)
+                {
+                    ppu2007SM_updateVramAddrEarly = false;
+                    vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x3FFF);
+                    if (ppu2007SM_isRead)
+                    {
+                        int a = vram_addr & 0x3FFF;
+                        ppu_2007_buffer = (a >= 0x3F00) ? PpuBusRead(a & 0x2FFF) : PpuBusRead(a);
+                    }
+                }
+                Increment2007();
+                if ((!ppu2007SM_isRead || !ppu2007SM_readDelayed) && ppu2007SM_performMysteryWrite)
+                {
+                    if ((mcCpuClock & 3) != 0)
+                    {
+                        int a = vram_addr & 0x3FFF;
+                        if (a >= 0x3F00)
+                            PpuBusWrite((ushort)(a & 0x2FFF), ppu2007SM_writeValue);
+                        else
+                            PpuBusWrite((ushort)a, ppu2007SM_writeValue);
+                    }
+                }
+                ppu2007SM_isRead = ppu2007SM_readDelayed;
+                ppu2007SM_performMysteryWrite = false;
+            }
+            else if (ppu2007SM == 8 && ppu2007SM_interruptedReadToWrite)
+            {
+                if ((mcCpuClock & 3) != 0)
+                    PpuBusWrite(ppu2007SM_addr, ppu2007SM_writeValue);
+                ppu2007SM_interruptedReadToWrite = false;
+                vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x3FFF);
+                if (mapperNeedsA12) NotifyMapperA12(vram_addr);
+            }
+            ppu2007SM++;
         }
 
         // hori(v) = hori(t)
@@ -246,428 +485,105 @@ namespace AprNes
         // two physical CIRAM pages ($2000-$23FF = page 0, $2400-$27FF = page 1)
         // based on current mirroring mode.  Real hardware has only 2 KB CIRAM;
         // mirroring is done at the address-decode level, not by data duplication.
+        // Branchless CIRAM address MUX — magic number 0xF0AC encodes mirror truth table
+        // Bit index = (mirror << 2) | ((addr >> 10) & 3), result bit = output bit 10
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static int CIRAMAddr(int addr)
         {
-            int mirror = *Vertical;
-            if (mirror == 0) // H-mirror: $2000=$2400(p0), $2800=$2C00(p1)
-                return (addr & 0x23FF) | ((addr & 0x0800) >> 1);
-            if (mirror == 1) // V-mirror: $2000=$2800(p0), $2400=$2C00(p1)
-                return addr & 0x27FF;
-            if (mirror == 2) // 1-screen A: all → page 0
-                return addr & 0x23FF;
-            if (mirror == 3) // 1-screen B: all → page 1
-                return (addr & 0x23FF) | 0x0400;
-            return addr & 0x2FFF; // 4-screen: 4 unique nametables, no mirroring
+            int m = *Vertical;
+            if (m > 3) return addr & 0x2FFF; // 4-screen (rare, perfectly predicted false)
+            int shift = (m << 2) | ((addr >> 10) & 3);
+            return (addr & 0x23FF) | (((0xF0AC >> shift) & 1) << 10);
         }
 
         // ---- Tile fetch state ----
-        static byte NTVal = 0, ATVal = 0, lowTile = 0, highTile = 0;
-        static int ioaddr = 0;
+        static byte NTVal = 0, ATVal = 0;
 
-        // ---- BG shift registers (16-bit, two tiles: high=current, low=next) ----
-        static ushort lowshift = 0, highshift = 0;
+        // ---- Per-dot render shift registers (TriCNES model: shifted left each half-step) ----
+        // Single set used for both pixel output and sprite 0 hit detection.
+        // Reloaded via deferred commit (phase 7 sets flag → next half-step loads).
+        static int renderLow = 0, renderHigh = 0;
+        // Per-dot attribute shift: shifted alongside render registers, serial-in from latch
+        static int renderAttrLow = 0, renderAttrHigh = 0;
+        // Attribute latch: 2-bit value from which bits are shifted in (TriCNES: PPU_AttributeLatchRegister)
+        static byte attrLatch = 0;
+        static byte pendingAttrLatch = 0; // TriCNES: PPU_Attribute → committed to attrLatch at load time
 
-        // ---- Per-dot shifted BG registers for sprite 0 hit (serial in: 0=low, 1=high) ----
-        static ushort lowshift_s0 = 0, highshift_s0 = 0;
+        // TriCNES commit chain (PPU_RenderTemp + commit flags)
+        // Full step: tile fetch stores to renderTemp, sets commit flags
+        // NEXT full step: CommitShiftRegistersAndBitPlanes processes flags (UNGATED)
+        // Half step: CommitShiftRegistersAndBitPlanes_HalfDot loads shift registers
+        static byte renderTemp = 0;             // TriCNES: PPU_RenderTemp
+        static bool commitNTFetch = false;       // TriCNES: PPU_Commit_NametableFetch
+        static bool commitATFetch = false;       // TriCNES: PPU_Commit_AttributeFetch
+        static bool commitPatLowFetch = false;   // TriCNES: PPU_Commit_PatternLowFetch
+        static bool commitPatHighFetch = false;  // TriCNES: PPU_Commit_PatternHighFetch
+
+        // Deferred shift register reload (TriCNES: PPU_Commit_LoadShiftRegisters)
+        static byte pendingTileLow = 0, pendingTileHigh = 0;
+        static bool commitLoadShiftReg = false;
 
         // ---- Attribute 3-stage pipeline ----
         // Phase-3 shifts ATVal into p1; phase-7 render reads p3 (2 groups later).
         // This correctly delays attribute by 2 fetch groups with no index drift.
-        static byte bg_attr_p1 = 0, bg_attr_p2 = 0, bg_attr_p3 = 0;
 
-        // Render 8 BG pixels at screen positions [ppu_cycles_x-7 .. ppu_cycles_x]
-        // using shift registers BEFORE reload (high byte = current tile data).
-        static void RenderBGTile(int cx)
+        // (per-dot rendering reads palette directly from ppu_ram + NesColors)
+
+
+
+        // TriCNES: PPU_SpriteEvaluation_GetSpriteAddress — compute sprite CHR pattern address
+        // for the given secondary OAM slot during sprite tile fetch (dots 257-320).
+        static int ComputeSpritePatternAddr(int slot)
         {
-            byte renderAttr = bg_attr_p3;
-            byte nextAttr   = bg_attr_p2;
+            int offset  = slot << 2;
+            int sprY    = secondaryOAM[offset];
+            int sprTile = secondaryOAM[offset + 1];
+            int sprAttr = secondaryOAM[offset + 2];
+            int row = (scanline & 0xFF) - sprY;
 
-            // Refresh palette caches for this tile (static alloc, no heap activity)
-            int baseAddrR = 0x3f00 | (renderAttr << 2);
-            int baseAddrN = 0x3f00 | (nextAttr   << 2);
-            uint bgColor = NesColors[ppu_ram[0x3f00] & 0x3f];
-            palCacheR[0] = palCacheN[0] = bgColor;
-            palCacheR[1] = NesColors[ppu_ram[baseAddrR + 1] & 0x3f];
-            palCacheR[2] = NesColors[ppu_ram[baseAddrR + 2] & 0x3f];
-            palCacheR[3] = NesColors[ppu_ram[baseAddrR + 3] & 0x3f];
-            palCacheN[1] = NesColors[ppu_ram[baseAddrN + 1] & 0x3f];
-            palCacheN[2] = NesColors[ppu_ram[baseAddrN + 2] & 0x3f];
-            palCacheN[3] = NesColors[ppu_ram[baseAddrN + 3] & 0x3f];
-
-            int baseX = cx - 7;
-            int scanOff = scanline << 8;
-            int fineX = FineX;
-            bool bgLeft8 = ShowBgLeft8;
-            ushort ls = lowshift;
-            ushort hs = highshift;
-            for (int loc = 0; loc < 8; loc++)
+            if (!Spritesize8x16)
             {
-                int screenX = baseX + loc;
-
-                int bit = 15 - loc - fineX;
-                byte attrUse = (bit >= 8) ? renderAttr : nextAttr;
-                int bgPixel = ((ls >> bit) & 1) | (((hs >> bit) & 1) << 1);
-
-                bool masked = !bgLeft8 && screenX < 8;
-                int slot = scanOff + screenX;
-                Buffer_BG_array[slot] = masked ? 0 : bgPixel;
-                uint* pal = (attrUse == renderAttr) ? palCacheR : palCacheN;
-                ScreenBuf1x[slot] = masked ? bgColor : pal[bgPixel];
-
-                // NTSC: 寫入原始調色盤索引（不經 NesColors RGB 轉換）
-                if (AnalogEnabled && (uint)screenX < 256)
-                {
-                    int padrBase = (attrUse == renderAttr) ? baseAddrR : baseAddrN;
-                    ntscScanBuf[screenX] = (masked || bgPixel == 0)
-                        ? (byte)(ppu_ram[0x3f00] & 0x3f)
-                        : (byte)(ppu_ram[padrBase + bgPixel] & 0x3f);
-                }
+                // 8x8: branchless Y-flip via XOR mask
+                // -(sprAttr >> 7) = 0 (no flip) or -1 (flip); & 7 → 0 or 7; row ^= 7 = 7-row
+                row ^= -(sprAttr >> 7) & 7;
+                return SpPatternTableAddr | (sprTile << 4) | (row & 7);
+            }
+            else
+            {
+                // 8x16: branchless flip + bitwise tile half selection
+                row ^= -(sprAttr >> 7) & 15;
+                return ((sprTile & 1) << 12) | ((sprTile & 0xFE) << 4) | ((row & 8) << 1) | (row & 7);
             }
         }
 
-        // Per-8-cycle tile fetch: runs each PPU cycle on visible/pre-render scanlines when rendering enabled.
-        // BG tiles fetched at cycles 0-255 (visible) and 320-335 (next-scanline prefetch).
-        // A12 notifications: BG at phases 0 (NT addr, A12=0) and 4 (CHR low addr, A12=BG table bit12),
-        // sprites at phases 0 (garbage NT, A12=0) and 3 (sprite CHR, A12=sprite table bit12).
-        static void ppu_rendering_tick(int cx, int preRenderLn)
+        // Reverse bits in a byte — 256-byte LUT (L1-resident, 1 read vs 12 ALU ops)
+        static readonly byte[] FlipTable = GenerateFlipTable();
+        static byte[] GenerateFlipTable()
         {
-            if (cx < 256 || (cx >= 320 && cx < 336))
+            byte[] t = new byte[256];
+            for (int i = 0; i < 256; i++)
             {
-                // MMC5 CHR A/B: ensure correct set at BG tile boundaries.
-                // Dot 0: initialize for this scanline (handles vblank→render transition).
-                // Dot 320: switch back to BG after sprite fetches.
-                if ((cx == 0 || cx == 320) && chrABAutoSwitch)
-                {
-                    byte*[] src = Spritesize8x16 ? (chrBGUseASet ? chrBankPtrsA : chrBankPtrsB) : chrBankPtrsA;
-                    for (int i = 0; i < 8; i++) chrBankPtrs[i] = src[i];
-                }
-                int phase = cx & 7;
-                if (phase == 0) {
-                    ioaddr = 0x2000 | (vram_addr & 0x0FFF);
-                    if (mapperA12IsMmc3) NotifyMapperA12(ioaddr);  // NT addr, A12=0
-                } else if (phase == 1) {
-                    if (ntChrOverrideEnabled)
-                        NTVal = ntBankPtrs[(ioaddr >> 10) & 3][ioaddr & 0x3FF];
-                    else
-                        NTVal = ppu_ram[CIRAMAddr(ioaddr)];
-                    if (extAttrEnabled) extAttrNTOffset = (ushort)(ioaddr & 0x3FF);
-                    if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ioaddr);
-                } else if (phase == 2) {
-                    ioaddr = 0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07);
-                } else if (phase == 3) {
-                    if (extAttrEnabled && extAttrNTOffset < 960) {
-                        byte exVal = extAttrRAM[extAttrNTOffset];
-                        extAttrChrBank = (exVal & 0x3F) | (extAttrChrUpperBits << 6);
-                        ATVal = (byte)((exVal >> 6) & 3);
-                    } else if (ntChrOverrideEnabled) {
-                        ATVal = (byte)((ntBankPtrs[(ioaddr >> 10) & 3][ioaddr & 0x3FF] >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
-                    } else {
-                        ATVal = (byte)((ppu_ram[CIRAMAddr(ioaddr)] >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
-                    }
-                    bg_attr_p3 = bg_attr_p2; bg_attr_p2 = bg_attr_p1; bg_attr_p1 = ATVal;
-                    if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ioaddr);
-                } else if (phase == 4) {
-                    if (extAttrEnabled && extAttrChrSize > 0)
-                        ioaddr = (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7);
-                    else
-                        ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
-                    if (mapperNeedsA12) NotifyMapperA12(ioaddr);  // CHR low addr
-                } else if (phase == 5) {
-                    if (extAttrEnabled && extAttrChrSize > 0)
-                        lowTile = extAttrCHR[ioaddr % extAttrChrSize];
-                    else
-                        lowTile = chrBankPtrs[(ioaddr >> 10) & 7][ioaddr & 0x3FF];
-                    if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ioaddr);
-                } else if (phase == 6) {
-                    if (extAttrEnabled && extAttrChrSize > 0)
-                        ioaddr = (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
-                    else
-                        ioaddr = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
-                    if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(ioaddr);  // MMC2/MMC4: CHR high triggers latch
-                } else {
-                    if (extAttrEnabled && extAttrChrSize > 0)
-                        highTile = extAttrCHR[ioaddr % extAttrChrSize];
-                    else
-                        highTile = chrBankPtrs[(ioaddr >> 10) & 7][ioaddr & 0x3FF];
-                    if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ioaddr);
-                    // Render 8 pixels using shift registers BEFORE reload (visible only, BG on)
-                    // Use delayed ppuRenderingEnabled for correct mid-scanline $2001 toggle behavior
-                    if (scanline < 240 && cx < 256 && ppuRenderingEnabled)
-                        RenderBGTile(cx);
-                    // Load shift registers (high = old-low = previous tile, low = new tile)
-                    lowshift  = (ushort)((lowshift  << 8) | lowTile);
-                    highshift = (ushort)((highshift << 8) | highTile);
-                    // Sync per-dot shadow registers: load new tile into low byte
-                    // (the per-dot shifting already shifted the old data up by 8 bits)
-                    lowshift_s0  = (ushort)((lowshift_s0  & 0xFF00) | lowTile);
-                    highshift_s0 = (ushort)((highshift_s0 & 0xFF00) | highTile);
-                    CXinc();
-                }
+                int v = i;
+                v = ((v & 0xF0) >> 4) | ((v & 0x0F) << 4);
+                v = ((v & 0xCC) >> 2) | ((v & 0x33) << 2);
+                v = ((v & 0xAA) >> 1) | ((v & 0x55) << 1);
+                t[i] = (byte)v;
             }
-            else if (cx == 256)
-            {
-                Yinc();
-            }
-            else if (cx >= 257 && cx < 320)
-            {
-                if (cx == 257)
-                {
-                    CopyHoriV(); spr_ram_add = 0;
-                    // MMC5 CHR A/B: switch to A set (sprites) at dot 257 (only in 8x16 mode)
-                    if (chrABAutoSwitch && Spritesize8x16)
-                        for (int i = 0; i < 8; i++) chrBankPtrs[i] = chrBankPtrsA[i];
-                }
-
-                // Latch sprite size at dot 261 (sprite 0 CHR low fetch address).
-                // On real hardware, the Spritesize8x16 value at CHR fetch time determines
-                // tile addressing. Mid-HBlank $2000 writes after this dot won't affect
-                // the current scanline's sprite 0 tile data.
-                if (cx == 261) spriteSizeLatchedForFetch = Spritesize8x16;
-
-                if (mapperA12IsMmc3)
-                {
-                    int phase = (cx - 257) & 7;
-                    if (phase == 0) NotifyMapperA12(0x2000);                // garbage NT addr, A12=0
-                    else if (phase == 3) NotifyMapperA12(SpPatternTableAddr); // sprite CHR addr (pre-output)
-                }
-                else if (mapperNeedsA12 && !mapperA12IsMmc3)
-                {
-                    // MMC2/MMC4: per-sprite CHR high address for right-latch detection
-                    int phase9 = (cx - 257) & 7;
-                    int slot9  = (cx - 257) >> 3;
-                    if (phase9 == 0) NotifyMapperA12(0x2000);
-                    else if (phase9 == 5 && slot9 < 8)
-                    {
-                        byte tileNum = secondaryOAM[slot9 * 4 + 1];
-                        NotifyMapperA12(SpPatternTableAddr | (tileNum << 4) | 8);
-                    }
-                }
-                // MMC5: per-fetch VRAM read notifications for sprite phase
-                if (mmc5Ref != null)
-                {
-                    int phaseM5 = (cx - 257) & 7;
-                    if (phaseM5 == 1) mmc5Ref.NotifyVramRead(0x2000);        // garbage NT
-                    else if (phaseM5 == 3) mmc5Ref.NotifyVramRead(0x23C0);   // garbage AT
-                    else if (phaseM5 == 5) mmc5Ref.NotifyVramRead(SpPatternTableAddr);       // CHR low
-                    else if (phaseM5 == 7) mmc5Ref.NotifyVramRead(SpPatternTableAddr | 8);   // CHR high
-                }
-            }
-
-            // Dot 321: latch secondary OAM[0] into oamCopyBuffer for dots 321-340
-            if (cx == 321 && scanline < 240 && (ShowBackGround || ShowSprites))
-                oamCopyBuffer = secondaryOAM[0];
-
-            // Pre-render scanline: continuous vert(v) = vert(t) copy at cycles 280-304
-            if (scanline == preRenderLn && cx >= 280 && cx <= 304)
-            {
-                vram_addr = (vram_addr & ~0x7BE0) | (vram_addr_internal & 0x7BE0);
-            }
-
-            // Garbage NT fetches at dots 336-339: notify A12=0 to create falling edge
-            // after BG prefetch CHR (A12=1 for BG=$1000), needed for scanline-boundary timing
-            if (mapperNeedsA12 && cx == 336)
-                NotifyMapperA12(0x2000);
-
-            // MMC5: garbage NT fetches at dots 337 and 339 (same NT address as first tile)
-            // These create the 3-consecutive-identical-read pattern for scanline detection
-            if (mmc5Ref != null && (cx == 337 || cx == 339))
-                mmc5Ref.NotifyVramRead(0x2000 | (vram_addr & 0x0FFF));
+            return t;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static byte FlipByte(byte b) => FlipTable[b];
+
         static void NotifyMapperA12(int address)
         {
+            // cx = PPU_Dot (post-increment), ppu_cycles_x = cx. Timestamp matches TriCNES.
             MapperObj.NotifyA12(address, scanline * 341 + ppu_cycles_x);
         }
 
-        // ── Region-specialized PPU step functions ──
-        // Common logic extracted into ppu_step_common + ppu_step_rendering (AggressiveInlining).
-        // Region-specific tail (VBL trigger, flag clear, dot skip, scanline wrap) hardcoded per version.
-        // Search "★ REGION" for all difference points.
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void ppu_step_common(out int cx, out bool renderingEnabled)
-        {
-            // $2007 read cooldown (suppresses rapid consecutive reads)
-            if (ppu2007ReadCooldown > 0) ppu2007ReadCooldown--;
 
-            // $2006 delayed t→v copy
-            if (ppu2006UpdateDelay > 0 && --ppu2006UpdateDelay == 0)
-            {
-                vram_addr = ppu2006PendingAddr;
-                if (mapperNeedsA12) NotifyMapperA12(vram_addr);
-            }
 
-            // $2005 delayed scroll update
-            if (ppu2005UpdateDelay > 0 && --ppu2005UpdateDelay == 0)
-            {
-                byte v = ppu2005PendingValue;
-                if (ppu2005PendingIsSecond)
-                {
-                    scrol_y = v & 7;
-                    vram_addr_internal = (vram_addr_internal & 0x0C1F) | ((v & 0x7) << 12) | ((v & 0xF8) << 2);
-                }
-                else
-                {
-                    vram_addr_internal = (vram_addr_internal & 0x7fe0) | ((v & 0xf8) >> 3);
-                    FineX = v & 0x07;
-                }
-            }
-
-            // Open bus decay
-            if (--open_bus_decay_timer == 0)
-            {
-                open_bus_decay_timer = 77777;
-                openbus = 0;
-            }
-
-            renderingEnabled = ShowBackGround || ShowSprites;
-            cx = ppu_cycles_x;
-
-            // At dot 0 of visible scanlines: precompute sprite 0 data for hit detection.
-            // Must run BEFORE the hit check so sprite0_on_line is valid at dot 0.
-            // On real hardware, sprite evaluation happens during the previous scanline.
-            if (scanline >= 0 && scanline < 240 && cx == 0)
-                PrecomputeSprite0Line();
-
-            // Per-pixel sprite 0 hit detection using per-dot shifted shadow registers.
-            // Condition order: cheapest short-circuits first.
-            // sprite0_on_line / !isSprite0hit eliminate most scanlines instantly.
-            // Range check (cx in [sprite0_line_x, +8)) narrows to 8 dots from 256,
-            // avoiding the inner sprCol calculation for the other 248 dots per scanline.
-            if (sprite0_on_line && !isSprite0hit
-                && cx >= sprite0_line_x && cx < sprite0_line_x + 8
-                && cx < 256
-                && scanline >= 0 && scanline < 240
-                && ShowBackGround && ShowSprites)
-            {
-                bool inLeft8 = cx < 8;
-                if (!(!ShowBgLeft8 && inLeft8) && !(!ShowSprLeft8 && inLeft8) && cx != 255)
-                {
-                    int sprCol = cx - sprite0_line_x;
-                    int bit = 15 - FineX;
-                    int bgPixel = ((lowshift_s0 >> bit) & 1) | (((highshift_s0 >> bit) & 1) << 1);
-                    if (bgPixel != 0)
-                    {
-                        int loc_t = sprite0_flip_x ? (7 - sprCol) : sprCol;
-                        int mask = 1 << (7 - loc_t);
-                        int sprPx = (((sprite0_tile_high & mask) << 1) + (sprite0_tile_low & mask)) >> (7 - loc_t);
-                        if (sprPx != 0)
-                            isSprite0hit = true;
-                    }
-                }
-            }
-        }
-
-        // ★ REGION: shared rendering body — PRE_RENDER_LINE passed as hardcoded literal from each version
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void ppu_step_rendering(int cx, bool renderingEnabled, int PRE_RENDER_LINE)
-        {
-            if (ppuRenderingEnabled)
-            {
-                if ((scanline >= 0 && scanline < 240 && cx < 256)
-                    || ((scanline < 240 || scanline == PRE_RENDER_LINE) // ★ REGION
-                        && cx >= 320 && cx < 336))
-                {
-                    lowshift_s0 <<= 1;
-                    highshift_s0 = (ushort)((highshift_s0 << 1) | 1);
-                }
-            }
-
-            if (scanline < 240 || scanline == PRE_RENDER_LINE) // ★ REGION
-            {
-                if (ppuRenderingEnabled)
-                    ppu_rendering_tick(cx, PRE_RENDER_LINE); // ★ REGION
-
-                // Per-dot sprite evaluation (visible scanlines only)
-                if (AccuracyOptA)
-                {
-                    if (scanline >= 0 && scanline < 240 && ppuRenderingEnabled)
-                    {
-                        // Dots 1-64: clear secondary OAM (write $FF, 2 dots per byte)
-                        if (cx >= 1 && cx <= 64)
-                        {
-                            oamCopyBuffer = 0xFF;
-                            if ((cx & 1) == 0)
-                                secondaryOAM[(cx >> 1) - 1] = 0xFF;
-                        }
-                        // Dot 65: initialize evaluation FSM
-                        else if (cx == 65)
-                        {
-                            sprite0_eval_addr = spr_ram_add;
-                            SpriteEvalInit();
-                            SpriteEvalTick();
-                        }
-                        // Dots 66-256: per-dot evaluation
-                        else if (cx >= 66 && cx <= 256)
-                        {
-                            SpriteEvalTick();
-                            if (cx == 256) SpriteEvalEnd();
-                        }
-                    }
-                    // Pre-render line: save sprite0_eval_addr at dot 65
-                    else if (scanline == PRE_RENDER_LINE && cx == 65 && ppuRenderingEnabled) // ★ REGION
-                    {
-                        sprite0_eval_addr = spr_ram_add;
-                    }
-                }
-
-                if (scanline >= 0 && scanline < 240)
-                {
-                    // At start of each visible scanline: always zero Buffer_BG_array to prevent
-                    // stale data from prior frames causing incorrect sprite priority decisions.
-                    if (cx == 0)
-                    {
-                        int scanOff = scanline << 8;
-                        int* bgp = Buffer_BG_array + scanOff;
-                        for (int* bge = bgp + 256; bgp < bge; bgp++) *bgp = 0;
-                        // Use delayed ppuRenderingEnabled (not immediate ShowBackGround)
-                        // to avoid premature backdrop fill when $2001 is toggled mid-scanline.
-                        if (!ppuRenderingEnabled)
-                        {
-                            uint bgColor = NesColors[ppu_ram[0x3f00] & 0x3f];
-                            uint* sp = ScreenBuf1x + scanOff;
-                            for (uint* se = sp + 256; sp < se; sp++) *sp = bgColor;
-                            // NTSC: BG 關閉時填入背景色調色盤索引
-                            if (AnalogEnabled)
-                            {
-                                byte bgIdx = (byte)(ppu_ram[0x3f00] & 0x3f);
-                                for (int i = 0; i < 256; i++) ntscScanBuf[i] = bgIdx;
-                            }
-                        }
-                        PrecomputeOverflow();
-                    }
-
-                    // Per-cycle sprite overflow flag (set at the exact evaluation cycle)
-                    if (spriteOverflowCycle >= 0 && cx == spriteOverflowCycle)
-                        isSpriteOverflow = true;
-
-                    // Sprite evaluation + rendering at cycle 257 (after BG tiles complete at cycle 255)
-                    if (cx == 257)
-                    {
-                        // MMC5: force A set (sprite) CHR banks before sprite rendering
-                        // NotifyVramRead-based switch doesn't fire until cx=258
-                        if (mmc5Ref != null) mmc5Ref.PreSpriteRender();
-                        RenderSpritesLine();
-                    }
-
-                }
-
-                // Pre-render line: compute pre-render sprite data at dot 257
-                if (scanline == PRE_RENDER_LINE && cx == 257 && ppuRenderingEnabled) // ★ REGION
-                    PrecomputePreRenderSprites();
-
-            }
-
-            if (scanline == 240 && cx == 1)
-            {
-                RenderScreen();
-                frame_count++;
-                if (AnalogEnabled) { Ntsc_SetFrameCount(frame_count); Crt_SetFrameCount(frame_count); }
-            }
-            ppuRenderingEnabled = renderingEnabled;
-        }
 
         // ═══════════════════════════════════════════════════════════════
         // Scanline Event 常數 — 用於 ppu_step_*() 的快速事件判定
@@ -685,148 +601,47 @@ namespace AprNes
         // const 在 C# 中是編譯期替換（等同直接寫字面值），JIT 視為 hardcode 常數。
         // ═══════════════════════════════════════════════════════════════
 
-        // NTSC: nmiTriggerLine=241, preRenderLine=261
-        private const int L_NTSC_VBL_START    = 0x1E201; // 241<<9|1  VBlank set + NMI
-        private const int L_NTSC_SPRITE_RESET = 0x20A01; // 261<<9|1  clear sprite0hit/overflow
-        private const int L_NTSC_VBL_END      = 0x20A02; // 261<<9|2  VBlank clear
-
-        // PAL: nmiTriggerLine=241, preRenderLine=311
-        private const int L_PAL_VBL_START     = 0x1E201; // 241<<9|1  (same as NTSC)
-        private const int L_PAL_SPRITE_RESET  = 0x26E01; // 311<<9|1
-        private const int L_PAL_VBL_END       = 0x26E02; // 311<<9|2
-
-        // Dendy: nmiTriggerLine=291, preRenderLine=311
-        private const int L_DENDY_VBL_START   = 0x24601; // 291<<9|1
-        private const int L_DENDY_SPRITE_RESET= 0x26E01; // 311<<9|1  (same as PAL)
-        private const int L_DENDY_VBL_END     = 0x26E02; // 311<<9|2  (same as PAL)
+        // Precomputed packed scanline event constants (set by ApplyRegionProfile)
+        static int L_VBL_START;     // (nmiTriggerLine << 9) | 1
+        static int L_SPRITE_RESET;  // (preRenderLine << 9) | 1
+        static int L_VBL_END;       // (preRenderLine << 9) | 2
 
         // ═══════════════════════════════════════════════════════════════
-        // NTSC: preRenderLine=261, nmiTriggerLine=241, totalScanlines=262, has dot skip
+        // Unified PPU step — region differences via precomputed parameters:
+        //   NTSC odd frame skip (always enabled — PAL/Dendy stripped)
         // ═══════════════════════════════════════════════════════════════
-        static void ppu_step_ntsc()
-        {
-            int cx; bool re;
-            ppu_step_common(out cx, out re);
-            ppu_step_rendering(cx, re, 261);
-            ppu_cycles_x = ++cx;
 
-            // ★ Scanline event guard: cx<=2 時才可能觸發 VBL/Sprite/VBL-end 事件
-            //   339/341 dots 完全跳過，僅 dot 1 & 2 進入內部判定
-            if (cx <= 2)
-            {
-                int L = (scanline << 9) | cx;
-                if (L == L_NTSC_VBL_START)         // scanline 241, dot 1
-                { if (!SuppressVbl) isVblank = true; SuppressVbl = false; }
-                else if (L == L_NTSC_SPRITE_RESET) // scanline 261, dot 1
-                    isSprite0hit = isSpriteOverflow = false;
-                else if (L == L_NTSC_VBL_END)      // scanline 261, dot 2
-                    isVblank = false;
-            }
-
-            // NTSC odd frame dot skip (pre-render line 261, dot 339)
-            if (scanline == 261 && cx == 339)
-            {
-                oddSwap = !oddSwap;
-                if (!oddSwap && (ShowBackGround || ShowSprites))
-                {
-                    if (mmc5Ref != null)
-                        mmc5Ref.NotifyVramRead(0x2000 | (vram_addr & 0x0FFF));
-                    ppu_cycles_x = ++cx;
-                }
-            }
-            if (cx == 341)
-            {
-                if (++scanline == 262)
-                { scanline = 0; if (ShowBackGround || ShowSprites) ProcessOamCorruption(); }
-                ppu_cycles_x = 0;
-            }
-        }
-
-        // ═══════════════════════════════════════════════════════════════
-        // PAL: preRenderLine=311, nmiTriggerLine=241, totalScanlines=312, no dot skip
-        // ═══════════════════════════════════════════════════════════════
-        static void ppu_step_pal()
-        {
-            int cx; bool re;
-            ppu_step_common(out cx, out re);
-            ppu_step_rendering(cx, re, 311);
-            ppu_cycles_x = ++cx;
-
-            if (cx <= 2)
-            {
-                int L = (scanline << 9) | cx;
-                if (L == L_PAL_VBL_START)         // scanline 241, dot 1
-                { if (!SuppressVbl) isVblank = true; SuppressVbl = false; }
-                else if (L == L_PAL_SPRITE_RESET) // scanline 311, dot 1
-                    isSprite0hit = isSpriteOverflow = false;
-                else if (L == L_PAL_VBL_END)      // scanline 311, dot 2
-                    isVblank = false;
-            }
-            // PAL — no dot skip
-            if (cx == 341)
-            {
-                if (++scanline == 312)
-                { scanline = 0; if (ShowBackGround || ShowSprites) ProcessOamCorruption(); }
-                ppu_cycles_x = 0;
-            }
-        }
-
-        // ═══════════════════════════════════════════════════════════════
-        // Dendy: preRenderLine=311, nmiTriggerLine=291, totalScanlines=312, no dot skip
-        // ═══════════════════════════════════════════════════════════════
-        static void ppu_step_dendy()
-        {
-            int cx; bool re;
-            ppu_step_common(out cx, out re);
-            ppu_step_rendering(cx, re, 311);
-            ppu_cycles_x = ++cx;
-
-            if (cx <= 2)
-            {
-                int L = (scanline << 9) | cx;
-                if (L == L_DENDY_VBL_START)         // scanline 291, dot 1
-                { if (!SuppressVbl) isVblank = true; SuppressVbl = false; }
-                else if (L == L_DENDY_SPRITE_RESET) // scanline 311, dot 1
-                    isSprite0hit = isSpriteOverflow = false;
-                else if (L == L_DENDY_VBL_END)      // scanline 311, dot 2
-                    isVblank = false;
-            }
-            // Dendy — no dot skip
-            if (cx == 341)
-            {
-                if (++scanline == 312)
-                { scanline = 0; if (ShowBackGround || ShowSprites) ProcessOamCorruption(); }
-                ppu_cycles_x = 0;
-            }
-        }
 
         #endregion
 
         static int open_bus_decay_timer = 77777;
 
         // Pre-computed sprite 0 data for per-pixel hit detection during BG rendering
-        static bool sprite0_on_line;
-        static int sprite0_line_x;
-        static byte sprite0_tile_low, sprite0_tile_high;
-        static bool sprite0_flip_x;
         static int sprite0_eval_addr;  // OAMADDR at start of sprite evaluation (dot 65), for next scanline's sprite 0
         static bool spriteSizeLatchedForFetch; // Spritesize8x16 latched at dot 261 (sprite 0 CHR fetch timing)
 
         // ========== Secondary OAM and Per-dot Sprite Evaluation FSM ==========
         static byte* secondaryOAM; // 8 sprites × 4 bytes
-        static byte oamCopyBuffer;                  // Last byte read during evaluation ($2004 returns this)
-        static byte spriteEvalAddrH;                // Primary OAM sprite index (0-63)
-        static byte spriteEvalAddrL;                // Byte offset within sprite (0-3)
-        static byte secOAMAddr;                     // Write position in secondary OAM (0-31)
-        static bool spriteInRange;                  // Current sprite Y is in range
-        static bool sprite0Added;                   // First evaluated sprite was in range
-        static bool oamCopyDone;                    // Evaluation wrapped around all 64 sprites
-        static byte overflowBugCounter;             // For sprite overflow hardware bug
+        static byte oamCopyBuffer;                  // Last byte read during evaluation (PPU_OAMLatch in TriCNES)
+        static byte ppuOamBuffer;                   // P4-3: cached $2004 value, updated per-dot in half-step (TriCNES PPU_OAMBuffer)
+        // TriCNES-aligned sprite evaluation state
+        // evalOamAddr is an ALIAS for spr_ram_add — TriCNES uses PPUOAMAddress directly as the register
+        static byte evalOamAddr { get { return spr_ram_add; } set { spr_ram_add = value; } }
+        static byte evalOam2Addr;                   // TriCNES: OAM2Address (0-31, wraps with & 0x1F)
+        static byte evalTick;                       // TriCNES: SpriteEvaluationTick (0-3)
+        static bool evalOam2Full;                   // TriCNES: SecondaryOAMFull
+        static bool evalOamOverflowed;              // TriCNES: OAMAddressOverflowedDuringSpriteEvaluation
+        static bool sprite0Added;                   // TriCNES: PPU_NextScanlineContainsSpriteZero
+        static bool nineObjectsOnLine;              // TriCNES: NineObjectsOnThisScanline
         static int evalSpriteCount;                 // Number of sprites found (0-8)
+        // Legacy aliases for code that still references old names
+        static byte spriteEvalAddrH { get { return (byte)(evalOamAddr >> 2); } }
+        static byte spriteEvalAddrL { get { return (byte)(evalOamAddr & 3); } }
+        static byte secOAMAddr { get { return evalOam2Addr; } set { evalOam2Addr = value; } }
+        static bool oamCopyDone { get { return evalOamOverflowed; } set { evalOamOverflowed = value; } }
         static bool evalSprite0Visible;             // Sprite 0 found in secondary OAM
 
         // Pre-render line sprite data (loaded at pre-render dot 257 for scanline 0)
-        static bool prerender_sprite0_valid;
         static int prerender_sprite0_x;
         static byte prerender_sprite0_tile_low, prerender_sprite0_tile_high;
         static bool prerender_sprite0_flip_x;
@@ -834,162 +649,66 @@ namespace AprNes
         // Pre-computed sprite overflow cycle for cycle-accurate overflow flag timing
         static int spriteOverflowCycle;
 
-        // OAM corruption: mark which row gets corrupted when rendering is disabled mid-scanline
-        static void SetOamCorruptionFlags()
-        {
-            if (ppu_cycles_x >= 0 && ppu_cycles_x < 64)
-            {
-                // Secondary OAM clear phase: every 2 dots shifts corruption down 1 row
-                corruptOamRow[ppu_cycles_x >> 1] = 1;
-            }
-            else if (ppu_cycles_x >= 256 && ppu_cycles_x < 320)
-            {
-                // Sprite tile fetch phase: 8-dot segments
-                int rel = ppu_cycles_x - 256;
-                int baseIdx = rel >> 3;
-                int offset = rel & 0x07;
-                if (offset > 3) offset = 3;
-                corruptOamRow[baseIdx * 4 + offset] = 1;
-            }
-        }
 
-        // OAM corruption: copy first 8 bytes of OAM over each marked row
-        // Optimized: single long (8-byte) read/write replaces inner byte loop
+
+        // OAM corruption: copy first 8 bytes of OAM over the corrupted row (TriCNES CorruptOAM)
         static unsafe void ProcessOamCorruption()
         {
-            long sourcePattern = *(long*)spr_ram; // row 0: first 8 bytes
-            for (int i = 1; i < 32; i++)
+            int idx = oamCorruptIndex;
+            if (idx >= 0x20) idx = 0; // TriCNES: wrap at 32
+            if (idx > 0)
             {
-                if (corruptOamRow[i] != 0)
-                {
-                    ((long*)spr_ram)[i] = sourcePattern;
-                    corruptOamRow[i] = 0;
-                }
+                // SWAR: copy row 0 (8 bytes) to corrupted row in single 64-bit move
+                *(ulong*)(spr_ram + idx * 8) = *(ulong*)spr_ram;
+                // Also corrupt secondary OAM (TriCNES: OAM2[index] = OAM2[0])
+                secondaryOAM[idx] = secondaryOAM[0];
             }
-            corruptOamRow[0] = 0;
         }
 
-        // Pre-compute sprite 0 tile data for the current scanline so hit detection
-        // can happen per-pixel inside RenderBGTile() at the correct PPU cycle.
-        static void PrecomputeSprite0Line()
-        {
-            sprite0_on_line = false;
-            if (isSprite0hit) return;
-            if (!ShowBackGround && !ShowSprites) return;
 
-            // Sprite 0 is the first sprite processed during evaluation on the PREVIOUS
-            // scanline. Use the saved OAMADDR from that evaluation (dot 65).
-            // For misaligned OAM, bytes wrap: addrH increments when addrL wraps past 3.
-            int addrH = (sprite0_eval_addr >> 2) & 0x3F;
-            int addrL = sprite0_eval_addr & 0x03;
-
-            // Read 4 bytes as hardware does: Y, tile, attr, X — with addrL wrapping
-            byte sprY    = spr_ram[(byte)(addrH * 4 + addrL)]; addrL++; if (addrL >= 4) { addrH = (addrH + 1) & 0x3F; addrL = 0; }
-            byte sprTile = spr_ram[(byte)(addrH * 4 + addrL)]; addrL++; if (addrL >= 4) { addrH = (addrH + 1) & 0x3F; addrL = 0; }
-            byte sprAttr = spr_ram[(byte)(addrH * 4 + addrL)]; addrL++; if (addrL >= 4) { addrH = (addrH + 1) & 0x3F; addrL = 0; }
-            byte sprX    = spr_ram[(byte)(addrH * 4 + addrL)];
-
-            int y_loc = sprY + 1; // NES hardware: sprites display at OAM_Y + 1
-            // Use latched sprite size from dot 261 of previous scanline's HBlank.
-            // This matches real hardware where sprite 0's CHR fetch uses the size
-            // at fetch time, not the value at dot 0 of the next scanline.
-            bool sprSize16 = spriteSizeLatchedForFetch;
-            int height = sprSize16 ? 15 : 7;
-            if (scanline < y_loc || scanline - y_loc > height)
-            {
-                // Scanline 0: use pre-render line sprite 0 data if available.
-                if (scanline == 0 && prerender_sprite0_valid)
-                {
-                    sprite0_on_line = true;
-                    sprite0_line_x = prerender_sprite0_x;
-                    sprite0_tile_low = prerender_sprite0_tile_low;
-                    sprite0_tile_high = prerender_sprite0_tile_high;
-                    sprite0_flip_x = prerender_sprite0_flip_x;
-                }
-                return;
-            }
-
-            sprite0_on_line = true;
-            sprite0_line_x = sprX;
-
-            sprite0_flip_x = (sprAttr & 0x40) != 0;
-            int offset, tile_th_t, line, line_t;
-            byte tile_th;
-
-            if (sprSize16)
-            {
-                tile_th = (byte)(sprTile & 0xfe);
-                offset = (sprTile & 1) != 0 ? 256 : 0;
-            }
-            else
-            {
-                tile_th = sprTile;
-                offset = SpPatternTableAddr >> 4;
-            }
-
-            if (scanline <= y_loc + 7)
-            {
-                tile_th_t = tile_th + offset;
-                line = scanline - y_loc;
-            }
-            else
-            {
-                tile_th_t = tile_th + offset + 1;
-                line = scanline - y_loc - 8;
-            }
-
-            if ((sprAttr & 0x80) != 0)
-            {
-                line_t = 7 - line;
-                if (sprSize16) tile_th_t ^= 1;
-            }
-            else line_t = line;
-
-            { int a = (tile_th_t << 4) | (line_t + 8); sprite0_tile_high = chrBankPtrs[(a >> 10) & 7][a & 0x3FF]; }
-            { int a = (tile_th_t << 4) | line_t;       sprite0_tile_low  = chrBankPtrs[(a >> 10) & 7][a & 0x3FF]; }
-        }
 
         // Pre-compute the PPU cycle at which sprite overflow flag should be set.
         // Simulates NES sprite evaluation timing (dots 65-256) with the hardware
         // overflow bug: after finding 8 sprites, byte offset m cycles 0→1→2→3,
         // reading tile/attr/X bytes as Y coordinates.
+        // Split-loop + pointer iteration + unsigned range check
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void PrecomputeOverflow()
         {
             spriteOverflowCycle = -1;
             if (!ShowBackGround && !ShowSprites) return;
 
-            int height = Spritesize8x16 ? 15 : 7;
-            int evalCycle = 65;
+            uint height = Spritesize8x16 ? 15u : 7u;
+            int evalCycle = 66;
             int foundCount = 0;
-            int m = 0; // byte offset for overflow bug
+            byte* p = spr_ram;
+            byte* pEnd = spr_ram + 256;
 
-            for (int n = 0; n < 64 && evalCycle <= 256; n++)
+            // Phase 1: find first 8 sprites (pointer iteration, no evalCycle bound needed — max 242)
+            while (p < pEnd)
             {
-                if (foundCount < 8)
+                uint diff = (uint)(scanline - *p);
+                p += 4;
+                if (diff <= height)
                 {
-                    // Normal evaluation: always read byte 0 (Y)
-                    int oam_y = spr_ram[n << 2];
-                    if (scanline >= oam_y && scanline - oam_y <= height)
-                    {
-                        foundCount++;
-                        evalCycle += 8; // in-range: 2 read + 6 copy
-                    }
-                    else
-                    {
-                        evalCycle += 2; // not in range
-                    }
+                    evalCycle += 8;
+                    if (++foundCount == 8) break;
                 }
                 else
-                {
-                    // Overflow bug evaluation: read byte m (cycles through 0,1,2,3)
-                    int oam_y = spr_ram[(n << 2) + m];
-                    if (scanline >= oam_y && scanline - oam_y <= height)
-                    {
-                        spriteOverflowCycle = evalCycle;
-                        return;
-                    }
-                    m = (m + 1) & 3; // bug: increment byte offset on miss
                     evalCycle += 2;
+            }
+
+            // Phase 2: overflow bug evaluation (byte offset m cycles 0,1,2,3)
+            if (foundCount == 8)
+            {
+                int m = 0;
+                while (p < pEnd && evalCycle <= 256)
+                {
+                    uint diff = (uint)(scanline - p[m]);
+                    if (diff <= height) { spriteOverflowCycle = evalCycle; return; }
+                    m = (m + 1) & 3;
+                    evalCycle += 2;
+                    p += 4;
                 }
             }
         }
@@ -999,134 +718,114 @@ namespace AprNes
         static void SpriteEvalInit()
         {
             sprite0Added = false;
-            spriteInRange = false;
-            secOAMAddr = 0;
-            overflowBugCounter = 0;
-            oamCopyDone = false;
-            spriteEvalAddrH = (byte)((spr_ram_add >> 2) & 0x3F);
-            spriteEvalAddrL = (byte)(spr_ram_add & 0x03);
+            evalOam2Addr = 0;           // TriCNES: OAM2Address = 0 at dot 65
+            evalOam2Full = false;       // TriCNES: SecondaryOAMFull = false
+            evalTick = 0;              // TriCNES: SpriteEvaluationTick = 0
+            evalOamOverflowed = false;  // TriCNES: OAMAddressOverflowedDuringSpriteEvaluation = false
+            nineObjectsOnLine = false;  // TriCNES: NineObjectsOnThisScanline = false
+            // evalOamAddr IS spr_ram_add (alias) — no init needed, PPUOAMAddress is the register itself
         }
 
         // Per-dot sprite evaluation: odd dots read, even dots write/check
+        // TriCNES uses (PPU_Dot & 1)==1 for odd. AprNes ppu_cycles_x = cx+1 (post-increment),
+        // so (ppu_cycles_x & 1)==0 aligns with TriCNES odd dots.
+        // Merged SpriteEvalTick + SpriteEvalWrite — guard clauses + pre-computed inRange
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void SpriteEvalTick()
         {
-            bool isOdd = (ppu_cycles_x & 1) != 0;
-
-            if (isOdd)
+            // === Odd cycle: read OAM (guard clause — early return) ===
+            if ((ppu_cycles_x & 1) != 0)
             {
-                // Odd cycle: read from primary OAM
-                oamCopyBuffer = spr_ram[(byte)(spriteEvalAddrH * 4 + spriteEvalAddrL)];
-                // Attribute byte bits 2-4 don't exist in hardware; masked on internal bus
-                if (spriteEvalAddrL == 2) oamCopyBuffer &= 0xE3;
+                oamCopyBuffer = spr_ram[evalOamAddr];
+                if ((evalOamAddr & 3) == 2) oamCopyBuffer &= 0xE7;
+                return;
             }
-            else
-            {
-                // Even cycle: write/check
-                SpriteEvalWrite();
-            }
-        }
 
-        static void SpriteEvalWrite()
-        {
+            // === Even cycle: write + state machine ===
+            bool ro = scanline == preRenderLine;
+
+            // Overflow path (guard clause — early return)
+            if (evalOamOverflowed)
+            {
+                if (!ro) evalOamAddr = (byte)((evalOamAddr + 4) & 0xFC);
+                oamCopyBuffer = secondaryOAM[evalOam2Addr];
+                return;
+            }
+
+            byte preIncAddr = evalOamAddr;
+
+            if (!evalOam2Full && !ro)
+                secondaryOAM[evalOam2Addr] = oamCopyBuffer;
+
+            byte oam2Read = secondaryOAM[evalOam2Addr];
+
+            // Pre-compute range check (single diff calculation)
             int height = Spritesize8x16 ? 16 : 8;
+            int diff = (scanline & 0xFF) - oamCopyBuffer;
+            bool inRange = diff >= 0 && diff < height;
 
-            if (secOAMAddr >= 0x20)
+            if (evalTick == 0) // Tick 0: Y byte
             {
-                // Secondary OAM full
-                oamCopyBuffer = secondaryOAM[secOAMAddr & 0x1F]; // read instead of write
-
-                if (oamCopyDone)
+                if (!nineObjectsOnLine && !ro && inRange)
                 {
-                    // Already found 8+ sprites, just advance
-                    spriteEvalAddrH = (byte)((spriteEvalAddrH + 1) & 0x3F);
-                    spriteEvalAddrL = 0;
-                }
-                else if (spriteInRange)
-                {
-                    // Found 9th+ sprite: overflow flag set by PrecomputeOverflow() at exact cycle
-                    spriteEvalAddrL++;
-                    if (spriteEvalAddrL >= 4)
+                    if (!evalOam2Full)
                     {
-                        spriteEvalAddrH = (byte)((spriteEvalAddrH + 1) & 0x3F);
-                        spriteEvalAddrL = 0;
-                    }
-                    if (overflowBugCounter == 0)
-                        overflowBugCounter = 3;
-                    else if (--overflowBugCounter == 0)
-                    {
-                        oamCopyDone = true;
-                        spriteEvalAddrL = 0;
-                    }
-                    spriteInRange = false; // reset for next check
-                }
-                else
-                {
-                    // Check in-range for overflow bug (reads wrong byte offset)
-                    if (scanline >= oamCopyBuffer && scanline < oamCopyBuffer + height)
-                        spriteInRange = true;
-                    // Advance both H and L (hardware bug: L increments on miss)
-                    spriteEvalAddrH = (byte)((spriteEvalAddrH + 1) & 0x3F);
-                    spriteEvalAddrL = (byte)((spriteEvalAddrL + 1) & 0x03);
-                    if (spriteEvalAddrH == 0) oamCopyDone = true;
-                }
-            }
-            else
-            {
-                // Check in-range if not already tracking
-                if (!spriteInRange)
-                {
-                    if (scanline >= oamCopyBuffer && scanline < oamCopyBuffer + height)
-                        spriteInRange = !oamCopyDone;
-                }
-
-                if (oamCopyDone)
-                {
-                    // All 64 sprites checked, fewer than 8 in range:
-                    // even dots read from secondary OAM into oamCopyBuffer (no write)
-                    oamCopyBuffer = secondaryOAM[secOAMAddr];
-                    // Still advance through primary OAM (hardware continues cycling)
-                    spriteEvalAddrH = (byte)((spriteEvalAddrH + 1) & 0x3F);
-                    spriteEvalAddrL = 0;
-                }
-                else
-                {
-                    // Write to secondary OAM (attribute already masked at read time)
-                    secondaryOAM[secOAMAddr] = oamCopyBuffer;
-
-                    if (spriteInRange)
-                    {
-                        // First in-range sprite at the very first evaluation is sprite 0
-                        if (ppu_cycles_x == 66) sprite0Added = true;
-
-                        spriteEvalAddrL++;
-                        secOAMAddr++;
-
-                        if (spriteEvalAddrL >= 4)
-                        {
-                            spriteEvalAddrH = (byte)((spriteEvalAddrH + 1) & 0x3F);
-                            spriteEvalAddrL = 0;
-                            if (spriteEvalAddrH == 0) oamCopyDone = true;
-                        }
-
-                        if ((secOAMAddr & 0x03) == 0)
-                        {
-                            // Done copying 4 bytes of this sprite
-                            spriteInRange = false;
-                        }
+                        if (!ro) evalOamAddr++;
+                        evalOam2Addr = (byte)((evalOam2Addr + 1) & 0x1F);
+                        if (evalOam2Addr == 0) evalOam2Full = true;
                     }
                     else
                     {
-                        // Not in range: skip to next sprite
-                        spriteEvalAddrH = (byte)((spriteEvalAddrH + 1) & 0x3F);
-                        spriteEvalAddrL = 0;
-                        if (spriteEvalAddrH == 0) oamCopyDone = true;
+                        nineObjectsOnLine = true;
+                        evalOamAddr++;
+                    }
+                    if (ppu_cycles_x == 66 && !evalOam2Full) sprite0Added = true;
+                    if (!ro) evalTick++;
+                }
+                else
+                {
+                    if (ppu_cycles_x == 66) sprite0Added = false;
+                    if (!ro)
+                    {
+                        if (evalOam2Full && !nineObjectsOnLine)
+                            evalOamAddr += (byte)(((evalOamAddr & 3) == 3) ? 1 : 5); // overflow bug compressed
+                        else
+                            evalOamAddr = (byte)((evalOamAddr + 4) & 0xFC);
                     }
                 }
             }
+            else // Ticks 1, 2, 3
+            {
+                if (evalTick == 3) // Tick 3: X byte pseudo range check
+                {
+                    if (inRange)
+                    {
+                        if (!ro) evalOamAddr += (byte)(evalOam2Full ? 4 : 1);
+                    }
+                    else
+                    {
+                        if (!evalOam2Full) { if (!ro) evalOamAddr = (byte)((evalOamAddr + 1) & 0xFC); }
+                        else evalOamAddr = (byte)((evalOamAddr + 1) & 0xFC); // no ro guard (hardware behavior)
+                    }
+                }
+                else // Ticks 1, 2
+                {
+                    if (!ro) evalOamAddr++;
+                }
 
-            // Update primary OAM read address (for $2003 visibility)
-            spr_ram_add = (byte)((spriteEvalAddrL & 0x03) | (spriteEvalAddrH << 2));
+                evalTick = (byte)((evalTick + 1) & 3);
+
+                if (!evalOam2Full && !ro)
+                {
+                    evalOam2Addr = (byte)((evalOam2Addr + 1) & 0x1F);
+                    if (evalOam2Addr == 0) evalOam2Full = true;
+                }
+            }
+
+            if (evalOamAddr < preIncAddr && evalOamAddr < 4)
+                evalOamOverflowed = true;
+
+            oamCopyBuffer = oam2Read;
         }
 
         // Finalize evaluation at dot 256
@@ -1134,209 +833,48 @@ namespace AprNes
         static void SpriteEvalEnd()
         {
             evalSprite0Visible = sprite0Added;
-            evalSpriteCount = (secOAMAddr + 3) >> 2;
+            // Count sprites: evalOam2Addr is the SecOAM write position.
+            // If evalOam2Full, we had 8 sprites (evalOam2Addr wrapped to 0).
+            evalSpriteCount = evalOam2Full ? 8 : (evalOam2Addr + 3) >> 2;
             if (evalSpriteCount > 8) evalSpriteCount = 8;
         }
 
-        // Pre-render line: check secondary OAM entries against (261 & 255) = 5
-        // and store sprite 0 data for scanline 0 rendering
+        // Pre-render line: sprite 0 data for scanline 0 — bitwise address computation
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void PrecomputePreRenderSprites()
         {
-            prerender_sprite0_valid = false;
-            int effectiveScanline = preRenderLine & 255; // NTSC: 261&255=5, PAL: 311&255=55
-            int height = Spritesize8x16 ? 16 : 8;
-
-            // Check first entry in secondary OAM (potential sprite 0)
             byte sprY = secondaryOAM[0];
-            if (sprY >= 240) return; // $FF or invalid
+            if (sprY >= 240) return;
 
-            if (effectiveScanline >= sprY && effectiveScanline < sprY + height)
+            int line = (preRenderLine & 255) - sprY;
+            int height = Spritesize8x16 ? 16 : 8;
+            if (line < 0 || line >= height) return;
+
+            byte sprTile = secondaryOAM[1];
+            byte sprAttr = secondaryOAM[2];
+            prerender_sprite0_x = secondaryOAM[3];
+            prerender_sprite0_flip_x = (sprAttr & 0x40) != 0;
+
+            int addr;
+            if (!Spritesize8x16)
             {
-                byte sprTile = secondaryOAM[1];
-                byte sprAttr = secondaryOAM[2];
-                byte sprX = secondaryOAM[3];
-
-                prerender_sprite0_valid = true;
-                prerender_sprite0_x = sprX;
-                prerender_sprite0_flip_x = (sprAttr & 0x40) != 0;
-
-                int line = effectiveScanline - sprY;
-                int offset, tile_th_t, line_t;
-                byte tile_th;
-
-                if (Spritesize8x16)
-                {
-                    tile_th = (byte)(sprTile & 0xfe);
-                    offset = (sprTile & 1) != 0 ? 256 : 0;
-                }
-                else
-                {
-                    tile_th = sprTile;
-                    offset = SpPatternTableAddr >> 4;
-                }
-
-                if (line <= 7)
-                {
-                    tile_th_t = tile_th + offset;
-                }
-                else
-                {
-                    tile_th_t = tile_th + offset + 1;
-                    line -= 8;
-                }
-
-                if ((sprAttr & 0x80) != 0)
-                {
-                    line_t = 7 - line;
-                    if (Spritesize8x16) tile_th_t ^= 1;
-                }
-                else line_t = line;
-
-                { int a = (tile_th_t << 4) | (line_t + 8); prerender_sprite0_tile_high = chrBankPtrs[(a >> 10) & 7][a & 0x3FF]; }
-                { int a = (tile_th_t << 4) | line_t;       prerender_sprite0_tile_low  = chrBankPtrs[(a >> 10) & 7][a & 0x3FF]; }
+                int r = ((sprAttr & 0x80) != 0) ? (7 - line) : line;
+                addr = SpPatternTableAddr | (sprTile << 4) | r;
             }
+            else
+            {
+                if ((sprAttr & 0x80) != 0) line = 15 - line;
+                // Branchless 8x16: bank from bit0, base tile from bits7-1,
+                // (line & 8) << 1 auto-selects bottom half, (line & 7) = fine Y
+                addr = ((sprTile & 1) << 12) | ((sprTile & 0xFE) << 4) | ((line & 8) << 1) | (line & 7);
+            }
+
+            prerender_sprite0_tile_low  = chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF];
+            int addrH = addr + 8;
+            prerender_sprite0_tile_high = chrBankPtrs[(addrH >> 10) & 7][addrH & 0x3FF];
         }
 
-        // ── RenderSpritesLine 優化摘要 ──
-        // Pass 1: unsigned subtraction 範圍檢查取代雙分支; 找到 8 個後 break
-        // Pass 2: long* 批次清零 sprSet (32×8=256 bytes); shift 取像素取代 mask+乘法;
-        //         8x16 tile 選擇用 line>>3 取代 if 分支; priority 直接位移取值
-        // Pass 3: long* 8-byte block-scan 跳過全空區域 (sprite 通常只佔少數像素)
-        static unsafe void RenderSpritesLine()
-        {
-            // Pass 1: scan OAM 0→63, pick first 8 sprites visible on this scanline.
-            // NES hardware only performs sprite evaluation when rendering is enabled.
-            // Overflow detection is handled by PrecomputeOverflow() at cycle-accurate timing.
-            if (!(ShowBackGround || ShowSprites))
-            {
-                if (AnalogEnabled) DecodeScanline(scanline, ntscScanBuf, ppuEmphasis);
-                return;
-            }
 
-            int* sel = stackalloc int[8];
-            int selCount = 0;
-            int height = Spritesize8x16 ? 15 : 7;
-
-            for (int oam_th = 0; oam_th < 64; oam_th++)
-            {
-                // Selection uses Y+1 (sprites display one scanline later).
-                // Unsigned subtraction trick: (uint)(a - b) <= (uint)h
-                // is equivalent to (a >= b && a - b <= h) but avoids two branches.
-                int render_y = spr_ram[oam_th << 2] + 1;
-                if ((uint)(scanline - render_y) <= (uint)height)
-                {
-                    if (selCount < 8) sel[selCount++] = oam_th;
-                    else break; // hardware stops after 8 sprites
-                }
-            }
-
-            if (!ShowSprites || selCount == 0)
-            {
-                // Analog mode: must decode every visible scanline even without sprites
-                if (AnalogEnabled) DecodeScanline(scanline, ntscScanBuf, ppuEmphasis);
-                return;
-            }
-
-            // Per-pixel sprite winner buffers.
-            // NES hardware picks ONE winning sprite per pixel (lowest OAM index with opaque pixel).
-            // That winner's priority bit then decides the BG/sprite composite for ALL sprites at that pixel.
-            // This implements the "sprite priority quirk": a behind-BG mask sprite (low OAM index,
-            // priority=1) can suppress a front sprite (high OAM index, priority=0) at the same pixel.
-            uint* sprColor    = stackalloc uint[256];
-            byte* sprPriority = stackalloc byte[256]; // 1 = behind BG, 0 = in front
-            byte* sprSet      = stackalloc byte[256]; // 1 = a winning sprite pixel exists here
-            byte* sprPalIdx   = stackalloc byte[256]; // NTSC: raw palette index of winning sprite
-            // Clear sprSet with long* writes: 32 × 8 bytes = 256 bytes (replaces scalar loop)
-            long* pClear = (long*)sprSet;
-            for (int i = 0; i < 32; i++) pClear[i] = 0;
-
-            // Pass 2: evaluate sprites in reverse OAM order so lower-index sprites overwrite higher,
-            // making the lowest-index sprite the final winner at each pixel.
-            for (int si = selCount - 1; si >= 0; si--)
-            {
-                int oam_addr = sel[si] << 2;
-                int y_loc = spr_ram[oam_addr] + 1; // NES hardware: sprites display at OAM_Y + 1
-                byte tile_th = spr_ram[oam_addr | 1];
-                byte sprite_attr = spr_ram[oam_addr | 2];
-                byte x_loc = spr_ram[oam_addr | 3];
-
-                int tile_th_t, line;
-                if (Spritesize8x16)
-                {
-                    int offset = (tile_th & 1) << 8; // bit 0 selects pattern bank (0 or 0x100)
-                    tile_th &= 0xFE;
-                    line = scanline - y_loc;
-                    tile_th_t = tile_th + offset + (line >> 3); // line 0~7 → +0 (top), 8~15 → +1 (bottom)
-                    line &= 7;
-                }
-                else
-                {
-                    tile_th_t = tile_th + (SpPatternTableAddr >> 4);
-                    line = scanline - y_loc;
-                }
-
-                // Vertical flip: reverse line within tile + swap top/bottom for 8x16
-                if ((sprite_attr & 0x80) != 0)
-                {
-                    line = 7 - line;
-                    if (Spritesize8x16) tile_th_t ^= 1; // swap top ↔ bottom tile
-                }
-
-                int addr_low = (tile_th_t << 4) | line;
-                byte tile_lbyte = chrBankPtrs[(addr_low >> 10) & 7][addr_low & 0x3FF];
-                byte tile_hbyte = chrBankPtrs[((addr_low + 8) >> 10) & 7][(addr_low + 8) & 0x3FF];
-                bool flip_x = (sprite_attr & 0x40) != 0;
-                int palBase = 0x3F10 + ((sprite_attr & 3) << 2);
-                byte priority = (byte)((sprite_attr & 0x20) >> 5); // 0 = front, 1 = behind BG
-
-                for (int loc = 0; loc < 8; loc++)
-                {
-                    int sx = x_loc + loc;
-                    if (sx > 255) break; // past right edge — remaining pixels also out of bounds
-                    if (!ShowSprLeft8 && sx < 8) continue;
-
-                    // Extract 2-bit pixel from tile planes using shift (branchless, no mask multiply)
-                    int shift = flip_x ? loc : (7 - loc);
-                    int p = ((tile_hbyte >> shift) & 1) << 1 | ((tile_lbyte >> shift) & 1);
-                    if (p == 0) continue;
-
-                    // Record as winner at this column (lower OAM index will overwrite later)
-                    byte rawPal = (byte)(ppu_ram[palBase | p] & 0x3F);
-                    sprSet[sx]      = 1;
-                    sprPriority[sx] = priority;
-                    sprColor[sx]    = NesColors[rawPal];
-                    sprPalIdx[sx]   = rawPal;
-                }
-            }
-
-            // Pass 3: composite — draw winning sprite pixel only if:
-            //   BG is disabled, OR BG pixel is transparent, OR winning sprite is front-priority.
-            // A behind-BG winner (priority=1) with opaque BG blocks ALL sprites at that pixel,
-            // correctly implementing the mask-sprite trick used by SMB3.
-            // long* 8-byte block-scan: skip all-zero blocks 8 pixels at a time.
-            int scanOff = scanline << 8;
-            long* pSprSetLong = (long*)sprSet;
-            for (int b = 0; b < 32; b++)
-            {
-                if (pSprSetLong[b] == 0) continue; // 8 pixels all empty — skip (performance core)
-                int bx = b << 3;
-                for (int i = 0; i < 8; i++)
-                {
-                    int sx = bx + i;
-                    if (sprSet[sx] == 0) continue;
-                    int loc = scanOff + sx;
-                    if (!ShowBackGround || Buffer_BG_array[loc] == 0 || sprPriority[sx] == 0)
-                    {
-                        ScreenBuf1x[loc] = sprColor[sx];
-                        if (AnalogEnabled) ntscScanBuf[sx] = sprPalIdx[sx];
-                    }
-                }
-            }
-
-            // NTSC: 訊號解碼（使用已填好的 ntscScanBuf 原始調色盤索引）
-            if (AnalogEnabled)
-                DecodeScanline(scanline, ntscScanBuf, ppuEmphasis);
-        }
 
         static public bool screen_lock = false;
         static public volatile bool emuWaiting = false;
@@ -1382,103 +920,173 @@ namespace AprNes
             }
         }
 
-        static bool SuppressVbl = false;
+        static bool pendingVblank = false; // half-dot VBL latch (TriCNES: PPU_PendingVBlank)
+        static bool pendingSprite0Hit = false; // half-dot sprite 0 hit latch (TriCNES: PPUStatus_PendingSpriteZeroHit)
+        static bool ppu2002ReadPending = false; // TriCNES: PPU_Read2002 (deferred VBL clear)
+
+        // Per-dot sprite compositing buffers (filled at cx==257, consumed per-dot in half-step)
+        static uint* sprLineBuf;     // 256 entries: winning sprite color (NesColors[])
+        static byte* sprLinePri;     // 256 entries: priority (0=front, 1=behind BG)
+        static byte* sprLineSet;     // 256 entries: 1=sprite pixel present, 0=empty
+        static byte* sprLinePalIdx;  // 256 entries: raw palette index (for NTSC analog)
         //ref http://wiki.nesdev.com/w/index.php/PPU_scrolling
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ppu_r_2002()
         {
-            bool vblFlag = isVblank;
+            // TriCNES line 8937-8949: $2002 read
+            // 1. VBL flag sampled BEFORE EmulateUntilEndOfRead
+            // 2. PPU_Read2002 set BEFORE EmulateUntilEndOfRead (deferred VBL clear)
+            // 3. EmulateUntilEndOfRead (7 master ticks)
+            // 4. Sprite flags sampled AFTER EmulateUntilEndOfRead (Delayed versions)
+            // NO explicit VBL suppression hack — natural deferred handling via ppu2002ReadPending
 
-            // VBL suppression at exact VBL set dot (sl=nmiTriggerLine, cx=1):
-            // VBL was just set by tick; suppress flag read and NMI
-            if (scanline == nmiTriggerLine && ppu_cycles_x == 1)
-            {
-                vblFlag = false;
-            }
+            byte vblBit = isVblank ? (byte)0x80 : (byte)0x00;
+            ppu2002ReadPending = true;
 
-            openbus = (byte)((vblFlag ? 0x80 : 0) | ((isSprite0hit) ? 0x40 : 0) | ((isSpriteOverflow) ? 0x20 : 0) | (openbus & 0x1f));
+            for (int i = 0; i < 7; i++)
+                MasterClockTick();
 
-            isVblank = false;
-            nmi_delay_cycle = -1;      // Cancel not-yet-promoted NMI (same-cycle $2002 read)
-            nmi_output_prev = false;   // Reset edge state to prevent false rising edge on next tick
-            // Note: nmi_pending is NOT cleared — once promoted, $2002 can't cancel it
+            openbus = (byte)(vblBit | ((isSprite0hit_Delayed ? 0x40 : 0) | (isSpriteOverflow_Delayed ? 0x20 : 0)) | (openbus & 0x1f));
+
             vram_latch = false;
+            // TriCNES refreshes PPUBusDecay[5..7] (per-bit). AprNes uses single timer — don't refresh here.
+            // The high 3 bits (flags) are freshly written; low 5 bits retain existing open bus decay.
             return openbus;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ppu_r_2007()
         {
-            if (ppu2007ReadCooldown > 0)
-                return openbus; // suppress rapid consecutive $2007 reads
-            byte result = ppu_read_fun[vram_addr](vram_addr);
-            ppu2007ReadCooldown = 6; // 6 PPU dots ≈ 2 CPU cycles
-            return result;
+            // TriCNES lines 8968-9047: $2007 read handler (single-tick SM)
+            byte result;
+
+            // Consecutive read detection: SM==3 && isRead
+            if (ppu2007SM == 3 && ppu2007SM_isRead)
+            {
+                // Alignment-specific behavior (TriCNES lines 8975-9009)
+                int phase = mcPpuClock & 3; // maps to PPUClock
+                // mcPpuClock: 0↔PPU0, 3↔PPU1, 2↔PPU2, 1↔PPU3
+                int ppuPhase = (mcPpuClock == 0) ? 0 : (mcPpuClock == 3) ? 1 : (mcPpuClock == 2) ? 2 : 3;
+                if (ppuPhase == 0) { result = ppu_2007_buffer; }
+                else if (ppuPhase == 1) { ppu2007SM_updateVramAddrEarly = true; result = ppu_2007_buffer; }
+                else if (ppuPhase == 2) { ppu2007SM_updateVramAddrEarly = true; result = (byte)(vram_addr & 0xFF); }
+                else { ppu2007SM_updateVramAddrEarly = true; result = (vram_addr >= 0x2000) ? ppu_2007_buffer : (byte)(vram_addr & 0xFF); }
+            }
+            else
+            {
+                // Normal read
+                if (vram_addr >= 0x3F00)
+                {
+                    ppuAddressBus = vram_addr;
+                    result = PpuBusRead(vram_addr & 0x3FFF);
+                    // Palette read: result has palette data, but open bus bits 6-7
+                    result = (byte)((openbus & 0xC0) | (result & 0x3F));
+                }
+                else
+                {
+                    result = ppu_2007_buffer;
+                }
+            }
+
+            // Start SM if idle, or restart if interrupted
+            if (ppu2007SM >= 9)
+            {
+                ppu2007SM = 0;
+                // Alignment-dependent: buffer updated late on phases 0/1
+                int ppuPhase = (mcPpuClock == 0) ? 0 : (mcPpuClock == 3) ? 1 : (mcPpuClock == 2) ? 2 : 3;
+                ppu2007SM_bufferLate = (ppuPhase <= 1);
+                // DMC DMA edge case (TriCNES line 9036-9039)
+                if (dmcDmaRunning && (dmcStatusEnabled || dmcImplicitAbortActive))
+                    vram_addr = (ushort)((vram_addr + 1) & 0x3FFF);
+            }
+
+            ppu2007SM_isRead = true;
+            ppu2007SM_readDelayed = true;
+            ppu2007SM_addr = vram_addr;
+
+            openbus = result;
+            open_bus_decay_timer = 77777;
+            return openbus;
         }
 
         static byte openbus;
         static public byte cpubus;  // CPU data bus value (last byte read/written by CPU)
 
-        static void ppu_w_2000(byte value) //ok
+        static void ppu_w_2000(byte value)
         {
             openbus = value;
 
-            // t: ...BA.. ........ = d: ......BA
-            vram_addr_internal = (ushort)((vram_addr_internal & 0x73ff) | ((value & 3) << 10)); // 0xx73ff
-            BaseNameTableAddr = 0x2000 | ((value & 3) << 10);
-            VramaddrIncrement = ((value & 4) > 0) ? 32 : 1;
+            // TriCNES model: IMMEDIATE application + delayed re-application
+            // P3-1: DataBus glitch — some fields use cpubus (last READ value, not written value)
+            // for 1-2 PPU cycles. The delayed handler fixes them with the correct value.
+            // Glitch-affected fields (TriCNES uses dataBus):
+            vram_addr_internal = (ushort)((vram_addr_internal & 0x73ff) | ((cpubus & 3) << 10));
+            BaseNameTableAddr = 0x2000 | ((cpubus & 3) << 10);
+            VramaddrIncrement = ((cpubus & 4) > 0) ? 32 : 1;
+            Spritesize8x16 = ((cpubus & 0x20) > 0);
+            // Non-glitch fields (TriCNES uses In directly):
+            NMIable = ((value & 0x80) > 0);
             SpPatternTableAddr = ((value & 8) > 0) ? 0x1000 : 0;
             BgPatternTableAddr = ((value & 0x10) > 0) ? 0x1000 : 0;
-            Spritesize8x16 = ((value & 0x20) > 0) ? true : false;
-            bool wasNMIable = NMIable;
-            NMIable = ((value & 0x80) > 0) ? true : false;
 
-            // NMI edge detection for $2000 writes:
-            // Falling edge (disable NMI): cancel nmi_delay (not yet promoted)
-            //   but NOT nmi_pending — once promoted, NMI cannot be cancelled by disable
-            // Rising edge (enable NMI): let next tick() detect it (natural delay)
-            bool nmi_output = isVblank && NMIable;
-            if (!nmi_output && nmi_output_prev)
-            {
-                nmi_delay_cycle = -1;
-                nmi_output_prev = false;
-            }
+            // TriCNES: NMILine clearing is NOT done here — it's handled by CPUClock==8 gate
+            // (NMILine cleared at operationCycle==0 when !(isVblank && NMIable))
+
+            // Delayed re-application (TriCNES: fixes open bus glitch after 1-2 PPU cycles)
+            ppu2000PendingValue = value;
+            // TriCNES: PPUClock 0,1=2; PPUClock 2,3=1. mcPpuClock 0↔PPU0, 3↔PPU1, 2↔PPU2, 1↔PPU3
+            ppu2000UpdateDelay = ((mcPpuClock & 3) == 0 || (mcPpuClock & 3) == 3) ? 2 : 1;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void ppu_w_2001(byte value) //ok
+        static void ppu_w_2001(byte value)
         {
             openbus = value;
 
-            ShowBgLeft8  = (value & 0x02) != 0; // bit1: show BG in leftmost 8 pixels
-            ShowSprLeft8 = (value & 0x04) != 0; // bit2: show sprites in leftmost 8 pixels
-            ShowBackGround = (value & 0x08) != 0;
-            ShowSprites    = (value & 0x10) != 0;
-            ppuEmphasis    = (byte)((value >> 5) & 0x7); // bits 5-7: RGB emphasis
-            // PAL/Dendy: Red (bit0) and Green (bit1) are swapped in hardware
-            if (Region != RegionType.NTSC)
-                ppuEmphasis = (byte)((ppuEmphasis & 0x4) | ((ppuEmphasis & 1) << 1) | ((ppuEmphasis >> 1) & 1));
+            // Tier 1: Instant flags — take effect immediately
+            ShowBackGround_Instant = (value & 0x08) != 0;
+            ShowSprites_Instant    = (value & 0x10) != 0;
 
-            bool newRenderingEnabled = ShowBackGround || ShowSprites;
-            if (prevRenderingEnabled != newRenderingEnabled && scanline >= 0 && scanline < 240)
+            // P4-1: TriCNES delayed OAM corruption model
+            bool newRenderingInstant = ShowBackGround_Instant || ShowSprites_Instant;
+            // Record state for delayed corruption check
+            oamCorruptWasRendering = prevRenderingEnabled;
+            oamCorrupt2001Value = value;
+            // Set delay based on alignment (TriCNES line 9518-9527)
+            switch (mcPpuClock & 3)
             {
-                if (newRenderingEnabled)
+                case 0: case 3: oamCorruptDelay = 2; break;
+                case 1: case 2: oamCorruptDelay = 3; break;
+            }
+
+            if (prevRenderingEnabled != newRenderingInstant)
+            {
+                bool outsideVblank = scanline >= 0 && (scanline < 240 || scanline == preRenderLine);
+                if (outsideVblank)
                 {
-                    ProcessOamCorruption();
-                    // Mid-scanline rendering re-enable: sprite 0 wasn't precomputed at dot 0
-                    // (rendering was off then). Re-run now so hit detection can work.
-                    // Sprite counters were frozen, so sprite appears at the current dot.
-                    if (!sprite0_on_line && !isSprite0hit && ppu_cycles_x > 0)
+                    if (!newRenderingInstant)
                     {
-                        PrecomputeSprite0Line();
-                        if (sprite0_on_line)
-                            sprite0_line_x = ppu_cycles_x;
+                        // OAM corruption: deferred to delay expiry (NOT immediate)
+                        // (palette corruption placeholder removed — no reader)
+                    }
+                    else
+                    {
+                        // Re-enabling rendering — suppression gate (TriCNES line 9564)
+                        int alignment = mcPpuClock & 3;
+                        if (oamCorruptPending && (alignment == 1 || alignment == 2))
+                            oamCorruptSuppressed = true;
+
+                        // Sprite 0 hit now uses CalculatePixel model (no pre-computation needed)
                     }
                 }
-                else
-                    SetOamCorruptionFlags();
             }
-            prevRenderingEnabled = newRenderingEnabled;
+            prevRenderingEnabled = newRenderingInstant;
+
+            // Tier 2: Delayed mask flags (ShowBG/ShowSprites/Left8)
+            ppu2001UpdateDelay = ((mcPpuClock & 3) == 2) ? 3 : 2; // TriCNES: phase 2=3, others=2
+            ppu2001PendingValue = value;
+
+            // Emphasis bits: independent delay (TriCNES: PPU_Update2001EmphasisBitsDelay)
+            // Alignment 0,3: 2 cycles; Alignment 1,2: 1 cycle
+            ppu2001EmphasisDelay = ((mcPpuClock & 3) == 0 || (mcPpuClock & 3) == 3) ? 2 : 1;
+            ppu2001EmphasisPending = value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1493,55 +1101,35 @@ namespace AprNes
         {
             openbus = value;
             // During rendering (visible + pre-render), writes don't modify OAM; OAMADDR increments by 4 and aligns to 4-byte boundary
-            if ((scanline < 240 || scanline == preRenderLine) && scanline >= 0 && (ShowBackGround || ShowSprites))
+            if ((scanline < 240 || scanline == preRenderLine) && scanline >= 0 && (ShowBackGround_Instant || ShowSprites_Instant))
             {
                 spr_ram_add = (byte)((spr_ram_add + 4) & 0xFC);
             }
             else
             {
+                // TriCNES line 9600-9602: attribute byte (offset 2) masked on write
+                if ((spr_ram_add & 3) == 2)
+                    value &= 0xE3; // bits 2-4 don't exist in hardware
                 spr_ram[spr_ram_add++] = value;
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte ppu_r_2004()
         {
+            // TriCNES: EmulateUntilEndOfRead — advance 7 master clocks before OAM read
+            for (int i = 0; i < 7; i++)
+                MasterClockTick();
+
             byte val;
             bool renderingOn = ShowBackGround || ShowSprites;
             if (scanline >= 0 && scanline < 240 && renderingOn)
             {
-                // Timing offset: tick() processes 3 PPU dots BEFORE the bus read,
-                // so at cx=N the last processed dot was N-1. Shift ranges by +1.
-                if (ppu_cycles_x >= 2 && ppu_cycles_x <= 65)
-                {
-                    // Secondary OAM clear phase (hardware dots 1-64): always $FF
-                    val = 0xFF;
-                }
-                else if (ppu_cycles_x >= 66 && ppu_cycles_x <= 257)
-                {
-                    // Sprite evaluation phase (hardware dots 65-256): last byte read from primary OAM
-                    val = oamCopyBuffer;
-                }
-                else if (ppu_cycles_x >= 258 && ppu_cycles_x <= 321)
-                {
-                    // Sprite tile fetch (hardware dots 257-320): reads from secondary OAM
-                    // Pattern per 8-dot group: Y, tile, attr, X, X, X, X, X
-                    int offset = ppu_cycles_x - 258;
-                    int spriteIdx = offset >> 3;
-                    int step = offset & 0x07;
-                    int byteIdx = step > 3 ? 3 : step;
-                    val = secondaryOAM[spriteIdx * 4 + byteIdx];
-                }
-                else
-                {
-                    // Dots 0-1 and 322-340: return oamCopyBuffer
-                    val = oamCopyBuffer;
-                }
+                val = ppuOamBuffer;
             }
             else
             {
                 val = spr_ram[spr_ram_add];
-                if ((spr_ram_add & 3) == 2) val &= 0xE3; // mask unimplemented bits of attribute byte
+                if ((spr_ram_add & 3) == 2) val &= 0xE3;
             }
             open_bus_decay_timer = 77777;
             return openbus = val;
@@ -1552,9 +1140,9 @@ namespace AprNes
             openbus = value;
             // Delayed scroll update (TriCNES: PPU_Update2005Delay = 1-2 cycles)
             ppu2005PendingValue = value;
-            ppu2005PendingIsSecond = vram_latch;
-            ppu2005UpdateDelay = 2; // ~2 PPU dots delay
-            vram_latch = !vram_latch;
+            // TriCNES: latch NOT flipped here — deferred to delay handler (line 1302)
+            // TriCNES: alignment 0,1,3=1cycle; alignment 2=2cycles
+            ppu2005UpdateDelay = ((mcPpuClock & 3) == 2) ? 2 : 1; // TriCNES: phase 2=2, others=1
         }
         static void ppu_w_2006(byte value)
         {
@@ -1568,24 +1156,58 @@ namespace AprNes
                 // In AprNes's tick-before-write model, 3 PPU dots of the current CPU cycle
                 // have already executed, so a delay of 3 more gives ~5-6 total from cycle start.
                 ppu2006PendingAddr = vram_addr_internal;
-                ppu2006UpdateDelay = 3;
+                // TriCNES: alignment 0,1,3=4cycles; alignment 2=5cycles
+                // TriCNES: case 0,3=4cycles; case 1,2=5cycles
+                ppu2006UpdateDelay = ((mcPpuClock & 3) == 2) ? 5 : 4; // TriCNES: phase 2=5, others=4
             }
             vram_latch = !vram_latch;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_w_2007(byte value)
         {
+            // TriCNES lines 9683-9727: $2007 write handler (single-tick SM)
+            openbus = value;
             open_bus_decay_timer = 77777;
-            ppu_write_fun[vram_addr](value);
+            ppu2007SM_writeValue = value;
+
+            // Consecutive access detection: SM==3 (1 CPU cycle) or SM==6 (2 CPU cycles)
+            if (ppu2007SM == 3 || ppu2007SM == 6)
+            {
+                ppu2007SM_mysteryAddr = (ushort)((vram_addr & 0xFF00) | value);
+                if (!ppu2007SM_isRead)
+                    ppu2007SM_performMysteryWrite = true;
+                else
+                    ppu2007SM_interruptedReadToWrite = true;
+            }
+            else
+            {
+                ppu2007SM_normalWriteBehavior = true;
+            }
+
+            if (ppu2007SM != 3)
+            {
+                if (ppu2007SM >= 9)
+                    ppu2007SM = 3; // standard write: start at state 3 (write executes next tick)
+                else
+                    ppu2007SM = 0; // interrupted: restart from 0
+                ppu2007SM_isRead = false;
+            }
+            else
+            {
+                ppu2007SM_readDelayed = false;
+            }
+
+            ppu2007SM_addr = vram_addr;
         }
 
         static void ppu_w_4014(byte value)//DMA , fixex 2017.01.16 pass sprite_ram test
         {
-            // Set OAM DMA flags — deferred to next read cycle via ProcessPendingDma()
+            // OAM DMA trigger — TriCNES per-cycle model
             spriteDmaTransfer = true;
             spriteDmaOffset = value;
-            dmaNeedHalt = true;
+            dmaFirstCycleOam = true;
+            dmaOamAligned = false;
+            dmaOamAddr = 0;
         }
     }
 }
