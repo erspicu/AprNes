@@ -368,11 +368,18 @@ namespace AprNes
         static void RebuildPaletteCache()
         {
             if (palCache == null) return;
+            uint* cache = palCache;
+            byte* ram = ppu_ram + 0x3F00;
+            uint* colors = NesColors;
+
             for (int i = 0; i < 32; i++)
-            {
-                int pa = i; if ((pa & 3) == 0) pa &= 0x0F;
-                palCache[i] = NesColors[ppu_ram[0x3F00 + pa] & 0x3F];
-            }
+                cache[i] = colors[ram[i] & 0x3F];
+
+            // Mirror patch: sprite transparent colors → BG transparent colors
+            cache[16] = cache[0];
+            cache[20] = cache[4];
+            cache[24] = cache[8];
+            cache[28] = cache[12];
         }
 
         // $2007 access increment: during rendering → CXinc + Yinc; otherwise → +1/+32
@@ -651,9 +658,8 @@ namespace AprNes
             if (idx >= 0x20) idx = 0; // TriCNES: wrap at 32
             if (idx > 0)
             {
-                // Copy row 0 (8 bytes) to corrupted row
-                for (int i = 0; i < 8; i++)
-                    spr_ram[idx * 8 + i] = spr_ram[i];
+                // SWAR: copy row 0 (8 bytes) to corrupted row in single 64-bit move
+                *(ulong*)(spr_ram + idx * 8) = *(ulong*)spr_ram;
                 // Also corrupt secondary OAM (TriCNES: OAM2[index] = OAM2[0])
                 secondaryOAM[idx] = secondaryOAM[0];
             }

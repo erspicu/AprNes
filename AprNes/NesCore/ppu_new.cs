@@ -499,10 +499,12 @@ namespace AprNes
                     // ── UpdateSpriteShiftRegisters (TriCNES line 3718, inside PPU_Dot>0 && <=257 block) ──
                     if (cx <= 256)
                     {
+                        bool renderEnabled = ShowSprites || ShowBackGround;
+                        bool canDecrement = !skippedPreRenderDot341;
                         for (int s = 0; s < 8; s++)
                         {
-                            if (sprXCounter[s] > 0 && !skippedPreRenderDot341) sprXCounter[s]--;
-                            else { if (ShowSprites || ShowBackGround) { sprShiftL[s] <<= 1; sprShiftH[s] <<= 1; } }
+                            if (sprXCounter[s] > 0 && canDecrement) sprXCounter[s]--;
+                            else if (renderEnabled) { sprShiftL[s] <<= 1; sprShiftH[s] <<= 1; }
                         }
                     }
                 }
