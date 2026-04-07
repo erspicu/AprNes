@@ -287,10 +287,7 @@ namespace AprNes
         static void CXinc()
         {
             if ((vram_addr & 0x001F) == 31)
-            {
-                vram_addr &= ~0x001F;
-                vram_addr ^= 0x0400;
-            }
+                vram_addr ^= 0x041F; // clear low 5 bits + flip NT bit in one XOR
             else
                 vram_addr += 1;
         }
@@ -304,17 +301,13 @@ namespace AprNes
             else
             {
                 vram_addr &= ~0x7000;
-                int y = (vram_addr & 0x03E0) >> 5;
-                if (y == 29)
-                {
-                    y = 0;
-                    vram_addr ^= 0x0800;
-                }
-                else if (y == 31)
-                    y = 0;
+                int y = vram_addr & 0x03E0; // no shift — work in bit position directly
+                if (y == 0x03A0)      // 29 << 5
+                { vram_addr ^= 0x0800; vram_addr &= ~0x03E0; }
+                else if (y == 0x03E0) // 31 << 5
+                { vram_addr &= ~0x03E0; }
                 else
-                    y += 1;
-                vram_addr = (vram_addr & ~0x03E0) | (y << 5);
+                { vram_addr += 0x0020; } // 1 << 5
             }
         }
 
@@ -334,8 +327,8 @@ namespace AprNes
                     ? ntBankPtrs[(nt_addr >> 10) & 3][nt_addr & 0x3FF]
                     : ppu_ram[CIRAMAddr(nt_addr)];
             }
-            // Palette ($3F00-$3FFF): mirrored, transparent-mirrored at $3F10/$3F14/$3F18/$3F1C
-            return ppu_ram[(addr & ((addr & 0x03) == 0 ? 0x0C : 0x1F)) + 0x3F00];
+            // Palette ($3F00-$3FFF): mirrored, transparent-mirrored
+            { int pa = addr & 0x1F; if ((pa & 3) == 0) pa &= 0x0F; return ppu_ram[0x3F00 + pa]; }
         }
 
         static void PpuBusWrite(int addr, byte val)
@@ -344,9 +337,8 @@ namespace AprNes
             if (addr < 0x2000)
             {
                 MapperObj.MapperW_CHR(addr, val);
-                return;
             }
-            if (addr < 0x3F00)
+            else if (addr < 0x3F00)
             {
                 int nt_addr = addr & 0x2FFF;
                 if (ntChrOverrideEnabled)
@@ -357,10 +349,12 @@ namespace AprNes
                 }
                 else
                     ppu_ram[CIRAMAddr(nt_addr)] = val;
-                return;
             }
-            // Palette
-            ppu_ram[(addr & ((addr & 0x03) == 0 ? 0x0C : 0x1F)) + 0x3F00] = val;
+            else
+            {
+                int pa = addr & 0x1F; if ((pa & 3) == 0) pa &= 0x0F;
+                ppu_ram[0x3F00 + pa] = val;
+            }
         }
 
         // $2007 access increment: during rendering → CXinc + Yinc; otherwise → +1/+32
@@ -374,7 +368,7 @@ namespace AprNes
             }
             else
             {
-                vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x7FFF);
+                vram_addr = (vram_addr + VramaddrIncrement) & 0x7FFF;
             }
             if (mapperNeedsA12) NotifyMapperA12(vram_addr);
         }
