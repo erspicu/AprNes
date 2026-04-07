@@ -516,51 +516,8 @@ namespace AprNes
                 _triOut = triActive ? TRI_SEQ[_triSeq] : 0;
             }
 
-            // ── Frame Counter (TriCNES: after timers) ──
-            if ((apuFrameCounterReset & 0x80) == 0)
-            {
-                apuFrameCounterReset--;
-                if ((apuFrameCounterReset & 0x80) != 0)
-                    apuFrameCounter = 0;
-            }
-
-            apuFrameCounter++;
-
-            // Frame counter: region-dependent thresholds via fc4step/fc5step arrays
-            int fc = apuFrameCounter;
-            if (ctrmode == 5)
-            {
-                if      (fc == fc5_0) apuQuarterFrame = true;
-                else if (fc == fc5_1) { apuQuarterFrame = true; apuHalfFrame = true; }
-                else if (fc == fc5_2) apuQuarterFrame = true;
-                else if (fc == fc5_3) { } // skip
-                else if (fc == fc5_4) { apuQuarterFrame = true; apuHalfFrame = true; }
-                else if (fc == fc5_5) apuFrameCounter = 0;
-            }
-            else
-            {
-                if      (fc == fc4_0) apuQuarterFrame = true;
-                else if (fc == fc4_1) { apuQuarterFrame = true; apuHalfFrame = true; }
-                else if (fc == fc4_2) apuQuarterFrame = true;
-                else if (fc == fc4_3) statusframeint = true;
-                else if (fc == fc4_4)
-                {
-                    apuQuarterFrame = true; apuHalfFrame = true;
-                    statusframeint = true;
-                    irqLineCurrent |= !apuintflag;
-                }
-                else if (fc == fc4_5)
-                {
-                    statusframeint = !apuintflag;
-                    irqLineCurrent |= !apuintflag;
-                    apuFrameCounter = 0;
-                }
-            }
-
-            // Process quarter/half frame, then clear flags (TriCNES: clear inside processing)
-            if (apuQuarterFrame) { setenvelope(); setlinctr(); apuQuarterFrame = false; }
-            if (apuHalfFrame) { setlength(); setsweep(); apuHalfFrame = false; }
-            else { processLenCtrReloadNonHalf(); }
+            // ── Frame Counter + quarter/half frame processing ──
+            ApuFrameCounterStep();
             setvolumes();
 
             // TriCNES: halt flags updated from registers EVERY APU cycle (lines 1139-1142)
@@ -650,6 +607,58 @@ namespace AprNes
             }
         }
 
+
+        // =====================================================================
+        // Frame counter step — extracted from apu_step to reduce IL size.
+        // Handles counter reset, threshold comparison, quarter/half frame dispatch.
+        // Most cycles don't hit any threshold (branch predictor skips the chain).
+        // =====================================================================
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void ApuFrameCounterStep()
+        {
+            if ((apuFrameCounterReset & 0x80) == 0)
+            {
+                apuFrameCounterReset--;
+                if ((apuFrameCounterReset & 0x80) != 0)
+                    apuFrameCounter = 0;
+            }
+
+            apuFrameCounter++;
+
+            int fc = apuFrameCounter;
+            if (ctrmode == 5)
+            {
+                if      (fc == fc5_0) apuQuarterFrame = true;
+                else if (fc == fc5_1) { apuQuarterFrame = true; apuHalfFrame = true; }
+                else if (fc == fc5_2) apuQuarterFrame = true;
+                else if (fc == fc5_3) { }
+                else if (fc == fc5_4) { apuQuarterFrame = true; apuHalfFrame = true; }
+                else if (fc == fc5_5) apuFrameCounter = 0;
+            }
+            else
+            {
+                if      (fc == fc4_0) apuQuarterFrame = true;
+                else if (fc == fc4_1) { apuQuarterFrame = true; apuHalfFrame = true; }
+                else if (fc == fc4_2) apuQuarterFrame = true;
+                else if (fc == fc4_3) statusframeint = true;
+                else if (fc == fc4_4)
+                {
+                    apuQuarterFrame = true; apuHalfFrame = true;
+                    statusframeint = true;
+                    irqLineCurrent |= !apuintflag;
+                }
+                else if (fc == fc4_5)
+                {
+                    statusframeint = !apuintflag;
+                    irqLineCurrent |= !apuintflag;
+                    apuFrameCounter = 0;
+                }
+            }
+
+            if (apuQuarterFrame) { setenvelope(); setlinctr(); apuQuarterFrame = false; }
+            if (apuHalfFrame) { setlength(); setsweep(); apuHalfFrame = false; }
+            else { processLenCtrReloadNonHalf(); }
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void setvolumes()
@@ -766,7 +775,9 @@ namespace AprNes
         // =====================================================================
         // DMC clock — timer -2 per GET cycle (TriCNES model)
         // Rate table values are in CPU cycles; -2 per GET = -1 per CPU cycle net rate
+        // NoInlining: too large for JIT inline anyway, explicit separation helps apu_step
         // =====================================================================
+        [MethodImpl(MethodImplOptions.NoInlining)]
         static void clockdmc()
         {
             dmctimer -= 2;
