@@ -568,30 +568,11 @@ namespace AprNes
         // --- HLT (JAM) helper ---
         static void DoHLT()
         {
-            switch (operationCycle)
-            {
-                case 1:
-                    dl = CpuRead(addressBus);
-                    break;
-                case 2:
-                    addressBus = 0xFFFF;
-                    CpuRead(addressBus);
-                    break;
-                case 3:
-                case 4:
-                    addressBus = 0xFFFE;
-                    CpuRead(addressBus);
-                    break;
-                case 5:
-                    addressBus = 0xFFFF;
-                    CpuRead(addressBus);
-                    break;
-                case 6:
-                    addressBus = 0xFFFF;
-                    CpuRead(addressBus);
-                    operationCycle = 5; // loop infinitely
-                    break;
-            }
+            if (operationCycle == 1) { dl = CpuRead(addressBus); }
+            else if (operationCycle == 2) { addressBus = 0xFFFF; CpuRead(addressBus); }
+            else if (operationCycle <= 4) { addressBus = 0xFFFE; CpuRead(addressBus); }
+            else if (operationCycle == 5) { addressBus = 0xFFFF; CpuRead(addressBus); }
+            else { addressBus = 0xFFFF; CpuRead(addressBus); operationCycle = 5; }
         }
 
         // ============================================================
@@ -648,53 +629,43 @@ namespace AprNes
 
         // === BRK / NMI / IRQ / RESET ===
         static void Op_00() {
-            switch (operationCycle)
-            {
-                case 1:
-                    if (!doBRK) { CpuRead(addressBus); }
-                    else { GetImmediate(); }
-                    break;
-                case 2:
-                    if (!doReset) StackPush((byte)(r_PC >> 8));
-                    else { CpuRead((ushort)(0x100 | r_SP)); r_SP--; }
-                    break;
-                case 3:
-                    if (!doReset) StackPush((byte)r_PC);
-                    else { CpuRead((ushort)(0x100 | r_SP)); r_SP--; }
-                    break;
-                case 4:
-                    if (!doReset)
-                    {
-                        byte pushed = (byte)(GetFlag() | 0x20 | (doBRK ? 0x10 : 0x00));
-                        StackPush(pushed);
-                    }
-                    else { CpuRead((ushort)(0x100 | r_SP)); r_SP--; }
-                    // PollInterrupts at BRK cycle 4 (TriCNES: exact same as PollInterrupts())
-                    PollInterrupts();
-                    break;
-                case 5:
-                    if (doNMI) r_PC = (ushort)((r_PC & 0xFF00) | CpuRead(0xFFFA));
-                    else if (doReset) r_PC = (ushort)((r_PC & 0xFF00) | CpuRead(0xFFFC));
-                    else r_PC = (ushort)((r_PC & 0xFF00) | CpuRead(0xFFFE));
-                    break;
-                case 6:
-                    if (doNMI) r_PC = (ushort)((r_PC & 0xFF) | (CpuRead(0xFFFB) << 8));
-                    else if (doReset) r_PC = (ushort)((r_PC & 0xFF) | (CpuRead(0xFFFD) << 8));
-                    else r_PC = (ushort)((r_PC & 0xFF) | (CpuRead(0xFFFF) << 8));
+            if (operationCycle == 1) {
+                if (!doBRK) { CpuRead(addressBus); }
+                else { GetImmediate(); }
+            } else if (operationCycle == 2) {
+                if (!doReset) StackPush((byte)(r_PC >> 8));
+                else { CpuRead((ushort)(0x100 | r_SP)); r_SP--; }
+            } else if (operationCycle == 3) {
+                if (!doReset) StackPush((byte)r_PC);
+                else { CpuRead((ushort)(0x100 | r_SP)); r_SP--; }
+            } else if (operationCycle == 4) {
+                if (!doReset)
+                {
+                    byte pushed = (byte)(GetFlag() | 0x20 | (doBRK ? 0x10 : 0x00));
+                    StackPush(pushed);
+                }
+                else { CpuRead((ushort)(0x100 | r_SP)); r_SP--; }
+                PollInterrupts();
+            } else if (operationCycle == 5) {
+                if (doNMI) r_PC = (ushort)((r_PC & 0xFF00) | CpuRead(0xFFFA));
+                else if (doReset) r_PC = (ushort)((r_PC & 0xFF00) | CpuRead(0xFFFC));
+                else r_PC = (ushort)((r_PC & 0xFF00) | CpuRead(0xFFFE));
+            } else {
+                if (doNMI) r_PC = (ushort)((r_PC & 0xFF) | (CpuRead(0xFFFB) << 8));
+                else if (doReset) r_PC = (ushort)((r_PC & 0xFF) | (CpuRead(0xFFFD) << 8));
+                else r_PC = (ushort)((r_PC & 0xFF) | (CpuRead(0xFFFF) << 8));
 
-                    if (doReset)
-                    {
-                        Console.WriteLine("soft reset !");
-                        NMILine = false; nmiPinsSignal = false; nmiPrevPinsSignal = false;
-                        IRQLine = false; statusmapperint = false;
-                        // apuSoftReset moved to SoftReset() — called BEFORE handler runs
-                        controllerStrobing = false; controllerStrobed = false;
-                        P1_ShiftCounter = 0; P2_ShiftCounter = 0;
-                    }
-                    CompleteOperation_NoPoll(); // BRK does NOT poll at end (TriCNES line 4228)
-                    doReset = false; doNMI = false; doIRQ = false; doBRK = false; flagI = 1;
-                    IRQLine = false;
-                    break;
+                if (doReset)
+                {
+                    Console.WriteLine("soft reset !");
+                    NMILine = false; nmiPinsSignal = false; nmiPrevPinsSignal = false;
+                    IRQLine = false; statusmapperint = false;
+                    controllerStrobing = false; controllerStrobed = false;
+                    P1_ShiftCounter = 0; P2_ShiftCounter = 0;
+                }
+                CompleteOperation_NoPoll();
+                doReset = false; doNMI = false; doIRQ = false; doBRK = false; flagI = 1;
+                IRQLine = false;
             }
         }
 
@@ -1046,20 +1017,20 @@ namespace AprNes
 
         // === BIT ===
         static void Op_24() {
-            switch (operationCycle) { case 1: GetAddressZeroPage(); break;
-                case 2: dl = CpuReadRMW(addressBus);
-                    flagZ = (byte)(((r_A & dl) == 0) ? 1 : 0);
-                    flagN = (byte)((dl & 0x80) >> 7);
-                    flagV = (byte)((dl & 0x40) >> 6);
-                    CompleteOperation(); break; }
+            if (operationCycle == 1) { GetAddressZeroPage(); }
+            else { dl = CpuReadRMW(addressBus);
+                flagZ = (byte)(((r_A & dl) == 0) ? 1 : 0);
+                flagN = (byte)((dl & 0x80) >> 7);
+                flagV = (byte)((dl & 0x40) >> 6);
+                CompleteOperation(); }
         }
         static void Op_2C() {
-            switch (operationCycle) { case 1: case 2: GetAddressAbsolute(); break;
-                case 3: dl = CpuReadRMW(addressBus);
-                    flagZ = (byte)(((r_A & dl) == 0) ? 1 : 0);
-                    flagN = (byte)((dl & 0x80) >> 7);
-                    flagV = (byte)((dl & 0x40) >> 6);
-                    CompleteOperation(); break; }
+            if (operationCycle < 3) { GetAddressAbsolute(); }
+            else { dl = CpuReadRMW(addressBus);
+                flagZ = (byte)(((r_A & dl) == 0) ? 1 : 0);
+                flagN = (byte)((dl & 0x80) >> 7);
+                flagV = (byte)((dl & 0x40) >> 6);
+                CompleteOperation(); }
         }
 
         // === ASL ===
@@ -1292,72 +1263,68 @@ namespace AprNes
             else { GetAddressAbsolute(); r_PC = addressBus; CompleteOperation(); }
         }
         static void Op_6C() {
-            switch (operationCycle) {
-                case 1: case 2: GetAddressAbsolute(); break;
-                case 3: specialBus = CpuRead(addressBus); break;
-                case 4:
-                    dl = CpuRead((ushort)((addressBus & 0xFF00) | (byte)(addressBus + 1)));
-                    r_PC = (ushort)((dl << 8) | specialBus);
-                    CompleteOperation(); break;
+            if (operationCycle < 3) { GetAddressAbsolute(); }
+            else if (operationCycle == 3) { specialBus = CpuRead(addressBus); }
+            else {
+                dl = CpuRead((ushort)((addressBus & 0xFF00) | (byte)(addressBus + 1)));
+                r_PC = (ushort)((dl << 8) | specialBus);
+                CompleteOperation();
             }
         }
 
         // === JSR ===
         static void Op_20() {
-            switch (operationCycle) {
-                case 1:
-                    addressBus = r_PC; dl = CpuRead(addressBus); r_PC++; break;
-                case 2:
-                    addressBus = (ushort)(0x100 | r_SP); specialBus = dl;
-                    CpuRead(addressBus); cpuIsRead = false; break; // TriCNES: CPU_Read=false before push writes
-                case 3:
-                    CpuWrite(addressBus, (byte)(r_PC >> 8));
-                    addressBus = (ushort)((byte)(addressBus - 1) | 0x100); break;
-                case 4:
-                    CpuWrite(addressBus, (byte)r_PC);
-                    addressBus = (ushort)((byte)(addressBus - 1) | 0x100);
-                    r_SP = (byte)addressBus;
-                    cpuIsRead = true; break; // TriCNES: CPU_Read=true after last push (cycle 5 is a read)
-                case 5:
-
-                    r_PC = (ushort)((CpuRead(r_PC) << 8) | specialBus);
-                    CompleteOperation(); break;
+            if (operationCycle == 1) {
+                addressBus = r_PC; dl = CpuRead(addressBus); r_PC++;
+            } else if (operationCycle == 2) {
+                addressBus = (ushort)(0x100 | r_SP); specialBus = dl;
+                CpuRead(addressBus); cpuIsRead = false;
+            } else if (operationCycle == 3) {
+                CpuWrite(addressBus, (byte)(r_PC >> 8));
+                addressBus = (ushort)((byte)(addressBus - 1) | 0x100);
+            } else if (operationCycle == 4) {
+                CpuWrite(addressBus, (byte)r_PC);
+                addressBus = (ushort)((byte)(addressBus - 1) | 0x100);
+                r_SP = (byte)addressBus;
+                cpuIsRead = true;
+            } else {
+                r_PC = (ushort)((CpuRead(r_PC) << 8) | specialBus);
+                CompleteOperation();
             }
         }
 
         // === RTS ===
         static void Op_60() {
-            switch (operationCycle) {
-                case 1: GetImmediate(); break;
-                case 2:
-                    addressBus = (ushort)(0x100 | r_SP); CpuRead(addressBus);
-                    addressBus = (ushort)((byte)(addressBus + 1) | 0x100); break;
-                case 3:
-                    dl = CpuRead(addressBus); r_PC = (ushort)((r_PC & 0xFF00) | dl);
-                    addressBus = (ushort)((byte)(addressBus + 1) | 0x100); break;
-                case 4:
-                    dl = CpuRead(addressBus); r_PC = (ushort)((r_PC & 0xFF) | (dl << 8)); break;
-                case 5:
-                    r_SP = (byte)addressBus; GetImmediate(); CompleteOperation(); break;
+            if (operationCycle == 1) { GetImmediate(); }
+            else if (operationCycle == 2) {
+                addressBus = (ushort)(0x100 | r_SP); CpuRead(addressBus);
+                addressBus = (ushort)((byte)(addressBus + 1) | 0x100);
+            } else if (operationCycle == 3) {
+                dl = CpuRead(addressBus); r_PC = (ushort)((r_PC & 0xFF00) | dl);
+                addressBus = (ushort)((byte)(addressBus + 1) | 0x100);
+            } else if (operationCycle == 4) {
+                dl = CpuRead(addressBus); r_PC = (ushort)((r_PC & 0xFF) | (dl << 8));
+            } else {
+                r_SP = (byte)addressBus; GetImmediate(); CompleteOperation();
             }
         }
 
         // === RTI ===
         static void Op_40() {
-            switch (operationCycle) {
-                case 1: GetImmediate(); break;
-                case 2:
-                    addressBus = (ushort)(0x100 | r_SP); CpuRead(addressBus);
-                    addressBus = (ushort)((byte)(addressBus + 1) | 0x100); break;
-                case 3:
-                    { byte status = CpuRead(addressBus); SetFlag(status); addressBus = (ushort)((byte)(addressBus + 1) | 0x100); } break;
-                case 4:
-                    dl = CpuRead(addressBus); r_PC = (ushort)((r_PC & 0xFF00) | dl);
-                    addressBus = (ushort)((byte)(addressBus + 1) | 0x100); break;
-                case 5:
-                    dl = CpuRead(addressBus);
-                    r_PC = (ushort)((r_PC & 0xFF) | (dl << 8)); r_SP = (byte)addressBus;
-                    CompleteOperation(); break;
+            if (operationCycle == 1) { GetImmediate(); }
+            else if (operationCycle == 2) {
+                addressBus = (ushort)(0x100 | r_SP); CpuRead(addressBus);
+                addressBus = (ushort)((byte)(addressBus + 1) | 0x100);
+            } else if (operationCycle == 3) {
+                byte status = CpuRead(addressBus); SetFlag(status);
+                addressBus = (ushort)((byte)(addressBus + 1) | 0x100);
+            } else if (operationCycle == 4) {
+                dl = CpuRead(addressBus); r_PC = (ushort)((r_PC & 0xFF00) | dl);
+                addressBus = (ushort)((byte)(addressBus + 1) | 0x100);
+            } else {
+                dl = CpuRead(addressBus);
+                r_PC = (ushort)((r_PC & 0xFF) | (dl << 8)); r_SP = (byte)addressBus;
+                CompleteOperation();
             }
         }
 
@@ -1738,71 +1705,75 @@ namespace AprNes
 
         // === LAE ===
         static void Op_BB() {
-            switch (operationCycle) { case 1: case 2: case 3: GetAddressAbsOffY(true); break;
-                case 4:
-                    dl = CpuRead(addressBus); r_A = (byte)(dl & r_SP); r_X = r_A; r_SP = r_A; SetNZ(r_A);
-                    CompleteOperation(); break; }
+            if (operationCycle < 4) { GetAddressAbsOffY(true); }
+            else { dl = CpuRead(addressBus); r_A = (byte)(dl & r_SP); r_X = r_A; r_SP = r_A; SetNZ(r_A);
+                CompleteOperation(); }
         }
 
         // === SHA (Ind),Y ===
         static void Op_93() {
-            switch (operationCycle) { case 1: case 2: case 3: GetAddressIndOffY(false); break;
-                case 4: GetAddressIndOffY(false); cpuIsRead = false; break;
-                case 5:
-                    if ((temporaryAddress & 0xFF00) != (addressBus & 0xFF00))
-                        addressBus = (ushort)((byte)addressBus | (((addressBus >> 8) & r_X) << 8));
-                    if (ignoreH) H = 0xFF;
-                    CpuWrite(addressBus, (byte)(r_A & (r_X | 0xF5) & H));
-                    CompleteOperation(); break; }
+            if (operationCycle < 4) { GetAddressIndOffY(false); }
+            else if (operationCycle == 4) { GetAddressIndOffY(false); cpuIsRead = false; }
+            else {
+                if ((temporaryAddress & 0xFF00) != (addressBus & 0xFF00))
+                    addressBus = (ushort)((byte)addressBus | (((addressBus >> 8) & r_X) << 8));
+                if (ignoreH) H = 0xFF;
+                CpuWrite(addressBus, (byte)(r_A & (r_X | 0xF5) & H));
+                CompleteOperation();
+            }
         }
 
         // === SHA Abs,Y ===
         static void Op_9F() {
-            switch (operationCycle) { case 1: case 2: GetAddressAbsOffY(false); break;
-                case 3: GetAddressAbsOffY(false); cpuIsRead = false; break;
-                case 4:
-                    if ((temporaryAddress & 0xFF00) != (addressBus & 0xFF00))
-                        addressBus = (ushort)((byte)addressBus | (((addressBus >> 8) & r_X) << 8));
-                    if (ignoreH) H = 0xFF;
-                    CpuWrite(addressBus, (byte)(r_A & (r_X | 0xF5) & H));
-                    CompleteOperation(); break; }
+            if (operationCycle < 3) { GetAddressAbsOffY(false); }
+            else if (operationCycle == 3) { GetAddressAbsOffY(false); cpuIsRead = false; }
+            else {
+                if ((temporaryAddress & 0xFF00) != (addressBus & 0xFF00))
+                    addressBus = (ushort)((byte)addressBus | (((addressBus >> 8) & r_X) << 8));
+                if (ignoreH) H = 0xFF;
+                CpuWrite(addressBus, (byte)(r_A & (r_X | 0xF5) & H));
+                CompleteOperation();
+            }
         }
 
         // === SHY Abs,X ===
         static void Op_9C() {
-            switch (operationCycle) { case 1: case 2: GetAddressAbsOffX(false); break;
-                case 3: GetAddressAbsOffX(false); cpuIsRead = false; break;
-                case 4:
-                    if ((temporaryAddress & 0xFF00) != (addressBus & 0xFF00))
-                        addressBus = (ushort)((byte)addressBus | (((addressBus >> 8) & r_Y) << 8));
-                    if (ignoreH) H = 0xFF;
-                    CpuWrite(addressBus, (byte)(r_Y & H));
-                    CompleteOperation(); break; }
+            if (operationCycle < 3) { GetAddressAbsOffX(false); }
+            else if (operationCycle == 3) { GetAddressAbsOffX(false); cpuIsRead = false; }
+            else {
+                if ((temporaryAddress & 0xFF00) != (addressBus & 0xFF00))
+                    addressBus = (ushort)((byte)addressBus | (((addressBus >> 8) & r_Y) << 8));
+                if (ignoreH) H = 0xFF;
+                CpuWrite(addressBus, (byte)(r_Y & H));
+                CompleteOperation();
+            }
         }
 
         // === SHX Abs,Y ===
         static void Op_9E() {
-            switch (operationCycle) { case 1: case 2: GetAddressAbsOffY(false); break;
-                case 3: GetAddressAbsOffY(false); cpuIsRead = false; break;
-                case 4:
-                    if ((temporaryAddress & 0xFF00) != (addressBus & 0xFF00))
-                        addressBus = (ushort)((byte)addressBus | (((addressBus >> 8) & r_X) << 8));
-                    if (ignoreH) H = 0xFF;
-                    CpuWrite(addressBus, (byte)(r_X & H));
-                    CompleteOperation(); break; }
+            if (operationCycle < 3) { GetAddressAbsOffY(false); }
+            else if (operationCycle == 3) { GetAddressAbsOffY(false); cpuIsRead = false; }
+            else {
+                if ((temporaryAddress & 0xFF00) != (addressBus & 0xFF00))
+                    addressBus = (ushort)((byte)addressBus | (((addressBus >> 8) & r_X) << 8));
+                if (ignoreH) H = 0xFF;
+                CpuWrite(addressBus, (byte)(r_X & H));
+                CompleteOperation();
+            }
         }
 
         // === SHS Abs,Y ===
         static void Op_9B() {
-            switch (operationCycle) { case 1: case 2: GetAddressAbsOffY(false); break;
-                case 3: GetAddressAbsOffY(false); cpuIsRead = false; break;
-                case 4:
-                    if ((temporaryAddress & 0xFF00) != (addressBus & 0xFF00))
-                        addressBus = (ushort)((byte)addressBus | (((addressBus >> 8) & r_X) << 8));
-                    r_SP = (byte)(r_A & r_X);
-                    if (ignoreH) H = 0xFF;
-                    CpuWrite(addressBus, (byte)(r_A & (r_X | 0xF5) & H));
-                    CompleteOperation(); break; }
+            if (operationCycle < 3) { GetAddressAbsOffY(false); }
+            else if (operationCycle == 3) { GetAddressAbsOffY(false); cpuIsRead = false; }
+            else {
+                if ((temporaryAddress & 0xFF00) != (addressBus & 0xFF00))
+                    addressBus = (ushort)((byte)addressBus | (((addressBus >> 8) & r_X) << 8));
+                r_SP = (byte)(r_A & r_X);
+                if (ignoreH) H = 0xFF;
+                CpuWrite(addressBus, (byte)(r_A & (r_X | 0xF5) & H));
+                CompleteOperation();
+            }
         }
 
         // === HLT (JAM) ===
