@@ -460,19 +460,15 @@ namespace AprNes
         // two physical CIRAM pages ($2000-$23FF = page 0, $2400-$27FF = page 1)
         // based on current mirroring mode.  Real hardware has only 2 KB CIRAM;
         // mirroring is done at the address-decode level, not by data duplication.
+        // Branchless CIRAM address MUX — magic number 0xF0AC encodes mirror truth table
+        // Bit index = (mirror << 2) | ((addr >> 10) & 3), result bit = output bit 10
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static int CIRAMAddr(int addr)
         {
-            int mirror = *Vertical;
-            if (mirror == 0) // H-mirror: $2000=$2400(p0), $2800=$2C00(p1)
-                return (addr & 0x23FF) | ((addr & 0x0800) >> 1);
-            if (mirror == 1) // V-mirror: $2000=$2800(p0), $2400=$2C00(p1)
-                return addr & 0x27FF;
-            if (mirror == 2) // 1-screen A: all → page 0
-                return addr & 0x23FF;
-            if (mirror == 3) // 1-screen B: all → page 1
-                return (addr & 0x23FF) | 0x0400;
-            return addr & 0x2FFF; // 4-screen: 4 unique nametables, no mirroring
+            int m = *Vertical;
+            if (m > 3) return addr & 0x2FFF; // 4-screen (rare, perfectly predicted false)
+            int shift = (m << 2) | ((addr >> 10) & 3);
+            return (addr & 0x23FF) | (((0xF0AC >> shift) & 1) << 10);
         }
 
         // ---- Tile fetch state ----
