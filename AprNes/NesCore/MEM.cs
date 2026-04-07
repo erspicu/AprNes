@@ -238,15 +238,10 @@ namespace AprNes
         {
             if (dmaOamAligned)
             {
-                // TriCNES: Store(OAM_InternalBus, 0x2004) — goes through $2004 write path
-                // Attribute byte (offset 2) is masked with 0xE3 (bits 2-4 don't exist)
-                byte dmaVal = dmaOamInternalBus;
-                if ((spr_ram_add & 3) == 2) dmaVal &= 0xE3;
-                spr_ram[spr_ram_add++] = dmaVal;
-                // TriCNES Store() line 9471: dataBus = Input (every write updates the bus)
+                byte mask = (byte)(0xFFE3FFFF >> ((spr_ram_add & 3) << 3));
+                spr_ram[spr_ram_add++] = (byte)(dmaOamInternalBus & mask);
                 cpubus = dmaOamInternalBus;
-                dmaOamAddr++;
-                if (dmaOamAddr == 0)
+                if (++dmaOamAddr == 0)
                 {
                     spriteDmaTransfer = false;
                     dmaOamAligned = false;
