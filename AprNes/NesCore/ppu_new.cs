@@ -409,42 +409,36 @@ namespace AprNes
                 {
                     if (ShowBackGround || ShowSprites) // Tier 2
                     {
-                        // PPU_Render_ShiftRegistersAndBitPlanes — 8-phase tile fetch
-                        // TriCNES: EACH phase independently computes its address
-                        // (no dependency on ioaddr from previous phase — critical for prefetch at dot 321
-                        //  where phase 0 at dot 320 is out of range)
-                        int phase = cx & 7;
-                        int ntAddr, atAddr, chrAddr;
-                        if (phase == 0) { ioaddr = 0x2000 | (vram_addr & 0x0FFF); }
-                        else if (phase == 1) {
-                            ntAddr = 0x2000 | (vram_addr & 0x0FFF);
-                            ppuAddressBus = ntAddr; if (mapperA12IsMmc3) NotifyMapperA12(ntAddr);
-                            renderTemp = PpuBusRead(ntAddr); commitNTFetch = true;
-                            if (extAttrEnabled) extAttrNTOffset = (ushort)(ntAddr & 0x3FF);
-                            if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ntAddr);
-                        }
-                        else if (phase == 2) { ioaddr = 0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07); }
-                        else if (phase == 3) {
-                            atAddr = 0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07);
-                            ppuAddressBus = atAddr; renderTemp = PpuBusRead(atAddr); commitATFetch = true;
-                            if (mmc5Ref != null) mmc5Ref.NotifyVramRead(atAddr);
-                        }
-                        else if (phase == 4) { ioaddr = (extAttrEnabled && extAttrChrSize > 0) ? (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7) : BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7); }
-                        else if (phase == 5) {
-                            chrAddr = (extAttrEnabled && extAttrChrSize > 0) ? (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7) : BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
-                            ppuAddressBus = chrAddr; ppuChrFetchA12 = (chrAddr >> 12) & 1;
-                            if (mapperNeedsA12) NotifyMapperA12(chrAddr);
-                            renderTemp = PpuBusRead(chrAddr); commitPatLowFetch = true;
-                            if (mmc5Ref != null) mmc5Ref.NotifyVramRead(chrAddr);
-                        }
-                        else if (phase == 6) { ioaddr = (extAttrEnabled && extAttrChrSize > 0) ? (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8 : BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8; }
-                        else { // phase 7
-                            chrAddr = (extAttrEnabled && extAttrChrSize > 0) ? (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8 : BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
-                            ppuAddressBus = chrAddr; ppuChrFetchA12 = (chrAddr >> 12) & 1;
-                            if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(chrAddr);
-                            renderTemp = PpuBusRead(chrAddr); commitPatHighFetch = true;
-                            if (mmc5Ref != null) mmc5Ref.NotifyVramRead(chrAddr);
-                            // RenderBGTile removed — palCacheR/N are dead code in per-dot rendering
+                        // Tile fetch: only odd phases do bus reads (even phases were dead ioaddr writes)
+                        if ((cx & 1) != 0) // odd phases only (1, 3, 5, 7)
+                        {
+                            int fetchPair = (cx >> 1) & 3; // 0=NT, 1=AT, 2=CHR-L, 3=CHR-H
+                            if (fetchPair == 0) { // phase 1: NT fetch
+                                int ntAddr = 0x2000 | (vram_addr & 0x0FFF);
+                                ppuAddressBus = ntAddr; if (mapperA12IsMmc3) NotifyMapperA12(ntAddr);
+                                renderTemp = PpuBusRead(ntAddr); commitNTFetch = true;
+                                if (extAttrEnabled) extAttrNTOffset = (ushort)(ntAddr & 0x3FF);
+                                if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ntAddr);
+                            }
+                            else if (fetchPair == 1) { // phase 3: AT fetch
+                                int atAddr = 0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07);
+                                ppuAddressBus = atAddr; renderTemp = PpuBusRead(atAddr); commitATFetch = true;
+                                if (mmc5Ref != null) mmc5Ref.NotifyVramRead(atAddr);
+                            }
+                            else if (fetchPair == 2) { // phase 5: CHR low fetch
+                                int chrAddr = (extAttrEnabled && extAttrChrSize > 0) ? (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7) : BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
+                                ppuAddressBus = chrAddr; ppuChrFetchA12 = (chrAddr >> 12) & 1;
+                                if (mapperNeedsA12) NotifyMapperA12(chrAddr);
+                                renderTemp = PpuBusRead(chrAddr); commitPatLowFetch = true;
+                                if (mmc5Ref != null) mmc5Ref.NotifyVramRead(chrAddr);
+                            }
+                            else { // phase 7: CHR high fetch
+                                int chrAddr = (extAttrEnabled && extAttrChrSize > 0) ? (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8 : BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
+                                ppuAddressBus = chrAddr; ppuChrFetchA12 = (chrAddr >> 12) & 1;
+                                if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(chrAddr);
+                                renderTemp = PpuBusRead(chrAddr); commitPatHighFetch = true;
+                                if (mmc5Ref != null) mmc5Ref.NotifyVramRead(chrAddr);
+                            }
                         }
 
                         // MMC5 CHR A/B switch at first tile of each group
@@ -639,17 +633,17 @@ namespace AprNes
                 && ((hsDot > 0 && hsDot <= 257) || (hsDot > 320 && hsDot <= 336)))
             {
                 renderLow  <<= 1;
-                renderHigh = (ushort)((renderHigh << 1) | 1);
-                renderAttrLow  = (ushort)((renderAttrLow << 1) | (attrLatch & 1));
-                renderAttrHigh = (ushort)((renderAttrHigh << 1) | ((attrLatch >> 1) & 1));
+                renderHigh = (renderHigh << 1) | 1;
+                renderAttrLow  = (renderAttrLow << 1) | (attrLatch & 1);
+                renderAttrHigh = (renderAttrHigh << 1) | ((attrLatch >> 1) & 1);
             }
 
             // ── CommitShiftRegistersAndBitPlanes_HalfDot — UNGATED (must run BEFORE fetch) ──
             if (commitLoadShiftReg)
             {
                 commitLoadShiftReg = false;
-                renderLow  = (ushort)((renderLow  & 0xFF00) | pendingTileLow);
-                renderHigh = (ushort)((renderHigh & 0xFF00) | pendingTileHigh);
+                renderLow  = (renderLow & 0xFF00) | pendingTileLow;
+                renderHigh = (renderHigh & 0xFF00) | pendingTileHigh;
                 attrLatch  = pendingAttrLatch;
             }
 

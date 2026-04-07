@@ -321,7 +321,6 @@ namespace AprNes
             spr_ram_add = 0;
 
             // PPU tile pipeline
-            NTVal = 0; ATVal = 0; ioaddr = 0;
             renderLow = 0; renderHigh = 0;
             pendingTileLow = 0; pendingTileHigh = 0; commitLoadShiftReg = false;
 

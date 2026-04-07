@@ -491,14 +491,13 @@ namespace AprNes
 
         // ---- Tile fetch state ----
         static byte NTVal = 0, ATVal = 0;
-        static int ioaddr = 0;
 
         // ---- Per-dot render shift registers (TriCNES model: shifted left each half-step) ----
         // Single set used for both pixel output and sprite 0 hit detection.
         // Reloaded via deferred commit (phase 7 sets flag → next half-step loads).
-        static ushort renderLow = 0, renderHigh = 0;
+        static int renderLow = 0, renderHigh = 0;
         // Per-dot attribute shift: shifted alongside render registers, serial-in from latch
-        static ushort renderAttrLow = 0, renderAttrHigh = 0;
+        static int renderAttrLow = 0, renderAttrHigh = 0;
         // Attribute latch: 2-bit value from which bits are shifted in (TriCNES: PPU_AttributeLatchRegister)
         static byte attrLatch = 0;
         static byte pendingAttrLatch = 0; // TriCNES: PPU_Attribute → committed to attrLatch at load time
