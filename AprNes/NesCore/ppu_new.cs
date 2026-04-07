@@ -31,52 +31,12 @@ namespace AprNes
 
             // ══════════════════════════════════════════════════════
             // Phase 2: Deferred register updates (TriCNES lines 1263-1496)
+            // Guard: >99% of dots have no pending updates, skip the call entirely
             // ══════════════════════════════════════════════════════
+            if (ppu2006UpdateDelay != 0 || ppu2005UpdateDelay != 0 || ppu2000UpdateDelay != 0 || ppu2007SM < 9)
+                PpuPhase2_DeferredUpdates(cx);
 
-            // ── $2006 delayed t→v copy (TriCNES lines 1263-1284) ──
-            if (ppu2006UpdateDelay != 0 && --ppu2006UpdateDelay == 0)
-            {
-                int prevAddr = vram_addr;
-                vram_addr = ppu2006PendingAddr;
-                ppuAddressBus = vram_addr;
-                if ((prevAddr & 0x3FFF) >= 0x3F00 && (vram_addr & 0x3FFF) < 0x3F00)
-                    if (scanline < 240 && cx <= 256 && (prevAddr & 0xF) != 0)
-                if (mapperNeedsA12 && !((ShowBackGround_Instant || ShowSprites_Instant) && (scanline < 240 || scanline == preRenderLine)))
-                    NotifyMapperA12(vram_addr);
-            }
-
-            // ── $2005 delayed scroll (TriCNES lines 1286-1304) ──
-            if (ppu2005UpdateDelay != 0 && --ppu2005UpdateDelay == 0)
-            {
-                    byte v = ppu2005PendingValue;
-                    if (!vram_latch) // first write
-                    {
-                        FineX = v & 0x07;
-                        vram_addr_internal = (vram_addr_internal & 0x7FE0) | ((v & 0xF8) >> 3);
-                    }
-                    else // second write
-                    {
-                        vram_addr_internal = (vram_addr_internal & 0x0C1F) | ((v & 0x7) << 12) | ((v & 0xF8) << 2);
-                    }
-                vram_latch = !vram_latch;
-            }
-
-            // ── $2000 delayed control (TriCNES lines 1306-1320) ──
-            if (ppu2000UpdateDelay != 0 && --ppu2000UpdateDelay == 0)
-            {
-                    NMIable = (ppu2000PendingValue & 0x80) != 0;
-                    VramaddrIncrement = (ppu2000PendingValue & 0x04) != 0 ? 32 : 1;
-                    Spritesize8x16 = (ppu2000PendingValue & 0x20) != 0;
-                    SpPatternTableAddr = (ppu2000PendingValue & 0x08) != 0 ? 0x1000 : 0;
-                    BgPatternTableAddr = (ppu2000PendingValue & 0x10) != 0 ? 0x1000 : 0;
-                vram_addr_internal = (ushort)((vram_addr_internal & 0x73FF) | ((ppu2000PendingValue & 3) << 10));
-            }
-
-            // ── $2007 state machine (extracted for I-Cache isolation) ──
-            if (ppu2007SM < 9)
-                Process2007StateMachine();
-
-            // Open bus decay (AprNes-specific, runs every dot)
+            // Open bus decay (runs every dot, too small to extract)
             if (--open_bus_decay_timer == 0) { open_bus_decay_timer = 77777; openbus = 0; }
 
             // ══════════════════════════════════════════════════════
@@ -119,29 +79,12 @@ namespace AprNes
 
             // ══════════════════════════════════════════════════════
             // Phase 3: Events (TriCNES lines 1532-1606)
-            // All use POST-increment cx (= PPU_Dot after ++)
+            // Guard: only scanlines >= nmiTriggerLine (241+) have events
             // ══════════════════════════════════════════════════════
-            if (scanline == nmiTriggerLine) // 241
-            {
-                if (cx == 0) pendingVblank = true; // TriCNES: PPU_Dot == 0
-                // cx == 1: FrameAdvance (emulator-specific, not PPU logic)
-            }
-            else if (scanline == (preRenderLine - 1) && cx == 340)
-            {
-                oddSwap = !oddSwap;
-            }
-            else if (scanline == preRenderLine && cx == 1)
-            {
-                isVblank = false;
-                canDetectSprite0Hit = true;
-                isSprite0hit = false;
-                isSpriteOverflow = false;
-                isSprite0hit_Delayed = false;
-                pendingSprite0Hit = false;
-                pendingSprite0Hit2 = false;
-            }
+            if (scanline >= nmiTriggerLine)
+                PpuPhase3_Events(cx);
 
-            // ── VSET latch pipeline (TriCNES lines 1608-1618) ──
+            // ── VSET latch pipeline (TriCNES lines 1608-1618, per-dot) ──
             ppuVSET_Latch1 = !ppuVSET;
             if (ppuVSET && !ppuVSET_Latch2)
                 isVblank = true;
@@ -411,6 +354,84 @@ namespace AprNes
 
             // ── End of dot: update ppuRenderingEnabled ──
             ppuRenderingEnabled = ShowBackGround_Instant || ShowSprites_Instant;
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // Phase 2: Deferred register updates — extracted from ppu_step_new
+        // Called only when a deferred update is pending (>99% of dots skip this).
+        // ════════════════════════════════════════════════════════════════
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void PpuPhase2_DeferredUpdates(int cx)
+        {
+            // ── $2006 delayed t→v copy (TriCNES lines 1263-1284) ──
+            if (ppu2006UpdateDelay != 0 && --ppu2006UpdateDelay == 0)
+            {
+                int prevAddr = vram_addr;
+                vram_addr = ppu2006PendingAddr;
+                ppuAddressBus = vram_addr;
+                if ((prevAddr & 0x3FFF) >= 0x3F00 && (vram_addr & 0x3FFF) < 0x3F00)
+                    if (scanline < 240 && cx <= 256 && (prevAddr & 0xF) != 0)
+                if (mapperNeedsA12 && !((ShowBackGround_Instant || ShowSprites_Instant) && (scanline < 240 || scanline == preRenderLine)))
+                    NotifyMapperA12(vram_addr);
+            }
+
+            // ── $2005 delayed scroll (TriCNES lines 1286-1304) ──
+            if (ppu2005UpdateDelay != 0 && --ppu2005UpdateDelay == 0)
+            {
+                byte v = ppu2005PendingValue;
+                if (!vram_latch)
+                {
+                    FineX = v & 0x07;
+                    vram_addr_internal = (vram_addr_internal & 0x7FE0) | ((v & 0xF8) >> 3);
+                }
+                else
+                {
+                    vram_addr_internal = (vram_addr_internal & 0x0C1F) | ((v & 0x7) << 12) | ((v & 0xF8) << 2);
+                }
+                vram_latch = !vram_latch;
+            }
+
+            // ── $2000 delayed control (TriCNES lines 1306-1320) ──
+            if (ppu2000UpdateDelay != 0 && --ppu2000UpdateDelay == 0)
+            {
+                NMIable = (ppu2000PendingValue & 0x80) != 0;
+                VramaddrIncrement = (ppu2000PendingValue & 0x04) != 0 ? 32 : 1;
+                Spritesize8x16 = (ppu2000PendingValue & 0x20) != 0;
+                SpPatternTableAddr = (ppu2000PendingValue & 0x08) != 0 ? 0x1000 : 0;
+                BgPatternTableAddr = (ppu2000PendingValue & 0x10) != 0 ? 0x1000 : 0;
+                vram_addr_internal = (ushort)((vram_addr_internal & 0x73FF) | ((ppu2000PendingValue & 3) << 10));
+            }
+
+            // ── $2007 state machine ──
+            if (ppu2007SM < 9)
+                Process2007StateMachine();
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // Phase 3: Scanline events — extracted from ppu_step_new
+        // Called only on scanlines >= nmiTriggerLine (241, preRenderLine-1, preRenderLine).
+        // ════════════════════════════════════════════════════════════════
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void PpuPhase3_Events(int cx)
+        {
+            if (scanline == nmiTriggerLine) // 241
+            {
+                if (cx == 0) pendingVblank = true;
+            }
+            else if (scanline == (preRenderLine - 1) && cx == 340)
+            {
+                oddSwap = !oddSwap;
+            }
+            else if (scanline == preRenderLine && cx == 1)
+            {
+                isVblank = false;
+                canDetectSprite0Hit = true;
+                isSprite0hit = false;
+                isSpriteOverflow = false;
+                isSprite0hit_Delayed = false;
+                pendingSprite0Hit = false;
+                pendingSprite0Hit2 = false;
+            }
         }
 
         // ════════════════════════════════════════════════════════════════
