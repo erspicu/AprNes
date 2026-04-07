@@ -157,9 +157,9 @@ namespace AprNes
         {
             nmiPrevPinsSignal = nmiPinsSignal;
             nmiPinsSignal = NMILine;
-            if (nmiPinsSignal && !nmiPrevPinsSignal)
+            if (nmiPinsSignal & !nmiPrevPinsSignal)
                 doNMI = true;
-            doIRQ = IRQLine && (flagI == 0);
+            doIRQ = IRQLine & (flagI == 0);
         }
 
         // TriCNES: PollInterrupts_CantDisableIRQ — for branch page-cross
@@ -169,10 +169,10 @@ namespace AprNes
         {
             nmiPrevPinsSignal = nmiPinsSignal;
             nmiPinsSignal = NMILine;
-            if (nmiPinsSignal && !nmiPrevPinsSignal)
+            if (nmiPinsSignal & !nmiPrevPinsSignal)
                 doNMI = true;
             if (!doIRQ)
-                doIRQ = IRQLine && (flagI == 0);
+                doIRQ = IRQLine & (flagI == 0);
         }
 
         // --- Operation helpers ---
@@ -180,16 +180,16 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void SetNZ(byte val)
         {
-            flagN = (byte)((val & 0x80) >> 7);
-            flagZ = (val == 0) ? (byte)1 : (byte)0;
+            flagN = (byte)(val >> 7);
+            flagZ = (byte)(((uint)(val - 1)) >> 31);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void Op_ADC(byte val)
         {
             int result = r_A + val + flagC;
-            flagV = (byte)((((r_A ^ val) & 0x80) == 0 && ((r_A ^ result) & 0x80) != 0) ? 1 : 0);
-            flagC = (result > 0xFF) ? (byte)1 : (byte)0;
+            flagV = (byte)((~(r_A ^ val) & (r_A ^ result) & 0x80) >> 7);
+            flagC = (byte)(result >> 8);
             r_A = (byte)result;
             SetNZ(r_A);
         }
@@ -198,8 +198,8 @@ namespace AprNes
         static void Op_SBC(byte val)
         {
             int result = r_A - val - (1 - flagC);
-            flagV = (byte)((((r_A ^ val) & 0x80) != 0 && ((r_A ^ result) & 0x80) != 0) ? 1 : 0);
-            flagC = (result >= 0) ? (byte)1 : (byte)0;
+            flagV = (byte)(((r_A ^ val) & (r_A ^ result) & 0x80) >> 7);
+            flagC = (byte)((~(uint)result) >> 31);
             r_A = (byte)result;
             SetNZ(r_A);
         }
@@ -625,7 +625,6 @@ namespace AprNes
                 {
                     doBRK = true;
                 }
-
 
                 if (!doNMI && !doIRQ && !doReset)
                 {
