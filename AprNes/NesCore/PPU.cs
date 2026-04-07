@@ -662,7 +662,7 @@ namespace AprNes
         // Simulates NES sprite evaluation timing (dots 65-256) with the hardware
         // overflow bug: after finding 8 sprites, byte offset m cycles 0→1→2→3,
         // reading tile/attr/X bytes as Y coordinates.
-        // Split-loop + unsigned range check optimization
+        // Split-loop + pointer iteration + unsigned range check
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void PrecomputeOverflow()
         {
@@ -671,17 +671,19 @@ namespace AprNes
 
             uint height = Spritesize8x16 ? 15u : 7u;
             int evalCycle = 66;
-            int n = 0;
-
-            // Phase 1: find first 8 sprites (normal evaluation, no m offset)
             int foundCount = 0;
-            for (; n < 64 && evalCycle <= 256; n++)
+            byte* p = spr_ram;
+            byte* pEnd = spr_ram + 256;
+
+            // Phase 1: find first 8 sprites (pointer iteration, no evalCycle bound needed — max 242)
+            while (p < pEnd)
             {
-                uint diff = (uint)(scanline - spr_ram[n << 2]);
+                uint diff = (uint)(scanline - *p);
+                p += 4;
                 if (diff <= height)
                 {
                     evalCycle += 8;
-                    if (++foundCount == 8) { n++; break; }
+                    if (++foundCount == 8) break;
                 }
                 else
                     evalCycle += 2;
@@ -691,12 +693,13 @@ namespace AprNes
             if (foundCount == 8)
             {
                 int m = 0;
-                for (; n < 64 && evalCycle <= 256; n++)
+                while (p < pEnd && evalCycle <= 256)
                 {
-                    uint diff = (uint)(scanline - spr_ram[(n << 2) + m]);
+                    uint diff = (uint)(scanline - p[m]);
                     if (diff <= height) { spriteOverflowCycle = evalCycle; return; }
                     m = (m + 1) & 3;
                     evalCycle += 2;
+                    p += 4;
                 }
             }
         }

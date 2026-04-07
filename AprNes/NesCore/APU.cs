@@ -617,41 +617,41 @@ namespace AprNes
         // =====================================================================
         // 混音並送出樣本
         // =====================================================================
+        // Pre-computed float constants (eliminate runtime division)
+        private const float INV_32767 = 1f / 32767f;
+        private const float RF_LEVEL_MUL = 0.05f * INV_32767;
+        private const float RF_PHASE_MUL = 0.0001f * INV_32767;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void generateSample(int sq1, int sq2, int tri, int noise, int dmc)
         {
             if (!AudioEnabled) return;
 
-            // Pulse 混音 (非線性查找表)
             int sqIdx = sq1 + sq2;
-            if (sqIdx >= 31) sqIdx = 30;
+            if (sqIdx > 30) sqIdx = 30;
 
-            // TND 混音
-            int tndIdx = 3 * tri + 2 * noise + dmc;
-            if (tndIdx >= 203) tndIdx = 202;
+            int tndIdx = 3 * tri + (noise << 1) + dmc;
+            if (tndIdx > 202) tndIdx = 202;
 
-            int mixed = SQUARELOOKUP[sqIdx] + TNDLOOKUP[tndIdx]; // 0..~98302
-            mixed += mapperExpansionAudio; // expansion audio (VRC6, Namco163, VRC7...)
+            int mixed = SQUARELOOKUP[sqIdx] + TNDLOOKUP[tndIdx];
+            mixed += mapperExpansionAudio;
 
-            // High-pass filter ~90 Hz — DC 偏移消除（Pure Digital 基線）
             mixed += _dckiller;
             _dckiller -= mixed >> 8;
             _dckiller += (mixed > 0 ? -1 : 1);
 
-            // 縮放至 16-bit signed，套用使用者音量
-            int clamped = mixed * Volume / 100;
-            if (clamped >  32767) clamped =  32767;
+            int clamped = (mixed * Volume) / 100;
             if (clamped < -32768) clamped = -32768;
+            else if (clamped > 32767) clamped = 32767;
 
-            AudioSampleReady?.Invoke((short)clamped, (short)clamped); // dual mono
+            AudioSampleReady?.Invoke((short)clamped, (short)clamped);
 
-            // RF 音訊干擾：將實際音訊電平饋入 NTSC RF 模擬
-            // RfAudioLevel = |sample| 指數平滑 → buzz bar 振幅
-            // RfBuzzPhase  = 累積音量 → bar 垂直滾動速度（音量越大滾越快）
             if (AnalogEnabled && AnalogOutput == AnalogOutputMode.RF)
             {
-                float absS = clamped < 0 ? -clamped / 32767f : clamped / 32767f;
-                RfAudioLevel = RfAudioLevel * 0.95f + absS * 0.05f;
-                RfBuzzPhase  = (RfBuzzPhase + absS * 0.0001f) % 1.0f;
+                int absClamped = clamped < 0 ? -clamped : clamped;
+                RfAudioLevel = RfAudioLevel * 0.95f + absClamped * RF_LEVEL_MUL;
+                RfBuzzPhase += absClamped * RF_PHASE_MUL;
+                if (RfBuzzPhase >= 1.0f) RfBuzzPhase -= 1.0f;
             }
         }
 
