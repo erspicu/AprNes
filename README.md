@@ -1,14 +1,20 @@
 # AprNes - C# NES Emulator
 
-> 🇺🇸 English | [🇹🇼 繁體中文](#aprnes---c-nes-模擬器) | Last updated: 2026-03-31
+> 🇺🇸 English | [🇹🇼 繁體中文](#aprnes---c-nes-模擬器) | Last updated: 2026-04-07
 
 A cycle-accurate NES (Nintendo Entertainment System) emulator written in C#, developed in collaboration with AI (GitHub Copilot / Claude). The project achieves **perfect scores** on both the blargg and AccuracyCoin test suites.
 
 ## Project Status
 
-This project has reached its milestone goals. Future development will continue in a separate project built on **.NET 10 + Avalonia**, leaving behind the .NET Framework 4.8.1 legacy. Once the migration is complete, this repository will no longer be actively maintained.
+AprNes will continue with additional mapper support before concluding its development on .NET Framework 4.8.1. Future development will move to a separate project built on **.NET 10 + Avalonia**.
 
 This project was developed with AI assistance, with a focus on leveraging modern computing power to explore and implement concepts I wanted to try.
+
+### TriCNES Timing Model Port
+
+Although AprNes passed all 136 AccuracyCoin tests and the full blargg test suite, real-world testing revealed subtle PPU rendering inaccuracies in certain test ROMs (e.g., `scanline-a1` and `colorwin_ntsc.nes`). Investigation traced the root cause to insufficient precision in the PPU timing model. Attempts to patch the existing architecture proved impractical, leading to the decision to port TriCNES's complete timing architecture — including its per-master-clock execution model and fine-grained PPU state machine — as an equivalent reimplementation.
+
+The TriCNES timing model is significantly more complex than a traditional NES emulator, with a comprehensive finite state machine covering every sub-cycle of PPU, CPU, APU, and DMA interaction. This thoroughness comes at a computational cost: on .NET Framework 4.8.1, the analog rendering pipeline (Ultra NTSC + CRT simulation) at 6x/8x resolution can dip below 60 FPS, despite extensive JIT-level optimization. Resolving this performance gap ultimately requires migrating to .NET 10, where TieredPGO and On-Stack Replacement can offset the overhead of this high-precision timing model.
 
 ## License
 
@@ -42,7 +48,7 @@ AprNes was developed as a learning and research project to understand the NES ha
 Key references used during development:
 
 - **[Mesen2](https://github.com/SourMesen/Mesen2)** — A highly accurate multi-system emulator. Used extensively as a reference for DMA timing, PPU rendering, and APU behavior.
-- **[TriCNES](https://github.com/erspicu/AprNes/tree/master/ref/TriCNES-main)** — An emulator written by the author of the AccuracyCoin test ROM. Studying TriCNES's source code was crucial for understanding precise CPU/DMA timing, particularly the DMC DMA load/reload countdown model that enabled achieving the perfect AccuracyCoin score.
+- **[TriCNES](https://github.com/erspicu/AprNes/tree/master/ref/TriCNES-main)** — An emulator written by the author of the AccuracyCoin test ROM. AprNes's entire timing architecture — per-master-clock execution model, PPU state machine, DMA bus model — was ported from TriCNES as an equivalent reimplementation to achieve maximum cycle-accuracy.
 - **[NESdev Wiki](https://www.nesdev.org/wiki/)** — The authoritative reference for NES hardware documentation.
 
 ## Directory Structure
@@ -60,7 +66,7 @@ Key references used during development:
     *   `FDS.cs` — Famicom Disk System support (BIOS validation, disk I/O state machine, IRQ timer, wavetable + FM audio).
     *   `Ntsc.cs` — NTSC composite video encoder/decoder (21.477 MHz waveform generation, FIR demodulation, SIMD batch YIQ-to-RGB).
     *   `CrtScreen.cs` — CRT electron beam optics (Gaussian scanline Bloom, curvature, phosphor persistence, SIMD pixel packing).
-    *   `Mapper/` — Cartridge mapper implementations (65 mappers, 60 verified).
+    *   `Mapper/` — Cartridge mapper implementations (65 mappers, 61 verified).
 *   **`AprNes/UI/`** — Windows Forms UI.
     *   `AprNesUI.cs` — Main window (FPS throttle, SRAM save/load, controller events).
     *   `AprNes_ConfigureUI.cs` — Keyboard/gamepad key binding UI.
@@ -175,7 +181,7 @@ python run_tests.py -j 10
 | Generic USB gamepad / joystick | DirectInput8 (raw vtable) | Auto-enumerated, excludes XInput devices |
 | Xbox 360 / One / Series | XInput (xinput1_4.dll) | Auto-detects players 0–3 |
 
-## Supported Mappers (60 verified)
+## Supported Mappers (61 verified)
 
 | Mapper | Representative Games |
 |--------|---------------------|
@@ -245,15 +251,21 @@ python run_tests.py -j 10
 
 # AprNes - C# NES 模擬器
 
-> [🇺🇸 English](#aprnes---c-nes-emulator) | 🇹🇼 繁體中文 | 最後編修：2026-03-31
+> [🇺🇸 English](#aprnes---c-nes-emulator) | 🇹🇼 繁體中文 | 最後編修：2026-04-07
 
 使用 C# 開發的 NES（任天堂娛樂系統）cycle-accurate 模擬器，與 AI（GitHub Copilot / Claude）協作開發完成。在 blargg 與 AccuracyCoin 兩大測試套件上均達到**滿分**。
 
 ## 專案狀態
 
-本專案的階段性目標已達成。後續開發將在獨立的新專案中進行，以 **.NET 10 + Avalonia** 為基礎，拋棄 .NET Framework 4.8.1 的歷史包袱。待完整轉移完成後，本專案原則上不再維護。
+AprNes 將在完成更多 Mapper 支援後，結束在 .NET Framework 4.8.1 平台上的開發。後續開發將轉移至以 **.NET 10 + Avalonia** 為基礎的獨立新專案。
 
 本專案由 AI 輔助開發，偏向於利用現代電腦效能來實現一些我想嘗試的概念。
+
+### TriCNES Timing 模型移植
+
+儘管 AprNes 已通過全部 136 項 AccuracyCoin 測試與 blargg 完整測試集，在實際遊玩過程中仍發現部分 PPU 渲染畫面不夠正確（如 `scanline-a1` 與 `colorwin_ntsc.nes`）。追查後確認根因是 PPU timing 模型精度不足。由於在現有架構下難以修補相關問題，最終決定將 TriCNES 的完整 timing 架構——包含 per-master-clock 執行模型與精細的 PPU 有限狀態機——進行等價移植（reimplementation）。
+
+TriCNES 的 timing 模型複雜度遠高於一般 NES 模擬器，其有限狀態機完整涵蓋了 PPU、CPU、APU、DMA 之間每個子週期的交互。這種精確性帶來了相當大的運算開銷：在 .NET Framework 4.8.1 上，即使經過大量 JIT 層級的效能優化，開啟類比渲染管線（Ultra NTSC + CRT 模擬）於 6x/8x 解析度時仍可能低於 60 FPS。要根本解決此效能瓶頸，最終需遷移至 .NET 10，借助 TieredPGO 與 On-Stack Replacement 來抵消高精度 timing 模型帶來的運算成本。
 
 ## 授權
 
@@ -285,7 +297,7 @@ AprNes 是一個以追求 cycle-accurate 精度為目標的 NES 硬體模擬研�
 開發過程中參考的重要資源：
 
 - **[Mesen2](https://github.com/SourMesen/Mesen2)** — 高精度多系統模擬器。DMA timing、PPU 渲染與 APU 行為均以此為主要參考。
-- **[TriCNES](https://github.com/erspicu/AprNes/tree/master/ref/TriCNES-main)** — 由 AccuracyCoin 測試 ROM 作者親自撰寫的模擬器。研讀 TriCNES 原始碼是突破 CPU/DMA 精確時序的關鍵，特別是 DMC DMA load/reload countdown 模型，使本專案最終達成 AccuracyCoin 滿分。
+- **[TriCNES](https://github.com/erspicu/AprNes/tree/master/ref/TriCNES-main)** — 由 AccuracyCoin 測試 ROM 作者親自撰寫的模擬器。AprNes 的完整 timing 架構——per-master-clock 執行模型、PPU 有限狀態機、DMA 匯流排模型——均移植自 TriCNES，以等價翻寫的方式追求最高精確度。
 - **[NESdev Wiki](https://www.nesdev.org/wiki/)** — NES 硬體文件的權威參考來源。
 
 ## 目錄結構說明
@@ -303,7 +315,7 @@ AprNes 是一個以追求 cycle-accurate 精度為目標的 NES 硬體模擬研�
     *   `FDS.cs` — Famicom Disk System 支援（BIOS 驗證、磁碟 I/O 狀態機、IRQ 計時器、wavetable + FM 音效）。
     *   `Ntsc.cs` — NTSC 複合視訊編解碼器（21.477 MHz 波形生成、FIR 解調、SIMD 批次 YIQ 轉 RGB）。
     *   `CrtScreen.cs` — CRT 電子束光學模擬（高斯掃描線 Bloom、曲面變形、磷光持續、SIMD 像素打包）。
-    *   `Mapper/` — 各類遊戲卡匣控制晶片實作（65 種 Mapper，60 個通過人工驗證）。
+    *   `Mapper/` — 各類遊戲卡匣控制晶片實作（65 種 Mapper，61 個通過人工驗證）。
 *   **`AprNes/UI/`** — 基於 Windows Forms 的使用者介面。
     *   `AprNesUI.cs` — 主視窗（FPS 節流、SRAM 讀寫、手把事件）。
     *   `AprNes_ConfigureUI.cs` — 鍵盤/手把按鍵設定視窗。
