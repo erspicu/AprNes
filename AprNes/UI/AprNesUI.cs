@@ -1018,6 +1018,7 @@ namespace AprNes
             {
                 NesCore.ChannelVolume[i] = ReadInt("ChVol_" + nesChKeys[i], 70, 0, 100);
                 NesCore.ChannelEnabled[i] = !cfg.ContainsKey("ChEn_" + nesChKeys[i]) || cfg["ChEn_" + nesChKeys[i]] != "0";
+                NesCore.SyncChannelEnableMask();
             }
             // Expansion channel volumes: per-chip keys (ChVol_VRC6_0, ChVol_N163_0, etc.)
             string[] chipPrefixes = { "", "VRC6", "VRC7", "N163", "S5B", "MMC5", "FDS" };

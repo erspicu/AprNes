@@ -409,6 +409,7 @@ public partial class MainWindow : Window
         {
             AprNes.NesCore.ChannelVolume[i] = ReadInt("ChVol_" + nesChKeys[i], 70, 0, 100);
             AprNes.NesCore.ChannelEnabled[i] = !(cfg.TryGetValue("ChEn_" + nesChKeys[i], out var en) && en == "0");
+            AprNes.NesCore.SyncChannelEnableMask();
         }
 
         // Per-chip expansion channels

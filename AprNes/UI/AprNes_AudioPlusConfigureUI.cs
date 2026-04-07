@@ -314,6 +314,7 @@ namespace AprNes.UI
             {
                 NesCore.ChannelVolume[i] = trkNes[i].Value;
                 NesCore.ChannelEnabled[i] = chkNes[i].Checked;
+                NesCore.SyncChannelEnableMask();
             }
 
             // Channel Volume — Expansion channels

@@ -104,6 +104,14 @@ namespace AprNes
         // Per-channel enable/disable (CheckBox mute)
         // [0]=Pulse1, [1]=Pulse2, [2]=Tri, [3]=Noise, [4]=DMC, [5..12]=Exp ch0~7
         static public bool[] ChannelEnabled = new bool[] { true, true, true, true, true, true, true, true, true, true, true, true, true };
+        // Bitmask for main 5 channels (bit0=Pulse1..bit4=DMC) — avoids array bounds check
+        static public int ChannelEnableMask = 0x1F;
+        /// <summary>Call after modifying ChannelEnabled[0..4] to sync bitmask.</summary>
+        static public void SyncChannelEnableMask()
+        {
+            ChannelEnableMask = (ChannelEnabled[0] ? 1 : 0) | (ChannelEnabled[1] ? 2 : 0) |
+                (ChannelEnabled[2] ? 4 : 0) | (ChannelEnabled[3] ? 8 : 0) | (ChannelEnabled[4] ? 16 : 0);
+        }
 
         // Mode 0/1 擴展音效增益 (從 ChannelVolume[5..] 平均值預算, 由 AudioPlus 更新)
         static public float ap_mode01ExpGain = 0f;
@@ -119,6 +127,9 @@ namespace AprNes
         // PAL:  8313/16627/24939/33251-33253 (4-step), +41565/41566 (5-step)
         static int[] fc4step = new int[6]; // [Q0, QH1, Q2, IRQ3a, QH_IRQ3b, IRQ_RESET3c]
         static int[] fc5step = new int[6]; // [Q0, QH1, Q2, skip3, QH4, RESET5]
+        // Flattened frame counter thresholds (no array bounds check in hot path)
+        static int fc4_0, fc4_1, fc4_2, fc4_3, fc4_4, fc4_5;
+        static int fc5_0, fc5_1, fc5_2, fc5_3, fc5_4, fc5_5;
         static ushort apuFrameCounter = 0;        // count-up counter
         static byte apuFrameCounterReset = 0xFF;  // TriCNES: APU_FrameCounterReset (0xFF=inactive, 0-4=countdown)
         static bool apuQuarterFrame = false;       // TriCNES: APU_QuarterFrameClock
@@ -288,6 +299,9 @@ namespace AprNes
                 fc4step[0]=7457; fc4step[1]=14913; fc4step[2]=22371; fc4step[3]=29828; fc4step[4]=29829; fc4step[5]=29830;
                 fc5step[0]=7457; fc5step[1]=14913; fc5step[2]=22371; fc5step[3]=29829; fc5step[4]=37281; fc5step[5]=37282;
             }
+            // Flatten to local vars for bounds-check-free hot path
+            fc4_0=fc4step[0]; fc4_1=fc4step[1]; fc4_2=fc4step[2]; fc4_3=fc4step[3]; fc4_4=fc4step[4]; fc4_5=fc4step[5];
+            fc5_0=fc5step[0]; fc5_1=fc5step[1]; fc5_2=fc5step[2]; fc5_3=fc5step[3]; fc5_4=fc5step[4]; fc5_5=fc5step[5];
 
             if (Region == RegionType.PAL)
             {
@@ -493,19 +507,18 @@ namespace AprNes
                 }
             }
 
-            // Triangle timer (every CPU cycle)
+            // Triangle timer (every CPU cycle) — cached triActive condition
             {
                 int triPeriod = _triPeriod;
                 int lc2 = lengthctr[2];
                 int linCtr = linearctr;
+                bool triActive = linCtr > 0 && lc2 > 0 && triPeriod >= 2;
                 if (--_triTimer < 0)
                 {
                     _triTimer = triPeriod;
-                    if (linCtr > 0 && lc2 > 0 && triPeriod >= 2)
-                        _triSeq = (_triSeq + 1) & 31;
+                    if (triActive) _triSeq = (_triSeq + 1) & 31;
                 }
-                _triOut = (linCtr > 0 && lc2 > 0 && triPeriod >= 2)
-                    ? TRI_SEQ[_triSeq] : 0;
+                _triOut = triActive ? TRI_SEQ[_triSeq] : 0;
             }
 
             // ── Frame Counter (TriCNES: after timers) ──
@@ -522,26 +535,26 @@ namespace AprNes
             int fc = apuFrameCounter;
             if (ctrmode == 5)
             {
-                if      (fc == fc5step[0]) apuQuarterFrame = true;
-                else if (fc == fc5step[1]) { apuQuarterFrame = true; apuHalfFrame = true; }
-                else if (fc == fc5step[2]) apuQuarterFrame = true;
-                else if (fc == fc5step[3]) { } // skip
-                else if (fc == fc5step[4]) { apuQuarterFrame = true; apuHalfFrame = true; }
-                else if (fc == fc5step[5]) apuFrameCounter = 0;
+                if      (fc == fc5_0) apuQuarterFrame = true;
+                else if (fc == fc5_1) { apuQuarterFrame = true; apuHalfFrame = true; }
+                else if (fc == fc5_2) apuQuarterFrame = true;
+                else if (fc == fc5_3) { } // skip
+                else if (fc == fc5_4) { apuQuarterFrame = true; apuHalfFrame = true; }
+                else if (fc == fc5_5) apuFrameCounter = 0;
             }
             else
             {
-                if      (fc == fc4step[0]) apuQuarterFrame = true;
-                else if (fc == fc4step[1]) { apuQuarterFrame = true; apuHalfFrame = true; }
-                else if (fc == fc4step[2]) apuQuarterFrame = true;
-                else if (fc == fc4step[3]) statusframeint = true;
-                else if (fc == fc4step[4])
+                if      (fc == fc4_0) apuQuarterFrame = true;
+                else if (fc == fc4_1) { apuQuarterFrame = true; apuHalfFrame = true; }
+                else if (fc == fc4_2) apuQuarterFrame = true;
+                else if (fc == fc4_3) statusframeint = true;
+                else if (fc == fc4_4)
                 {
                     apuQuarterFrame = true; apuHalfFrame = true;
                     statusframeint = true;
                     irqLineCurrent |= !apuintflag;
                 }
-                else if (fc == fc4step[5])
+                else if (fc == fc4_5)
                 {
                     statusframeint = !apuintflag;
                     irqLineCurrent |= !apuintflag;
@@ -576,12 +589,13 @@ namespace AprNes
                 mapperExpansionAudio = sum;
             }
 
-            // Apply per-channel enable/mute
-            int sq1val  = ChannelEnabled[0] ? volume[0] * _pulseOut[0] : 0;
-            int sq2val  = ChannelEnabled[1] ? volume[1] * _pulseOut[1] : 0;
-            int trival  = ChannelEnabled[2] ? _triOut : 0;
-            int noisval = ChannelEnabled[3] ? volume[3] * _noiseOut : 0;
-            int dmcval  = ChannelEnabled[4] ? dmcvalue : 0;
+            // Apply per-channel enable/mute (bitmask — no array bounds check)
+            int mask = ChannelEnableMask;
+            int sq1val  = (mask & 1)  != 0 ? volume[0] * _pulseOut[0] : 0;
+            int sq2val  = (mask & 2)  != 0 ? volume[1] * _pulseOut[1] : 0;
+            int trival  = (mask & 4)  != 0 ? _triOut : 0;
+            int noisval = (mask & 8)  != 0 ? volume[3] * _noiseOut : 0;
+            int dmcval  = (mask & 16) != 0 ? dmcvalue : 0;
 
             if (AudioMode > 0)
             {
