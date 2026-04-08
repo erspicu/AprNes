@@ -292,7 +292,8 @@ namespace AprNes
                             if (canDetectSprite0Hit && sprSlot == 0 && sprZeroInSlots && showBG && showSpr && bgColor != 0 && sprColor != 0)
                             { if ((ShowSprLeft8 || cx > 8) && cx < 256) { pendingSprite0Hit = true; canDetectSprite0Hit = false; } }
 
-                            if (sprColor != 0 && showSpr) { if (bgColor == 0 || sprPriority) { bgColor = sprColor; bgPalette = sprPalette; } }
+                            // Branchless pixel blend — uses | (not ||) to avoid short-circuit, ternary for potential CMOV
+                            if (sprColor != 0 && showSpr) { bool ow = (bgColor == 0) | sprPriority; bgColor = ow ? sprColor : bgColor; bgPalette = ow ? sprPalette : bgPalette; }
                         }
 
                         if ((showBG || showSpr) && cx <= 256)
