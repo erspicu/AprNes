@@ -107,10 +107,6 @@ namespace AprNes
                 cpuFreq        = 1789773.0;
                 FrameSeconds   = 1.0 / 60.0988;
             }
-            // Precompute packed scanline event constants
-            L_VBL_START    = (nmiTriggerLine << 9) | 1;
-            L_SPRITE_RESET = (preRenderLine << 9) | 1;
-            L_VBL_END      = (preRenderLine << 9) | 2;
         }
 
         // ── AudioPlus 音訊引擎設定 ──────────────────────────────────

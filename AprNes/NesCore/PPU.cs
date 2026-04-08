@@ -601,11 +601,6 @@ namespace AprNes
         // const 在 C# 中是編譯期替換（等同直接寫字面值），JIT 視為 hardcode 常數。
         // ═══════════════════════════════════════════════════════════════
 
-        // Precomputed packed scanline event constants (set by ApplyRegionProfile)
-        static int L_VBL_START;     // (nmiTriggerLine << 9) | 1
-        static int L_SPRITE_RESET;  // (preRenderLine << 9) | 1
-        static int L_VBL_END;       // (preRenderLine << 9) | 2
-
         // ═══════════════════════════════════════════════════════════════
         // Unified PPU step — region differences via precomputed parameters:
         //   NTSC odd frame skip (always enabled — PAL/Dendy stripped)
