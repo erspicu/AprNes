@@ -204,7 +204,7 @@ namespace AprNes
         static public int ppuChrFetchA12;
 
         // P4-1: TriCNES-style per-alignment OAM corruption model
-        // When rendering disabled mid-scanline → capture corruption index from secOAMAddr.
+        // When rendering disabled mid-scanline → capture corruption index from evalOam2Addr.
         // When rendering re-enabled → apply corruption (copy row 0 over target row),
         // UNLESS alignment 1 or 2 suppresses it.
         static byte* corruptOamRow; // 32 bytes (legacy, kept for allocation)
@@ -629,11 +629,6 @@ namespace AprNes
         static bool sprite0Added;                   // TriCNES: PPU_NextScanlineContainsSpriteZero
         static bool nineObjectsOnLine;              // TriCNES: NineObjectsOnThisScanline
         static int evalSpriteCount;                 // Number of sprites found (0-8)
-        // Legacy aliases for code that still references old names
-        static byte spriteEvalAddrH { get { return (byte)(evalOamAddr >> 2); } }
-        static byte spriteEvalAddrL { get { return (byte)(evalOamAddr & 3); } }
-        static byte secOAMAddr { get { return evalOam2Addr; } set { evalOam2Addr = value; } }
-        static bool oamCopyDone { get { return evalOamOverflowed; } set { evalOamOverflowed = value; } }
         static bool evalSprite0Visible;             // Sprite 0 found in secondary OAM
 
         // Pre-render line sprite data (loaded at pre-render dot 257 for scanline 0)
