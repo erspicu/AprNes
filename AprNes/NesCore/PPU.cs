@@ -870,7 +870,28 @@ namespace AprNes
         static public volatile bool emuWaiting = false;
         static void RenderScreen()
         {
-            if (AnalogEnabled && analogRenderThreadRunning)
+            if (!AnalogEnabled)
+            {
+                // === 數位模式同步 path / headless (最常見路徑) ===
+                screen_lock = true;
+                VideoOutput?.Invoke(null, null);
+                screen_lock = false;
+                emuWaiting = true;
+                _event.WaitOne();
+                emuWaiting = false;
+            }
+            else if (!analogRenderThreadRunning)
+            {
+                // === Analog 同步 fallback (UI 停止渲染執行緒時 / headless 模式) ===
+                screen_lock = true;
+                if (UltraAnalog && CrtEnabled) Crt_Render();
+                VideoOutput?.Invoke(null, null);
+                screen_lock = false;
+                emuWaiting = true;
+                _event.WaitOne();
+                emuWaiting = false;
+            }
+            else
             {
                 // === Async double buffer path (類比模式) ===
                 screen_lock = true;
@@ -886,27 +907,6 @@ namespace AprNes
 
                 // 通知渲染執行緒開始 blit back buffer
                 analogRenderReady.Set();
-            }
-            else if (AnalogEnabled)
-            {
-                // === Analog 同步 fallback (UI 停止渲染執行緒時 / headless 模式) ===
-                screen_lock = true;
-                if (UltraAnalog && CrtEnabled) Crt_Render();
-                VideoOutput?.Invoke(null, null);
-                screen_lock = false;
-                emuWaiting = true;
-                _event.WaitOne();
-                emuWaiting = false;
-            }
-            else
-            {
-                // === 數位模式同步 path / headless ===
-                screen_lock = true;
-                VideoOutput?.Invoke(null, null);
-                screen_lock = false;
-                emuWaiting = true;
-                _event.WaitOne();
-                emuWaiting = false;
             }
         }
 
