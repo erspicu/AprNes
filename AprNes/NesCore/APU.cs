@@ -442,9 +442,7 @@ namespace AprNes
                     if (--_noiseTimer < 0)
                     {
                         _noiseTimer = noiseperiod[_noisePeriodIdx] >> 1;
-                        int fb = _noiseMode
-                            ? ((_noiseLfsr & 1) ^ ((_noiseLfsr >> 6) & 1))
-                            : ((_noiseLfsr & 1) ^ ((_noiseLfsr >> 1) & 1));
+                        int fb = (_noiseLfsr ^ (_noiseLfsr >> (_noiseMode ? 6 : 1))) & 1;
                         _noiseLfsr = (ushort)((_noiseLfsr >> 1) | (fb << 14));
                     }
                     _noiseOut = (lengthctr[3] > 0 && (_noiseLfsr & 1) == 0) ? 1 : 0;
