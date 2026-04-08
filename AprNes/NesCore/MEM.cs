@@ -73,18 +73,19 @@ namespace AprNes
             // ── PUT cycle — OAM has priority ──
             if (mcApuPutCycle)
             {
-                if (spriteDmaTransfer && !dmaOamHalt)      OamDmaPut();
-                else if (dmcDmaRunning && !dmcDmaHalt)     DmcDmaPut();
-                else if (spriteDmaTransfer)                OamDmaHalted();
-                else if (dmcDmaRunning)                    DmcDmaHalted();
+                if (spriteDmaTransfer && !dmaOamHalt)        OamDmaPut();
+                else if (dmcDmaRunning && !dmcDmaHalt)       DmcDmaPut();
+                // WARNING: OamDmaHalted() and DmcDmaHalted() are currently identical (DmaFetch(addressBus)).
+                // If either is changed in the future, this merge MUST be split back to separate calls.
+                else if (spriteDmaTransfer | dmcDmaRunning)  DmcDmaHalted();
             }
             // ── GET cycle — DMC has priority ──
             else
             {
-                if (dmcDmaRunning && !dmcDmaHalt)          DmcDmaGet();
-                else if (spriteDmaTransfer && !dmaOamHalt) OamDmaGet();
-                else if (dmcDmaRunning)                    DmcDmaHalted();
-                else if (spriteDmaTransfer)                OamDmaHalted();
+                if (dmcDmaRunning && !dmcDmaHalt)            DmcDmaGet();
+                else if (spriteDmaTransfer && !dmaOamHalt)   OamDmaGet();
+                // WARNING: same merge as PUT — split if OamDmaHalted/DmcDmaHalted diverge.
+                else if (dmcDmaRunning | spriteDmaTransfer)  DmcDmaHalted();
 
                 dmcDmaHalt = false;
                 dmaOamHalt = false;
@@ -95,7 +96,7 @@ namespace AprNes
             if (dmcImplicitAbortActive)
             {
                 dmcImplicitAbortActive = false;
-                if (dmcDmaRunning && dmcsamplesleft == 0)
+                if (dmcDmaRunning & (dmcsamplesleft == 0))
                 {
                     dmcDmaRunning = false;
                     dmcDmaHalt = false;
