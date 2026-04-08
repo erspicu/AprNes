@@ -876,12 +876,17 @@ namespace AprNes
                 if (digitalRenderThreadRunning)
                 {
                     // === 數位模式 async double buffer path ===
-                    screen_lock = true;
-                    screen_lock = false;
-
-                    // 等上一幀 filter+blit 完成
                     digitalRenderDone.Wait();
                     digitalRenderDone.Reset();
+
+                    // 若 render thread 在等待期間被停止，fallthrough 到 sync path
+                    if (!digitalRenderThreadRunning)
+                    {
+                        emuWaiting = true;
+                        _event.WaitOne();
+                        emuWaiting = false;
+                        return;
+                    }
 
                     // Swap front/back — UI 讀 back buffer（上一幀），模擬寫 front buffer（下一幀）
                     SwapDigitalBuffers();
