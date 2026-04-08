@@ -779,46 +779,43 @@ namespace AprNes
         static void clockdmc()
         {
             dmctimer -= 2;
-            if (dmctimer <= 0)
+            if (dmctimer > 0) return; // Early-exit: ~96% of calls return here
+
+            dmctimer = dmcrate;
+
+            if (!dmcsilence)
             {
-                dmctimer = dmcrate;
+                // Branchless delta: bit=1→+2, bit=0→-2
+                int nextValue = dmcvalue + ((dmcshiftregister & 1) << 2) - 2;
+                // Branchless clamp 0~127: (uint) cast catches both < 0 and > 127
+                if ((uint)nextValue > 0x7F)
+                    nextValue = (nextValue >> 31) == 0 ? 0x7F : 0;
+                dmcvalue = nextValue;
+                dmcshiftregister >>= 1;
+            }
 
-                if (!dmcsilence)
+            if (--dmcbitsleft <= 0)
+            {
+                dmcbitsleft = 8;
+
+                // TriCNES model: DMA trigger + shifter load inside bitsRemaining==0
+                if (dmcsamplesleft > 0 | dmcImplicitAbortPending)
                 {
-                    dmcvalue += ((dmcshiftregister & 1) != 0) ? 2 : -2;
-                    if (dmcvalue > 0x7f) dmcvalue = 0x7f;
-                    if (dmcvalue < 0)    dmcvalue  = 0;
-                    dmcshiftregister >>= 1;
+                    if (!dmcDmaRunning & dmcDmaCooldown != 2)
+                    {
+                        dmcDmaRunning = true;
+                        dmcDmaHalt = true;
+                    }
+                    // Promote implicit abort
+                    dmcImplicitAbortActive |= dmcImplicitAbortPending;
+                    dmcImplicitAbortPending = false;
+
+                    dmcshiftregister = dmcbuffer;
+                    dmcsilence = false;
                 }
-                --dmcbitsleft;
-                if (dmcbitsleft <= 0)
+                else
                 {
-                    dmcbitsleft = 8;
-
-
-                    // TriCNES model: DMA trigger + shifter load inside bitsRemaining==0
-                    if (dmcsamplesleft > 0 || dmcImplicitAbortPending)
-                    {
-                        // Start DMA if not already running and no cooldown
-                        if (!dmcDmaRunning && dmcDmaCooldown != 2)
-                        {
-                            dmcDmaRunning = true;
-                            dmcDmaHalt = true;
-                        }
-                        // Promote implicit abort
-                        if (dmcImplicitAbortPending)
-                        {
-                            dmcImplicitAbortActive = true;
-                            dmcImplicitAbortPending = false;
-                        }
-                        // Always load shifter from buffer (TriCNES: no bufferEmpty check)
-                        dmcshiftregister = dmcbuffer;
-                        dmcsilence = false;
-                    }
-                    else
-                    {
-                        dmcsilence = true;
-                    }
+                    dmcsilence = true;
                 }
             }
         }
