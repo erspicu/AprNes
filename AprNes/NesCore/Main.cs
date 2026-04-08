@@ -220,6 +220,7 @@ namespace AprNes
             if (secondaryOAM != null) { Marshal.FreeHGlobal((IntPtr)secondaryOAM); secondaryOAM = null; }
             if (corruptOamRow!= null) { Marshal.FreeHGlobal((IntPtr)corruptOamRow);corruptOamRow= null; }
             if (ppu_ram      != null) { Marshal.FreeHGlobal((IntPtr)ppu_ram);      ppu_ram      = null; }
+            if (FlipTable    != null) { Marshal.FreeHGlobal((IntPtr)FlipTable);    FlipTable    = null; }
             if (sprShiftL    != null) { Marshal.FreeHGlobal((IntPtr)sprShiftL);    sprShiftL    = null; }
             if (sprShiftH    != null) { Marshal.FreeHGlobal((IntPtr)sprShiftH);    sprShiftH    = null; }
             if (sprXCounter  != null) { Marshal.FreeHGlobal((IntPtr)sprXCounter);  sprXCounter  = null; }
@@ -465,6 +466,7 @@ prerender_sprite0_x = 0;
                 corruptOamRow    = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
                 ppu_ram          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 0x4000);
                 palCache         = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 32);
+                InitFlipTable();
                 sprShiftL        = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 sprShiftH        = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 sprXCounter      = (int* )Marshal.AllocHGlobal(sizeof(int)  * 8);

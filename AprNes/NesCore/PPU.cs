@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace AprNes
 {
@@ -556,20 +557,19 @@ namespace AprNes
             }
         }
 
-        // Reverse bits in a byte — 256-byte LUT (L1-resident, 1 read vs 12 ALU ops)
-        static readonly byte[] FlipTable = GenerateFlipTable();
-        static byte[] GenerateFlipTable()
+        // Reverse bits in a byte — 256-byte LUT (unmanaged, no bounds check)
+        static byte* FlipTable;
+        static void InitFlipTable()
         {
-            byte[] t = new byte[256];
+            FlipTable = (byte*)Marshal.AllocHGlobal(256);
             for (int i = 0; i < 256; i++)
             {
                 int v = i;
                 v = ((v & 0xF0) >> 4) | ((v & 0x0F) << 4);
                 v = ((v & 0xCC) >> 2) | ((v & 0x33) << 2);
                 v = ((v & 0xAA) >> 1) | ((v & 0x55) << 1);
-                t[i] = (byte)v;
+                FlipTable[i] = (byte)v;
             }
-            return t;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
