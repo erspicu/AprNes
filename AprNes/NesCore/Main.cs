@@ -570,10 +570,11 @@ prerender_sprite0_x = 0;
 
         static public void run()
         {
-            // Batched execution: check exit every ~1364 master ticks (≈1 scanline)
+            // Batched execution: check exit every ~357368 master ticks (≈1 NTSC frame)
+            // 341 dots × 262 scanlines × 4 master ticks/dot = 357368
             while (!exit)
             {
-                for (int batch = 0; batch < 1364; batch++)
+                for (int batch = 0; batch < 357368; batch++)
                     MasterClockTick();
             }
             Console.WriteLine("exit..");
