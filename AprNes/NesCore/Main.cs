@@ -597,8 +597,6 @@ prerender_sprite0_x = 0;
                 if (dmcDmaRunning && dmcImplicitAbortActive)
                     dmcImplicitAbortActive = false;
 
-                cpuCycleCount++;
-
                 if (!isFDS) MapperObj.CpuCycle();
                 else fds_CpuCycle();
             }

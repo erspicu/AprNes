@@ -32,8 +32,6 @@ namespace AprNes
         // Master Clock timing (TriCNES model: per-master-clock execution)
         // NTSC: 21,477,272.73 Hz — CPU = master ÷ 12, PPU = master ÷ 4 (3:1)
         // PAL:  26,601,714 Hz   — CPU = master ÷ 16, PPU = master ÷ 5 (3.2:1)
-        static long cpuCycleCount = 0; // TriCNES: defaults to 0
-
         // Per-master-clock dividers (TriCNES: CPUClock/PPUClock countdown timers)
         // Count DOWN to 0, component executes when counter reaches 0, then resets.
         static int mcCpuClock = 0;    // TriCNES: defaults to 0 (CPU fires on first tick)
