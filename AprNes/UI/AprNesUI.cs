@@ -1739,7 +1739,8 @@ public string GetRomInfo()
             if (digitalRenderThread == null) return;
             NesCore._event.Reset();
             NesCore.digitalRenderThreadRunning = false;
-            NesCore.digitalRenderReady.Set();
+            NesCore.digitalRenderReady.Set();    // 喚醒 render thread 退出迴圈
+            NesCore.digitalRenderDone.Set();     // 釋放模擬 thread（可能卡在 Wait）
             digitalRenderThread.Join(500);
             digitalRenderThread = null;
             NesCore.digitalRenderDone.Set();
