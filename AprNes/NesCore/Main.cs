@@ -588,8 +588,9 @@ prerender_sprite0_x = 0;
             {
                 mcCpuClock = masterPerCpu;
 
-                if ((dmcDmaRunning && (dmcStatusEnabled || dmcImplicitAbortActive) && cpuIsRead) ||
-                    (spriteDmaTransfer && cpuIsRead))
+                // Branchless DMA gate: & and | avoid short-circuit branches
+                bool isDmcActive = dmcDmaRunning & (dmcStatusEnabled | dmcImplicitAbortActive);
+                if (cpuIsRead & (isDmcActive | spriteDmaTransfer))
                     DmaOneCycle();
                 else
                     cpu_step_one_cycle();
