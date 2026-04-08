@@ -1713,7 +1713,8 @@ public string GetRomInfo()
         void StartRenderThread()
         {
             if (NesCore.AnalogEnabled) StartAnalogRenderThread();
-            else StartDigitalRenderThread();
+            // TODO: digital async double buffer disabled — deadlock on filter switch needs deeper investigation
+            // else StartDigitalRenderThread();
         }
 
         // ═══════════════════════════════════════════════════════════
@@ -1737,12 +1738,15 @@ public string GetRomInfo()
         public void StopDigitalRenderThread()
         {
             if (digitalRenderThread == null) return;
+            // 1. 先 Reset _event，防止模擬 thread 被釋放後直接衝過 WaitOne
             NesCore._event.Reset();
+            // 2. 停止 render thread
             NesCore.digitalRenderThreadRunning = false;
             NesCore.digitalRenderReady.Set();    // 喚醒 render thread 退出迴圈
-            NesCore.digitalRenderDone.Set();     // 釋放模擬 thread（可能卡在 Wait）
-            digitalRenderThread.Join(500);
+            digitalRenderThread.Join(500);       // 等 render thread 結束
             digitalRenderThread = null;
+            // 3. 釋放模擬 thread — 它會走 fallthrough: emuWaiting=true + _event.WaitOne() 卡住
+            NesCore.digitalRenderDone.Set();
             NesCore.digitalRenderDone.Set();
         }
 
