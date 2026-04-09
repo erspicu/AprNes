@@ -785,12 +785,10 @@ namespace AprNes
 
             if (!dmcsilence)
             {
-                // Branchless delta: bit=1→+2, bit=0→-2
+                // Hardware-accurate discard: if +2/-2 would overflow 0~127, keep old value
+                // TriCNES model (line 914-923): only apply delta when result stays in range
                 int nextValue = dmcvalue + ((dmcshiftregister & 1) << 2) - 2;
-                // Branchless clamp 0~127: (uint) cast catches both < 0 and > 127
-                if ((uint)nextValue > 0x7F)
-                    nextValue = (nextValue >> 31) == 0 ? 0x7F : 0;
-                dmcvalue = nextValue;
+                if ((uint)nextValue <= 0x7F) dmcvalue = nextValue;
                 dmcshiftregister >>= 1;
             }
 
