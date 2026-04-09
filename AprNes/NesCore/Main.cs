@@ -191,20 +191,6 @@ namespace AprNes
             Crt_UpdateScreenBuf(AnalogScreenBuf);
         }
 
-        // Async double buffer for digital mode (mirrors analog pattern)
-        // ScreenBuf1x = front buffer (emulation writes per-dot)
-        // ScreenBuf1xBack = back buffer (UI reads for filter + GDI blit)
-        static public ManualResetEventSlim digitalRenderReady = new ManualResetEventSlim(false);
-        static public ManualResetEventSlim digitalRenderDone  = new ManualResetEventSlim(true);
-        static public volatile bool digitalRenderThreadRunning = false;
-
-        static public void SwapDigitalBuffers()
-        {
-            var tmp = ScreenBuf1x;
-            ScreenBuf1x = ScreenBuf1xBack;
-            ScreenBuf1xBack = tmp;
-        }
-
         // 錄影用：目前 RenderObj 的最終輸出緩衝區指標與尺寸（由各 Render class init() 設定）
         static public uint* RenderOutputPtr = null;
         static public int   RenderOutputW   = 256;
@@ -228,7 +214,6 @@ namespace AprNes
             if (PRG_ROM      != null) { Marshal.FreeHGlobal((IntPtr)PRG_ROM);      PRG_ROM      = null; }
             if (CHR_ROM      != null) { Marshal.FreeHGlobal((IntPtr)CHR_ROM);      CHR_ROM      = null; }
             if (ScreenBuf1x  != null) { Marshal.FreeHGlobal((IntPtr)ScreenBuf1x);  ScreenBuf1x  = null; }
-            if (ScreenBuf1xBack != null) { Marshal.FreeHGlobal((IntPtr)ScreenBuf1xBack); ScreenBuf1xBack = null; }
             if (Buffer_BG_array != null) { Marshal.FreeHGlobal((IntPtr)Buffer_BG_array); Buffer_BG_array = null; }
             if (NesColors    != null) { Marshal.FreeHGlobal((IntPtr)NesColors);    NesColors    = null; }
             if (spr_ram      != null) { Marshal.FreeHGlobal((IntPtr)spr_ram);      spr_ram      = null; }
@@ -463,7 +448,6 @@ prerender_sprite0_x = 0;
 
                 //init allocate
                 ScreenBuf1x      = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 61440);
-                ScreenBuf1xBack  = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 61440);
                 if (AnalogEnabled)
                 {
                     SyncAnalogConfig();  // 確保 Crt_DstW/DstH 使用正確的 AnalogSize

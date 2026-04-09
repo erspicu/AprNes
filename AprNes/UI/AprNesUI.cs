@@ -206,7 +206,7 @@ namespace AprNes
         {
             // 停止 async 渲染執行緒：initUIsize 會 dispose grfx / resize panel，
             // 若渲染執行緒正在用同一個 HDC 做 SetDIBitsToDevice 會死鎖
-            StopAllRenderThreads();
+            StopAnalogRenderThread();
 
             // AnalogEnabled 時依 AnalogSize 決定（256×N × 210×N，8:7 AR）
             // 直接從 NesCore.AnalogSize 計算，避免依賴 NesCore.Crt_DstW/DstH（可能尚未 sync）
@@ -1459,7 +1459,7 @@ public string GetRomInfo()
             {
                 try
                 {
-                    StopAllRenderThreads();
+                    StopAnalogRenderThread();
                     EndHighResPeriod();
                     NesCore.exit = true;
                     NesCore._event.Set();
@@ -1517,8 +1517,8 @@ public string GetRomInfo()
             _fpsStopWatch.Restart();
             if (NesCore.AudioEnabled) WaveOutPlayer.OpenAudio();
             BeginHighResPeriod();
-            // 啟動獨立渲染執行緒（async double buffer）
-            StartRenderThread();
+            // Analog mode: 啟動獨立渲染執行緒（async double buffer）
+            if (NesCore.AnalogEnabled) StartAnalogRenderThread();
             nes_t = new Thread(NesCore.run);
             nes_t.IsBackground = true;
             nes_t.Start();
@@ -1547,7 +1547,7 @@ public string GetRomInfo()
         {
             StopRecordingIfActive();
             app_running = false;
-            StopAllRenderThreads();
+            StopAnalogRenderThread();
             EndHighResPeriod();
             NesCore.exit = true;
             NesCore._event.Set();
@@ -1605,8 +1605,8 @@ public string GetRomInfo()
                 Thread.Sleep(0);
 
             // Async analog mode: 暫停渲染執行緒以安全讀取 buffer
-            bool wasAsync = NesCore.analogRenderThreadRunning || NesCore.digitalRenderThreadRunning;
-            if (wasAsync) StopAllRenderThreads();
+            bool wasAsync = NesCore.analogRenderThreadRunning;
+            if (wasAsync) StopAnalogRenderThread();
             NesCore._event.Reset();
 
             DateTime dt = DateTime.Now;
@@ -1620,7 +1620,7 @@ public string GetRomInfo()
             }
             catch (Exception e) { Console.WriteLine("i:" + e.Message); }
 
-            if (wasAsync) StartRenderThread();
+            if (wasAsync) StartAnalogRenderThread();
             NesCore._event.Set();
 
             Console.WriteLine("Screen-" + stamp + ".png" + " write finish !");
@@ -1702,85 +1702,6 @@ public string GetRomInfo()
             }
         }
 
-        // Unified stop helper — stops whichever render thread is active
-        void StopAllRenderThreads()
-        {
-            StopAnalogRenderThread();
-            StopDigitalRenderThread();
-        }
-
-        // Start the appropriate render thread based on current mode
-        void StartRenderThread()
-        {
-            if (NesCore.AnalogEnabled) StartAnalogRenderThread();
-            // TODO: digital async double buffer disabled — deadlock on filter switch needs deeper investigation
-            // else StartDigitalRenderThread();
-        }
-
-        // ═══════════════════════════════════════════════════════════
-        // Digital mode async double buffer render thread
-        // Mirrors analog pattern: wait ready → filter+blit → signal done
-        // ═══════════════════════════════════════════════════════════
-        Thread digitalRenderThread;
-
-        void StartDigitalRenderThread()
-        {
-            if (digitalRenderThread != null) return;
-            NesCore.digitalRenderDone.Set();
-            NesCore.digitalRenderReady.Reset();
-            NesCore.digitalRenderThreadRunning = true;
-            digitalRenderThread = new Thread(DigitalRenderThreadLoop);
-            digitalRenderThread.IsBackground = true;
-            digitalRenderThread.Name = "DigitalRender";
-            digitalRenderThread.Start();
-        }
-
-        public void StopDigitalRenderThread()
-        {
-            if (digitalRenderThread == null) return;
-            // 1. 先 Reset _event，防止模擬 thread 被釋放後直接衝過 WaitOne
-            NesCore._event.Reset();
-            // 2. 停止 render thread
-            NesCore.digitalRenderThreadRunning = false;
-            NesCore.digitalRenderReady.Set();    // 喚醒 render thread 退出迴圈
-            digitalRenderThread.Join(500);       // 等 render thread 結束
-            digitalRenderThread = null;
-            // 3. 釋放模擬 thread — 它會走 fallthrough: emuWaiting=true + _event.WaitOne() 卡住
-            NesCore.digitalRenderDone.Set();
-            NesCore.digitalRenderDone.Set();
-        }
-
-        unsafe void DigitalRenderThreadLoop()
-        {
-            while (NesCore.digitalRenderThreadRunning)
-            {
-                NesCore.digitalRenderReady.Wait();
-                if (!NesCore.digitalRenderThreadRunning) break;
-                NesCore.digitalRenderReady.Reset();
-
-                // Filter + GDI blit from ScreenBuf1xBack
-                // RenderObj._input points to the swapped-out buffer (completed frame)
-                RenderObj.Render();
-
-                if (VideoRecorder.IsRecording && NesCore.ScreenBuf1xBack != null)
-                    VideoRecorder.PushFrame(NesCore.ScreenBuf1xBack);
-
-                if (LimitFPS)
-                {
-                    if (!_fpsStopWatch.IsRunning) _fpsStopWatch.Restart();
-                    double now = _fpsStopWatch.Elapsed.TotalSeconds;
-                    if (_fpsDeadline < now)
-                        _fpsDeadline = now + NesCore.FrameSeconds;
-                    while (_fpsDeadline - _fpsStopWatch.Elapsed.TotalSeconds > 0.001)
-                        Thread.Sleep(1);
-                    while (_fpsStopWatch.Elapsed.TotalSeconds < _fpsDeadline) { }
-                    _fpsDeadline += NesCore.FrameSeconds;
-                }
-
-                NesCore.digitalRenderDone.Set();
-            }
-        }
-
         unsafe void VideoOutputDeal(object sender, EventArgs e)
         {
             RenderObj.Render();
@@ -1835,7 +1756,7 @@ public string GetRomInfo()
             SaveSRam();
             NesCore.rom_file_name = rom_file_name;
 
-            StopAllRenderThreads();
+            StopAnalogRenderThread();
             NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
             NesCore._event.Reset();
             while (!NesCore.emuWaiting) Thread.Sleep(1);
@@ -1845,7 +1766,7 @@ public string GetRomInfo()
             NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
 
             NesCore.SoftReset();   // 設 flag（模擬線程暫停中，無 race condition）
-            StartRenderThread();
+            if (NesCore.AnalogEnabled) StartAnalogRenderThread();
             NesCore._event.Set();  // 恢復模擬線程，cpu_step 中偵測 softreset flag
         }
 
@@ -1883,7 +1804,7 @@ public string GetRomInfo()
             if (!running) return;
 
             // 停止 async 渲染執行緒（若有），讓模擬端回到同步模式以便安全暫停
-            StopAllRenderThreads();
+            StopAnalogRenderThread();
 
             NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
             NesCore._event.Reset();
@@ -1925,8 +1846,9 @@ public string GetRomInfo()
             RenderObj.init(NesCore.ScreenBuf1x, grfx);
             NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
 
-            // 重啟 async 渲染執行緒
-            StartRenderThread();
+            // Analog mode: 重啟 async 渲染執行緒
+            if (NesCore.AnalogEnabled)
+                StartAnalogRenderThread();
 
             NesCore._event.Set();
         }
@@ -1937,7 +1859,7 @@ public string GetRomInfo()
             StopRecordingIfActive(true);
 
             // 停止 async 渲染執行緒 + 模擬線程
-            StopAllRenderThreads();
+            StopAnalogRenderThread();
             EndHighResPeriod();
             NesCore.exit = true;
             NesCore._event.Set();
@@ -1982,7 +1904,7 @@ public string GetRomInfo()
             _fpsStopWatch.Restart();
             if (NesCore.AudioEnabled) WaveOutPlayer.OpenAudio();
             BeginHighResPeriod();
-            StartRenderThread();
+            if (NesCore.AnalogEnabled) StartAnalogRenderThread();
             nes_t = new Thread(NesCore.run);
             nes_t.IsBackground = true;
             nes_t.Start();
@@ -2018,7 +1940,7 @@ public string GetRomInfo()
             // 同步渲染管線（Ntsc._ultraAnalog 需要與 NesCore.UltraAnalog 一致）
             if (running && NesCore.AnalogEnabled)
             {
-                StopAllRenderThreads();
+                StopAnalogRenderThread();
                 NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
                 NesCore._event.Reset();
                 while (!NesCore.emuWaiting) Thread.Sleep(1);
@@ -2028,7 +1950,7 @@ public string GetRomInfo()
                 NesCore.Crt_Init();
 
                 NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
-                StartRenderThread();
+                StartAnalogRenderThread();
                 NesCore._event.Set();
             }
         }
@@ -2320,7 +2242,7 @@ public string GetRomInfo()
             // 暫停模擬執行緒，安全重新分配 buffer
             if (running)
             {
-                StopAllRenderThreads();
+                StopAnalogRenderThread();
                 NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
                 NesCore._event.Reset();
                 while (!NesCore.emuWaiting) Thread.Sleep(1);
@@ -2386,7 +2308,7 @@ public string GetRomInfo()
             if (running)
             {
                 NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
-                StartRenderThread();
+                if (NesCore.AnalogEnabled) StartAnalogRenderThread();
                 NesCore._event.Set();
             }
 
@@ -2398,7 +2320,7 @@ public string GetRomInfo()
             // 暫停模擬執行緒
             if (running)
             {
-                StopAllRenderThreads();
+                StopAnalogRenderThread();
                 NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
                 NesCore._event.Reset();
                 while (!NesCore.emuWaiting) Thread.Sleep(1);
@@ -2450,7 +2372,7 @@ public string GetRomInfo()
             if (running)
             {
                 NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
-                StartRenderThread();
+                if (NesCore.AnalogEnabled) StartAnalogRenderThread();
                 NesCore._event.Set();
             }
 

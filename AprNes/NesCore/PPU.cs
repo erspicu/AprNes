@@ -222,7 +222,6 @@ namespace AprNes
 
         // P4-2: Palette corruption flags
         static public uint* ScreenBuf1x;
-        static public uint* ScreenBuf1xBack;  // Digital mode async double buffer (GDI reads this)
         static uint* NesColors; //, targetSize;
         static int* Buffer_BG_array;
         static byte spr_ram_add = 0;
@@ -873,37 +872,13 @@ namespace AprNes
         {
             if (!AnalogEnabled)
             {
-                if (digitalRenderThreadRunning)
-                {
-                    // === 數位模式 async double buffer path ===
-                    digitalRenderDone.Wait();
-                    digitalRenderDone.Reset();
-
-                    // 若 render thread 在等待期間被停止，fallthrough 到 sync path
-                    if (!digitalRenderThreadRunning)
-                    {
-                        emuWaiting = true;
-                        _event.WaitOne();
-                        emuWaiting = false;
-                        return;
-                    }
-
-                    // Swap front/back — UI 讀 back buffer（上一幀），模擬寫 front buffer（下一幀）
-                    SwapDigitalBuffers();
-
-                    // 通知渲染執行緒開始 filter + blit back buffer
-                    digitalRenderReady.Set();
-                }
-                else
-                {
-                    // === 數位模式同步 path / headless (最常見路徑) ===
-                    screen_lock = true;
-                    VideoOutput?.Invoke(null, null);
-                    screen_lock = false;
-                    emuWaiting = true;
-                    _event.WaitOne();
-                    emuWaiting = false;
-                }
+                // === 數位模式同步 path / headless (最常見路徑) ===
+                screen_lock = true;
+                VideoOutput?.Invoke(null, null);
+                screen_lock = false;
+                emuWaiting = true;
+                _event.WaitOne();
+                emuWaiting = false;
             }
             else if (!analogRenderThreadRunning)
             {
