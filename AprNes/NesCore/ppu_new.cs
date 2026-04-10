@@ -249,12 +249,14 @@ namespace AprNes
                                 int ntAddr = 0x2000 | (vram_addr & 0x0FFF);
                                 ppuAddressBus = ntAddr; if (mapperA12IsMmc3) NotifyMapperA12(ntAddr);
                                 renderTemp = PpuBusRead(ntAddr); commitNTFetch = true;
+                                ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp; // FetchPPU side effect
                                 if (extAttrEnabled) extAttrNTOffset = (ushort)(ntAddr & 0x3FF);
                                 if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ntAddr);
                             }
                             else if (fetchPair == 1) { // phase 3: AT fetch
                                 int atAddr = 0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07);
                                 ppuAddressBus = atAddr; renderTemp = PpuBusRead(atAddr); commitATFetch = true;
+                                ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp; // FetchPPU side effect
                                 if (mmc5Ref != null) mmc5Ref.NotifyVramRead(atAddr);
                             }
                             else if (fetchPair == 2) { // phase 5: CHR low fetch
@@ -262,6 +264,7 @@ namespace AprNes
                                 ppuAddressBus = chrAddr; ppuChrFetchA12 = (chrAddr >> 12) & 1;
                                 if (mapperNeedsA12) NotifyMapperA12(chrAddr);
                                 renderTemp = PpuBusRead(chrAddr); commitPatLowFetch = true;
+                                ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp; // FetchPPU side effect
                                 if (mmc5Ref != null) mmc5Ref.NotifyVramRead(chrAddr);
                             }
                             else { // phase 7: CHR high fetch
@@ -269,6 +272,7 @@ namespace AprNes
                                 ppuAddressBus = chrAddr; ppuChrFetchA12 = (chrAddr >> 12) & 1;
                                 if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(chrAddr);
                                 renderTemp = PpuBusRead(chrAddr); commitPatHighFetch = true;
+                                ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp; // FetchPPU side effect
                                 if (mmc5Ref != null) mmc5Ref.NotifyVramRead(chrAddr);
                             }
                         }
