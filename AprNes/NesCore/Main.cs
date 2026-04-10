@@ -291,7 +291,7 @@ namespace AprNes
             // PPU VRAM address / scroll
             vram_addr_internal = 0; vram_addr = 0; FineX = 0;
             vram_latch = false;
-            ppu_2007_buffer = 0; ppu2007SM = 9;
+            ppu_2007_buffer = 0;
             // SR latch pipeline reset
             ppu2007_Read_SR = false; ppu2007_Read = false;
             ppu2007_Write_SR = false; ppu2007_Write = false;

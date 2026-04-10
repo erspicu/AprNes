@@ -181,11 +181,8 @@ namespace AprNes
         static bool ppu2007_PPU_WRITE = false;      // TriCNES: PPU_WRITE
         // Data fields
         static byte ppu2007SM_writeValue = 0;       // TriCNES: PPU_2007_WriteData
-        static bool ppu2007SM_deferredRefill = false; // deferred to after tile fetch
         // OctalLatch (8-bit address latch, low byte of PPU address bus)
         static byte ppuOctalLatch = 0;
-        // Legacy integer SM — kept only for init/reset
-        static int ppu2007SM = 9;
 
         // $2000 delayed control update (TriCNES: PPU_Update2000Delay, 1-2 PPU cycles)
         // ALL fields delayed: NMI enable, pattern table, sprite size, nametable, increment

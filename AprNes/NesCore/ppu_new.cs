@@ -228,8 +228,9 @@ namespace AprNes
                         if (ppu2007_PPU_ALE && ppu2007_PPU_READ)
                             ppuOctalLatch = (byte)ppuAddressBus;
 
-                        // Tile fetch: even phases = ALE (set address bus), odd phases = Read (fetch data)
-                        if ((cx & 1) == 0) // even phases — ALE (address latch enable, TriCNES cases 0/2/4/6)
+                        // Tile fetch: AprNes convention — even cx = ALE, odd cx = READ
+                        // (TriCNES has ALE on odd PPU_Dot, READ on even — reversed but same fetch result per tile)
+                        if ((cx & 1) == 0) // even cx = ALE (address setup)
                         {
                             int fetchPair = (cx >> 1) & 3; // 0=NT, 1=AT, 2=CHR-L, 3=CHR-H
                             if (fetchPair == 0) { ppuAddressBus = 0x2000 | (vram_addr & 0x0FFF); }
@@ -243,38 +244,38 @@ namespace AprNes
                                 ppuAddressBus = chrAddr;
                             }
                         }
-                        else // odd phases — Read (1, 3, 5, 7)
+                        else // odd cx = READ via OctalLatch
                         {
-                            int fetchPair = (cx >> 1) & 3; // 0=NT, 1=AT, 2=CHR-L, 3=CHR-H
-                            if (fetchPair == 0) { // phase 1: NT fetch
-                                int ntAddr = 0x2000 | (vram_addr & 0x0FFF);
-                                ppuAddressBus = ntAddr; if (mapperA12IsMmc3) NotifyMapperA12(ntAddr);
-                                renderTemp = PpuBusRead(ntAddr); commitNTFetch = true;
-                                ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp; // FetchPPU side effect
-                                if (extAttrEnabled) extAttrNTOffset = (ushort)(ntAddr & 0x3FF);
-                                if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ntAddr);
+                            // TriCNES: AddressBus = (PAR & 0xFF00) | OctalLatch; FetchPPU()
+                            int fetchPair = (cx >> 1) & 3;
+                            int readAddr = (ppuAddressBus & 0xFF00) | ppuOctalLatch; // OctalLatch model
+                            if (fetchPair == 0) { // case 1: NT fetch
+                                ppuAddressBus = readAddr;
+                                if (mapperA12IsMmc3) NotifyMapperA12(readAddr);
+                                renderTemp = PpuBusRead(readAddr); commitNTFetch = true;
+                                ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp;
+                                if (extAttrEnabled) extAttrNTOffset = (ushort)(readAddr & 0x3FF);
+                                if (mmc5Ref != null) mmc5Ref.NotifyVramRead(readAddr);
                             }
-                            else if (fetchPair == 1) { // phase 3: AT fetch
-                                int atAddr = 0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07);
-                                ppuAddressBus = atAddr; renderTemp = PpuBusRead(atAddr); commitATFetch = true;
-                                ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp; // FetchPPU side effect
-                                if (mmc5Ref != null) mmc5Ref.NotifyVramRead(atAddr);
+                            else if (fetchPair == 1) { // case 3: AT fetch
+                                ppuAddressBus = readAddr;
+                                renderTemp = PpuBusRead(readAddr); commitATFetch = true;
+                                ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp;
+                                if (mmc5Ref != null) mmc5Ref.NotifyVramRead(readAddr);
                             }
-                            else if (fetchPair == 2) { // phase 5: CHR low fetch
-                                int chrAddr = (extAttrEnabled && extAttrChrSize > 0) ? (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7) : BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
-                                ppuAddressBus = chrAddr; ppuChrFetchA12 = (chrAddr >> 12) & 1;
-                                if (mapperNeedsA12) NotifyMapperA12(chrAddr);
-                                renderTemp = PpuBusRead(chrAddr); commitPatLowFetch = true;
-                                ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp; // FetchPPU side effect
-                                if (mmc5Ref != null) mmc5Ref.NotifyVramRead(chrAddr);
+                            else if (fetchPair == 2) { // case 5: CHR low fetch
+                                ppuAddressBus = readAddr; ppuChrFetchA12 = (readAddr >> 12) & 1;
+                                if (mapperNeedsA12) NotifyMapperA12(readAddr);
+                                renderTemp = PpuBusRead(readAddr); commitPatLowFetch = true;
+                                ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp;
+                                if (mmc5Ref != null) mmc5Ref.NotifyVramRead(readAddr);
                             }
-                            else { // phase 7: CHR high fetch
-                                int chrAddr = (extAttrEnabled && extAttrChrSize > 0) ? (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8 : BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
-                                ppuAddressBus = chrAddr; ppuChrFetchA12 = (chrAddr >> 12) & 1;
-                                if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(chrAddr);
-                                renderTemp = PpuBusRead(chrAddr); commitPatHighFetch = true;
-                                ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp; // FetchPPU side effect
-                                if (mmc5Ref != null) mmc5Ref.NotifyVramRead(chrAddr);
+                            else { // case 7: CHR high fetch
+                                ppuAddressBus = readAddr; ppuChrFetchA12 = (readAddr >> 12) & 1;
+                                if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(readAddr);
+                                renderTemp = PpuBusRead(readAddr); commitPatHighFetch = true;
+                                ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp;
+                                if (mmc5Ref != null) mmc5Ref.NotifyVramRead(readAddr);
                             }
                         }
 
@@ -657,7 +658,9 @@ namespace AprNes
             // TriCNES line 1763-1764
             bool BLNK = (!ShowBackGround && !ShowSprites) || (scanline >= 240 && scanline < preRenderLine);
             ppu2007_BLNK_Latch = BLNK;
-            bool H0_DASH = (ppu_cycles_x - 1 & 1) != 0; // TriCNES line 1765
+            // AprNes convention: odd cx = READ dot, even cx = ALE dot
+            // TriCNES: H0_DASH=true on READ dot. In AprNes, READ is odd cx.
+            bool H0_DASH = (ppu_cycles_x & 1) != 0; // true on odd cx = READ dot
 
             // TriCNES line 1767-1768
             ppu2007_PaletteRAMEnable = ((ppuAddressBus & 0x3F00) == 0x3F00) && ppu2007_BLNK_Latch;
@@ -674,9 +677,8 @@ namespace AprNes
             ppu2007_PD_RB = ppu2007_ReadLatches[4] && !ppu2007_ReadLatches[2];
             ppu2007_ReadALE = !ppu2007_ReadLatches[4] && ppu2007_ReadLatches[2];
 
-            // TriCNES line 1782: PPU_READ
-            bool Read_H0_Latch = (ppu_cycles_x - 1 & 1) != 0; // same as H0_DASH
-            ppu2007_PPU_READ = ppu2007_PD_RB || (!BLNK && Read_H0_Latch);
+            // TriCNES line 1782: PPU_READ — true on READ dots
+            ppu2007_PPU_READ = ppu2007_PD_RB || (!BLNK && H0_DASH);
 
             // TriCNES line 1784-1791: advance write latches (even index)
             ppu2007_WriteLatches[0] = ppu2007_Write_SR;
@@ -703,8 +705,6 @@ namespace AprNes
                 }
             }
 
-            // Legacy integer SM increment (for consecutive access detection)
-            ppu2007SM++;
         }
 
         // ════════════════════════════════════════════════════════════════
