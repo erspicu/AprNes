@@ -296,6 +296,14 @@ namespace AprNes
                             if (sprColor != 0 && showSpr) { bool ow = (bgColor == 0) | sprPriority; bgColor = ow ? sprColor : bgColor; bgPalette = ow ? sprPalette : bgPalette; }
                         }
 
+                        // TriCNES v2: palette corruption check
+                        if (ppuPaletteCorruptionFromVChange | ppuPaletteCorruptionFromDisable)
+                        {
+                            ppuPaletteCorruptionFromVChange = false;
+                            ppuPaletteCorruptionFromDisable = false;
+                            CorruptPalettes(bgColor, vram_addr);
+                        }
+
                         if ((showBG || showSpr) && cx <= 256)
                         { int pa = (bgPalette << 2) | bgColor; if (bgColor == 0) pa = 0; compositeColor = palCache[pa]; compositePalIdx = (byte)(ppu_ram[0x3f00 + pa] & 0x3f); }
                         else if (cx <= 256) { if ((vram_addr & 0x3F1F) >= 0x3F00) { int pa = vram_addr & 0x1F; if ((pa & 3) == 0) pa &= 0x0F; compositeColor = NesColors[ppu_ram[0x3f00 + pa] & 0x3f]; compositePalIdx = (byte)(ppu_ram[0x3f00 + pa] & 0x3f); } }
@@ -370,8 +378,10 @@ namespace AprNes
                 int prevAddr = vram_addr;
                 vram_addr = ppu2006PendingAddr;
                 ppuAddressBus = vram_addr;
+                // TriCNES v2: palette corruption when v leaves palette range
                 if ((prevAddr & 0x3FFF) >= 0x3F00 && (vram_addr & 0x3FFF) < 0x3F00)
                     if (scanline < 240 && cx <= 256 && (prevAddr & 0xF) != 0)
+                        ppuPaletteCorruptionFromVChange = true;
                 if (mapperNeedsA12 && !((ShowBackGround_Instant || ShowSprites_Instant) && (scanline < 240 || scanline == preRenderLine)))
                     NotifyMapperA12(vram_addr);
             }
@@ -518,9 +528,9 @@ namespace AprNes
                         int addr = ppuAddressBus; byte tile = chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF];
                         sprShiftL[slot] = (sprFetchAttr[slot] & 0x40) != 0 ? FlipByte(tile) : tile;
                         if (slot >= sprSlotCount) sprShiftL[slot] = 0;
+                        // TriCNES in-range check — only when fetch enabled (preserve stale data when rendering off)
+                        { int sprY = secondaryOAM[slot * 4]; int h = Spritesize8x16 ? 16 : 8; int diff = (scanline & 0xFF) - sprY; if (!(diff >= 0 && diff < h)) sprShiftL[slot] = 0; }
                     }
-                    // TriCNES in-range check (line 2926)
-                    { int sprY = secondaryOAM[slot * 4]; int h = Spritesize8x16 ? 16 : 8; int diff = (scanline & 0xFF) - sprY; if (!(diff >= 0 && diff < h)) sprShiftL[slot] = 0; }
                 }
                 else if (sprPhase == 6) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; ppuAddressBus = ComputeSpritePatternAddr(slot) + 8; ppuChrFetchA12 = (ppuAddressBus >> 12) & 1; } }
                 else // sprPhase == 7
@@ -532,9 +542,9 @@ namespace AprNes
                         int addr = ppuAddressBus; byte tile = chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF];
                         sprShiftH[slot] = (sprFetchAttr[slot] & 0x40) != 0 ? FlipByte(tile) : tile;
                         if (slot >= sprSlotCount) sprShiftH[slot] = 0;
+                        // TriCNES in-range check — only when fetch enabled (preserve stale data when rendering off)
+                        { int sprY = secondaryOAM[slot * 4]; int h = Spritesize8x16 ? 16 : 8; int diff = (scanline & 0xFF) - sprY; if (!(diff >= 0 && diff < h)) sprShiftH[slot] = 0; }
                     }
-                    // TriCNES in-range check (line 2961)
-                    { int sprY = secondaryOAM[slot * 4]; int h = Spritesize8x16 ? 16 : 8; int diff = (scanline & 0xFF) - sprY; if (!(diff >= 0 && diff < h)) sprShiftH[slot] = 0; }
                     evalOam2Addr++;
                 }
 

@@ -229,6 +229,10 @@ namespace AprNes
         static bool oddSwap = false;
         static bool ppuRenderingEnabled = false; // Tier 3: Delayed rendering enable (end of PPU dot)
 
+        // TriCNES v2: Palette corruption flags
+        static bool ppuPaletteCorruptionFromVChange = false;    // v left palette range ($3F00+) on visible scanline
+        static bool ppuPaletteCorruptionFromDisable = false;    // rendering disabled when v >= $3C00
+
         // Deferred commit: CXinc (TriCNES: PPU_Commit_PatternHighFetch → CXinc at next dot)
         // In TriCNES, CHR high commit + CXinc fires at the NEXT full step (1 dot after phase 7).
 
@@ -574,6 +578,92 @@ namespace AprNes
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte FlipByte(byte b) => FlipTable[b];
+
+        // TriCNES v2: Palette corruption — hardware-tested lookup table.
+        // Corrupts palette RAM when v register leaves palette range ($3F00+)
+        // on visible scanlines, or when rendering is disabled with v >= $3C00.
+        // Only fires on CPU/PPU alignment 2 (mcCpuClock & 3).
+        // Ported from TriCNES 20260410 Emulator.cs lines 3251-3566.
+        static void CorruptPalettes(int bgColor, int vAddr)
+        {
+            if ((mcCpuClock & 3) != 2) return;
+
+            int vNibble = vAddr & 0xF;
+            byte[] c = new byte[32];
+            for (int i = 0; i < 32; i++) c[i] = ppu_ram[0x3F00 + i];
+
+            switch (bgColor)
+            {
+                case 0:
+                    c[vNibble] = (byte)((c[0] & c[vNibble & 0xC]) | (c[0] & c[vNibble]) | (c[vNibble & 0xC] & c[vNibble]));
+                    break;
+                case 1:
+                    switch (vNibble)
+                    {
+                        case 0:  c[0x0]=(byte)((c[0x1]&c[0xD])|c[0x0]); c[0x4]=c[0x5]; c[0x8]=c[0x9]; c[0xC]=c[0xD]; break;
+                        case 1:  break;
+                        case 2:  c[0x2]=(byte)((c[0x2]|c[0xD])&c[0x3]); c[0x3]=(byte)((c[0x1]|c[0x2])&c[0x3]); c[0x6]=(byte)((c[0x6]|c[0x5])&c[0x7]); c[0xA]=(byte)((c[0xA]|c[0x9])&c[0xB]); c[0xE]=c[0xD]; c[0xF]=c[0xD]; break;
+                        case 3:  c[0x3]&=(byte)(c[0x1]|c[0xD]); c[0xF]=c[0xD]; break;
+                        case 4:  c[0x0]=c[0x1]; c[0x4]=(byte)((c[0x5]&c[0xD])|c[0x4]); c[0x8]=c[0x9]; c[0xC]=c[0xD]; break;
+                        case 5:  break;
+                        case 6:  c[0x2]=(byte)((c[0x2]|c[0x1])&c[0x3]); c[0x6]=(byte)((c[0x6]|c[0x7])&c[0xD]); c[0x7]=(byte)((c[0x7]|c[0x6])&c[0x5]); c[0xA]=(byte)((c[0xA]|c[0x9])&c[0xB]); c[0xE]=c[0xD]; c[0xF]=c[0xD]; break;
+                        case 7:  c[0x7]&=(byte)(c[0x5]|c[0xD]); c[0xF]=c[0xD]; break;
+                        case 8:  c[0x0]=c[0x1]; c[0x4]=c[0x5]; c[0x8]=(byte)((c[0x9]&c[0xD])|c[0x8]); c[0xC]=c[0xD]; break;
+                        case 9:  break;
+                        case 0xA: c[0x2]=(byte)((c[0x2]|c[0x1])&c[0x3]); c[0x6]=(byte)((c[0x6]|c[0xD])&c[0x7]); c[0xA]=(byte)((c[0xB]|c[0xD])&c[0xA]); c[0xB]=(byte)((c[0x9]|c[0xA])&c[0xB]); c[0xE]=c[0xD]; c[0xF]=c[0xD]; break;
+                        case 0xB: c[0xB]&=(byte)(c[0x9]|c[0xD]); c[0xF]=c[0xD]; break;
+                        case 0xC: c[0x0]=c[0x1]; c[0x4]=c[0x5]; c[0x8]=c[0x9]; c[0xC]=c[0xD]; break;
+                        case 0xD: break;
+                        case 0xE: c[0x2]=(byte)((c[0x2]|c[0x1])&c[0x3]); c[0x6]=(byte)((c[0x6]|c[0xD])&c[0x7]); c[0xA]=(byte)((c[0xA]|c[0x9])&c[0xB]); c[0xE]=c[0xD]; c[0xF]=c[0xD]; break;
+                        case 0xF: c[0xF]=c[0xD]; break;
+                    }
+                    break;
+                case 2:
+                    switch (vNibble)
+                    {
+                        case 0:  c[0x0]=(byte)(c[0x0]|(c[0x2]&c[0xE])); c[0x4]=c[0x6]; c[0x8]=c[0xA]; c[0xC]=c[0xE]; break;
+                        case 1:  c[0x1]=(byte)((c[0x2]|c[0x1]|c[0xE])&(c[0x3]|c[0xE])); c[0x3]=(byte)((c[0x2]|c[0xE]|0x3C)&c[0x3]); c[0x5]=(byte)((c[0x6]|c[0x7])&c[0x5]); c[0x9]=(byte)((c[0xA]|c[0xB])&c[0x9]); c[0xD]=c[0xE]; c[0xF]=c[0xE]; break;
+                        case 2:  break;
+                        case 3:  c[0x3]&=(byte)(c[0x2]|c[0xE]); c[0xF]=c[0xE]; break;
+                        case 4:  c[0x0]=c[0x2]; c[0x4]=(byte)(c[0x4]|(c[0x6]&c[0xE])); c[0x8]=c[0xA]; c[0xC]=c[0xE]; break;
+                        case 5:  c[0x1]=(byte)((c[0x2]|c[0x1])&c[0x3]); c[0x5]=(byte)((c[0xE]|c[0x6])&c[0x5]); c[0x7]=(byte)((c[0xE]|c[0x6])&c[0x7]); c[0xD]=c[0xE]; c[0xF]=c[0xE]; break;
+                        case 6:  break;
+                        case 7:  c[0x7]&=(byte)(c[0x6]|c[0xE]); break;
+                        case 8:  c[0x0]=c[0x2]; c[0x4]=c[0x6]; c[0x8]=(byte)(c[0x8]|(c[0xA]&c[0xE])); c[0xC]=c[0xE]; break;
+                        case 9:  c[0x1]=(byte)((c[0x2]|c[0x1])&c[0x3]); c[0x5]=(byte)((c[0x6]|c[0x5])&c[0x7]); c[0x9]=(byte)((c[0xE]|c[0xA]|0x01)&c[0x9]); c[0xB]=(byte)((c[0xE]|c[0xA]|0x31)&c[0xB]); c[0xD]=c[0xE]; c[0xF]=c[0xE]; break;
+                        case 0xA: break;
+                        case 0xB: c[0xB]&=(byte)(c[0xA]|c[0xE]); c[0xF]=c[0xE]; break;
+                        case 0xC: c[0x0]=c[0x2]; c[0x4]=c[0x6]; c[0x8]=c[0xA]; c[0xC]=c[0xE]; break;
+                        case 0xD: c[0x1]=(byte)((c[0x2]|c[0x1])&c[0x3]); c[0x5]=(byte)((c[0x6]|c[0x5])&c[0x7]); c[0x9]=(byte)((c[0xA]|c[0x9])&c[0xB]); c[0xD]=c[0xE]; c[0xF]=c[0xE]; break;
+                        case 0xE: break;
+                        case 0xF: c[0xF]=c[0xE]; break;
+                    }
+                    break;
+                case 3:
+                    switch (vNibble)
+                    {
+                        case 0:  c[0x0]=(byte)(c[0x3]|(c[0xF]&c[0x0])); c[0x4]&=c[0x7]; c[0x8]&=(byte)(c[0x9]|c[0xA]|c[0xB]|c[0xF]|0x22); c[0xC]=c[0xF]; break;
+                        case 1:  c[0x1]=(byte)((c[0x1]|c[0xF])&c[0x3]); c[0x5]=c[0x7]; c[0x9]=c[0xB]; c[0xD]=c[0xF]; break;
+                        case 2:  c[0x2]=(byte)((c[0x3]|c[0xF])&c[0x3]); c[0x6]=c[0x7]; c[0xA]=c[0xB]; c[0xE]=c[0xF]; break;
+                        case 3:  break;
+                        case 4:  c[0x0]&=(byte)((c[0xF]^0xFF)|c[0x1]|c[0x2]|c[0x3]|0x7); c[0x4]&=(byte)(c[0x7]|c[0xF]); c[0x8]&=(byte)(c[0xB]|c[0xF]|(c[0xC]^0xFF)); c[0xC]=(byte)((c[0x7]&c[0xF])|c[0xC]); break;
+                        case 5:  c[0x1]=c[0x3]; c[0x5]=(byte)((c[0x5]|c[0xF])&c[0x7]); c[0x9]=c[0xB]; c[0xD]=c[0xF]; break;
+                        case 6:  c[0x2]=c[0x3]; c[0x6]=(byte)((c[0x6]|c[0xF])&c[0x7]); c[0xA]=c[0xB]; c[0xE]=c[0xF]; break;
+                        case 7:  break;
+                        case 8:  c[0x0]&=(byte)((c[0xF]^0xFF)|c[0x1]|c[0x2]|c[0x3]|0x23); c[0x4]=c[0x7]; c[0x8]&=(byte)(c[0xB]|c[0xF]|(c[0xC]^0xFF)); c[0xC]=(byte)((c[0xB]&c[0xF])|c[0xC]); break;
+                        case 9:  c[0x1]=c[0x3]; c[0x5]=c[0x7]; c[0x9]=(byte)((c[0x9]|c[0xF])&c[0xB]); c[0xD]=c[0xF]; break;
+                        case 0xA: c[0x2]=c[0x3]; c[0x6]=c[0x7]; c[0xA]=(byte)((c[0xA]|c[0xF])&c[0xB]); c[0xE]=c[0xF]; break;
+                        case 0xB: break;
+                        case 0xC: c[0x0]&=(byte)((c[0xF]^0xFF)|c[0x1]|c[0x2]|c[0x3]|0x37); c[0x4]=c[0x7]; c[0x8]&=(byte)(c[0xB]|0x2F); c[0xC]=c[0xF]; break;
+                        case 0xD: c[0x1]=c[0x3]; c[0x5]=c[0x7]; c[0x9]=c[0xB]; c[0xD]=c[0xF]; break;
+                        case 0xE: c[0x2]=c[0x3]; c[0x6]=c[0x7]; c[0xA]=c[0xB]; c[0xE]=c[0xF]; break;
+                        case 0xF: break;
+                    }
+                    break;
+            }
+            for (int i = 0; i < 32; i++) ppu_ram[0x3F00 + i] = c[i];
+            RebuildPaletteCache();
+        }
 
         static void NotifyMapperA12(int address)
         {
@@ -1130,9 +1220,22 @@ namespace AprNes
             openbus = value;
             // Delayed scroll update (TriCNES: PPU_Update2005Delay = 1-2 cycles)
             ppu2005PendingValue = value;
-            // TriCNES: latch NOT flipped here — deferred to delay handler (line 1302)
             // TriCNES: alignment 0,1,3=1cycle; alignment 2=2cycles
-            ppu2005UpdateDelay = ((mcPpuClock & 3) == 2) ? 2 : 1; // TriCNES: phase 2=2, others=1
+            ppu2005UpdateDelay = ((mcPpuClock & 3) == 2) ? 2 : 1;
+
+            // TriCNES v2: immediate open bus glitch — apply dataBus (cpubus) to t/FineX
+            // before the delay handler applies the correct value.
+            // In normal writes cpubus == value, but hardware models the bus latency.
+            if (!vram_latch) // first write
+            {
+                FineX = cpubus & 0x07;
+                vram_addr_internal = (vram_addr_internal & 0x7FE0) | ((cpubus & 0xF8) >> 3);
+            }
+            else // second write
+            {
+                vram_addr_internal = (vram_addr_internal & 0x0C1F) | ((cpubus & 0x7) << 12) | ((cpubus & 0xF8) << 2);
+            }
+            // latch NOT flipped here — deferred to delay handler (TriCNES line 1302)
         }
         static void ppu_w_2006(byte value)
         {

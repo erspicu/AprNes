@@ -1,0 +1,294 @@
+[EXECUTING: PerfView /RestartingToElevelate: /DataFile:PerfViewData.etl /BufferSizeMB:256 /StackCompression /NoGui /NoNGenRundown Stop]
+Stopping tracing for sessions 'NT Kernel Logger' and 'PerfViewSession'.
+No Heap events were active for this trace.
+[Sending rundown command to CLR providers...]
+Enabling Provider:PerfViewLogger Level:Verbose Keywords:0xffffffffffffffff Stacks:0 Values: Guid:a8a71ac1-040f-54a2-07ca-00a89b5ab761
+Enabling Provider:CLRRundown Level:Verbose Keywords:0x108 Stacks:0 Values: Guid:a669021c-c450-4609-a035-5af59af4df18
+Enabling Provider:CLRRundown Level:Verbose Keywords:0x1080060111 Stacks:0 Values: Guid:a669021c-c450-4609-a035-5af59af4df18
+Waiting up to 120 sec for rundown events.  Use /RundownTimeout to change.
+If you know your process has exited, use /noRundown qualifer to skip this step.
+Rundown File Length: 75.3MB delta: 75.3MB
+Rundown File Length: 75.3MB delta: 0.0MB
+Rundown file has stopped growing, assuming rundown complete.
+CLR Rundown took 2.826 sec.
+Done stopping sessions.
+Ensuring .NET Allocation profiler not installed.
+Detected 64 bit system, removing 32 bit keys.
+[Merging data files to aprnes_profile.etl.  Can take 10s of seconds... (can skip if data analyzed on same machine with PerfView)]
+WARNING NO _NT_SYMBOL_PATH set ...
+Symbol reader _NT_SYMBOL_PATH= {
+    C:\ai_project\AprNes\temp;
+    }
+This can be set using the File -> Set Symbol Path dialog on the Stack Viewer.
+Created SymbolReader with SymbolPath C:\ai_project\AprNes\temp
+Setting SymbolReaderOptions forces clearing Pdb lookup cache
+Starting Merging of C:\ai_projfor C:\ai_project\AprNes\temle.etl
+Checking for V4.5 for NGEN image C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319\ngen.exe
+Got NGEN image file version number: 4.8.9221.0 built by: NET481REL1LAST_25H2
+Is a V4.6 or beyond
+Path has a AUX file in NIC: C:\Windows\assembly\NativeImages_v4.0.30319_64\mscorlib\50abde036072b0b49b01ecf91d35cf89\mscorlib.ni.dll
+set COMPLUS_NGenEnableCreatePdb=1
+set PATH=%PATH%;C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319
+set _NT_SYMBOL_PATH=C:\ai_project\AprNes\temp
+*** NGEN  CREATEPDB cmdline: C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319\ngen.exe createpdb "C:\Windows\assembly\NativeImages_v4.0.30319_64\mscorlib\50abde036072b0b49b01ecf91d35cf89\mscorlib.ni.dll" "C:\Users\erspi\AppData\Local\Temp\SymbolCache" 
+
+Microsoft (R) CLR Native Image Generator - Version 4.8.9221.0
+Copyright (c) Microsoft Corporation.  All rights reserved.
+Successfully generated PDB for native assembly 'C:\Windows\assembly\NativeImages_v4.0.30319_64\mscorlib\50abde036072b0b49b01ecf91d35cf89\mscorlib.ni.dll'.
+PDB generated in directory C:\Users\erspi\AppData\Local\Temp\SymbolCache\mscorlib.ni.pdb\50abde036072b0b49b01ecf91d35cf891\
+
+
+*** NGEN CREATEPDB returns: 0
+Found NGEN pdb C:\Users\erspi\AppData\Local\Temp\SymbolCache\mscorlib.ni.pdb\50abde036072b0b49b01ecf91d35cf891\mscorlib.ni.pdb
+NGEN PDB creation for C:\Windows\assembly\NativeImages_v4.0.30319_64\mscorlib\50abde036072b0b49b01ecf91d35cf89\mscorlib.ni.dll took 0.85 Sec
+Checking for V4.5 for NGEN image C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319\ngen.exe
+Got NGEN image file version number: 4.8.9221.0 built by: NET481REL1LAST_25H2
+Is a V4.6 or beyond
+Path has a AUX file in NIC: C:\Windows\assembly\NativeImages_v4.0.30319_64\System\b89327cd35484f2adf9aab6a5a7d1f85\System.ni.dll
+set COMPLUS_NGenEnableCreatePdb=1
+set PATH=%PATH%;C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319
+set _NT_SYMBOL_PATH=C:\ai_project\AprNes\temp
+*** NGEN  CREATEPDB cmdline: C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319\ngen.exe createpdb "C:\Windows\assembly\NativeImages_v4.0.30319_64\System\b89327cd35484f2adf9aab6a5a7d1f85\System.ni.dll" "C:\Users\erspi\AppData\Local\Temp\SymbolCache" 
+
+Microsoft (R) CLR Native Image Generator - Version 4.8.9221.0
+Copyright (c) Microsoft Corporation.  All rights reserved.
+Successfully generated PDB for native assembly 'C:\Windows\assembly\NativeImages_v4.0.30319_64\System\b89327cd35484f2adf9aab6a5a7d1f85\System.ni.dll'.
+PDB generated in directory C:\Users\erspi\AppData\Local\Temp\SymbolCache\System.ni.pdb\b89327cd35484f2adf9aab6a5a7d1f851\
+
+
+*** NGEN CREATEPDB returns: 0
+Found NGEN pdb C:\Users\erspi\AppData\Local\Temp\SymbolCache\System.ni.pdb\b89327cd35484f2adf9aab6a5a7d1f851\System.ni.pdb
+NGEN PDB creation for C:\Windows\assembly\NativeImages_v4.0.30319_64\System\b89327cd35484f2adf9aab6a5a7d1f85\System.ni.dll took 0.53 Sec
+Checking for V4.5 for NGEN image C:\WINDOWS\Microsoft.NET\Framework\v4.0.30319\ngen.exe
+Got NGEN image file version number: 4.8.9221.0 built by: NET481REL1LAST_25H2
+Is a V4.6 or beyond
+Path has a AUX file in NIC: C:\Windows\assembly\NativeImages_v4.0.30319_32\System\6b357c2d0224c4a4f1b585bdfcb5a557\System.ni.dll
+set COMPLUS_NGenEnableCreatePdb=1
+set PATH=%PATH%;C:\WINDOWS\Microsoft.NET\Framework\v4.0.30319
+set _NT_SYMBOL_PATH=C:\ai_project\AprNes\temp
+*** NGEN  CREATEPDB cmdline: C:\WINDOWS\Microsoft.NET\Framework\v4.0.30319\ngen.exe createpdb "C:\Windows\assembly\NativeImages_v4.0.30319_32\System\6b357c2d0224c4a4f1b585bdfcb5a557\System.ni.dll" "C:\Users\erspi\AppData\Local\Temp\SymbolCache" 
+
+Microsoft (R) CLR Native Image Generator - Version 4.8.9221.0
+Copyright (c) Microsoft Corporation.  All rights reserved.
+Successfully generated PDB for native assembly 'C:\Windows\assembly\NativeImages_v4.0.30319_32\System\6b357c2d0224c4a4f1b585bdfcb5a557\System.ni.dll'.
+PDB generated in directory C:\Users\erspi\AppData\Local\Temp\SymbolCache\System.ni.pdb\6b357c2d0224c4a4f1b585bdfcb5a5571\
+
+
+*** NGEN CREATEPDB returns: 0
+Found NGEN pdb C:\Users\erspi\AppData\Local\Temp\SymbolCache\System.ni.pdb\6b357c2d0224c4a4f1b585bdfcb5a5571\System.ni.pdb
+NGEN PDB creation for C:\Windows\assembly\NativeImages_v4.0.30319_32\System\6b357c2d0224c4a4f1b585bdfcb5a557\System.ni.dll took 0.67 Sec
+Checking for V4.5 for NGEN image C:\WINDOWS\Microsoft.NET\Framework\v4.0.30319\ngen.exe
+Got NGEN image file version number: 4.8.9221.0 built by: NET481REL1LAST_25H2
+Is a V4.6 or beyond
+Path has a AUX file in NIC: C:\Windows\assembly\NativeImages_v4.0.30319_32\mscorlib\23e72feb67df94f6e88db52f3ac8b22f\mscorlib.ni.dll
+set COMPLUS_NGenEnableCreatePdb=1
+set PATH=%PATH%;C:\WINDOWS\Microsoft.NET\Framework\v4.0.30319
+set _NT_SYMBOL_PATH=C:\ai_project\AprNes\temp
+*** NGEN  CREATEPDB cmdline: C:\WINDOWS\Microsoft.NET\Framework\v4.0.30319\ngen.exe createpdb "C:\Windows\assembly\NativeImages_v4.0.30319_32\mscorlib\23e72feb67df94f6e88db52f3ac8b22f\mscorlib.ni.dll" "C:\Users\erspi\AppData\Local\Temp\SymbolCache" 
+
+Microsoft (R) CLR Native Image Generator - Version 4.8.9221.0
+Copyright (c) Microsoft Corporation.  All rights reserved.
+Successfully generated PDB for native assembly 'C:\Windows\assembly\NativeImages_v4.0.30319_32\mscorlib\23e72feb67df94f6e88db52f3ac8b22f\mscorlib.ni.dll'.
+PDB generated in directory C:\Users\erspi\AppData\Local\Temp\SymbolCache\mscorlib.ni.pdb\23e72feb67df94f6e88db52f3ac8b22f1\
+
+
+*** NGEN CREATEPDB returns: 0
+Found NGEN pdb C:\Users\erspi\AppData\Local\Temp\SymbolCache\mscorlib.ni.pdb\23e72feb67df94f6e88db52f3ac8b22f1\mscorlib.ni.pdb
+NGEN PDB creation for C:\Windows\assembly\NativeImages_v4.0.30319_32\mscorlib\23e72feb67df94f6e88db52f3ac8b22f\mscorlib.ni.dll took 0.95 Sec
+Checking for V4.5 for NGEN image C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319\ngen.exe
+Got NGEN image file version number: 4.8.9221.0 built by: NET481REL1LAST_25H2
+Is a V4.6 or beyond
+Path has a AUX file in NIC: C:\Windows\assembly\NativeImages_v4.0.30319_64\Microsoft.C05205801#\3a77e74378da8c22b5bd1963d088858f\Microsoft.CodeAnalysis.LanguageServer.Protocol.ni.dll
+set COMPLUS_NGenEnableCreatePdb=1
+set PATH=%PATH%;C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319
+set _NT_SYMBOL_PATH=C:\ai_project\AprNes\temp
+*** NGEN  CREATEPDB cmdline: C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319\ngen.exe createpdb "C:\Windows\assembly\NativeImages_v4.0.30319_64\Microsoft.C05205801#\3a77e74378da8c22b5bd1963d088858f\Microsoft.CodeAnalysis.LanguageServer.Protocol.ni.dll" "C:\Users\erspi\AppData\Local\Temp\SymbolCache" 
+
+Microsoft (R) CLR Native Image Generator - Version 4.8.9221.0
+Copyright (c) Microsoft Corporation.  All rights reserved.
+Successfully generated PDB for native assembly 'C:\Windows\assembly\NativeImages_v4.0.30319_64\Microsoft.C05205801#\3a77e74378da8c22b5bd1963d088858f\Microsoft.CodeAnalysis.LanguageServer.Protocol.ni.dll'.
+PDB generated in directory C:\Users\erspi\AppData\Local\Temp\SymbolCache\Microsoft.CodeAnalysis.LanguageServer.Protocol.ni.pdb\3a77e74378da8c22b5bd1963d088858f1\
+
+
+*** NGEN CREATEPDB returns: 0
+Found NGEN pdb C:\Users\erspi\AppData\Local\Temp\SymbolCache\Microsoft.CodeAnalysis.LanguageServer.Protocol.ni.pdb\3a77e74378da8c22b5bd1963d088858f1\Microsoft.CodeAnalysis.LanguageServer.Protocol.ni.pdb
+NGEN PDB creation for C:\Windows\assembly\NativeImages_v4.0.30319_64\Microsoft.C05205801#\3a77e74378da8c22b5bd1963d088858f\Microsoft.CodeAnalysis.LanguageServer.Protocol.ni.dll took 1.28 Sec
+Checking for V4.5 for NGEN image C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319\ngen.exe
+Got NGEN image file version number: 4.8.9221.0 built by: NET481REL1LAST_25H2
+Is a V4.6 or beyond
+Path has a AUX file in NIC: C:\Windows\assembly\NativeImages_v4.0.30319_64\Microsoft.V412add50#\dbd983513b898ca8f01cd42f9fc533ed\Microsoft.VisualStudio.Shell.UI.Internal.ni.dll
+set COMPLUS_NGenEnableCreatePdb=1
+set PATH=%PATH%;C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319
+set _NT_SYMBOL_PATH=C:\ai_project\AprNes\temp
+*** NGEN  CREATEPDB cmdline: C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319\ngen.exe createpdb "C:\Windows\assembly\NativeImages_v4.0.30319_64\Microsoft.V412add50#\dbd983513b898ca8f01cd42f9fc533ed\Microsoft.VisualStudio.Shell.UI.Internal.ni.dll" "C:\Users\erspi\AppData\Local\Temp\SymbolCache" 
+
+Microsoft (R) CLR Native Image Generator - Version 4.8.9221.0
+Copyright (c) Microsoft Corporation.  All rights reserved.
+Successfully generated PDB for native assembly 'C:\Windows\assembly\NativeImages_v4.0.30319_64\Microsoft.V412add50#\dbd983513b898ca8f01cd42f9fc533ed\Microsoft.VisualStudio.Shell.UI.Internal.ni.dll'.
+PDB generated in directory C:\Users\erspi\AppData\Local\Temp\SymbolCache\Microsoft.VisualStudio.Shell.UI.Internal.ni.pdb\dbd983513b898ca8f01cd42f9fc533ed1\
+
+
+*** NGEN CREATEPDB returns: 0
+Found NGEN pdb C:\Users\erspi\AppData\Local\Temp\SymbolCache\Microsoft.VisualStudio.Shell.UI.Internal.ni.pdb\dbd983513b898ca8f01cd42f9fc533ed1\Microsoft.VisualStudio.Shell.UI.Internal.ni.pdb
+NGEN PDB creation for C:\Windows\assembly\NativeImages_v4.0.30319_64\Microsoft.V412add50#\dbd983513b898ca8f01cd42f9fc533ed\Microsoft.VisualStudio.Shell.UI.Internal.ni.dll took 2.08 Sec
+Checking for V4.5 for NGEN image C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319\ngen.exe
+Got NGEN image file version number: 4.8.9221.0 built by: NET481REL1LAST_25H2
+Is a V4.6 or beyond
+Path has a AUX file in NIC: C:\Windows\assembly\NativeImages_v4.0.30319_64\Microsoft.Vbeb7089b#\d060b8e039634a0fdaa6e989231798f4\Microsoft.VisualStudio.Threading.ni.dll
+set COMPLUS_NGenEnableCreatePdb=1
+set PATH=%PATH%;C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319
+set _NT_SYMBOL_PATH=C:\ai_project\AprNes\temp
+*** NGEN  CREATEPDB cmdline: C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319\ngen.exe createpdb "C:\Windows\assembly\NativeImages_v4.0.30319_64\Microsoft.Vbeb7089b#\d060b8e039634a0fdaa6e989231798f4\Microsoft.VisualStudio.Threading.ni.dll" "C:\Users\erspi\AppData\Local\Temp\SymbolCache" 
+
+Microsoft (R) CLR Native Image Generator - Version 4.8.9221.0
+Copyright (c) Microsoft Corporation.  All rights reserved.
+Successfully generated PDB for native assembly 'C:\Windows\assembly\NativeImages_v4.0.30319_64\Microsoft.Vbeb7089b#\d060b8e039634a0fdaa6e989231798f4\Microsoft.VisualStudio.Threading.ni.dll'.
+PDB generated in directory C:\Users\erspi\AppData\Local\Temp\SymbolCache\Microsoft.VisualStudio.Threading.ni.pdb\d060b8e039634a0fdaa6e989231798f41\
+
+
+*** NGEN CREATEPDB returns: 0
+Found NGEN pdb C:\Users\erspi\AppData\Local\Temp\SymbolCache\Microsoft.VisualStudio.Threading.ni.pdb\d060b8e039634a0fdaa6e989231798f41\Microsoft.VisualStudio.Threading.ni.pdb
+NGEN PDB creation for C:\Windows\assembly\NativeImages_v4.0.30319_64\Microsoft.Vbeb7089b#\d060b8e039634a0fdaa6e989231798f4\Microsoft.VisualStudio.Threading.ni.dll took 0.47 Sec
+Checking for V4.5 for NGEN image C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319\ngen.exe
+Got NGEN image file version number: 4.8.9221.0 built by: NET481REL1LAST_25H2
+Is a V4.6 or beyond
+Path has a AUX file in NIC: C:\Windows\assembly\NativeImages_v4.0.30319_64\System.IO.Pipelines\17599e31af8ff0c1eda9c310961359e4\System.IO.Pipelines.ni.dll
+set COMPLUS_NGenEnableCreatePdb=1
+set PATH=%PATH%;C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319
+set _NT_SYMBOL_PATH=C:\ai_project\AprNes\temp
+*** NGEN  CREATEPDB cmdline: C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319\ngen.exe createpdb "C:\Windows\assembly\NativeImages_v4.0.30319_64\System.IO.Pipelines\17599e31af8ff0c1eda9c310961359e4\System.IO.Pipelines.ni.dll" "C:\Users\erspi\AppData\Local\Temp\SymbolCache" 
+
+Microsoft (R) CLR Native Image Generator - Version 4.8.9221.0
+Copyright (c) Microsoft Corporation.  All rights reserved.
+Successfully generated PDB for native assembly 'C:\Windows\assembly\NativeImages_v4.0.30319_64\System.IO.Pipelines\17599e31af8ff0c1eda9c310961359e4\System.IO.Pipelines.ni.dll'.
+PDB generated in directory C:\Users\erspi\AppData\Local\Temp\SymbolCache\System.IO.Pipelines.ni.pdb\17599e31af8ff0c1eda9c310961359e41\
+
+
+*** NGEN CREATEPDB returns: 0
+Found NGEN pdb C:\Users\erspi\AppData\Local\Temp\SymbolCache\System.IO.Pipelines.ni.pdb\17599e31af8ff0c1eda9c310961359e41\System.IO.Pipelines.ni.pdb
+NGEN PDB creation for C:\Windows\assembly\NativeImages_v4.0.30319_64\System.IO.Pipelines\17599e31af8ff0c1eda9c310961359e4\System.IO.Pipelines.ni.dll took 0.39 Sec
+Checking for V4.5 for NGEN image C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319\ngen.exe
+Got NGEN image file version number: 4.8.9221.0 built by: NET481REL1LAST_25H2
+Is a V4.6 or beyond
+Path has a AUX file in NIC: C:\Windows\assembly\NativeImages_v4.0.30319_64\Microsoft.Vdf67b619#\76964c2fdaf69a03ed4b72088492f3fa\Microsoft.VisualStudio.Shell.Framework.ni.dll
+set COMPLUS_NGenEnableCreatePdb=1
+set PATH=%PATH%;C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319
+set _NT_SYMBOL_PATH=C:\ai_project\AprNes\temp
+*** NGEN  CREATEPDB cmdline: C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319\ngen.exe createpdb "C:\Windows\assembly\NativeImages_v4.0.30319_64\Microsoft.Vdf67b619#\76964c2fdaf69a03ed4b72088492f3fa\Microsoft.VisualStudio.Shell.Framework.ni.dll" "C:\Users\erspi\AppData\Local\Temp\SymbolCache" 
+
+Microsoft (R) CLR Native Image Generator - Version 4.8.9221.0
+Copyright (c) Microsoft Corporation.  All rights reserved.
+Successfully generated PDB for native assembly 'C:\Windows\assembly\NativeImages_v4.0.30319_64\Microsoft.Vdf67b619#\76964c2fdaf69a03ed4b72088492f3fa\Microsoft.VisualStudio.Shell.Framework.ni.dll'.
+PDB generated in directory C:\Users\erspi\AppData\Local\Temp\SymbolCache\Microsoft.VisualStudio.Shell.Framework.ni.pdb\76964c2fdaf69a03ed4b72088492f3fa1\
+
+
+*** NGEN CREATEPDB returns: 0
+Found NGEN pdb C:\Users\erspi\AppData\Local\Temp\SymbolCache\Microsoft.VisualStudio.Shell.Framework.ni.pdb\76964c2fdaf69a03ed4b72088492f3fa1\Microsoft.VisualStudio.Shell.Framework.ni.pdb
+NGEN PDB creation for C:\Windows\assembly\NativeImages_v4.0.30319_64\Microsoft.Vdf67b619#\76964c2fdaf69a03ed4b72088492f3fa\Microsoft.VisualStudio.Shell.Framework.ni.dll took 0.47 Sec
+Checking for V4.5 for NGEN image C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319\ngen.exe
+Got NGEN image file version number: 4.8.9221.0 built by: NET481REL1LAST_25H2
+Is a V4.6 or beyond
+Path has a AUX file in NIC: C:\Windows\assembly\NativeImages_v4.0.30319_64\System.Thre95f54cb4#\e5dcbccc797225ce8d0e348d28c211c1\System.Threading.Tasks.Extensions.ni.dll
+set COMPLUS_NGenEnableCreatePdb=1
+set PATH=%PATH%;C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319
+set _NT_SYMBOL_PATH=C:\ai_project\AprNes\temp
+*** NGEN  CREATEPDB cmdline: C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319\ngen.exe createpdb "C:\Windows\assembly\NativeImages_v4.0.30319_64\System.Thre95f54cb4#\e5dcbccc797225ce8d0e348d28c211c1\System.Threading.Tasks.Extensions.ni.dll" "C:\Users\erspi\AppData\Local\Temp\SymbolCache" 
+
+Microsoft (R) CLR Native Image Generator - Version 4.8.9221.0
+Copyright (c) Microsoft Corporation.  All rights reserved.
+Successfully generated PDB for native assembly 'C:\Windows\assembly\NativeImages_v4.0.30319_64\System.Thre95f54cb4#\e5dcbccc797225ce8d0e348d28c211c1\System.Threading.Tasks.Extensions.ni.dll'.
+PDB generated in directory C:\Users\erspi\AppData\Local\Temp\SymbolCache\System.Threading.Tasks.Extensions.ni.pdb\e5dcbccc797225ce8d0e348d28c211c11\
+
+
+*** NGEN CREATEPDB returns: 0
+Found NGEN pdb C:\Users\erspi\AppData\Local\Temp\SymbolCache\System.Threading.Tasks.Extensions.ni.pdb\e5dcbccc797225ce8d0e348d28c211c11\System.Threading.Tasks.Extensions.ni.pdb
+NGEN PDB creation for C:\Windows\assembly\NativeImages_v4.0.30319_64\System.Thre95f54cb4#\e5dcbccc797225ce8d0e348d28c211c1\System.Threading.Tasks.Extensions.ni.dll took 0.36 Sec
+Could not find CLR directory for NGEN image C:\Program Files\Microsoft Visual Studio\2022\Community\dotnet\net8.0\runtime\shared\Microsoft.NETCore.App\8.0.21\System.Private.CoreLib.dll, Giving up
+NGEN PDB creation for C:\Program Files\Microsoft Visual Studio\2022\Community\dotnet\net8.0\runtime\shared\Microsoft.NETCore.App\8.0.21\System.Private.CoreLib.dll took 0.00 Sec
+Could not find CLR directory for NGEN image C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\ServiceHub\SharedAssemblies\Newtonsoft.Json.dll, Giving up
+NGEN PDB creation for C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\ServiceHub\SharedAssemblies\Newtonsoft.Json.dll took 0.00 Sec
+Checking for V4.5 for NGEN image C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319\ngen.exe
+Got NGEN image file version number: 4.8.9221.0 built by: NET481REL1LAST_25H2
+Is a V4.6 or beyond
+Path has a AUX file in NIC: C:\Windows\assembly\NativeImages_v4.0.30319_64\System.Core\525f2a858f50bdd1965f8b2fe315fe78\System.Core.ni.dll
+set COMPLUS_NGenEnableCreatePdb=1
+set PATH=%PATH%;C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319
+set _NT_SYMBOL_PATH=C:\ai_project\AprNes\temp
+*** NGEN  CREATEPDB cmdline: C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319\ngen.exe createpdb "C:\Windows\assembly\NativeImages_v4.0.30319_64\System.Core\525f2a858f50bdd1965f8b2fe315fe78\System.Core.ni.dll" "C:\Users\erspi\AppData\Local\Temp\SymbolCache" 
+
+Microsoft (R) CLR Native Image Generator - Version 4.8.9221.0
+Copyright (c) Microsoft Corporation.  All rights reserved.
+Successfully generated PDB for native assembly 'C:\Windows\assembly\NativeImages_v4.0.30319_64\System.Core\525f2a858f50bdd1965f8b2fe315fe78\System.Core.ni.dll'.
+PDB generated in directory C:\Users\erspi\AppData\Local\Temp\SymbolCache\System.Core.ni.pdb\525f2a858f50bdd1965f8b2fe315fe781\
+
+
+*** NGEN CREATEPDB returns: 0
+Found NGEN pdb C:\Users\erspi\AppData\Local\Temp\SymbolCache\System.Core.ni.pdb\525f2a858f50bdd1965f8b2fe315fe781\System.Core.ni.pdb
+NGEN PDB creation for C:\Windows\assembly\NativeImages_v4.0.30319_64\System.Core\525f2a858f50bdd1965f8b2fe315fe78\System.Core.ni.dll took 0.54 Sec
+Checking for V4.5 for NGEN image C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319\ngen.exe
+Got NGEN image file version number: 4.8.9221.0 built by: NET481REL1LAST_25H2
+Is a V4.6 or beyond
+Path has a AUX file in NIC: C:\Windows\assembly\NativeImages_v4.0.30319_64\Microsoft.Pb378ec07#\08c5fc780d76a5ce018458e5c64ffc14\Microsoft.PowerShell.ConsoleHost.ni.dll
+set COMPLUS_NGenEnableCreatePdb=1
+set PATH=%PATH%;C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319
+set _NT_SYMBOL_PATH=C:\ai_project\AprNes\temp
+*** NGEN  CREATEPDB cmdline: C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319\ngen.exe createpdb "C:\Windows\assembly\NativeImages_v4.0.30319_64\Microsoft.Pb378ec07#\08c5fc780d76a5ce018458e5c64ffc14\Microsoft.PowerShell.ConsoleHost.ni.dll" "C:\Users\erspi\AppData\Local\Temp\SymbolCache" 
+
+Microsoft (R) CLR Native Image Generator - Version 4.8.9221.0
+Copyright (c) Microsoft Corporation.  All rights reserved.
+Successfully generated PDB for native assembly 'C:\Windows\assembly\NativeImages_v4.0.30319_64\Microsoft.Pb378ec07#\08c5fc780d76a5ce018458e5c64ffc14\Microsoft.PowerShell.ConsoleHost.ni.dll'.
+PDB generated in directory C:\Users\erspi\AppData\Local\Temp\SymbolCache\Microsoft.PowerShell.ConsoleHost.ni.pdb\08c5fc780d76a5ce018458e5c64ffc141\
+
+
+*** NGEN CREATEPDB returns: 0
+Found NGEN pdb C:\Users\erspi\AppData\Local\Temp\SymbolCache\Microsoft.PowerShell.ConsoleHost.ni.pdb\08c5fc780d76a5ce018458e5c64ffc141\Microsoft.PowerShell.ConsoleHost.ni.pdb
+NGEN PDB creation for C:\Windows\assembly\NativeImages_v4.0.30319_64\Microsoft.Pb378ec07#\08c5fc780d76a5ce018458e5c64ffc14\Microsoft.PowerShell.ConsoleHost.ni.dll took 0.39 Sec
+Checking for V4.5 for NGEN image C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319\ngen.exe
+Got NGEN image file version number: 4.8.9221.0 built by: NET481REL1LAST_25H2
+Is a V4.6 or beyond
+Path has a AUX file in NIC: C:\Windows\assembly\NativeImages_v4.0.30319_64\System.Manaa57fc8cc#\ed3198a6dd2d6271479525f570ca4eac\System.Management.Automation.ni.dll
+set COMPLUS_NGenEnableCreatePdb=1
+set PATH=%PATH%;C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319
+set _NT_SYMBOL_PATH=C:\ai_project\AprNes\temp
+*** NGEN  CREATEPDB cmdline: C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319\ngen.exe createpdb "C:\Windows\assembly\NativeImages_v4.0.30319_64\System.Manaa57fc8cc#\ed3198a6dd2d6271479525f570ca4eac\System.Management.Automation.ni.dll" "C:\Users\erspi\AppData\Local\Temp\SymbolCache" 
+
+Microsoft (R) CLR Native Image Generator - Version 4.8.9221.0
+Copyright (c) Microsoft Corporation.  All rights reserved.
+Merging took 24.3 sec
+Successfully generated PDB for native assembly 'C:\Windows\assembly\NativeImages_v4.0.30319_64\System.Manaa57fc8cc#\ed3198a6dd2d6271479525f570ca4eac\System.Management.Automation.ni.dll'.
+PDB generated in directory C:\Users\erspi\AppData\Local\Temp\SymbolCache\System.Management.Automation.ni.pdb\ed3198a6dd2d6271479525f570ca4eac1\
+
+
+*** NGEN CREATEPDB returns: 0
+Found NGEN pdb C:\Users\erspi\AppData\Local\Temp\SymbolCache\System.Management.Automation.ni.pdb\ed3198a6dd2d6271479525f570ca4eac1\System.Management.Automation.ni.pdb
+NGEN PDB creation for C:\Windows\assembly\NativeImages_v4.0.30319_64\System.Manaa57fc8cc#\ed3198a6dd2d6271479525f570ca4eac\System.Management.Automation.ni.dll took 0.98 Sec
+Checking for V4.5 for NGEN image C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319\ngen.exe
+Got NGEN image file version number: 4.8.9221.0 built by: NET481REL1LAST_25H2
+Is a V4.6 or beyond
+Path has a AUX file in NIC: C:\Windows\assembly\NativeImages_v4.0.30319_64\System.Xml\e19298d8c2d93c6228a5a904c8f6a1f5\System.Xml.ni.dll
+set COMPLUS_NGenEnableCreatePdb=1
+set PATH=%PATH%;C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319
+set _NT_SYMBOL_PATH=C:\ai_project\AprNes\temp
+*** NGEN  CREATEPDB cmdline: C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319\ngen.exe createpdb "C:\Windows\assembly\NativeImages_v4.0.30319_64\System.Xml\e19298d8c2d93c6228a5a904c8f6a1f5\System.Xml.ni.dll" "C:\Users\erspi\AppData\Local\Temp\SymbolCache" 
+
+Microsoft (R) CLR Native Image Generator - Version 4.8.9221.0
+Copyright (c) Microsoft Corporation.  All rights reserved.
+Successfully generated PDB for native assembly 'C:\Windows\assembly\NativeImages_v4.0.30319_64\System.Xml\e19298d8c2d93c6228a5a904c8f6a1f5\System.Xml.ni.dll'.
+PDB generated in directory C:\Users\erspi\AppData\Local\Temp\SymbolCache\System.Xml.ni.pdb\e19298d8c2d93c6228a5a904c8f6a1f51\
+
+
+*** NGEN CREATEPDB returns: 0
+Found NGEN pdb C:\Users\erspi\AppData\Local\Temp\SymbolCache\System.Xml.ni.pdb\e19298d8c2d93c6228a5a904c8f6a1f51\System.Xml.ni.pdb
+NGEN PDB creation for C:\Windows\assembly\NativeImages_v4.0.30319_64\System.Xml\e19298d8c2d93c6228a5a904c8f6a1f5\System.Xml.ni.dll took 0.47 Sec
+Generating NGEN Pdbs took 25.7 sec
+Moving C:\ai_project\AprNes\temp\aprnes_profile.etl.new to C:\ai_project\AprNes\temp\aprnes_profile.etl
+Deleting temp file
+Merge and NGEN PDB Generation took 25.699 sec.
+Merge output file C:\ai_project\AprNes\temp\aprnes_profile.etl
+[Zipping ETL file C:\ai_project\AprNes\temp\aprnes_profile.etl]
+[Writing 14 PDBS to Zip file]
+ZIP generation took 6.183 sec
+ZIP output file C:\ai_project\AprNes\temp\aprnes_profile.etl.zip
+Time: 2026/4/7 下午 08:02:35
+Stop Completed at 2026/4/7 下午 08:02:35
+[DONE 20:02:35 SUCCESS: PerfView /RestartingToElevelate: /DataFile:PerfViewData.etl /BufferSizeMB:256 /StackCompression /NoGui /NoNGenRundown Stop]
