@@ -76,22 +76,41 @@
 - ⚠️ v increment 移到 half-step（#3）— 已實作但造成 20/174 FAIL 回歸
 - ⚠️ 第 2 次 FetchPPU in half-step（#4）— 已實作但可能有問題
 
-## 當前狀態（2026-04-10）
+## 當前狀態（2026-04-11）
 
 **Branch**: feature/tricnes-v2-port
-**blargg**: 154/174 PASS（20 FAIL 回歸）
-**問題**: v increment 從 SM state 4 移到 half-step 後造成大量回歸
-**根因待查**: 需要逐行比對 TriCNES StateMachine_Half 和我們的 half-step 實作
-         重點是 v increment 的時機：TriCNES 用 TStep = TStep_Latch || PD_RB 控制
-         我們用 flag（ppu2007SM_halfStepVInc）在 sm==4 時設置、half-step 執行
-         可能問題：
-         1. half-step 執行順序（v inc 在 BG shift 之後）vs TriCNES（在 StateMachine_Half 開頭）
-         2. flag 在 updateVramAddrEarly 的 else 分支設置 — 若 updateVramAddrEarly=false 且 !(isRead && bufferLate) 時仍會設 flag
-         3. half-step 的第 2 次 refill 用 OctalLatch model 可能地址不對
+**blargg**: ~162/174 PASS（12 unique FAIL, 2 pre-existing MMC3）
+**AC v2 P19**: 5/7 PASS（BG Serial In FAIL, SprOnSL0 FAIL 3, $2007 Stress FAIL 1）
+
+## 已完成的 SR latch 3-phase 移植
+
+- ✅ PPU_DATA_StateMachine() — 完整 SR latch pipeline, signals
+- ✅ PPU_DATA_StateMachine2() — PD_RB → FetchPPU (OctalLatch model)
+- ✅ PPU_DATA_StateMachine_Half() — TStep, v inc, 2nd FetchPPU, latch advance, write
+- ✅ ppu_r_2007 / ppu_w_2007 — 簡化對齊 TriCNES（SR latch trigger only）
+- ✅ 7MC EmulateUntilEndOfRead in handlers
+- ✅ SM 呼叫位置（after dot++, events, mapper）
+- ✅ H0_DASH polarity（odd cx = READ）
+- ✅ FetchPPU bus side effect（all fetch points）
+- ✅ OctalLatch guards（BG fetch + DummyNT + sprite fetch）
+- ✅ Odd-dot READ 用 OctalLatch model
+- ✅ Tile fetch range cx>=1 + DummyNT
+
+## 10 個新回歸待查（非 pre-existing）
+
+| 測試 | 類型 | 可能原因 |
+|------|------|---------|
+| ppu_read_buffer | $2007 buffer | SR latch timing vs integer SM |
+| 4× dmc_dma_during_read4 | DMA+$2007 | 7MC 推進影響 DMA timing |
+| vram_access | PPU VRAM | write handler 簡化移除了 consecutive detection |
+| cpu_dummy_writes_ppumem | CPU+PPU | 同上 |
+| cpu_exec_space_ppuio | CPU+PPU | 同上 |
+| sprite_hit 05/09 | Sprite timing | tile fetch range 或 DummyNT 改動 |
 
 ## 下一步
 
-1. 逐行比對 TriCNES StateMachine_Half（line 1827-1868）vs 我們的 half-step SM
-2. 特別檢查 v increment 的條件和時序
-3. 確認 halfStepVInc flag 的設置條件是否正確覆蓋 read + write
-4. 修正後跑 blargg 確認 174/174，再跑 AC v2 確認 stress test
+繼續逐區域比對，重點：
+1. CalculatePixel range: AprNes cx<=257 vs TriCNES PPU_Dot<=256
+2. Sprite fetch CHR: AprNes 直接用 addr vs TriCNES OctalLatch model
+3. Write handler: TriCNES 的 consecutive access 由 SR pipeline 自然處理，需確認 SR pipeline 正確覆蓋
+4. DMA + $2007 交互：7MC 推進期間 DMA 是否正確暫停

@@ -288,8 +288,8 @@ namespace AprNes
                     }
                 }
 
-                // CalculatePixel + UpdateSpriteShift (TriCNES lines 1745-1751)
-                if (cx > 0 && cx <= 257)
+                // CalculatePixel + UpdateSpriteShift (TriCNES line 1600: PPU_Dot > 0 && <= 256)
+                if (cx > 0 && cx <= 256)
                 {
                     // Local cache of static fields for JIT register allocation
                     bool showBG = ShowBackGround;
