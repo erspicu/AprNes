@@ -545,6 +545,9 @@ namespace AprNes
                 int slot = (evalDot - 257) >> 3;
                 bool sprFetchEnabled = ShowBG_EvalDelay || ShowSpr_EvalDelay;
 
+                // TriCNES line 2833-2836: OctalLatch guard before sprite switch
+                if (ppu2007_PPU_READ) ppuOctalLatch = (byte)ppuAddressBus;
+
                 // Dummy BG fetch (cases 0-3)
                 if (sprPhase <= 3)
                 {
@@ -587,6 +590,9 @@ namespace AprNes
                     }
                     evalOam2Addr++;
                 }
+
+                // TriCNES line 2995-2998: OctalLatch guard after sprite switch
+                if (ppu2007_PPU_ALE && !ppu2007_PPU_READ) ppuOctalLatch = (byte)ppuAddressBus;
 
                 if (mmc5Ref != null) { if (sprPhase == 1) mmc5Ref.NotifyVramRead(0x2000); else if (sprPhase == 3) mmc5Ref.NotifyVramRead(0x23C0); else if (sprPhase == 5) mmc5Ref.NotifyVramRead(SpPatternTableAddr); else if (sprPhase == 7) mmc5Ref.NotifyVramRead(SpPatternTableAddr | 8); }
             }
