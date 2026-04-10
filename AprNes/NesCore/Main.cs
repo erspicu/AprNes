@@ -323,7 +323,7 @@ namespace AprNes
 
             // PPU tile pipeline
             renderLow = 0; renderHigh = 0;
-            pendingTileLow = 0; pendingTileHigh = 0; commitLoadShiftReg = false;
+            pendingTileLow = 0; pendingTileHigh = 0;
 
             // PPU sprite state
 prerender_sprite0_x = 0;

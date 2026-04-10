@@ -1818,17 +1818,21 @@ namespace TriCNES
 
                 }
                 PPU_ReadBuffer = Cart.MapperChip.FetchPPU();
+                if (debug2007Log && PPU_Scanline >= 0 && PPU_Scanline < 240)
+                    System.Console.Error.WriteLine($"SM2 sl={PPU_Scanline} cx={PPU_Dot} addr={((PPU_AddressBus & 0x3F00) | PPU_OctalLatch):X4} buf={PPU_ReadBuffer:X2} bus={PPU_AddressBus:X4} ol={PPU_OctalLatch:X2}");
                 if (PPU_ALE)
                 {
                     PPU_OctalLatch = (byte)PPU_AddressBus;
                 }
-            }           
+            }
         }
         void PPU_DATA_StateMachine_Half()
         {
             PPU_2007_TStep = (PPU_2007_TStep_Latch || PPU_2007_PD_RB);
             if (PPU_2007_TStep) // If this occurs inside PPU_DATA_StateMachine() instead, the timing is wrong, and this breaks SMB1's title screen.
             {
+                if (debug2007Log && PPU_Scanline >= 0 && PPU_Scanline < 240)
+                    System.Console.Error.WriteLine($"TStp sl={PPU_Scanline} cx={PPU_Dot} v={PPU_v:X4} TL={PPU_2007_TStep_Latch} PD={PPU_2007_PD_RB}");
                 PPU_v += (ushort)(PPUControlIncrementMode32 ? 32 : 1);
                 if (!PPU_2007_BLNK_Latch)
                 {

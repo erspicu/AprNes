@@ -794,6 +794,9 @@ namespace AprNes
                 // TriCNES FetchPPU side effect: AddressBus = (AddressBus & 0xFF00) | data
                 ppuAddressBus = (ppuAddressBus & 0xFF00) | data;
 
+                if (debug2007Log && scanline >= 0 && scanline < 240)
+                    System.Console.Error.WriteLine($"SM2 sl={scanline} cx={ppu_cycles_x} addr={addr:X4} buf={data:X2} bus={ppuAddressBus:X4} ol={ppuOctalLatch:X2}");
+
                 // TriCNES line 1821-1824
                 if (ppu2007_PPU_ALE)
                     ppuOctalLatch = (byte)ppuAddressBus;
@@ -812,6 +815,8 @@ namespace AprNes
             ppu2007_TStep = ppu2007_TStep_Latch || ppu2007_PD_RB;
             if (ppu2007_TStep)
             {
+                if (debug2007Log && scanline >= 0 && scanline < 240)
+                    System.Console.Error.WriteLine($"TStp sl={scanline} cx={ppu_cycles_x} v={vram_addr:X4} TL={ppu2007_TStep_Latch} PD={ppu2007_PD_RB}");
                 // TriCNES line 1832: always increment v (no rendering gate, no 14-bit mask)
                 vram_addr = (ushort)(vram_addr + VramaddrIncrement);
                 if (!ppu2007_BLNK_Latch)
