@@ -86,6 +86,9 @@ namespace TriCNES
                     case "--wait-result":
                         waitResult = true;
                         break;
+                    case "--debug-2007":
+                        // Will be set on emu after creation
+                        break;
                     case "--max-wait":
                         if (i + 1 < args.Length) maxWaitSec = int.Parse(args[++i]);
                         break;
@@ -134,6 +137,8 @@ namespace TriCNES
 
             // Create emulator and load ROM
             Emulator emu = new Emulator();
+            if (Array.Exists(args, a => a == "--debug-2007"))
+                emu.debug2007Log = true;
             try
             {
                 Cartridge cart = new Cartridge(romPath);

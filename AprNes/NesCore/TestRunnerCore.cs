@@ -199,6 +199,9 @@ namespace AprNes
                     case "--dump-debug":
                         dumpDebug = true;
                         break;
+                    case "--debug-2007":
+                        NesCore.debug2007Log = true;
+                        break;
                     case "--analog":
                         NesCore.AnalogEnabled = true;
                         break;

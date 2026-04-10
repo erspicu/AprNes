@@ -626,6 +626,7 @@ namespace TriCNES
         public bool DoIRQ; // Set if an Interrupt Request is occurring
 
         public bool DoReset;  // Set when resetting the console, or power on.
+        public bool debug2007Log = false; // DEBUG: log $2007 reads
         public bool DoOAMDMA; // If set, the Object Acctribute Memory's Direct Memory Access will occur.
         public bool FirstCycleOfOAMDMA; // The first cycle caa behave differently.
         public bool DoDMCDMA; // If set, the Delta Modulation Channel's Direct Memory Access will occur.
@@ -9058,6 +9059,11 @@ namespace TriCNES
                         EmulateUntilEndOfRead();
                         PPU_2007_Read_SR = true; // set the SR latch at the end of the CPU read. Here's where the clock alignment differences begin. :)
                         PPU_2007_Read = true; // Start the $2007 Read state machine.
+
+                        // DEBUG: $2007 read log
+                        if (debug2007Log && PPU_Scanline >= 0 && PPU_Scanline < 240)
+                            System.Console.Error.WriteLine($"R2007 sl={PPU_Scanline} cx={PPU_Dot} buf={PPU_ReadBuffer:X2} ret={dataBus:X2} v={PPU_v:X4}");
+
 
                         break;
                 }

@@ -1086,9 +1086,15 @@ namespace AprNes
 
             openbus = result;
             open_bus_decay_timer = 77777;
+
+            // DEBUG: $2007 read log for stress test comparison
+            if (debug2007Log && scanline >= 0 && scanline < 240)
+                System.Console.Error.WriteLine($"R2007 sl={scanline} cx={ppu_cycles_x} buf={ppu_2007_buffer:X2} ret={result:X2} v={vram_addr:X4} sm={ppu2007SM}");
+
             return openbus;
         }
 
+        static public bool debug2007Log = false; // enable via --debug-2007
         static byte openbus;
         static public byte cpubus;  // CPU data bus value (last byte read/written by CPU)
 
