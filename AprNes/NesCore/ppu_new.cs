@@ -117,17 +117,15 @@ namespace AprNes
             if (oddSwap && (ShowBackGround || ShowSprites) && scanline == 0 && cx == 2)
                 skippedPreRenderDot341 = false;
 
-            // ── Rendering OFF → bus = vram_addr (TriCNES line 1530-1535) ──
+            // ── PPU_DATA_StateMachine — Phase 1 (TriCNES line 1511) ──
+            PPU_DATA_StateMachine();
+
+            // ── Rendering OFF → bus = vram_addr (TriCNES line 1530-1535, AFTER SM) ──
             if (!ShowBackGround && !ShowSprites)
             {
                 ppuAddressBus = vram_addr;
                 ppuOctalLatch = (byte)ppuAddressBus;
             }
-
-            // ── PPU_DATA_StateMachine — Phase 1 (TriCNES line 1511) ──
-            // Must be AFTER dot++, events, VSET, mapper, odd frame skip
-            // Must be BEFORE sprite eval and rendering
-            PPU_DATA_StateMachine();
 
             // ══════════════════════════════════════════════════════
             // Phase 4: Eval delay + sprite eval + $2001 + emphasis
