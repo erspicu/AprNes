@@ -1144,7 +1144,11 @@ namespace AprNes
                     if (!newRenderingInstant)
                     {
                         // OAM corruption: deferred to delay expiry (NOT immediate)
-                        // (palette corruption placeholder removed — no reader)
+                        // TriCNES v2: palette corruption when disabling rendering with v >= $3C00
+                        // The AT address mux briefly points into palette RAM due to v being used
+                        // as NT input when rendering is disabled during an AT fetch phase.
+                        if ((vram_addr & 0x3FFF) >= 0x3C00)
+                            ppuPaletteCorruptionFromDisable = true;
                     }
                     else
                     {
