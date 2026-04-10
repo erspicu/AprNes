@@ -292,8 +292,12 @@ namespace AprNes
             vram_addr_internal = 0; vram_addr = 0; FineX = 0;
             vram_latch = false;
             ppu_2007_buffer = 0; ppu2007SM = 9;
-            ppu2007SM_performMysteryWrite = false; ppu2007SM_normalWriteBehavior = false;
-            ppu2007SM_updateVramAddrEarly = false; ppu2007SM_readDelayed = false; ppu2007SM_mysteryAddr = 0;
+            // SR latch pipeline reset
+            ppu2007_Read_SR = false; ppu2007_Read = false;
+            ppu2007_Write_SR = false; ppu2007_Write = false;
+            ppu2007_PD_RB = false; ppu2007_ReadALE = false; ppu2007_WriteALE = false;
+            ppu2007_DB_PAR = false; ppu2007_TStep_Latch = false; ppu2007_TStep = false;
+            for (int i = 0; i < 5; i++) { ppu2007_ReadLatches[i] = (i & 1) != 0; ppu2007_WriteLatches[i] = (i & 1) != 0; }  // idle: [F,T,F,T,F]
             ppu2006UpdateDelay = 0; ppu2006PendingAddr = 0;
             openbus = 0; open_bus_decay_timer = 77777;
 

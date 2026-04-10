@@ -33,7 +33,10 @@ namespace AprNes
             // Phase 2: Deferred register updates (TriCNES lines 1263-1496)
             // Guard: >99% of dots have no pending updates, skip the call entirely
             // ══════════════════════════════════════════════════════
-            if (ppu2006UpdateDelay != 0 || ppu2005UpdateDelay != 0 || ppu2000UpdateDelay != 0 || ppu2007SM < 9)
+            // Phase 1: SR latch pipeline runs every dot (TriCNES: PPU_DATA_StateMachine at line 1511)
+            PPU_DATA_StateMachine();
+
+            if (ppu2006UpdateDelay != 0 || ppu2005UpdateDelay != 0 || ppu2000UpdateDelay != 0)
                 PpuPhase2_DeferredUpdates(cx);
 
             // Open bus decay (runs every dot, too small to extract)
@@ -363,17 +366,8 @@ namespace AprNes
                 }
             }
 
-            // ── Deferred $2007 SM buffer refill (TriCNES StateMachine2 model) ──
-            // Runs after tile fetch so buffer reads from shared rendering bus via OctalLatch
-            if (ppu2007SM_deferredRefill)
-            {
-                ppu2007SM_deferredRefill = false;
-                // #5: Use OctalLatch model — (AddressBus & 0x3F00) | OctalLatch
-                int addr = (ppuAddressBus & 0x3F00) | ppuOctalLatch;
-                ppu_2007_buffer = PpuBusRead(addr >= 0x3F00 ? addr & 0x2FFF : addr & 0x3FFF);
-                // Update OctalLatch after fetch (TriCNES StateMachine2 line 1821-1824)
-                if (ppu2007_PPU_ALE) ppuOctalLatch = (byte)ppuAddressBus;
-            }
+            // Phase 2: PPU_DATA_StateMachine2 — buffer refill after rendering (TriCNES line 1657)
+            PPU_DATA_StateMachine2();
 
             // ── DrawToScreen (TriCNES line 1764) ──
             if (scanline >= 0 && scanline < 240)
@@ -448,9 +442,7 @@ namespace AprNes
                 vram_addr_internal = (ushort)((vram_addr_internal & 0x73FF) | ((ppu2000PendingValue & 3) << 10));
             }
 
-            // ── $2007 state machine ──
-            if (ppu2007SM < 9)
-                Process2007StateMachine();
+            // $2007 SM Phase 1 moved to ppu_step_new (runs every dot via PPU_DATA_StateMachine)
         }
 
         // ════════════════════════════════════════════════════════════════
@@ -642,123 +634,146 @@ namespace AprNes
 
         // ════════════════════════════════════════════════════════════════
         // _EmulateHalfPPU — half PPU step (called at mcPpuClock == 2)
-        // TriCNES: Emulator.cs line 1809
         // ════════════════════════════════════════════════════════════════
-        // $2007 State Machine — TriCNES 3-phase model:
-        //   Phase 1 (full-dot, before rendering): set flags, buffer refill (deferred if rendering)
-        //   Phase 2 (after rendering): execute deferred buffer refill
-        //   Phase 3 (half-step): v increment + second buffer refill
-        // Only active when ppu2007SM < 9 (after $2007 read/write, ~9 dots max)
+        // Method 1: PPU_DATA_StateMachine — TriCNES line 1761-1806
+        // Phase 1: full dot, BEFORE rendering. Advances SR latch pipeline,
+        // computes PD_RB/ReadALE/PPU_READ/PPU_ALE signals.
+        // Called from PpuPhase2_DeferredUpdates.
         // ════════════════════════════════════════════════════════════════
-        static void Process2007StateMachine()
+        static void PPU_DATA_StateMachine()
         {
-            int sm = ppu2007SM++;
-
-            // #2: Compute PPU_READ / PPU_ALE / BLNK signals (TriCNES StateMachine lines 1763-1796)
+            // TriCNES line 1763-1764
             bool BLNK = (!ShowBackGround && !ShowSprites) || (scanline >= 240 && scanline < preRenderLine);
             ppu2007_BLNK_Latch = BLNK;
-            bool H0_DASH = (ppu_cycles_x - 1 & 1) != 0; // odd dot = H0_DASH true
-            ppu2007_PD_RB = (sm == 1 && ppu2007SM_isRead && !ppu2007SM_bufferLate)
-                         || (sm == 4 && ppu2007SM_isRead && ppu2007SM_bufferLate);
-            ppu2007_PPU_READ = ppu2007_PD_RB || (!BLNK && H0_DASH);
-            bool isReadALE = (sm == 0 && ppu2007SM_isRead); // approximate: SM just started = ALE phase
-            bool isWriteALE = (sm == 0 && !ppu2007SM_isRead && ppu2007SM < 9);
-            ppu2007_PPU_ALE = isReadALE || isWriteALE || (!BLNK && !H0_DASH);
+            bool H0_DASH = (ppu_cycles_x - 1 & 1) != 0; // TriCNES line 1765
 
-            if (sm == 1)
+            // TriCNES line 1767-1768
+            ppu2007_PaletteRAMEnable = ((ppuAddressBus & 0x3F00) == 0x3F00) && ppu2007_BLNK_Latch;
+            ppu2007_Read_XRB = ppu2007_Read && ppu2007_PaletteRAMEnable;
+
+            // TriCNES line 1770-1774: advance read latches (even index)
+            ppu2007_ReadLatches[0] = ppu2007_Read_SR;
+            if (ppu2007_Read)
+                ppu2007_Read = false;
+            ppu2007_ReadLatches[2] = !ppu2007_ReadLatches[1];
+            ppu2007_ReadLatches[4] = !ppu2007_ReadLatches[3];
+
+            // TriCNES line 1777-1778: derive PD_RB and ReadALE
+            ppu2007_PD_RB = ppu2007_ReadLatches[4] && !ppu2007_ReadLatches[2];
+            ppu2007_ReadALE = !ppu2007_ReadLatches[4] && ppu2007_ReadLatches[2];
+
+            // TriCNES line 1782: PPU_READ
+            bool Read_H0_Latch = (ppu_cycles_x - 1 & 1) != 0; // same as H0_DASH
+            ppu2007_PPU_READ = ppu2007_PD_RB || (!BLNK && Read_H0_Latch);
+
+            // TriCNES line 1784-1791: advance write latches (even index)
+            ppu2007_WriteLatches[0] = ppu2007_Write_SR;
+            if (ppu2007_Write)
+                ppu2007_Write = false;
+            ppu2007_WriteLatches[2] = !ppu2007_WriteLatches[1];
+            ppu2007_WriteLatches[4] = !ppu2007_WriteLatches[3];
+            ppu2007_WriteALE = !ppu2007_WriteLatches[4] && ppu2007_WriteLatches[2];
+
+            // TriCNES line 1793
+            ppu2007_TStep_Latch = ppu2007_DB_PAR;
+
+            // TriCNES line 1795-1796: PPU_ALE
+            bool b = !BLNK && !H0_DASH;
+            ppu2007_PPU_ALE = ppu2007_ReadALE || ppu2007_WriteALE || b;
+
+            // TriCNES line 1798-1805: SM ALE → address bus
+            if (ppu2007_ReadALE || ppu2007_WriteALE)
             {
-                if (ppu2007SM_isRead && !ppu2007SM_bufferLate)
+                if (!ppu2007_PPU_READ)
                 {
-                    // OctalLatch model: during rendering, defer buffer refill to after tile fetch
-                    bool isRenderingActive = (ShowBackGround || ShowSprites) && (scanline < 240 || scanline == preRenderLine);
-                    if (isRenderingActive)
-                    {
-                        ppu2007SM_deferredRefill = true;
-                    }
-                    else
-                    {
-                        ppuAddressBus = ppu2007SM_addr;
-                        ppuOctalLatch = (byte)ppuAddressBus;
-                        ppu_2007_buffer = PpuBusRead(ppu2007SM_addr >= 0x3F00 ? ppu2007SM_addr & 0x2FFF : ppu2007SM_addr & 0x3FFF);
-                    }
-                    // Note: v increment happens at sm==4 (original timing preserved)
-                }
-            }
-            else if (sm == 3)
-            {
-                if (ppu2007SM_normalWriteBehavior)
-                {
-                    ppu2007SM_normalWriteBehavior = false;
-                    if (!ppu2007SM_isRead || !ppu2007SM_readDelayed)
-                    {
-                        ppuAddressBus = vram_addr;
-                        PpuBusWrite(vram_addr, ppu2007SM_writeValue);
-                    }
-                }
-                else if (!ppu2007SM_isRead && ppu2007SM_performMysteryWrite)
-                {
-                    ppuAddressBus = vram_addr;
-                    if (ppu2007SM_mysteryAddr >= 0x3F00)
-                        PpuBusWrite(vram_addr & 0x2FFF, (byte)ppu2007SM_mysteryAddr);
-                    else
-                    {
-                        PpuBusWrite(ppu2007SM_mysteryAddr, (byte)ppu2007SM_mysteryAddr);
-                        PpuBusWrite(vram_addr, (byte)vram_addr);
-                    }
-                }
-            }
-            else if (sm == 4)
-            {
-                if (ppu2007SM_isRead && ppu2007SM_bufferLate)
-                {
-                    // OctalLatch model: during rendering, defer buffer refill to after tile fetch
-                    bool isRenderingActive = (ShowBackGround || ShowSprites) && (scanline < 240 || scanline == preRenderLine);
-                    if (isRenderingActive)
-                    {
-                        ppu2007SM_deferredRefill = true;
-                    }
-                    else
-                    {
-                        ppuAddressBus = vram_addr;
-                        ppuOctalLatch = (byte)ppuAddressBus;
-                        ppu_2007_buffer = PpuBusRead(vram_addr >= 0x3F00 ? vram_addr & 0x2FFF : vram_addr & 0x3FFF);
-                    }
-                }
-                if (ppu2007SM_updateVramAddrEarly)
-                {
-                    ppu2007SM_updateVramAddrEarly = false;
-                    vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x3FFF);
                     ppuAddressBus = vram_addr;
                     ppuOctalLatch = (byte)ppuAddressBus;
-                    if (ppu2007SM_isRead)
-                        ppu_2007_buffer = PpuBusRead(vram_addr >= 0x3F00 ? vram_addr & 0x2FFF : vram_addr & 0x3FFF);
                 }
-                // v increment — keep original timing (full dot, NOT half-step)
+            }
+
+            // Legacy integer SM increment (for consecutive access detection)
+            ppu2007SM++;
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // Method 2: PPU_DATA_StateMachine2 — TriCNES line 1807-1826
+        // Phase 2: full dot, AFTER rendering. Executes buffer refill when PD_RB.
+        // Called from ppu_step_new after tile fetch.
+        // ════════════════════════════════════════════════════════════════
+        static void PPU_DATA_StateMachine2()
+        {
+            if (ppu2007_PD_RB)
+            {
+                // TriCNES line 1820: PPU_ReadBuffer = FetchPPU()
+                // Use OctalLatch model: (AddressBus & 0x3F00) | OctalLatch
+                int addr = (ppuAddressBus & 0x3F00) | ppuOctalLatch;
+                ppu_2007_buffer = PpuBusRead(addr >= 0x3F00 ? addr & 0x2FFF : addr & 0x3FFF);
+
+                // TriCNES line 1821-1824
+                if (ppu2007_PPU_ALE)
+                    ppuOctalLatch = (byte)ppuAddressBus;
+            }
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // Method 3: PPU_DATA_StateMachine_Half — TriCNES line 1827-1868
+        // Phase 3: half-step. v increment + second FetchPPU + write execution
+        // + odd-index latch advancement + SR reset.
+        // Called from ppu_half_step_new.
+        // ════════════════════════════════════════════════════════════════
+        static void PPU_DATA_StateMachine_Half()
+        {
+            // TriCNES line 1829-1837: TStep → v increment
+            ppu2007_TStep = ppu2007_TStep_Latch || ppu2007_PD_RB;
+            if (ppu2007_TStep)
+            {
+                // v increment
                 if ((ShowBackGround || ShowSprites) && (scanline < 240 || scanline == preRenderLine))
-                { CXinc(); Yinc(); }
+                {
+                    // During rendering: glitchy CXinc + Yinc (TriCNES: IncrementScrollY)
+                    CXinc(); Yinc();
+                }
                 else
-                { vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x3FFF); }
+                {
+                    vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x3FFF);
+                }
                 ppuAddressBus = vram_addr;
                 ppuOctalLatch = (byte)ppuAddressBus;
                 if (mapperNeedsA12) NotifyMapperA12(vram_addr);
-                if (!ppu2007SM_isRead || !ppu2007SM_readDelayed)
-                {
-                    if (ppu2007SM_performMysteryWrite && (mcCpuClock & 3) != 0)
-                    {
-                        int a = ppuAddressBus;
-                        PpuBusWrite(a >= 0x3F00 ? a & 0x2FFF : a & 0x3FFF, ppu2007SM_writeValue);
-                    }
-                }
-                ppu2007SM_isRead = ppu2007SM_readDelayed;
-                ppu2007SM_performMysteryWrite = false;
             }
-            else if (sm == 7 && ppu2007SM_interruptedReadToWrite)
+
+            // TriCNES line 1839
+            ppu2007_PPU_ALE = ppu2007_ReadALE || ppu2007_WriteALE;
+
+            // TriCNES line 1840-1848: second FetchPPU (after v increment)
+            if (ppu2007_PD_RB)
             {
-                PpuBusWrite(ppuAddressBus, ppu2007SM_writeValue);
-                ppu2007SM_interruptedReadToWrite = false;
-                vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x3FFF);
-                ppuAddressBus = vram_addr;
-                if (mapperNeedsA12) NotifyMapperA12(vram_addr);
+                int addr = (ppuAddressBus & 0x3F00) | ppuOctalLatch;
+                ppu_2007_buffer = PpuBusRead(addr >= 0x3F00 ? addr & 0x2FFF : addr & 0x3FFF);
+                if (ppu2007_PPU_ALE)
+                    ppuOctalLatch = (byte)ppuAddressBus;
+            }
+
+            // TriCNES line 1849-1854: advance read latches (odd index) + SR reset
+            ppu2007_ReadLatches[1] = !ppu2007_ReadLatches[0];
+            ppu2007_ReadLatches[3] = !ppu2007_ReadLatches[2];
+            if (!ppu2007_ReadLatches[3])
+                ppu2007_Read_SR = false;
+
+            // TriCNES line 1856-1860: advance write latches (odd index) + SR reset
+            ppu2007_WriteLatches[1] = !ppu2007_WriteLatches[0];
+            ppu2007_WriteLatches[3] = !ppu2007_WriteLatches[2];
+            if (!ppu2007_WriteLatches[3])
+                ppu2007_Write_SR = false;
+
+            // TriCNES line 1862-1867: DB_PAR → write execution
+            ppu2007_DB_PAR = ppu2007_WriteLatches[1] && !ppu2007_WriteLatches[3];
+            ppu2007_PPU_WRITE = !ppu2007_PaletteRAMEnable && ppu2007_DB_PAR;
+            if (ppu2007_DB_PAR)
+            {
+                // TriCNES line 1866: StorePPUData(AddressBus, WriteData)
+                int waddr = ppuAddressBus & 0x3FFF;
+                PpuBusWrite(waddr, ppu2007SM_writeValue);
             }
         }
 
@@ -813,10 +828,8 @@ namespace AprNes
             if (pendingSprite0Hit2) { pendingSprite0Hit2 = false; isSprite0hit = true; }
             if (pendingSprite0Hit)  { pendingSprite0Hit  = false; pendingSprite0Hit2 = true; }
 
-            // #3/#4: v increment + second refill — kept at original timing (state 4 full dot)
-            // TriCNES does these in StateMachine_Half, but moving them caused 20 FAIL regression.
-            // The deferred refill (#1 fix) is the key change for the stress test.
-            // TODO: revisit half-step timing when all other issues resolved.
+            // Phase 3: PPU_DATA_StateMachine_Half — v inc + second FetchPPU + write (TriCNES line 1734)
+            PPU_DATA_StateMachine_Half();
         }
     }
 }
