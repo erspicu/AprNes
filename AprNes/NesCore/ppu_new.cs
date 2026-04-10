@@ -226,6 +226,10 @@ namespace AprNes
                 {
                     if (ShowBackGround || ShowSprites) // Tier 2
                     {
+                        // TriCNES line 3587-3590: OctalLatch update before fetch (odd dot + READ active)
+                        if (ppu2007_PPU_ALE && ppu2007_PPU_READ)
+                            ppuOctalLatch = (byte)ppuAddressBus;
+
                         // Tile fetch: even phases = ALE (set address bus), odd phases = Read (fetch data)
                         if ((cx & 1) == 0) // even phases — ALE (address latch enable, TriCNES cases 0/2/4/6)
                         {
@@ -240,7 +244,6 @@ namespace AprNes
                                 int chrAddr = (extAttrEnabled && extAttrChrSize > 0) ? (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8 : BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
                                 ppuAddressBus = chrAddr;
                             }
-                            ppuOctalLatch = (byte)ppuAddressBus; // #5: OctalLatch — ALE latches low byte
                         }
                         else // odd phases — Read (1, 3, 5, 7)
                         {
@@ -276,6 +279,10 @@ namespace AprNes
                                 if (mmc5Ref != null) mmc5Ref.NotifyVramRead(chrAddr);
                             }
                         }
+
+                        // TriCNES line 3643-3646: OctalLatch update after fetch (even dot + ALE + !READ)
+                        if (ppu2007_PPU_ALE && !ppu2007_PPU_READ)
+                            ppuOctalLatch = (byte)ppuAddressBus;
 
                         // MMC5 CHR A/B switch at first tile of each group
                         if ((cx == 1 || cx == 321) && chrABAutoSwitch) { byte*[] src = Spritesize8x16 ? (chrBGUseASet ? chrBankPtrsA : chrBankPtrsB) : chrBankPtrsA; for (int i = 0; i < 8; i++) chrBankPtrs[i] = src[i]; }
