@@ -518,7 +518,7 @@ namespace AprNes
                 if (sprPhase == 0) { if (sprFetchEnabled) oamCopyBuffer = secondaryOAM[evalOam2Addr]; evalOam2Addr++; }
                 else if (sprPhase == 1) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus); } evalOam2Addr++; }
                 else if (sprPhase == 2) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; sprFetchAttr[slot] = oamCopyBuffer; } evalOam2Addr++; }
-                else if (sprPhase == 3) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; sprXPos[slot] = oamCopyBuffer; } }
+                else if (sprPhase == 3) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; sprXPos[slot] = oamCopyBuffer; sprXCounter[slot] = oamCopyBuffer; } }
                 else if (sprPhase == 4) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; ppuAddressBus = ComputeSpritePatternAddr(slot); ppuChrFetchA12 = (ppuAddressBus >> 12) & 1; } }
                 else if (sprPhase == 5)
                 {
@@ -561,15 +561,24 @@ namespace AprNes
             else if (scanline == preRenderLine && evalDot == 257) { sprSlotCount = evalSpriteCount; sprZeroInSlots = evalSprite0Visible; }
             if (scanline == preRenderLine && evalDot == 257 && ppuRenderingEnabled) PrecomputePreRenderSprites();
 
-            // Dot 339: X counter init + sprite active flag
+            // Dot 339: sprite active flag + conditional counter init
+            // TriCNES v2: rendering ON at dot 339 → counters NOT touched here
+            //   (they were set during sprite fetch dots 257-320 via sprXPos;
+            //    if fetch was skipped due to rendering off, counters keep their previous value)
+            // Rendering OFF at dot 339 → zero all counters (halted mode)
+            // This enables stale sprite shift register behavior: if rendering was off during
+            // sprite fetch but re-enabled before dot 339, the counter retains its old value
+            // (likely 0 = halted) and stale shift data outputs immediately.
             if (evalDot == 339)
             {
+                if (!(ShowSprites || ShowBackGround))
+                {
+                    for (int i = 0; i < 8; i++)
+                        sprXCounter[i] = 0;
+                }
                 bool anyActive = false;
                 for (int i = 0; i < 8; i++)
-                {
-                    sprXCounter[i] = (ShowSprites || ShowBackGround) ? sprXPos[i] : 0;
                     if ((sprShiftH[i] | sprShiftL[i]) != 0) anyActive = true;
-                }
                 spriteAnyActive = anyActive;
             }
 
