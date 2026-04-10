@@ -31,23 +31,45 @@ t2: ALE — v 放上 address bus + octal latch
 t4: Read — bus data 放入 buffer
 ```
 
-### 修正方向
-**方向 1（推薦）**: 調整舊 SM 的 buffer 更新時機
-- 目前 Process2007StateMachine state 1 做部分 buffer 更新
-- state 4 做完整 buffer 更新 + v increment
-- 需要確認 state 4 是否對應 t4（4 half-cycles after M2 low）
-- 檢查 bufferLate flag 是否正確處理 alignment 差異
+### 已嘗試的修正（失敗）
+- 將 state 1 buffer update 移到 state 2：仍然 FAIL 1，184/184 無回歸但 P19 沒改善
 
-**方向 2（大工程）**: 移植 D-latch 管線
-- 之前嘗試失敗（30 FAIL — Phase1 干擾 rendering）
-- 需要先完成 Phase B（rendering fetch 走 bus 模型）
-- 工程量大，但是最終正確的做法
+### 根因分析
+Process2007StateMachine 在 ppu_step_new **dot 開頭**（Phase 2 deferred updates 內）呼叫。
+Buffer refill 和 v increment 都在這一次呼叫內一口氣完成。
+
+但硬體上 D-latch 管線的效果是：
+- dot 開頭: 信號建立（ALE）
+- **dot 中段（rendering 後）**: buffer refill
+- **half step**: v increment + 實際寫入
+
+buffer 在 dot 開頭更新 vs rendering fetch 在 odd dot 讀取 → **timing 不對齊**。
+這不是 SM state 偏移能修的，需要把 buffer refill 分散到 rendering 後或 half-step。
+
+### 修正方向
+**方向 1 結論**: 舊 SM 架構無法正確處理，因為整個 SM 在 dot 開頭一次跑完，
+無法模擬 buffer refill 在 mid-dot 發生的硬體行為。
+
+**方向 2（必要）**: 需要至少拆分 SM 的 buffer refill 到 mid-dot 位置。
+不一定要完整 D-latch 管線，但至少需要：
+1. SM 的 buffer refill 部分移到 rendering 之後（Phase5 之後）
+2. 或加一個 flag 在 SM 中標記，在 rendering 後或 half-step 中執行 refill
 
 ### 下一步
-1. 讀 Process2007StateMachine 的 state 1 和 state 4
-2. 對照 AC test 的 D-latch timeline 表
-3. 確認 buffer 更新是否在 t4（4 half-cycles after read end）
-4. 如果差 1 half-cycle，調整 state timing
+### 已嘗試的方向 2 最小改動（失敗）
+- Deferred refill flag：SM state 1 設 flag，rendering 之後執行 refill → 仍 FAIL 1
+- 原因：refill 用 `PpuBusRead(ppu2007SM_addr)` 讀的是 vram_addr 指向的資料
+- 但硬體上 SM Read 和 rendering fetch Read **共用同一條 bus**
+- Buffer 應該得到 **rendering fetch 正在讀的 tile/sprite 資料**
+- 這需要完整的 bus 模型（OctalLatch + FetchPPU）才能正確實現
+
+### 最終結論
+$2007 Stress Test 需要**方向 2（完整 bus 模型移植）**。方向 1 已確認不可行：
+1. SM state 偏移（state 1→2）：無效
+2. Deferred refill 到 mid-dot：無效（地址不對）
+3. 根因：buffer 值必須來自 rendering fetch bus，不是 vram_addr
+
+下一步：完整移植 Phase B（rendering fetch 走 OctalLatch + FetchPPU 統一 bus 模型）
 
 ### 關鍵檔案
 - `ppu_new.cs` line 648: `Process2007StateMachine()`
