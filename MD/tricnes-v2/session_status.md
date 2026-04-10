@@ -69,7 +69,23 @@ $2007 Stress Test 需要**方向 2（完整 bus 模型移植）**。方向 1 已
 2. Deferred refill 到 mid-dot：無效（地址不對）
 3. 根因：buffer 值必須來自 rendering fetch bus，不是 vram_addr
 
-下一步：完整移植 Phase B（rendering fetch 走 OctalLatch + FetchPPU 統一 bus 模型）
+### Log 對比結果（2026-04-10 確認）
+
+AprNes cx=30 buf=02（重複 vram_addr data）
+TriCNES cx=30 buf=C0（AT fetch data — rendering bus）
+
+差異：SM Read 在 even dot 觸發時，TriCNES 用 OctalLatch 讀到 rendering fetch
+上一次 latch 的地址的資料。AprNes 用 PpuBusRead(vram_addr) 讀到 v 指向的資料。
+
+SM 的 Read 不一定和 rendering fetch 的 Read 在同一 dot（可以在 even dot 讀）。
+lastBusValue 方案不夠，因為 even dot 沒有 rendering fetch read。
+
+### 最終結論
+137/138 是舊 SM + 直接 PpuBusRead 架構的硬天花板。
+138/138 需要 OctalLatch bus 模型：SM Read 用 (AddressBus high | OctalLatch) 讀取，
+和 rendering fetch 共用同一條 multiplexed address bus。
+
+下一步：實作 OctalLatch — 最小改動版本，不需要完整 FetchPPU 重寫
 
 ### 關鍵檔案
 - `ppu_new.cs` line 648: `Process2007StateMachine()`
