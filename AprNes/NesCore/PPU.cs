@@ -137,6 +137,7 @@ namespace AprNes
         public static bool ShowBackGround = false, ShowSprites = false; // Tier 2 (delayed)
         static bool ShowBackGround_Instant = false, ShowSprites_Instant = false; // Tier 1 (immediate)
         static bool ShowBgLeft8 = true, ShowSprLeft8 = true; // bit1/bit2 (delayed with $2001)
+        static bool ppuGreyscale = false; // $2001 bit 0 — greyscale mode (palette read returns & 0x30)
         static byte ppuEmphasis = 0; // $2001[7:5] emphasis bits (for NTSC signal amplitude)
 
         // NTSC 類比模式：每條掃描線的原始調色盤索引緩衝區（256 bytes，0x00-0x3F）
@@ -1057,8 +1058,9 @@ namespace AprNes
                 {
                     ppuAddressBus = vram_addr;
                     result = PpuBusRead(vram_addr & 0x3FFF);
-                    // Palette read: result has palette data, but open bus bits 6-7
-                    result = (byte)((openbus & 0xC0) | (result & 0x3F));
+                    // Palette read: greyscale masks low 4 bits; open bus bits 6-7
+                    int palMask = ppuGreyscale ? 0x30 : 0x3F;
+                    result = (byte)((openbus & 0xC0) | (result & palMask));
                 }
                 else
                 {

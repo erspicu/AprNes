@@ -158,6 +158,7 @@ namespace AprNes
             // ── $2001 delayed mask update (TriCNES lines 1681-1694) ──
             if (ppu2001UpdateDelay > 0 && --ppu2001UpdateDelay == 0)
             {
+                ppuGreyscale   = (ppu2001PendingValue & 0x01) != 0;
                 ShowBgLeft8    = (ppu2001PendingValue & 0x02) != 0;
                 ShowSprLeft8   = (ppu2001PendingValue & 0x04) != 0;
                 ShowBackGround = (ppu2001PendingValue & 0x08) != 0;
