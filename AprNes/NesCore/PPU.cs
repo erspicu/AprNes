@@ -168,6 +168,17 @@ namespace AprNes
         static bool ppu2007SM_updateVramAddrEarly = false;   // TriCNES: PPU_Data_StateMachine_UpdateVRAMAddressEarly
         static bool ppu2007SM_readDelayed = false;           // TriCNES: PPU_Data_StateMachine_Read_Delayed
         static ushort ppu2007SM_mysteryAddr = 0;             // TriCNES: PPU_VRAM_MysteryAddress
+        static bool ppu2007SM_deferredRefill = false;          // OctalLatch model: defer buffer refill to after tile fetch
+        // #2: PPU_READ / PPU_ALE signals (TriCNES bus control)
+        static bool ppu2007_PPU_READ = false;   // TriCNES: PPU_READ — PD_RB || (!BLNK && H0_DASH)
+        static bool ppu2007_PPU_ALE = false;    // TriCNES: PPU_ALE — ReadALE || WriteALE || (!BLNK && !H0_DASH)
+        static bool ppu2007_PD_RB = false;      // TriCNES: PPU_2007_PD_RB — buffer refill signal
+        static bool ppu2007_BLNK_Latch = false; // TriCNES: PPU_2007_BLNK_Latch — blank period latch
+        // #3/#4: v increment + second refill deferred to half-step
+        static bool ppu2007SM_halfStepVInc = false;     // flag: do v increment in half-step
+        static bool ppu2007SM_halfStepRefill = false;   // flag: do second FetchPPU in half-step
+        // #5: OctalLatch (8-bit address latch, low byte of PPU address bus)
+        static byte ppuOctalLatch = 0;
 
         // $2000 delayed control update (TriCNES: PPU_Update2000Delay, 1-2 PPU cycles)
         // ALL fields delayed: NMI enable, pattern table, sprite size, nametable, increment
