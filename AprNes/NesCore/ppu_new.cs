@@ -120,12 +120,8 @@ namespace AprNes
             // ── PPU_DATA_StateMachine — Phase 1 (TriCNES line 1511) ──
             PPU_DATA_StateMachine();
 
-            // ── Rendering OFF → bus = vram_addr (TriCNES line 1530-1535, AFTER SM) ──
-            if (!ShowBackGround && !ShowSprites)
-            {
-                ppuAddressBus = vram_addr;
-                ppuOctalLatch = (byte)ppuAddressBus;
-            }
+            // TriCNES line 1530-1535: rendering OFF → bus = v
+            // Moved to correct position (after sprite eval, line ~161) matching TriCNES
 
             // ══════════════════════════════════════════════════════
             // Phase 4: Eval delay + sprite eval + $2001 + emphasis
@@ -158,11 +154,10 @@ namespace AprNes
                 ShowSpr_EvalDelay = ShowSprites;
             }
 
-            // ── ppuAddressBus = vram_addr when rendering disabled (TriCNES line 1674) ──
+            // ── ppuAddressBus = vram_addr when rendering disabled (TriCNES line 1530-1535) ──
             if (!ShowBackGround && !ShowSprites)
             {
                 ppuAddressBus = vram_addr;
-                ppuChrFetchA12 = (vram_addr >> 12) & 1;
             }
 
             // ── $2001 delayed mask update (TriCNES lines 1681-1694) ──
@@ -197,24 +192,7 @@ namespace AprNes
             prevPrevPrevDotColor = prevPrevDotColor; prevPrevDotColor = prevDotColor; prevDotColor = dotColor;
             prevPrevPrevDotPalIdx = prevPrevDotPalIdx; prevPrevDotPalIdx = prevDotPalIdx; prevDotPalIdx = dotPalIdx;
 
-            // ── CommitShiftRegistersAndBitPlanes — UNGATED (TriCNES line 1727) ──
-            if (commitNTFetch) { commitNTFetch = false; NTVal = renderTemp; }
-            if (commitATFetch)
-            {
-                commitATFetch = false;
-                byte atRaw = renderTemp;
-                if (extAttrEnabled && extAttrNTOffset < 960) {
-                    byte exVal = extAttrRAM[extAttrNTOffset];
-                    extAttrChrBank = (exVal & 0x3F) | (extAttrChrUpperBits << 6);
-                    ATVal = (byte)((exVal >> 6) & 3);
-                } else {
-                    ATVal = (byte)((atRaw >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
-                }
-                pendingAttrLatch = ATVal;
-            }
-            if (commitPatLowFetch) { commitPatLowFetch = false; pendingTileLow = renderTemp; }
-            if (commitPatHighFetch) { commitPatHighFetch = false; pendingTileHigh = renderTemp; CXinc(); }
-
+            // CommitShiftRegistersAndBitPlanes moved to half-step (TriCNES line 1691: inside _EmulateHalfPPU)
 
             // ── Tile fetch + CalculatePixel + UpdateSpriteShift (TriCNES lines 1728-1751) ──
             if (isActiveScanline)
@@ -224,15 +202,15 @@ namespace AprNes
                 {
                     if (ShowBackGround || ShowSprites) // Tier 2
                     {
-                        // TriCNES line 3587-3590: OctalLatch update before fetch (odd dot + READ active)
+                        // TriCNES line 3587-3590: OctalLatch update before fetch (READ active + ALE active)
                         if (ppu2007_PPU_ALE && ppu2007_PPU_READ)
                             ppuOctalLatch = (byte)ppuAddressBus;
 
-                        // Tile fetch: AprNes convention — even cx = ALE, odd cx = READ
-                        // (TriCNES has ALE on odd PPU_Dot, READ on even — reversed but same fetch result per tile)
-                        if ((cx & 1) == 0) // even cx = ALE (address setup)
+                        // Tile fetch: odd cx = ALE, even cx = READ (matches TriCNES H0_DASH)
+                        // fetchPair: 0=NT, 1=AT, 2=CHR-L, 3=CHR-H
+                        int fetchPair = ((cx - 1) >> 1) & 3;
+                        if ((cx & 1) != 0) // odd cx = ALE (address setup) — TriCNES cycleTick 0,2,4,6
                         {
-                            int fetchPair = (cx >> 1) & 3; // 0=NT, 1=AT, 2=CHR-L, 3=CHR-H
                             if (fetchPair == 0) { ppuAddressBus = 0x2000 | (vram_addr & 0x0FFF); }
                             else if (fetchPair == 1) { ppuAddressBus = 0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07); }
                             else if (fetchPair == 2) {
@@ -244,12 +222,10 @@ namespace AprNes
                                 ppuAddressBus = chrAddr;
                             }
                         }
-                        else // odd cx = READ via OctalLatch
+                        else // even cx = READ via OctalLatch — TriCNES cycleTick 1,3,5,7
                         {
-                            // TriCNES: AddressBus = (PAR & 0xFF00) | OctalLatch; FetchPPU()
-                            int fetchPair = (cx >> 1) & 3;
-                            int readAddr = (ppuAddressBus & 0xFF00) | ppuOctalLatch; // OctalLatch model
-                            if (fetchPair == 0) { // case 1: NT fetch
+                            int readAddr = (ppuAddressBus & 0xFF00) | ppuOctalLatch;
+                            if (fetchPair == 0) { // NT fetch
                                 ppuAddressBus = readAddr;
                                 if (mapperA12IsMmc3) NotifyMapperA12(readAddr);
                                 renderTemp = PpuBusRead(readAddr); commitNTFetch = true;
@@ -257,20 +233,20 @@ namespace AprNes
                                 if (extAttrEnabled) extAttrNTOffset = (ushort)(readAddr & 0x3FF);
                                 if (mmc5Ref != null) mmc5Ref.NotifyVramRead(readAddr);
                             }
-                            else if (fetchPair == 1) { // case 3: AT fetch
+                            else if (fetchPair == 1) { // AT fetch
                                 ppuAddressBus = readAddr;
                                 renderTemp = PpuBusRead(readAddr); commitATFetch = true;
                                 ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp;
                                 if (mmc5Ref != null) mmc5Ref.NotifyVramRead(readAddr);
                             }
-                            else if (fetchPair == 2) { // case 5: CHR low fetch
+                            else if (fetchPair == 2) { // CHR low fetch
                                 ppuAddressBus = readAddr; ppuChrFetchA12 = (readAddr >> 12) & 1;
                                 if (mapperNeedsA12) NotifyMapperA12(readAddr);
                                 renderTemp = PpuBusRead(readAddr); commitPatLowFetch = true;
                                 ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp;
                                 if (mmc5Ref != null) mmc5Ref.NotifyVramRead(readAddr);
                             }
-                            else { // case 7: CHR high fetch
+                            else { // CHR high fetch
                                 ppuAddressBus = readAddr; ppuChrFetchA12 = (readAddr >> 12) & 1;
                                 if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(readAddr);
                                 renderTemp = PpuBusRead(readAddr); commitPatHighFetch = true;
@@ -279,7 +255,7 @@ namespace AprNes
                             }
                         }
 
-                        // TriCNES line 3643-3646: OctalLatch update after fetch (even dot + ALE + !READ)
+                        // TriCNES line 3643-3646: OctalLatch update after fetch (ALE + !READ)
                         if (ppu2007_PPU_ALE && !ppu2007_PPU_READ)
                             ppuOctalLatch = (byte)ppuAddressBus;
 
@@ -548,44 +524,94 @@ namespace AprNes
                 // TriCNES line 2833-2836: OctalLatch guard before sprite switch
                 if (ppu2007_PPU_READ) ppuOctalLatch = (byte)ppuAddressBus;
 
-                // Dummy BG fetch (cases 0-3)
-                if (sprPhase <= 3)
+                // TriCNES sprite eval cases 0-7 (line 2855-2993)
+                // NOTE: AprNes ALE/READ convention is REVERSED from TriCNES (odd cx=READ, even cx=ALE).
+                // OctalLatch updates via guards won't match TriCNES timing for sprite fetch.
+                // Sprite reads use ppuAddressBus directly; OctalLatch guards still run for SM benefit.
+                if (sprPhase == 0)
                 {
-                    int bgPhase = evalDot & 7;
-                    if (bgPhase == 1) ppuAddressBus = (ushort)(0x2000 | (vram_addr & 0x0FFF));
-                    else if (bgPhase == 3) ppuAddressBus = (ushort)(0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07));
+                    // Case 0: Y pos + set NT address on bus (TriCNES line 2862-2864)
+                    if (sprFetchEnabled) oamCopyBuffer = secondaryOAM[evalOam2Addr];
+                    if (sprFetchEnabled) ppuAddressBus = (ushort)(0x2000 | (vram_addr & 0x0FFF));
+                    evalOam2Addr++;
                 }
-
-                // OAM2 reads + sprite tile fetch
-                if (sprPhase == 0) { if (sprFetchEnabled) oamCopyBuffer = secondaryOAM[evalOam2Addr]; evalOam2Addr++; }
-                else if (sprPhase == 1) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus); } evalOam2Addr++; }
-                else if (sprPhase == 2) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; sprFetchAttr[slot] = oamCopyBuffer; } evalOam2Addr++; }
-                else if (sprPhase == 3) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; sprXPos[slot] = oamCopyBuffer; sprXCounter[slot] = oamCopyBuffer; } }
-                else if (sprPhase == 4) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; ppuAddressBus = ComputeSpritePatternAddr(slot); ppuChrFetchA12 = (ppuAddressBus >> 12) & 1; } }
+                else if (sprPhase == 1)
+                {
+                    // Case 1: Pattern + dummy NT read (TriCNES line 2876: calls tile fetch → FetchPPU)
+                    if (sprFetchEnabled)
+                    {
+                        oamCopyBuffer = secondaryOAM[evalOam2Addr];
+                        if (mapperA12IsMmc3) NotifyMapperA12(ppuAddressBus);
+                        byte data = PpuBusRead(ppuAddressBus & 0x3FFF);
+                        ppuAddressBus = (ppuAddressBus & 0xFF00) | data; // bus side effect
+                    }
+                    evalOam2Addr++;
+                }
+                else if (sprPhase == 2)
+                {
+                    // Case 2: Attribute + set AT address on bus (TriCNES line 2887-2889)
+                    if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; sprFetchAttr[slot] = oamCopyBuffer; }
+                    if (sprFetchEnabled) ppuAddressBus = (ushort)(0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07));
+                    evalOam2Addr++;
+                }
+                else if (sprPhase == 3)
+                {
+                    // Case 3: X pos + dummy AT read (TriCNES line 2900: calls tile fetch → FetchPPU)
+                    if (sprFetchEnabled)
+                    {
+                        oamCopyBuffer = secondaryOAM[evalOam2Addr];
+                        sprXPos[slot] = oamCopyBuffer; sprXCounter[slot] = oamCopyBuffer;
+                        byte data = PpuBusRead(ppuAddressBus & 0x3FFF);
+                        ppuAddressBus = (ppuAddressBus & 0xFF00) | data; // bus side effect
+                    }
+                }
+                else if (sprPhase == 4)
+                {
+                    // Case 4: sprite CHR address setup (low plane) (TriCNES line 2912-2915)
+                    if (sprFetchEnabled)
+                    {
+                        oamCopyBuffer = secondaryOAM[evalOam2Addr];
+                        ppuAddressBus = ComputeSpritePatternAddr(slot);
+                        ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
+                    }
+                }
                 else if (sprPhase == 5)
                 {
+                    // Case 5: sprite CHR read (low plane) (TriCNES line 2927: FetchPPU)
                     if (sprFetchEnabled)
                     {
                         oamCopyBuffer = secondaryOAM[evalOam2Addr];
                         if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus);
-                        int addr = ppuAddressBus; byte tile = chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF];
+                        byte tile = PpuBusRead(ppuAddressBus & 0x3FFF);
+                        ppuAddressBus = (ppuAddressBus & 0xFF00) | tile; // bus side effect
                         sprShiftL[slot] = (sprFetchAttr[slot] & 0x40) != 0 ? FlipByte(tile) : tile;
                         if (slot >= sprSlotCount) sprShiftL[slot] = 0;
-                        // TriCNES in-range check — only when fetch enabled (preserve stale data when rendering off)
+                        // TriCNES in-range check — only when fetch enabled
                         { int sprY = secondaryOAM[slot * 4]; int h = Spritesize8x16 ? 16 : 8; int diff = (scanline & 0xFF) - sprY; if (!(diff >= 0 && diff < h)) sprShiftL[slot] = 0; }
                     }
                 }
-                else if (sprPhase == 6) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; ppuAddressBus = ComputeSpritePatternAddr(slot) + 8; ppuChrFetchA12 = (ppuAddressBus >> 12) & 1; } }
+                else if (sprPhase == 6)
+                {
+                    // Case 6: sprite CHR address setup (high plane) (TriCNES line 2951-2956)
+                    if (sprFetchEnabled)
+                    {
+                        oamCopyBuffer = secondaryOAM[evalOam2Addr];
+                        ppuAddressBus = ComputeSpritePatternAddr(slot) + 8;
+                        ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
+                    }
+                }
                 else // sprPhase == 7
                 {
+                    // Case 7: sprite CHR read (high plane) (TriCNES line 2969: FetchPPU)
                     if (sprFetchEnabled)
                     {
                         oamCopyBuffer = secondaryOAM[evalOam2Addr];
                         if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(ppuAddressBus);
-                        int addr = ppuAddressBus; byte tile = chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF];
+                        byte tile = PpuBusRead(ppuAddressBus & 0x3FFF);
+                        ppuAddressBus = (ppuAddressBus & 0xFF00) | tile; // bus side effect
                         sprShiftH[slot] = (sprFetchAttr[slot] & 0x40) != 0 ? FlipByte(tile) : tile;
                         if (slot >= sprSlotCount) sprShiftH[slot] = 0;
-                        // TriCNES in-range check — only when fetch enabled (preserve stale data when rendering off)
+                        // TriCNES in-range check — only when fetch enabled
                         { int sprY = secondaryOAM[slot * 4]; int h = Spritesize8x16 ? 16 : 8; int diff = (scanline & 0xFF) - sprY; if (!(diff >= 0 && diff < h)) sprShiftH[slot] = 0; }
                     }
                     evalOam2Addr++;
@@ -702,9 +728,9 @@ namespace AprNes
             // TriCNES line 1763-1764
             bool BLNK = (!ShowBackGround && !ShowSprites) || (scanline >= 240 && scanline < preRenderLine);
             ppu2007_BLNK_Latch = BLNK;
-            // AprNes convention: odd cx = READ dot, even cx = ALE dot
-            // TriCNES: H0_DASH=true on READ dot. In AprNes, READ is odd cx.
-            bool H0_DASH = (ppu_cycles_x & 1) != 0; // true on odd cx = READ dot
+            // TriCNES line 1765: H0_DASH = (PPU_Dot - 1 & 1) != 0
+            // Odd dot = ALE (H0_DASH=false), Even dot = READ (H0_DASH=true)
+            bool H0_DASH = ((ppu_cycles_x - 1) & 1) != 0;
 
             // TriCNES line 1767-1768
             ppu2007_PaletteRAMEnable = ((ppuAddressBus & 0x3F00) == 0x3F00) && ppu2007_BLNK_Latch;
@@ -786,19 +812,15 @@ namespace AprNes
             ppu2007_TStep = ppu2007_TStep_Latch || ppu2007_PD_RB;
             if (ppu2007_TStep)
             {
-                // v increment
-                if ((ShowBackGround || ShowSprites) && (scanline < 240 || scanline == preRenderLine))
+                // TriCNES line 1832: always increment v (no rendering gate, no 14-bit mask)
+                vram_addr = (ushort)(vram_addr + VramaddrIncrement);
+                if (!ppu2007_BLNK_Latch)
                 {
-                    // During rendering: glitchy CXinc + Yinc (TriCNES: IncrementScrollY)
-                    CXinc(); Yinc();
+                    // TriCNES line 1835: also IncrementScrollY during rendering
+                    Yinc();
                 }
-                else
-                {
-                    vram_addr = (ushort)((vram_addr + VramaddrIncrement) & 0x3FFF);
-                }
-                ppuAddressBus = vram_addr;
-                ppuOctalLatch = (byte)ppuAddressBus;
-                if (mapperNeedsA12) NotifyMapperA12(vram_addr);
+                // TriCNES: NO ppuAddressBus/ppuOctalLatch/mapper update here
+                // Bus is updated by rendering-OFF check on next dot, or by tile fetch during rendering
             }
 
             // TriCNES line 1839
@@ -855,20 +877,33 @@ namespace AprNes
                 renderAttrHigh = (renderAttrHigh << 1) | ((attrLatch >> 1) & 1);
             }
 
-            // ── CommitShiftRegistersAndBitPlanes_HalfDot — UNGATED (must run BEFORE fetch) ──
-            if (commitLoadShiftReg)
+            // ── CommitShiftRegistersAndBitPlanes — TriCNES line 1691 (inside _EmulateHalfPPU) ──
+            // Process commit flags set by tile fetch in previous full dot, then load shift registers.
+            if (commitNTFetch) { commitNTFetch = false; NTVal = renderTemp; }
+            if (commitATFetch)
             {
-                commitLoadShiftReg = false;
+                commitATFetch = false;
+                byte atRaw = renderTemp;
+                if (extAttrEnabled && extAttrNTOffset < 960) {
+                    byte exVal = extAttrRAM[extAttrNTOffset];
+                    extAttrChrBank = (exVal & 0x3F) | (extAttrChrUpperBits << 6);
+                    ATVal = (byte)((exVal >> 6) & 3);
+                } else {
+                    ATVal = (byte)((atRaw >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
+                }
+                pendingAttrLatch = ATVal;
+            }
+            if (commitPatLowFetch) { commitPatLowFetch = false; pendingTileLow = renderTemp; }
+            if (commitPatHighFetch)
+            {
+                commitPatHighFetch = false;
+                pendingTileHigh = renderTemp;
+                // TriCNES line 3689-3690: LoadShiftRegisters + IncrementScrollX
                 renderLow  = (renderLow & 0xFF00) | pendingTileLow;
                 renderHigh = (renderHigh & 0xFF00) | pendingTileHigh;
                 attrLatch  = pendingAttrLatch;
+                CXinc();
             }
-
-            // ── Half-step tile fetch (AFTER commit — sets flag for NEXT half step) ──
-            if (isActiveScanline && isRendering
-                && ((hsDot >= 0 && hsDot < 257) || (hsDot >= 320 && hsDot < 336))
-                && (hsDot & 7) == 7)
-                commitLoadShiftReg = true;
 
             // ── VBL latch half-step (branchless) ──
             ppuVSET = pendingVblank;

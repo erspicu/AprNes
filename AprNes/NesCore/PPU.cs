@@ -453,7 +453,7 @@ namespace AprNes
 
         // Deferred shift register reload (TriCNES: PPU_Commit_LoadShiftRegisters)
         static byte pendingTileLow = 0, pendingTileHigh = 0;
-        static bool commitLoadShiftReg = false;
+        // commitLoadShiftReg removed — commit + load merged in half-step (TriCNES model)
 
         // ---- Attribute 3-stage pipeline ----
         // Phase-3 shifts ATVal into p1; phase-7 render reads p3 (2 groups later).
