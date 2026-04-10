@@ -30,12 +30,9 @@ namespace AprNes
             int cx = ppu_cycles_x; // local alias, PRE-increment value
 
             // ══════════════════════════════════════════════════════
-            // Phase 2: Deferred register updates (TriCNES lines 1263-1496)
+            // Deferred register updates (TriCNES lines 1263-1496)
             // Guard: >99% of dots have no pending updates, skip the call entirely
             // ══════════════════════════════════════════════════════
-            // Phase 1: SR latch pipeline runs every dot (TriCNES: PPU_DATA_StateMachine at line 1511)
-            PPU_DATA_StateMachine();
-
             if (ppu2006UpdateDelay != 0 || ppu2005UpdateDelay != 0 || ppu2000UpdateDelay != 0)
                 PpuPhase2_DeferredUpdates(cx);
 
@@ -119,6 +116,18 @@ namespace AprNes
             }
             if (oddSwap && (ShowBackGround || ShowSprites) && scanline == 0 && cx == 2)
                 skippedPreRenderDot341 = false;
+
+            // ── Rendering OFF → bus = vram_addr (TriCNES line 1530-1535) ──
+            if (!ShowBackGround && !ShowSprites)
+            {
+                ppuAddressBus = vram_addr;
+                ppuOctalLatch = (byte)ppuAddressBus;
+            }
+
+            // ── PPU_DATA_StateMachine — Phase 1 (TriCNES line 1511) ──
+            // Must be AFTER dot++, events, VSET, mapper, odd frame skip
+            // Must be BEFORE sprite eval and rendering
+            PPU_DATA_StateMachine();
 
             // ══════════════════════════════════════════════════════
             // Phase 4: Eval delay + sprite eval + $2001 + emphasis
@@ -208,12 +217,6 @@ namespace AprNes
             if (commitPatLowFetch) { commitPatLowFetch = false; pendingTileLow = renderTemp; }
             if (commitPatHighFetch) { commitPatHighFetch = false; pendingTileHigh = renderTemp; CXinc(); }
 
-            // TriCNES line 1530-1535: address bus = v when rendering disabled
-            if (!ShowBackGround && !ShowSprites)
-            {
-                ppuAddressBus = vram_addr;
-                ppuOctalLatch = (byte)ppuAddressBus;
-            }
 
             // ── Tile fetch + CalculatePixel + UpdateSpriteShift (TriCNES lines 1728-1751) ──
             if (isActiveScanline)
@@ -705,9 +708,12 @@ namespace AprNes
             if (ppu2007_PD_RB)
             {
                 // TriCNES line 1820: PPU_ReadBuffer = FetchPPU()
-                // Use OctalLatch model: (AddressBus & 0x3F00) | OctalLatch
+                // FetchPPU: addr = (AddressBus & 0x3F00) | OctalLatch, then AddressBus low = data
                 int addr = (ppuAddressBus & 0x3F00) | ppuOctalLatch;
-                ppu_2007_buffer = PpuBusRead(addr >= 0x3F00 ? addr & 0x2FFF : addr & 0x3FFF);
+                byte data = PpuBusRead(addr >= 0x3F00 ? addr & 0x2FFF : addr & 0x3FFF);
+                ppu_2007_buffer = data;
+                // TriCNES FetchPPU side effect: AddressBus = (AddressBus & 0xFF00) | data
+                ppuAddressBus = (ppuAddressBus & 0xFF00) | data;
 
                 // TriCNES line 1821-1824
                 if (ppu2007_PPU_ALE)
@@ -749,7 +755,9 @@ namespace AprNes
             if (ppu2007_PD_RB)
             {
                 int addr = (ppuAddressBus & 0x3F00) | ppuOctalLatch;
-                ppu_2007_buffer = PpuBusRead(addr >= 0x3F00 ? addr & 0x2FFF : addr & 0x3FFF);
+                byte data = PpuBusRead(addr >= 0x3F00 ? addr & 0x2FFF : addr & 0x3FFF);
+                ppu_2007_buffer = data;
+                ppuAddressBus = (ppuAddressBus & 0xFF00) | data; // FetchPPU side effect
                 if (ppu2007_PPU_ALE)
                     ppuOctalLatch = (byte)ppuAddressBus;
             }
@@ -772,8 +780,7 @@ namespace AprNes
             if (ppu2007_DB_PAR)
             {
                 // TriCNES line 1866: StorePPUData(AddressBus, WriteData)
-                int waddr = ppuAddressBus & 0x3FFF;
-                PpuBusWrite(waddr, ppu2007SM_writeValue);
+                PpuBusWrite(ppuAddressBus, ppu2007SM_writeValue);
             }
         }
 
