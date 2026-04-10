@@ -219,8 +219,8 @@ namespace AprNes
             // ── Tile fetch + CalculatePixel + UpdateSpriteShift (TriCNES lines 1728-1751) ──
             if (isActiveScanline)
             {
-                // BG tile fetch (TriCNES line 1730-1735)
-                if ((cx >= 0 && cx < 257) || (cx > 320 && cx <= 336))
+                // BG tile fetch (TriCNES line 1585: PPU_Dot >= 1 && <= 256, or >= 321 && <= 336)
+                if ((cx >= 1 && cx <= 256) || (cx >= 321 && cx <= 336))
                 {
                     if (ShowBackGround || ShowSprites) // Tier 2
                     {
@@ -621,10 +621,48 @@ namespace AprNes
                 spriteAnyActive = anyActive;
             }
 
-            // Garbage NT fetch (dots 336-340)
-            if (evalDot == 336 || evalDot == 338) { ppuAddressBus = 0x2000 | (vram_addr & 0x0FFF); PpuBusRead(ppuAddressBus); }
-            else if (evalDot == 337 || evalDot == 339) { NTVal = ppu_ram[CIRAMAddr(ppuAddressBus)]; if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus); }
-            else if (evalDot == 340) { ppuAddressBus = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7); ppuChrFetchA12 = (ppuAddressBus >> 12) & 1; }
+            // Garbage/Dummy NT fetch (TriCNES: PPU_Render_ShiftRegistersAndBitPlanes_DummyNT)
+            // dots 337-340 + dot 0: set bus to NT addr, do dummy fetch, update OctalLatch
+            if (evalDot >= 337 || evalDot == 0)
+            {
+                if (ShowBackGround || ShowSprites)
+                {
+                    // OctalLatch guard before (TriCNES line 3697-3700)
+                    if (ppu2007_PPU_READ) ppuOctalLatch = (byte)ppuAddressBus;
+
+                    if (evalDot == 0)
+                    {
+                        // TriCNES line 3702-3706: dot 0 = CHR address setup
+                        ppuAddressBus = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
+                        ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
+                    }
+                    else
+                    {
+                        int dt = evalDot - 337;
+                        if (dt == 0 || dt == 2) // ALE: set NT address
+                        {
+                            ppuAddressBus = 0x2000 | (vram_addr & 0x0FFF);
+                        }
+                        else if (dt == 1) // READ: fetch NT (commit)
+                        {
+                            ppuAddressBus = 0x2000 | (vram_addr & 0x0FFF);
+                            renderTemp = (byte)PpuBusRead((ppuAddressBus & 0xFF00) | ppuOctalLatch);
+                            ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp;
+                            commitNTFetch = true;
+                        }
+                        else if (dt == 3) // READ: dummy fetch (no commit)
+                        {
+                            renderTemp = (byte)PpuBusRead((ppuAddressBus & 0xFF00) | ppuOctalLatch);
+                            ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp;
+                        }
+                    }
+
+                    // OctalLatch guard after (TriCNES line 3734-3737)
+                    if (ppu2007_PPU_ALE && !ppu2007_PPU_READ) ppuOctalLatch = (byte)ppuAddressBus;
+                }
+
+                if (mmc5Ref != null && (evalDot == 337 || evalDot == 339)) mmc5Ref.NotifyVramRead(0x2000 | (vram_addr & 0x0FFF));
+            }
 
             if (mmc5Ref != null && (evalDot == 337 || evalDot == 339)) mmc5Ref.NotifyVramRead(0x2000 | (vram_addr & 0x0FFF));
 
