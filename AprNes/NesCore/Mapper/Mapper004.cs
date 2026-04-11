@@ -36,11 +36,14 @@ namespace AprNes
         public void PpuClock()
         {
             bool a12Now = (NesCore.ppuAddressBus & 0x1000) != 0;
+            // A12 filter: count consecutive PPU dots with A12=0
+            // Threshold=10: filters 4-dot BG gaps AND 9-dot scanline boundary gaps
+            // Only accepts 64+ dot sprite fetch gaps → 1 clock per scanline
             if (!a12Now)
             {
                 if (m2Filter < 16) m2Filter++;
             }
-            if (!NesCore.ppuA12Prev && a12Now && m2Filter >= 8)
+            if (!NesCore.ppuA12Prev && a12Now && m2Filter >= 10)
             {
                 Mapper04step_IRQ();
             }
