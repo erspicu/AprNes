@@ -39,6 +39,8 @@ namespace AprNes
         public void PpuClock()
         {
             bool a12Now = (NesCore.ppuAddressBus & 0x1000) != 0;
+            if (NesCore.debug2007Log && NesCore.scanline == 0 && a12Now != NesCore.ppuA12Prev)
+                System.Console.Error.WriteLine($"A12d sl={NesCore.scanline} cx={NesCore.ppu_cycles_x} prev={NesCore.ppuA12Prev} now={a12Now} bus={NesCore.ppuAddressBus:X4} m2f={m2Filter}");
             if (!NesCore.ppuA12Prev && a12Now && m2Filter == 3)
             {
                 Mapper04step_IRQ();

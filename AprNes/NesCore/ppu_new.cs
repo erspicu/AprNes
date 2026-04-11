@@ -359,6 +359,8 @@ namespace AprNes
             // ── Mapper + A12 (TriCNES line 1478-1479: end of _EmulatePPU) ──
             MapperObj.PpuClock();
             ppuA12Prev = (ppuAddressBus & 0x1000) != 0;
+            if (debug2007Log && scanline == 0 && cx >= 257 && cx <= 268 && ppuAddressBus != 0)
+                System.Console.Error.WriteLine($"BUS sl={scanline} cx={cx} bus={ppuAddressBus:X4} a12p={ppuA12Prev}");
 
             // ── DrawToScreen (TriCNES line 1764) ──
             if (scanline >= 0 && scanline < 240)

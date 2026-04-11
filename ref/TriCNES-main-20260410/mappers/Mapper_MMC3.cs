@@ -348,7 +348,10 @@ namespace TriCNES.mappers
         public override void PPUClock()
         {
             // if bit 12 of the ppu address bus (A12) changes:
-            if (!Cart.Emu.PPU_A12_Prev && ((Cart.Emu.PPU_AddressBus & 0b0001000000000000) != 0) && Mapper_4_M2Filter == 3)
+            bool a12Now_dbg = ((Cart.Emu.PPU_AddressBus & 0b0001000000000000) != 0);
+            if (Cart.Emu.debug2007Log && Cart.Emu.PPU_Scanline == 0 && a12Now_dbg != Cart.Emu.PPU_A12_Prev)
+                System.Console.Error.WriteLine($"A12d sl={Cart.Emu.PPU_Scanline} cx={Cart.Emu.PPU_Dot} prev={Cart.Emu.PPU_A12_Prev} now={a12Now_dbg} bus={Cart.Emu.PPU_AddressBus:X4} m2f={Mapper_4_M2Filter}");
+            if (!Cart.Emu.PPU_A12_Prev && a12Now_dbg && Mapper_4_M2Filter == 3)
             {
                 if (Mapper_4_ReloadIRQCounter)
                 {
