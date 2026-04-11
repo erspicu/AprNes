@@ -197,7 +197,7 @@ namespace AprNes
                 // BG tile fetch via PAR (TriCNES PPU_Render_ShiftRegistersAndBitPlanes, line 3588)
                 if ((cx >= 1 && cx <= 256) || (cx >= 321 && cx <= 336))
                 {
-                    if (ShowBackGround || ShowSprites) // Tier 2 (Delayed gate)
+                    if (ShowBG_EvalDelay || ShowSpr_EvalDelay) // Tier 2 (TriCNES: _Delayed gate)
                     {
                         // TriCNES line 3593-3596: OctalLatch guard before fetch
                         if (ppu2007_PPU_ALE && ppu2007_PPU_READ)
@@ -683,7 +683,7 @@ namespace AprNes
             // dots 337-340 + dot 0: set bus to NT addr, do dummy fetch, update OctalLatch
             if (evalDot >= 337 || evalDot == 0)
             {
-                if (ShowBackGround || ShowSprites)
+                if (ShowBG_EvalDelay || ShowSpr_EvalDelay) // TriCNES: _Delayed gate
                 {
                     // OctalLatch guard before (TriCNES line 3697-3700)
                     if (ppu2007_PPU_READ) ppuOctalLatch = (byte)ppuAddressBus;
