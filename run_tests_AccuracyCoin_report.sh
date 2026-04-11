@@ -64,7 +64,7 @@ get_test_wait() {
         14)     echo 12 ;;  # APU Tests
         17)     echo 25 ;;  # PPU VBlank Timing (v2 has more sub-tests)
         13)     echo 12 ;;  # APU Registers/DMA
-        18)     echo 20 ;;  # PPU OAM/Sprite Evaluation (v2 has more sub-tests)
+        18)     echo 15 ;;  # PPU OAM/Sprite Evaluation
         19)     echo 65 ;;  # PPU Misc: $2007 Stress Test needs ~60s
         16)     echo 12 ;;  # PPU Rendering
         20)     echo 15 ;;  # CPU Behavior 2
