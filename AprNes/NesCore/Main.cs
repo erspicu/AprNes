@@ -647,6 +647,7 @@ prerender_sprite0_x = 0;
             // ── Decrement all counters ──
             mcCpuClock--;
             mcPpuClock--;
+            masterClockTotal++;
         }
     }
 

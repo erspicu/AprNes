@@ -222,9 +222,7 @@ namespace AprNes
                                 ppuPAR_CHR &= 0b1111111110111; // clear bit 3
                                 ppuPAR_MUX = ppuPAR_CHR;
                                 ppuAddressBus = ppuPAR_MUX;
-                                // Immediate A12 edge for MMC3 — only during visible (1-256), not prefetch (321-336)
-                                if (mapperA12IsMmc3 && (ppuAddressBus & 0x1000) != 0 && cx <= 256)
-                                    ((Mapper004)MapperObj).NotifyA12Rising();
+                                // A12 edge handled by PpuClock's IsA12RisingEdge (Mesen2 timestamp model)
                             }
                             else { // CHR-H ALE
                                 PPU_CheckPAR();

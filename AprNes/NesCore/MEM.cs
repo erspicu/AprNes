@@ -37,6 +37,7 @@ namespace AprNes
         static int mcCpuClock = 12;   // TriCNES: CPU fires after 12 MC (not immediately)
         static int mcPpuClock = 4;    // TriCNES: PPU fires after 4 MC (not immediately)
         static bool mcApuPutCycle = false; // M2 phase (toggles every APU/CPU step)
+        static public long masterClockTotal = 0; // Total master clocks (for Mesen2-style MMC3 A12 filter)
 
         // Called at every site that changes statusframeint, apuintflag, statusdmcint, or statusmapperint
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
