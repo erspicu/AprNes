@@ -1,7 +1,7 @@
 #!/bin/bash
 # run_tests_AccuracyCoin_report.sh
 # Run AccuracyCoin page-by-page and generate HTML report.
-# All 136 tests are executed (no skips).
+# AccuracyCoin v2 (20260410): 138 tests across 20 pages.
 # Page 15 (Power On State) is DRAW-only, screenshots only.
 #
 # Usage:
@@ -15,7 +15,7 @@ set -u
 cd /c/ai_project/AprNes
 
 EXE="AprNes/bin/Debug/AprNes.exe"
-ROM="nes-test-roms-master/AccuracyCoin-main/AccuracyCoin.nes"
+ROM="nes-test-roms-master/AccuracyCoin-main-20260410/AccuracyCoin.nes"
 REPORT_DIR="reports/report"
 SS_DIR="$REPORT_DIR/screenshots-ac"
 OUTPUT_HTML="$REPORT_DIR/AccuracyCoin_report.html"
@@ -64,7 +64,8 @@ get_test_wait() {
         17)     echo 16 ;;  # PPU VBlank Timing: ~14s
         13)     echo 8  ;;  # APU Registers/DMA: ~6s
         18)     echo 12 ;;  # PPU OAM tests: ~10s
-        16|19|20) echo 8 ;;  # PPU tests: ~6s
+        19)     echo 65 ;;  # PPU Misc: $2007 Stress Test needs ~60s
+        16|20)  echo 8  ;;  # PPU tests: ~6s
         *)      echo 6  ;;  # CPU/unofficial opcodes: ~3-4s
     esac
 }
@@ -647,8 +648,8 @@ tr:hover td {{ background:#1e2a5e; }}
 </style>
 </head>
 <body>
-<h1>AccuracyCoin Report - AprNes</h1>
-<div class="meta">Generated: {now} | ROM: AccuracyCoin.nes (Mapper 0/NROM) | Method: page-by-page</div>
+<h1>AccuracyCoin v2 Report - AprNes</h1>
+<div class="meta">Generated: {now} | ROM: AccuracyCoin v2 (20260410, 138 tests / 20 pages) | Method: page-by-page</div>
 
 <div class="summary">
   <div class="stat"><div class="num pass-c">{total_pass}</div><div class="lbl">PASS</div></div>
