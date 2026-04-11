@@ -158,14 +158,14 @@ namespace AprNes
         // $2007 SR Latch Pipeline (TriCNES v2 faithful port)
         // Replaces integer counter SM timing with 5-bool latch chain
         // ════════════════════════════════════════════════════════════════
-        // Read latch pipeline — TriCNES: PPU_2007_Read_Latches[5]
-        static bool[] ppu2007_ReadLatches = new bool[5] { false, true, false, true, false }; // idle state
+        // Read latch pipeline — 5-stage shift register packed into byte
+        // Bit layout: bit0=L[0], bit1=L[1], bit2=L[2], bit3=L[3], bit4=L[4]
+        // Idle state: {F,T,F,T,F} = 0x0A
+        static byte readLatch = 0x0A;
         static bool ppu2007_Read_SR = false;     // TriCNES: PPU_2007_Read_SR — set by read handler
-        static bool ppu2007_Read = false;         // TriCNES: PPU_2007_Read — one-shot trigger
-        // Write latch pipeline — TriCNES: PPU_2007_Write_Latches[5]
-        static bool[] ppu2007_WriteLatches = new bool[5] { false, true, false, true, false };
+        // Write latch pipeline — same packed format
+        static byte writeLatch = 0x0A;
         static bool ppu2007_Write_SR = false;
-        static bool ppu2007_Write = false;
         // Signals computed by PPU_DATA_StateMachine (Phase 1)
         static bool ppu2007_PD_RB = false;        // buffer refill trigger
         static bool ppu2007_ReadALE = false;       // read address latch enable
@@ -174,7 +174,6 @@ namespace AprNes
         static bool ppu2007_PPU_ALE = false;       // PPU_ALE = ReadALE || WriteALE || (!BLNK && !H0_DASH)
         static bool ppu2007_BLNK_Latch = false;
         static bool ppu2007_PaletteRAMEnable = false;
-        static bool ppu2007_Read_XRB = false;      // TriCNES: PPU_2007_Read_XRB
         static bool ppu2007_TStep_Latch = false;   // TriCNES: PPU_2007_TStep_Latch = DB_PAR
         static bool ppu2007_TStep = false;          // TriCNES: PPU_2007_TStep
         static bool ppu2007_DB_PAR = false;         // TriCNES: PPU_2007_DB_PAR — write strobe
@@ -1023,7 +1022,6 @@ namespace AprNes
 
             // TriCNES line 9060-9061: set SR latch AFTER advancement
             ppu2007_Read_SR = true;
-            ppu2007_Read = true;
 
             return openbus;
         }
@@ -1208,7 +1206,6 @@ namespace AprNes
                 MasterClockTick();
 
             // TriCNES line 9676-9677: set SR latch
-            ppu2007_Write = true;
             ppu2007_Write_SR = true;
         }
 

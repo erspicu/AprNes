@@ -293,11 +293,11 @@ namespace AprNes
             vram_latch = false;
             ppu_2007_buffer = 0;
             // SR latch pipeline reset
-            ppu2007_Read_SR = false; ppu2007_Read = false;
-            ppu2007_Write_SR = false; ppu2007_Write = false;
+            ppu2007_Read_SR = false;
+            ppu2007_Write_SR = false;
             ppu2007_PD_RB = false; ppu2007_ReadALE = false; ppu2007_WriteALE = false;
             ppu2007_DB_PAR = false; ppu2007_TStep_Latch = false; ppu2007_TStep = false;
-            for (int i = 0; i < 5; i++) { ppu2007_ReadLatches[i] = (i & 1) != 0; ppu2007_WriteLatches[i] = (i & 1) != 0; }  // idle: [F,T,F,T,F]
+            readLatch = 0x0A; writeLatch = 0x0A;  // idle: {F,T,F,T,F} = 0x0A
             ppu2006UpdateDelay = 0; ppu2006PendingAddr = 0;
             openbus = 0; open_bus_decay_timer = 77777;
 

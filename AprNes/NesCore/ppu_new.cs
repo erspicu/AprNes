@@ -746,58 +746,39 @@ namespace AprNes
         // computes PD_RB/ReadALE/PPU_READ/PPU_ALE signals.
         // Called from PpuPhase2_DeferredUpdates.
         // ════════════════════════════════════════════════════════════════
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         static void PPU_DATA_StateMachine()
         {
-            // TriCNES line 1763-1764
             bool BLNK = (!ShowBackGround && !ShowSprites) || (scanline >= 240 && scanline < preRenderLine);
             ppu2007_BLNK_Latch = BLNK;
-            // TriCNES line 1765: H0_DASH = (PPU_Dot - 1 & 1) != 0
-            // Odd dot = ALE (H0_DASH=false), Even dot = READ (H0_DASH=true)
             bool H0_DASH = ((ppu_cycles_x - 1) & 1) != 0;
 
-            // TriCNES line 1767-1768
-            ppu2007_PaletteRAMEnable = ((ppuAddressBus & 0x3F00) == 0x3F00) && ppu2007_BLNK_Latch;
-            ppu2007_Read_XRB = ppu2007_Read && ppu2007_PaletteRAMEnable;
+            ppu2007_PaletteRAMEnable = ((ppuAddressBus & 0x3F00) == 0x3F00) && BLNK;
 
-            // TriCNES line 1770-1774: advance read latches (even index)
-            ppu2007_ReadLatches[0] = ppu2007_Read_SR;
-            if (ppu2007_Read)
-                ppu2007_Read = false;
-            ppu2007_ReadLatches[2] = !ppu2007_ReadLatches[1];
-            ppu2007_ReadLatches[4] = !ppu2007_ReadLatches[3];
+            // Read latch pipeline (Phase 1): update even bits (L[0], L[2], L[4])
+            byte newREven = (byte)((ppu2007_Read_SR ? 1 : 0) | ((~readLatch << 1) & 0x14));
+            readLatch = (byte)((readLatch & 0x0A) | newREven);
+            ppu2007_PD_RB = (readLatch & 0x14) == 0x10;     // L[4] && !L[2]
+            ppu2007_ReadALE = (readLatch & 0x14) == 0x04;    // !L[4] && L[2]
 
-            // TriCNES line 1777-1778: derive PD_RB and ReadALE
-            ppu2007_PD_RB = ppu2007_ReadLatches[4] && !ppu2007_ReadLatches[2];
-            ppu2007_ReadALE = !ppu2007_ReadLatches[4] && ppu2007_ReadLatches[2];
-
-            // TriCNES line 1782: PPU_READ — true on READ dots
             ppu2007_PPU_READ = ppu2007_PD_RB || (!BLNK && H0_DASH);
 
-            // TriCNES line 1784-1791: advance write latches (even index)
-            ppu2007_WriteLatches[0] = ppu2007_Write_SR;
-            if (ppu2007_Write)
-                ppu2007_Write = false;
-            ppu2007_WriteLatches[2] = !ppu2007_WriteLatches[1];
-            ppu2007_WriteLatches[4] = !ppu2007_WriteLatches[3];
-            ppu2007_WriteALE = !ppu2007_WriteLatches[4] && ppu2007_WriteLatches[2];
+            // Write latch pipeline (Phase 1): update even bits
+            byte newWEven = (byte)((ppu2007_Write_SR ? 1 : 0) | ((~writeLatch << 1) & 0x14));
+            writeLatch = (byte)((writeLatch & 0x0A) | newWEven);
+            ppu2007_WriteALE = (writeLatch & 0x14) == 0x04;  // !L[4] && L[2]
 
-            // TriCNES line 1793
             ppu2007_TStep_Latch = ppu2007_DB_PAR;
+            ppu2007_PPU_ALE = ppu2007_ReadALE || ppu2007_WriteALE || (!BLNK && !H0_DASH);
 
-            // TriCNES line 1795-1796: PPU_ALE
-            bool b = !BLNK && !H0_DASH;
-            ppu2007_PPU_ALE = ppu2007_ReadALE || ppu2007_WriteALE || b;
-
-            // TriCNES line 1798-1805: SM ALE → address bus
             if (ppu2007_ReadALE || ppu2007_WriteALE)
             {
                 if (!ppu2007_PPU_READ)
                 {
                     ppuAddressBus = vram_addr;
-                    ppuOctalLatch = (byte)ppuAddressBus;
+                    ppuOctalLatch = (byte)vram_addr;
                 }
             }
-
         }
 
         // ════════════════════════════════════════════════════════════════
@@ -805,22 +786,18 @@ namespace AprNes
         // Phase 2: full dot, AFTER rendering. Executes buffer refill when PD_RB.
         // Called from ppu_step_new after tile fetch.
         // ════════════════════════════════════════════════════════════════
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         static void PPU_DATA_StateMachine2()
         {
-            if (ppu2007_PD_RB)
-            {
-                // TriCNES line 1820: PPU_ReadBuffer = FetchPPU()
-                // FetchPPU: addr = (AddressBus & 0x3F00) | OctalLatch, then AddressBus low = data
-                int addr = (ppuAddressBus & 0x3F00) | ppuOctalLatch;
-                byte data = PpuBusRead(addr >= 0x3F00 ? addr & 0x2FFF : addr & 0x3FFF);
-                ppu_2007_buffer = data;
-                // TriCNES FetchPPU side effect: AddressBus = (AddressBus & 0xFF00) | data
-                ppuAddressBus = (ppuAddressBus & 0xFF00) | data;
+            if (!ppu2007_PD_RB) return;
 
-                // TriCNES line 1821-1824
-                if (ppu2007_PPU_ALE)
-                    ppuOctalLatch = (byte)ppuAddressBus;
-            }
+            int addr = (ppuAddressBus & 0x3F00) | ppuOctalLatch;
+            byte data = PpuBusRead(addr >= 0x3F00 ? addr & 0x2FFF : addr);
+            ppu_2007_buffer = data;
+            ppuAddressBus = (ppuAddressBus & 0xFF00) | data;
+
+            if (ppu2007_PPU_ALE)
+                ppuOctalLatch = data;
         }
 
         // ════════════════════════════════════════════════════════════════
@@ -829,55 +806,43 @@ namespace AprNes
         // + odd-index latch advancement + SR reset.
         // Called from ppu_half_step_new.
         // ════════════════════════════════════════════════════════════════
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         static void PPU_DATA_StateMachine_Half()
         {
-            // TriCNES line 1829-1837: TStep → v increment
             ppu2007_TStep = ppu2007_TStep_Latch || ppu2007_PD_RB;
             if (ppu2007_TStep)
             {
-                // TriCNES line 1832: always increment v (no rendering gate, no 14-bit mask)
                 vram_addr = (ushort)(vram_addr + VramaddrIncrement);
                 if (!ppu2007_BLNK_Latch)
-                {
-                    // TriCNES line 1835: also IncrementScrollY during rendering
                     Yinc();
-                }
-                // TriCNES: NO ppuAddressBus/ppuOctalLatch/mapper update here
-                // Bus is updated by rendering-OFF check on next dot, or by tile fetch during rendering
             }
 
-            // TriCNES line 1839
             ppu2007_PPU_ALE = ppu2007_ReadALE || ppu2007_WriteALE;
 
-            // TriCNES line 1840-1848: second FetchPPU (after v increment)
             if (ppu2007_PD_RB)
             {
                 int addr = (ppuAddressBus & 0x3F00) | ppuOctalLatch;
-                byte data = PpuBusRead(addr >= 0x3F00 ? addr & 0x2FFF : addr & 0x3FFF);
+                byte data = PpuBusRead(addr >= 0x3F00 ? addr & 0x2FFF : addr);
                 ppu_2007_buffer = data;
-                ppuAddressBus = (ppuAddressBus & 0xFF00) | data; // FetchPPU side effect
+                ppuAddressBus = (ppuAddressBus & 0xFF00) | data;
                 if (ppu2007_PPU_ALE)
-                    ppuOctalLatch = (byte)ppuAddressBus;
+                    ppuOctalLatch = data;
             }
 
-            // TriCNES line 1849-1854: advance read latches (odd index) + SR reset
-            ppu2007_ReadLatches[1] = !ppu2007_ReadLatches[0];
-            ppu2007_ReadLatches[3] = !ppu2007_ReadLatches[2];
-            if (!ppu2007_ReadLatches[3])
-                ppu2007_Read_SR = false;
+            // Read latch pipeline (Phase 3): update odd bits (L[1], L[3])
+            byte newROdd = (byte)(((~readLatch) << 1) & 0x0A);
+            readLatch = (byte)((readLatch & 0x15) | newROdd);
+            if ((readLatch & 0x08) == 0) ppu2007_Read_SR = false;  // L[3]==false → clear SR
 
-            // TriCNES line 1856-1860: advance write latches (odd index) + SR reset
-            ppu2007_WriteLatches[1] = !ppu2007_WriteLatches[0];
-            ppu2007_WriteLatches[3] = !ppu2007_WriteLatches[2];
-            if (!ppu2007_WriteLatches[3])
-                ppu2007_Write_SR = false;
+            // Write latch pipeline (Phase 3): update odd bits
+            byte newWOdd = (byte)(((~writeLatch) << 1) & 0x0A);
+            writeLatch = (byte)((writeLatch & 0x15) | newWOdd);
+            if ((writeLatch & 0x08) == 0) ppu2007_Write_SR = false;
 
-            // TriCNES line 1862-1867: DB_PAR → write execution
-            ppu2007_DB_PAR = ppu2007_WriteLatches[1] && !ppu2007_WriteLatches[3];
+            ppu2007_DB_PAR = (writeLatch & 0x0A) == 0x02;  // L[1] && !L[3]
             ppu2007_PPU_WRITE = !ppu2007_PaletteRAMEnable && ppu2007_DB_PAR;
             if (ppu2007_DB_PAR)
             {
-                // TriCNES line 1866: StorePPUData(AddressBus, WriteData)
                 PpuBusWrite(ppuAddressBus, ppu2007SM_writeValue);
             }
         }
