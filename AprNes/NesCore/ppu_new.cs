@@ -523,116 +523,65 @@ namespace AprNes
                 // TriCNES line 2833-2836: OctalLatch guard before sprite switch
                 if (ppu2007_PPU_READ) ppuOctalLatch = (byte)ppuAddressBus;
 
-                // TriCNES sprite eval cases 0-7 (line 2855-2993) — uses PAR system
-                if (sprPhase == 0)
+                // TriCNES sprite eval cases 0-7 (line 2855-2993) — even=ALE, odd=READ
+                if (sprFetchEnabled)
                 {
-                    // Case 0: Y pos + NT ALE (TriCNES line 2859-2867)
-                    if (sprFetchEnabled)
+                    oamCopyBuffer = secondaryOAM[evalOam2Addr];
+
+                    if ((sprPhase & 1) == 0)
                     {
-                        oamCopyBuffer = secondaryOAM[evalOam2Addr];
-                        ppuPAR_NT = (ushort)(0x2000 | (vram_addr & 0x0FFF));
-                        ppuPAR_MUX = ppuPAR_NT;
-                        ppuAddressBus = ppuPAR_MUX;
-                        ppuInRangeCheck = (ushort)((scanline & 0xFF) - oamCopyBuffer);
-                    }
-                    evalOam2Addr++;
-                }
-                else if (sprPhase == 1)
-                {
-                    // Case 1: Pattern + dummy NT READ via tile fetch (TriCNES line 2876)
-                    if (sprFetchEnabled)
-                    {
-                        oamCopyBuffer = secondaryOAM[evalOam2Addr];
-                        ppuAddressBus = (ushort)((ppuPAR_NT & 0xFF00) | ppuOctalLatch);
-                        renderTemp = PpuBusRead(ppuAddressBus);
-                        commitNTFetch = true;
-                        ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp;
-                    }
-                    evalOam2Addr++;
-                }
-                else if (sprPhase == 2)
-                {
-                    // Case 2: Attribute + AT ALE (TriCNES line 2884-2889)
-                    if (sprFetchEnabled)
-                    {
-                        oamCopyBuffer = secondaryOAM[evalOam2Addr];
-                        sprFetchAttr[slot] = oamCopyBuffer;
-                        ppuPAR_NT = (ushort)(0x2000 | (vram_addr & 0x0FFF));
-                        ppuPAR_MUX = ppuPAR_NT;
+                        // Even phases (0, 2, 4, 6): Address Latch Enable
+                        if (sprPhase < 4)
+                        {
+                            if (sprPhase == 0) ppuInRangeCheck = (ushort)((scanline & 0xFF) - oamCopyBuffer);
+                            else               sprFetchAttr[slot] = oamCopyBuffer; // Phase 2
+                            ppuPAR_NT = (ushort)(0x2000 | (vram_addr & 0x0FFF));
+                            ppuPAR_MUX = ppuPAR_NT;
+                        }
+                        else
+                        {
+                            PPU_CheckPAR();
+                            ppuPAR_CHR = (ushort)((ppuPAR_CHR & ~8) | ((sprPhase & 2) << 2));
+                            ppuPAR_MUX = ppuPAR_CHR;
+                        }
                         ppuAddressBus = ppuPAR_MUX;
                     }
-                    evalOam2Addr++;
-                }
-                else if (sprPhase == 3)
-                {
-                    // Case 3: X pos + dummy AT READ via tile fetch (TriCNES line 2900)
-                    if (sprFetchEnabled)
+                    else
                     {
-                        oamCopyBuffer = secondaryOAM[evalOam2Addr];
-                        sprXPos[slot] = oamCopyBuffer; sprXCounter[slot] = oamCopyBuffer;
-                        ppuAddressBus = (ushort)((ppuPAR_AT & 0xFF00) | ppuOctalLatch);
-                        renderTemp = PpuBusRead(ppuAddressBus);
-                        commitATFetch = true;
-                        ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp;
+                        // Odd phases (1, 3, 5, 7): Memory Read
+                        if (sprPhase == 3) { sprXPos[slot] = oamCopyBuffer; sprXCounter[slot] = oamCopyBuffer; }
+
+                        ushort baseAddr = (sprPhase == 1) ? ppuPAR_NT : ((sprPhase == 3) ? ppuPAR_AT : ppuPAR_CHR);
+                        ppuAddressBus = (ushort)((baseAddr & 0xFF00) | ppuOctalLatch);
+
+                        if (sprPhase >= 5)
+                        {
+                            ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
+                            if (mapperNeedsA12 && (sprPhase == 5 || !mapperA12IsMmc3))
+                                NotifyMapperA12(ppuAddressBus);
+                        }
+
+                        byte val = PpuBusRead(ppuAddressBus);
+                        ppuAddressBus = (ppuAddressBus & 0xFF00) | val;
+
+                        if (sprPhase < 5)
+                        {
+                            renderTemp = val;
+                            if (sprPhase == 1) commitNTFetch = true;
+                            else               commitATFetch = true;
+                        }
+                        else
+                        {
+                            byte tile = (sprFetchAttr[slot] & 0x40) != 0 ? FlipByte(val) : val;
+                            if (slot >= sprSlotCount || ppuInRangeCheck >= (Spritesize8x16 ? 16 : 8))
+                                tile = 0;
+                            if (sprPhase == 5) sprShiftL[slot] = tile;
+                            else               sprShiftH[slot] = tile;
+                        }
                     }
                 }
-                else if (sprPhase == 4)
-                {
-                    // Case 4: sprite CHR ALE (low plane) via PAR (TriCNES line 2911-2918)
-                    if (sprFetchEnabled)
-                    {
-                        oamCopyBuffer = secondaryOAM[evalOam2Addr];
-                        PPU_CheckPAR();
-                        ppuPAR_CHR &= 0b1111111110111; // clear bit 3 (low plane)
-                        ppuPAR_MUX = ppuPAR_CHR;
-                        ppuAddressBus = ppuPAR_MUX;
-                    }
-                }
-                else if (sprPhase == 5)
-                {
-                    // Case 5: sprite CHR READ (low plane) via FetchPPU (TriCNES line 2927)
-                    if (sprFetchEnabled)
-                    {
-                        oamCopyBuffer = secondaryOAM[evalOam2Addr];
-                        ppuAddressBus = (ushort)((ppuPAR_CHR & 0xFF00) | ppuOctalLatch);
-                        ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
-                        if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus);
-                        byte tile = PpuBusRead(ppuAddressBus);
-                        ppuAddressBus = (ppuAddressBus & 0xFF00) | tile;
-                        sprShiftL[slot] = (sprFetchAttr[slot] & 0x40) != 0 ? FlipByte(tile) : tile;
-                        if (slot >= sprSlotCount) sprShiftL[slot] = 0;
-                        if (!(ppuInRangeCheck < (Spritesize8x16 ? 16 : 8))) sprShiftL[slot] = 0;
-                    }
-                }
-                else if (sprPhase == 6)
-                {
-                    // Case 6: sprite CHR ALE (high plane) via PAR (TriCNES line 2951-2959)
-                    if (sprFetchEnabled)
-                    {
-                        oamCopyBuffer = secondaryOAM[evalOam2Addr];
-                        PPU_CheckPAR();
-                        ppuPAR_CHR |= 8; // set bit 3 (high plane)
-                        ppuPAR_MUX = ppuPAR_CHR;
-                        ppuAddressBus = ppuPAR_MUX;
-                    }
-                }
-                else // sprPhase == 7
-                {
-                    // Case 7: sprite CHR READ (high plane) via FetchPPU (TriCNES line 2969)
-                    if (sprFetchEnabled)
-                    {
-                        oamCopyBuffer = secondaryOAM[evalOam2Addr];
-                        ppuAddressBus = (ushort)((ppuPAR_CHR & 0xFF00) | ppuOctalLatch);
-                        ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
-                        if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(ppuAddressBus);
-                        byte tile = PpuBusRead(ppuAddressBus);
-                        ppuAddressBus = (ppuAddressBus & 0xFF00) | tile;
-                        sprShiftH[slot] = (sprFetchAttr[slot] & 0x40) != 0 ? FlipByte(tile) : tile;
-                        if (slot >= sprSlotCount) sprShiftH[slot] = 0;
-                        if (!(ppuInRangeCheck < (Spritesize8x16 ? 16 : 8))) sprShiftH[slot] = 0;
-                    }
-                    evalOam2Addr++;
-                }
+                // Branchless increment: phases 0,1,2,7 → mask 0x87 (10000111)
+                evalOam2Addr += (byte)((0x87 >> sprPhase) & 1);
 
                 // TriCNES line 2995-2998: OctalLatch guard after sprite switch
                 if (ppu2007_PPU_ALE && !ppu2007_PPU_READ) ppuOctalLatch = (byte)ppuAddressBus;
