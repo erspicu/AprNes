@@ -313,6 +313,11 @@ for rom in 1.frame_basics.nes 2.vbl_timing.nes 3.even_odd_frames.nes 4.vbl_clear
     run_test "vbl_nmi_timing" "$rom" "--max-wait 30"
 done
 
+# pal_apu_tests (10) — requires --region PAL
+for rom in 01.len_ctr.nes 02.len_table.nes 03.irq_flag.nes 04.clock_jitter.nes 05.len_timing_mode0.nes 06.len_timing_mode1.nes 07.irq_flag_timing.nes 08.irq_timing.nes 10.len_halt_timing.nes 11.len_reload_timing.nes; do
+    run_test "pal_apu_tests" "$rom" "--max-wait 30 --region PAL"
+done
+
 # ─────────────────────────────────────────────
 # Finalize
 # ─────────────────────────────────────────────
