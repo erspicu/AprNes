@@ -147,6 +147,8 @@ namespace AprNes
         static ushort extAttrNTOffset;  // nametable offset saved at phase 1
         static int extAttrChrBank;      // 4KB CHR bank computed at phase 3
 
+        static bool ppuGreyscale = false; // $2001 bit 0 — applied via emphasis delay
+
         //ppu status 0x2002.
         static bool isSpriteOverflow = false, isSprite0hit = false, isVblank = false;
 
@@ -966,9 +968,11 @@ namespace AprNes
                 if (vram_addr >= 0x3F00)
                 {
                     ppuAddressBus = vram_addr;
-                    result = PpuBusRead(vram_addr & 0x3FFF);
-                    // Palette read: result has palette data, but open bus bits 6-7
-                    result = (byte)((openbus & 0xC0) | (result & 0x3F));
+                    // Palette read: direct from palette RAM with greyscale mask + open bus bits 6-7
+                    int palAddr = vram_addr & 0x3F1F;
+                    if ((palAddr & 3) == 0) palAddr &= 0x3F0F;
+                    int palMask = ppuGreyscale ? 0x30 : 0x3F;
+                    result = (byte)((openbus & 0xC0) | (ppu_ram[0x3F00 + (palAddr & 0x1F)] & palMask));
                 }
                 else
                 {

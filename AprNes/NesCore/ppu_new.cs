@@ -171,6 +171,7 @@ namespace AprNes
             if (ppu2001EmphasisDelay > 0 && --ppu2001EmphasisDelay == 0)
             {
                 byte v = ppu2001EmphasisPending;
+                ppuGreyscale = (v & 0x01) != 0;
                 ppuEmphasis = (byte)((v >> 5) & 0x7);
                 if (Region != RegionType.NTSC)
                     ppuEmphasis = (byte)((ppuEmphasis & 0x4) | ((ppuEmphasis & 1) << 1) | ((ppuEmphasis >> 1) & 1));
