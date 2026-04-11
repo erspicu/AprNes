@@ -527,7 +527,14 @@ prerender_sprite0_x = 0;
                 for (int i = 0; i < 32; i++) { secondaryOAM[i] = 0; corruptOamRow[i] = 0; }
                 P1_Port = 0; P2_Port = 0;
                 P1_ShiftRegister = 0; P2_ShiftRegister = 0;
+                // TriCNES power-on RAM pattern: alternating $F0/$0F per 16-byte block
                 for (int i = 0; i < 65536; i++) NES_MEM[i] = 0;
+                for (int i = 0; i < 0x800; i++)
+                {
+                    bool swap = (i & 0x1F) >= 0x10;
+                    bool lowHalf = (i & 0x2) < 0x2;
+                    NES_MEM[i] = (byte)((lowHalf != swap) ? 0xF0 : 0x0F);
+                }
 
                 ApplyRegionProfile(); // set timing parameters before any subsystem init
                 HardResetState();  // reset all CPU/PPU/DMA static state
