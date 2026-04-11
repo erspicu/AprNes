@@ -1545,6 +1545,8 @@ namespace TriCNES
                 PPU_Update2001Delay--;
                 if (PPU_Update2001Delay == 0) // if we've waited enough cycles, apply the changes
                 {
+                    if (debug2007Log && PPU_Scanline >= 0 && PPU_Scanline < 10)
+                        System.Console.Error.WriteLine($"D2001 sl={PPU_Scanline} cx={PPU_Dot} val={PPU_Update2001Value:X2} bgON={(PPU_Update2001Value & 0x08) != 0}");
                     PPU_Mask_8PxShowBackground = (PPU_Update2001Value & 0x02) != 0;
                     PPU_Mask_8PxShowSprites = (PPU_Update2001Value & 0x04) != 0;
                     PPU_Mask_ShowBackground = (PPU_Update2001Value & 0x08) != 0;

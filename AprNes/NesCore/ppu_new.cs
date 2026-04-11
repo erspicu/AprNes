@@ -157,6 +157,8 @@ namespace AprNes
             // ── $2001 delayed mask update (TriCNES lines 1681-1694) ──
             if (ppu2001UpdateDelay > 0 && --ppu2001UpdateDelay == 0)
             {
+                if (debug2007Log && scanline >= 0 && scanline < 10)
+                    System.Console.Error.WriteLine($"D2001 sl={scanline} cx={ppu_cycles_x} val={ppu2001PendingValue:X2} bgON={(ppu2001PendingValue & 0x08) != 0}");
                 ppuGreyscale   = (ppu2001PendingValue & 0x01) != 0;
                 ShowBgLeft8    = (ppu2001PendingValue & 0x02) != 0;
                 ShowSprLeft8   = (ppu2001PendingValue & 0x04) != 0;
