@@ -518,8 +518,8 @@ namespace AprNes
             }
 
             // ── Frame Counter + quarter/half frame processing ──
+            // setvolumes() is called inside setlength() and processLenCtrReloadNonHalf() — not per-cycle
             ApuFrameCounterStep();
-            setvolumes();
 
             // TriCNES: halt flags updated from registers EVERY APU cycle (lines 1139-1142)
             // Not just at HalfFrame — allows mid-frame halt changes to take effect next cycle
@@ -529,40 +529,54 @@ namespace AprNes
             lenctrHalt3 = (apuRegister[0xC] & 0x20) != 0;
 
             // 生成音效樣本
-            // 為 Mode 0/1 計算相容的單一 mapperExpansionAudio 值
-            if (expansionChannelCount > 0 && AudioMode < 2)
-            {
-                float gain = ap_mode01ExpGain;
-                int sum = 0;
-                for (int i = 0; i < expansionChannelCount; i++)
-                {
-                    if (ChannelEnabled[5 + i])
-                        sum += (int)(expansionChannels[i] * gain);
-                }
-                mapperExpansionAudio = sum;
-            }
-
-            // Apply per-channel enable/mute (bitmask — no array bounds check)
-            int mask = ChannelEnableMask;
-            int sq1val  = (mask & 1)  != 0 ? volume[0] * _pulseOut[0] : 0;
-            int sq2val  = (mask & 2)  != 0 ? volume[1] * _pulseOut[1] : 0;
-            int trival  = (mask & 4)  != 0 ? _triOut : 0;
-            int noisval = (mask & 8)  != 0 ? volume[3] * _noiseOut : 0;
-            int dmcval  = (mask & 16) != 0 ? dmcvalue : 0;
-
             if (AudioMode > 0)
             {
-                // Authentic / Modern: 每 APU cycle 推入 AudioPlus
-                AudioPlus_PushApuCycle(sq1val, sq2val, trival, noisval, dmcval, mapperExpansionAudio);
+                // Authentic / Modern: 每 APU cycle 推入 AudioPlus (需要 per-cycle 精度)
+                if (expansionChannelCount > 0)
+                {
+                    float gain = ap_mode01ExpGain;
+                    int sum = 0;
+                    for (int i = 0; i < expansionChannelCount; i++)
+                    {
+                        if (ChannelEnabled[5 + i])
+                            sum += (int)(expansionChannels[i] * gain);
+                    }
+                    mapperExpansionAudio = sum;
+                }
+                int mask = ChannelEnableMask;
+                AudioPlus_PushApuCycle(
+                    (mask & 1)  != 0 ? volume[0] * _pulseOut[0] : 0,
+                    (mask & 2)  != 0 ? volume[1] * _pulseOut[1] : 0,
+                    (mask & 4)  != 0 ? _triOut : 0,
+                    (mask & 8)  != 0 ? volume[3] * _noiseOut : 0,
+                    (mask & 16) != 0 ? dmcvalue : 0,
+                    mapperExpansionAudio);
             }
             else
             {
-                // Pure Digital: 原有 ~40.58 cycle 降頻 + DC killer
+                // Pure Digital: catchup — only compute output at sample rate (~40 cycle interval)
                 _sampleAccum += 1.0;
                 if (_sampleAccum >= _cycPerSample)
                 {
                     _sampleAccum -= _cycPerSample;
-                    generateSample(sq1val, sq2val, trival, noisval, dmcval);
+                    if (expansionChannelCount > 0)
+                    {
+                        float gain = ap_mode01ExpGain;
+                        int sum = 0;
+                        for (int i = 0; i < expansionChannelCount; i++)
+                        {
+                            if (ChannelEnabled[5 + i])
+                                sum += (int)(expansionChannels[i] * gain);
+                        }
+                        mapperExpansionAudio = sum;
+                    }
+                    int mask = ChannelEnableMask;
+                    generateSample(
+                        (mask & 1)  != 0 ? volume[0] * _pulseOut[0] : 0,
+                        (mask & 2)  != 0 ? volume[1] * _pulseOut[1] : 0,
+                        (mask & 4)  != 0 ? _triOut : 0,
+                        (mask & 8)  != 0 ? volume[3] * _noiseOut : 0,
+                        (mask & 16) != 0 ? dmcvalue : 0);
                 }
             }
         }
@@ -699,6 +713,7 @@ namespace AprNes
             if (lenCtrReloadFlag1) { lengthctr[1] = lenCtrReloadValue1; lenCtrReloadFlag1 = false; }
             if (lenCtrReloadFlag2) { lengthctr[2] = lenCtrReloadValue2; lenCtrReloadFlag2 = false; }
             if (lenCtrReloadFlag3) { lengthctr[3] = lenCtrReloadValue3; lenCtrReloadFlag3 = false; }
+            setvolumes();
         }
 
         static void setlinctr()
@@ -1040,6 +1055,7 @@ namespace AprNes
             if (lenCtrEnable[1] == 0) lengthctr[1] = 0;
             if (lenCtrEnable[2] == 0) lengthctr[2] = 0;
             if (lenCtrEnable[3] == 0) lengthctr[3] = 0;
+            setvolumes();
 
             // Deferred status (TriCNES: APU_DelayedDMC4015 = PutCycle ? 3 : 4)
             dmcDelayedEnable = dmcEnable;
