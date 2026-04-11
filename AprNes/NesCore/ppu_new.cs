@@ -543,7 +543,6 @@ namespace AprNes
                     if (sprFetchEnabled)
                     {
                         oamCopyBuffer = secondaryOAM[evalOam2Addr];
-                        // TriCNES calls PPU_Render_ShiftRegistersAndBitPlanes → cycleTick 1 → NT READ
                         ppuAddressBus = (ushort)((ppuPAR_NT & 0xFF00) | ppuOctalLatch);
                         renderTemp = PpuBusRead(ppuAddressBus);
                         commitNTFetch = true;
@@ -571,7 +570,6 @@ namespace AprNes
                     {
                         oamCopyBuffer = secondaryOAM[evalOam2Addr];
                         sprXPos[slot] = oamCopyBuffer; sprXCounter[slot] = oamCopyBuffer;
-                        // TriCNES calls PPU_Render_ShiftRegistersAndBitPlanes → cycleTick 3 → AT READ
                         ppuAddressBus = (ushort)((ppuPAR_AT & 0xFF00) | ppuOctalLatch);
                         renderTemp = PpuBusRead(ppuAddressBus);
                         commitATFetch = true;
@@ -584,9 +582,7 @@ namespace AprNes
                     if (sprFetchEnabled)
                     {
                         oamCopyBuffer = secondaryOAM[evalOam2Addr];
-                        // TriCNES: GetSpriteAddress sets AddressBus, then CheckPAR updates PAR_CHR
-                        // PAR_CHR tile number was set by NT commit (line 3668: OAM2 pattern byte)
-                        PPU_CheckPAR(); // sets bit12 (pattern table) + fine Y from InRangeCheck
+                        PPU_CheckPAR();
                         ppuPAR_CHR &= 0b1111111110111; // clear bit 3 (low plane)
                         ppuPAR_MUX = ppuPAR_CHR;
                         ppuAddressBus = ppuPAR_MUX;
@@ -614,7 +610,6 @@ namespace AprNes
                     if (sprFetchEnabled)
                     {
                         oamCopyBuffer = secondaryOAM[evalOam2Addr];
-                        // TriCNES: recalculate GetSpriteAddress, AddressBus |= 8, CheckPAR, PAR |= 8
                         PPU_CheckPAR();
                         ppuPAR_CHR |= 8; // set bit 3 (high plane)
                         ppuPAR_MUX = ppuPAR_CHR;
@@ -666,13 +661,12 @@ namespace AprNes
             {
                 if (!(ShowSprites || ShowBackGround))
                 {
-                    for (int i = 0; i < 8; i++)
-                        sprXCounter[i] = 0;
+                    // SWAR: clear 8 ints (32 bytes) as 4 ulongs
+                    ulong* xc = (ulong*)sprXCounter;
+                    xc[0] = 0; xc[1] = 0; xc[2] = 0; xc[3] = 0;
                 }
-                bool anyActive = false;
-                for (int i = 0; i < 8; i++)
-                    if ((sprShiftH[i] | sprShiftL[i]) != 0) anyActive = true;
-                spriteAnyActive = anyActive;
+                // SWAR: check 8+8 bytes in one 64-bit OR
+                spriteAnyActive = ((*(ulong*)sprShiftH) | (*(ulong*)sprShiftL)) != 0;
             }
 
             // Garbage/Dummy NT fetch (TriCNES: PPU_Render_ShiftRegistersAndBitPlanes_DummyNT)
