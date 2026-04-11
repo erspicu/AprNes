@@ -618,18 +618,7 @@ prerender_sprite0_x = 0;
                     NMILine = false;
             }
 
-            // ── PPU full(0) / half(masterPerPpuHalf) — mutually exclusive ──
-            if (mcPpuClock == 0)
-            {
-                mcPpuClock = masterPerPpu;
-                ppu_step_new();
-            }
-            else if (mcPpuClock == masterPerPpuHalf)
-            {
-                ppu_half_step_new();
-            }
-
-            // ── IRQ(5) / APU(masterPerCpu) — mutually exclusive ──
+            // ── IRQ(5) / APU(masterPerCpu) — TriCNES: IRQ check BEFORE PPU ──
             if (mcCpuClock == 5)
             {
                 IRQLine = irqLineCurrent;
@@ -641,6 +630,17 @@ prerender_sprite0_x = 0;
             {
                 apu_step();
                 mcApuPutCycle = !mcApuPutCycle;
+            }
+
+            // ── PPU full(0) / half(masterPerPpuHalf) — mutually exclusive ──
+            if (mcPpuClock == 0)
+            {
+                mcPpuClock = masterPerPpu;
+                ppu_step_new();
+            }
+            else if (mcPpuClock == masterPerPpuHalf)
+            {
+                ppu_half_step_new();
             }
 
             // ── Decrement all counters ──
