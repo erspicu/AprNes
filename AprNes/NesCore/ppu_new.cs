@@ -690,11 +690,10 @@ namespace AprNes
 
                     if (evalDot == 0)
                     {
-                        // TriCNES line 3702-3706: dot 0 = CHR ALE via PAR
-                        PPU_CheckPAR();
-                        ppuPAR_CHR &= 0b1111111110111; // clear bit 3
-                        ppuAddressBus = ppuPAR_CHR;
-                        ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
+                        // Dot 0: idle/setup. Use NT address (A12=0) to maintain M2Filter
+                        // for correct MMC3 scanline counter behavior with BG at $1000.
+                        // TriCNES uses CHR PAR here but also fails mmc3_test #8.
+                        ppuAddressBus = 0x2000 | (vram_addr & 0x0FFF);
                     }
                     else
                     {
