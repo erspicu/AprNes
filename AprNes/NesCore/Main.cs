@@ -291,9 +291,13 @@ namespace AprNes
             // PPU VRAM address / scroll
             vram_addr_internal = 0; vram_addr = 0; FineX = 0;
             vram_latch = false;
-            ppu_2007_buffer = 0; ppu2007SM = 9;
-            ppu2007SM_performMysteryWrite = false; ppu2007SM_normalWriteBehavior = false;
-            ppu2007SM_updateVramAddrEarly = false; ppu2007SM_readDelayed = false; ppu2007SM_mysteryAddr = 0;
+            ppu_2007_buffer = 0;
+            // SR latch pipeline reset
+            ppu2007_Read_SR = false; ppu2007_Read = false;
+            ppu2007_Write_SR = false; ppu2007_Write = false;
+            ppu2007_PD_RB = false; ppu2007_ReadALE = false; ppu2007_WriteALE = false;
+            ppu2007_DB_PAR = false; ppu2007_TStep_Latch = false; ppu2007_TStep = false;
+            for (int i = 0; i < 5; i++) { ppu2007_ReadLatches[i] = (i & 1) != 0; ppu2007_WriteLatches[i] = (i & 1) != 0; }  // idle: [F,T,F,T,F]
             ppu2006UpdateDelay = 0; ppu2006PendingAddr = 0;
             openbus = 0; open_bus_decay_timer = 77777;
 
@@ -314,12 +318,16 @@ namespace AprNes
             oamCorruptPending = false; oamCorruptSuppressed = false;
             oamCorruptDelay = 0; oamCorruptDisabledFlag = false;
             // P4-2: Palette corruption
-            mcCpuClock = 0; mcPpuClock = 0; mcApuPutCycle = true; // TriCNES: APU_PutCycle=true at power-on
+            // TriCNES: counters start at 0, count UP, fire at 12/4.
+            // AprNes: count DOWN, fire at 0. To match first-fire timing:
+            // CPU first fire at tick 13 → init=12 (12→11→...→0=fire at tick 13)
+            // PPU first fire at tick 5  → init=4  (4→3→2→1→0=fire at tick 5)
+            mcCpuClock = masterPerCpu; mcPpuClock = masterPerPpu; mcApuPutCycle = true;
             spr_ram_add = 0;
 
             // PPU tile pipeline
             renderLow = 0; renderHigh = 0;
-            pendingTileLow = 0; pendingTileHigh = 0; commitLoadShiftReg = false;
+            pendingTileLow = 0; pendingTileHigh = 0;
 
             // PPU sprite state
 prerender_sprite0_x = 0;
@@ -520,6 +528,7 @@ prerender_sprite0_x = 0;
                 P1_Port = 0; P2_Port = 0;
                 P1_ShiftRegister = 0; P2_ShiftRegister = 0;
                 for (int i = 0; i < 65536; i++) NES_MEM[i] = 0;
+                for (int i = 0; i < 0x4000; i++) ppu_ram[i] = 0;
 
                 ApplyRegionProfile(); // set timing parameters before any subsystem init
                 HardResetState();  // reset all CPU/PPU/DMA static state
@@ -610,18 +619,7 @@ prerender_sprite0_x = 0;
                     NMILine = false;
             }
 
-            // ── PPU full(0) / half(masterPerPpuHalf) — mutually exclusive ──
-            if (mcPpuClock == 0)
-            {
-                mcPpuClock = masterPerPpu;
-                ppu_step_new();
-            }
-            else if (mcPpuClock == masterPerPpuHalf)
-            {
-                ppu_half_step_new();
-            }
-
-            // ── IRQ(5) / APU(masterPerCpu) — mutually exclusive ──
+            // ── IRQ(5) / APU(masterPerCpu) — TriCNES: IRQ check BEFORE PPU ──
             if (mcCpuClock == 5)
             {
                 IRQLine = irqLineCurrent;
@@ -635,9 +633,21 @@ prerender_sprite0_x = 0;
                 mcApuPutCycle = !mcApuPutCycle;
             }
 
+            // ── PPU full(0) / half(masterPerPpuHalf) — mutually exclusive ──
+            if (mcPpuClock == 0)
+            {
+                mcPpuClock = masterPerPpu;
+                ppu_step_new();
+            }
+            else if (mcPpuClock == masterPerPpuHalf)
+            {
+                ppu_half_step_new();
+            }
+
             // ── Decrement all counters ──
             mcCpuClock--;
             mcPpuClock--;
+            masterClockTotal++;
         }
     }
 
