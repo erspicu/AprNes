@@ -27,10 +27,7 @@ namespace AprNes
         public void CpuCycle() { }
         public void CpuClockRise()
         {
-            if ((NesCore.ppuAddressBus & 0x1000) == 0)
-            {
-                if (m2Filter < 3) m2Filter++;
-            }
+            // M2Filter now uses PPU dot counting (moved to PpuClock)
         }
         public MapperA12Mode A12NotifyMode => MapperA12Mode.MMC3;
 
@@ -39,12 +36,33 @@ namespace AprNes
         public void PpuClock()
         {
             bool a12Now = (NesCore.ppuAddressBus & 0x1000) != 0;
-            if (!NesCore.ppuA12Prev && a12Now && m2Filter == 3)
+            // A12 filter: count consecutive PPU dots with A12=0, threshold=8
+            // 4-dot gaps (BG NT+AT) → ignored. 9-dot gaps (scanline boundary) → accepted.
+            if (!a12Now)
+            {
+                if (m2Filter < 16) m2Filter++;
+            }
+            // Edge detection uses ppuA12Prev (set at end of previous dot)
+            if (!NesCore.ppuA12Prev && a12Now && m2Filter >= 8)
             {
                 Mapper04step_IRQ();
             }
             if (a12Now)
                 m2Filter = 0;
+        }
+
+        // Called from tile fetch when CHR ALE puts A12=1 on bus
+        // Provides immediate A12 edge notification within the same dot
+        // Called from BG tile fetch CHR-L ALE when A12 transitions 0→1
+        public void NotifyA12Rising()
+        {
+            if (m2Filter >= 8)
+            {
+                if (NesCore.debug2007Log)
+                    System.Console.Error.WriteLine($"A12R sl={NesCore.scanline} cx={NesCore.ppu_cycles_x} m2f={m2Filter} cnt={IRQCounter}");
+                Mapper04step_IRQ();
+            }
+            m2Filter = 0;
         }
 
         public virtual void Mapper04step_IRQ()
