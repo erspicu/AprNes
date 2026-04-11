@@ -498,7 +498,7 @@ namespace AprNes
             if (evalDot >= 257 && evalDot <= 320)
             {
                 if (ShowBG_EvalDelay || ShowSpr_EvalDelay) spr_ram_add = 0;
-                if (evalDot == 257) evalOam2Addr = 0;
+                if (evalDot == 257) { evalOam2Addr = 0; sprFetchRanThisScanline = false; }
                 if (evalDot == 262) spriteSizeLatchedForFetch = Spritesize8x16;
 
                 int sprPhase = (evalDot - 257) & 7;
@@ -517,7 +517,7 @@ namespace AprNes
                 if (sprPhase == 0) { if (sprFetchEnabled) oamCopyBuffer = secondaryOAM[evalOam2Addr]; evalOam2Addr++; }
                 else if (sprPhase == 1) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus); } evalOam2Addr++; }
                 else if (sprPhase == 2) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; sprFetchAttr[slot] = oamCopyBuffer; } evalOam2Addr++; }
-                else if (sprPhase == 3) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; sprXPos[slot] = oamCopyBuffer; } }
+                else if (sprPhase == 3) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; sprXPos[slot] = oamCopyBuffer; sprFetchRanThisScanline = true; } }
                 else if (sprPhase == 4) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; ppuAddressBus = ComputeSpritePatternAddr(slot); ppuChrFetchA12 = (ppuAddressBus >> 12) & 1; } }
                 else if (sprPhase == 5)
                 {
@@ -561,15 +561,16 @@ namespace AprNes
             if (scanline == preRenderLine && evalDot == 257 && ppuRenderingEnabled) PrecomputePreRenderSprites();
 
             // Dot 339: X counter init + sprite active flag
-            // When rendering OFF (F-Blank): don't touch sprXCounter (stale sprite behavior)
+            // Counter reload only if sprite fetch actually ran this scanline
+            // (rendering was ON during dots 257-320). If sprite fetch was skipped
+            // (F-Blank), counters retain previous state (stale sprite behavior).
             if (evalDot == 339)
             {
-                if (ShowSprites || ShowBackGround)
+                if (sprFetchRanThisScanline)
                 {
                     for (int i = 0; i < 8; i++)
                         sprXCounter[i] = sprXPos[i];
                 }
-                // else: rendering OFF → leave sprXCounter untouched (stale data stays)
                 bool anyActive = false;
                 for (int i = 0; i < 8; i++)
                     if ((sprShiftH[i] | sprShiftL[i]) != 0) anyActive = true;
