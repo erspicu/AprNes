@@ -1045,26 +1045,22 @@ namespace AprNes
         {
             openbus = value;
 
-            // TriCNES model: IMMEDIATE application + delayed re-application
-            // P3-1: DataBus glitch — some fields use cpubus (last READ value, not written value)
-            // for 1-2 PPU cycles. The delayed handler fixes them with the correct value.
-            // Glitch-affected fields (TriCNES uses dataBus):
+            // TriCNES line 9453-9477: $2000 write handler
+            // P3-1: DataBus glitch — t register uses cpubus (dataBus) initially
             vram_addr_internal = (ushort)((vram_addr_internal & 0x73ff) | ((cpubus & 3) << 10));
-            BaseNameTableAddr = 0x2000 | ((cpubus & 3) << 10);
-            VramaddrIncrement = ((cpubus & 4) > 0) ? 32 : 1;
-            Spritesize8x16 = ((cpubus & 0x20) > 0);
-            // Non-glitch fields (TriCNES uses In directly):
-            NMIable = ((value & 0x80) > 0);
-            SpPatternTableAddr = ((value & 8) > 0) ? 0x1000 : 0;
-            BgPatternTableAddr = ((value & 0x10) > 0) ? 0x1000 : 0;
 
-            // TriCNES: NMILine clearing is NOT done here — it's handled by CPUClock==8 gate
-            // (NMILine cleared at operationCycle==0 when !(isVblank && NMIable))
+            // TriCNES line 9468: EmulateNMasterClockCycles(2) — wait for CPU databus to change
+            for (int i = 0; i < 2; i++)
+                MasterClockTick();
 
-            // Delayed re-application (TriCNES: fixes open bus glitch after 1-2 PPU cycles)
-            ppu2000PendingValue = value;
-            // TriCNES: PPUClock 0,1=2; PPUClock 2,3=1. mcPpuClock 0↔PPU0, 3↔PPU1, 2↔PPU2, 1↔PPU3
-            ppu2000UpdateDelay = ((mcPpuClock & 3) == 0 || (mcPpuClock & 3) == 3) ? 2 : 1;
+            // TriCNES line 9469-9474: set ALL fields with correct value (In) AFTER 2MC push
+            NMIable = (value & 0x80) != 0;
+            VramaddrIncrement = (value & 0x04) != 0 ? 32 : 1;
+            Spritesize8x16 = (value & 0x20) != 0;
+            SpPatternTableAddr = (value & 0x08) != 0 ? 0x1000 : 0;
+            BgPatternTableAddr = (value & 0x10) != 0 ? 0x1000 : 0;
+            vram_addr_internal = (ushort)((vram_addr_internal & 0x73ff) | ((value & 3) << 10));
+            BaseNameTableAddr = 0x2000 | ((value & 3) << 10);
         }
 
         static void ppu_w_2001(byte value)

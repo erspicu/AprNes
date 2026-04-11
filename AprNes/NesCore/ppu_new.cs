@@ -33,7 +33,7 @@ namespace AprNes
             // Deferred register updates (TriCNES lines 1263-1496)
             // Guard: >99% of dots have no pending updates, skip the call entirely
             // ══════════════════════════════════════════════════════
-            if (ppu2006UpdateDelay != 0 || ppu2005UpdateDelay != 0 || ppu2000UpdateDelay != 0)
+            if (ppu2006UpdateDelay != 0 || ppu2005UpdateDelay != 0)
                 PpuPhase2_DeferredUpdates(cx);
 
             // Open bus decay (runs every dot, too small to extract)
@@ -436,16 +436,7 @@ namespace AprNes
                 vram_latch = !vram_latch;
             }
 
-            // ── $2000 delayed control (TriCNES lines 1306-1320) ──
-            if (ppu2000UpdateDelay != 0 && --ppu2000UpdateDelay == 0)
-            {
-                NMIable = (ppu2000PendingValue & 0x80) != 0;
-                VramaddrIncrement = (ppu2000PendingValue & 0x04) != 0 ? 32 : 1;
-                Spritesize8x16 = (ppu2000PendingValue & 0x20) != 0;
-                SpPatternTableAddr = (ppu2000PendingValue & 0x08) != 0 ? 0x1000 : 0;
-                BgPatternTableAddr = (ppu2000PendingValue & 0x10) != 0 ? 0x1000 : 0;
-                vram_addr_internal = (ushort)((vram_addr_internal & 0x73FF) | ((ppu2000PendingValue & 3) << 10));
-            }
+            // $2000 delayed control removed — now handled by 2MC push in ppu_w_2000 (TriCNES model)
 
             // $2007 SM Phase 1 moved to ppu_step_new (runs every dot via PPU_DATA_StateMachine)
         }
