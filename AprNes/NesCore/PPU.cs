@@ -192,11 +192,6 @@ namespace AprNes
         static ushort ppuPAR_MUX = 0;  // PAR output multiplexer → drives ppuAddressBus
         static ushort ppuInRangeCheck = 0; // TriCNES: InRangeCheck (sprite Y distance)
 
-        // $2000 delayed control update (TriCNES: PPU_Update2000Delay, 1-2 PPU cycles)
-        // ALL fields delayed: NMI enable, pattern table, sprite size, nametable, increment
-        static int ppu2000UpdateDelay = 0;
-        static byte ppu2000PendingValue = 0;
-
         // $2001 delayed mask update (TriCNES: PPU_Update2001Delay, 2-3 PPU cycles)
         // _Instant flags set immediately; ShowBackGround/ShowSprites applied after delay
         static int ppu2001UpdateDelay = 0;
