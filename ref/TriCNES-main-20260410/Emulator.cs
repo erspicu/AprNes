@@ -1477,8 +1477,8 @@ namespace TriCNES
             // Right now, I'm only emulating MMC3's IRQ counter in this function.
             PPU_MapperSpecificFunctions();
             PPU_A12_Prev = (PPU_AddressBus & 0b0001000000000000) != 0; // Record the value of the A12. This is used in the PPU_MapperSpecificFunctions(), so if this changes between here and next ppu cycle, we'll know.
-            if (debug2007Log && PPU_Scanline == 0 && PPU_Dot >= 257 && PPU_Dot <= 268 && PPU_AddressBus != 0)
-                System.Console.Error.WriteLine($"BUS sl={PPU_Scanline} cx={PPU_Dot} bus={PPU_AddressBus:X4} a12p={PPU_A12_Prev}");
+            if (debug2007Log && PPU_Scanline == 0 && PPU_Dot >= 45 && PPU_Dot <= 57)
+                System.Console.Error.WriteLine($"DOT sl=0 cx={PPU_Dot} bus={PPU_AddressBus:X4} a12={(PPU_AddressBus & 0x1000) != 0}");
             if (PPU_OddFrame && (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites))
             {
                 if (PPU_Scanline == 261 && PPU_Dot == 340)
@@ -9528,6 +9528,8 @@ namespace TriCNES
                         case 3:
                             PPU_Update2001Delay = 2; PPU_Update2001EmphasisBitsDelay = 2; PPU_Update2001OAMCorruptionDelay = 2; break;
                     }
+                    if (debug2007Log)
+                        System.Console.Error.WriteLine($"W2001 sl={PPU_Scanline} cx={PPU_Dot} val={In:X2} ppuClk={PPUClock} delay={PPU_Update2001Delay}");
                     PPU_WasRenderingBefore2001Write = PPU_Mask_ShowBackground || PPU_Mask_ShowSprites;
                     PPU_Mask_ShowBackground_Instant = PPU_Mask_ShowBackground; // now that the PPU has updated, OAM evaluation will also recognize the change
                     PPU_Mask_ShowSprites_Instant = PPU_Mask_ShowSprites;

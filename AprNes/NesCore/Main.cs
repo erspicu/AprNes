@@ -318,7 +318,11 @@ namespace AprNes
             oamCorruptPending = false; oamCorruptSuppressed = false;
             oamCorruptDelay = 0; oamCorruptDisabledFlag = false;
             // P4-2: Palette corruption
-            mcCpuClock = 0; mcPpuClock = 0; mcApuPutCycle = true; // TriCNES: APU_PutCycle=true at power-on
+            // TriCNES: counters start at 0, count UP, fire at 12/4.
+            // AprNes: count DOWN, fire at 0. To match first-fire timing:
+            // CPU first fire at tick 13 → init=12 (12→11→...→0=fire at tick 13)
+            // PPU first fire at tick 5  → init=4  (4→3→2→1→0=fire at tick 5)
+            mcCpuClock = masterPerCpu; mcPpuClock = masterPerPpu; mcApuPutCycle = true;
             spr_ram_add = 0;
 
             // PPU tile pipeline

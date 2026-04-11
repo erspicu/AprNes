@@ -100,6 +100,8 @@ namespace AprNes
             // ── Mapper + A12 (TriCNES line 1478-1479: START of _EmulatePPU, BEFORE SM) ──
             MapperObj.PpuClock();
             ppuA12Prev = (ppuAddressBus & 0x1000) != 0;
+            if (debug2007Log && scanline == 0 && cx >= 45 && cx <= 57)
+                System.Console.Error.WriteLine($"DOT sl=0 cx={cx} bus={ppuAddressBus:X4} a12={(ppuAddressBus & 0x1000) != 0}");
 
             // ── Odd frame skip (TriCNES lines 1629-1643) ──
             // PAL/Dendy: no dot skip (PAL phase alternation eliminates dot crawl naturally)
