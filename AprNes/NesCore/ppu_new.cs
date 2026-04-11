@@ -202,63 +202,46 @@ namespace AprNes
                         int fetchPair = ((cx - 1) >> 1) & 3;
                         if ((cx & 1) != 0) // odd cx = ALE — TriCNES cycleTick 0,2,4,6
                         {
-                            if (fetchPair == 0) { // NT ALE
-                                ppuPAR_NT = (ushort)(0x2000 | (vram_addr & 0x0FFF));
-                                ppuPAR_MUX = ppuPAR_NT;
-                                ppuAddressBus = ppuPAR_MUX;
+                            if (fetchPair < 2) // 0: NT, 1: AT
+                            {
+                                if (fetchPair == 0)
+                                    ppuPAR_NT = (ushort)(0x2000 | (vram_addr & 0x0FFF));
+                                else
+                                    ppuPAR_AT = (ushort)(0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07));
+                                ppuPAR_MUX = (fetchPair == 0) ? ppuPAR_NT : ppuPAR_AT;
                             }
-                            else if (fetchPair == 1) { // AT ALE
-                                ppuPAR_AT = (ushort)(0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07));
-                                ppuPAR_MUX = ppuPAR_AT;
-                                ppuAddressBus = ppuPAR_MUX;
-                            }
-                            else if (fetchPair == 2) { // CHR-L ALE
+                            else // 2: CHR-L, 3: CHR-H
+                            {
                                 PPU_CheckPAR();
-                                ppuPAR_CHR &= 0b1111111110111; // clear bit 3
+                                ppuPAR_CHR = (ushort)((ppuPAR_CHR & ~8) | ((fetchPair & 1) << 3));
                                 ppuPAR_MUX = ppuPAR_CHR;
-                                ppuAddressBus = ppuPAR_MUX;
-                                // A12 edge handled by PpuClock's IsA12RisingEdge (Mesen2 timestamp model)
                             }
-                            else { // CHR-H ALE
-                                PPU_CheckPAR();
-                                ppuPAR_CHR |= 8; // set bit 3
-                                ppuPAR_MUX = ppuPAR_CHR;
-                                ppuAddressBus = ppuPAR_MUX;
-                            }
+                            ppuAddressBus = ppuPAR_MUX;
                         }
                         else // even cx = READ — TriCNES cycleTick 1,3,5,7
                         {
-                            // FetchPPU: addr = (PAR & 0xFF00) | OctalLatch
-                            if (fetchPair == 0) { // NT READ
-                                ppuAddressBus = (ushort)((ppuPAR_NT & 0xFF00) | ppuOctalLatch);
-                                if (mapperA12IsMmc3) NotifyMapperA12(ppuAddressBus);
-                                renderTemp = PpuBusRead(ppuAddressBus); commitNTFetch = true;
-                                ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp;
-                                if (extAttrEnabled) extAttrNTOffset = (ushort)(ppuAddressBus & 0x3FF);
-                                if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ppuAddressBus);
-                            }
-                            else if (fetchPair == 1) { // AT READ
-                                ppuAddressBus = (ushort)((ppuPAR_AT & 0xFF00) | ppuOctalLatch);
-                                renderTemp = PpuBusRead(ppuAddressBus); commitATFetch = true;
-                                ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp;
-                                if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ppuAddressBus);
-                            }
-                            else if (fetchPair == 2) { // CHR-L READ
-                                ppuAddressBus = (ushort)((ppuPAR_CHR & 0xFF00) | ppuOctalLatch);
+                            ppuAddressBus = (ushort)((ppuPAR_MUX & 0xFF00) | ppuOctalLatch);
+
+                            if (fetchPair >= 2)
+                            {
                                 ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
-                                if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus);
-                                renderTemp = PpuBusRead(ppuAddressBus); commitPatLowFetch = true;
-                                ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp;
-                                if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ppuAddressBus);
+                                if (mapperNeedsA12 && (fetchPair == 2 || !mapperA12IsMmc3))
+                                    NotifyMapperA12(ppuAddressBus);
                             }
-                            else { // CHR-H READ
-                                ppuAddressBus = (ushort)((ppuPAR_CHR & 0xFF00) | ppuOctalLatch);
-                                ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
-                                if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(ppuAddressBus);
-                                renderTemp = PpuBusRead(ppuAddressBus); commitPatHighFetch = true;
-                                ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp;
-                                if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ppuAddressBus);
+                            else if (fetchPair == 0 && mapperA12IsMmc3)
+                            {
+                                NotifyMapperA12(ppuAddressBus);
                             }
+
+                            renderTemp = PpuBusRead(ppuAddressBus);
+                            ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp;
+
+                            if (fetchPair == 0) { commitNTFetch = true; if (extAttrEnabled) extAttrNTOffset = (ushort)(ppuAddressBus & 0x3FF); }
+                            else if (fetchPair == 1) commitATFetch = true;
+                            else if (fetchPair == 2) commitPatLowFetch = true;
+                            else                     commitPatHighFetch = true;
+
+                            if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ppuAddressBus);
                         }
 
                         // TriCNES line 3649-3652: OctalLatch guard after fetch
