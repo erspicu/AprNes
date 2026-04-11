@@ -435,6 +435,10 @@ input[type="text"]::placeholder{color:var(--text-dim)}
   <div class="progress-bar"><div class="fill" id="progress-fill"></div></div>
   <div class="progress-text" id="progress-text"></div>
 </div>
+<div style="margin:1rem 0;padding:.75rem 1rem;background:#1a2332;border:1px solid #2d4a6f;border-radius:8px;font-size:.85rem;color:#8cb4e0">
+  <strong style="color:#5dadec">New in v2:</strong> Added <strong>10 PAL APU tests</strong> (pal_apu_tests suite, --region PAL). Total: 174 &rarr; 184 tests.
+  Also includes TriCNES v2 PPU timing port &amp; MMC3 A12 filter fix (threshold=10 PPU dots).
+</div>
 <div class="controls">
   <div class="btn-group">
     <button class="filter-btn active" data-filter="all">All</button>
