@@ -79,7 +79,7 @@ namespace AprNes
 
         static public ExpansionChipType expansionChipType = ExpansionChipType.None;
         static public int   expansionChannelCount = 0;       // 0~8
-        static public int[] expansionChannels = new int[8];   // raw output per channel
+        static public int* expansionChannels;   // raw output per channel (unmanaged, 8 ints)
 
         // 每晶片增益 — 匹配原有 mapperExpansionAudio 乘數
         // 讓 per-channel × gain 加總後落在 NES APU 混音範圍 (~0-98302)
@@ -158,8 +158,8 @@ namespace AprNes
         // Length counter — TriCNES deferred reload flag model
         static int* lengthctr;
         static int* lenctrload;         // LUT: 32-entry length counter load table
-        static bool[] lenCtrReloadFlag = new bool[4];   // deferred reload pending
-        static int[] lenCtrReloadValue = new int[4];     // deferred reload value
+        static bool lenCtrReloadFlag0, lenCtrReloadFlag1, lenCtrReloadFlag2, lenCtrReloadFlag3;
+        static int  lenCtrReloadValue0, lenCtrReloadValue1, lenCtrReloadValue2, lenCtrReloadValue3;
         // Halt read from register every APU cycle (TriCNES model)
         static byte* apuRegister;       // raw $4000-$400F register values (for halt readback)
         // TriCNES: halt flags updated every APU cycle from apuRegister (not just at HalfFrame)
@@ -257,6 +257,7 @@ namespace AprNes
             if (_pulseSeq    == null) _pulseSeq    = (int*)Marshal.AllocHGlobal(sizeof(int) * 2);
             if (_pulseDuty   == null) _pulseDuty   = (int*)Marshal.AllocHGlobal(sizeof(int) * 2);
             if (_pulseOut    == null) _pulseOut    = (int*)Marshal.AllocHGlobal(sizeof(int) * 2);
+            if (expansionChannels == null) expansionChannels = (int*)Marshal.AllocHGlobal(sizeof(int) * 8);
             if (volume       == null) volume       = (int*)Marshal.AllocHGlobal(sizeof(int) * 4);
             if (SQUARELOOKUP == null) SQUARELOOKUP = (int*)Marshal.AllocHGlobal(sizeof(int) * 31);
             if (TNDLOOKUP    == null) TNDLOOKUP    = (int*)Marshal.AllocHGlobal(sizeof(int) * 203);
@@ -337,7 +338,9 @@ namespace AprNes
                 TNDLOOKUP[i] = (int)((163.67 / (24329.0 / (i == 0 ? 0.0001 : i) + 100)) * 49151);
 
             // Default bool* arrays
-            for (int i = 0; i < 4; i++) { lenCtrEnable[i] = 1; envConstVolume[i] = 1; envelopeStartFlag[i] = 0; lenCtrReloadFlag[i] = false; lenCtrReloadValue[i] = 0; }
+            for (int i = 0; i < 4; i++) { lenCtrEnable[i] = 1; envConstVolume[i] = 1; envelopeStartFlag[i] = 0; }
+            lenCtrReloadFlag0 = lenCtrReloadFlag1 = lenCtrReloadFlag2 = lenCtrReloadFlag3 = false;
+            lenCtrReloadValue0 = lenCtrReloadValue1 = lenCtrReloadValue2 = lenCtrReloadValue3 = 0;
             for (int i = 0; i < 16; i++) apuRegister[i] = 0;
             for (int i = 0; i < 2; i++) { sweepenable[i] = 0; sweepnegate[i] = 0; sweepsilence[i] = 0; sweepreload[i] = 0; }
 
@@ -370,14 +373,14 @@ namespace AprNes
                 lenCtrEnable[i] = 0;
                 lengthctr[i] = 0;
                 volume[i] = 0;
-                lenCtrReloadFlag[i] = false;
-                lenCtrReloadValue[i] = 0;
                 envelopeValue[i] = 0;
                 envelopeCounter[i] = 0;
                 envelopePos[i] = 0;
                 envConstVolume[i] = 0;
                 envelopeStartFlag[i] = 0;
             }
+            lenCtrReloadFlag0 = lenCtrReloadFlag1 = lenCtrReloadFlag2 = lenCtrReloadFlag3 = false;
+            lenCtrReloadValue0 = lenCtrReloadValue1 = lenCtrReloadValue2 = lenCtrReloadValue3 = 0;
             for (int i = 0; i < 2; i++)
             {
                 sweepenable[i] = 0;
@@ -673,36 +676,28 @@ namespace AprNes
         static void setlength()
         {
             // 1. Reload (only if flag set AND counter==0)
-            for (int i = 0; i < 4; i++)
-            {
-                if (lenCtrReloadFlag[i] && lengthctr[i] == 0)
-                    lengthctr[i] = lenCtrReloadValue[i];
-                else
-                    lenCtrReloadFlag[i] = false;
-            }
+            if (lenCtrReloadFlag0 && lengthctr[0] == 0) lengthctr[0] = lenCtrReloadValue0; else lenCtrReloadFlag0 = false;
+            if (lenCtrReloadFlag1 && lengthctr[1] == 0) lengthctr[1] = lenCtrReloadValue1; else lenCtrReloadFlag1 = false;
+            if (lenCtrReloadFlag2 && lengthctr[2] == 0) lengthctr[2] = lenCtrReloadValue2; else lenCtrReloadFlag2 = false;
+            if (lenCtrReloadFlag3 && lengthctr[3] == 0) lengthctr[3] = lenCtrReloadValue3; else lenCtrReloadFlag3 = false;
             // 2. Status disable ($4015 bit=0 → zero counter)
             for (int i = 0; i < 4; i++)
                 if (lenCtrEnable[i] == 0) lengthctr[i] = 0;
             // 3. Decrement (guarded: !halt && !reloadFlag)
-            // Uses halt flags cached from previous APU cycle (TriCNES: updated every cycle at end)
-            if (lengthctr[0] > 0 && !lenctrHalt0 && !lenCtrReloadFlag[0]) lengthctr[0]--;
-            if (lengthctr[1] > 0 && !lenctrHalt1 && !lenCtrReloadFlag[1]) lengthctr[1]--;
-            if (lengthctr[2] > 0 && !lenctrHalt2 && !lenCtrReloadFlag[2]) lengthctr[2]--;
-            if (lengthctr[3] > 0 && !lenctrHalt3 && !lenCtrReloadFlag[3]) lengthctr[3]--;
+            if (lengthctr[0] > 0 && !lenctrHalt0 && !lenCtrReloadFlag0) lengthctr[0]--;
+            if (lengthctr[1] > 0 && !lenctrHalt1 && !lenCtrReloadFlag1) lengthctr[1]--;
+            if (lengthctr[2] > 0 && !lenctrHalt2 && !lenCtrReloadFlag2) lengthctr[2]--;
+            if (lengthctr[3] > 0 && !lenctrHalt3 && !lenCtrReloadFlag3) lengthctr[3]--;
             setvolumes();
         }
 
         // TriCNES: non-HalfFrame cycle — unconditional reload if flag set, then clear
         static void processLenCtrReloadNonHalf()
         {
-            for (int i = 0; i < 4; i++)
-            {
-                if (lenCtrReloadFlag[i])
-                {
-                    lengthctr[i] = lenCtrReloadValue[i];
-                    lenCtrReloadFlag[i] = false;
-                }
-            }
+            if (lenCtrReloadFlag0) { lengthctr[0] = lenCtrReloadValue0; lenCtrReloadFlag0 = false; }
+            if (lenCtrReloadFlag1) { lengthctr[1] = lenCtrReloadValue1; lenCtrReloadFlag1 = false; }
+            if (lenCtrReloadFlag2) { lengthctr[2] = lenCtrReloadValue2; lenCtrReloadFlag2 = false; }
+            if (lenCtrReloadFlag3) { lengthctr[3] = lenCtrReloadValue3; lenCtrReloadFlag3 = false; }
         }
 
         static void setlinctr()
@@ -919,7 +914,7 @@ namespace AprNes
             _pulseTimer[0]  = _pulsePeriod[0];
             _pulseSeq[0]    = 0;
             if (lenCtrEnable[0] != 0)
-            { lenCtrReloadValue[0] = lenctrload[(val >> 3) & 0x1F]; lenCtrReloadFlag[0] = true; }
+            { lenCtrReloadValue0 = lenctrload[(val >> 3) & 0x1F]; lenCtrReloadFlag0 = true; }
             envelopeStartFlag[0] = 1;
         }
         // $4004: Pulse 2 duty/envelope
@@ -954,7 +949,7 @@ namespace AprNes
             _pulseTimer[1]  = _pulsePeriod[1];
             _pulseSeq[1]    = 0;
             if (lenCtrEnable[1] != 0)
-            { lenCtrReloadValue[1] = lenctrload[(val >> 3) & 0x1F]; lenCtrReloadFlag[1] = true; }
+            { lenCtrReloadValue1 = lenctrload[(val >> 3) & 0x1F]; lenCtrReloadFlag1 = true; }
             envelopeStartFlag[1] = 1;
         }
         // $4008: Triangle linear counter
@@ -978,7 +973,7 @@ namespace AprNes
             _triPeriod = (_triPeriod & 0xFF) | ((val & 7) << 8);
             _triTimer  = _triPeriod;
             if (lenCtrEnable[2] != 0)
-            { lenCtrReloadValue[2] = lenctrload[(val >> 3) & 0x1F]; lenCtrReloadFlag[2] = true; }
+            { lenCtrReloadValue2 = lenctrload[(val >> 3) & 0x1F]; lenCtrReloadFlag2 = true; }
             linctrflag = true;
         }
         // $400C: Noise envelope
@@ -1000,7 +995,7 @@ namespace AprNes
         static void apu_400f(byte val)
         {
             if (lenCtrEnable[3] != 0)
-            { lenCtrReloadValue[3] = lenctrload[(val >> 3) & 0x1F]; lenCtrReloadFlag[3] = true; }
+            { lenCtrReloadValue3 = lenctrload[(val >> 3) & 0x1F]; lenCtrReloadFlag3 = true; }
             envelopeStartFlag[3] = 1;
         }
         // $4010: DMC flags + rate
