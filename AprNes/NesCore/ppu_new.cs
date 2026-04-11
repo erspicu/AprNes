@@ -220,27 +220,27 @@ namespace AprNes
                             if (fetchPair == 0) { // phase 1: NT fetch
                                 int ntAddr = 0x2000 | (vram_addr & 0x0FFF);
                                 ppuAddressBus = ntAddr; if (mapperA12IsMmc3) NotifyMapperA12(ntAddr);
-                                renderTemp = PpuBusRead(ntAddr); commitNTFetch = true;
+                                lastTileFetchAddr = ntAddr; renderTemp = PpuBusRead(ntAddr); commitNTFetch = true;
                                 if (extAttrEnabled) extAttrNTOffset = (ushort)(ntAddr & 0x3FF);
                                 if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ntAddr);
                             }
                             else if (fetchPair == 1) { // phase 3: AT fetch
                                 int atAddr = 0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07);
-                                ppuAddressBus = atAddr; renderTemp = PpuBusRead(atAddr); commitATFetch = true;
+                                ppuAddressBus = atAddr; lastTileFetchAddr = atAddr; renderTemp = PpuBusRead(atAddr); commitATFetch = true;
                                 if (mmc5Ref != null) mmc5Ref.NotifyVramRead(atAddr);
                             }
                             else if (fetchPair == 2) { // phase 5: CHR low fetch
                                 int chrAddr = (extAttrEnabled && extAttrChrSize > 0) ? (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7) : BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7);
                                 ppuAddressBus = chrAddr; ppuChrFetchA12 = (chrAddr >> 12) & 1;
                                 if (mapperNeedsA12) NotifyMapperA12(chrAddr);
-                                renderTemp = PpuBusRead(chrAddr); commitPatLowFetch = true;
+                                lastTileFetchAddr = chrAddr; renderTemp = PpuBusRead(chrAddr); commitPatLowFetch = true;
                                 if (mmc5Ref != null) mmc5Ref.NotifyVramRead(chrAddr);
                             }
                             else { // phase 7: CHR high fetch
                                 int chrAddr = (extAttrEnabled && extAttrChrSize > 0) ? (extAttrChrBank << 12) | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8 : BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7) | 8;
                                 ppuAddressBus = chrAddr; ppuChrFetchA12 = (chrAddr >> 12) & 1;
                                 if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(chrAddr);
-                                renderTemp = PpuBusRead(chrAddr); commitPatHighFetch = true;
+                                lastTileFetchAddr = chrAddr; renderTemp = PpuBusRead(chrAddr); commitPatHighFetch = true;
                                 if (mmc5Ref != null) mmc5Ref.NotifyVramRead(chrAddr);
                             }
                         }
@@ -337,8 +337,7 @@ namespace AprNes
             if (ppu2007SM_deferredRefill)
             {
                 ppu2007SM_deferredRefill = false;
-                // Use current ppuAddressBus (set by tile fetch) for bus-accurate refill
-                int refillAddr = ppuAddressBus & 0x3FFF;
+                int refillAddr = lastTileFetchAddr & 0x3FFF;
                 ppu_2007_buffer = PpuBusRead(refillAddr >= 0x3F00 ? refillAddr & 0x2FFF : refillAddr);
             }
 
@@ -509,8 +508,8 @@ namespace AprNes
                 if (sprPhase <= 3)
                 {
                     int bgPhase = evalDot & 7;
-                    if (bgPhase == 1) ppuAddressBus = (ushort)(0x2000 | (vram_addr & 0x0FFF));
-                    else if (bgPhase == 3) ppuAddressBus = (ushort)(0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07));
+                    if (bgPhase == 1) { ppuAddressBus = (ushort)(0x2000 | (vram_addr & 0x0FFF)); lastTileFetchAddr = ppuAddressBus; }
+                    else if (bgPhase == 3) { ppuAddressBus = (ushort)(0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07)); lastTileFetchAddr = ppuAddressBus; }
                 }
 
                 // OAM2 reads + sprite tile fetch
@@ -525,7 +524,8 @@ namespace AprNes
                     {
                         oamCopyBuffer = secondaryOAM[evalOam2Addr];
                         if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus);
-                        int addr = ppuAddressBus; byte tile = chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF];
+                        int addr = ppuAddressBus; lastTileFetchAddr = addr;
+                        byte tile = chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF];
                         sprShiftL[slot] = (sprFetchAttr[slot] & 0x40) != 0 ? FlipByte(tile) : tile;
                         if (slot >= sprSlotCount) sprShiftL[slot] = 0;
                     }
@@ -539,7 +539,8 @@ namespace AprNes
                     {
                         oamCopyBuffer = secondaryOAM[evalOam2Addr];
                         if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(ppuAddressBus);
-                        int addr = ppuAddressBus; byte tile = chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF];
+                        int addr = ppuAddressBus; lastTileFetchAddr = addr;
+                        byte tile = chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF];
                         sprShiftH[slot] = (sprFetchAttr[slot] & 0x40) != 0 ? FlipByte(tile) : tile;
                         if (slot >= sprSlotCount) sprShiftH[slot] = 0;
                     }
@@ -578,8 +579,8 @@ namespace AprNes
             }
 
             // Garbage NT fetch (dots 336-340)
-            if (evalDot == 336 || evalDot == 338) { ppuAddressBus = 0x2000 | (vram_addr & 0x0FFF); PpuBusRead(ppuAddressBus); }
-            else if (evalDot == 337 || evalDot == 339) { NTVal = ppu_ram[CIRAMAddr(ppuAddressBus)]; if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus); }
+            if (evalDot == 336 || evalDot == 338) { ppuAddressBus = 0x2000 | (vram_addr & 0x0FFF); lastTileFetchAddr = ppuAddressBus; PpuBusRead(ppuAddressBus); }
+            else if (evalDot == 337 || evalDot == 339) { lastTileFetchAddr = ppuAddressBus; NTVal = ppu_ram[CIRAMAddr(ppuAddressBus)]; if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus); }
             else if (evalDot == 340) { ppuAddressBus = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7); ppuChrFetchA12 = (ppuAddressBus >> 12) & 1; }
 
             if (mmc5Ref != null && (evalDot == 337 || evalDot == 339)) mmc5Ref.NotifyVramRead(0x2000 | (vram_addr & 0x0FFF));
@@ -616,9 +617,15 @@ namespace AprNes
             {
                 if (ppu2007SM_isRead && !ppu2007SM_bufferLate)
                 {
-                    // Deferred refill: set flag, actual refill after tile fetch
-                    // so buffer gets rendering bus value (not v address)
-                    ppu2007SM_deferredRefill = true;
+                    if ((ShowBackGround || ShowSprites) && (scanline < 240 || scanline == preRenderLine))
+                    {
+                        ppu2007SM_deferredRefill = true;
+                    }
+                    else
+                    {
+                        ppuAddressBus = ppu2007SM_addr;
+                        ppu_2007_buffer = PpuBusRead(ppu2007SM_addr >= 0x3F00 ? ppu2007SM_addr & 0x2FFF : ppu2007SM_addr & 0x3FFF);
+                    }
                 }
             }
             else if (sm == 3)
@@ -648,8 +655,17 @@ namespace AprNes
             {
                 if (ppu2007SM_isRead && ppu2007SM_bufferLate)
                 {
-                    ppuAddressBus = vram_addr;
-                    ppu_2007_buffer = PpuBusRead(vram_addr >= 0x3F00 ? vram_addr & 0x2FFF : vram_addr & 0x3FFF);
+                    if ((ShowBackGround || ShowSprites) && (scanline < 240 || scanline == preRenderLine))
+                    {
+                        // During rendering: defer refill to after tile fetch (uses rendering bus)
+                        ppu2007SM_deferredRefill = true;
+                    }
+                    else
+                    {
+                        // VBlank/rendering off: immediate refill from v address
+                        ppuAddressBus = vram_addr;
+                        ppu_2007_buffer = PpuBusRead(vram_addr >= 0x3F00 ? vram_addr & 0x2FFF : vram_addr & 0x3FFF);
+                    }
                 }
                 if (ppu2007SM_updateVramAddrEarly)
                 {

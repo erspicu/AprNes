@@ -252,6 +252,7 @@ namespace AprNes
         static int sprSlotCount = 0;                   // Number of valid sprites fetched (from evalSpriteCount)
         static bool spriteAnyActive = false;            // Fast-path: any sprite has non-zero shift data
         static bool sprFetchRanThisScanline = false;  // Tracks if sprite fetch (257-320) ran with rendering ON
+        static int lastTileFetchAddr = 0;             // Last address read by tile fetch (for $2007 SM refill)
 
         // Palette cache: 32-entry (mirrors NES palette RAM layout), rebuilt on palette write
         static uint* palCache;  // NesColors[ppu_ram[0x3F00+i] & 0x3F] for i=0..31
