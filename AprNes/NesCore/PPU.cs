@@ -1025,14 +1025,9 @@ namespace AprNes
             ppu2007_Read_SR = true;
             ppu2007_Read = true;
 
-            // DEBUG
-            if (debug2007Log && scanline >= 0 && scanline < 240)
-                System.Console.Error.WriteLine($"R2007 sl={scanline} cx={ppu_cycles_x} buf={ppu_2007_buffer:X2} ret={result:X2} v={vram_addr:X4}");
-
             return openbus;
         }
 
-        static public bool debug2007Log = false; // enable via --debug-2007
         static byte openbus;
         static public byte cpubus;  // CPU data bus value (last byte read/written by CPU)
 
@@ -1108,9 +1103,6 @@ namespace AprNes
             // Tier 2: Delayed mask flags (ShowBG/ShowSprites/Left8)
             ppu2001UpdateDelay = ((mcPpuClock & 3) == 2) ? 3 : 2; // TriCNES: phase 2=3, others=2
             ppu2001PendingValue = value;
-            if (debug2007Log)
-                System.Console.Error.WriteLine($"W2001 sl={scanline} cx={ppu_cycles_x} val={value:X2} mcPpu={mcPpuClock} delay={ppu2001UpdateDelay}");
-
             // Emphasis bits: independent delay (TriCNES: PPU_Update2001EmphasisBitsDelay)
             // Alignment 0,3: 2 cycles; Alignment 1,2: 1 cycle
             ppu2001EmphasisDelay = ((mcPpuClock & 3) == 0 || (mcPpuClock & 3) == 3) ? 2 : 1;

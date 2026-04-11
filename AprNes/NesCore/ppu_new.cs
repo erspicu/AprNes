@@ -100,9 +100,6 @@ namespace AprNes
             // ── Mapper + A12 (TriCNES line 1478-1479: START of _EmulatePPU, BEFORE SM) ──
             MapperObj.PpuClock();
             ppuA12Prev = (ppuAddressBus & 0x1000) != 0;
-            if (debug2007Log && scanline == 0 && cx >= 45 && cx <= 57)
-                System.Console.Error.WriteLine($"DOT sl=0 cx={cx} bus={ppuAddressBus:X4} a12={(ppuAddressBus & 0x1000) != 0}");
-
             // ── Odd frame skip (TriCNES lines 1629-1643) ──
             // PAL/Dendy: no dot skip (PAL phase alternation eliminates dot crawl naturally)
             if (Region == RegionType.NTSC && oddSwap && (ShowBackGround || ShowSprites))
@@ -157,8 +154,6 @@ namespace AprNes
             // ── $2001 delayed mask update (TriCNES lines 1681-1694) ──
             if (ppu2001UpdateDelay > 0 && --ppu2001UpdateDelay == 0)
             {
-                if (debug2007Log && scanline >= 0 && scanline < 10)
-                    System.Console.Error.WriteLine($"D2001 sl={scanline} cx={ppu_cycles_x} val={ppu2001PendingValue:X2} bgON={(ppu2001PendingValue & 0x08) != 0}");
                 ppuGreyscale   = (ppu2001PendingValue & 0x01) != 0;
                 ShowBgLeft8    = (ppu2001PendingValue & 0x02) != 0;
                 ShowSprLeft8   = (ppu2001PendingValue & 0x04) != 0;
@@ -822,9 +817,6 @@ namespace AprNes
                 // TriCNES FetchPPU side effect: AddressBus = (AddressBus & 0xFF00) | data
                 ppuAddressBus = (ppuAddressBus & 0xFF00) | data;
 
-                if (debug2007Log && scanline >= 0 && scanline < 240)
-                    System.Console.Error.WriteLine($"SM2 sl={scanline} cx={ppu_cycles_x} addr={addr:X4} buf={data:X2} bus={ppuAddressBus:X4} ol={ppuOctalLatch:X2}");
-
                 // TriCNES line 1821-1824
                 if (ppu2007_PPU_ALE)
                     ppuOctalLatch = (byte)ppuAddressBus;
@@ -843,8 +835,6 @@ namespace AprNes
             ppu2007_TStep = ppu2007_TStep_Latch || ppu2007_PD_RB;
             if (ppu2007_TStep)
             {
-                if (debug2007Log && scanline >= 0 && scanline < 240)
-                    System.Console.Error.WriteLine($"TStp sl={scanline} cx={ppu_cycles_x} v={vram_addr:X4} TL={ppu2007_TStep_Latch} PD={ppu2007_PD_RB}");
                 // TriCNES line 1832: always increment v (no rendering gate, no 14-bit mask)
                 vram_addr = (ushort)(vram_addr + VramaddrIncrement);
                 if (!ppu2007_BLNK_Latch)
