@@ -97,7 +97,9 @@ namespace AprNes
             // ── Sprite overflow delayed (TriCNES line 1619) ──
             isSpriteOverflow_Delayed = isSpriteOverflow;
 
-            // Mapper PpuClock moved to end of dot (after SM2, TriCNES line 1478)
+            // ── Mapper + A12 (TriCNES line 1478-1479: START of _EmulatePPU, BEFORE SM) ──
+            MapperObj.PpuClock();
+            ppuA12Prev = (ppuAddressBus & 0x1000) != 0;
 
             // ── Odd frame skip (TriCNES lines 1629-1643) ──
             // PAL/Dendy: no dot skip (PAL phase alternation eliminates dot crawl naturally)
@@ -370,11 +372,7 @@ namespace AprNes
             // Phase 2: PPU_DATA_StateMachine2 — buffer refill after rendering (TriCNES line 1657)
             PPU_DATA_StateMachine2();
 
-            // ── Mapper + A12 (TriCNES line 1478-1479: end of _EmulatePPU) ──
-            MapperObj.PpuClock();
-            ppuA12Prev = (ppuAddressBus & 0x1000) != 0;
-            if (debug2007Log && scanline == 0 && cx >= 257 && cx <= 268 && ppuAddressBus != 0)
-                System.Console.Error.WriteLine($"BUS sl={scanline} cx={cx} bus={ppuAddressBus:X4} a12p={ppuA12Prev}");
+            // PpuClock moved to start of dot (TriCNES line 1478, before SM)
 
             // ── DrawToScreen (TriCNES line 1764) ──
             if (scanline >= 0 && scanline < 240)

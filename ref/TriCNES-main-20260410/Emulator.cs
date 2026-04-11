@@ -1518,6 +1518,8 @@ namespace TriCNES
                 if (PPU_Scanline < 241 || PPU_Scanline == 261)
                 {
                     PPU_Render_SpriteEvaluation(); // fill in secondary OAM, and set up various arrays of sprite properties.
+                    if (debug2007Log && PPU_Scanline == 0 && PPU_Dot == 261)
+                        System.Console.Error.WriteLine($"AFTER_SPREVAL cx={PPU_Dot} bus={PPU_AddressBus:X4}");
                 }
             }
 
@@ -1531,10 +1533,12 @@ namespace TriCNES
 
             if (!PPU_Mask_ShowBackground && !PPU_Mask_ShowSprites)
             {
+                if (debug2007Log && PPU_Scanline == 0 && PPU_Dot >= 261 && PPU_Dot <= 262)
+                    System.Console.Error.WriteLine($"ROFF sl={PPU_Scanline} cx={PPU_Dot} bus_before={PPU_AddressBus:X4} v={PPU_v:X4}");
                 PPU_AddressBus = PPU_v; // the address bus is always v when rendering is disabled.
-                // TODO: Is this occuring one ppu cycle too late???
-                // I specifically moved this here (outside of the following if statements) because it broke nes_reset_state_detect-letters.nes on alignment 1.
             }
+            if (debug2007Log && PPU_Scanline == 0 && PPU_Dot == 261)
+                System.Console.Error.WriteLine($"AFTER_ROFF cx={PPU_Dot} bus={PPU_AddressBus:X4} bgOn={PPU_Mask_ShowBackground} spOn={PPU_Mask_ShowSprites}");
             // after sprite evaluation, but before screen rendering...
             if (PPU_Update2001Delay > 0) // if we wrote to 2001 recently
             {
@@ -2919,6 +2923,13 @@ namespace TriCNES
                             PPU_PatternAddressRegister_CHR &= 0b1111111110111;
                             PPU_PAR_MUX = PPU_PatternAddressRegister_CHR;
                             PPU_AddressBus = PPU_PAR_MUX;
+                            if (debug2007Log && PPU_Scanline == 0 && PPU_Dot >= 261 && PPU_Dot <= 262)
+                                System.Console.Error.WriteLine($"C4 sl={PPU_Scanline} cx={PPU_Dot} bus={PPU_AddressBus:X4} PAR={PPU_PatternAddressRegister_CHR:X4} del={PPU_Mask_ShowBackground_Delayed||PPU_Mask_ShowSprites_Delayed}");
+                        }
+                        else
+                        {
+                            if (debug2007Log && PPU_Scanline == 0 && PPU_Dot >= 261 && PPU_Dot <= 262)
+                                System.Console.Error.WriteLine($"C4skip sl={PPU_Scanline} cx={PPU_Dot} delBG={PPU_Mask_ShowBackground_Delayed} delSP={PPU_Mask_ShowSprites_Delayed} bg={PPU_Mask_ShowBackground} sp={PPU_Mask_ShowSprites}");
                         }
 
                         break;
