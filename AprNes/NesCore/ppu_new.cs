@@ -552,14 +552,18 @@ namespace AprNes
             if (scanline == preRenderLine && evalDot == 257 && ppuRenderingEnabled) PrecomputePreRenderSprites();
 
             // Dot 339: X counter init + sprite active flag
+            // When rendering OFF (F-Blank): don't touch sprXCounter (stale sprite behavior)
             if (evalDot == 339)
             {
+                if (ShowSprites || ShowBackGround)
+                {
+                    for (int i = 0; i < 8; i++)
+                        sprXCounter[i] = sprXPos[i];
+                }
+                // else: rendering OFF → leave sprXCounter untouched (stale data stays)
                 bool anyActive = false;
                 for (int i = 0; i < 8; i++)
-                {
-                    sprXCounter[i] = (ShowSprites || ShowBackGround) ? sprXPos[i] : 0;
                     if ((sprShiftH[i] | sprShiftL[i]) != 0) anyActive = true;
-                }
                 spriteAnyActive = anyActive;
             }
 
