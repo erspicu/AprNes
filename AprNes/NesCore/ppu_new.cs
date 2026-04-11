@@ -124,7 +124,7 @@ namespace AprNes
             }
 
             // ── PPU_DATA_StateMachine — Phase 1 (TriCNES line 1513) ──
-            PPU_DATA_StateMachine();
+            PPU_DATA_Pipeline_Step(1);
 
             // ── Delayed OAM corruption (TriCNES lines 1695-1711) ──
             if (oamCorruptDelay != 0 && --oamCorruptDelay == 0)
@@ -362,7 +362,7 @@ namespace AprNes
             }
 
             // Phase 2: PPU_DATA_StateMachine2 — buffer refill after rendering (TriCNES line 1657)
-            PPU_DATA_StateMachine2();
+            PPU_DATA_Pipeline_Step(2);
 
             // PpuClock moved to start of dot (TriCNES line 1478, before SM)
 
@@ -741,109 +741,77 @@ namespace AprNes
         // ════════════════════════════════════════════════════════════════
         // _EmulateHalfPPU — half PPU step (called at mcPpuClock == 2)
         // ════════════════════════════════════════════════════════════════
-        // Method 1: PPU_DATA_StateMachine — TriCNES line 1761-1806
-        // Phase 1: full dot, BEFORE rendering. Advances SR latch pipeline,
-        // computes PD_RB/ReadALE/PPU_READ/PPU_ALE signals.
-        // Called from PpuPhase2_DeferredUpdates.
+        // Unified $2007 SR Latch Pipeline — merges Phase 1/2/3
+        // phase 1: dot start (signal setup), phase 2: after tile fetch (buffer refill),
+        // phase 3: half-step (v inc + odd latch + write)
         // ════════════════════════════════════════════════════════════════
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        static void PPU_DATA_StateMachine()
+        static void PPU_DATA_Pipeline_Step(int phase)
         {
-            bool BLNK = (!ShowBackGround && !ShowSprites) || (scanline >= 240 && scanline < preRenderLine);
-            ppu2007_BLNK_Latch = BLNK;
-            bool H0_DASH = ((ppu_cycles_x - 1) & 1) != 0;
-
-            ppu2007_PaletteRAMEnable = ((ppuAddressBus & 0x3F00) == 0x3F00) && BLNK;
-
-            // Read latch pipeline (Phase 1): update even bits (L[0], L[2], L[4])
-            byte newREven = (byte)((ppu2007_Read_SR ? 1 : 0) | ((~readLatch << 1) & 0x14));
-            readLatch = (byte)((readLatch & 0x0A) | newREven);
-            ppu2007_PD_RB = (readLatch & 0x14) == 0x10;     // L[4] && !L[2]
-            ppu2007_ReadALE = (readLatch & 0x14) == 0x04;    // !L[4] && L[2]
-
-            ppu2007_PPU_READ = ppu2007_PD_RB || (!BLNK && H0_DASH);
-
-            // Write latch pipeline (Phase 1): update even bits
-            byte newWEven = (byte)((ppu2007_Write_SR ? 1 : 0) | ((~writeLatch << 1) & 0x14));
-            writeLatch = (byte)((writeLatch & 0x0A) | newWEven);
-            ppu2007_WriteALE = (writeLatch & 0x14) == 0x04;  // !L[4] && L[2]
-
-            ppu2007_TStep_Latch = ppu2007_DB_PAR;
-            ppu2007_PPU_ALE = ppu2007_ReadALE || ppu2007_WriteALE || (!BLNK && !H0_DASH);
-
-            if (ppu2007_ReadALE || ppu2007_WriteALE)
+            if (phase == 1)
             {
-                if (!ppu2007_PPU_READ)
+                bool BLNK = (!ShowBackGround && !ShowSprites) || (scanline >= 240 && scanline < preRenderLine);
+                ppu2007_BLNK_Latch = BLNK;
+                bool H0_DASH = ((ppu_cycles_x - 1) & 1) != 0;
+                ppu2007_PaletteRAMEnable = ((ppuAddressBus & 0x3F00) == 0x3F00) && BLNK;
+
+                byte newREven = (byte)((ppu2007_Read_SR ? 1 : 0) | ((~readLatch << 1) & 0x14));
+                readLatch = (byte)((readLatch & 0x0A) | newREven);
+                ppu2007_PD_RB = (readLatch & 0x14) == 0x10;
+                ppu2007_ReadALE = (readLatch & 0x14) == 0x04;
+                ppu2007_PPU_READ = ppu2007_PD_RB || (!BLNK && H0_DASH);
+
+                byte newWEven = (byte)((ppu2007_Write_SR ? 1 : 0) | ((~writeLatch << 1) & 0x14));
+                writeLatch = (byte)((writeLatch & 0x0A) | newWEven);
+                ppu2007_WriteALE = (writeLatch & 0x14) == 0x04;
+
+                ppu2007_TStep_Latch = ppu2007_DB_PAR;
+                ppu2007_PPU_ALE = ppu2007_ReadALE || ppu2007_WriteALE || (!BLNK && !H0_DASH);
+
+                if ((ppu2007_ReadALE || ppu2007_WriteALE) && !ppu2007_PPU_READ)
                 {
                     ppuAddressBus = vram_addr;
                     ppuOctalLatch = (byte)vram_addr;
                 }
             }
-        }
-
-        // ════════════════════════════════════════════════════════════════
-        // Method 2: PPU_DATA_StateMachine2 — TriCNES line 1807-1826
-        // Phase 2: full dot, AFTER rendering. Executes buffer refill when PD_RB.
-        // Called from ppu_step_new after tile fetch.
-        // ════════════════════════════════════════════════════════════════
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        static void PPU_DATA_StateMachine2()
-        {
-            if (!ppu2007_PD_RB) return;
-
-            int addr = (ppuAddressBus & 0x3F00) | ppuOctalLatch;
-            byte data = PpuBusRead(addr >= 0x3F00 ? addr & 0x2FFF : addr);
-            ppu_2007_buffer = data;
-            ppuAddressBus = (ppuAddressBus & 0xFF00) | data;
-
-            if (ppu2007_PPU_ALE)
-                ppuOctalLatch = data;
-        }
-
-        // ════════════════════════════════════════════════════════════════
-        // Method 3: PPU_DATA_StateMachine_Half — TriCNES line 1827-1868
-        // Phase 3: half-step. v increment + second FetchPPU + write execution
-        // + odd-index latch advancement + SR reset.
-        // Called from ppu_half_step_new.
-        // ════════════════════════════════════════════════════════════════
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        static void PPU_DATA_StateMachine_Half()
-        {
-            ppu2007_TStep = ppu2007_TStep_Latch || ppu2007_PD_RB;
-            if (ppu2007_TStep)
+            else
             {
-                vram_addr = (ushort)(vram_addr + VramaddrIncrement);
-                if (!ppu2007_BLNK_Latch)
-                    Yinc();
-            }
+                if (phase == 3)
+                {
+                    ppu2007_TStep = ppu2007_TStep_Latch || ppu2007_PD_RB;
+                    if (ppu2007_TStep)
+                    {
+                        vram_addr = (ushort)(vram_addr + VramaddrIncrement);
+                        if (!ppu2007_BLNK_Latch) Yinc();
+                    }
+                    ppu2007_PPU_ALE = ppu2007_ReadALE || ppu2007_WriteALE;
+                }
 
-            ppu2007_PPU_ALE = ppu2007_ReadALE || ppu2007_WriteALE;
+                if (ppu2007_PD_RB)
+                {
+                    int addr = (ppuAddressBus & 0x3F00) | ppuOctalLatch;
+                    byte data = PpuBusRead(addr >= 0x3F00 ? addr & 0x2FFF : addr);
+                    ppu_2007_buffer = data;
+                    ppuAddressBus = (ppuAddressBus & 0xFF00) | data;
+                    if (ppu2007_PPU_ALE) ppuOctalLatch = data;
+                }
 
-            if (ppu2007_PD_RB)
-            {
-                int addr = (ppuAddressBus & 0x3F00) | ppuOctalLatch;
-                byte data = PpuBusRead(addr >= 0x3F00 ? addr & 0x2FFF : addr);
-                ppu_2007_buffer = data;
-                ppuAddressBus = (ppuAddressBus & 0xFF00) | data;
-                if (ppu2007_PPU_ALE)
-                    ppuOctalLatch = data;
-            }
+                if (phase == 2) return;
 
-            // Read latch pipeline (Phase 3): update odd bits (L[1], L[3])
-            byte newROdd = (byte)(((~readLatch) << 1) & 0x0A);
-            readLatch = (byte)((readLatch & 0x15) | newROdd);
-            if ((readLatch & 0x08) == 0) ppu2007_Read_SR = false;  // L[3]==false → clear SR
+                byte newROdd = (byte)(((~readLatch) << 1) & 0x0A);
+                readLatch = (byte)((readLatch & 0x15) | newROdd);
+                if ((readLatch & 0x08) == 0) ppu2007_Read_SR = false;
 
-            // Write latch pipeline (Phase 3): update odd bits
-            byte newWOdd = (byte)(((~writeLatch) << 1) & 0x0A);
-            writeLatch = (byte)((writeLatch & 0x15) | newWOdd);
-            if ((writeLatch & 0x08) == 0) ppu2007_Write_SR = false;
+                byte newWOdd = (byte)(((~writeLatch) << 1) & 0x0A);
+                writeLatch = (byte)((writeLatch & 0x15) | newWOdd);
+                if ((writeLatch & 0x08) == 0) ppu2007_Write_SR = false;
 
-            ppu2007_DB_PAR = (writeLatch & 0x0A) == 0x02;  // L[1] && !L[3]
-            ppu2007_PPU_WRITE = !ppu2007_PaletteRAMEnable && ppu2007_DB_PAR;
-            if (ppu2007_DB_PAR)
-            {
-                PpuBusWrite(ppuAddressBus, ppu2007SM_writeValue);
+                ppu2007_DB_PAR = (writeLatch & 0x0A) == 0x02;
+                ppu2007_PPU_WRITE = !ppu2007_PaletteRAMEnable && ppu2007_DB_PAR;
+                if (ppu2007_DB_PAR)
+                {
+                    PpuBusWrite(ppuAddressBus, ppu2007SM_writeValue);
+                }
             }
         }
 
@@ -922,7 +890,7 @@ namespace AprNes
             if (pendingSprite0Hit)  { pendingSprite0Hit  = false; pendingSprite0Hit2 = true; }
 
             // Phase 3: PPU_DATA_StateMachine_Half — v inc + second FetchPPU + write (TriCNES line 1734)
-            PPU_DATA_StateMachine_Half();
+            PPU_DATA_Pipeline_Step(3);
         }
     }
 }
