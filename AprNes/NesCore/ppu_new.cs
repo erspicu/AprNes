@@ -247,6 +247,9 @@ namespace AprNes
                             }
                         }
 
+                        // $2007 SM active during rendering: buffer = last fetch data
+                        if (ppu2007SM > 2 && ppu2007SM < 9 && (ShowBackGround || ShowSprites)) ppu_2007_buffer = renderTemp;
+
                         // MMC5 CHR A/B switch at first tile of each group
                         if ((cx == 1 || cx == 321) && chrABAutoSwitch) { byte*[] src = Spritesize8x16 ? (chrBGUseASet ? chrBankPtrsA : chrBankPtrsB) : chrBankPtrsA; for (int i = 0; i < 8; i++) chrBankPtrs[i] = src[i]; }
                     }
@@ -338,17 +341,7 @@ namespace AprNes
             // ── $2007 buffer refill from rendering bus (behavioral equivalent of TriCNES PD_RB) ──
             // When SM is active during rendering, refill buffer from current tile fetch address every dot.
             // This matches TriCNES where overlapping SR latch pipelines produce PD_RB every dot.
-            // $2007 rendering refill: 1-dot delayed (matches TriCNES PD_RB pipeline timing)
-            if (ppu2007SM_renderRefillPending)
-            {
-                ppu2007SM_renderRefillPending = false;
-                int refillAddr = (ppuAddressBus & 0x3F00) | ppuOctalLatch;
-                ppu_2007_buffer = PpuBusRead(refillAddr >= 0x3F00 ? refillAddr & 0x2FFF : refillAddr);
-            }
-            if (ppu2007SM < 9 && (ShowBackGround || ShowSprites) && isActiveScanline)
-            {
-                ppu2007SM_renderRefillPending = true; // will fire NEXT dot (after tile fetch)
-            }
+            // $2007 rendering refill removed — handled inline in tile fetch below
 
             // ── DrawToScreen (TriCNES line 1764) ──
             if (scanline >= 0 && scanline < 240)
@@ -523,9 +516,9 @@ namespace AprNes
 
                 // OAM2 reads + sprite tile fetch
                 if (sprPhase == 0) { if (sprFetchEnabled) oamCopyBuffer = secondaryOAM[evalOam2Addr]; evalOam2Addr++; }
-                else if (sprPhase == 1) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; if (mapperA12IsMmc3) NotifyMapperA12(ppuAddressBus); byte d = PpuBusRead(ppuAddressBus & 0x3FFF); ppuAddressBus = (ppuAddressBus & 0xFF00) | d; } evalOam2Addr++; }
+                else if (sprPhase == 1) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; if (mapperA12IsMmc3) NotifyMapperA12(ppuAddressBus); byte d = PpuBusRead(ppuAddressBus & 0x3FFF); ppuAddressBus = (ppuAddressBus & 0xFF00) | d; if (ppu2007SM > 2 && ppu2007SM < 9 && (ShowBackGround || ShowSprites)) ppu_2007_buffer = d; } evalOam2Addr++; }
                 else if (sprPhase == 2) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; sprFetchAttr[slot] = oamCopyBuffer; } evalOam2Addr++; }
-                else if (sprPhase == 3) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; sprXPos[slot] = oamCopyBuffer; sprFetchRanThisScanline = true; byte d = PpuBusRead(ppuAddressBus & 0x3FFF); ppuAddressBus = (ppuAddressBus & 0xFF00) | d; } }
+                else if (sprPhase == 3) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; sprXPos[slot] = oamCopyBuffer; sprFetchRanThisScanline = true; byte d = PpuBusRead(ppuAddressBus & 0x3FFF); ppuAddressBus = (ppuAddressBus & 0xFF00) | d; if (ppu2007SM > 2 && ppu2007SM < 9 && (ShowBackGround || ShowSprites)) ppu_2007_buffer = d; } }
                 else if (sprPhase == 4) { if (sprFetchEnabled) { oamCopyBuffer = secondaryOAM[evalOam2Addr]; ppuAddressBus = ComputeSpritePatternAddr(slot); ppuOctalLatch = (byte)ppuAddressBus; ppuChrFetchA12 = (ppuAddressBus >> 12) & 1; } }
                 else if (sprPhase == 5)
                 {
@@ -535,7 +528,8 @@ namespace AprNes
                         if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus);
                         int addr = ppuAddressBus; lastTileFetchAddr = addr;
                         byte tile = chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF];
-                        ppuAddressBus = (ppuAddressBus & 0xFF00) | tile; // bus side effect
+                        ppuAddressBus = (ppuAddressBus & 0xFF00) | tile;
+                        if (ppu2007SM > 2 && ppu2007SM < 9 && (ShowBackGround || ShowSprites)) ppu_2007_buffer = tile;
                         sprShiftL[slot] = (sprFetchAttr[slot] & 0x40) != 0 ? FlipByte(tile) : tile;
                         if (slot >= sprSlotCount) sprShiftL[slot] = 0;
                     }
@@ -551,7 +545,8 @@ namespace AprNes
                         if (mapperNeedsA12 && !mapperA12IsMmc3) NotifyMapperA12(ppuAddressBus);
                         int addr = ppuAddressBus; lastTileFetchAddr = addr;
                         byte tile = chrBankPtrs[(addr >> 10) & 7][addr & 0x3FF];
-                        ppuAddressBus = (ppuAddressBus & 0xFF00) | tile; // bus side effect
+                        ppuAddressBus = (ppuAddressBus & 0xFF00) | tile;
+                        if (ppu2007SM > 2 && ppu2007SM < 9 && (ShowBackGround || ShowSprites)) ppu_2007_buffer = tile;
                         sprShiftH[slot] = (sprFetchAttr[slot] & 0x40) != 0 ? FlipByte(tile) : tile;
                         if (slot >= sprSlotCount) sprShiftH[slot] = 0;
                     }
@@ -591,7 +586,7 @@ namespace AprNes
 
             // Garbage NT fetch (dots 336-340)
             if (evalDot == 336 || evalDot == 338) { ppuAddressBus = 0x2000 | (vram_addr & 0x0FFF); ppuOctalLatch = (byte)ppuAddressBus; PpuBusRead(ppuAddressBus); }
-            else if (evalDot == 337 || evalDot == 339) { byte d = ppu_ram[CIRAMAddr(ppuAddressBus)]; NTVal = d; ppuAddressBus = (ppuAddressBus & 0xFF00) | d; if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus); }
+            else if (evalDot == 337 || evalDot == 339) { byte d = ppu_ram[CIRAMAddr(ppuAddressBus)]; NTVal = d; ppuAddressBus = (ppuAddressBus & 0xFF00) | d; if (ppu2007SM > 2 && ppu2007SM < 9 && (ShowBackGround || ShowSprites)) ppu_2007_buffer = d; if (mapperNeedsA12) NotifyMapperA12(ppuAddressBus); }
             else if (evalDot == 340) { ppuAddressBus = BgPatternTableAddr | (NTVal << 4) | ((vram_addr >> 12) & 7); ppuOctalLatch = (byte)ppuAddressBus; ppuChrFetchA12 = (ppuAddressBus >> 12) & 1; }
 
             if (mmc5Ref != null && (evalDot == 337 || evalDot == 339)) mmc5Ref.NotifyVramRead(0x2000 | (vram_addr & 0x0FFF));
