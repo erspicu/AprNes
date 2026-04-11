@@ -1,7 +1,7 @@
 #!/bin/bash
 # run_tests_AccuracyCoin_report.sh
 # Run AccuracyCoin page-by-page and generate HTML report.
-# AccuracyCoin v2 (20260410): 138 tests across 20 pages.
+# AccuracyCoin commit 03385dd (2026-04-10): 138 tests across 20 pages.
 # Page 15 (Power On State) is DRAW-only, screenshots only.
 #
 # Usage:
@@ -58,15 +58,17 @@ rm -f "$RESULTS_DIR"/page_*.hex
 get_test_wait() {
     # Per-page test wait time (seconds after A press for all tests to complete)
     # Measured empirically with 2s safety buffer
+    # AC v2 timing — increased for longer tests
     case $1 in
         12)     echo 30 ;;  # CPU Interrupts (IFlagLatency takes ~20s)
-        14)     echo 9  ;;  # APU Tests: ~7s
-        17)     echo 16 ;;  # PPU VBlank Timing: ~14s
-        13)     echo 8  ;;  # APU Registers/DMA: ~6s
-        18)     echo 12 ;;  # PPU OAM tests: ~10s
+        14)     echo 12 ;;  # APU Tests
+        17)     echo 25 ;;  # PPU VBlank Timing (v2 has more sub-tests)
+        13)     echo 12 ;;  # APU Registers/DMA
+        18)     echo 20 ;;  # PPU OAM/Sprite Evaluation (v2 has more sub-tests)
         19)     echo 65 ;;  # PPU Misc: $2007 Stress Test needs ~60s
-        16|20)  echo 8  ;;  # PPU tests: ~6s
-        *)      echo 6  ;;  # CPU/unofficial opcodes: ~3-4s
+        16)     echo 12 ;;  # PPU Rendering
+        20)     echo 15 ;;  # CPU Behavior 2
+        *)      echo 8  ;;  # CPU/unofficial opcodes
     esac
 }
 
@@ -648,8 +650,8 @@ tr:hover td {{ background:#1e2a5e; }}
 </style>
 </head>
 <body>
-<h1>AccuracyCoin v2 Report - AprNes</h1>
-<div class="meta">Generated: {now} | ROM: AccuracyCoin v2 (20260410, 138 tests / 20 pages) | Method: page-by-page</div>
+<h1>AccuracyCoin Report - AprNes</h1>
+<div class="meta">Generated: {now} | ROM: AccuracyCoin <a href="https://github.com/100thCoin/AccuracyCoin/commit/03385dd" style="color:#5dadec">03385dd</a> (2026-04-10, 138 tests / 20 pages) | Method: page-by-page</div>
 
 <div class="summary">
   <div class="stat"><div class="num pass-c">{total_pass}</div><div class="lbl">PASS</div></div>
