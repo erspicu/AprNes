@@ -579,6 +579,7 @@ namespace AprNes
         // Main per-cycle CPU step function
         // Called once per CPU cycle from the master clock loop.
         // ============================================================
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void cpu_step_one_cycle()
         {
             if (operationCycle == 0)

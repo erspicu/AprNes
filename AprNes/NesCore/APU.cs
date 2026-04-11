@@ -614,7 +614,7 @@ namespace AprNes
         // Handles counter reset, threshold comparison, quarter/half frame dispatch.
         // Most cycles don't hit any threshold (branch predictor skips the chain).
         // =====================================================================
-        [MethodImpl(MethodImplOptions.NoInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ApuFrameCounterStep()
         {
             if ((apuFrameCounterReset & 0x80) == 0)
@@ -632,7 +632,7 @@ namespace AprNes
                 if      (fc == fc5_0) apuQuarterFrame = true;
                 else if (fc == fc5_1) { apuQuarterFrame = true; apuHalfFrame = true; }
                 else if (fc == fc5_2) apuQuarterFrame = true;
-                else if (fc == fc5_3) { }
+                else if (fc == fc5_3) { } // skip — early exit avoids fc5_4/fc5_5 comparisons
                 else if (fc == fc5_4) { apuQuarterFrame = true; apuHalfFrame = true; }
                 else if (fc == fc5_5) apuFrameCounter = 0;
             }
@@ -692,6 +692,7 @@ namespace AprNes
         }
 
         // TriCNES: non-HalfFrame cycle — unconditional reload if flag set, then clear
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void processLenCtrReloadNonHalf()
         {
             if (lenCtrReloadFlag0) { lengthctr[0] = lenCtrReloadValue0; lenCtrReloadFlag0 = false; }
