@@ -74,6 +74,7 @@ namespace AprNes
         static int masterPerPpuHalf = 2;      // masterPerPpu >> 1 (pre-computed)
         static double cpuFreq          = 1789773.0;  // NTSC=1789773, PAL=1662607, Dendy=1773447
         static public double FrameSeconds = 1.0 / 60.0988; // NTSC=1/60.0988, PAL/Dendy=1/50.0070
+        static int MasterTicksPerFrame = 357368;          // 341 * (preRenderLine+1) * masterPerPpu
 
         static void ApplyRegionProfile()
         {
@@ -86,6 +87,7 @@ namespace AprNes
                 masterPerPpuHalf = 2;
                 cpuFreq        = 1662607.0;
                 FrameSeconds   = 1.0 / 50.0070;
+                MasterTicksPerFrame = 341 * (preRenderLine + 1) * masterPerPpu;
             }
             else if (Region == RegionType.Dendy)
             {
@@ -96,6 +98,7 @@ namespace AprNes
                 masterPerPpuHalf = 2;
                 cpuFreq        = 1773447.0;
                 FrameSeconds   = 1.0 / 50.0070;
+                MasterTicksPerFrame = 341 * (preRenderLine + 1) * masterPerPpu;
             }
             else // NTSC
             {
@@ -106,6 +109,7 @@ namespace AprNes
                 masterPerPpuHalf = 2;
                 cpuFreq        = 1789773.0;
                 FrameSeconds   = 1.0 / 60.0988;
+                MasterTicksPerFrame = 341 * (preRenderLine + 1) * masterPerPpu;
             }
         }
 
@@ -581,11 +585,11 @@ prerender_sprite0_x = 0;
 
         static public void run()
         {
-            // Batched execution: check exit every ~357368 master ticks (≈1 NTSC frame)
-            // 341 dots × 262 scanlines × 4 master ticks/dot = 357368
+            // Batched execution: check exit every frame worth of master ticks
+            // NTSC: 341×262×4=357368, PAL: 341×312×5=531960, Dendy: 341×312×5=531960
             while (!exit)
             {
-                for (int batch = 0; batch < 357368; batch++)
+                for (int batch = 0; batch < MasterTicksPerFrame; batch++)
                     MasterClockTick();
             }
             Console.WriteLine("exit..");
