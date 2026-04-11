@@ -184,6 +184,14 @@ namespace AprNes
         // OctalLatch (8-bit address latch, low byte of PPU address bus)
         static byte ppuOctalLatch = 0;
 
+        // Pattern Address Registers (TriCNES: PPU_PatternAddressRegister_*)
+        // PAR intermediary between address computation and bus — bus only updated via PAR_MUX
+        static ushort ppuPAR_NT = 0;   // Nametable address register
+        static ushort ppuPAR_AT = 0;   // Attribute table address register
+        static ushort ppuPAR_CHR = 0;  // CHR pattern address register (table select + tile + fine Y)
+        static ushort ppuPAR_MUX = 0;  // PAR output multiplexer → drives ppuAddressBus
+        static ushort ppuInRangeCheck = 0; // TriCNES: InRangeCheck (sprite Y distance)
+
         // $2000 delayed control update (TriCNES: PPU_Update2000Delay, 1-2 PPU cycles)
         // ALL fields delayed: NMI enable, pattern table, sprite size, nametable, increment
         static int ppu2000UpdateDelay = 0;
@@ -590,6 +598,38 @@ namespace AprNes
             }
             for (int i = 0; i < 32; i++) ppu_ram[0x3F00 + i] = c[i];
             RebuildPaletteCache();
+        }
+
+        // TriCNES: PPU_CheckPAR — sets CHR PAR bits based on dot range (BG vs sprite)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void PPU_CheckPAR()
+        {
+            if (ppu_cycles_x < 256 || ppu_cycles_x > 320)
+            {
+                // BG pattern table
+                ppuPAR_CHR &= 0b0111111111000;
+                ppuPAR_CHR |= (ushort)(BgPatternTableAddr != 0 ? 0b1000000000000 : 0);
+                ppuPAR_CHR |= (ushort)((vram_addr & 0b0111000000000000) >> 12);
+            }
+            else
+            {
+                // Sprite pattern table
+                if (!Spritesize8x16)
+                {
+                    bool flipy = (secondaryOAM[(evalOam2Addr & 0x1C) + 2] & 0x80) != 0;
+                    ppuPAR_CHR &= 0b0111111111000;
+                    ppuPAR_CHR |= (ushort)(SpPatternTableAddr != 0 ? 0b1000000000000 : 0);
+                    ppuPAR_CHR |= (ushort)(flipy ? 7 - (ppuInRangeCheck & 0x7) : (ppuInRangeCheck & 0x7));
+                }
+                else
+                {
+                    bool flipy = (secondaryOAM[(evalOam2Addr & 0x1C) + 2] & 0x80) != 0;
+                    ppuPAR_CHR &= 0b0111111101000;
+                    ppuPAR_CHR |= (ushort)(((secondaryOAM[(evalOam2Addr & 0x1C) + 1] & 1) != 0) ? 0b1000000000000 : 0);
+                    ppuPAR_CHR |= (ushort)(flipy ? 7 - (ppuInRangeCheck & 0x7) : (ppuInRangeCheck & 0x7));
+                    ppuPAR_CHR |= (ushort)(((ppuInRangeCheck & 0x08) ^ (flipy ? 8 : 0)) << 1);
+                }
+            }
         }
 
         static void NotifyMapperA12(int address)
