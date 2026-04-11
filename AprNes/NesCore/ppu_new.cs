@@ -282,22 +282,30 @@ namespace AprNes
                         bool sprPriority = false;
                         if (cx <= 256 && showSpr && (cx > 8 || ShowSprLeft8) && spriteAnyActive)
                         {
-                            // Sprite loop fully unrolled — (H|L)>=128 fast-checks bit7 without shift
-                            if (sprXCounter[0] == 0 || skippedPreRenderDot341) { if ((sprShiftH[0] | sprShiftL[0]) >= 128) { sprColor = ((sprShiftH[0] >> 7) << 1) | (sprShiftL[0] >> 7); sprPalette = (sprFetchAttr[0] & 3) | 4; sprPriority = ((sprFetchAttr[0] >> 5) & 1) == 0; sprSlot = 0; goto SpriteFound; } }
-                            if (sprXCounter[1] == 0 || skippedPreRenderDot341) { if ((sprShiftH[1] | sprShiftL[1]) >= 128) { sprColor = ((sprShiftH[1] >> 7) << 1) | (sprShiftL[1] >> 7); sprPalette = (sprFetchAttr[1] & 3) | 4; sprPriority = ((sprFetchAttr[1] >> 5) & 1) == 0; sprSlot = 1; goto SpriteFound; } }
-                            if (sprXCounter[2] == 0 || skippedPreRenderDot341) { if ((sprShiftH[2] | sprShiftL[2]) >= 128) { sprColor = ((sprShiftH[2] >> 7) << 1) | (sprShiftL[2] >> 7); sprPalette = (sprFetchAttr[2] & 3) | 4; sprPriority = ((sprFetchAttr[2] >> 5) & 1) == 0; sprSlot = 2; goto SpriteFound; } }
-                            if (sprXCounter[3] == 0 || skippedPreRenderDot341) { if ((sprShiftH[3] | sprShiftL[3]) >= 128) { sprColor = ((sprShiftH[3] >> 7) << 1) | (sprShiftL[3] >> 7); sprPalette = (sprFetchAttr[3] & 3) | 4; sprPriority = ((sprFetchAttr[3] >> 5) & 1) == 0; sprSlot = 3; goto SpriteFound; } }
-                            if (sprXCounter[4] == 0 || skippedPreRenderDot341) { if ((sprShiftH[4] | sprShiftL[4]) >= 128) { sprColor = ((sprShiftH[4] >> 7) << 1) | (sprShiftL[4] >> 7); sprPalette = (sprFetchAttr[4] & 3) | 4; sprPriority = ((sprFetchAttr[4] >> 5) & 1) == 0; sprSlot = 4; goto SpriteFound; } }
-                            if (sprXCounter[5] == 0 || skippedPreRenderDot341) { if ((sprShiftH[5] | sprShiftL[5]) >= 128) { sprColor = ((sprShiftH[5] >> 7) << 1) | (sprShiftL[5] >> 7); sprPalette = (sprFetchAttr[5] & 3) | 4; sprPriority = ((sprFetchAttr[5] >> 5) & 1) == 0; sprSlot = 5; goto SpriteFound; } }
-                            if (sprXCounter[6] == 0 || skippedPreRenderDot341) { if ((sprShiftH[6] | sprShiftL[6]) >= 128) { sprColor = ((sprShiftH[6] >> 7) << 1) | (sprShiftL[6] >> 7); sprPalette = (sprFetchAttr[6] & 3) | 4; sprPriority = ((sprFetchAttr[6] >> 5) & 1) == 0; sprSlot = 6; goto SpriteFound; } }
-                            if (sprXCounter[7] == 0 || skippedPreRenderDot341) { if ((sprShiftH[7] | sprShiftL[7]) >= 128) { sprColor = ((sprShiftH[7] >> 7) << 1) | (sprShiftL[7] >> 7); sprPalette = (sprFetchAttr[7] & 3) | 4; sprPriority = ((sprFetchAttr[7] >> 5) & 1) == 0; sprSlot = 7; } }
-                            SpriteFound:
+                            for (int i = 0; i < 8; i++)
+                            {
+                                if (sprXCounter[i] == 0 || skippedPreRenderDot341)
+                                {
+                                    if ((sprShiftH[i] | sprShiftL[i]) >= 128)
+                                    {
+                                        sprColor = ((sprShiftH[i] >> 7) << 1) | (sprShiftL[i] >> 7);
+                                        sprPalette = (sprFetchAttr[i] & 3) | 4;
+                                        sprPriority = ((sprFetchAttr[i] >> 5) & 1) == 0;
+                                        sprSlot = i;
+                                        break;
+                                    }
+                                }
+                            }
 
-                            if (canDetectSprite0Hit && sprSlot == 0 && sprZeroInSlots && showBG && showSpr && bgColor != 0 && sprColor != 0)
-                            { if ((ShowSprLeft8 || cx > 8) && cx < 256) { pendingSprite0Hit = true; canDetectSprite0Hit = false; } }
+                            if (sprColor != 0)
+                            {
+                                if (canDetectSprite0Hit && sprSlot == 0 && sprZeroInSlots && showBG && bgColor != 0)
+                                { if ((ShowSprLeft8 || cx > 8) && cx < 256) { pendingSprite0Hit = true; canDetectSprite0Hit = false; } }
 
-                            // Branchless pixel blend — uses | (not ||) to avoid short-circuit, ternary for potential CMOV
-                            if (sprColor != 0 && showSpr) { bool ow = (bgColor == 0) | sprPriority; bgColor = ow ? sprColor : bgColor; bgPalette = ow ? sprPalette : bgPalette; }
+                                bool ow = (bgColor == 0) | sprPriority;
+                                bgColor = ow ? sprColor : bgColor;
+                                bgPalette = ow ? sprPalette : bgPalette;
+                            }
                         }
 
                         // TriCNES v2: palette corruption check
