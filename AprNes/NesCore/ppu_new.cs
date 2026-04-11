@@ -119,16 +119,15 @@ namespace AprNes
             if (oddSwap && (ShowBackGround || ShowSprites) && scanline == 0 && cx == 2)
                 skippedPreRenderDot341 = false;
 
-            // ── PPU_DATA_StateMachine — Phase 1 (TriCNES line 1511) ──
+            // ── Eval delay: non-phase-3 (TriCNES line 1506: BEFORE SM) ──
+            if ((mcCpuClock & 3) != 3)
+            {
+                ShowBG_EvalDelay = ShowBackGround;
+                ShowSpr_EvalDelay = ShowSprites;
+            }
+
+            // ── PPU_DATA_StateMachine — Phase 1 (TriCNES line 1513) ──
             PPU_DATA_StateMachine();
-
-            // TriCNES line 1530-1535: rendering OFF → bus = v
-            // Moved to correct position (after sprite eval, line ~161) matching TriCNES
-
-            // ══════════════════════════════════════════════════════
-            // Phase 4: Eval delay + sprite eval + $2001 + emphasis
-            // (TriCNES lines 1652-1722)
-            // ══════════════════════════════════════════════════════
 
             // ── Delayed OAM corruption (TriCNES lines 1695-1711) ──
             if (oamCorruptDelay != 0 && --oamCorruptDelay == 0)
@@ -136,13 +135,6 @@ namespace AprNes
                 if (oamCorruptWasRendering && (oamCorrupt2001Value & 0x18) == 0)
                     if (isActiveScanline && !oamCorruptPending)
                         oamCorruptDisabledFlag = true;
-            }
-
-            // ── Eval delay: non-phase-3 (TriCNES lines 1653-1658) ──
-            if ((mcCpuClock & 3) != 3)
-            {
-                ShowBG_EvalDelay = ShowBackGround;
-                ShowSpr_EvalDelay = ShowSprites;
             }
 
             // ── Sprite evaluation (TriCNES line 1664, inside scanline gate) ──
