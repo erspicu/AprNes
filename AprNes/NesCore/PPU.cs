@@ -162,6 +162,7 @@ namespace AprNes
         static byte ppu2007SM_writeValue = 0;
         static bool ppu2007SM_bufferLate = false; // alignment: buffer updated at state 4 instead of 1
         static int ppu2007SM_addr = 0; // vram_addr snapshot at time of access
+        static bool ppu2007SM_deferredRefill = false; // buffer refill deferred to after tile fetch
         static bool ppu2007SM_interruptedReadToWrite = false; // TriCNES: write during active read SM
         // P3-3: Mystery write flags (TriCNES consecutive $2007 access model)
         static bool ppu2007SM_performMysteryWrite = false;   // TriCNES: PPU_Data_StateMachine_PerformMysteryWrite

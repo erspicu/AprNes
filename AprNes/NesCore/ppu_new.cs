@@ -333,6 +333,15 @@ namespace AprNes
                 }
             }
 
+            // ── $2007 SM deferred buffer refill (after tile fetch, uses rendering bus) ──
+            if (ppu2007SM_deferredRefill)
+            {
+                ppu2007SM_deferredRefill = false;
+                // Use current ppuAddressBus (set by tile fetch) for bus-accurate refill
+                int refillAddr = ppuAddressBus & 0x3FFF;
+                ppu_2007_buffer = PpuBusRead(refillAddr >= 0x3F00 ? refillAddr & 0x2FFF : refillAddr);
+            }
+
             // ── DrawToScreen (TriCNES line 1764) ──
             if (scanline >= 0 && scanline < 240)
             {
@@ -606,8 +615,9 @@ namespace AprNes
             {
                 if (ppu2007SM_isRead && !ppu2007SM_bufferLate)
                 {
-                    ppuAddressBus = ppu2007SM_addr;
-                    ppu_2007_buffer = PpuBusRead(ppu2007SM_addr >= 0x3F00 ? ppu2007SM_addr & 0x2FFF : ppu2007SM_addr & 0x3FFF);
+                    // Deferred refill: set flag, actual refill after tile fetch
+                    // so buffer gets rendering bus value (not v address)
+                    ppu2007SM_deferredRefill = true;
                 }
             }
             else if (sm == 3)
