@@ -582,28 +582,26 @@ namespace AprNes
         {
             if (ppu_cycles_x < 256 || ppu_cycles_x > 320)
             {
-                // BG pattern table
-                ppuPAR_CHR &= 0b0111111111000;
-                ppuPAR_CHR |= (ushort)(BgPatternTableAddr != 0 ? 0b1000000000000 : 0);
-                ppuPAR_CHR |= (ushort)((vram_addr & 0b0111000000000000) >> 12);
+                // BG: keep tile bits, set pattern table + fine Y from vram_addr
+                ppuPAR_CHR = (ushort)((ppuPAR_CHR & 0x0FF8) | BgPatternTableAddr | ((vram_addr >> 12) & 7));
             }
             else
             {
-                // Sprite pattern table
+                // Sprite: branchless flip via XOR
+                int oamIdx = evalOam2Addr & 0x1C;
+                int flipY = secondaryOAM[oamIdx + 2] >> 7; // 0 or 1
+                int fineY = (ppuInRangeCheck & 7) ^ (-flipY & 7); // XOR 7 flips 0-7 range
+
                 if (!Spritesize8x16)
                 {
-                    bool flipy = (secondaryOAM[(evalOam2Addr & 0x1C) + 2] & 0x80) != 0;
-                    ppuPAR_CHR &= 0b0111111111000;
-                    ppuPAR_CHR |= (ushort)(SpPatternTableAddr != 0 ? 0b1000000000000 : 0);
-                    ppuPAR_CHR |= (ushort)(flipy ? 7 - (ppuInRangeCheck & 0x7) : (ppuInRangeCheck & 0x7));
+                    ppuPAR_CHR = (ushort)((ppuPAR_CHR & 0x0FF8) | SpPatternTableAddr | fineY);
                 }
                 else
                 {
-                    bool flipy = (secondaryOAM[(evalOam2Addr & 0x1C) + 2] & 0x80) != 0;
-                    ppuPAR_CHR &= 0b0111111101000;
-                    ppuPAR_CHR |= (ushort)(((secondaryOAM[(evalOam2Addr & 0x1C) + 1] & 1) != 0) ? 0b1000000000000 : 0);
-                    ppuPAR_CHR |= (ushort)(flipy ? 7 - (ppuInRangeCheck & 0x7) : (ppuInRangeCheck & 0x7));
-                    ppuPAR_CHR |= (ushort)(((ppuInRangeCheck & 0x08) ^ (flipy ? 8 : 0)) << 1);
+                    int tile = secondaryOAM[oamIdx + 1];
+                    int table = (tile & 1) << 12;
+                    int halfOffset = ((ppuInRangeCheck ^ (flipY << 3)) & 8) << 1;
+                    ppuPAR_CHR = (ushort)((ppuPAR_CHR & 0x0FE8) | table | halfOffset | fineY);
                 }
             }
         }
