@@ -342,10 +342,14 @@ namespace AprNes
                         }
                         else
                         {
+                            int renderShift = renderEnabled ? 1 : 0;
                             for (int s = 0; s < 8; s++)
                             {
-                                if (sprXCounter[s] > 0) sprXCounter[s]--;
-                                else if (renderEnabled) { sprShiftL[s] <<= 1; sprShiftH[s] <<= 1; }
+                                int isZero = sprXCounter[s] == 0 ? 1 : 0;
+                                sprXCounter[s] -= 1 - isZero;
+                                int doShift = isZero & renderShift;
+                                sprShiftL[s] <<= doShift;
+                                sprShiftH[s] <<= doShift;
                             }
                         }
                     }
