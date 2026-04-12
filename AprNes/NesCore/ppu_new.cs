@@ -127,11 +127,11 @@ namespace AprNes
             PPU_DATA_Pipeline_Step(1);
 
             // ── Delayed OAM corruption (TriCNES lines 1695-1711) ──
-            if (oamCorruptDelay != 0 && --oamCorruptDelay == 0)
+            if (oamCorruptDelay != 0 && --oamCorruptDelay == 0 &&
+                oamCorruptWasRendering && isActiveScanline &&
+                !oamCorruptPending && (oamCorrupt2001Value & 0x18) == 0)
             {
-                if (oamCorruptWasRendering && (oamCorrupt2001Value & 0x18) == 0)
-                    if (isActiveScanline && !oamCorruptPending)
-                        oamCorruptDisabledFlag = true;
+                oamCorruptDisabledFlag = true;
             }
 
             // ── Sprite evaluation (TriCNES line 1664, inside scanline gate) ──
