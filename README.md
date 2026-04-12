@@ -1,6 +1,6 @@
 # AprNes - C# NES Emulator
 
-> 🇺🇸 English | [🇹🇼 繁體中文](#aprnes---c-nes-模擬器) | Last updated: 2026-04-07
+> 🇺🇸 English | [🇹🇼 繁體中文](#aprnes---c-nes-模擬器) | Last updated: 2026-04-12
 
 A cycle-accurate NES (Nintendo Entertainment System) emulator written in C#, developed in collaboration with AI (GitHub Copilot / Claude). The project achieves **perfect scores** on both the blargg and AccuracyCoin test suites.
 
@@ -36,10 +36,10 @@ See [`LICENSE`](LICENSE) for the full license text.
 
 | Test Suite | Passed | Total | Rate |
 |-----------|--------|-------|------|
-| Blargg     | 174    | 174   | 100% |
-| AccuracyCoin | 136  | 136   | 100% |
+| Blargg (incl. PAL APU) | 184 | 184 | 100% |
+| AccuracyCoin (Commit 03385dd) | 138 | 138 | 100% |
 
-![AccuracyCoin 136/136 PERFECT](reports/report/screenshots-ac/ac_summary.webp)
+![AccuracyCoin 138/138 PERFECT](MD/image_needs/actest_v2138.png)
 
 ## About This Project
 
@@ -96,8 +96,8 @@ Key references used during development:
 ### Tests & Reports
 
 *   **`nes-test-roms-master/`** — NES test ROM collection.
-    *   `checked/` — 174 blargg test ROMs (CPU, PPU, APU, Mapper timing).
-    *   `AccuracyCoin-main/` — AccuracyCoin accuracy scoring test (136 sub-tests).
+    *   `checked/` — 184 blargg test ROMs (CPU, PPU, APU, Mapper timing).
+    *   `AccuracyCoin-main-20260410/` — AccuracyCoin accuracy scoring test (Commit 03385dd, 138 sub-tests).
 *   **`reports/`** — Auto-generated test reports.
     *   `report/` — Blargg + AccuracyCoin reports for AprNes (WinForms).
         *   `index.html` — Blargg test report (with screenshots).
@@ -118,7 +118,7 @@ Key references used during development:
 ### Reference Material (ref/)
 
 *   **`ref/Mesen2-master/`** — Full Mesen2 source code (primary reference for DMA/PPU timing).
-*   **`ref/TriCNES-main/`** — TriCNES source code (with added headless TestRunner; 136/136 AccuracyCoin).
+*   **`ref/TriCNES-main/`** — TriCNES source code (with added headless TestRunner; 138/138 AccuracyCoin).
 *   **`ref/mapper/`** — Mapper implementation documentation and references.
 
 ### Tools (tools/)
@@ -136,9 +136,9 @@ Key references used during development:
 | `build.bat` / `build.ps1` / `do_build.bat` | Build AprNes (.NET Framework 4.8.1) |
 | `build_avalonia.bat` | Build AprNesAvalonia (.NET 10 + Avalonia) |
 | `build_wasm.bat` / `deploy_wasm.bat` | Build/deploy WASM variant |
-| `run_tests.py` | Run all 174 blargg tests (Python, supports `-j 10` parallel) |
-| `run_tests_avalonia.py` | Run all 174 blargg tests against AprNesAvalonia |
-| `run_tests.sh` | Run all 174 blargg tests (Bash) |
+| `run_tests.py` | Run all 184 blargg tests (Python, supports `-j 10` parallel) |
+| `run_tests_avalonia.py` | Run all 184 blargg tests against AprNesAvalonia |
+| `run_tests.sh` | Run all 184 blargg tests (Bash) |
 | `run_tests_report.sh` | Generate blargg report (JSON + screenshots + HTML → `reports/report/`) |
 | `run_tests_AccuracyCoin_report.sh` | Generate AccuracyCoin report (→ `reports/report/`) |
 | `run_tests_AccuracyCoin_avalonia.sh` | Generate AccuracyCoin report for Avalonia build (→ `reports/report-avalonia/`) |
@@ -170,7 +170,7 @@ AprNesAvalonia/bin/Debug/net10.0/AprNesAvalonia.exe
 # Run a test ROM (headless)
 AprNes/bin/Debug/AprNes.exe --rom nes-test-roms-master/checked/cpu_timing_test6/cpu_timing_test.nes --wait-result --max-wait 30
 
-# Run all 174 blargg tests
+# Run all 184 blargg tests
 python run_tests.py -j 10
 ```
 
@@ -251,7 +251,7 @@ python run_tests.py -j 10
 
 # AprNes - C# NES 模擬器
 
-> [🇺🇸 English](#aprnes---c-nes-emulator) | 🇹🇼 繁體中文 | 最後編修：2026-04-07
+> [🇺🇸 English](#aprnes---c-nes-emulator) | 🇹🇼 繁體中文 | 最後編修：2026-04-12
 
 使用 C# 開發的 NES（任天堂娛樂系統）cycle-accurate 模擬器，與 AI（GitHub Copilot / Claude）協作開發完成。在 blargg 與 AccuracyCoin 兩大測試套件上均達到**滿分**。
 
@@ -287,8 +287,8 @@ TriCNES 的 timing 模型複雜度遠高於一般 NES 模擬器，其有限狀�
 
 | 測試套件 | 通過 | 總數 | 通過率 |
 |---------|------|------|--------|
-| Blargg 綜合測試 | 174 | 174 | 100% |
-| AccuracyCoin | 136 | 136 | 100% |
+| Blargg 綜合測試（含 PAL APU） | 184 | 184 | 100% |
+| AccuracyCoin（Commit 03385dd） | 138 | 138 | 100% |
 
 ## 專案背景
 
@@ -345,8 +345,8 @@ AprNes 是一個以追求 cycle-accurate 精度為目標的 NES 硬體模擬研�
 ### 測試與驗證
 
 *   **`nes-test-roms-master/`** — NES 測試 ROM 集合。
-    *   `checked/` — 174 個 blargg 測試 ROM（CPU、PPU、APU、Mapper 時序驗證）。
-    *   `AccuracyCoin-main/` — AccuracyCoin 精確度評分測試（136 項子測試）。
+    *   `checked/` — 184 個 blargg 測試 ROM（CPU、PPU、APU、Mapper 時序驗證，含 PAL APU）。
+    *   `AccuracyCoin-main-20260410/` — AccuracyCoin 精確度評分測試（Commit 03385dd，138 項子測試）。
 *   **`reports/`** — 自動產生的測試報告。
     *   `report/` — AprNes（WinForms）blargg + AccuracyCoin 報告。
         *   `index.html` — blargg 測試報告（含截圖）。
