@@ -17,7 +17,7 @@ $sep  = "=" * 60
 Write-Host $sep -ForegroundColor Yellow
 Write-Host " Building Debug|x64 ..." -ForegroundColor Yellow
 Write-Host $sep -ForegroundColor Yellow
-& $msbuild $proj /p:Configuration=Debug /p:Platform=x64 /m /nologo /v:minimal
+& $msbuild $proj /p:Configuration=Debug /p:Platform=x64 /t:Rebuild /m /nologo /v:minimal
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[FAILED] Debug|x64" -ForegroundColor Red
     exit 1
@@ -29,7 +29,7 @@ Write-Host ""
 Write-Host $sep -ForegroundColor Yellow
 Write-Host " Building Release|x64 ..." -ForegroundColor Yellow
 Write-Host $sep -ForegroundColor Yellow
-& $msbuild $proj /p:Configuration=Release /p:Platform=x64 /m /nologo /v:minimal
+& $msbuild $proj /p:Configuration=Release /p:Platform=x64 /t:Rebuild /m /nologo /v:minimal
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[FAILED] Release|x64" -ForegroundColor Red
     exit 1
