@@ -387,13 +387,13 @@ AprNes 是一個以追求 cycle-accurate 精度為目標的 NES 硬體模擬研�
 | `build.bat` / `build.ps1` / `do_build.bat` | 編譯 AprNes（.NET Framework 4.8.1） |
 | `build_avalonia.bat` | 編譯 AprNesAvalonia（.NET 10 + Avalonia） |
 | `build_wasm.bat` / `deploy_wasm.bat` | 編譯/部署 WASM 版本 |
-| `run_tests.py` | 跑 174 個 blargg 測試（Python，支援 `-j 10` 並行） |
-| `run_tests_avalonia.py` | 對 AprNesAvalonia 跑 174 個 blargg 測試 |
-| `run_tests.sh` | 跑 174 個 blargg 測試（Bash） |
+| `run_tests.py` | 跑 184 個 blargg 測試（Python，支援 `-j 10` 並行） |
+| `run_tests_avalonia.py` | 對 AprNesAvalonia 跑 184 個 blargg 測試 |
+| `run_tests.sh` | 跑 184 個 blargg 測試（Bash） |
 | `run_tests_report.sh` | 產生 blargg 測試報告（JSON + 截圖 + HTML → `reports/report/`） |
 | `run_tests_AccuracyCoin_report.sh` | 產生 AccuracyCoin 測試報告（→ `reports/report/`） |
 | `run_tests_AccuracyCoin_avalonia.sh` | 產生 Avalonia 版 AccuracyCoin 報告（→ `reports/report-avalonia/`） |
-| `run_tests_TriCNES.sh` | 跑 TriCNES 對照測試（174 ROM） |
+| `run_tests_TriCNES.sh` | 跑 TriCNES 對照測試（184 ROM） |
 | `run_ac_test.sh` | 快速跑單項 AC 測試 |
 
 ## 開發環境
@@ -421,7 +421,7 @@ AprNesAvalonia/bin/Debug/net10.0/AprNesAvalonia.exe
 # 跑測試 ROM（headless）
 AprNes/bin/Debug/AprNes.exe --rom nes-test-roms-master/checked/cpu_timing_test6/cpu_timing_test.nes --wait-result --max-wait 30
 
-# 跑全部 174 個測試
+# 跑全部 184 個測試
 python run_tests.py -j 10
 ```
 
