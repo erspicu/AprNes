@@ -657,8 +657,6 @@ namespace AprNes
                 if (mmc5Ref != null && (evalDot == 337 || evalDot == 339)) mmc5Ref.NotifyVramRead(0x2000 | (vram_addr & 0x0FFF));
             }
 
-            if (mmc5Ref != null && (evalDot == 337 || evalDot == 339)) mmc5Ref.NotifyVramRead(0x2000 | (vram_addr & 0x0FFF));
-
             // Per-cycle sprite overflow + scanline init
             if (scanline >= 0 && scanline < 240)
             {
