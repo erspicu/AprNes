@@ -367,8 +367,8 @@ namespace AprNes
                 if (cx >= 4 && cx <= 259)
                 {
                     int pos = (scanline << 8) + (cx - 4);
-                    ScreenBuf1x[pos] = prevPrevPrevDotColor;
                     if (AnalogEnabled) ntscScanBuf[cx - 4] = prevPrevPrevDotPalIdx;
+                    else ScreenBuf1x[pos] = prevPrevPrevDotColor;
                 }
                 if (AnalogEnabled && cx == 260)
                     DecodeScanline(scanline, ntscScanBuf, ppuEmphasis);
@@ -669,7 +669,8 @@ namespace AprNes
                     ulong* bgp = (ulong*)(Buffer_BG_array + scanOff);
                     for (int i = 0; i < 128; i++) bgp[i] = 0;
                     // SWAR: fill 256 uints with backdrop color as 128 ulongs
-                    { uint bgColor = palCache[0]; ulong fill = bgColor | ((ulong)bgColor << 32); ulong* sp = (ulong*)(ScreenBuf1x + scanOff); for (int i = 0; i < 128; i++) sp[i] = fill; if (AnalogEnabled) { byte bgIdx = (byte)(ppu_ram[0x3f00] & 0x3f); for (int i = 0; i < 256; i++) ntscScanBuf[i] = bgIdx; } }
+                    if (AnalogEnabled) { byte bgIdx = (byte)(ppu_ram[0x3f00] & 0x3f); for (int i = 0; i < 256; i++) ntscScanBuf[i] = bgIdx; }
+                    else { uint bgColor = palCache[0]; ulong fill = bgColor | ((ulong)bgColor << 32); ulong* sp = (ulong*)(ScreenBuf1x + scanOff); for (int i = 0; i < 128; i++) sp[i] = fill; }
                     PrecomputeOverflow();
                 }
                 if (spriteOverflowCycle >= 0 && evalDot == spriteOverflowCycle) isSpriteOverflow = true;
