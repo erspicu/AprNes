@@ -44,14 +44,14 @@ tr:hover td { background:#1e2a5e; }
 </head>
 <body>
 <h1>AccuracyCoin Report - AprNes</h1>
-<div class="meta">Generated: 2026-04-06 08:06 | ROM: AccuracyCoin.nes (Mapper 0/NROM) | Method: page-by-page</div>
+<div class="meta">Generated: 2026-04-12 21:48 | ROM: AccuracyCoin <a href="https://github.com/100thCoin/AccuracyCoin/commit/03385dd" style="color:#5dadec">03385dd</a> (2026-04-10, 138 tests / 20 pages) | Method: page-by-page</div>
 
 <div class="summary">
-  <div class="stat"><div class="num pass-c">136</div><div class="lbl">PASS</div></div>
+  <div class="stat"><div class="num pass-c">138</div><div class="lbl">PASS</div></div>
   <div class="stat"><div class="num fail-c">0</div><div class="lbl">FAIL</div></div>
   <div class="stat"><div class="num skip-c">0</div><div class="lbl">SKIP</div></div>
   <div class="stat"><div class="num notrun-c">0</div><div class="lbl">N/A</div></div>
-  <div class="stat"><div class="num">136</div><div class="lbl">TOTAL</div></div>
+  <div class="stat"><div class="num">138</div><div class="lbl">TOTAL</div></div>
 </div>
 <img src="screenshots-ac/ac_summary.webp" alt="AccuracyCoin Summary" class="ss-summary" loading="lazy">
 
@@ -285,7 +285,7 @@ tr:hover td { background:#1e2a5e; }
     <tr><td>4</td><td>DMA + $2007 Write</td><td><span class="badge pass">PASS</span></td><td class="addr">$044F=01</td></tr>
     <tr><td>5</td><td>DMA + $4015 Read</td><td><span class="badge pass">PASS</span></td><td class="addr">$045D=01</td></tr>
     <tr><td>6</td><td>DMA + $4016 Read</td><td><span class="badge pass">PASS</span></td><td class="addr">$045E=05</td></tr>
-    <tr><td>7</td><td>DMC DMA Bus Conflicts</td><td><span class="badge pass">PASS</span></td><td class="addr">$046B=05</td></tr>
+    <tr><td>7</td><td>DMC DMA Bus Conflicts</td><td><span class="badge pass">PASS</span></td><td class="addr">$046B=E1</td></tr>
     <tr><td>8</td><td>DMC DMA + OAM DMA</td><td><span class="badge pass">PASS</span></td><td class="addr">$0477=01</td></tr>
     <tr><td>9</td><td>Explicit DMA Abort</td><td><span class="badge pass">PASS</span></td><td class="addr">$0479=01</td></tr>
     <tr><td>10</td><td>Implicit DMA Abort</td><td><span class="badge pass">PASS</span></td><td class="addr">$0478=09</td></tr>
@@ -336,7 +336,7 @@ tr:hover td { background:#1e2a5e; }
     <tr><td>1</td><td>CHR ROM is not writable</td><td><span class="badge pass">PASS</span></td><td class="addr">$0485=01</td></tr>
     <tr><td>2</td><td>PPU Register Mirroring</td><td><span class="badge pass">PASS</span></td><td class="addr">$0404=01</td></tr>
     <tr><td>3</td><td>PPU Register Open Bus</td><td><span class="badge pass">PASS</span></td><td class="addr">$044E=01</td></tr>
-    <tr><td>4</td><td>PPU Read Buffer</td><td><span class="badge pass">PASS</span></td><td class="addr">$0476=01</td></tr>
+    <tr><td>4</td><td>PPU Read Buffer</td><td><span class="badge pass">PASS</span></td><td class="addr">$0476=41</td></tr>
     <tr><td>5</td><td>Palette RAM Quirks</td><td><span class="badge pass">PASS</span></td><td class="addr">$047E=01</td></tr>
     <tr><td>6</td><td>Rendering Flag Behavior</td><td><span class="badge pass">PASS</span></td><td class="addr">$0486=01</td></tr>
     <tr><td>7</td><td>$2007 read w/ rendering</td><td><span class="badge pass">PASS</span></td><td class="addr">$048A=01</td></tr>
@@ -375,7 +375,7 @@ tr:hover td { background:#1e2a5e; }
     <tr><td>4</td><td>Suddenly Resize Sprite</td><td><span class="badge pass">PASS</span></td><td class="addr">$0489=01</td></tr>
     <tr><td>5</td><td>Arbitrary Sprite zero</td><td><span class="badge pass">PASS</span></td><td class="addr">$0458=01</td></tr>
     <tr><td>6</td><td>Misaligned OAM behavior</td><td><span class="badge pass">PASS</span></td><td class="addr">$045A=01</td></tr>
-    <tr><td>7</td><td>Address $2004 behavior</td><td><span class="badge pass">PASS</span></td><td class="addr">$045B=01</td></tr>
+    <tr><td>7</td><td>Address $2004 behavior</td><td><span class="badge pass">PASS</span></td><td class="addr">$045B=41</td></tr>
     <tr><td>8</td><td>OAM Corruption</td><td><span class="badge pass">PASS</span></td><td class="addr">$047B=01</td></tr>
     <tr><td>9</td><td>INC $4014</td><td><span class="badge pass">PASS</span></td><td class="addr">$0480=01</td></tr>
   </table>
@@ -384,7 +384,7 @@ tr:hover td { background:#1e2a5e; }
 <div class="suite">
   <div class="suite-header">
     <span>Page 19: PPU Misc.</span>
-    <span class="suite-stats"><span class="pass-c">6 PASS</span></span>
+    <span class="suite-stats"><span class="pass-c">8 PASS</span></span>
   </div>
   <img src="screenshots-ac/ac_page_19.webp" alt="PPU Misc." class="ss" loading="lazy">
   <table>
@@ -392,9 +392,11 @@ tr:hover td { background:#1e2a5e; }
     <tr><td>1</td><td>Attributes As Tiles</td><td><span class="badge pass">PASS</span></td><td class="addr">$0481=01</td></tr>
     <tr><td>2</td><td>t Register Quirks</td><td><span class="badge pass">PASS</span></td><td class="addr">$0482=01</td></tr>
     <tr><td>3</td><td>Stale BG Shift Registers</td><td><span class="badge pass">PASS</span></td><td class="addr">$0483=01</td></tr>
-    <tr><td>4</td><td>BG Serial In</td><td><span class="badge pass">PASS</span></td><td class="addr">$0487=01</td></tr>
-    <tr><td>5</td><td>Sprites On Scanline 0</td><td><span class="badge pass">PASS</span></td><td class="addr">$0484=05</td></tr>
-    <tr><td>6</td><td>$2004 Stress Test</td><td><span class="badge pass">PASS</span></td><td class="addr">$048C=01</td></tr>
+    <tr><td>4</td><td>Stale Sprite Shift Regs</td><td><span class="badge pass">PASS</span></td><td class="addr">$048F=01</td></tr>
+    <tr><td>5</td><td>BG Serial In</td><td><span class="badge pass">PASS</span></td><td class="addr">$0487=01</td></tr>
+    <tr><td>6</td><td>Sprites On Scanline 0</td><td><span class="badge pass">PASS</span></td><td class="addr">$0484=05</td></tr>
+    <tr><td>7</td><td>$2004 Stress Test</td><td><span class="badge pass">PASS</span></td><td class="addr">$048C=01</td></tr>
+    <tr><td>8</td><td>$2007 Stress Test</td><td><span class="badge pass">PASS</span></td><td class="addr">$048E=01</td></tr>
   </table>
 </div>
 
