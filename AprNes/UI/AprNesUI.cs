@@ -28,18 +28,7 @@ namespace AprNes
         string ConfigureFile = Application.StartupPath + @"\configure\AprNes.ini";
         string AudioPlusIniFile = Application.StartupPath + @"\configure\AprNesAudioPlus.ini";
 
-        // 舊版 AprNes.ini 若殘留 analog key 則在 Configure_Write 時過濾掉（避免重複寫入）
-        static readonly System.Collections.Generic.HashSet<string> s_analogKeys =
-            new System.Collections.Generic.HashSet<string>(new[] {
-                "RF_NoiseIntensity", "RF_SlewRate", "RF_ChromaBlur",
-                "AV_NoiseIntensity", "AV_SlewRate", "AV_ChromaBlur",
-                "SV_NoiseIntensity", "SV_SlewRate", "SV_ChromaBlur",
-                "RF_BeamSigma", "RF_BloomStrength", "RF_BrightnessBoost",
-                "AV_BeamSigma", "AV_BloomStrength", "AV_BrightnessBoost",
-                "SV_BeamSigma", "SV_BloomStrength", "SV_BrightnessBoost",
-            });
-
-        // AudioPlus 效果參數已移至 AprNesAudioPlus.ini，從主 ini 過濾掉
+        // AudioPlus 效果參數在 AprNesAudioPlus.ini，從主 ini 過濾掉
         static readonly System.Collections.Generic.HashSet<string> s_audioPlusKeys =
             new System.Collections.Generic.HashSet<string>(new[] {
                 "ConsoleModel", "RfCrosstalk", "CustomLpfCutoff", "CustomBuzz",
@@ -47,8 +36,6 @@ namespace AprNes
                 "StereoWidth", "HaasDelay", "HaasCrossfeed",
                 "ReverbWet", "CombFeedback", "CombDamp",
                 "BassBoostDb", "BassBoostFreq",
-                // 舊版相容（從 AprNes.ini 遷移過來的舊 key）
-                "Reverb", "BassBoost",
             });
 
         Dictionary<int, KeyMap> NES_KeyMAP = new Dictionary<int, KeyMap>();
@@ -60,15 +47,6 @@ namespace AprNes
         ToolStripMenuItem _recentROMsMenuItem;
 
         joystick _joystick = new joystick();
-
-        /// <summary>舊版相容：若舊位置有 ini 而新位置沒有，自動搬移</summary>
-        static void MigrateOldIni(string fileName)
-        {
-            string oldPath = System.IO.Path.Combine(Application.StartupPath, fileName);
-            string newPath = System.IO.Path.Combine(ConfigureDir, fileName);
-            if (System.IO.File.Exists(oldPath) && !System.IO.File.Exists(newPath))
-                System.IO.File.Move(oldPath, newPath);
-        }
 
         static readonly string LogFile = System.IO.Path.Combine(Application.StartupPath, "AprNes.log");
 
@@ -93,12 +71,6 @@ namespace AprNes
             // 確保 configure 目錄存在
             if (!System.IO.Directory.Exists(ConfigureDir))
                 System.IO.Directory.CreateDirectory(ConfigureDir);
-
-            // 舊版相容：自動搬移舊位置的 ini 到 configure/
-            MigrateOldIni("AprNes.ini");
-            MigrateOldIni("AprNesLang.ini");
-            MigrateOldIni("AprNesAnalog.ini");
-            MigrateOldIni("AprNesAudioPlus.ini");
 
             LangINI.init();
             if (LangINI.LangFileMissing)
@@ -720,7 +692,6 @@ namespace AprNes
             string conf = "";
             foreach (string i in AppConfigure.Keys)
             {
-                if (s_analogKeys.Contains(i)) continue;          // 過濾殘留的舊版 analog key
                 if (s_audioPlusKeys.Contains(i)) continue;       // 已移至 AprNesAudioPlus.ini
                 if (string.IsNullOrWhiteSpace(i)) continue;      // 防呆：跳過空白 key
                 if (i.Contains("=") || i.Contains("\n")) continue; // 防呆：key 不得含 = 或換行
