@@ -467,7 +467,7 @@ namespace AprNes
             {
                 uint jns = (uint)(ntsc_frameCount * 2654435761u + (uint)sl * 340573321u);
                 jns ^= jns << 13; jns ^= jns >> 17; jns ^= jns << 5;
-                if ((jns & 31) == 0) phase0 = (phase0 + ((jns & 64) != 0 ? 1 : 5)) % 6;
+                if ((jns & 31) == 0) { phase0 += ((jns & 64) != 0 ? 1 : 5); phase0 += ((5 - phase0) >> 31) & -6; }
             }
             if ((AnalogOutputMode)ntsc_analogOutput == AnalogOutputMode.SVideo)
             {
@@ -643,7 +643,8 @@ namespace AprNes
             {
                 int wQ = winQ, wQ_half = winQ_half;
                 float* wvQ = chromaBuf + kLeadPad - wQ_half + 2;
-                int tModQ = ((phase0 - wQ_half + 2) % 6 + 6) % 6;
+                int tModQ = phase0 + 5;
+                tModQ += ((5 - tModQ) >> 31) & -6;
                 for (int d = 0; d < 256; d++)
                 {
                     float* cwQ = combinedQ + tModQ * kWinQ; int n = 0;
@@ -660,7 +661,8 @@ namespace AprNes
             }
 
             float* wvY = waveBuf + kLeadPad - kWinY_half; float* wvI = chromaBuf + kLeadPad - kWinI_half;
-            int tModI = ((phase0 - kWinI_half) % 6 + 6) % 6;
+            int tModI = phase0 + 3;
+            tModI += ((5 - tModI) >> 31) & -6;
             float* yChunk = stackalloc float[VS]; float* iChunk = stackalloc float[VS]; float* qChunk = stackalloc float[VS];
 
             uint* tmpOutBuf = null;
