@@ -118,7 +118,8 @@ Key references used during development:
 ### Reference Material (ref/)
 
 *   **`ref/Mesen2-master/`** — Full Mesen2 source code (primary reference for DMA/PPU timing).
-*   **`ref/TriCNES-main/`** — TriCNES source code (with added headless TestRunner; 138/138 AccuracyCoin).
+*   **`ref/TriCNES-main/`** — TriCNES source code, original version (with added headless TestRunner; 136/136 AccuracyCoin Commit 62ed684).
+*   **`ref/TriCNES-main-20260410/`** — TriCNES updated version (build-only, no source; used as reference for SR Latch Pipeline and circuit-level timing).
 *   **`ref/mapper/`** — Mapper implementation documentation and references.
 
 ### Tools (tools/)
@@ -367,7 +368,8 @@ AprNes 是一個以追求 cycle-accurate 精度為目標的 NES 硬體模擬研�
 ### 參考資料 (ref/)
 
 *   **`ref/Mesen2-master/`** — Mesen2 模擬器完整源碼（主要參考，DMA/PPU timing）。
-*   **`ref/TriCNES-main/`** — TriCNES 模擬器源碼（含我們加入的 headless TestRunner，AC 136/136）。
+*   **`ref/TriCNES-main/`** — TriCNES 模擬器源碼，原始版本（含我們加入的 headless TestRunner；AccuracyCoin Commit 62ed684 136/136）。
+*   **`ref/TriCNES-main-20260410/`** — TriCNES 更新版本（僅含建置檔，無原始碼；用於 SR Latch Pipeline 與電路級時序參考）。
 *   **`ref/mapper/`** — Mapper 實作文件與參考資料。
 
 ### 輔助工具 (tools/)
