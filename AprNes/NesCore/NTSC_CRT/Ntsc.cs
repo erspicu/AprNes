@@ -340,7 +340,7 @@ namespace AprNes
             }
         }
 
-        public static void DecodeScanline(int sl, byte[] palBuf, byte emphasisBits)
+        public static void DecodeScanline(int sl, byte* palBuf, byte emphasisBits)
         {
             if (sl < 0 || sl >= kSrcH) return;
             if (ntsc_ultraAnalog)
@@ -355,7 +355,7 @@ namespace AprNes
             }
         }
 
-        static void DecodeScanline_Fast(int sl, byte[] palBuf, byte emphasisBits, float* dotY, float* dotI, float* dotQ)
+        static void DecodeScanline_Fast(int sl, byte* palBuf, byte emphasisBits, float* dotY, float* dotI, float* dotQ)
         {
             int phase0 = scanPhase6;
 
@@ -368,7 +368,7 @@ namespace AprNes
             else DecodeAV_Composite(sl, phase0, dotY, dotI, dotQ);
         }
 
-        static void GenerateSignal(byte[] palBuf, byte emphasisBits, float* dotY, float* dotI, float* dotQ)
+        static void GenerateSignal(byte* palBuf, byte emphasisBits, float* dotY, float* dotI, float* dotQ)
         {
             int emph = emphasisBits & 7;
             for (int d = 0; d < 256; d++)
@@ -455,7 +455,7 @@ namespace AprNes
             VerticalFillRows(sl, dstW, row0, rowStart, rowEnd);
         }
 
-        static void DecodeScanline_Physical(int sl, byte[] palBuf, byte emphasisBits, float* waveBuf, float* cBuf)
+        static void DecodeScanline_Physical(int sl, byte* palBuf, byte emphasisBits, float* waveBuf, float* cBuf)
         {
             int phase0 = scanPhaseBase;
 
@@ -482,7 +482,7 @@ namespace AprNes
             }
         }
 
-        static void GenerateWaveform(byte[] palBuf, byte emphasisBits, bool isRF, int sl, int phase0, float* waveBuf)
+        static void GenerateWaveform(byte* palBuf, byte emphasisBits, bool isRF, int sl, int phase0, float* waveBuf)
         {
             int emph = emphasisBits & 7; float* ea = emphAtten + emph * 12;
             bool addNoise = NoiseIntensity > 0f;
@@ -512,7 +512,7 @@ namespace AprNes
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void RunWaveformLoop(byte[] palBuf, float* ea, float* waveBuf, int phase0,
+        private static void RunWaveformLoop(byte* palBuf, float* ea, float* waveBuf, int phase0,
             float leftPad, float lastY, bool addNoise, bool herring, uint ns, float nScale, float nOff, float hR, float hI, float hC, float hS)
         {
             float vPrev = leftPad; float ringDamp = RingStrength * 0.5f; float vVel = 0f; int tMod = phase0;
@@ -567,7 +567,7 @@ namespace AprNes
         }
 
         // 移除不該加的 AggressiveInlining 標籤，讓外層維持清爽！
-        static void GenerateWaveform_SVideo(byte[] palBuf, byte emphasisBits, int sl, int phase0, float* waveBuf, float* cBuf)
+        static void GenerateWaveform_SVideo(byte* palBuf, byte emphasisBits, int sl, int phase0, float* waveBuf, float* cBuf)
         {
             int emph = emphasisBits & 7; float* ea = emphAtten + emph * 12;
             bool addNoise = NoiseIntensity > 0f; float firstY = yBaseE[(palBuf[0] & 63) * 8 + emph]; float lastY = yBaseE[(palBuf[255] & 63) * 8 + emph];
@@ -582,7 +582,7 @@ namespace AprNes
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void RunWaveformLoop_SVideo(byte[] palBuf, float* ea, float* waveBuf, float* cBuf, int phase0,
+        private static void RunWaveformLoop_SVideo(byte* palBuf, float* ea, float* waveBuf, float* cBuf, int phase0,
             int emph, float leftPad, float lastY, bool addNoise, uint ns, float nScale, float nOff)
         {
             float vPrev = leftPad, rd = RingStrength * 0.5f, vv = 0f; int tMod = phase0;

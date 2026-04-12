@@ -231,6 +231,7 @@ namespace AprNes
             if (sprFetchAttr != null) { Marshal.FreeHGlobal((IntPtr)sprFetchAttr); sprFetchAttr = null; }
             if (sprXPos      != null) { Marshal.FreeHGlobal((IntPtr)sprXPos);      sprXPos      = null; }
             if (expansionChannels != null) { Marshal.FreeHGlobal((IntPtr)expansionChannels); expansionChannels = null; }
+            if (ntscScanBuf  != null) { Marshal.FreeHGlobal((IntPtr)ntscScanBuf);  ntscScanBuf  = null; }
             if (NES_MEM      != null) { Marshal.FreeHGlobal((IntPtr)NES_MEM);      NES_MEM      = null; }
             if (Vertical           != null) { Marshal.FreeHGlobal((IntPtr)Vertical);           Vertical           = null; }
             if (AnalogScreenBuf     != null) { Marshal.FreeHGlobal((IntPtr)AnalogScreenBuf);     AnalogScreenBuf     = null; AnalogBufSize = 0; }
@@ -485,6 +486,7 @@ prerender_sprite0_x = 0;
                 sprXCounter      = (int* )Marshal.AllocHGlobal(sizeof(int)  * 8);
                 sprFetchAttr     = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 sprXPos          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
+                ntscScanBuf      = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
                 // P1_joypad_status/P2_joypad_status removed — shift register model uses static bytes
                 NES_MEM          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 65536);
 

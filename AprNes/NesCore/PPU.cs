@@ -142,7 +142,7 @@ namespace AprNes
 
         // NTSC 類比模式：每條掃描線的原始調色盤索引緩衝區（256 bytes，0x00-0x3F）
         // 由 RenderBGTile 和 RenderSpritesLine 在 AnalogEnabled=true 時填入
-        static byte[] ntscScanBuf = new byte[256];
+        static byte* ntscScanBuf;
 
         // MMC5 extended attribute mode (per-tile palette + CHR bank from ExRAM)
         static ushort extAttrNTOffset;  // nametable offset saved at phase 1
