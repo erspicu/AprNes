@@ -34,6 +34,12 @@ echo   ROM: ny2011.nes
 echo   Config: NTSC / 1x (256x240) / Audio Mode 0 (Pure Digital)
 echo   Protocol: JIT(%JIT_SEC%s) + Cool(%COOL_SEC%s) + Run2(%TEST_SEC%s) + Cool(%COOL_SEC%s) + Run3(%TEST_SEC%s)
 echo   Start: %date% %time:~0,8%
+for /f "delims=" %%v in ('"%EXE%" --version 2^>nul') do echo   %%v
+echo.
+echo   Hardware:
+for /f "delims=" %%c in ('powershell -NoProfile -Command "(Get-CimInstance Win32_Processor).Name" 2^>nul') do echo     CPU: %%c
+for /f "delims=" %%m in ('powershell -NoProfile -Command "[math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory/1GB)" 2^>nul') do echo     RAM: %%m GB
+for /f "delims=" %%g in ('powershell -NoProfile -Command "(Get-CimInstance Win32_VideoController).Name" 2^>nul') do echo     GPU: %%g
 echo ============================================================
 echo.
 

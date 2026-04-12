@@ -20,6 +20,17 @@ namespace AprNes
         const double NES_FPS = 60.0988;
         const int DEFAULT_HOLD_FRAMES = 10; // ~166ms
 
+        static DateTime GetBuildTimestamp()
+        {
+            string filePath = System.Reflection.Assembly.GetCallingAssembly().Location;
+            byte[] b = new byte[2048];
+            using (var s = new System.IO.FileStream(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read))
+                s.Read(b, 0, 2048);
+            int pe = BitConverter.ToInt32(b, 60);
+            int ts = BitConverter.ToInt32(b, pe + 8);
+            return new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(ts).ToLocalTime();
+        }
+
         // ── Platform delegates (must be set before calling Run) ──
         public static Action<string> SaveScreenshotFn;
         public static Func<string> GetBaseDirectoryFn; // returns exe directory for INI + FDS BIOS
@@ -272,6 +283,12 @@ namespace AprNes
                             else NesCore.Region = NesCore.RegionType.NTSC;
                         }
                         break;
+                    case "--version":
+                        {
+                            DateTime dt = GetBuildTimestamp();
+                            Console.WriteLine("AprNes Build: " + dt.ToString("yyyy/MM/dd HH:mm:ss"));
+                            return 0;
+                        }
                 }
             }
 
@@ -286,6 +303,7 @@ namespace AprNes
                 Console.Error.WriteLine("       [--region <NTSC|PAL|Dendy>]");
                 Console.Error.WriteLine("       [--audio-dsp] [--audio-mode <0|1|2>] [--region <NTSC|PAL|DENDY>]");
                 Console.Error.WriteLine("       [--perf <rom> [seconds] [note]]");
+                Console.Error.WriteLine("       [--version]");
                 Console.Error.WriteLine("  Filter specs: xbrz_2..xbrz_6, scalex_2, scalex_3, nn_2..nn_N, none");
                 return 2;
             }
