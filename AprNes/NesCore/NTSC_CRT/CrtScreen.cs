@@ -582,40 +582,35 @@ namespace AprNes
                 float halfW = dstW * 0.5f;
                 float invHW = halfW > 0f ? 1f / halfW : 0f;
                 float step = invHW * maxOff;
-                float baseOffset = -halfW * step + 1024.5f;
+                // Fixed-point 16.16: eliminate per-pixel float→int conversion
+                int stepFx = (int)(step * 65536f);
+                int baseFx = (int)((-halfW * step + 0.5f) * 65536f); // baseOffset - 1024, pre-subtracted
                 int maxIdx = dstW - 1;
 
                 Parallel.For(0, dstH, ty =>
                 {
                     int rowOff = ty * dstW;
+                    int iFx = baseFx; // accumulate instead of multiply per pixel
                     for (int tx = 0; tx < dstW; tx++)
                     {
                         int dstIdx = rowOff + tx;
                         int srcIdx = map[dstIdx];
 
-                        // 這個分支必須留著，用來保護記憶體越界 (Out-of-bounds Guard)
-                        if (srcIdx < 0) { dst[dstIdx] = 0xFF000000u; continue; }
+                        if (srcIdx < 0) { dst[dstIdx] = 0xFF000000u; iFx += stepFx; continue; }
 
-                        // 預計算 column index 消除整數除法
                         int srcTx = col[dstIdx];
                         int srcRowOff = srcIdx - srcTx;
 
-                        // ★ 技巧 3：融合乘加 (FMA) 與無分支四捨五入 (錯誤)
-                        //int ioff = (int)(srcTx * step + baseOffset) - 1024;
+                        int ioff = iFx >> 16;
 
-                        // 改成用實體螢幕座標 tx 來計算物理偏差 (修正版)
-                        int ioff = (int)(tx * step + baseOffset) - 1024;
-
-
-                        // ★ 技巧 4：RyuJIT CMOV 無分支邊界限制
                         int rxR = Math.Max(0, Math.Min(srcTx + ioff, maxIdx));
                         int rxB = Math.Max(0, Math.Min(srcTx - ioff, maxIdx));
 
-                        // ★ 技巧 5：SWAR 零位移、零轉型的極速像素組裝
                         dst[dstIdx] = (tmp[srcRowOff + rxB] & 0x000000FFu) |
                                       (tmp[srcRowOff + srcTx] & 0x0000FF00u) |
                                       (tmp[srcRowOff + rxR] & 0x00FF0000u) |
                                       0xFF000000u;
+                        iFx += stepFx;
                     }
                 });
             }
