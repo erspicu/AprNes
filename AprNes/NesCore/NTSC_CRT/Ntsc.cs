@@ -624,7 +624,16 @@ namespace AprNes
             for (int i = kLeadPad + kWaveLen; i < kBufLen; i++) { vv = vv * rd + (lastY - vPrev) * SlewRate; vPrev += vv; waveBuf[i] = vPrev; cBuf[i] = 0f; }
         }
 
+        // Composite: chroma (I/Q) comes from the same waveBuf as luma
         static void DemodulateRow(int sl, int phase0, float* waveBuf)
+            => DemodulateRow_Core(sl, phase0, waveBuf, waveBuf);
+
+        // S-Video: chroma (I/Q) comes from a separate clean channel (cBuf)
+        static void DemodulateRow_SVideo(int sl, int phase0, float* waveBuf, float* cBuf)
+            => DemodulateRow_Core(sl, phase0, waveBuf, cBuf);
+
+        // Unified NTSC demodulation core — only the chroma source pointer differs
+        static void DemodulateRow_Core(int sl, int phase0, float* waveBuf, float* chromaBuf)
         {
             bool toCrt = ntsc_crtEnabled; int dstW = Crt_DstW;
             int rowStart = sl * Crt_DstH / Crt_SrcH; int rowEnd = Math.Min((sl + 1) * Crt_DstH / Crt_SrcH, Crt_DstH);
@@ -633,7 +642,7 @@ namespace AprNes
             float* qDotBuf = stackalloc float[256];
             {
                 int wQ = winQ, wQ_half = winQ_half;
-                float* wvQ = waveBuf + kLeadPad - wQ_half + 2;
+                float* wvQ = chromaBuf + kLeadPad - wQ_half + 2;
                 int tModQ = ((phase0 - wQ_half + 2) % 6 + 6) % 6;
                 for (int d = 0; d < 256; d++)
                 {
@@ -650,7 +659,7 @@ namespace AprNes
                 }
             }
 
-            float* wvY = waveBuf + kLeadPad - kWinY_half; float* wvI = waveBuf + kLeadPad - kWinI_half;
+            float* wvY = waveBuf + kLeadPad - kWinY_half; float* wvI = chromaBuf + kLeadPad - kWinI_half;
             int tModI = ((phase0 - kWinI_half) % 6 + 6) % 6;
             float* yChunk = stackalloc float[VS]; float* iChunk = stackalloc float[VS]; float* qChunk = stackalloc float[VS];
 
@@ -661,96 +670,6 @@ namespace AprNes
             float* lbR = toCrt ? linearBuffer + (long)sl * kOutW : null;
             float* lbG = toCrt ? linearBuffer + (long)kPlane + (long)sl * kOutW : null;
             float* lbB = toCrt ? linearBuffer + 2L * kPlane + (long)sl * kOutW : null;
-
-            // ★ 將 toCrt 分支拉出 SIMD 迴圈
-            if (toCrt)
-            {
-                for (int p = 0; p < kOutW; p += VS)
-                {
-                    for (int k = 0; k < VS; k++)
-                    {
-                        yChunk[k] = hannY[0] * wvY[0] + hannY[1] * wvY[1] + hannY[2] * wvY[2] + hannY[3] * wvY[3] + hannY[4] * wvY[4] + hannY[5] * wvY[5];
-                        float* cwI = combinedI + tModI * kWinI; int n = 0; var acc = new Vector<float>(0f);
-                        for (; n <= kWinI - VS; n += VS) acc += *(Vector<float>*)(cwI + n) * *(Vector<float>*)(wvI + n);
-                        float sumI = Vector.Dot(acc, new Vector<float>(1f)); for (; n < kWinI; n++) sumI += cwI[n] * wvI[n];
-                        iChunk[k] = 2f * sumI; qChunk[k] = qDotBuf[(p + k) >> 2]; wvY++; wvI++;
-
-                        // ★ 符號位元擴展黑魔法
-                        tModI++;
-                        tModI += ((5 - tModI) >> 31) & -6;
-                    }
-                    var Y = *(Vector<float>*)yChunk; var I = *(Vector<float>*)iChunk; var Q = *(Vector<float>*)qChunk;
-                    *(Vector<float>*)(lbR + p) = Vector.Min(Vector.Max(vRY * Y + vRI * I + vRQ * Q, vZeroN), vOneN);
-                    *(Vector<float>*)(lbG + p) = Vector.Min(Vector.Max(vGY * Y + vGI * I + vGQ * Q, vZeroN), vOneN);
-                    *(Vector<float>*)(lbB + p) = Vector.Min(Vector.Max(vBY * Y + vBI * I + vBQ * Q, vZeroN), vOneN);
-                }
-            }
-            else
-            {
-                for (int p = 0; p < kOutW; p += VS)
-                {
-                    for (int k = 0; k < VS; k++)
-                    {
-                        yChunk[k] = hannY[0] * wvY[0] + hannY[1] * wvY[1] + hannY[2] * wvY[2] + hannY[3] * wvY[3] + hannY[4] * wvY[4] + hannY[5] * wvY[5];
-                        float* cwI = combinedI + tModI * kWinI; int n = 0; var acc = new Vector<float>(0f);
-                        for (; n <= kWinI - VS; n += VS) acc += *(Vector<float>*)(cwI + n) * *(Vector<float>*)(wvI + n);
-                        float sumI = Vector.Dot(acc, new Vector<float>(1f)); for (; n < kWinI; n++) sumI += cwI[n] * wvI[n];
-                        iChunk[k] = 2f * sumI; qChunk[k] = qDotBuf[(p + k) >> 2]; wvY++; wvI++;
-
-                        // ★ 符號位元擴展黑魔法
-                        tModI++;
-                        tModI += ((5 - tModI) >> 31) & -6;
-                    }
-                    var Y = *(Vector<float>*)yChunk; var I = *(Vector<float>*)iChunk; var Q = *(Vector<float>*)qChunk;
-                    var R = Vector.Min(Vector.Max(vRY * Y + vRI * I + vRQ * Q, vZeroN), vOneN);
-                    var G = Vector.Min(Vector.Max(vGY * Y + vGI * I + vGQ * Q, vZeroN), vOneN);
-                    var B = Vector.Min(Vector.Max(vBY * Y + vBI * I + vBQ * Q, vZeroN), vOneN);
-                    R *= (v1_minus_GC + vGC * R); G *= (v1_minus_GC + vGC * G); B *= (v1_minus_GC + vGC * B);
-                    var ri = Vector.ConvertToInt32(R * v255_0N);
-                    var gi = Vector.ConvertToInt32(G * v255_0N);
-                    var bi = Vector.ConvertToInt32(B * v255_0N);
-                    *(Vector<int>*)(tmpOutBuf + p) = Vector.BitwiseOr(Vector.BitwiseOr(bi, gi * v256iN), Vector.BitwiseOr(ri * v65536iN, vAlphaiN));
-                }
-
-                if (dstW != kOutW) { if (UpscaleMode == 1) ResampleH_Bilinear(tmpOutBuf, kOutW, row0, dstW); else { int fs = (kOutW << 16) / dstW; for (int x = 0; x < dstW; x++) row0[x] = tmpOutBuf[(x * fs) >> 16]; } }
-                else Buffer.MemoryCopy(tmpOutBuf, row0, dstW * sizeof(uint), dstW * sizeof(uint));
-                VerticalFillRows(sl, dstW, row0, rowStart, rowEnd);
-            }
-        }
-
-        static void DemodulateRow_SVideo(int sl, int phase0, float* waveBuf, float* cBuf)
-        {
-            bool toCrt = ntsc_crtEnabled; int dstW = Crt_DstW;
-            int rowStart = sl * Crt_DstH / Crt_SrcH; int rowEnd = Math.Min((sl + 1) * Crt_DstH / Crt_SrcH, Crt_DstH);
-            uint* row0 = ntsc_analogScreenBuf + (long)rowStart * dstW; int VS = Vector<float>.Count;
-            float* qDotBuf = stackalloc float[256];
-            {
-                int wQ = winQ, wQ_half = winQ_half;
-                float* wvQ = cBuf + kLeadPad - wQ_half + 2;
-                int tModQ = ((phase0 - wQ_half + 2) % 6 + 6) % 6;
-                for (int d = 0; d < 256; d++)
-                {
-                    float* cwQ = combinedQ + tModQ * kWinQ; int n = 0;
-                    var accQ0 = new Vector<float>(0f); var accQ1 = new Vector<float>(0f); int stride2Q = VS * 2;
-                    for (; n <= wQ - stride2Q; n += stride2Q) { accQ0 += *(Vector<float>*)(cwQ + n) * *(Vector<float>*)(wvQ + n); accQ1 += *(Vector<float>*)(cwQ + n + VS) * *(Vector<float>*)(wvQ + n + VS); }
-                    for (; n <= wQ - VS; n += VS) accQ0 += *(Vector<float>*)(cwQ + n) * *(Vector<float>*)(wvQ + n);
-                    float sumQ = Vector.Dot(accQ0 + accQ1, new Vector<float>(1f)); for (; n < wQ; n++) sumQ += cwQ[n] * wvQ[n];
-                    qDotBuf[d] = -2f * sumQ; wvQ += kSampDot;
-
-                    // ★ 符號位元擴展黑魔法
-                    tModQ += 4;
-                    tModQ += ((5 - tModQ) >> 31) & -6;
-                }
-            }
-            float* wvY = waveBuf + kLeadPad - kWinY_half; float* wvI = cBuf + kLeadPad - kWinI_half;
-            int tModI = ((phase0 - kWinI_half) % 6 + 6) % 6;
-            float* yChunk = stackalloc float[VS]; float* iChunk = stackalloc float[VS]; float* qChunk = stackalloc float[VS];
-
-            uint* tmpOutBuf = null;
-            uint* stackPtr = stackalloc uint[kOutW];
-            if (!toCrt) tmpOutBuf = stackPtr;
-
-            float* lbR = toCrt ? linearBuffer + (long)sl * kOutW : null; float* lbG = toCrt ? linearBuffer + (long)kPlane + (long)sl * kOutW : null; float* lbB = toCrt ? linearBuffer + 2L * kPlane + (long)sl * kOutW : null;
 
             // ★ 將 toCrt 分支拉出 SIMD 迴圈
             if (toCrt)
