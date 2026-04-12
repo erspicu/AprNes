@@ -79,7 +79,7 @@ namespace AprNes
 
         static public ExpansionChipType expansionChipType = ExpansionChipType.None;
         static public int   expansionChannelCount = 0;       // 0~8
-        static public int[] expansionChannels = new int[8];   // raw output per channel
+        static public int* expansionChannels;   // raw output per channel (unmanaged, 8 ints)
 
         // 每晶片增益 — 匹配原有 mapperExpansionAudio 乘數
         // 讓 per-channel × gain 加總後落在 NES APU 混音範圍 (~0-98302)
@@ -158,8 +158,8 @@ namespace AprNes
         // Length counter — TriCNES deferred reload flag model
         static int* lengthctr;
         static int* lenctrload;         // LUT: 32-entry length counter load table
-        static bool[] lenCtrReloadFlag = new bool[4];   // deferred reload pending
-        static int[] lenCtrReloadValue = new int[4];     // deferred reload value
+        static bool lenCtrReloadFlag0, lenCtrReloadFlag1, lenCtrReloadFlag2, lenCtrReloadFlag3;
+        static int  lenCtrReloadValue0, lenCtrReloadValue1, lenCtrReloadValue2, lenCtrReloadValue3;
         // Halt read from register every APU cycle (TriCNES model)
         static byte* apuRegister;       // raw $4000-$400F register values (for halt readback)
         // TriCNES: halt flags updated every APU cycle from apuRegister (not just at HalfFrame)
@@ -257,6 +257,7 @@ namespace AprNes
             if (_pulseSeq    == null) _pulseSeq    = (int*)Marshal.AllocHGlobal(sizeof(int) * 2);
             if (_pulseDuty   == null) _pulseDuty   = (int*)Marshal.AllocHGlobal(sizeof(int) * 2);
             if (_pulseOut    == null) _pulseOut    = (int*)Marshal.AllocHGlobal(sizeof(int) * 2);
+            if (expansionChannels == null) expansionChannels = (int*)Marshal.AllocHGlobal(sizeof(int) * 8);
             if (volume       == null) volume       = (int*)Marshal.AllocHGlobal(sizeof(int) * 4);
             if (SQUARELOOKUP == null) SQUARELOOKUP = (int*)Marshal.AllocHGlobal(sizeof(int) * 31);
             if (TNDLOOKUP    == null) TNDLOOKUP    = (int*)Marshal.AllocHGlobal(sizeof(int) * 203);
@@ -337,7 +338,9 @@ namespace AprNes
                 TNDLOOKUP[i] = (int)((163.67 / (24329.0 / (i == 0 ? 0.0001 : i) + 100)) * 49151);
 
             // Default bool* arrays
-            for (int i = 0; i < 4; i++) { lenCtrEnable[i] = 1; envConstVolume[i] = 1; envelopeStartFlag[i] = 0; lenCtrReloadFlag[i] = false; lenCtrReloadValue[i] = 0; }
+            for (int i = 0; i < 4; i++) { lenCtrEnable[i] = 1; envConstVolume[i] = 1; envelopeStartFlag[i] = 0; }
+            lenCtrReloadFlag0 = lenCtrReloadFlag1 = lenCtrReloadFlag2 = lenCtrReloadFlag3 = false;
+            lenCtrReloadValue0 = lenCtrReloadValue1 = lenCtrReloadValue2 = lenCtrReloadValue3 = 0;
             for (int i = 0; i < 16; i++) apuRegister[i] = 0;
             for (int i = 0; i < 2; i++) { sweepenable[i] = 0; sweepnegate[i] = 0; sweepsilence[i] = 0; sweepreload[i] = 0; }
 
@@ -370,14 +373,14 @@ namespace AprNes
                 lenCtrEnable[i] = 0;
                 lengthctr[i] = 0;
                 volume[i] = 0;
-                lenCtrReloadFlag[i] = false;
-                lenCtrReloadValue[i] = 0;
                 envelopeValue[i] = 0;
                 envelopeCounter[i] = 0;
                 envelopePos[i] = 0;
                 envConstVolume[i] = 0;
                 envelopeStartFlag[i] = 0;
             }
+            lenCtrReloadFlag0 = lenCtrReloadFlag1 = lenCtrReloadFlag2 = lenCtrReloadFlag3 = false;
+            lenCtrReloadValue0 = lenCtrReloadValue1 = lenCtrReloadValue2 = lenCtrReloadValue3 = 0;
             for (int i = 0; i < 2; i++)
             {
                 sweepenable[i] = 0;
@@ -515,8 +518,8 @@ namespace AprNes
             }
 
             // ── Frame Counter + quarter/half frame processing ──
+            // setvolumes() is called inside setlength() and processLenCtrReloadNonHalf() — not per-cycle
             ApuFrameCounterStep();
-            setvolumes();
 
             // TriCNES: halt flags updated from registers EVERY APU cycle (lines 1139-1142)
             // Not just at HalfFrame — allows mid-frame halt changes to take effect next cycle
@@ -526,40 +529,54 @@ namespace AprNes
             lenctrHalt3 = (apuRegister[0xC] & 0x20) != 0;
 
             // 生成音效樣本
-            // 為 Mode 0/1 計算相容的單一 mapperExpansionAudio 值
-            if (expansionChannelCount > 0 && AudioMode < 2)
-            {
-                float gain = ap_mode01ExpGain;
-                int sum = 0;
-                for (int i = 0; i < expansionChannelCount; i++)
-                {
-                    if (ChannelEnabled[5 + i])
-                        sum += (int)(expansionChannels[i] * gain);
-                }
-                mapperExpansionAudio = sum;
-            }
-
-            // Apply per-channel enable/mute (bitmask — no array bounds check)
-            int mask = ChannelEnableMask;
-            int sq1val  = (mask & 1)  != 0 ? volume[0] * _pulseOut[0] : 0;
-            int sq2val  = (mask & 2)  != 0 ? volume[1] * _pulseOut[1] : 0;
-            int trival  = (mask & 4)  != 0 ? _triOut : 0;
-            int noisval = (mask & 8)  != 0 ? volume[3] * _noiseOut : 0;
-            int dmcval  = (mask & 16) != 0 ? dmcvalue : 0;
-
             if (AudioMode > 0)
             {
-                // Authentic / Modern: 每 APU cycle 推入 AudioPlus
-                AudioPlus_PushApuCycle(sq1val, sq2val, trival, noisval, dmcval, mapperExpansionAudio);
+                // Authentic / Modern: 每 APU cycle 推入 AudioPlus (需要 per-cycle 精度)
+                if (expansionChannelCount > 0)
+                {
+                    float gain = ap_mode01ExpGain;
+                    int sum = 0;
+                    for (int i = 0; i < expansionChannelCount; i++)
+                    {
+                        if (ChannelEnabled[5 + i])
+                            sum += (int)(expansionChannels[i] * gain);
+                    }
+                    mapperExpansionAudio = sum;
+                }
+                int mask = ChannelEnableMask;
+                AudioPlus_PushApuCycle(
+                    (mask & 1)  != 0 ? volume[0] * _pulseOut[0] : 0,
+                    (mask & 2)  != 0 ? volume[1] * _pulseOut[1] : 0,
+                    (mask & 4)  != 0 ? _triOut : 0,
+                    (mask & 8)  != 0 ? volume[3] * _noiseOut : 0,
+                    (mask & 16) != 0 ? dmcvalue : 0,
+                    mapperExpansionAudio);
             }
             else
             {
-                // Pure Digital: 原有 ~40.58 cycle 降頻 + DC killer
+                // Pure Digital: catchup — only compute output at sample rate (~40 cycle interval)
                 _sampleAccum += 1.0;
                 if (_sampleAccum >= _cycPerSample)
                 {
                     _sampleAccum -= _cycPerSample;
-                    generateSample(sq1val, sq2val, trival, noisval, dmcval);
+                    if (expansionChannelCount > 0)
+                    {
+                        float gain = ap_mode01ExpGain;
+                        int sum = 0;
+                        for (int i = 0; i < expansionChannelCount; i++)
+                        {
+                            if (ChannelEnabled[5 + i])
+                                sum += (int)(expansionChannels[i] * gain);
+                        }
+                        mapperExpansionAudio = sum;
+                    }
+                    int mask = ChannelEnableMask;
+                    generateSample(
+                        (mask & 1)  != 0 ? volume[0] * _pulseOut[0] : 0,
+                        (mask & 2)  != 0 ? volume[1] * _pulseOut[1] : 0,
+                        (mask & 4)  != 0 ? _triOut : 0,
+                        (mask & 8)  != 0 ? volume[3] * _noiseOut : 0,
+                        (mask & 16) != 0 ? dmcvalue : 0);
                 }
             }
         }
@@ -611,7 +628,7 @@ namespace AprNes
         // Handles counter reset, threshold comparison, quarter/half frame dispatch.
         // Most cycles don't hit any threshold (branch predictor skips the chain).
         // =====================================================================
-        [MethodImpl(MethodImplOptions.NoInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ApuFrameCounterStep()
         {
             if ((apuFrameCounterReset & 0x80) == 0)
@@ -629,7 +646,7 @@ namespace AprNes
                 if      (fc == fc5_0) apuQuarterFrame = true;
                 else if (fc == fc5_1) { apuQuarterFrame = true; apuHalfFrame = true; }
                 else if (fc == fc5_2) apuQuarterFrame = true;
-                else if (fc == fc5_3) { }
+                else if (fc == fc5_3) { } // skip — early exit avoids fc5_4/fc5_5 comparisons
                 else if (fc == fc5_4) { apuQuarterFrame = true; apuHalfFrame = true; }
                 else if (fc == fc5_5) apuFrameCounter = 0;
             }
@@ -673,36 +690,30 @@ namespace AprNes
         static void setlength()
         {
             // 1. Reload (only if flag set AND counter==0)
-            for (int i = 0; i < 4; i++)
-            {
-                if (lenCtrReloadFlag[i] && lengthctr[i] == 0)
-                    lengthctr[i] = lenCtrReloadValue[i];
-                else
-                    lenCtrReloadFlag[i] = false;
-            }
+            if (lenCtrReloadFlag0 && lengthctr[0] == 0) lengthctr[0] = lenCtrReloadValue0; else lenCtrReloadFlag0 = false;
+            if (lenCtrReloadFlag1 && lengthctr[1] == 0) lengthctr[1] = lenCtrReloadValue1; else lenCtrReloadFlag1 = false;
+            if (lenCtrReloadFlag2 && lengthctr[2] == 0) lengthctr[2] = lenCtrReloadValue2; else lenCtrReloadFlag2 = false;
+            if (lenCtrReloadFlag3 && lengthctr[3] == 0) lengthctr[3] = lenCtrReloadValue3; else lenCtrReloadFlag3 = false;
             // 2. Status disable ($4015 bit=0 → zero counter)
             for (int i = 0; i < 4; i++)
                 if (lenCtrEnable[i] == 0) lengthctr[i] = 0;
             // 3. Decrement (guarded: !halt && !reloadFlag)
-            // Uses halt flags cached from previous APU cycle (TriCNES: updated every cycle at end)
-            if (lengthctr[0] > 0 && !lenctrHalt0 && !lenCtrReloadFlag[0]) lengthctr[0]--;
-            if (lengthctr[1] > 0 && !lenctrHalt1 && !lenCtrReloadFlag[1]) lengthctr[1]--;
-            if (lengthctr[2] > 0 && !lenctrHalt2 && !lenCtrReloadFlag[2]) lengthctr[2]--;
-            if (lengthctr[3] > 0 && !lenctrHalt3 && !lenCtrReloadFlag[3]) lengthctr[3]--;
+            if (lengthctr[0] > 0 && !lenctrHalt0 && !lenCtrReloadFlag0) lengthctr[0]--;
+            if (lengthctr[1] > 0 && !lenctrHalt1 && !lenCtrReloadFlag1) lengthctr[1]--;
+            if (lengthctr[2] > 0 && !lenctrHalt2 && !lenCtrReloadFlag2) lengthctr[2]--;
+            if (lengthctr[3] > 0 && !lenctrHalt3 && !lenCtrReloadFlag3) lengthctr[3]--;
             setvolumes();
         }
 
         // TriCNES: non-HalfFrame cycle — unconditional reload if flag set, then clear
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void processLenCtrReloadNonHalf()
         {
-            for (int i = 0; i < 4; i++)
-            {
-                if (lenCtrReloadFlag[i])
-                {
-                    lengthctr[i] = lenCtrReloadValue[i];
-                    lenCtrReloadFlag[i] = false;
-                }
-            }
+            if (lenCtrReloadFlag0) { lengthctr[0] = lenCtrReloadValue0; lenCtrReloadFlag0 = false; }
+            if (lenCtrReloadFlag1) { lengthctr[1] = lenCtrReloadValue1; lenCtrReloadFlag1 = false; }
+            if (lenCtrReloadFlag2) { lengthctr[2] = lenCtrReloadValue2; lenCtrReloadFlag2 = false; }
+            if (lenCtrReloadFlag3) { lengthctr[3] = lenCtrReloadValue3; lenCtrReloadFlag3 = false; }
+            setvolumes();
         }
 
         static void setlinctr()
@@ -919,7 +930,7 @@ namespace AprNes
             _pulseTimer[0]  = _pulsePeriod[0];
             _pulseSeq[0]    = 0;
             if (lenCtrEnable[0] != 0)
-            { lenCtrReloadValue[0] = lenctrload[(val >> 3) & 0x1F]; lenCtrReloadFlag[0] = true; }
+            { lenCtrReloadValue0 = lenctrload[(val >> 3) & 0x1F]; lenCtrReloadFlag0 = true; }
             envelopeStartFlag[0] = 1;
         }
         // $4004: Pulse 2 duty/envelope
@@ -954,7 +965,7 @@ namespace AprNes
             _pulseTimer[1]  = _pulsePeriod[1];
             _pulseSeq[1]    = 0;
             if (lenCtrEnable[1] != 0)
-            { lenCtrReloadValue[1] = lenctrload[(val >> 3) & 0x1F]; lenCtrReloadFlag[1] = true; }
+            { lenCtrReloadValue1 = lenctrload[(val >> 3) & 0x1F]; lenCtrReloadFlag1 = true; }
             envelopeStartFlag[1] = 1;
         }
         // $4008: Triangle linear counter
@@ -978,7 +989,7 @@ namespace AprNes
             _triPeriod = (_triPeriod & 0xFF) | ((val & 7) << 8);
             _triTimer  = _triPeriod;
             if (lenCtrEnable[2] != 0)
-            { lenCtrReloadValue[2] = lenctrload[(val >> 3) & 0x1F]; lenCtrReloadFlag[2] = true; }
+            { lenCtrReloadValue2 = lenctrload[(val >> 3) & 0x1F]; lenCtrReloadFlag2 = true; }
             linctrflag = true;
         }
         // $400C: Noise envelope
@@ -1000,7 +1011,7 @@ namespace AprNes
         static void apu_400f(byte val)
         {
             if (lenCtrEnable[3] != 0)
-            { lenCtrReloadValue[3] = lenctrload[(val >> 3) & 0x1F]; lenCtrReloadFlag[3] = true; }
+            { lenCtrReloadValue3 = lenctrload[(val >> 3) & 0x1F]; lenCtrReloadFlag3 = true; }
             envelopeStartFlag[3] = 1;
         }
         // $4010: DMC flags + rate
@@ -1044,6 +1055,7 @@ namespace AprNes
             if (lenCtrEnable[1] == 0) lengthctr[1] = 0;
             if (lenCtrEnable[2] == 0) lengthctr[2] = 0;
             if (lenCtrEnable[3] == 0) lengthctr[3] = 0;
+            setvolumes();
 
             // Deferred status (TriCNES: APU_DelayedDMC4015 = PutCycle ? 3 : 4)
             dmcDelayedEnable = dmcEnable;

@@ -65,6 +65,7 @@ for r in sprdma_and_dmc_dma.nes sprdma_and_dmc_dma_512.nes; do a "sprdma_and_dmc
 for r in 01.basics.nes 02.alignment.nes 03.corners.nes 04.flip.nes 05.left_clip.nes 06.right_edge.nes 07.screen_bottom.nes 08.double_height.nes 09.timing_basics.nes 10.timing_order.nes 11.edge_timing.nes; do a "sprite_hit_tests_2005.10.05" "$r" "--max-wait 15"; done
 for r in 1.Basics.nes 2.Details.nes 3.Timing.nes 4.Obscure.nes 5.Emulator.nes; do a "sprite_overflow_tests" "$r" "--max-wait 15"; done
 for r in 1.frame_basics.nes 2.vbl_timing.nes 3.even_odd_frames.nes 4.vbl_clear_timing.nes 5.nmi_suppression.nes 6.nmi_disable.nes 7.nmi_timing.nes; do a "vbl_nmi_timing" "$r" "--max-wait 15"; done
+for r in 01.len_ctr.nes 02.len_table.nes 03.irq_flag.nes 04.clock_jitter.nes 05.len_timing_mode0.nes 06.len_timing_mode1.nes 07.irq_flag_timing.nes 08.irq_timing.nes 10.len_halt_timing.nes 11.len_reload_timing.nes; do a "pal_apu_tests" "$r" "--max-wait 15 --region PAL"; done
 
 TOTAL=$(wc -l < "$TL")
 echo "=== Starting test run ($TOTAL tests, $JOBS parallel jobs) ==="

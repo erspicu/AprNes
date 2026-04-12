@@ -34,9 +34,10 @@ namespace AprNes
         // PAL:  26,601,714 Hz   — CPU = master ÷ 16, PPU = master ÷ 5 (3.2:1)
         // Per-master-clock dividers (TriCNES: CPUClock/PPUClock countdown timers)
         // Count DOWN to 0, component executes when counter reaches 0, then resets.
-        static int mcCpuClock = 0;    // TriCNES: defaults to 0 (CPU fires on first tick)
-        static int mcPpuClock = 0;    // PPU: 4→0 (full step at 0, half step at 2)
+        static int mcCpuClock = 12;   // TriCNES: CPU fires after 12 MC (not immediately)
+        static int mcPpuClock = 4;    // TriCNES: PPU fires after 4 MC (not immediately)
         static bool mcApuPutCycle = false; // M2 phase (toggles every APU/CPU step)
+        static public long masterClockTotal = 0; // Total master clocks (for Mesen2-style MMC3 A12 filter)
 
         // Called at every site that changes statusframeint, apuintflag, statusdmcint, or statusmapperint
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

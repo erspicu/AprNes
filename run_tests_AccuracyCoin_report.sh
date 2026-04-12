@@ -1,7 +1,7 @@
 #!/bin/bash
 # run_tests_AccuracyCoin_report.sh
 # Run AccuracyCoin page-by-page and generate HTML report.
-# All 136 tests are executed (no skips).
+# AccuracyCoin commit 03385dd (2026-04-10): 138 tests across 20 pages.
 # Page 15 (Power On State) is DRAW-only, screenshots only.
 #
 # Usage:
@@ -15,7 +15,7 @@ set -u
 cd /c/ai_project/AprNes
 
 EXE="AprNes/bin/Debug/AprNes.exe"
-ROM="nes-test-roms-master/AccuracyCoin-main/AccuracyCoin.nes"
+ROM="nes-test-roms-master/AccuracyCoin-main-20260410/AccuracyCoin.nes"
 REPORT_DIR="reports/report"
 SS_DIR="$REPORT_DIR/screenshots-ac"
 OUTPUT_HTML="$REPORT_DIR/AccuracyCoin_report.html"
@@ -58,14 +58,17 @@ rm -f "$RESULTS_DIR"/page_*.hex
 get_test_wait() {
     # Per-page test wait time (seconds after A press for all tests to complete)
     # Measured empirically with 2s safety buffer
+    # AC v2 timing — increased for longer tests
     case $1 in
         12)     echo 30 ;;  # CPU Interrupts (IFlagLatency takes ~20s)
-        14)     echo 9  ;;  # APU Tests: ~7s
-        17)     echo 16 ;;  # PPU VBlank Timing: ~14s
-        13)     echo 8  ;;  # APU Registers/DMA: ~6s
-        18)     echo 12 ;;  # PPU OAM tests: ~10s
-        16|19|20) echo 8 ;;  # PPU tests: ~6s
-        *)      echo 6  ;;  # CPU/unofficial opcodes: ~3-4s
+        14)     echo 12 ;;  # APU Tests
+        17)     echo 25 ;;  # PPU VBlank Timing (v2 has more sub-tests)
+        13)     echo 12 ;;  # APU Registers/DMA
+        18)     echo 15 ;;  # PPU OAM/Sprite Evaluation
+        19)     echo 65 ;;  # PPU Misc: $2007 Stress Test needs ~60s
+        16)     echo 12 ;;  # PPU Rendering
+        20)     echo 15 ;;  # CPU Behavior 2
+        *)      echo 8  ;;  # CPU/unofficial opcodes
     esac
 }
 
@@ -547,12 +550,14 @@ SUITES = [
         ("INC $4014",                0x0480),
     ]),
     (19, "PPU Misc.", [
-        ("Attributes As Tiles",      0x0481),
-        ("t Register Quirks",        0x0482),
-        ("Stale BG Shift Registers", 0x0483),
-        ("BG Serial In",             0x0487),
-        ("Sprites On Scanline 0",    0x0484),
-        ("$2004 Stress Test",        0x048C),
+        ("Attributes As Tiles",        0x0481),
+        ("t Register Quirks",          0x0482),
+        ("Stale BG Shift Registers",   0x0483),
+        ("Stale Sprite Shift Regs",    0x048F),
+        ("BG Serial In",               0x0487),
+        ("Sprites On Scanline 0",      0x0484),
+        ("$2004 Stress Test",          0x048C),
+        ("$2007 Stress Test",          0x048E),
     ]),
     (20, "CPU Behavior 2", [
         ("Instruction Timing",  0x0460),
@@ -648,7 +653,7 @@ tr:hover td {{ background:#1e2a5e; }}
 </head>
 <body>
 <h1>AccuracyCoin Report - AprNes</h1>
-<div class="meta">Generated: {now} | ROM: AccuracyCoin.nes (Mapper 0/NROM) | Method: page-by-page</div>
+<div class="meta">Generated: {now} | ROM: AccuracyCoin <a href="https://github.com/100thCoin/AccuracyCoin/commit/03385dd" style="color:#5dadec">03385dd</a> (2026-04-10, 138 tests / 20 pages) | Method: page-by-page</div>
 
 <div class="summary">
   <div class="stat"><div class="num pass-c">{total_pass}</div><div class="lbl">PASS</div></div>

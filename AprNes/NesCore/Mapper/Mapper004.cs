@@ -14,7 +14,7 @@ namespace AprNes
         protected byte IRQlatchVal = 0, IRQCounter = 0; // TriCNES: byte type (0-1 wraps to 255)
         int BankReg = 0;
 
-        // TriCNES M2 filter model for A12 rising edge detection
+        // A12 filter: count PPU dots with A12=0, threshold >= 8
         int m2Filter = 0;
         int CHR0_Bankselect1k = 0, CHR1_Bankselect1k = 0, CHR2_Bankselect1k = 0, CHR3_Bankselect1k = 0;
         int CHR0_Bankselect2k = 0, CHR1_Bankselect2k = 0;
@@ -27,10 +27,7 @@ namespace AprNes
         public void CpuCycle() { }
         public void CpuClockRise()
         {
-            if ((NesCore.ppuAddressBus & 0x1000) == 0)
-            {
-                if (m2Filter < 3) m2Filter++;
-            }
+            // A12 filter uses PPU dot counting in PpuClock
         }
         public MapperA12Mode A12NotifyMode => MapperA12Mode.MMC3;
 
@@ -39,7 +36,14 @@ namespace AprNes
         public void PpuClock()
         {
             bool a12Now = (NesCore.ppuAddressBus & 0x1000) != 0;
-            if (!NesCore.ppuA12Prev && a12Now && m2Filter == 3)
+            // A12 filter: count consecutive PPU dots with A12=0
+            // Threshold=10: filters 4-dot BG gaps AND 9-dot scanline boundary gaps
+            // Only accepts 64+ dot sprite fetch gaps → 1 clock per scanline
+            if (!a12Now)
+            {
+                if (m2Filter < 16) m2Filter++;
+            }
+            if (!NesCore.ppuA12Prev && a12Now && m2Filter >= 10)
             {
                 Mapper04step_IRQ();
             }

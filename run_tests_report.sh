@@ -313,6 +313,11 @@ for rom in 1.frame_basics.nes 2.vbl_timing.nes 3.even_odd_frames.nes 4.vbl_clear
     run_test "vbl_nmi_timing" "$rom" "--max-wait 30"
 done
 
+# pal_apu_tests (10) — requires --region PAL
+for rom in 01.len_ctr.nes 02.len_table.nes 03.irq_flag.nes 04.clock_jitter.nes 05.len_timing_mode0.nes 06.len_timing_mode1.nes 07.irq_flag_timing.nes 08.irq_timing.nes 10.len_halt_timing.nes 11.len_reload_timing.nes; do
+    run_test "pal_apu_tests" "$rom" "--max-wait 30 --region PAL"
+done
+
 # ─────────────────────────────────────────────
 # Finalize
 # ─────────────────────────────────────────────
@@ -429,6 +434,10 @@ input[type="text"]::placeholder{color:var(--text-dim)}
 <div class="progress-wrap">
   <div class="progress-bar"><div class="fill" id="progress-fill"></div></div>
   <div class="progress-text" id="progress-text"></div>
+</div>
+<div style="margin:1rem 0;padding:.75rem 1rem;background:#1a2332;border:1px solid #2d4a6f;border-radius:8px;font-size:.85rem;color:#8cb4e0">
+  <strong style="color:#5dadec">New in v2:</strong> Added <strong>10 PAL APU tests</strong> (pal_apu_tests suite, --region PAL). Total: 174 &rarr; 184 tests.
+  Also includes TriCNES v2 PPU timing port &amp; MMC3 A12 filter fix (threshold=10 PPU dots).
 </div>
 <div class="controls">
   <div class="btn-group">
