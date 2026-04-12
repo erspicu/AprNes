@@ -518,42 +518,59 @@ namespace AprNes
             float vPrev = leftPad; float ringDamp = RingStrength * 0.5f; float vVel = 0f; int tMod = phase0;
             float hRl = hR, hIl = hI;
 
+            // 4-step lookahead: precompute rotation matrices for steps 1-4
+            float c1 = hC, s1 = hS;
+            float c2 = c1 * hC - s1 * hS, s2 = s1 * hC + c1 * hS;
+            float c3 = c2 * hC - s2 * hS, s3 = s2 * hC + c2 * hS;
+            float c4 = c3 * hC - s3 * hS, s4 = s3 * hC + c3 * hS;
+
             for (int d = 0; d < kDots; d++)
             {
                 float* src = waveTable + ((palBuf[d] & 63) * 6 + tMod) * 4;
+                float* ePtr = ea + tMod;
                 int baseIdx = kLeadPad + d * 4;
 
-                // ★ 暴力攤平: 完全展開 s=0~3
+                // Herringbone: parallel 4-sample computation (breaks data dependency)
+                float h0 = 0, h1 = 0, h2 = 0, h3 = 0;
+                if (herring)
+                {
+                    h0 = hIl;
+                    h1 = hRl * s1 + hIl * c1;
+                    h2 = hRl * s2 + hIl * c2;
+                    h3 = hRl * s3 + hIl * c3;
+                    float tR = hRl * c4 - hIl * s4;
+                    hIl = hRl * s4 + hIl * c4;
+                    hRl = tR;
+                }
 
-                // --- s = 0 ---
-                float x0 = src[0] * ea[tMod];
-                if (herring) { x0 += hIl; float t = hRl * hC - hIl * hS; hIl = hRl * hS + hIl * hC; hRl = t; }
-                if (addNoise) { ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5; x0 += (ns & 0xFF) * nScale - nOff; }
+                // Noise: single xorshift, split 32-bit into 4 bytes
+                float n0 = 0, n1 = 0, n2 = 0, n3 = 0;
+                if (addNoise)
+                {
+                    ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5;
+                    n0 = (ns & 0xFF) * nScale - nOff;
+                    n1 = ((ns >> 8) & 0xFF) * nScale - nOff;
+                    n2 = ((ns >> 16) & 0xFF) * nScale - nOff;
+                    n3 = ((ns >> 24) & 0xFF) * nScale - nOff;
+                }
+
+                // LTI filter (sequential: vVel/vPrev dependency cannot be broken)
+                float x0 = src[0] * ePtr[0] + h0 + n0;
                 vVel = vVel * ringDamp + (x0 - vPrev) * SlewRate; vPrev += vVel;
                 waveBuf[baseIdx] = vPrev;
 
-                // --- s = 1 ---
-                float x1 = src[1] * ea[tMod + 1];
-                if (herring) { x1 += hIl; float t = hRl * hC - hIl * hS; hIl = hRl * hS + hIl * hC; hRl = t; }
-                if (addNoise) { ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5; x1 += (ns & 0xFF) * nScale - nOff; }
+                float x1 = src[1] * ePtr[1] + h1 + n1;
                 vVel = vVel * ringDamp + (x1 - vPrev) * SlewRate; vPrev += vVel;
                 waveBuf[baseIdx + 1] = vPrev;
 
-                // --- s = 2 ---
-                float x2 = src[2] * ea[tMod + 2];
-                if (herring) { x2 += hIl; float t = hRl * hC - hIl * hS; hIl = hRl * hS + hIl * hC; hRl = t; }
-                if (addNoise) { ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5; x2 += (ns & 0xFF) * nScale - nOff; }
+                float x2 = src[2] * ePtr[2] + h2 + n2;
                 vVel = vVel * ringDamp + (x2 - vPrev) * SlewRate; vPrev += vVel;
                 waveBuf[baseIdx + 2] = vPrev;
 
-                // --- s = 3 ---
-                float x3 = src[3] * ea[tMod + 3];
-                if (herring) { x3 += hIl; float t = hRl * hC - hIl * hS; hIl = hRl * hS + hIl * hC; hRl = t; }
-                if (addNoise) { ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5; x3 += (ns & 0xFF) * nScale - nOff; }
+                float x3 = src[3] * ePtr[3] + h3 + n3;
                 vVel = vVel * ringDamp + (x3 - vPrev) * SlewRate; vPrev += vVel;
                 waveBuf[baseIdx + 3] = vPrev;
 
-                // ★ 符號位元擴展黑魔法
                 tMod += 4;
                 tMod += ((5 - tMod) >> 31) & -6;
             }
