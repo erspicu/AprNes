@@ -1,0 +1,120 @@
+<section id="analog">
+  <div class="container">
+    <div class="text-center mb-5">
+      <h2 class="sec-title" data-i18n="analog_title">📺 NTSC 類比訊號模擬</h2>
+      <p class="sec-sub" data-i18n="analog_sub">物理建模的複合視訊訊號管線，還原 CRT 電視的真實觀感</p>
+    </div>
+
+    <!-- intro banner -->
+    <div class="analog-hero mb-4">
+      <div class="row align-items-center g-4">
+        <div class="col-lg-7">
+          <h5 class="fw-700 mb-2" style="color:#fb923c" data-i18n="analog_intro_h">從電子訊號到 CRT 掃描線，逐步還原真實畫面</h5>
+          <p style="font-size:.9rem;color:var(--nes-muted);line-height:1.75;margin-bottom:1rem" data-i18n="analog_intro_p">
+            AprNes 的類比模擬直接對 NES PPU 輸出的原始調色盤索引進行 NTSC 複合視訊編解碼：
+            以 4 samples/dot（21.477 MHz）建立複合訊號，再經 YIQ 解調、Gamma 編碼輸出至縮放後的緩衝區。
+            選擇性開啟 CRT Stage 2，加入高斯掃描線 Bloom 與 BrightnessBoost，精確模擬 CRT 電視的光學特性。
+          </p>
+          <div class="d-flex gap-2 flex-wrap">
+            <span class="connector-pill">📡 RF 射頻</span>
+            <span class="connector-pill">🔌 AV 複合</span>
+            <span class="connector-pill">🎛️ S-Video</span>
+            <span class="connector-pill">📺 CRT Bloom</span>
+            <span class="connector-pill">⚡ SIMD 加速</span>
+            <span class="connector-pill">🎨 8:7 AR</span>
+          </div>
+        </div>
+        <div class="col-lg-5">
+          <div class="d-flex flex-column gap-2">
+            <div style="background:rgba(0,0,0,.35);border-radius:10px;padding:1rem 1.2rem;font-size:.82rem;font-family:monospace;color:#94a3b8;line-height:1.7">
+              <span style="color:#fb923c">S(t)</span> = <span style="color:#38bdf8">Y(t)</span>
+              + <span style="color:#4ade80">I(t)</span>·cos(2π·f<sub>sc</sub>·t)
+              − <span style="color:#f472b6">Q(t)</span>·sin(2π·f<sub>sc</sub>·t)<br>
+              <span style="color:#64748b;font-size:.75rem">f<sub>sc</sub> = 3.579545 MHz &nbsp;|&nbsp; 4 samples/dot &nbsp;|&nbsp; 21.477 MHz</span>
+            </div>
+            <div style="font-size:.8rem;color:var(--nes-muted);text-align:center" data-i18n="analog_formula_cap">NTSC 複合訊號方程式（Level 3 UltraAnalog 完整實作）</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- mode cards -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-6">
+        <div class="analog-mode-card">
+          <div class="mode-badge mode-badge-l2">LEVEL 2 — Fast Analog</div>
+          <h5 class="mb-2" style="font-size:1.05rem" data-i18n="al2_title">快速 IIR 路徑</h5>
+          <p style="font-size:.86rem;color:var(--nes-muted);line-height:1.65;margin-bottom:1rem" data-i18n="al2_desc">
+            不生成完整的 21.477 MHz 時域波形，直接以預算 YIQ LUT（64 色 × 6 相位）搭配 IIR SlewRate / ChromaBlur 濾波器近似複合視訊色彩擴散，
+            以極低的運算量提供自然的 dot crawl 與色彩暈染效果。
+          </p>
+          <ul style="font-size:.82rem;color:var(--nes-muted);padding-left:1.1rem;margin:0;line-height:1.8">
+            <li data-i18n="al2_f1">64 色 × 6 相位 YIQ LUT（Phase C 優化）</li>
+            <li data-i18n="al2_f2">IIR SlewRate（模擬電容響應）+ ChromaBlur</li>
+            <li data-i18n="al2_f3">RF / AV / S-Video 三種端子參數獨立可調</li>
+            <li data-i18n="al2_f4">SIMD AnalogSize 2x / 4x / 6x / 8x 輸出</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="analog-mode-card" style="border-color:rgba(251,146,60,.25)">
+          <div class="mode-badge mode-badge-l3">LEVEL 3 — UltraAnalog ✦</div>
+          <h5 class="mb-2" style="font-size:1.05rem" data-i18n="al3_title">物理正確波形解調</h5>
+          <p style="font-size:.86rem;color:var(--nes-muted);line-height:1.65;margin-bottom:1rem" data-i18n="al3_desc">
+            完整模擬 NES PPU 輸出的 21.477 MHz NTSC 複合波形，並以 Hann 視窗 FIR 相干解調（Y 6-tap / I 18-tap / Q 54-tap），
+            還原真實電視接收到的帶限 YIQ 訊號，色彩精度與真實硬體一致。
+          </p>
+          <ul style="font-size:.82rem;color:var(--nes-muted);padding-left:1.1rem;margin:0;line-height:1.8">
+            <li data-i18n="al3_f1">21.477 MHz 時域複合波形生成（cosTab6/sinTab6 LUT）</li>
+            <li data-i18n="al3_f2">Hann 窗 FIR 相干解調 Y/I/Q（帶限精確）</li>
+            <li data-i18n="al3_f3">RF AM 調變/解調 + 音訊載波 buzz bar 干擾</li>
+            <li data-i18n="al3_f5">SIMD 批次 YIQ→RGB 轉換（二次 Gamma 取代 LUT）</li>
+            <li data-i18n="al3_f4">接續 CRT Stage 2（高斯掃描線 Bloom）</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- CRT + read more -->
+    <div class="row g-3 align-items-stretch">
+      <div class="col-md-5">
+        <div class="analog-mode-card" style="border-color:rgba(0,128,128,.25)">
+          <div class="mode-badge" style="background:rgba(0,128,128,.15);color:#2dd4bf;border:1px solid rgba(0,128,128,.3)">STAGE 2 — CRT Optics</div>
+          <h5 class="mb-2" style="font-size:1.05rem" data-i18n="acrt_title">CRT 電子束光學模擬</h5>
+          <p style="font-size:.86rem;color:var(--nes-muted);line-height:1.65;margin-bottom:.8rem" data-i18n="acrt_desc">
+            UltraAnalog 開啟時，linearBuffer（1024×240 線性 RGB）經高斯掃描線 Bloom 垂直擴展至 256N×210N，
+            模擬 CRT 電子束的物理擴散、高光溢出與亮度補償。
+          </p>
+          <ul style="font-size:.82rem;color:var(--nes-muted);padding-left:1.1rem;margin:0;line-height:1.8">
+            <li data-i18n="acrt_f1">高斯權重掃描線（BeamSigma 可調）</li>
+            <li data-i18n="acrt_f2">Bloom 高光溢出（BloomStrength）</li>
+            <li data-i18n="acrt_f3">BrightnessBoost 黑溝亮度補償</li>
+            <li data-i18n="acrt_f4">RF / AV / S-Video 三組獨立參數</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col-md-7 d-flex flex-column justify-content-between gap-3">
+        <div style="background:var(--nes-card);border:1px solid var(--nes-border);border-radius:12px;padding:1.2rem 1.4rem">
+          <div style="font-size:.78rem;color:var(--nes-muted);margin-bottom:.6rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700" data-i18n="analog_pipeline_label">訊號處理管線</div>
+          <div style="font-size:.82rem;font-family:monospace;line-height:2;color:var(--nes-text)">
+            <span style="color:#fb923c">PPU 調色盤索引</span>
+            → <span style="color:#38bdf8">NTSC 複合訊號</span>
+            → <span style="color:#4ade80">YIQ 解調</span>
+            → <span style="color:#fbbf24">sRGB Gamma</span>
+            → <span style="color:#2dd4bf">AnalogScreenBuf</span><br>
+            <span style="padding-left:7.5rem;color:#64748b">↑ Stage 1（Ntsc.cs）</span><br>
+            <span style="padding-left:12.5rem;color:#9ca3af">＋ Stage 2 CrtScreen（UltraAnalog）</span>
+          </div>
+        </div>
+        <div style="background:var(--nes-card);border:1px solid var(--nes-border);border-radius:12px;padding:1.2rem 1.4rem">
+          <div style="font-size:.82rem;color:var(--nes-muted);margin-bottom:1rem" data-i18n="analog_docs_label">詳細技術文件 — 訊號方程式、LUT 設計、效能優化歷程（Phase A–D）、與 blargg nes_ntsc 比較</div>
+          <div class="d-flex gap-2 flex-wrap">
+            <a href="AprNesAnalog/index.html" target="_blank" class="analog-doc-link zh" data-i18n="analog_doc_zh">📖 中文技術文件</a>
+            <a href="AprNesAnalog/index_en.html" target="_blank" class="analog-doc-link en" data-i18n="analog_doc_en">📖 English Technical Docs</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>

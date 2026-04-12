@@ -1,0 +1,73 @@
+<section id="history">
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-5 mb-4 mb-lg-0">
+        <h2 class="sec-title" data-i18n="hist_title">開發歷史</h2>
+        <p class="sec-sub mb-0" data-i18n="hist_sub">從業餘學習到 cycle-accurate 精準度的演進歷程</p>
+      </div>
+      <div class="col-lg-7">
+        <div class="timeline">
+
+          <div class="tl-item">
+            <div class="tl-dot"></div>
+            <div class="tl-year">2015</div>
+            <div class="tl-title" data-i18n="tl1_t">重啟舊專案</div>
+            <div class="tl-desc" data-i18n="tl1_d">將未完成的 NES 模擬器重新啟動，目標是以學習和研究為主，理解 NES 硬體架構。</div>
+          </div>
+
+          <div class="tl-item">
+            <div class="tl-dot"></div>
+            <div class="tl-year">2016.10</div>
+            <div class="tl-title" data-i18n="tl2_t">首版發布 — Mapper 0</div>
+            <div class="tl-desc" data-i18n="tl2_d">第一個公開版本，支援 NROM (Mapper 0)。Sprite0Hit、SpriteOverflow flag 已實作，sprite/背景穿透正確。</div>
+          </div>
+
+          <div class="tl-item">
+            <div class="tl-dot"></div>
+            <div class="tl-year">2016.11</div>
+            <div class="tl-title" data-i18n="tl3_t">Mapper 擴充 + 介面完善</div>
+            <div class="tl-desc" data-i18n="tl3_d">加入 MMC1 (M1)、UNROM (M2)、CNROM (M3) 支援；SRAM 存檔；ZIP 讀取；介面設定項目。</div>
+          </div>
+
+          <div class="tl-item">
+            <div class="tl-dot"></div>
+            <div class="tl-year">2016.11.21</div>
+            <div class="tl-title" data-i18n="tl4_t">MMC3 + xBRZ Filter</div>
+            <div class="tl-desc" data-i18n="tl4_d">MMC3 (Mapper 4) 支援，整體遊戲相容度約 70%。xBRZ 2x/4x/6x 影像濾鏡加入，多核心加速。</div>
+          </div>
+
+          <div class="tl-item">
+            <div class="tl-dot"></div>
+            <div class="tl-year">2017.02</div>
+            <div class="tl-title" data-i18n="tl5_t">Scanline Filter + 暫停更新</div>
+            <div class="tl-desc" data-i18n="tl5_d">加入 NTSC Scanline Filter、YIQ color bleeding 效果，移除所有第三方依賴（單一 167KB EXE）。
+              版本暫停："I will be back."</div>
+          </div>
+
+          <div class="tl-item">
+            <div class="tl-dot highlight"></div>
+            <div class="tl-year">2026.02</div>
+            <div class="tl-title" data-i18n="tl6_t">AI 輔助復活 — APU + 精準時序</div>
+            <div class="tl-desc" data-i18n="tl6_d">以 Claude AI 協作全面重建：APU 五聲道音效完成、VBL/NMI 精確時序、CPU interrupt 修正、
+              Sprite timing 修正，通過 blargg 全部測試。</div>
+          </div>
+
+          <div class="tl-item">
+            <div class="tl-dot highlight"></div>
+            <div class="tl-year">2026.03</div>
+            <div class="tl-title" data-i18n="tl7_t">Cycle-Accurate 達成</div>
+            <div class="tl-desc" data-i18n="tl7_d">AccuracyCoin 136/136 滿分達成（DMA timing、per-dot sprite eval、PPU rendering 精準修正）。</div>
+          </div>
+
+          <div class="tl-item">
+            <div class="tl-dot highlight"></div>
+            <div class="tl-year">2026.04</div>
+            <div class="tl-title" data-i18n="tl8_t">TriCNES 時序架構移植</div>
+            <div class="tl-desc" data-i18n="tl8_d">移植 TriCNES 高精度時序模型，達成 blargg 184/184 + AccuracyCoin 138/138 雙滿分（Commit 03385dd）。</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

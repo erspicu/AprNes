@@ -1,0 +1,89 @@
+<section id="features">
+  <div class="container">
+    <div class="text-center mb-5">
+      <h2 class="sec-title" data-i18n="feat_title">核心特色</h2>
+      <p class="sec-sub" data-i18n="feat_sub">從硬體文件出發，逐一實作每個 NES 子系統的精確行為</p>
+    </div>
+    <div class="row g-3">
+      <div class="col-sm-6 col-lg-3">
+        <div class="feat-card">
+          <div class="feat-icon" style="background:rgba(0,128,128,.18)">⏱️</div>
+          <h5 data-i18n="f1_title">Cycle-Accurate 時序</h5>
+          <p data-i18n="f1_desc">CPU、PPU、APU 全部以 per-cycle 精度模擬。每次記憶體存取觸發精確的 tick 計時，NMI/IRQ 延遲、DMA 週期偷取等細節均符合真實硬體行為。</p>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="feat-card">
+          <div class="feat-icon" style="background:rgba(251,191,36,.12)">🔀</div>
+          <h5 data-i18n="f2_title">完整 DMA 模擬</h5>
+          <p data-i18n="f2_desc">OAM DMA 514 cycle、DMC 週期偷取（3–4 cycle）、phantom read、implicit abort 等所有 DMA 時序邊界情況均正確實作，通過最嚴苛的 DMA 測試 ROM。</p>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="feat-card">
+          <div class="feat-icon" style="background:rgba(56,189,248,.12)">🎵</div>
+          <h5 data-i18n="f3_title">APU 五聲道音效</h5>
+          <p data-i18n="f3_desc">Pulse×2、Triangle、Noise、DMC 完整實作。自製 WaveOut 輸出（winmm.dll），44100Hz 16-bit，無任何第三方音效套件依賴。</p>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="feat-card">
+          <div class="feat-icon" style="background:rgba(192,132,252,.12)">🤖</div>
+          <h5 data-i18n="f4_title">AI 協作開發</h5>
+          <p data-i18n="f4_desc">以 AI 輔助研究 NES 硬體行為、分析測試 ROM 失敗原因、設計修復方案、效能最佳化。探索 AI-driven 嵌入式系統模擬開發的可行邊界。</p>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="feat-card">
+          <div class="feat-icon" style="background:rgba(34,197,94,.1)">🧪</div>
+          <h5 data-i18n="f5_title">自動化測試流程</h5>
+          <p data-i18n="f5_desc">184 個 blargg test ROM + 138 個 AccuracyCoin 測試全自動化。截圖比對、CRC 驗證、headless 批次執行，每次 commit 均有正確性保障。</p>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="feat-card">
+          <div class="feat-icon" style="background:rgba(0,128,128,.15)">🗺️</div>
+          <h5 data-i18n="f7_title">多 Mapper 支援</h5>
+          <p data-i18n="f7_desc">65 個 Mapper 已實作，61 個人工校驗通過。涵蓋 MMC1/MMC3/MMC5/VRC6/VRC7/FME-7/Namco 163/FDS 等，支援擴充音效。</p>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="feat-card">
+          <div class="feat-icon" style="background:rgba(56,189,248,.08)">🖼️</div>
+          <h5 data-i18n="f8_title">畫面 Scaler Filter</h5>
+          <p data-i18n="f8_desc">xBRZ 2x/4x/6x 高品質影像放大濾鏡，多核心平行加速。內建 NTSC CRT 比例修正與 YIQ color bleeding 模擬效果。</p>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="feat-card">
+          <div class="feat-icon" style="background:rgba(251,146,60,.12)">📺</div>
+          <h5 data-i18n="f9_title">NTSC 類比訊號模擬</h5>
+          <p data-i18n="f9_desc">物理建模的 NTSC 複合視訊訊號：Level 2 快速 IIR 路徑或 Level 3 UltraAnalog 21.477 MHz 時域波形解調。RF / AV / S-Video 三種端子參數，搭配 CRT 電子束光學模擬。</p>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="feat-card">
+          <div class="feat-icon" style="background:rgba(168,85,247,.12)">🎧</div>
+          <h5 data-i18n="f10_title">AudioPlus DSP 音效引擎</h5>
+          <p data-i18n="f10_desc">三種音效模式：Raw（原始）、Classic（經典濾波）、Modern Digital（現代 DSP）。Mode 2 處理鏈：DC Blocker → FIR LPF → Stereo Widener → Comb Reverb → Biquad HPF → Soft Limiter。支援擴充音效晶片（VRC6/VRC7/5B/N163/FDS）獨立混音。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ACCURACY + PERF STATS -->
+<section style="padding: 4rem 0;">
+  <div class="container">
+    <div class="row g-4 text-center mb-5">
+      <div class="col-6">
+        <div class="stat-big green">184<span style="font-size:1.2rem">/184</span></div>
+        <div style="font-size:.8rem;color:var(--nes-muted);margin-top:.3rem" data-i18n="stat_blargg">blargg 測試通過</div>
+      </div>
+      <div class="col-6">
+        <div class="stat-big yellow">138<span style="font-size:1.2rem">/138</span></div>
+        <div style="font-size:.8rem;color:var(--nes-muted);margin-top:.3rem" data-i18n="stat_ac">AccuracyCoin 通過</div>
+      </div>
+    </div>
+  </div>
+</section>

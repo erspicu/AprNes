@@ -1,0 +1,19 @@
+<section id="tricnes" style="padding:4.5rem 0">
+  <div class="container">
+    <div class="text-center mb-5">
+      <h2 class="sec-title" data-i18n="tricnes_title">TriCNES 時序架構移植</h2>
+      <p class="sec-sub" data-i18n="tricnes_sub">移植高精度時序模型，達成雙滿分精準度</p>
+    </div>
+    <div style="background:var(--nes-card);border:1px solid var(--nes-border);border-radius:12px;padding:2rem;max-width:850px;margin:0 auto">
+      <p style="font-size:.92rem;color:var(--nes-text);line-height:1.8;margin-bottom:1rem" data-i18n="tricnes_p1">
+        AprNes 移植了 <a href="https://github.com/100thCoin/TriCNES" target="_blank" style="color:var(--nes-accent)">TriCNES</a> 的時序架構，以達成更高的模擬精準度。TriCNES 是一款專注於學術研究與 TAS 正確性的優秀模擬器，其設計方向朝著真實電路層級的行為模擬前進。感謝 TriCNES 作者的傑出工作。
+      </p>
+      <p style="font-size:.92rem;color:var(--nes-text);line-height:1.8;margin-bottom:1rem" data-i18n="tricnes_p2">
+        移植的動機來自於在 scanline-a1、colorwin_ntsc 等測試 ROM 中發現的 PPU 渲染不精確問題。原有的時序模型無法正確處理這些邊界情況，而 TriCNES 的高精度時序架構能夠精確重現真實硬體行為。
+      </p>
+      <p style="font-size:.92rem;color:var(--nes-text);line-height:1.8;margin-bottom:1rem" data-i18n="tricnes_p3">
+        移植完成後，AprNes 達成 blargg 184/184 + AccuracyCoin 138/138 雙滿分（Commit 03385dd）。高精度時序模型帶來額外的運算成本，效能最佳化持續進行中。
+      </p>
+    </div>
+  </div>
+</section>

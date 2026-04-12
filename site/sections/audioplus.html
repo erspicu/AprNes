@@ -1,0 +1,138 @@
+<section id="audioplus">
+  <div class="container">
+    <div class="text-center mb-5">
+      <h2 class="sec-title" data-i18n="dsp_title">🎧 AudioPlus DSP 音效引擎</h2>
+      <p class="sec-sub" data-i18n="dsp_sub">三段式音效處理管線，從原始硬體音色到現代數位音場</p>
+    </div>
+
+    <!-- intro banner -->
+    <div class="analog-hero mb-4">
+      <div class="row align-items-center g-4">
+        <div class="col-lg-7">
+          <h5 class="fw-700 mb-2" style="color:#a78bfa" data-i18n="dsp_intro_h">從 NES 原始波形到沉浸式音場，逐級提升聽感</h5>
+          <p style="font-size:.9rem;color:var(--nes-muted);line-height:1.75;margin-bottom:1rem" data-i18n="dsp_intro_p">
+            AudioPlus 提供三種音效模式，讓使用者自由選擇聽感風格。Mode 0 輸出 APU 原始混音，
+            Mode 1 套用 NES 硬體等效濾波器（HPF 440 Hz + LPF 14 kHz），Mode 2 加入完整 DSP 處理鏈，
+            提供立體聲空間感、殘響深度與動態限幅，同時保留 NES 音色的本質特徵。
+          </p>
+          <div class="d-flex gap-2 flex-wrap">
+            <span class="connector-pill">🔇 Mode 0 Raw</span>
+            <span class="connector-pill">🎛️ Mode 1 Classic</span>
+            <span class="connector-pill">🎧 Mode 2 Modern</span>
+            <span class="connector-pill">🎹 擴充音效</span>
+            <span class="connector-pill">🎚️ 獨立音量</span>
+          </div>
+        </div>
+        <div class="col-lg-5">
+          <div class="d-flex flex-column gap-2">
+            <div style="background:rgba(0,0,0,.35);border-radius:10px;padding:1rem 1.2rem;font-size:.82rem;font-family:monospace;color:#94a3b8;line-height:1.7">
+              <span style="color:#a78bfa">APU out</span>
+              → <span style="color:#38bdf8">DC Block</span>
+              → <span style="color:#4ade80">FIR LPF</span>
+              → <span style="color:#fbbf24">Stereo</span>
+              → <span style="color:#fb923c">Reverb</span>
+              → <span style="color:#f472b6">HPF</span>
+              → <span style="color:#22c55e">Limiter</span><br>
+              <span style="color:#64748b;font-size:.75rem">44100 Hz · 16-bit · per-sample processing</span>
+            </div>
+            <div style="font-size:.8rem;color:var(--nes-muted);text-align:center" data-i18n="dsp_chain_cap">Mode 2 Modern Digital DSP 處理鏈</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- mode cards -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-4">
+        <div class="analog-mode-card" style="border-color:rgba(148,163,184,.2)">
+          <div class="mode-badge" style="background:rgba(148,163,184,.12);color:#94a3b8;border:1px solid rgba(148,163,184,.25)">MODE 0 — Raw</div>
+          <h5 class="mb-2" style="font-size:1.05rem" data-i18n="dsp_m0_title">原始輸出</h5>
+          <p style="font-size:.86rem;color:var(--nes-muted);line-height:1.65;margin-bottom:1rem" data-i18n="dsp_m0_desc">
+            直接輸出 APU 混音結果，不經過任何濾波處理。適合需要精確分析原始波形的開發者與研究用途。
+          </p>
+          <ul style="font-size:.82rem;color:var(--nes-muted);padding-left:1.1rem;margin:0;line-height:1.8">
+            <li data-i18n="dsp_m0_f1">無濾波、無處理</li>
+            <li data-i18n="dsp_m0_f2">最低延遲</li>
+            <li data-i18n="dsp_m0_f3">適合波形分析</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="analog-mode-card" style="border-color:rgba(251,191,36,.2)">
+          <div class="mode-badge" style="background:rgba(251,191,36,.12);color:#fbbf24;border:1px solid rgba(251,191,36,.25)">MODE 1 — Classic</div>
+          <h5 class="mb-2" style="font-size:1.05rem" data-i18n="dsp_m1_title">經典硬體濾波</h5>
+          <p style="font-size:.86rem;color:var(--nes-muted);line-height:1.65;margin-bottom:1rem" data-i18n="dsp_m1_desc">
+            模擬 NES 主機的硬體音效特性：440 Hz 高通濾波器去除直流偏移與低頻隆隆聲，14 kHz 低通濾波器柔化高頻毛刺，還原真實主機的聽感。
+          </p>
+          <ul style="font-size:.82rem;color:var(--nes-muted);padding-left:1.1rem;margin:0;line-height:1.8">
+            <li data-i18n="dsp_m1_f1">440 Hz 一階高通濾波器</li>
+            <li data-i18n="dsp_m1_f2">14 kHz 一階低通濾波器</li>
+            <li data-i18n="dsp_m1_f3">忠實還原硬體音色</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="analog-mode-card" style="border-color:rgba(168,85,247,.25)">
+          <div class="mode-badge" style="background:rgba(168,85,247,.15);color:#a78bfa;border:1px solid rgba(168,85,247,.3)">MODE 2 — Modern Digital ✦</div>
+          <h5 class="mb-2" style="font-size:1.05rem" data-i18n="dsp_m2_title">現代數位音效</h5>
+          <p style="font-size:.86rem;color:var(--nes-muted);line-height:1.65;margin-bottom:1rem" data-i18n="dsp_m2_desc">
+            完整 DSP 處理鏈，在保留 NES 音色特徵的同時提供現代化的聽覺體驗。Stereo Widener 營造空間感，Comb Reverb 增添深度，Soft Limiter 防止削波失真。
+          </p>
+          <ul style="font-size:.82rem;color:var(--nes-muted);padding-left:1.1rem;margin:0;line-height:1.8">
+            <li data-i18n="dsp_m2_f1">DC Blocker 直流阻隔</li>
+            <li data-i18n="dsp_m2_f2">FIR 低通濾波器（高頻抑制）</li>
+            <li data-i18n="dsp_m2_f3">Stereo Widener 立體聲展寬</li>
+            <li data-i18n="dsp_m2_f4">Comb Reverb 梳狀殘響</li>
+            <li data-i18n="dsp_m2_f5">Biquad HPF + Soft Limiter</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- expansion audio + pipeline -->
+    <div class="row g-3 align-items-stretch">
+      <div class="col-md-5">
+        <div class="analog-mode-card" style="border-color:rgba(34,197,94,.2)">
+          <div class="mode-badge" style="background:rgba(34,197,94,.12);color:#22c55e;border:1px solid rgba(34,197,94,.25)">EXPANSION AUDIO</div>
+          <h5 class="mb-2" style="font-size:1.05rem" data-i18n="dsp_exp_title">擴充音效晶片支援</h5>
+          <p style="font-size:.86rem;color:var(--nes-muted);line-height:1.65;margin-bottom:.8rem" data-i18n="dsp_exp_desc">
+            卡帶擴充音效晶片的輸出經過獨立的混音通道處理，與主 APU 分離混音後再匯入 DSP 鏈，確保擴充音效的音量平衡與音色品質。
+          </p>
+          <ul style="font-size:.82rem;color:var(--nes-muted);padding-left:1.1rem;margin:0;line-height:1.8">
+            <li data-i18n="dsp_exp_f1">VRC6 — 2 Pulse + Sawtooth</li>
+            <li data-i18n="dsp_exp_f2">VRC7 — OPLL FM 合成（6 聲道）</li>
+            <li data-i18n="dsp_exp_f3">Sunsoft 5B — 3 聲道方波（PSG）</li>
+            <li data-i18n="dsp_exp_f4">Namco 163 — 8 聲道波表</li>
+            <li data-i18n="dsp_exp_f5">FDS — 波表 + FM 調變</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col-md-7 d-flex flex-column justify-content-between gap-3">
+        <div style="background:var(--nes-card);border:1px solid var(--nes-border);border-radius:12px;padding:1.2rem 1.4rem">
+          <div style="font-size:.78rem;color:var(--nes-muted);margin-bottom:.6rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700" data-i18n="dsp_pipeline_label">音效處理管線</div>
+          <div style="font-size:.82rem;font-family:monospace;line-height:2;color:var(--nes-text)">
+            <span style="color:#a78bfa">APU 5ch 混音</span>
+            → <span style="color:#38bdf8">DC Blocker</span>
+            → <span style="color:#4ade80">FIR LPF</span>
+            → <span style="color:#fbbf24">Stereo Widener</span>
+            → <span style="color:#fb923c">Comb Reverb</span>
+            → <span style="color:#f472b6">Biquad HPF</span>
+            → <span style="color:#22c55e">Soft Limiter</span><br>
+            <span style="padding-left:3rem;color:#64748b">↑ Mode 2 Modern Digital 完整處理鏈</span><br>
+            <span style="color:#22c55e">+ Expansion Audio</span>
+            <span style="color:#64748b"> (VRC6/VRC7/5B/N163/FDS → 獨立混音通道)</span>
+          </div>
+        </div>
+        <div style="background:var(--nes-card);border:1px solid var(--nes-border);border-radius:12px;padding:1.2rem 1.4rem">
+          <div style="font-size:.78rem;color:var(--nes-muted);margin-bottom:.6rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700" data-i18n="dsp_perf_label">效能特性</div>
+          <ul style="font-size:.82rem;color:var(--nes-muted);padding-left:1.1rem;margin:0;line-height:1.8">
+            <li data-i18n="dsp_perf_f1">FIR 展開最佳化 + Transposed Biquad，吞吐量 +20–28%</li>
+            <li data-i18n="dsp_perf_f2">Flat architecture — 無虛擬函式、無 heap 配置</li>
+            <li data-i18n="dsp_perf_f3">每聲道獨立音量控制（Pulse 1/2, Triangle, Noise, DMC）</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
