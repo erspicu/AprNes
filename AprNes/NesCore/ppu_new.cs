@@ -286,11 +286,13 @@ namespace AprNes
                             {
                                 if (sprXCounter[i] == 0 || skippedPreRenderDot341)
                                 {
-                                    if ((sprShiftH[i] | sprShiftL[i]) >= 128)
+                                    int h = sprShiftH[i], l = sprShiftL[i];
+                                    if ((h | l) >= 128)
                                     {
-                                        sprColor = ((sprShiftH[i] >> 7) << 1) | (sprShiftL[i] >> 7);
-                                        sprPalette = (sprFetchAttr[i] & 3) | 4;
-                                        sprPriority = ((sprFetchAttr[i] >> 5) & 1) == 0;
+                                        int attr = sprFetchAttr[i];
+                                        sprColor = ((h >> 7) << 1) | (l >> 7);
+                                        sprPalette = (attr & 3) | 4;
+                                        sprPriority = (attr & 0x20) == 0;
                                         sprSlot = i;
                                         break;
                                     }

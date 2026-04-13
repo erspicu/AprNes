@@ -360,8 +360,7 @@ namespace AprNes
             int phase0 = scanPhase6;
 
             // ★ 符號位元擴展黑魔法
-            scanPhase6 += 2;
-            scanPhase6 += ((5 - scanPhase6) >> 31) & -6;
+            scanPhase6 += 2 + (((3 - scanPhase6) >> 31) & -6);
 
             GenerateSignal(palBuf, emphasisBits, dotY, dotI, dotQ);
             if ((AnalogOutputMode)ntsc_analogOutput == AnalogOutputMode.SVideo) DecodeAV_SVideo(sl, dotY, dotI, dotQ);
@@ -433,8 +432,7 @@ namespace AprNes
                 row0[x] = YiqToRgb(y, iF, qF);
 
                 // ★ 符號位元擴展黑魔法
-                ph++;
-                ph += ((5 - ph) >> 31) & -6;
+                ph += 1 + (((4 - ph) >> 31) & -6);
             }
             iFilt = iF; qFilt = qF; yFilt = yF; yVel = yV;
         }
@@ -460,8 +458,7 @@ namespace AprNes
             int phase0 = scanPhaseBase;
 
             // ★ 符號位元擴展黑魔法
-            scanPhaseBase += 2;
-            scanPhaseBase += ((5 - scanPhaseBase) >> 31) & -6;
+            scanPhaseBase += 2 + (((3 - scanPhaseBase) >> 31) & -6);
 
             if (ColorBurstJitter && (AnalogOutputMode)ntsc_analogOutput == AnalogOutputMode.RF)
             {
@@ -482,6 +479,11 @@ namespace AprNes
             }
         }
 
+        // Precomputed herringbone rotation constants (cos/sin of 1.31683 rad).
+        private const float HerringRadPerDot = 1.31683f;
+        private static readonly float CosHerring = (float)Math.Cos(HerringRadPerDot);
+        private static readonly float SinHerring = (float)Math.Sin(HerringRadPerDot);
+
         static void GenerateWaveform(byte* palBuf, byte emphasisBits, bool isRF, int sl, int phase0, float* waveBuf)
         {
             int emph = emphasisBits & 7; float* ea = emphAtten + emph * 12;
@@ -494,12 +496,16 @@ namespace AprNes
                 float buzz = RfAudioLevel * 0.06f; float env = buzz * (float)Math.Sin((sl / 240.0 + RfBuzzPhase) * 2.0 * Math.PI);
                 if (env > 0.0001f || env < -0.0001f)
                 {
-                    herring = true; hC_buzz = (float)Math.Cos(1.31683f); hS_buzz = (float)Math.Sin(1.31683f);
-                    float lPh = sl * 1364f * 1.31683f; hR_buzz = env * (float)Math.Cos(lPh); hI_buzz = env * (float)Math.Sin(lPh);
+                    herring = true; hC_buzz = CosHerring; hS_buzz = SinHerring;
+                    float lPh = sl * 1364f * HerringRadPerDot; hR_buzz = env * (float)Math.Cos(lPh); hI_buzz = env * (float)Math.Sin(lPh);
                 }
             }
-            uint ns = addNoise ? (uint)(ntsc_frameCount * 1664525u + (uint)sl * 1013904223u + 1442695041u) : 0u;
-            float nScale = 2f * NoiseIntensity / 255.0f, nOff = NoiseIntensity;
+            uint ns = 0u; float nScale = 0f, nOff = 0f;
+            if (addNoise)
+            {
+                ns = (uint)(ntsc_frameCount * 1664525u + (uint)sl * 1013904223u + 1442695041u);
+                nScale = 2f * NoiseIntensity / 255.0f; nOff = NoiseIntensity;
+            }
 
             float leftPad = HbiSimulation ? 0.0f : firstY;
             for (int i = 0; i < kLeadPad; i++) waveBuf[i] = leftPad;
@@ -571,8 +577,7 @@ namespace AprNes
                 vVel = vVel * ringDamp + (x3 - vPrev) * SlewRate; vPrev += vVel;
                 waveBuf[baseIdx + 3] = vPrev;
 
-                tMod += 4;
-                tMod += ((5 - tMod) >> 31) & -6;
+                tMod += 4 + (((1 - tMod) >> 31) & -6);
             }
 
             for (int i = kLeadPad + kWaveLen; i < kBufLen; i++)
@@ -635,8 +640,7 @@ namespace AprNes
                 waveBuf[baseIdx + 3] = vPrev; cBuf[baseIdx + 3] = csrc[3] * ea[tMod + 3];
 
                 // ★ 符號位元擴展黑魔法
-                tMod += 4;
-                tMod += ((5 - tMod) >> 31) & -6;
+                tMod += 4 + (((1 - tMod) >> 31) & -6);
             }
             for (int i = kLeadPad + kWaveLen; i < kBufLen; i++) { vv = vv * rd + (lastY - vPrev) * SlewRate; vPrev += vv; waveBuf[i] = vPrev; cBuf[i] = 0f; }
         }
@@ -672,8 +676,7 @@ namespace AprNes
                     qDotBuf[d] = -2f * sumQ; wvQ += kSampDot;
 
                     // ★ 符號位元擴展黑魔法
-                    tModQ += 4;
-                    tModQ += ((5 - tModQ) >> 31) & -6;
+                    tModQ += 4 + (((1 - tModQ) >> 31) & -6);
                 }
             }
 
@@ -704,8 +707,7 @@ namespace AprNes
                         iChunk[k] = 2f * sumI; qChunk[k] = qDotBuf[(p + k) >> 2]; wvY++; wvI++;
 
                         // ★ 符號位元擴展黑魔法
-                        tModI++;
-                        tModI += ((5 - tModI) >> 31) & -6;
+                        tModI += 1 + (((4 - tModI) >> 31) & -6);
                     }
                     var Y = *(Vector<float>*)yChunk; var I = *(Vector<float>*)iChunk; var Q = *(Vector<float>*)qChunk;
                     *(Vector<float>*)(lbR + p) = Vector.Min(Vector.Max(vRY * Y + vRI * I + vRQ * Q, vZeroN), vOneN);
@@ -726,8 +728,7 @@ namespace AprNes
                         iChunk[k] = 2f * sumI; qChunk[k] = qDotBuf[(p + k) >> 2]; wvY++; wvI++;
 
                         // ★ 符號位元擴展黑魔法
-                        tModI++;
-                        tModI += ((5 - tModI) >> 31) & -6;
+                        tModI += 1 + (((4 - tModI) >> 31) & -6);
                     }
                     var Y = *(Vector<float>*)yChunk; var I = *(Vector<float>*)iChunk; var Q = *(Vector<float>*)qChunk;
                     var R = Vector.Min(Vector.Max(vRY * Y + vRI * I + vRQ * Q, vZeroN), vOneN);

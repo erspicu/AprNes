@@ -21,8 +21,11 @@ namespace AprNes
         const int    APU_SAMPLE_RATE = 44100;
         // CPU_FREQ is now region-dependent: use cpuFreq field from Main.cs
 
-        static double _sampleAccum  = 0.0;
-        static double _cycPerSample = 1789773.0 / APU_SAMPLE_RATE; // recalculated in initAPU from cpuFreq
+        // Bresenham-style integer accumulator (eliminates FPU in hot path).
+        // Emit a sample whenever _sampleAccum >= _cpuFreqInt, then subtract.
+        // Increment per APU cycle is APU_SAMPLE_RATE; threshold is the CPU frequency.
+        static int _sampleAccum = 0;
+        static int _cpuFreqInt  = 1789773; // recalculated in initAPU from cpuFreq
 
         // 音效開關與音量 (可由 UI 控制)
         static public bool AudioEnabled = true;
@@ -235,7 +238,7 @@ namespace AprNes
             _triTimer = _triPeriod = _triSeq = _triOut = 0;
             _noiseTimer = 0; _noisePeriodIdx = 0; _noiseLfsr = 1;
             _noiseMode = false; _noiseOut = 0;
-            _sampleAccum = 0.0;
+            _sampleAccum = 0;
             _dckiller    = 0;
 
             // 清除 expansion audio 的暫存值，但不重設 chipType/channelCount
@@ -287,7 +290,7 @@ namespace AprNes
                 for (int i = 0; i < 32; i++) DUTYLOOKUP[i] = dv[i]; }
 
             // Initialize region-dependent data arrays
-            _cycPerSample = cpuFreq / APU_SAMPLE_RATE;
+            _cpuFreqInt = (int)cpuFreq;
 
             // Frame counter thresholds (count-up positions)
             if (Region == RegionType.PAL)
@@ -363,7 +366,7 @@ namespace AprNes
             _triTimer  = _triPeriod = _triSeq = _triOut = 0;
             _noiseTimer = 0; _noisePeriodIdx = 0; _noiseLfsr = 1;
             _noiseMode = false; _noiseOut = 0;
-            _sampleAccum = 0.0;
+            _sampleAccum = 0;
             _dckiller    = 0;
             AudioPlus_Reset();
 
@@ -555,10 +558,10 @@ namespace AprNes
             else
             {
                 // Pure Digital: catchup — only compute output at sample rate (~40 cycle interval)
-                _sampleAccum += 1.0;
-                if (_sampleAccum >= _cycPerSample)
+                _sampleAccum += APU_SAMPLE_RATE;
+                if (_sampleAccum >= _cpuFreqInt)
                 {
-                    _sampleAccum -= _cycPerSample;
+                    _sampleAccum -= _cpuFreqInt;
                     if (expansionChannelCount > 0)
                     {
                         float gain = ap_mode01ExpGain;

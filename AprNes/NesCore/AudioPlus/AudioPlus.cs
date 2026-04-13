@@ -196,7 +196,8 @@ namespace AprNes
                 int mono = (scaledL + scaledR) / 2;
                 float absS = mono < 0 ? -mono / 32767f : mono / 32767f;
                 RfAudioLevel = RfAudioLevel * 0.95f + absS * 0.05f;
-                RfBuzzPhase = (RfBuzzPhase + absS * 0.0001f) % 1.0f;
+                float np = RfBuzzPhase + absS * 0.0001f;
+                RfBuzzPhase = np >= 1.0f ? np - 1.0f : np;
             }
         }
 
