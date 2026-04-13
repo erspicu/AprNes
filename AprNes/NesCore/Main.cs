@@ -591,7 +591,11 @@ prerender_sprite0_x = 0;
         // legacy slow path until their own Run_*() are implemented.
         static public void run()
         {
-            if (!isFDS && Region == RegionType.NTSC)
+            if (isFDS)
+            {
+                Run_FDS();
+            }
+            else if (Region == RegionType.NTSC)
             {
                 Run_NTSC();
             }
@@ -708,6 +712,77 @@ prerender_sprite0_x = 0;
             MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC();
             MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC();
             MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC();
+        }
+
+        // FDS runs on NTSC master clock timing (12 MC CPU, 4 MC PPU). Only
+        // difference: fds_CpuCycle() replaces MapperObj.CpuCycle() (FDS uses
+        // FdsChrMapper whose CpuCycle is empty; the FDS-side disk/IRQ/audio
+        // state machine lives in fds_CpuCycle). Mapper.CpuClockRise() is
+        // skipped (FdsChrMapper's is empty).
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void MasterClockTickInlineFDS()
+        {
+            if (mcCpuClock == 0)
+            {
+                mcCpuClock = 12;
+                bool isDmcActive = dmcDmaRunning & (dmcStatusEnabled | dmcImplicitAbortActive);
+                if (cpuIsRead & (isDmcActive | spriteDmaTransfer)) DmaOneCycle();
+                else cpu_step_one_cycle();
+                if (dmcDmaRunning && dmcImplicitAbortActive) dmcImplicitAbortActive = false;
+                fds_CpuCycle();
+            }
+            else if (mcCpuClock == 8)
+            {
+                NMILine |= NMIable && isVblank;
+                if (operationCycle == 0 && !(isVblank && NMIable)) NMILine = false;
+            }
+
+            if (mcCpuClock == 5)
+            {
+                IRQLine = irqLineCurrent;
+                if (statusframeint && !apuintflag) irqLineCurrent = true;
+                // FDS: no MapperObj.CpuClockRise() (FdsChrMapper is empty)
+            }
+            else if (mcCpuClock == 12)
+            {
+                apu_step();
+                mcApuPutCycle = !mcApuPutCycle;
+            }
+
+            if (mcPpuClock == 0)
+            {
+                mcPpuClock = 4;
+                ppu_step_new();
+            }
+            else if (mcPpuClock == 2)
+            {
+                ppu_half_step_new();
+            }
+
+            mcCpuClock--;
+            mcPpuClock--;
+            masterClockTotal++;
+        }
+
+        static void FDSFast12Clocks()
+        {
+            MasterClockTickInlineFDS(); MasterClockTickInlineFDS(); MasterClockTickInlineFDS(); MasterClockTickInlineFDS();
+            MasterClockTickInlineFDS(); MasterClockTickInlineFDS(); MasterClockTickInlineFDS(); MasterClockTickInlineFDS();
+            MasterClockTickInlineFDS(); MasterClockTickInlineFDS(); MasterClockTickInlineFDS(); MasterClockTickInlineFDS();
+        }
+
+        // FDS fast path — same shape as Run_NTSC. FDS is always NTSC-timed.
+        static void Run_FDS()
+        {
+            AlignPhaseForFastPath();
+
+            const int ExitCheckInterval = 10000;
+            while (!exit)
+            {
+                for (int i = 0; i < ExitCheckInterval; i++)
+                    FDSFast12Clocks();
+            }
+            Console.WriteLine("exit..");
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
