@@ -42,6 +42,7 @@ public partial class MainWindow : Window
         // Wire events before loading settings so initial resolution is applied
         _emu.FrameReady += OnFrameReady;
         _emu.ResolutionChanged += OnResolutionChanged;
+        _emu.FdsRegionForced += OnFdsRegionForced;
 
         // Load INI settings (triggers ApplyRenderPipeline → ResolutionChanged)
         string iniPath = Path.Combine(AppContext.BaseDirectory, "configure", "AprNes.ini");
@@ -531,6 +532,19 @@ public partial class MainWindow : Window
         GameCanvas.FrameHeight = h;
     }
 
+    // Raised when EmulatorEngine loads an FDS ROM with non-NTSC region and
+    // auto-corrects to NTSC. Sync UI (menu + ini) and notify user.
+    private async void OnFdsRegionForced()
+    {
+        _currentRegion = "NTSC";
+        _ini.Set("Region", "NTSC");
+        _ini.Save();
+        await Dispatcher.UIThread.InvokeAsync(() => UpdateMenuStates());
+        await ShowMessageBox(
+            "FDS (Famicom Disk System) is NTSC-only hardware.\n" +
+            "Region has been switched to NTSC.");
+    }
+
     private void OnFrameReady()
     {
         // Hand the front buffer pointer to the control and request redraw.
@@ -731,10 +745,20 @@ public partial class MainWindow : Window
         _emu.Start();
     }
 
-    private void MenuRegion_Click(object? sender, RoutedEventArgs e)
+    private async void MenuRegion_Click(object? sender, RoutedEventArgs e)
     {
         if (sender is not MenuItem mi || mi.Tag is not string region) return;
         if (_currentRegion == region) return;
+
+        // Block PAL/Dendy when an FDS game is loaded (FDS is NTSC-only hardware).
+        if (AprNes.NesCore.isFDS && region != "NTSC")
+        {
+            await ShowMessageBox(
+                "FDS (Famicom Disk System) is NTSC-only hardware.\n" +
+                "Region cannot be changed while an FDS game is loaded.");
+            UpdateMenuStates(); // restore the NTSC check mark
+            return;
+        }
 
         _currentRegion = region;
         StopRecordingIfActive(true);

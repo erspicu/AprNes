@@ -586,14 +586,330 @@ prerender_sprite0_x = 0;
         // Per-master-clock main loop (TriCNES _EmulatorCore model)
         // CPU/PPU/APU each gated by their own countdown timer.
 
+        // Region/FDS-static dispatcher. Picks the optimal unrolled fast path
+        // for the current ROM at thread start. PAL/Dendy/FDS still use the
+        // legacy slow path until their own Run_*() are implemented.
         static public void run()
         {
-            // Batched execution: check exit every frame worth of master ticks
-            // NTSC: 341×262×4=357368, PAL: 341×312×5=531960, Dendy: 341×312×5=531960
+            // Safety net: FDS hardware is NTSC-only. The UI should have caught
+            // this at load time (via warning dialog), but guard here too in
+            // case of headless / CLI invocation with explicit --region flag.
+            if (isFDS && Region != RegionType.NTSC)
+            {
+                Console.WriteLine("ERROR: FDS requires NTSC region. Got Region=" + Region + ". Aborting emulator thread.");
+                return;
+            }
+
+            if (isFDS)
+            {
+                Run_FDS();
+            }
+            else if (Region == RegionType.NTSC)
+            {
+                Run_NTSC();
+            }
+            else if (Region == RegionType.Dendy)
+            {
+                Run_Dendy();
+            }
+            else if (Region == RegionType.PAL)
+            {
+                Run_PAL();
+            }
+            else
+            {
+                Run_Legacy();
+            }
+        }
+
+        // Legacy shared MasterClockTick loop. Used by PAL/Dendy/FDS during
+        // staged rollout; will be retired once all 4 Run_*() paths land.
+        static void Run_Legacy()
+        {
             while (!exit)
             {
                 for (int batch = 0; batch < MasterTicksPerFrame; batch++)
                     MasterClockTick();
+            }
+            Console.WriteLine("exit..");
+        }
+
+        // NTSC fast path. MasterClockTickInlineNTSC is AggressiveInlined
+        // directly into this method's tight loop (mirroring the Legacy
+        // structure where MasterClockTick was inlined into Run_Legacy).
+        // No NTSCFast12Clocks intermediate method — it was adding a function
+        // call boundary per 12 MC that cost more than the branch savings.
+        static void Run_NTSC()
+        {
+            AlignPhaseForFastPath();
+
+            const int ExitCheckInterval = 120000; // ~60ms @ 1.79MHz
+            while (!exit)
+            {
+                for (int i = 0; i < ExitCheckInterval; i++)
+                    MasterClockTickInlineNTSC();
+            }
+            Console.WriteLine("exit..");
+        }
+
+        // Run the legacy slow path until counters land at the start-of-window
+        // state for the fast path (mcCpuClock==0 && mcPpuClock==0 — about to
+        // fire CPU+APU+PPU coincidently). After this, fast path takes over.
+        static void AlignPhaseForFastPath()
+        {
+            // Convergence guaranteed within masterPerCpu ticks (12 for NTSC).
+            while (!exit && !(mcCpuClock == 0 && mcPpuClock == 0))
+                MasterClockTick();
+        }
+
+        // Unrolled 12-MC NTSC kernel. Layout (matches MasterClockTick semantics):
+        //   MC 0:  CPU step (+ DMA gate) + Mapper.CpuCycle + apu_step + ppu_step_new
+        //   MC 2:  ppu_half_step_new
+        //   MC 4:  NMI check + ppu_step_new
+        //   MC 6:  ppu_half_step_new
+        //   MC 7:  IRQ check + Mapper.CpuClockRise
+        //   MC 8:  ppu_step_new
+        //   MC 10: ppu_half_step_new
+        // Skips !isFDS branches — caller guarantees this is non-FDS NTSC.
+        // Inline a single tick of MasterClockTick — used by NTSCFast12Clocks unroll
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void MasterClockTickInlineNTSC()
+        {
+            if (mcCpuClock == 0)
+            {
+                mcCpuClock = 12;
+                bool isDmcActive = dmcDmaRunning & (dmcStatusEnabled | dmcImplicitAbortActive);
+                if (cpuIsRead & (isDmcActive | spriteDmaTransfer)) DmaOneCycle();
+                else cpu_step_one_cycle();
+                if (dmcDmaRunning && dmcImplicitAbortActive) dmcImplicitAbortActive = false;
+                MapperObj.CpuCycle();
+            }
+            else if (mcCpuClock == 8)
+            {
+                NMILine |= NMIable && isVblank;
+                if (operationCycle == 0 && !(isVblank && NMIable)) NMILine = false;
+            }
+
+            if (mcCpuClock == 5)
+            {
+                IRQLine = irqLineCurrent;
+                if (statusframeint && !apuintflag) irqLineCurrent = true;
+                MapperObj.CpuClockRise();
+            }
+            else if (mcCpuClock == 12)
+            {
+                apu_step();
+                mcApuPutCycle = !mcApuPutCycle;
+            }
+
+            if (mcPpuClock == 0)
+            {
+                mcPpuClock = 4;
+                ppu_step_new();
+            }
+            else if (mcPpuClock == 2)
+            {
+                ppu_half_step_new();
+            }
+
+            mcCpuClock--;
+            mcPpuClock--;
+            masterClockTotal++;
+        }
+
+        // FDS runs on NTSC master clock timing (12 MC CPU, 4 MC PPU). Only
+        // difference: fds_CpuCycle() replaces MapperObj.CpuCycle() (FDS uses
+        // FdsChrMapper whose CpuCycle is empty; the FDS-side disk/IRQ/audio
+        // state machine lives in fds_CpuCycle). Mapper.CpuClockRise() is
+        // skipped (FdsChrMapper's is empty).
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void MasterClockTickInlineFDS()
+        {
+            if (mcCpuClock == 0)
+            {
+                mcCpuClock = 12;
+                bool isDmcActive = dmcDmaRunning & (dmcStatusEnabled | dmcImplicitAbortActive);
+                if (cpuIsRead & (isDmcActive | spriteDmaTransfer)) DmaOneCycle();
+                else cpu_step_one_cycle();
+                if (dmcDmaRunning && dmcImplicitAbortActive) dmcImplicitAbortActive = false;
+                fds_CpuCycle();
+            }
+            else if (mcCpuClock == 8)
+            {
+                NMILine |= NMIable && isVblank;
+                if (operationCycle == 0 && !(isVblank && NMIable)) NMILine = false;
+            }
+
+            if (mcCpuClock == 5)
+            {
+                IRQLine = irqLineCurrent;
+                if (statusframeint && !apuintflag) irqLineCurrent = true;
+                // FDS: no MapperObj.CpuClockRise() (FdsChrMapper is empty)
+            }
+            else if (mcCpuClock == 12)
+            {
+                apu_step();
+                mcApuPutCycle = !mcApuPutCycle;
+            }
+
+            if (mcPpuClock == 0)
+            {
+                mcPpuClock = 4;
+                ppu_step_new();
+            }
+            else if (mcPpuClock == 2)
+            {
+                ppu_half_step_new();
+            }
+
+            mcCpuClock--;
+            mcPpuClock--;
+            masterClockTotal++;
+        }
+
+        // FDS fast path — same shape as Run_NTSC. FDS is always NTSC-timed.
+        static void Run_FDS()
+        {
+            AlignPhaseForFastPath();
+
+            const int ExitCheckInterval = 120000;
+            while (!exit)
+            {
+                for (int i = 0; i < ExitCheckInterval; i++)
+                    MasterClockTickInlineFDS();
+            }
+            Console.WriteLine("exit..");
+        }
+
+        // Dendy: CPU=15 MC, PPU=5 MC (vs NTSC 12/4). CPU:PPU ratio is still
+        // 3:1 so structure mirrors NTSC but with different constants:
+        //   - NMI at mcCpuClock == 11 (= 15 - 4; "CPU step + 4 MC" offset)
+        //   - IRQ at mcCpuClock == 5  (= "next CPU minus 5 MC", TriCNES rule)
+        //   - APU at mcCpuClock == 15 (= masterPerCpu, same tick as CPU step)
+        //   - PPU full on mcPpuClock == 0 (reset to 5)
+        //   - PPU half on mcPpuClock == 2 (asymmetric: half at 2/5 of cycle;
+        //     matches current TriCNES masterPerPpuHalf = 2 for PAL/Dendy)
+        //   - mcPpuClock counts 5→4→3→2(half)→1→0(full+reset)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void MasterClockTickInlineDendy()
+        {
+            if (mcCpuClock == 0)
+            {
+                mcCpuClock = 15;
+                bool isDmcActive = dmcDmaRunning & (dmcStatusEnabled | dmcImplicitAbortActive);
+                if (cpuIsRead & (isDmcActive | spriteDmaTransfer)) DmaOneCycle();
+                else cpu_step_one_cycle();
+                if (dmcDmaRunning && dmcImplicitAbortActive) dmcImplicitAbortActive = false;
+                MapperObj.CpuCycle();
+            }
+            else if (mcCpuClock == 11)
+            {
+                NMILine |= NMIable && isVblank;
+                if (operationCycle == 0 && !(isVblank && NMIable)) NMILine = false;
+            }
+
+            if (mcCpuClock == 5)
+            {
+                IRQLine = irqLineCurrent;
+                if (statusframeint && !apuintflag) irqLineCurrent = true;
+                MapperObj.CpuClockRise();
+            }
+            else if (mcCpuClock == 15)
+            {
+                apu_step();
+                mcApuPutCycle = !mcApuPutCycle;
+            }
+
+            if (mcPpuClock == 0)
+            {
+                mcPpuClock = 5;
+                ppu_step_new();
+            }
+            else if (mcPpuClock == 2)
+            {
+                ppu_half_step_new();
+            }
+
+            mcCpuClock--;
+            mcPpuClock--;
+            masterClockTotal++;
+        }
+
+        static void Run_Dendy()
+        {
+            AlignPhaseForFastPath();
+
+            const int ExitCheckInterval = 120000;
+            while (!exit)
+            {
+                for (int i = 0; i < ExitCheckInterval; i++)
+                    MasterClockTickInlineDendy();
+            }
+            Console.WriteLine("exit..");
+        }
+
+        // PAL: CPU=16 MC, PPU=5 MC. LCM(16,5) = 80.
+        //   - NMI at mcCpuClock == 12 (= 16 - 4, "CPU step + 4 MC" rule)
+        //   - IRQ at mcCpuClock == 5  (= "next CPU minus 5 MC", TriCNES rule)
+        //   - APU at mcCpuClock == 16 (= masterPerCpu, same tick as CPU step)
+        //   - PPU half at mcPpuClock == 2 (asymmetric; TriCNES masterPerPpuHalf)
+        // Fixes the latent NTSC-hardcoded NMI literal 8 in MasterClockTick
+        // that was wrong for PAL; PAL APU tests pass independent of this
+        // because their timing is CPU-relative, not master-clock-relative.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void MasterClockTickInlinePAL()
+        {
+            if (mcCpuClock == 0)
+            {
+                mcCpuClock = 16;
+                bool isDmcActive = dmcDmaRunning & (dmcStatusEnabled | dmcImplicitAbortActive);
+                if (cpuIsRead & (isDmcActive | spriteDmaTransfer)) DmaOneCycle();
+                else cpu_step_one_cycle();
+                if (dmcDmaRunning && dmcImplicitAbortActive) dmcImplicitAbortActive = false;
+                MapperObj.CpuCycle();
+            }
+            else if (mcCpuClock == 12)
+            {
+                NMILine |= NMIable && isVblank;
+                if (operationCycle == 0 && !(isVblank && NMIable)) NMILine = false;
+            }
+
+            if (mcCpuClock == 5)
+            {
+                IRQLine = irqLineCurrent;
+                if (statusframeint && !apuintflag) irqLineCurrent = true;
+                MapperObj.CpuClockRise();
+            }
+            else if (mcCpuClock == 16)
+            {
+                apu_step();
+                mcApuPutCycle = !mcApuPutCycle;
+            }
+
+            if (mcPpuClock == 0)
+            {
+                mcPpuClock = 5;
+                ppu_step_new();
+            }
+            else if (mcPpuClock == 2)
+            {
+                ppu_half_step_new();
+            }
+
+            mcCpuClock--;
+            mcPpuClock--;
+            masterClockTotal++;
+        }
+
+        static void Run_PAL()
+        {
+            AlignPhaseForFastPath();
+
+            const int ExitCheckInterval = 120000;
+            while (!exit)
+            {
+                for (int i = 0; i < ExitCheckInterval; i++)
+                    MasterClockTickInlinePAL();
             }
             Console.WriteLine("exit..");
         }

@@ -1,0 +1,56 @@
+Here is the exact cycle-accurate event schedule for your 80-MC PAL unrolled loop. It uses zero-based indexing (0-4 for CPU/APU/NMI/IRQ, 0-15 for PPU/PPU Half). 
+
+The formulas applied match your NTSC logic:
+* **CPU/APU**: `16 * k`
+* **PPU**: `5 * j`
+* **PPU Half**: `5 * j + 2`
+* **NMI Check**: `16 * k + 4`
+* **IRQ Check**: `16 * (k + 1) - 5`
+
+### 80-MC PAL Event Schedule
+
+| MC Offset | Events Fired |
+| :--- | :--- |
+| **0** | CPU/APU 0, PPU 0 |
+| **2** | PPU Half 0 |
+| **4** | NMI Check 0 |
+| **5** | PPU 1 |
+| **7** | PPU Half 1 |
+| **10** | PPU 2 |
+| **11** | IRQ Check 0 |
+| **12** | PPU Half 2 |
+| **15** | PPU 3 |
+| **16** | CPU/APU 1 |
+| **17** | PPU Half 3 |
+| **20** | PPU 4, NMI Check 1 |
+| **22** | PPU Half 4 |
+| **25** | PPU 5 |
+| **27** | PPU Half 5, IRQ Check 1 |
+| **30** | PPU 6 |
+| **32** | CPU/APU 2, PPU Half 6 |
+| **35** | PPU 7 |
+| **36** | NMI Check 2 |
+| **37** | PPU Half 7 |
+| **40** | PPU 8 |
+| **42** | PPU Half 8 |
+| **43** | IRQ Check 2 |
+| **45** | PPU 9 |
+| **47** | PPU Half 9 |
+| **48** | CPU/APU 3 |
+| **50** | PPU 10 |
+| **52** | PPU Half 10, NMI Check 3 |
+| **55** | PPU 11 |
+| **57** | PPU Half 11 |
+| **59** | IRQ Check 3 |
+| **60** | PPU 12 |
+| **62** | PPU Half 12 |
+| **64** | CPU/APU 4 |
+| **65** | PPU 13 |
+| **67** | PPU Half 13 |
+| **68** | NMI Check 4 |
+| **70** | PPU 14 |
+| **72** | PPU Half 14 |
+| **75** | PPU 15, IRQ Check 4 |
+| **77** | PPU Half 15 |
+
+*(MC 78 and 79 contain no events in this unroll; at MC 80, the loop wraps back to MC 0).*

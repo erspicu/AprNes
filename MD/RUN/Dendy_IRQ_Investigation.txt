@@ -1,0 +1,7 @@
+For a Dendy emulator, the IRQ sampling point scales with the **CPU divider (15 MC)** and is completely independent of the PPU.
+
+According to the NESdev wiki, the 6502 samples the IRQ line at the falling edge of the internal **phi2** clock phase during the instruction's penultimate CPU cycle. Your NTSC offset of "5 master clocks before the next step" simply aligns with the falling edge of phi2 within a 12-MC window (where phi1 and phi2 are roughly 6 MC each).
+
+Because the Dendy CPU clone (UMC UA6527P) uses a /15 divider, the entire CPU cycle—including the phi2 phase—is stretched. Consequently, the absolute sampling point does not remain at 5 MC, nor does it convert to PPU dots. Instead, it scales proportionately to the extended CPU cycle. 
+
+Assuming a roughly symmetric internal divider for the Dendy chip (e.g., a 7/8 or 8/7 MC split for phi1/phi2), the correct IRQ polling point shifts to roughly **6 or 7 master clocks** before the next CPU step. Emulators like Mesen2 handle interrupt polling relative to the CPU cycle boundary; when the CPU divider changes to 15, the phi2 polling offset stretches with it.

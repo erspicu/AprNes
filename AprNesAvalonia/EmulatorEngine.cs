@@ -313,6 +313,14 @@ public sealed unsafe class EmulatorEngine : IDisposable
         bool initOk;
         if (NesCore.IsFdsFile(rom))
         {
+            // FDS is NTSC-only hardware. Force NTSC if misconfigured.
+            if (NesCore.Region != NesCore.RegionType.NTSC)
+            {
+                Console.WriteLine("WARNING: FDS requires NTSC. Forcing region from " + NesCore.Region + " to NTSC.");
+                NesCore.Region = NesCore.RegionType.NTSC;
+                FdsRegionForced?.Invoke();
+            }
+
             byte[] bios = NesCore.LoadAndValidateFdsBios(AppContext.BaseDirectory);
             if (bios == null) return false;
             _biosBytes = bios;
@@ -333,6 +341,9 @@ public sealed unsafe class EmulatorEngine : IDisposable
         return true;
     }
 
+    /// <summary>Raised by LoadRom/HardReset when FDS forces NTSC. UI may show a dialog.</summary>
+    public event Action? FdsRegionForced;
+
     /// <summary>Hard reset (power cycle): re-init current ROM from scratch.</summary>
     public bool HardReset()
     {
@@ -345,7 +356,15 @@ public sealed unsafe class EmulatorEngine : IDisposable
 
         bool initOk;
         if (_biosBytes != null && NesCore.IsFdsFile(_romBytes))
+        {
+            if (NesCore.Region != NesCore.RegionType.NTSC)
+            {
+                Console.WriteLine("WARNING: FDS requires NTSC. Forcing region from " + NesCore.Region + " to NTSC.");
+                NesCore.Region = NesCore.RegionType.NTSC;
+                FdsRegionForced?.Invoke();
+            }
             initOk = NesCore.initFDS(_biosBytes, _romBytes);
+        }
         else
             initOk = NesCore.init(_romBytes);
 
