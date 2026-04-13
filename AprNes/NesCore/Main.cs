@@ -599,6 +599,10 @@ prerender_sprite0_x = 0;
             {
                 Run_NTSC();
             }
+            else if (Region == RegionType.Dendy)
+            {
+                Run_Dendy();
+            }
             else
             {
                 Run_Legacy();
@@ -781,6 +785,83 @@ prerender_sprite0_x = 0;
             {
                 for (int i = 0; i < ExitCheckInterval; i++)
                     FDSFast12Clocks();
+            }
+            Console.WriteLine("exit..");
+        }
+
+        // Dendy: CPU=15 MC, PPU=5 MC (vs NTSC 12/4). CPU:PPU ratio is still
+        // 3:1 so structure mirrors NTSC but with different constants:
+        //   - NMI at mcCpuClock == 11 (= 15 - 4; "CPU step + 4 MC" offset)
+        //   - IRQ at mcCpuClock == 5  (= "next CPU minus 5 MC", TriCNES rule)
+        //   - APU at mcCpuClock == 15 (= masterPerCpu, same tick as CPU step)
+        //   - PPU full on mcPpuClock == 0 (reset to 5)
+        //   - PPU half on mcPpuClock == 2 (asymmetric: half at 2/5 of cycle;
+        //     matches current TriCNES masterPerPpuHalf = 2 for PAL/Dendy)
+        //   - mcPpuClock counts 5→4→3→2(half)→1→0(full+reset)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void MasterClockTickInlineDendy()
+        {
+            if (mcCpuClock == 0)
+            {
+                mcCpuClock = 15;
+                bool isDmcActive = dmcDmaRunning & (dmcStatusEnabled | dmcImplicitAbortActive);
+                if (cpuIsRead & (isDmcActive | spriteDmaTransfer)) DmaOneCycle();
+                else cpu_step_one_cycle();
+                if (dmcDmaRunning && dmcImplicitAbortActive) dmcImplicitAbortActive = false;
+                MapperObj.CpuCycle();
+            }
+            else if (mcCpuClock == 11)
+            {
+                NMILine |= NMIable && isVblank;
+                if (operationCycle == 0 && !(isVblank && NMIable)) NMILine = false;
+            }
+
+            if (mcCpuClock == 5)
+            {
+                IRQLine = irqLineCurrent;
+                if (statusframeint && !apuintflag) irqLineCurrent = true;
+                MapperObj.CpuClockRise();
+            }
+            else if (mcCpuClock == 15)
+            {
+                apu_step();
+                mcApuPutCycle = !mcApuPutCycle;
+            }
+
+            if (mcPpuClock == 0)
+            {
+                mcPpuClock = 5;
+                ppu_step_new();
+            }
+            else if (mcPpuClock == 2)
+            {
+                ppu_half_step_new();
+            }
+
+            mcCpuClock--;
+            mcPpuClock--;
+            masterClockTotal++;
+        }
+
+        // 15-MC Dendy kernel (LCM(15,5)=15, perfectly divisible).
+        static void DendyFast15Clocks()
+        {
+            MasterClockTickInlineDendy(); MasterClockTickInlineDendy(); MasterClockTickInlineDendy();
+            MasterClockTickInlineDendy(); MasterClockTickInlineDendy(); MasterClockTickInlineDendy();
+            MasterClockTickInlineDendy(); MasterClockTickInlineDendy(); MasterClockTickInlineDendy();
+            MasterClockTickInlineDendy(); MasterClockTickInlineDendy(); MasterClockTickInlineDendy();
+            MasterClockTickInlineDendy(); MasterClockTickInlineDendy(); MasterClockTickInlineDendy();
+        }
+
+        static void Run_Dendy()
+        {
+            AlignPhaseForFastPath();
+
+            const int ExitCheckInterval = 10000;
+            while (!exit)
+            {
+                for (int i = 0; i < ExitCheckInterval; i++)
+                    DendyFast15Clocks();
             }
             Console.WriteLine("exit..");
         }
