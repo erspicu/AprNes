@@ -586,16 +586,128 @@ prerender_sprite0_x = 0;
         // Per-master-clock main loop (TriCNES _EmulatorCore model)
         // CPU/PPU/APU each gated by their own countdown timer.
 
+        // Region/FDS-static dispatcher. Picks the optimal unrolled fast path
+        // for the current ROM at thread start. PAL/Dendy/FDS still use the
+        // legacy slow path until their own Run_*() are implemented.
         static public void run()
         {
-            // Batched execution: check exit every frame worth of master ticks
-            // NTSC: 341×262×4=357368, PAL: 341×312×5=531960, Dendy: 341×312×5=531960
+            if (!isFDS && Region == RegionType.NTSC)
+            {
+                Run_NTSC();
+            }
+            else
+            {
+                Run_Legacy();
+            }
+        }
+
+        // Legacy shared MasterClockTick loop. Used by PAL/Dendy/FDS during
+        // staged rollout; will be retired once all 4 Run_*() paths land.
+        static void Run_Legacy()
+        {
             while (!exit)
             {
                 for (int batch = 0; batch < MasterTicksPerFrame; batch++)
                     MasterClockTick();
             }
             Console.WriteLine("exit..");
+        }
+
+        // NTSC fast path: one CPU step + 3 PPU steps + 3 PPU half steps,
+        // unrolled across exactly 12 master clocks (LCM(12,4)=12). Counters
+        // mcCpuClock/mcPpuClock are NOT touched here — phase is preserved
+        // structurally by the unroll.
+        static void Run_NTSC()
+        {
+            AlignPhaseForFastPath();
+
+            const int ExitCheckInterval = 10000; // ~120K MC per check (~60ms @ 1.79MHz)
+            while (!exit)
+            {
+                for (int i = 0; i < ExitCheckInterval; i++)
+                    NTSCFast12Clocks();
+            }
+            Console.WriteLine("exit..");
+        }
+
+        // Run the legacy slow path until counters land at the start-of-window
+        // state for the fast path (mcCpuClock==0 && mcPpuClock==0 — about to
+        // fire CPU+APU+PPU coincidently). After this, fast path takes over.
+        static void AlignPhaseForFastPath()
+        {
+            // Convergence guaranteed within masterPerCpu ticks (12 for NTSC).
+            while (!exit && !(mcCpuClock == 0 && mcPpuClock == 0))
+                MasterClockTick();
+        }
+
+        // Unrolled 12-MC NTSC kernel. Layout (matches MasterClockTick semantics):
+        //   MC 0:  CPU step (+ DMA gate) + Mapper.CpuCycle + apu_step + ppu_step_new
+        //   MC 2:  ppu_half_step_new
+        //   MC 4:  NMI check + ppu_step_new
+        //   MC 6:  ppu_half_step_new
+        //   MC 7:  IRQ check + Mapper.CpuClockRise
+        //   MC 8:  ppu_step_new
+        //   MC 10: ppu_half_step_new
+        // Skips !isFDS branches — caller guarantees this is non-FDS NTSC.
+        // Inline a single tick of MasterClockTick — used by NTSCFast12Clocks unroll
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void MasterClockTickInlineNTSC()
+        {
+            if (mcCpuClock == 0)
+            {
+                mcCpuClock = 12;
+                bool isDmcActive = dmcDmaRunning & (dmcStatusEnabled | dmcImplicitAbortActive);
+                if (cpuIsRead & (isDmcActive | spriteDmaTransfer)) DmaOneCycle();
+                else cpu_step_one_cycle();
+                if (dmcDmaRunning && dmcImplicitAbortActive) dmcImplicitAbortActive = false;
+                MapperObj.CpuCycle();
+            }
+            else if (mcCpuClock == 8)
+            {
+                NMILine |= NMIable && isVblank;
+                if (operationCycle == 0 && !(isVblank && NMIable)) NMILine = false;
+            }
+
+            if (mcCpuClock == 5)
+            {
+                IRQLine = irqLineCurrent;
+                if (statusframeint && !apuintflag) irqLineCurrent = true;
+                MapperObj.CpuClockRise();
+            }
+            else if (mcCpuClock == 12)
+            {
+                apu_step();
+                mcApuPutCycle = !mcApuPutCycle;
+            }
+
+            if (mcPpuClock == 0)
+            {
+                mcPpuClock = 4;
+                ppu_step_new();
+            }
+            else if (mcPpuClock == 2)
+            {
+                ppu_half_step_new();
+            }
+
+            mcCpuClock--;
+            mcPpuClock--;
+            masterClockTotal++;
+        }
+
+        // 12-MC NTSC kernel — calls MasterClockTickInlineNTSC 12 times.
+        // The inlined variant hardcodes NTSC constants (12/4/2/8/5) and skips
+        // the !isFDS branch on Mapper.CpuCycle/Mapper.CpuClockRise (this path
+        // is only taken when isFDS=false). Pure shortcut unroll (skipping the
+        // mcCpu==X gate checks) regressed PPU timing tests — the slow-path
+        // reset-then-decrement protocol on mcCpu/mcPpu is load-bearing for
+        // PPU register handlers (some still observe transient values during
+        // CPU-side $200x writes via & 3 lookups). Keep the gated form.
+        static void NTSCFast12Clocks()
+        {
+            MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC();
+            MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC();
+            MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
