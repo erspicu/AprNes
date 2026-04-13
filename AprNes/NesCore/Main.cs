@@ -625,19 +625,20 @@ prerender_sprite0_x = 0;
             Console.WriteLine("exit..");
         }
 
-        // NTSC fast path: one CPU step + 3 PPU steps + 3 PPU half steps,
-        // unrolled across exactly 12 master clocks (LCM(12,4)=12). Counters
-        // mcCpuClock/mcPpuClock are NOT touched here — phase is preserved
-        // structurally by the unroll.
+        // NTSC fast path. MasterClockTickInlineNTSC is AggressiveInlined
+        // directly into this method's tight loop (mirroring the Legacy
+        // structure where MasterClockTick was inlined into Run_Legacy).
+        // No NTSCFast12Clocks intermediate method — it was adding a function
+        // call boundary per 12 MC that cost more than the branch savings.
         static void Run_NTSC()
         {
             AlignPhaseForFastPath();
 
-            const int ExitCheckInterval = 10000; // ~120K MC per check (~60ms @ 1.79MHz)
+            const int ExitCheckInterval = 120000; // ~60ms @ 1.79MHz
             while (!exit)
             {
                 for (int i = 0; i < ExitCheckInterval; i++)
-                    NTSCFast12Clocks();
+                    MasterClockTickInlineNTSC();
             }
             Console.WriteLine("exit..");
         }
@@ -707,21 +708,6 @@ prerender_sprite0_x = 0;
             masterClockTotal++;
         }
 
-        // 12-MC NTSC kernel — calls MasterClockTickInlineNTSC 12 times.
-        // The inlined variant hardcodes NTSC constants (12/4/2/8/5) and skips
-        // the !isFDS branch on Mapper.CpuCycle/Mapper.CpuClockRise (this path
-        // is only taken when isFDS=false). Pure shortcut unroll (skipping the
-        // mcCpu==X gate checks) regressed PPU timing tests — the slow-path
-        // reset-then-decrement protocol on mcCpu/mcPpu is load-bearing for
-        // PPU register handlers (some still observe transient values during
-        // CPU-side $200x writes via & 3 lookups). Keep the gated form.
-        static void NTSCFast12Clocks()
-        {
-            MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC();
-            MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC();
-            MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC(); MasterClockTickInlineNTSC();
-        }
-
         // FDS runs on NTSC master clock timing (12 MC CPU, 4 MC PPU). Only
         // difference: fds_CpuCycle() replaces MapperObj.CpuCycle() (FDS uses
         // FdsChrMapper whose CpuCycle is empty; the FDS-side disk/IRQ/audio
@@ -772,23 +758,16 @@ prerender_sprite0_x = 0;
             masterClockTotal++;
         }
 
-        static void FDSFast12Clocks()
-        {
-            MasterClockTickInlineFDS(); MasterClockTickInlineFDS(); MasterClockTickInlineFDS(); MasterClockTickInlineFDS();
-            MasterClockTickInlineFDS(); MasterClockTickInlineFDS(); MasterClockTickInlineFDS(); MasterClockTickInlineFDS();
-            MasterClockTickInlineFDS(); MasterClockTickInlineFDS(); MasterClockTickInlineFDS(); MasterClockTickInlineFDS();
-        }
-
         // FDS fast path — same shape as Run_NTSC. FDS is always NTSC-timed.
         static void Run_FDS()
         {
             AlignPhaseForFastPath();
 
-            const int ExitCheckInterval = 10000;
+            const int ExitCheckInterval = 120000;
             while (!exit)
             {
                 for (int i = 0; i < ExitCheckInterval; i++)
-                    FDSFast12Clocks();
+                    MasterClockTickInlineFDS();
             }
             Console.WriteLine("exit..");
         }
@@ -847,25 +826,15 @@ prerender_sprite0_x = 0;
             masterClockTotal++;
         }
 
-        // 15-MC Dendy kernel (LCM(15,5)=15, perfectly divisible).
-        static void DendyFast15Clocks()
-        {
-            MasterClockTickInlineDendy(); MasterClockTickInlineDendy(); MasterClockTickInlineDendy();
-            MasterClockTickInlineDendy(); MasterClockTickInlineDendy(); MasterClockTickInlineDendy();
-            MasterClockTickInlineDendy(); MasterClockTickInlineDendy(); MasterClockTickInlineDendy();
-            MasterClockTickInlineDendy(); MasterClockTickInlineDendy(); MasterClockTickInlineDendy();
-            MasterClockTickInlineDendy(); MasterClockTickInlineDendy(); MasterClockTickInlineDendy();
-        }
-
         static void Run_Dendy()
         {
             AlignPhaseForFastPath();
 
-            const int ExitCheckInterval = 10000;
+            const int ExitCheckInterval = 120000;
             while (!exit)
             {
                 for (int i = 0; i < ExitCheckInterval; i++)
-                    DendyFast15Clocks();
+                    MasterClockTickInlineDendy();
             }
             Console.WriteLine("exit..");
         }
@@ -923,24 +892,15 @@ prerender_sprite0_x = 0;
             masterClockTotal++;
         }
 
-        // 80-MC PAL kernel (LCM(16,5) = 80). Loop-based — 80 inlined calls
-        // would produce an enormous method; a tight for-loop with an
-        // AggressiveInlining body gives the JIT room to optimize while
-        // keeping the generated code reasonable.
-        static void PALFast80Clocks()
-        {
-            for (int i = 0; i < 80; i++) MasterClockTickInlinePAL();
-        }
-
         static void Run_PAL()
         {
             AlignPhaseForFastPath();
 
-            const int ExitCheckInterval = 10000;
+            const int ExitCheckInterval = 120000;
             while (!exit)
             {
                 for (int i = 0; i < ExitCheckInterval; i++)
-                    PALFast80Clocks();
+                    MasterClockTickInlinePAL();
             }
             Console.WriteLine("exit..");
         }
