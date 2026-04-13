@@ -327,6 +327,9 @@ namespace AprNes
                 ppu_ram          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 0x4000);
                 palCache         = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 32);
                 InitFlipTable();
+                // expansionChannels: needed by mapper Reset() before initAPU()
+                expansionChannels = (int*)Marshal.AllocHGlobal(sizeof(int) * 8);
+                for (int i = 0; i < 8; i++) expansionChannels[i] = 0;
                 sprShiftL        = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 sprShiftH        = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 sprXCounter      = (int* )Marshal.AllocHGlobal(sizeof(int)  * 8);

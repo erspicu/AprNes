@@ -487,6 +487,11 @@ prerender_sprite0_x = 0;
                 sprFetchAttr     = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 sprXPos          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 ntscScanBuf      = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
+                // Allocate expansionChannels early — Mapper024/019/069/085 etc.
+                // touch NesCore.expansionChannels[0..7] in their Reset(), which
+                // runs BEFORE initAPU() is called below.
+                expansionChannels = (int*)Marshal.AllocHGlobal(sizeof(int) * 8);
+                for (int i = 0; i < 8; i++) expansionChannels[i] = 0;
                 // P1_joypad_status/P2_joypad_status removed — shift register model uses static bytes
                 NES_MEM          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 65536);
 
