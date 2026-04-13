@@ -603,6 +603,10 @@ prerender_sprite0_x = 0;
             {
                 Run_Dendy();
             }
+            else if (Region == RegionType.PAL)
+            {
+                Run_PAL();
+            }
             else
             {
                 Run_Legacy();
@@ -862,6 +866,81 @@ prerender_sprite0_x = 0;
             {
                 for (int i = 0; i < ExitCheckInterval; i++)
                     DendyFast15Clocks();
+            }
+            Console.WriteLine("exit..");
+        }
+
+        // PAL: CPU=16 MC, PPU=5 MC. LCM(16,5) = 80.
+        //   - NMI at mcCpuClock == 12 (= 16 - 4, "CPU step + 4 MC" rule)
+        //   - IRQ at mcCpuClock == 5  (= "next CPU minus 5 MC", TriCNES rule)
+        //   - APU at mcCpuClock == 16 (= masterPerCpu, same tick as CPU step)
+        //   - PPU half at mcPpuClock == 2 (asymmetric; TriCNES masterPerPpuHalf)
+        // Fixes the latent NTSC-hardcoded NMI literal 8 in MasterClockTick
+        // that was wrong for PAL; PAL APU tests pass independent of this
+        // because their timing is CPU-relative, not master-clock-relative.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void MasterClockTickInlinePAL()
+        {
+            if (mcCpuClock == 0)
+            {
+                mcCpuClock = 16;
+                bool isDmcActive = dmcDmaRunning & (dmcStatusEnabled | dmcImplicitAbortActive);
+                if (cpuIsRead & (isDmcActive | spriteDmaTransfer)) DmaOneCycle();
+                else cpu_step_one_cycle();
+                if (dmcDmaRunning && dmcImplicitAbortActive) dmcImplicitAbortActive = false;
+                MapperObj.CpuCycle();
+            }
+            else if (mcCpuClock == 12)
+            {
+                NMILine |= NMIable && isVblank;
+                if (operationCycle == 0 && !(isVblank && NMIable)) NMILine = false;
+            }
+
+            if (mcCpuClock == 5)
+            {
+                IRQLine = irqLineCurrent;
+                if (statusframeint && !apuintflag) irqLineCurrent = true;
+                MapperObj.CpuClockRise();
+            }
+            else if (mcCpuClock == 16)
+            {
+                apu_step();
+                mcApuPutCycle = !mcApuPutCycle;
+            }
+
+            if (mcPpuClock == 0)
+            {
+                mcPpuClock = 5;
+                ppu_step_new();
+            }
+            else if (mcPpuClock == 2)
+            {
+                ppu_half_step_new();
+            }
+
+            mcCpuClock--;
+            mcPpuClock--;
+            masterClockTotal++;
+        }
+
+        // 80-MC PAL kernel (LCM(16,5) = 80). Loop-based — 80 inlined calls
+        // would produce an enormous method; a tight for-loop with an
+        // AggressiveInlining body gives the JIT room to optimize while
+        // keeping the generated code reasonable.
+        static void PALFast80Clocks()
+        {
+            for (int i = 0; i < 80; i++) MasterClockTickInlinePAL();
+        }
+
+        static void Run_PAL()
+        {
+            AlignPhaseForFastPath();
+
+            const int ExitCheckInterval = 10000;
+            while (!exit)
+            {
+                for (int i = 0; i < ExitCheckInterval; i++)
+                    PALFast80Clocks();
             }
             Console.WriteLine("exit..");
         }
