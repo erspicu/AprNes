@@ -69,12 +69,10 @@ namespace AprNes
         // ── Region-dependent timing parameters (set by ApplyRegionProfile) ──
         static int preRenderLine  = 261;      // NTSC=261, PAL/Dendy=311
         static int nmiTriggerLine = 241;      // NTSC/PAL=241, Dendy=291
-        static int masterPerCpu   = 12;       // NTSC=12, PAL=16, Dendy=15
-        static int masterPerPpu   = 4;        // NTSC=4, PAL=5, Dendy=5
-        static int masterPerPpuHalf = 2;      // masterPerPpu >> 1 (pre-computed)
+        static int masterPerCpu   = 12;       // NTSC=12, PAL=16, Dendy=15 — used by init() to seed mc*Clock
+        static int masterPerPpu   = 4;        // NTSC=4,  PAL=5,  Dendy=5
         static double cpuFreq          = 1789773.0;  // NTSC=1789773, PAL=1662607, Dendy=1773447
         static public double FrameSeconds = 1.0 / 60.0988; // NTSC=1/60.0988, PAL/Dendy=1/50.0070
-        static int MasterTicksPerFrame = 357368;          // 341 * (preRenderLine+1) * masterPerPpu
 
         static void ApplyRegionProfile()
         {
@@ -84,10 +82,8 @@ namespace AprNes
                 nmiTriggerLine = 241;      // PAL VBL starts at same scanline as NTSC
                 masterPerCpu   = 16;
                 masterPerPpu   = 5;
-                masterPerPpuHalf = 2;
                 cpuFreq        = 1662607.0;
                 FrameSeconds   = 1.0 / 50.0070;
-                MasterTicksPerFrame = 341 * (preRenderLine + 1) * masterPerPpu;
             }
             else if (Region == RegionType.Dendy)
             {
@@ -95,10 +91,8 @@ namespace AprNes
                 nmiTriggerLine = 291;      // Dendy: 51 extra post-render idle lines
                 masterPerCpu   = 15;
                 masterPerPpu   = 5;
-                masterPerPpuHalf = 2;
                 cpuFreq        = 1773447.0;
                 FrameSeconds   = 1.0 / 50.0070;
-                MasterTicksPerFrame = 341 * (preRenderLine + 1) * masterPerPpu;
             }
             else // NTSC
             {
@@ -106,10 +100,8 @@ namespace AprNes
                 nmiTriggerLine = 241;
                 masterPerCpu   = 12;
                 masterPerPpu   = 4;
-                masterPerPpuHalf = 2;
                 cpuFreq        = 1789773.0;
                 FrameSeconds   = 1.0 / 60.0988;
-                MasterTicksPerFrame = 341 * (preRenderLine + 1) * masterPerPpu;
             }
         }
 
@@ -594,7 +586,19 @@ prerender_sprite0_x = 0;
         // Region/FDS-static dispatcher. Picks the optimal unrolled fast path
         // for the current ROM at thread start. PAL/Dendy/FDS still use the
         // legacy slow path until their own Run_*() are implemented.
-        static public void run()
+
+        // Region-specific MasterClockTick dispatcher — set once when a Run_X()
+        // method begins executing. Used by:
+        //   - PPU register handlers (ppu_r_2002/2007, ppu_w_2000/2001/2005/2006)
+        //     which do EmulateNMasterClockCycles(N) during register access
+        //   - AlignPhaseForFastPath (cold-start phase alignment)
+        // All callers see the correct region-specific tick logic (NMI/IRQ
+        // offsets matched to the right masterPerCpu, no !isFDS branch). Lets
+        // the legacy MasterClockTick be retired once all call sites are routed
+        // through this pointer.
+        static public unsafe delegate*<void> mcTickFn = null;
+
+        static public unsafe void run()
         {
             // Safety net: FDS hardware is NTSC-only. The UI should have caught
             // this at load time (via warning dialog), but guard here too in
@@ -621,22 +625,8 @@ prerender_sprite0_x = 0;
             {
                 Run_PAL();
             }
-            else
-            {
-                Run_Legacy();
-            }
-        }
-
-        // Legacy shared MasterClockTick loop. Used by PAL/Dendy/FDS during
-        // staged rollout; will be retired once all 4 Run_*() paths land.
-        static void Run_Legacy()
-        {
-            while (!exit)
-            {
-                for (int batch = 0; batch < MasterTicksPerFrame; batch++)
-                    MasterClockTick();
-            }
-            Console.WriteLine("exit..");
+            // All RegionType enum values (NTSC/PAL/Dendy) are covered above,
+            // plus isFDS. No fallback path needed.
         }
 
         // NTSC fast path. MasterClockTickInlineNTSC is AggressiveInlined
@@ -644,8 +634,9 @@ prerender_sprite0_x = 0;
         // structure where MasterClockTick was inlined into Run_Legacy).
         // No NTSCFast12Clocks intermediate method — it was adding a function
         // call boundary per 12 MC that cost more than the branch savings.
-        static void Run_NTSC()
+        static unsafe void Run_NTSC()
         {
+            mcTickFn = &MasterClockTickInlineNTSC;
             AlignPhaseForFastPath();
 
             const int ExitCheckInterval = 120000; // ~60ms @ 1.79MHz
@@ -684,11 +675,12 @@ prerender_sprite0_x = 0;
         // Run the legacy slow path until counters land at the start-of-window
         // state for the fast path (mcCpuClock==0 && mcPpuClock==0 — about to
         // fire CPU+APU+PPU coincidently). After this, fast path takes over.
-        static void AlignPhaseForFastPath()
+        static unsafe void AlignPhaseForFastPath()
         {
             // Convergence guaranteed within masterPerCpu ticks (12 for NTSC).
+            // Uses mcTickFn so PAL/Dendy/FDS align with their correct NMI offset.
             while (!exit && !(mcCpuClock == 0 && mcPpuClock == 0))
-                MasterClockTick();
+                mcTickFn();
         }
 
         // Unrolled 12-MC NTSC kernel. Layout (matches MasterClockTick semantics):
@@ -795,8 +787,9 @@ prerender_sprite0_x = 0;
         }
 
         // FDS fast path — same shape as Run_NTSC. FDS is always NTSC-timed.
-        static void Run_FDS()
+        static unsafe void Run_FDS()
         {
+            mcTickFn = &MasterClockTickInlineFDS;
             AlignPhaseForFastPath();
 
             const int ExitCheckInterval = 120000;
@@ -861,8 +854,9 @@ prerender_sprite0_x = 0;
             mcPpuClock--;
         }
 
-        static void Run_Dendy()
+        static unsafe void Run_Dendy()
         {
+            mcTickFn = &MasterClockTickInlineDendy;
             AlignPhaseForFastPath();
 
             const int ExitCheckInterval = 120000;
@@ -926,8 +920,9 @@ prerender_sprite0_x = 0;
             mcPpuClock--;
         }
 
-        static void Run_PAL()
+        static unsafe void Run_PAL()
         {
+            mcTickFn = &MasterClockTickInlinePAL;
             AlignPhaseForFastPath();
 
             const int ExitCheckInterval = 120000;
@@ -939,63 +934,15 @@ prerender_sprite0_x = 0;
             Console.WriteLine("exit..");
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void MasterClockTick()
-        {
-            // ── CPU(0) / NMI(8) — mutually exclusive ──
-            if (mcCpuClock == 0)
-            {
-                mcCpuClock = masterPerCpu;
-
-                // Branchless DMA gate: & and | avoid short-circuit branches
-                bool isDmcActive = dmcDmaRunning & (dmcStatusEnabled | dmcImplicitAbortActive);
-                if (cpuIsRead & (isDmcActive | spriteDmaTransfer))
-                    DmaOneCycle();
-                else
-                    cpu_step_one_cycle();
-
-                if (dmcDmaRunning && dmcImplicitAbortActive)
-                    dmcImplicitAbortActive = false;
-
-                if (!isFDS) MapperObj.CpuCycle();
-                else fds_CpuCycle();
-            }
-            else if (mcCpuClock == 8)
-            {
-                NMILine |= NMIable && isVblank;
-                if (operationCycle == 0 && !(isVblank && NMIable))
-                    NMILine = false;
-            }
-
-            // ── IRQ(5) / APU(masterPerCpu) — TriCNES: IRQ check BEFORE PPU ──
-            if (mcCpuClock == 5)
-            {
-                IRQLine = irqLineCurrent;
-                if (statusframeint && !apuintflag)
-                    irqLineCurrent = true;
-                if (!isFDS) MapperObj.CpuClockRise();
-            }
-            else if (mcCpuClock == masterPerCpu)
-            {
-                apu_step();
-                mcApuPutCycle = !mcApuPutCycle;
-            }
-
-            // ── PPU full(0) / half(masterPerPpuHalf) — mutually exclusive ──
-            if (mcPpuClock == 0)
-            {
-                mcPpuClock = masterPerPpu;
-                ppu_step_new();
-            }
-            else if (mcPpuClock == masterPerPpuHalf)
-            {
-                ppu_half_step_new();
-            }
-
-            // ── Decrement all counters ──
-            mcCpuClock--;
-            mcPpuClock--;
-        }
+        // Legacy MasterClockTick() removed 2026-04-14 — all call sites now
+        // route through the region-specific inline variants via mcTickFn.
+        // History: this generic form was the original single-implementation
+        // tick used by Run_Legacy + PPU register handlers. Static dispatch
+        // refactor (feature/static-dispatch-mainloop → master commit 2780287)
+        // added MasterClockTickInline{NTSC,PAL,Dendy,FDS} for Run_X outer
+        // loops. This follow-up routes nested callers (PPU handlers,
+        // AlignPhaseForFastPath) through mcTickFn so the legacy NTSC-hardcoded
+        // NMI literal (mcCpu == 8) stops leaking into PAL/Dendy sessions.
     }
 
 }

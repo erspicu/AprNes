@@ -964,7 +964,7 @@ namespace AprNes
             ppu2002ReadPending = true;
 
             for (int i = 0; i < 7; i++)
-                MasterClockTick();
+                mcTickFn();
 
             openbus = (byte)(vblBit | ((isSprite0hit_Delayed ? 0x40 : 0) | (isSpriteOverflow_Delayed ? 0x20 : 0)) | (openbus & 0x1f));
 
@@ -998,7 +998,7 @@ namespace AprNes
 
             // TriCNES line 9059: EmulateUntilEndOfRead — advance 7 master clocks
             for (int i = 0; i < 7; i++)
-                MasterClockTick();
+                mcTickFn();
 
             // TriCNES line 9060-9061: set SR latch AFTER advancement
             ppu2007_Read_SR = true;
@@ -1019,7 +1019,7 @@ namespace AprNes
 
             // TriCNES line 9468: EmulateNMasterClockCycles(2) — wait for CPU databus to change
             for (int i = 0; i < 2; i++)
-                MasterClockTick();
+                mcTickFn();
 
             // TriCNES line 9469-9474: set ALL fields with correct value (In) AFTER 2MC push
             NMIable = (value & 0x80) != 0;
@@ -1116,7 +1116,7 @@ namespace AprNes
         {
             // TriCNES: EmulateUntilEndOfRead — advance 7 master clocks before OAM read
             for (int i = 0; i < 7; i++)
-                MasterClockTick();
+                mcTickFn();
 
             byte val;
             bool renderingOn = ShowBackGround || ShowSprites;
@@ -1183,7 +1183,7 @@ namespace AprNes
 
             // TriCNES line 9675: EmulateNMasterClockCycles(7)
             for (int i = 0; i < 7; i++)
-                MasterClockTick();
+                mcTickFn();
 
             // TriCNES line 9676-9677: set SR latch
             ppu2007_Write_SR = true;
