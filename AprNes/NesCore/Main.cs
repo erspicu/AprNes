@@ -719,7 +719,6 @@ prerender_sprite0_x = 0;
 
             mcCpuClock--;
             mcPpuClock--;
-            masterClockTotal++;
         }
 
         // FDS runs on NTSC master clock timing (12 MC CPU, 4 MC PPU). Only
@@ -769,7 +768,6 @@ prerender_sprite0_x = 0;
 
             mcCpuClock--;
             mcPpuClock--;
-            masterClockTotal++;
         }
 
         // FDS fast path — same shape as Run_NTSC. FDS is always NTSC-timed.
@@ -837,7 +835,6 @@ prerender_sprite0_x = 0;
 
             mcCpuClock--;
             mcPpuClock--;
-            masterClockTotal++;
         }
 
         static void Run_Dendy()
@@ -903,7 +900,6 @@ prerender_sprite0_x = 0;
 
             mcCpuClock--;
             mcPpuClock--;
-            masterClockTotal++;
         }
 
         static void Run_PAL()
@@ -975,7 +971,6 @@ prerender_sprite0_x = 0;
             // ── Decrement all counters ──
             mcCpuClock--;
             mcPpuClock--;
-            masterClockTotal++;
         }
     }
 
