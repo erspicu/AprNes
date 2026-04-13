@@ -1450,6 +1450,20 @@ public string GetRomInfo()
             bool init_result;
             if (NesCore.IsFdsFile(rom_bytes))
             {
+                // FDS is NTSC-only hardware. Warn user if region is misconfigured
+                // and force NTSC before initFDS (which seeds region-dependent tables).
+                if (NesCore.Region != NesCore.RegionType.NTSC)
+                {
+                    MessageBox.Show(
+                        "FDS (Famicom Disk System) is NTSC-only hardware.\n" +
+                        "Current region: " + NesCore.Region + "\n\n" +
+                        "Region will be automatically switched to NTSC.",
+                        "FDS Region Warning",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                    NesCore.Region = NesCore.RegionType.NTSC;
+                }
+
                 // FDS mode: load and validate BIOS first
                 byte[] bios = NesCore.LoadAndValidateFdsBios(Application.StartupPath);
                 if (bios == null)
@@ -1849,7 +1863,22 @@ public string GetRomInfo()
 
             bool init_result;
             if (current_bios_bytes != null && NesCore.IsFdsFile(current_rom_bytes))
+            {
+                // FDS is NTSC-only; enforce on hard reset too (user may have
+                // changed region via menu between load and reset).
+                if (NesCore.Region != NesCore.RegionType.NTSC)
+                {
+                    MessageBox.Show(
+                        "FDS (Famicom Disk System) is NTSC-only hardware.\n" +
+                        "Current region: " + NesCore.Region + "\n\n" +
+                        "Region will be automatically switched to NTSC.",
+                        "FDS Region Warning",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                    NesCore.Region = NesCore.RegionType.NTSC;
+                }
                 init_result = NesCore.initFDS(current_bios_bytes, current_rom_bytes);
+            }
             else
                 init_result = NesCore.init(current_rom_bytes);
 
@@ -2138,6 +2167,19 @@ public string GetRomInfo()
             else newRegion = NesCore.RegionType.NTSC;
 
             if (newRegion == NesCore.Region) return;
+
+            // Block PAL/Dendy when an FDS game is loaded (FDS is NTSC-only hardware).
+            if (running && NesCore.isFDS && newRegion != NesCore.RegionType.NTSC)
+            {
+                MessageBox.Show(
+                    "FDS (Famicom Disk System) is NTSC-only hardware.\n" +
+                    "Region cannot be changed while an FDS game is loaded.",
+                    "FDS Region Warning",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                UpdateRegionCheckmarks(); // restore NTSC check
+                return;
+            }
 
             NesCore.Region = newRegion;
             UpdateRegionCheckmarks();

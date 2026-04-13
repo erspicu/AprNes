@@ -591,6 +591,15 @@ prerender_sprite0_x = 0;
         // legacy slow path until their own Run_*() are implemented.
         static public void run()
         {
+            // Safety net: FDS hardware is NTSC-only. The UI should have caught
+            // this at load time (via warning dialog), but guard here too in
+            // case of headless / CLI invocation with explicit --region flag.
+            if (isFDS && Region != RegionType.NTSC)
+            {
+                Console.WriteLine("ERROR: FDS requires NTSC region. Got Region=" + Region + ". Aborting emulator thread.");
+                return;
+            }
+
             if (isFDS)
             {
                 Run_FDS();
