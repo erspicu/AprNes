@@ -1,8 +1,27 @@
 # 靜態分派主迴圈重構規劃 (Static Dispatch Main Loop)
 
 **日期**: 2026-04-13
-**狀態**: 規劃中（尚未實作）
+**狀態**: ✅ **已完成（feature/static-dispatch-mainloop 分支，Stages 1/3/4/5 全 commit）**
 **基線**: master @ 4a6ff7d, 184/184 blargg + 138/138 AC, FPS=64.77 (Debug, ultra+CRT+RF+4x+DSP2)
+
+## 實作結果總覽
+
+| 階段 | Commit | 內容 | 驗證 |
+|------|--------|------|------|
+| 1 | 88da1a7 | Run_NTSC + AlignPhaseForFastPath + MasterClockTickInlineNTSC | 184/184 blargg PASS |
+| 2 | — | UI dispatcher（無需改動，已透過 run() 內建） | ✅ 自動生效 |
+| 3 | 103acfc | Run_FDS + MasterClockTickInlineFDS | FDS 由使用者自行煙霧測試 |
+| 4 | 7f946ea | Run_Dendy + MasterClockTickInlineDendy (LCM=15) | 無 Dendy 專屬測試 ROM |
+| 5 | 48b70b4 | Run_PAL + MasterClockTickInlinePAL (LCM=80) | pal_apu_tests 10/10 PASS |
+
+**效益**：
+- 架構目標達成：4-way static dispatch, region-specific kernels
+- 修正 `mcCpuClock == 8` NTSC-hardcoded NMI 偏移問題於 PAL (12) / Dendy (11)
+- FPS 與 master 基線持平（Debug + 全 analog 管線，瓶頸在 CRT 後處理）
+- 真正的 FPS 增益需更高階優化（例如純結構展開），但該路徑被證實會破壞 PPU timing（見下）
+
+**重要學習（未來優化的護欄）**：
+純結構展開（移除 `mcCpu==X` / `mcPpu==X` gate checks、手動設定計數器值）會回歸 PPU timing 測試（vbl_nmi_timing / sprite_hit_tests / ppu_vbl_nmi）。即使每個事件點的 mc*Clock 值看似與 slow path 完全一致，PPU register handler 透過 `& 3` 觀察的**過渡態**仍依賴 slow path 的 reset-then-decrement 語意。Stage 1A 採取的「inlined-gated」折衷版是目前能保持 184/184 的最佳形式。
 
 ---
 
