@@ -321,12 +321,51 @@ UI 端（AprNesUI.cs + AprNesAvalonia MainWindow.axaml.cs）只需把 `new Threa
 
 ---
 
-## 7. 問題 / 待決定
+## 7. 問題 / 待決定（已敲定）
 
-1. **Dendy IRQ 時機**：與 NTSC 完全一致 (mcCpuClock==5) 或需查 TriCNES？→ 暫定一致，實作階段再查。
-2. **`mcCpuClock--` / `mcPpuClock--` 的保留**：Fast path 不需要，但 slow path 需要。AlignPhaseForFastPath 結束後 mcCpuClock/mcPpuClock 已歸位；Fast path 內不再更新。切回 slow path 時需重置為 masterPerCpu/masterPerPpu。
-3. **`masterClockTotal` 語意**：目前 +1 per MC。Fast path 改 +12/+80/+15 per batch 等效。
-4. **exit flag 讀取頻率**：每 10,000 次 12-MC 週期 = 每 0.06 秒（@ 2MHz）。若使用者按 ESC 退出，最長延遲 60ms 可接受。
+### 7.1 Dendy IRQ 時機 — ✅ **已驗證**
+**結論**：與 NTSC 完全一致使用 "下個 CPU 前 5 MC" 規則，即 `mcCpuClock == 5`（counting down from 15）。
+
+**驗證來源**：
+- Gemini 建議「scale 到 6-7 MC」基於 Mesen2 的 phi1/phi2 硬體模型（NesCpu.cpp:550-568：NTSC start=6/end=6, PAL start=8/end=8, Dendy start=7/end=8 不對稱）
+- **AprNes 跟隨 TriCNES**，TriCNES 模型 IRQ 是「相對下個 CPU step 前 5 MC」（純相對位置，與 phi 相位解耦）
+- 因此 Dendy IRQ 在 mcCpuClock=5 是 TriCNES-correct
+- 不採信 Gemini 的 Mesen2-based 估算
+
+### 7.2 NMI 時機跨區域 — ✅ **已敲定**
+保持「CPU step + 4 MC」相對偏移：
+- NTSC: `mcCpuClock == 8` (= 12-4)
+- PAL:  `mcCpuClock == 12` (= 16-4)
+- Dendy: `mcCpuClock == 11` (= 15-4)
+
+注意：當前 MasterClockTick 用 NTSC-hardcoded `8`，PAL/Dendy 實際偏移錯誤。靜態分派順便修正。
+
+### 7.3 PAL 80-MC 排程表 — ✅ **已生成（待實作驗證）**
+公式：CPU=16k, PPU=5j, PPU_Half=5j+2, NMI=CPU+4, IRQ=NextCPU−5（=16k+11）
+完整事件表見 `temp/gemini_pal_80mc.txt`（Gemini 已輸出）。
+
+**同 MC 衝突點**（需固定觸發順序）：
+- MC 20: PPU 4 + NMI Check 1
+- MC 27: PPU Half 5 + IRQ Check 1
+- MC 32: CPU/APU 2 + PPU Half 6
+- MC 52: PPU Half 10 + NMI Check 3
+- MC 75: PPU 15 + IRQ Check 4
+
+實作時依 NTSC 12-MC 範本內的順序（CPU/APU → PPU full → NMI → PPU half → IRQ）對應展開。
+
+### 7.4 mcCpuClock--/mcPpuClock-- 保留策略 — ✅ 已敲定
+- Slow path（MasterClockTick）保留 decrement 不動
+- Fast path 內不更新計數器（相位由 unroll 結構保證）
+- 切回 slow path（清退或冷啟動）時需重置 mcCpuClock=masterPerCpu, mcPpuClock=masterPerPpu
+
+### 7.5 masterClockTotal 語意 — ✅ 已敲定
+Fast path 用 `masterClockTotal += 12/80/15` 等效於 slow path 的 +1 × 12/80/15 次。
+
+### 7.6 exit flag 讀取頻率 — ✅ 已敲定
+每 10,000 個 fast batch 檢查一次 exit；NTSC ≈ 60ms 延遲，可接受。
+
+### 7.7 MasterClockTick() 移除策略 — ✅ 已敲定
+舊路徑（MasterClockTick + run）**先保留**作為冷啟動相位對齊與 fallback。所有 4 條 Run_*() 完成、全測試通過、人工煙霧測試後再移除 dead code。
 
 ---
 
