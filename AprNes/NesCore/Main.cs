@@ -657,6 +657,30 @@ prerender_sprite0_x = 0;
             Console.WriteLine("exit..");
         }
 
+        // ARCHITECTURAL NOTE — why no "structural unroll" version of the 12-MC kernel:
+        //
+        // PPU register handlers (ppu_r_2002, ppu_r_2007, ppu_w_2000/2001/2005/2006)
+        // internally call MasterClockTick() 2-7 times to model TriCNES's
+        // EmulateUntilEndOfRead / EmulateNMasterClockCycles time advancement.
+        //
+        // A full unroll bundles 12 ticks into one function call, but nested
+        // MasterClockTick invocations (from inside cpu_step_one_cycle) consume
+        // unknown additional ticks. The outer unrolled code cannot detect or
+        // compensate — events get fired at the wrong absolute master clock
+        // position, breaking VBL/NMI/sprite timing tests (vbl_nmi_timing,
+        // sprite_hit_tests).
+        //
+        // The gated form (MasterClockTickInlineNTSC × N) handles nesting
+        // naturally: each call processes exactly 1 tick with self-aware gates;
+        // when nested calls consume extra ticks, the outer for-loop simply
+        // runs fewer of its own logical ticks — total master-clock progress
+        // remains correct.
+        //
+        // The gate checks (if mcCpu==0/8/5/12, if mcPpu==0/2) are NOT redundant.
+        // They are the mechanism that lets each tick know its position. Cannot
+        // be eliminated without removing TriCNES-style intra-instruction time
+        // advancement (a much larger architectural change with no clear win).
+
         // Run the legacy slow path until counters land at the start-of-window
         // state for the fast path (mcCpuClock==0 && mcPpuClock==0 — about to
         // fire CPU+APU+PPU coincidently). After this, fast path takes over.
