@@ -764,24 +764,26 @@ prerender_sprite0_x = 0;
             mcPpuClock = 0;
         }
 
-        // ARCHITECTURAL NOTE — structural unroll of the 12-MC kernel:
+        // ARCHITECTURAL NOTE — structural unroll (applies to all 4 regions):
         //
-        // Phase 1 (commit fe341df) replaced the PPU register handlers' calls
-        // to mcTickFn (which recursively re-entered MasterClockTickInlineNTSC)
-        // with self-contained NestedTickN functions that produce a
-        // deterministic end counter state (NestedTick2 → mcCpu=10,
-        // NestedTick7 → mcCpu=5). De-recursion made the outer's post-cpu_step
-        // state a reliable dispatch signal.
+        // Phase 1 (NestedTickN variants) replaced PPU register handlers'
+        // recursive mcTickFn calls with self-contained functions producing a
+        // deterministic end counter state:
+        //   NTSC/FDS : NestedTick2 → mcCpu=10,  NestedTick7 → mcCpu=5
+        //   PAL      : NestedTick2 → mcCpu=14,  NestedTick7 → mcCpu=9
+        //              (with 5-way switch on starting mcPpu, since PAL has
+        //               5 CPU gates per 80-MC window at varying phases)
+        //   Dendy    : NestedTick2 → mcCpu=13,  NestedTick7 → mcCpu=8
+        // De-recursion made the outer's post-cpu_step state a reliable
+        // dispatch signal.
         //
-        // Phase 2 (this commit) leverages that signal: MasterClockTickUnrolledNTSC
-        // runs one 12-MC window per call, choosing one of 3 tails based on
-        // mcCpu after cpu_step. Each case covers all remaining events of the
-        // 12-MC window that the nested didn't already fire.
+        // Phase 2 leverages that: MasterClockTickUnrolled<Region> runs one
+        // full window per call, choosing a tail based on mcCpu after
+        // cpu_step. Each case covers remaining events of the window.
         //
-        // The gated form (MasterClockTickInlineNTSC) is retained as the single-
-        // tick backend used by AlignPhaseForFastPath for cold-start phase
-        // alignment; it's also the fallback behavior for PAL/Dendy/FDS which
-        // don't have their own unrolled variants yet.
+        // MasterClockTickInline<Region> (the gated single-tick form) is
+        // retained as the backend used by AlignPhaseForFastPath for cold-
+        // start phase alignment — invoked via mcTickFn pointer.
 
         // Run the legacy slow path until counters land at the start-of-window
         // state for the fast path (mcCpuClock==0 && mcPpuClock==0 — about to
@@ -1110,17 +1112,9 @@ prerender_sprite0_x = 0;
             }
         }
 
-        // ── Fallback wrappers for Dendy/FDS (still recursive via mcTickFn).
-        // NTSC and PAL have their specialized variants above.
-        static unsafe void NestedTick7_Fallback()
-        {
-            for (int i = 0; i < 7; i++) mcTickFn();
-        }
-
-        static unsafe void NestedTick2_Fallback()
-        {
-            for (int i = 0; i < 2; i++) mcTickFn();
-        }
+        // NestedTick7/2_Fallback removed 2026-04-14 — all 4 regions (NTSC/PAL/
+        // Dendy/FDS) now bind to specialized NestedTickN variants. Fallback
+        // wrappers were dead code (no caller) after Phase 1D+2D completion.
 
         // ════════════════════════════════════════════════════════════════════
         // PAL structural unroll (Phase 2B)
