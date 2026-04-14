@@ -462,56 +462,23 @@ namespace AprNes
                 // ── PUT cycle block (TriCNES: APU_PutCycle) ──
 
                 // Deferred frame interrupt clear (TriCNES: Clearing_APU_FrameInterrupt)
-                if (clearingFrameInterrupt)
-                {
-                    clearingFrameInterrupt = false;
-                    statusframeint = false;
-                    irqLineCurrent = false;
-                    UpdateIRQLine();
-                }
+                if (clearingFrameInterrupt) apuClearFrameIntFn();
 
                 // DMC Load DMA countdown (from $4015 write)
-                // TriCNES: DMCDMADelay decrements on PUT cycles
-                if (dmcLoadDmaCountdown > 0)
-                {
-                    --dmcLoadDmaCountdown;
-                    // TriCNES: if delay expired and DMA not already running, start + load shifter
-                    if (dmcLoadDmaCountdown == 0 && !dmcDmaRunning)
-                    {
-                        dmcDmaRunning = true;
-                        dmcDmaHalt = true;
-                        dmcshiftregister = dmcbuffer;
-                        dmcsilence = false;
-                    }
-                }
+                if (dmcLoadDmaCountdown > 0) apuDmcLoadDmaFn();
             }
 
             // ── Both cycles ──
 
             // DMC deferred $4015 status update
-            if (dmcStatusDelay > 0)
-            {
-                --dmcStatusDelay;
-                if (dmcStatusDelay == 0)
-                {
-                    dmcStatusEnabled = dmcDelayedEnable;
-                    if (!dmcDelayedEnable)
-                    {
-                        dmcsamplesleft = 0;
-                        dmcStopTransfer();
-                    }
-                }
-            }
+            if (dmcStatusDelay > 0) apuDmcStatusFn();
 
-            // Triangle timer (every CPU cycle) — cached triActive condition
+            // Triangle timer (every CPU cycle) — cached triActive condition (used 2x)
             {
-                int triPeriod = _triPeriod;
-                int lc2 = lengthctr[2];
-                int linCtr = linearctr;
-                bool triActive = linCtr > 0 && lc2 > 0 && triPeriod >= 2;
+                bool triActive = linearctr > 0 && lengthctr[2] > 0 && _triPeriod >= 2;
                 if (--_triTimer < 0)
                 {
-                    _triTimer = triPeriod;
+                    _triTimer = _triPeriod;
                     if (triActive) _triSeq = (_triSeq + 1) & 31;
                 }
                 _triOut = triActive ? TRI_SEQ[_triSeq] : 0;
@@ -542,6 +509,45 @@ namespace AprNes
         public static void ApuRefreshOutputFn()
         {
             apuOutputFn = AudioMode > 0 ? &ApuOutputPushPlus : &ApuOutputCatchup;
+        }
+
+        // ── Cold helpers via function pointer (forces no-inline + indirect call) ──
+        static delegate*<void> apuClearFrameIntFn = &ApuDoClearFrameInterrupt;
+        static delegate*<void> apuDmcLoadDmaFn   = &ApuDoDmcLoadDma;
+        static delegate*<void> apuDmcStatusFn    = &ApuDoDmcStatus;
+
+        static void ApuDoClearFrameInterrupt()
+        {
+            clearingFrameInterrupt = false;
+            statusframeint = false;
+            irqLineCurrent = false;
+            UpdateIRQLine();
+        }
+
+        static void ApuDoDmcLoadDma()
+        {
+            --dmcLoadDmaCountdown;
+            if (dmcLoadDmaCountdown == 0 && !dmcDmaRunning)
+            {
+                dmcDmaRunning = true;
+                dmcDmaHalt = true;
+                dmcshiftregister = dmcbuffer;
+                dmcsilence = false;
+            }
+        }
+
+        static void ApuDoDmcStatus()
+        {
+            --dmcStatusDelay;
+            if (dmcStatusDelay == 0)
+            {
+                dmcStatusEnabled = dmcDelayedEnable;
+                if (!dmcDelayedEnable)
+                {
+                    dmcsamplesleft = 0;
+                    dmcStopTransfer();
+                }
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
