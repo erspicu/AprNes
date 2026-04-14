@@ -128,8 +128,6 @@ namespace AprNes
         // Counter increments every CPU cycle; events fire at threshold positions.
         // NTSC: 7457/14913/22371/29828-29830 (4-step), +37281/37282 (5-step)
         // PAL:  8313/16627/24939/33251-33253 (4-step), +41565/41566 (5-step)
-        static int[] fc4step = new int[6]; // [Q0, QH1, Q2, IRQ3a, QH_IRQ3b, IRQ_RESET3c]
-        static int[] fc5step = new int[6]; // [Q0, QH1, Q2, skip3, QH4, RESET5]
         // Flattened frame counter thresholds (no array bounds check in hot path)
         static int fc4_0, fc4_1, fc4_2, fc4_3, fc4_4, fc4_5;
         static int fc5_0, fc5_1, fc5_2, fc5_3, fc5_4, fc5_5;
@@ -294,20 +292,17 @@ namespace AprNes
             // Initialize region-dependent data arrays
             _cpuFreqInt = (int)cpuFreq;
 
-            // Frame counter thresholds (count-up positions)
+            // Frame counter thresholds (count-up positions) — direct scalar assignment
             if (Region == RegionType.PAL)
             {
-                fc4step[0]=8313; fc4step[1]=16627; fc4step[2]=24939; fc4step[3]=33252; fc4step[4]=33253; fc4step[5]=33254;
-                fc5step[0]=8313; fc5step[1]=16627; fc5step[2]=24939; fc5step[3]=33253; fc5step[4]=41565; fc5step[5]=41566;
+                fc4_0=8313; fc4_1=16627; fc4_2=24939; fc4_3=33252; fc4_4=33253; fc4_5=33254;
+                fc5_0=8313; fc5_1=16627; fc5_2=24939; fc5_3=33253; fc5_4=41565; fc5_5=41566;
             }
             else // NTSC and Dendy
             {
-                fc4step[0]=7457; fc4step[1]=14913; fc4step[2]=22371; fc4step[3]=29828; fc4step[4]=29829; fc4step[5]=29830;
-                fc5step[0]=7457; fc5step[1]=14913; fc5step[2]=22371; fc5step[3]=29829; fc5step[4]=37281; fc5step[5]=37282;
+                fc4_0=7457; fc4_1=14913; fc4_2=22371; fc4_3=29828; fc4_4=29829; fc4_5=29830;
+                fc5_0=7457; fc5_1=14913; fc5_2=22371; fc5_3=29829; fc5_4=37281; fc5_5=37282;
             }
-            // Flatten to local vars for bounds-check-free hot path
-            fc4_0=fc4step[0]; fc4_1=fc4step[1]; fc4_2=fc4step[2]; fc4_3=fc4step[3]; fc4_4=fc4step[4]; fc4_5=fc4step[5];
-            fc5_0=fc5step[0]; fc5_1=fc5step[1]; fc5_2=fc5step[2]; fc5_3=fc5step[3]; fc5_4=fc5step[4]; fc5_5=fc5step[5];
 
             if (Region == RegionType.PAL)
             {
