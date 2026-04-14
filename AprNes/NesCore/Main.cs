@@ -928,10 +928,190 @@ prerender_sprite0_x = 0;
             mcPpuClock = 2;
         }
 
-        // ── Fallback wrappers for PAL/Dendy/FDS (still goes through mcTickFn
-        // → has recursion via MasterClockTickInline<Region>, behavior identical
-        // to pre-refactor). NTSC will replace these with the unrolled variants
-        // above. PAL/Dendy/FDS-specialized variants are future work (Phase 1B).
+        // ════════════════════════════════════════════════════════════════════
+        // PAL NestedTick variants (Phase 1B)
+        //
+        // PAL has 5 CPU gates per 80-MC window (LCM(16,5)=80). Each gate
+        // fires cpu_step at a different mcPpu starting value — namely
+        // 0, 4, 3, 2, 1 at the 5 gates respectively (derived from
+        // (k-1 ticks from window start) mod 5 mapped to the mcPpu cycle).
+        //
+        // Therefore NestedTick variants need a 5-way switch on mcPpuClock
+        // at entry to pick the correct event sequence. Each case is a
+        // careful trace of 7 (or 2) gated ticks from (16, startPpu).
+        //
+        // PAL gate constants:
+        //   mcCpu==0  → CPU+reset to 16    (not reached during nested)
+        //   mcCpu==12 → NMI
+        //   mcCpu==5  → IRQ                 (not reached during 7 nested ticks)
+        //   mcCpu==16 → APU
+        //   mcPpu==0  → PPU full+reset to 5
+        //   mcPpu==2  → PPU half
+        //
+        // End state invariants:
+        //   NestedTick7_PAL: mcCpu always = 9 (different mcPpu per case)
+        //   NestedTick2_PAL: mcCpu always = 14
+        // These invariants give a clean post-cpu_step dispatch signal for
+        // a future Phase 2B PAL outer unroll.
+        // ════════════════════════════════════════════════════════════════════
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void NestedTick7_PAL()
+        {
+            switch (mcPpuClock)
+            {
+                case 0:
+                    // Gate 1: start (16, 0)
+                    // t1: APU + PPU full   → (15, 4)
+                    // t4: PPU half @(13,2) → (12, 1)
+                    // t5: NMI @(12,1)      → (11, 0)
+                    // t6: PPU full @(11,0) → (10, 4)
+                    // end: (9, 3)
+                    apu_step();
+                    mcApuPutCycle = !mcApuPutCycle;
+                    mcPpuClock = 5;
+                    ppu_step_new();
+                    mcCpuClock = 13; mcPpuClock = 2;
+                    ppu_half_step_new();
+                    mcCpuClock = 12; mcPpuClock = 1;
+                    NMILine |= NMIable && isVblank;
+                    if (operationCycle == 0 && !(isVblank && NMIable)) NMILine = false;
+                    mcCpuClock = 11; mcPpuClock = 5;
+                    ppu_step_new();
+                    mcCpuClock = 9; mcPpuClock = 3;
+                    break;
+
+                case 4:
+                    // Gate 2: start (16, 4)
+                    // t1: APU                → (15, 3)
+                    // t3: PPU half @(14,2)   → (13, 1)
+                    // t5: NMI + PPU full @(12,0) → (11, 4)
+                    // end: (9, 2)
+                    apu_step();
+                    mcApuPutCycle = !mcApuPutCycle;
+                    mcCpuClock = 14; mcPpuClock = 2;
+                    ppu_half_step_new();
+                    mcCpuClock = 12; mcPpuClock = 0;
+                    NMILine |= NMIable && isVblank;
+                    if (operationCycle == 0 && !(isVblank && NMIable)) NMILine = false;
+                    mcPpuClock = 5;
+                    ppu_step_new();
+                    mcCpuClock = 9; mcPpuClock = 2;
+                    break;
+
+                case 3:
+                    // Gate 3: start (16, 3)
+                    // t1: APU                → (15, 2)
+                    // t2: PPU half @(15,2)   → (14, 1)
+                    // t4: PPU full @(13,0)   → (12, 4)
+                    // t5: NMI @(12,4)        → (11, 3)
+                    // t7: PPU half @(10,2)   → (9, 1)
+                    apu_step();
+                    mcApuPutCycle = !mcApuPutCycle;
+                    mcCpuClock = 15; mcPpuClock = 2;
+                    ppu_half_step_new();
+                    mcCpuClock = 13; mcPpuClock = 5;
+                    ppu_step_new();
+                    mcCpuClock = 12; mcPpuClock = 4;
+                    NMILine |= NMIable && isVblank;
+                    if (operationCycle == 0 && !(isVblank && NMIable)) NMILine = false;
+                    mcCpuClock = 10; mcPpuClock = 2;
+                    ppu_half_step_new();
+                    mcCpuClock = 9; mcPpuClock = 1;
+                    break;
+
+                case 2:
+                    // Gate 4: start (16, 2)
+                    // t1: APU + PPU half     → (15, 1)
+                    // t3: PPU full @(14,0)   → (13, 4)
+                    // t5: NMI @(12,3)        → (11, 2)
+                    // t6: PPU half @(11,2)   → (10, 1)
+                    // end: (9, 0)
+                    apu_step();
+                    mcApuPutCycle = !mcApuPutCycle;
+                    ppu_half_step_new();
+                    mcCpuClock = 14; mcPpuClock = 5;
+                    ppu_step_new();
+                    mcCpuClock = 12; mcPpuClock = 3;
+                    NMILine |= NMIable && isVblank;
+                    if (operationCycle == 0 && !(isVblank && NMIable)) NMILine = false;
+                    mcCpuClock = 11; mcPpuClock = 2;
+                    ppu_half_step_new();
+                    mcCpuClock = 9; mcPpuClock = 0;
+                    break;
+
+                case 1:
+                    // Gate 5: start (16, 1)
+                    // t1: APU                → (15, 0)
+                    // t2: PPU full @(15,0)   → (14, 4)
+                    // t5: NMI + PPU half @(12,2) → (11, 1)
+                    // t7: PPU full @(10,0)   → (9, 4)
+                    apu_step();
+                    mcApuPutCycle = !mcApuPutCycle;
+                    mcCpuClock = 15; mcPpuClock = 5;
+                    ppu_step_new();
+                    mcCpuClock = 12; mcPpuClock = 2;
+                    NMILine |= NMIable && isVblank;
+                    if (operationCycle == 0 && !(isVblank && NMIable)) NMILine = false;
+                    ppu_half_step_new();
+                    mcCpuClock = 10; mcPpuClock = 5;
+                    ppu_step_new();
+                    mcCpuClock = 9; mcPpuClock = 4;
+                    break;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void NestedTick2_PAL()
+        {
+            switch (mcPpuClock)
+            {
+                case 0:
+                    // (16, 0): t1 APU + PPU full → (15, 4). t2 → (14, 3).
+                    apu_step();
+                    mcApuPutCycle = !mcApuPutCycle;
+                    mcPpuClock = 5;
+                    ppu_step_new();
+                    mcCpuClock = 14; mcPpuClock = 3;
+                    break;
+
+                case 4:
+                    // (16, 4): t1 APU → (15, 3). t2 → (14, 2).
+                    apu_step();
+                    mcApuPutCycle = !mcApuPutCycle;
+                    mcCpuClock = 14; mcPpuClock = 2;
+                    break;
+
+                case 3:
+                    // (16, 3): t1 APU → (15, 2). t2 PPU half → (14, 1).
+                    apu_step();
+                    mcApuPutCycle = !mcApuPutCycle;
+                    mcCpuClock = 15; mcPpuClock = 2;
+                    ppu_half_step_new();
+                    mcCpuClock = 14; mcPpuClock = 1;
+                    break;
+
+                case 2:
+                    // (16, 2): t1 APU + PPU half → (15, 1). t2 → (14, 0).
+                    apu_step();
+                    mcApuPutCycle = !mcApuPutCycle;
+                    ppu_half_step_new();
+                    mcCpuClock = 14; mcPpuClock = 0;
+                    break;
+
+                case 1:
+                    // (16, 1): t1 APU → (15, 0). t2 PPU full → (14, 4).
+                    apu_step();
+                    mcApuPutCycle = !mcApuPutCycle;
+                    mcCpuClock = 15; mcPpuClock = 5;
+                    ppu_step_new();
+                    mcCpuClock = 14; mcPpuClock = 4;
+                    break;
+            }
+        }
+
+        // ── Fallback wrappers for Dendy/FDS (still recursive via mcTickFn).
+        // NTSC and PAL have their specialized variants above.
         static unsafe void NestedTick7_Fallback()
         {
             for (int i = 0; i < 7; i++) mcTickFn();
@@ -1132,8 +1312,8 @@ prerender_sprite0_x = 0;
         static unsafe void Run_PAL()
         {
             mcTickFn = &MasterClockTickInlinePAL;
-            nestedTick7Fn = &NestedTick7_Fallback;
-            nestedTick2Fn = &NestedTick2_Fallback;
+            nestedTick7Fn = &NestedTick7_PAL;
+            nestedTick2Fn = &NestedTick2_PAL;
             AlignPhaseForFastPath();
 
             const int ExitCheckInterval = 120000;
