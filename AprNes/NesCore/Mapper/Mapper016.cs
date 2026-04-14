@@ -48,7 +48,14 @@
             PRG_ROM = _PRG_ROM; CHR_ROM = _CHR_ROM; ppu_ram = _ppu_ram;
             PRG_ROM_count = _PRG_ROM_count; CHR_ROM_count = _CHR_ROM_count;
             Vertical = _Vertical;
+            if ((_PRG_ROM_count & (_PRG_ROM_count - 1)) != 0)
+                throw new System.Exception($"Mapper016: PRG_ROM_count must be power of 2, got {_PRG_ROM_count}");
+            if (_CHR_ROM_count > 0 && (_CHR_ROM_count & (_CHR_ROM_count - 1)) != 0)
+                throw new System.Exception($"Mapper016: CHR_ROM_count must be power of 2, got {_CHR_ROM_count}");
+            prgCountMask = _PRG_ROM_count - 1;
+            total1kMask  = (_CHR_ROM_count * 8) - 1;
         }
+        int prgCountMask, total1kMask;
 
         public void Reset()
         {
@@ -143,8 +150,7 @@
 
         public byte MapperR_RPG(ushort address)
         {
-            int n = PRG_ROM_count;  // total 16K banks
-            int bank = address < 0xC000 ? prgBank % n : n - 1;
+            int bank = address < 0xC000 ? (prgBank & prgCountMask) : prgCountMask;
             return PRG_ROM[(address & 0x3FFF) + (bank << 14)];
         }
 
@@ -155,9 +161,8 @@
                 for (int i = 0; i < 8; i++) NesCore.chrBankPtrs[i] = ppu_ram + (i << 10);
                 return;
             }
-            int total1k = CHR_ROM_count * 8;
             for (int i = 0; i < 8; i++)
-                NesCore.chrBankPtrs[i] = CHR_ROM + ((chrBanks[i] % total1k) << 10);
+                NesCore.chrBankPtrs[i] = CHR_ROM + ((chrBanks[i] & total1kMask) << 10);
         }
 
         public byte MapperR_CHR(int address) { return NesCore.chrBankPtrs[(address >> 10) & 7][address & 0x3FF]; }

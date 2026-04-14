@@ -16,6 +16,10 @@ namespace AprNes
         int MapperShiftCount = 0;
         int MapperRegBuffer = 0;
         int* Vertical;
+        // Pow2 masks for hot-path bank wrapping (replace `% N` with `& mask`).
+        // CHR_ROM_count must be pow2 (asserted at init); banks4k = CHR_ROM_count*2 also pow2.
+        int chrCountMask;   // CHR_ROM_count - 1
+        int banks4kMask;    // CHR_ROM_count*2 - 1
 
         public void MapperInit(byte* _PRG_ROM, byte* _CHR_ROM, byte* _ppu_ram, int _PRG_ROM_count, int _CHR_ROM_count, int* _Vertical)
         {
@@ -27,6 +31,11 @@ namespace AprNes
             Vertical = _Vertical;
             PRG_Bankselect = _PRG_ROM_count - 2;
             NES_MEM = NesCore.NES_MEM;
+            // Pow2 verification (CHR=0 means CHR-RAM; skip check then)
+            if (_CHR_ROM_count > 0 && (_CHR_ROM_count & (_CHR_ROM_count - 1)) != 0)
+                throw new System.Exception($"Mapper001: CHR_ROM_count must be power of 2, got {_CHR_ROM_count}");
+            chrCountMask = _CHR_ROM_count - 1;
+            banks4kMask  = (_CHR_ROM_count * 2) - 1;
         }
 
         public byte MapperR_ExpansionROM(ushort address)
@@ -115,15 +124,14 @@ namespace AprNes
             }
             if (CHR_Bankmode > 0) // 4K mode: two independent 4KB banks
             {
-                int banks4k = CHR_ROM_count * 2;
-                byte* b0 = CHR_ROM + ((CHR0_Bankselect % banks4k) << 12);
-                byte* b1 = CHR_ROM + ((CHR1_Bankselect % banks4k) << 12);
+                byte* b0 = CHR_ROM + ((CHR0_Bankselect & banks4kMask) << 12);
+                byte* b1 = CHR_ROM + ((CHR1_Bankselect & banks4kMask) << 12);
                 d[0] = b0;          d[1] = b0 + 0x0400; d[2] = b0 + 0x0800; d[3] = b0 + 0x0C00;
                 d[4] = b1;          d[5] = b1 + 0x0400; d[6] = b1 + 0x0800; d[7] = b1 + 0x0C00;
             }
             else // 8K mode
             {
-                byte* b = CHR_ROM + (((CHR0_Bankselect >> 1) % CHR_ROM_count) << 13);
+                byte* b = CHR_ROM + (((CHR0_Bankselect >> 1) & chrCountMask) << 13);
                 d[0] = b;          d[1] = b + 0x0400; d[2] = b + 0x0800; d[3] = b + 0x0C00;
                 d[4] = b + 0x1000; d[5] = b + 0x1400; d[6] = b + 0x1800; d[7] = b + 0x1C00;
             }
@@ -135,11 +143,10 @@ namespace AprNes
 
             if (CHR_Bankmode > 0) //4K
             {
-                int banks4k = CHR_ROM_count * 2;
-                if (address < 0x1000) return CHR_ROM[address + ((CHR0_Bankselect % banks4k) << 12)];
-                else return CHR_ROM[(address - 0x1000) + ((CHR1_Bankselect % banks4k) << 12)];
+                if (address < 0x1000) return CHR_ROM[address + ((CHR0_Bankselect & banks4kMask) << 12)];
+                else return CHR_ROM[(address - 0x1000) + ((CHR1_Bankselect & banks4kMask) << 12)];
             }
-            else return CHR_ROM[address + 0x2000 * ((CHR0_Bankselect >> 1) % CHR_ROM_count)];
+            else return CHR_ROM[address + 0x2000 * ((CHR0_Bankselect >> 1) & chrCountMask)];
         }
 
         public void MapperW_CHR(int addr, byte val) { if (CHR_ROM_count == 0) ppu_ram[addr] = val; }

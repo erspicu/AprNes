@@ -55,7 +55,14 @@ namespace AprNes
             PRG_ROM = _PRG_ROM; CHR_ROM = _CHR_ROM; ppu_ram = _ppu_ram;
             PRG_ROM_count = _PRG_ROM_count; CHR_ROM_count = _CHR_ROM_count;
             Vertical = _Vertical;
+            if ((_PRG_ROM_count & (_PRG_ROM_count - 1)) != 0)
+                throw new System.Exception($"Mapper019: PRG_ROM_count must be power of 2, got {_PRG_ROM_count}");
+            if (_CHR_ROM_count > 0 && (_CHR_ROM_count & (_CHR_ROM_count - 1)) != 0)
+                throw new System.Exception($"Mapper019: CHR_ROM_count must be power of 2, got {_CHR_ROM_count}");
+            n8kMask     = (_PRG_ROM_count * 2) - 1;
+            total1kMask = _CHR_ROM_count > 0 ? (_CHR_ROM_count * 8) - 1 : 0;
         }
+        int n8kMask, total1kMask;
 
         public void Reset()
         {
@@ -176,23 +183,21 @@ namespace AprNes
 
         public byte MapperR_RPG(ushort address)
         {
-            int n8k = PRG_ROM_count * 2;
-            if (address < 0xA000) return PRG_ROM[(address - 0x8000) + (prgBank[0] % n8k) * 0x2000];
-            if (address < 0xC000) return PRG_ROM[(address - 0xA000) + (prgBank[1] % n8k) * 0x2000];
-            if (address < 0xE000) return PRG_ROM[(address - 0xC000) + (prgBank[2] % n8k) * 0x2000];
-            return PRG_ROM[(address - 0xE000) + (n8k - 1) * 0x2000];
+            if (address < 0xA000) return PRG_ROM[(address - 0x8000) + (prgBank[0] & n8kMask) * 0x2000];
+            if (address < 0xC000) return PRG_ROM[(address - 0xA000) + (prgBank[1] & n8kMask) * 0x2000];
+            if (address < 0xE000) return PRG_ROM[(address - 0xC000) + (prgBank[2] & n8kMask) * 0x2000];
+            return PRG_ROM[(address - 0xE000) + n8kMask * 0x2000];
         }
 
         public void UpdateCHRBanks()
         {
-            int total1k = CHR_ROM_count > 0 ? CHR_ROM_count * 8 : 1;
             // Pattern table slots 0-3 (PPU $0000-$0FFF)
             for (int i = 0; i < 4; i++)
             {
                 if (!lowChrNtMode && chrReg[i] >= 0xE0 && CHR_ROM_count > 0)
                     NesCore.chrBankPtrs[i] = ppu_ram + 0x2000 + ((chrReg[i] & 0x01) << 10);
                 else if (CHR_ROM_count > 0)
-                    NesCore.chrBankPtrs[i] = CHR_ROM + ((chrReg[i] % total1k) << 10);
+                    NesCore.chrBankPtrs[i] = CHR_ROM + ((chrReg[i] & total1kMask) << 10);
                 else
                     NesCore.chrBankPtrs[i] = ppu_ram + (i << 10);
             }
@@ -202,7 +207,7 @@ namespace AprNes
                 if (!highChrNtMode && chrReg[i] >= 0xE0 && CHR_ROM_count > 0)
                     NesCore.chrBankPtrs[i] = ppu_ram + 0x2000 + ((chrReg[i] & 0x01) << 10);
                 else if (CHR_ROM_count > 0)
-                    NesCore.chrBankPtrs[i] = CHR_ROM + ((chrReg[i] % total1k) << 10);
+                    NesCore.chrBankPtrs[i] = CHR_ROM + ((chrReg[i] & total1kMask) << 10);
                 else
                     NesCore.chrBankPtrs[i] = ppu_ram + (i << 10);
             }
@@ -211,7 +216,6 @@ namespace AprNes
 
         void UpdateNametables()
         {
-            int total1k = CHR_ROM_count > 0 ? CHR_ROM_count * 8 : 1;
             for (int i = 0; i < 4; i++)
             {
                 if (ntReg[i] >= 0xE0)
@@ -221,7 +225,7 @@ namespace AprNes
                 }
                 else if (CHR_ROM_count > 0)
                 {
-                    NesCore.ntBankPtrs[i] = CHR_ROM + ((ntReg[i] % total1k) << 10);
+                    NesCore.ntBankPtrs[i] = CHR_ROM + ((ntReg[i] & total1kMask) << 10);
                     NesCore.ntBankWritable[i] = false; // CHR-ROM is read-only
                 }
                 else

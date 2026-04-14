@@ -31,7 +31,14 @@
             CHR_ROM_count = _CHR_ROM_count;
             PRG_ROM_count = _PRG_ROM_count;
             Vertical = _Vertical;
+            if ((_PRG_ROM_count & (_PRG_ROM_count - 1)) != 0)
+                throw new System.Exception($"Mapper010: PRG_ROM_count must be power of 2, got {_PRG_ROM_count}");
+            if (_CHR_ROM_count > 0 && (_CHR_ROM_count & (_CHR_ROM_count - 1)) != 0)
+                throw new System.Exception($"Mapper010: CHR_ROM_count must be power of 2, got {_CHR_ROM_count}");
+            prgCountMask = _PRG_ROM_count - 1;
+            total4kMask  = (_CHR_ROM_count * 2) - 1;
         }
+        int prgCountMask, total4kMask;
 
         public void Reset()
         {
@@ -61,14 +68,13 @@
         public byte MapperR_RPG(ushort address)
         {
             // $8000-$BFFF: selected 16K bank; $C000-$FFFF: last 16K fixed
-            if (address < 0xC000) return PRG_ROM[(address - 0x8000) + ((prgBank % PRG_ROM_count) << 14)];
+            if (address < 0xC000) return PRG_ROM[(address - 0x8000) + ((prgBank & prgCountMask) << 14)];
             return PRG_ROM[(address - 0xC000) + ((PRG_ROM_count - 1) << 14)];
         }
 
         void UpdateLeftBank()
         {
-            int total4k = CHR_ROM_count * 2;
-            int bank = (leftLatch == 0 ? leftFD : leftFE) % total4k;
+            int bank = (leftLatch == 0 ? leftFD : leftFE) & total4kMask;
             byte* b = CHR_ROM + (bank << 12);
             NesCore.chrBankPtrs[0] = b;
             NesCore.chrBankPtrs[1] = b + 1024;
@@ -78,8 +84,7 @@
 
         void UpdateRightBank()
         {
-            int total4k = CHR_ROM_count * 2;
-            int bank = (rightLatch == 0 ? rightFD : rightFE) % total4k;
+            int bank = (rightLatch == 0 ? rightFD : rightFE) & total4kMask;
             byte* b = CHR_ROM + (bank << 12);
             NesCore.chrBankPtrs[4] = b;
             NesCore.chrBankPtrs[5] = b + 1024;

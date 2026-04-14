@@ -32,7 +32,11 @@
             CHR_ROM_count = _CHR_ROM_count;
             PRG_ROM_count = _PRG_ROM_count;
             Vertical = _Vertical;
+            if (_CHR_ROM_count > 0 && (_CHR_ROM_count & (_CHR_ROM_count - 1)) != 0)
+                throw new System.Exception($"Mapper009: CHR_ROM_count must be power of 2, got {_CHR_ROM_count}");
+            total4kMask = (_CHR_ROM_count * 2) - 1;
         }
+        int total4kMask;
 
         public void Reset()
         {
@@ -73,8 +77,7 @@
 
         void UpdateLeftBank()
         {
-            int total4k = CHR_ROM_count * 2;
-            int bank = (leftLatch == 0 ? leftFD : leftFE) % total4k;
+            int bank = (leftLatch == 0 ? leftFD : leftFE) & total4kMask;
             byte* b = CHR_ROM + (bank << 12);
             NesCore.chrBankPtrs[0] = b;
             NesCore.chrBankPtrs[1] = b + 1024;
@@ -84,8 +87,7 @@
 
         void UpdateRightBank()
         {
-            int total4k = CHR_ROM_count * 2;
-            int bank = (rightLatch == 0 ? rightFD : rightFE) % total4k;
+            int bank = (rightLatch == 0 ? rightFD : rightFE) & total4kMask;
             byte* b = CHR_ROM + (bank << 12);
             NesCore.chrBankPtrs[4] = b;
             NesCore.chrBankPtrs[5] = b + 1024;

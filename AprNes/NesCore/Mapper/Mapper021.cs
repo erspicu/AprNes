@@ -45,7 +45,14 @@
             PRG_ROM = _PRG_ROM; CHR_ROM = _CHR_ROM; ppu_ram = _ppu_ram;
             PRG_ROM_count = _PRG_ROM_count; CHR_ROM_count = _CHR_ROM_count;
             Vertical = _Vertical;
+            if ((_PRG_ROM_count & (_PRG_ROM_count - 1)) != 0)
+                throw new System.Exception($"Mapper021: PRG_ROM_count must be power of 2, got {_PRG_ROM_count}");
+            if (_CHR_ROM_count > 0 && (_CHR_ROM_count & (_CHR_ROM_count - 1)) != 0)
+                throw new System.Exception($"Mapper021: CHR_ROM_count must be power of 2, got {_CHR_ROM_count}");
+            n8kMask     = (_PRG_ROM_count * 2) - 1;
+            total1kMask = _CHR_ROM_count > 0 ? (_CHR_ROM_count * 8) - 1 : 0;
         }
+        int n8kMask, total1kMask;
 
         public void Reset()
         {
@@ -161,21 +168,20 @@
 
         public byte MapperR_RPG(ushort address)
         {
-            int n = PRG_ROM_count * 2;  // total 8K banks
             int bank;
             if (prgMode == 0)
             {
-                if      (address < 0xA000) bank = prgReg0 % n;
-                else if (address < 0xC000) bank = prgReg1 % n;
-                else if (address < 0xE000) bank = n - 2;
-                else                       bank = n - 1;
+                if      (address < 0xA000) bank = prgReg0 & n8kMask;
+                else if (address < 0xC000) bank = prgReg1 & n8kMask;
+                else if (address < 0xE000) bank = n8kMask - 1;
+                else                       bank = n8kMask;
             }
             else
             {
-                if      (address < 0xA000) bank = n - 2;
-                else if (address < 0xC000) bank = prgReg1 % n;
-                else if (address < 0xE000) bank = prgReg0 % n;
-                else                       bank = n - 1;
+                if      (address < 0xA000) bank = n8kMask - 1;
+                else if (address < 0xC000) bank = prgReg1 & n8kMask;
+                else if (address < 0xE000) bank = prgReg0 & n8kMask;
+                else                       bank = n8kMask;
             }
             return PRG_ROM[(address & 0x1FFF) + (bank << 13)];
         }
@@ -187,11 +193,10 @@
                 for (int i = 0; i < 8; i++) NesCore.chrBankPtrs[i] = ppu_ram + (i << 10);
                 return;
             }
-            int total1k = CHR_ROM_count * 8;
             for (int i = 0; i < 8; i++)
             {
                 int page = chrLo[i] | (chrHi[i] << 4);
-                NesCore.chrBankPtrs[i] = CHR_ROM + ((page % total1k) << 10);
+                NesCore.chrBankPtrs[i] = CHR_ROM + ((page & total1kMask) << 10);
             }
         }
 
