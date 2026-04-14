@@ -1431,6 +1431,176 @@ prerender_sprite0_x = 0;
             PalGate5();  // (0,1) → (0,0)
         }
 
+        // ════════════════════════════════════════════════════════════════════
+        // Dendy NestedTick variants (Phase 1D)
+        //
+        // Dendy: CPU=15 MC, PPU=5 MC. LCM(15,5) = 15 MC per window (CPU:PPU
+        // ratio 3:1, same structure as NTSC). Gate constants:
+        //   mcCpu==11 → NMI (= 15 - 4, "CPU step + 4 MC" rule)
+        //   mcCpu==5  → IRQ
+        //   mcCpu==15 → APU (= masterPerCpu)
+        //   mcPpu==0  → PPU full (reset to 5)
+        //   mcPpu==2  → PPU half
+        //
+        // cpu_step always runs at outer MC 0 with mcCpu reset to 15, mcPpu=0.
+        // NestedTick counter trace from (15, 0):
+        //   t1 (15,0): APU + PPU full → (14, 4)
+        //   t2-t3:     nothing         → (12, 2)
+        //   t4 (12,2): PPU half        → (11, 1)
+        //   t5 (11,1): NMI             → (10, 0)
+        //   t6 (10,0): PPU full        → (9, 4)
+        //   t7 (9,4):  nothing         → (8, 3)  [end for N=7]
+        //   (for N=2 end after t2:     → (13, 3))
+        // ════════════════════════════════════════════════════════════════════
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void NestedTick7_Dendy()
+        {
+            // Call 1 — APU + PPU full at (15, 5)
+            apu_step();
+            mcApuPutCycle = !mcApuPutCycle;
+            mcPpuClock = 5;
+            ppu_step_new();
+
+            // Call 4 — PPU half at (12, 2)
+            mcCpuClock = 12; mcPpuClock = 2;
+            ppu_half_step_new();
+
+            // Call 5 — NMI at (11, 1)
+            mcCpuClock = 11; mcPpuClock = 1;
+            NMILine |= NMIable && isVblank;
+            if (operationCycle == 0 && !(isVblank && NMIable)) NMILine = false;
+
+            // Call 6 — PPU full at (10, 5)
+            mcCpuClock = 10; mcPpuClock = 5;
+            ppu_step_new();
+
+            // End state (8, 3)
+            mcCpuClock = 8; mcPpuClock = 3;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void NestedTick2_Dendy()
+        {
+            // Call 1 — APU + PPU full
+            apu_step();
+            mcApuPutCycle = !mcApuPutCycle;
+            mcPpuClock = 5;
+            ppu_step_new();
+
+            // End state (13, 3)
+            mcCpuClock = 13; mcPpuClock = 3;
+        }
+
+        // ════════════════════════════════════════════════════════════════════
+        // Dendy outer unroll (Phase 2D)
+        //
+        // Single CPU gate per 15-MC window (like NTSC). 3-way dispatch on
+        // post-cpu_step mcCpuClock:
+        //   15 → no nesting, run full 15-MC event sequence
+        //   13 → NestedTick2_Dendy ran, skip t1 events, run tail from t4
+        //    8 → NestedTick7_Dendy ran, skip t1-t6 events, run tail from t9
+        //
+        // Full event sequence from (0, 0) start:
+        //   t1  (15,5): CPU, Mapper.CpuCycle, APU, PPU full
+        //   t4  (12,2): PPU half
+        //   t5  (11,1): NMI
+        //   t6  (10,5): PPU full
+        //   t9  (7, 2): PPU half
+        //   t11 (5, 4): IRQ + Mapper.CpuClockRise; (5, 5) PPU full
+        //   t14 (2, 2): PPU half
+        //   End (0, 0)
+        // ════════════════════════════════════════════════════════════════════
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void MasterClockTickUnrolledDendy()
+        {
+            mcCpuClock = 15;
+            bool isDmcActive = dmcDmaRunning & (dmcStatusEnabled | dmcImplicitAbortActive);
+            if (cpuIsRead & (isDmcActive | spriteDmaTransfer)) DmaOneCycle();
+            else cpu_step_one_cycle();
+            if (dmcDmaRunning && dmcImplicitAbortActive) dmcImplicitAbortActive = false;
+            MapperObj.CpuCycle();
+
+            int state = mcCpuClock;
+
+            if (state == 15)
+            {
+                // No nest — fire full 15-MC event sequence
+                apu_step();
+                mcApuPutCycle = !mcApuPutCycle;
+                mcPpuClock = 5;
+                ppu_step_new();                             // t1 PPU full
+
+                mcCpuClock = 12; mcPpuClock = 2;
+                ppu_half_step_new();                        // t4
+
+                mcCpuClock = 11; mcPpuClock = 1;
+                NMILine |= NMIable && isVblank;
+                if (operationCycle == 0 && !(isVblank && NMIable)) NMILine = false;   // t5 NMI
+
+                mcCpuClock = 10; mcPpuClock = 5;
+                ppu_step_new();                             // t6 PPU full
+
+                mcCpuClock = 7; mcPpuClock = 2;
+                ppu_half_step_new();                        // t9
+
+                mcCpuClock = 5; mcPpuClock = 4;
+                IRQLine = irqLineCurrent;
+                if (statusframeint && !apuintflag) irqLineCurrent = true;
+                MapperObj.CpuClockRise();                   // t11 IRQ
+                mcPpuClock = 5;
+                ppu_step_new();                             // t11 PPU full
+
+                mcCpuClock = 2; mcPpuClock = 2;
+                ppu_half_step_new();                        // t14
+            }
+            else if (state == 13)
+            {
+                // NestedTick2_Dendy fired t1 events (APU + PPU full). Tail from t4.
+                mcCpuClock = 12; mcPpuClock = 2;
+                ppu_half_step_new();                        // t4
+
+                mcCpuClock = 11; mcPpuClock = 1;
+                NMILine |= NMIable && isVblank;
+                if (operationCycle == 0 && !(isVblank && NMIable)) NMILine = false;
+
+                mcCpuClock = 10; mcPpuClock = 5;
+                ppu_step_new();
+
+                mcCpuClock = 7; mcPpuClock = 2;
+                ppu_half_step_new();
+
+                mcCpuClock = 5; mcPpuClock = 4;
+                IRQLine = irqLineCurrent;
+                if (statusframeint && !apuintflag) irqLineCurrent = true;
+                MapperObj.CpuClockRise();
+                mcPpuClock = 5;
+                ppu_step_new();
+
+                mcCpuClock = 2; mcPpuClock = 2;
+                ppu_half_step_new();
+            }
+            else // state == 8: NestedTick7_Dendy fired t1-t6 events. Tail from t9.
+            {
+                mcCpuClock = 7; mcPpuClock = 2;
+                ppu_half_step_new();                        // t9
+
+                mcCpuClock = 5; mcPpuClock = 4;
+                IRQLine = irqLineCurrent;
+                if (statusframeint && !apuintflag) irqLineCurrent = true;
+                MapperObj.CpuClockRise();                   // t11 IRQ
+                mcPpuClock = 5;
+                ppu_step_new();                             // t11 PPU full
+
+                mcCpuClock = 2; mcPpuClock = 2;
+                ppu_half_step_new();                        // t14
+            }
+
+            // End state (0, 0)
+            mcCpuClock = 0; mcPpuClock = 0;
+        }
+
         // FDS runs on NTSC master clock timing (12 MC CPU, 4 MC PPU). Only
         // difference: fds_CpuCycle() replaces MapperObj.CpuCycle() (FDS uses
         // FdsChrMapper whose CpuCycle is empty; the FDS-side disk/IRQ/audio
@@ -1648,15 +1818,16 @@ prerender_sprite0_x = 0;
         static unsafe void Run_Dendy()
         {
             mcTickFn = &MasterClockTickInlineDendy;
-            nestedTick7Fn = &NestedTick7_Fallback;
-            nestedTick2Fn = &NestedTick2_Fallback;
+            nestedTick7Fn = &NestedTick7_Dendy;
+            nestedTick2Fn = &NestedTick2_Dendy;
             AlignPhaseForFastPath();
 
-            const int ExitCheckInterval = 120000;
+            // One unrolled call = 15 MC. 8000 × 15 = 120K MC per exit check.
+            const int ExitCheckInterval = 8000;
             while (!exit)
             {
                 for (int i = 0; i < ExitCheckInterval; i++)
-                    MasterClockTickInlineDendy();
+                    MasterClockTickUnrolledDendy();
             }
             Console.WriteLine("exit..");
         }
