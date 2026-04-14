@@ -1480,21 +1480,116 @@ prerender_sprite0_x = 0;
             mcPpuClock--;
         }
 
-        // FDS fast path — same shape as Run_NTSC. FDS is always NTSC-timed.
+        // FDS fast path. Reuses NTSC NestedTickN variants (their event sequence
+        // is identical — APU/PPU/NMI events don't touch the mapper, so the only
+        // cartridge-side difference (fds_CpuCycle vs MapperObj.CpuCycle) lives
+        // exclusively in the outer CPU gate body, never in nested ticks).
         static unsafe void Run_FDS()
         {
             mcTickFn = &MasterClockTickInlineFDS;
-            nestedTick7Fn = &NestedTick7_Fallback;
-            nestedTick2Fn = &NestedTick2_Fallback;
+            nestedTick7Fn = &NestedTick7_NTSC;
+            nestedTick2Fn = &NestedTick2_NTSC;
             AlignPhaseForFastPath();
 
-            const int ExitCheckInterval = 120000;
+            // One unrolled call = 12 MC. 10000 × 12 = 120K MC per exit check.
+            const int ExitCheckInterval = 10000;
             while (!exit)
             {
                 for (int i = 0; i < ExitCheckInterval; i++)
-                    MasterClockTickInlineFDS();
+                    MasterClockTickUnrolledFDS();
             }
             Console.WriteLine("exit..");
+        }
+
+        // 12-MC FDS unrolled kernel — direct port of MasterClockTickUnrolledNTSC
+        // with two cartridge-side substitutions:
+        //   1. MapperObj.CpuCycle() → fds_CpuCycle()  (FDS disk/audio/IRQ state machine)
+        //   2. MapperObj.CpuClockRise() removed       (FdsChrMapper.CpuClockRise is empty)
+        // All other timing constants (12/4/2/8/5) and event ordering identical
+        // to NTSC since FDS hardware is NTSC-only.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void MasterClockTickUnrolledFDS()
+        {
+            // ── MC 0: CPU gate (may trigger NestedTickN via cpu_step) ──
+            mcCpuClock = 12;
+            bool isDmcActive = dmcDmaRunning & (dmcStatusEnabled | dmcImplicitAbortActive);
+            if (cpuIsRead & (isDmcActive | spriteDmaTransfer)) DmaOneCycle();
+            else cpu_step_one_cycle();
+            if (dmcDmaRunning && dmcImplicitAbortActive) dmcImplicitAbortActive = false;
+            fds_CpuCycle();   // FDS-specific: replaces MapperObj.CpuCycle()
+
+            int state = mcCpuClock; // 12 / 10 / 5
+
+            if (state == 12)
+            {
+                apu_step();
+                mcApuPutCycle = !mcApuPutCycle;
+                mcPpuClock = 4;
+                ppu_step_new();                            // MC 0 PPU full
+
+                mcCpuClock = 10; mcPpuClock = 2;
+                ppu_half_step_new();                       // MC 2
+
+                mcCpuClock = 8; mcPpuClock = 0;
+                NMILine |= NMIable && isVblank;
+                if (operationCycle == 0 && !(isVblank && NMIable)) NMILine = false;
+                mcPpuClock = 4;
+                ppu_step_new();                            // MC 4 PPU full
+
+                mcCpuClock = 6; mcPpuClock = 2;
+                ppu_half_step_new();                       // MC 6
+
+                mcCpuClock = 5;
+                IRQLine = irqLineCurrent;
+                if (statusframeint && !apuintflag) irqLineCurrent = true;
+                // FDS: MapperObj.CpuClockRise() omitted (FdsChrMapper.CpuClockRise is empty)
+
+                mcCpuClock = 4; mcPpuClock = 4;
+                ppu_step_new();                            // MC 8 PPU full
+
+                mcCpuClock = 2; mcPpuClock = 2;
+                ppu_half_step_new();                       // MC 10
+            }
+            else if (state == 10)
+            {
+                // NestedTick2_NTSC fired MC 0 APU + PPU full. State now (10, 2).
+                ppu_half_step_new();                       // MC 2
+
+                mcCpuClock = 8; mcPpuClock = 0;
+                NMILine |= NMIable && isVblank;
+                if (operationCycle == 0 && !(isVblank && NMIable)) NMILine = false;
+                mcPpuClock = 4;
+                ppu_step_new();                            // MC 4
+
+                mcCpuClock = 6; mcPpuClock = 2;
+                ppu_half_step_new();                       // MC 6
+
+                mcCpuClock = 5;
+                IRQLine = irqLineCurrent;
+                if (statusframeint && !apuintflag) irqLineCurrent = true;
+                // FDS: no MapperObj.CpuClockRise()
+
+                mcCpuClock = 4; mcPpuClock = 4;
+                ppu_step_new();                            // MC 8
+
+                mcCpuClock = 2; mcPpuClock = 2;
+                ppu_half_step_new();                       // MC 10
+            }
+            else // state == 5: NestedTick7_NTSC fired MC 0-6 events. State (5, 1).
+            {
+                IRQLine = irqLineCurrent;
+                if (statusframeint && !apuintflag) irqLineCurrent = true;
+                // FDS: no MapperObj.CpuClockRise()
+
+                mcCpuClock = 4; mcPpuClock = 4;
+                ppu_step_new();                            // MC 8
+
+                mcCpuClock = 2; mcPpuClock = 2;
+                ppu_half_step_new();                       // MC 10
+            }
+
+            mcCpuClock = 0;
+            mcPpuClock = 0;
         }
 
         // Dendy: CPU=15 MC, PPU=5 MC (vs NTSC 12/4). CPU:PPU ratio is still
