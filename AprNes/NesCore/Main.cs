@@ -32,6 +32,9 @@ namespace AprNes
         // 64-byte block (8 × byte* on x64) — enables single-struct copy instead of 8× element assign
         [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
         unsafe struct PtrBlock8 { public byte* p0, p1, p2, p3, p4, p5, p6, p7; }
+        // 32-byte block (4 × byte*) — for mappers that switch banks in 4KB halves
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        unsafe struct PtrBlock4 { public byte* p0, p1, p2, p3; }
 
         static public byte** chrBankPtrs = null; // P34: 8×1KB CHR bank pointers, updated by mapper (unmanaged)
         static public bool mapperNeedsA12  = false; // any A12 notification needed (MMC3 or MMC2/4)

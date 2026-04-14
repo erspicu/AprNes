@@ -105,9 +105,12 @@ namespace AprNes
 
         public void UpdateCHRBanks()
         {
+            byte** d = NesCore.chrBankPtrs;
             if (CHR_ROM_count == 0)
             {
-                for (int i = 0; i < 8; i++) NesCore.chrBankPtrs[i] = ppu_ram + i * 1024;
+                byte* b = ppu_ram;
+                d[0] = b;          d[1] = b + 0x0400; d[2] = b + 0x0800; d[3] = b + 0x0C00;
+                d[4] = b + 0x1000; d[5] = b + 0x1400; d[6] = b + 0x1800; d[7] = b + 0x1C00;
                 return;
             }
             if (CHR_Bankmode > 0) // 4K mode: two independent 4KB banks
@@ -115,13 +118,14 @@ namespace AprNes
                 int banks4k = CHR_ROM_count * 2;
                 byte* b0 = CHR_ROM + ((CHR0_Bankselect % banks4k) << 12);
                 byte* b1 = CHR_ROM + ((CHR1_Bankselect % banks4k) << 12);
-                for (int i = 0; i < 4; i++) NesCore.chrBankPtrs[i] = b0 + i * 1024;
-                for (int i = 4; i < 8; i++) NesCore.chrBankPtrs[i] = b1 + (i - 4) * 1024;
+                d[0] = b0;          d[1] = b0 + 0x0400; d[2] = b0 + 0x0800; d[3] = b0 + 0x0C00;
+                d[4] = b1;          d[5] = b1 + 0x0400; d[6] = b1 + 0x0800; d[7] = b1 + 0x0C00;
             }
             else // 8K mode
             {
                 byte* b = CHR_ROM + (((CHR0_Bankselect >> 1) % CHR_ROM_count) << 13);
-                for (int i = 0; i < 8; i++) NesCore.chrBankPtrs[i] = b + i * 1024;
+                d[0] = b;          d[1] = b + 0x0400; d[2] = b + 0x0800; d[3] = b + 0x0C00;
+                d[4] = b + 0x1000; d[5] = b + 0x1400; d[6] = b + 0x1800; d[7] = b + 0x1C00;
             }
         }
 

@@ -699,34 +699,33 @@ namespace AprNes
             spriteOverflowCycle = -1;
             if (!ShowBackGround && !ShowSprites) return;
 
-            uint height = Spritesize8x16 ? 15u : 7u;
-            int evalCycle = 66;
+            uint sl = (uint)scanline;
+            uint h = Spritesize8x16 ? 15u : 7u;
             int foundCount = 0;
             byte* p = spr_ram;
             byte* pEnd = spr_ram + 256;
 
-            // Phase 1: find first 8 sprites (pointer iteration, no evalCycle bound needed — max 242)
+            // Phase 1: 4-sprite unroll, drop per-iter evalCycle math
+            // (recomputed once after the loop via pointer arithmetic).
             while (p < pEnd)
             {
-                uint diff = (uint)(scanline - *p);
-                p += 4;
-                if (diff <= height)
-                {
-                    evalCycle += 8;
-                    if (++foundCount == 8) break;
-                }
-                else
-                    evalCycle += 2;
+                if ((uint)(sl - p[0])  <= h && ++foundCount == 8) { p += 4;  break; }
+                if ((uint)(sl - p[4])  <= h && ++foundCount == 8) { p += 8;  break; }
+                if ((uint)(sl - p[8])  <= h && ++foundCount == 8) { p += 12; break; }
+                if ((uint)(sl - p[12]) <= h && ++foundCount == 8) { p += 16; break; }
+                p += 16;
             }
 
             // Phase 2: overflow bug evaluation (byte offset m cycles 0,1,2,3)
             if (foundCount == 8)
             {
+                // Recover evalCycle: original = 66 + 8*8 + 2*N where N = out-of-range count.
+                // (p - spr_ram) = 4 * (8 + N), so /2 = 16 + 2N → 114 + (p-spr_ram)/2 = 130 + 2N.
+                int evalCycle = 114 + (int)(p - spr_ram) / 2;
                 int m = 0;
                 while (p < pEnd && evalCycle <= 256)
                 {
-                    uint diff = (uint)(scanline - p[m]);
-                    if (diff <= height) { spriteOverflowCycle = evalCycle; return; }
+                    if ((uint)(sl - p[m]) <= h) { spriteOverflowCycle = evalCycle; return; }
                     m = (m + 1) & 3;
                     evalCycle += 2;
                     p += 4;

@@ -67,10 +67,11 @@ namespace AprNes
             {
                 ppu_cycles_x = cx = 0;
                 scanline++;
-                if (scanline > preRenderLine)
-                {
-                    scanline = 0;
-                }
+                // Branchless wrap: equivalent to `if (scanline > preRenderLine) scanline = 0;`
+                // Trick: signed (scanline - (preRenderLine+1)) >> 31 yields all-1s when negative
+                // (i.e. scanline <= preRenderLine → keep), all-0s when ≥ 0 (wrap → zero out).
+                // Requires `scanline` to be signed int (it is). preRenderLine ∈ {261 NTSC, 311 PAL/Dendy}.
+                scanline &= (scanline - (preRenderLine + 1)) >> 31;
             }
 
             // Cache active scanline flag (visible 0-239 or pre-render)

@@ -33,8 +33,10 @@ namespace AprNes
 
         public void UpdateCHRBanks()
         {
-            for (int i = 0; i < 8; i++)
-                NesCore.chrBankPtrs[i] = ppu_ram + (i << 10);
+            byte* b = ppu_ram;
+            byte** d = NesCore.chrBankPtrs;
+            d[0] = b;          d[1] = b + 0x0400; d[2] = b + 0x0800; d[3] = b + 0x0C00;
+            d[4] = b + 0x1000; d[5] = b + 0x1400; d[6] = b + 0x1800; d[7] = b + 0x1C00;
         }
 
         public void CpuCycle() { }
