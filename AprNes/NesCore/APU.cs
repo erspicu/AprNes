@@ -784,11 +784,10 @@ namespace AprNes
             ++sweeppos[i];
             int rawperiod     = _pulsePeriod[i];
             int shiftedperiod = rawperiod >> sweepshift[i];
-            // NOTE: formula validated by blargg 184/184 + AC v2 138/138 (incl. sweep tests).
-            // Don't "fix" the +i offset without matching reference — there's likely a compensating
-            // factor elsewhere that makes this specific form correct for our representation.
+            // NESdev Wiki: Pulse1 uses 1's complement (-c - 1); Pulse2 uses 2's complement (-c).
+            // Unified formula: (-shifted - 1 + i) gives (-shifted-1) for i=0 and (-shifted) for i=1.
             if (sweepnegate[i] != 0)
-                shiftedperiod = -shiftedperiod + i; // Pulse2 (+1) vs Pulse1 (+0) difference
+                shiftedperiod = -shiftedperiod - 1 + i;
             shiftedperiod += rawperiod;
 
             if (rawperiod < 8 || shiftedperiod > 0x7ff)
