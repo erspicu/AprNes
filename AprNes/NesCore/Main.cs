@@ -29,7 +29,11 @@ namespace AprNes
         static public string rom_file_name = "";
 
         static IMapper MapperObj;
-        static public byte*[] chrBankPtrs = new byte*[8]; // P34: 8×1KB CHR bank pointers, updated by mapper
+        // 64-byte block (8 × byte* on x64) — enables single-struct copy instead of 8× element assign
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        unsafe struct PtrBlock8 { public byte* p0, p1, p2, p3, p4, p5, p6, p7; }
+
+        static public byte** chrBankPtrs = null; // P34: 8×1KB CHR bank pointers, updated by mapper (unmanaged)
         static public bool mapperNeedsA12  = false; // any A12 notification needed (MMC3 or MMC2/4)
         static public bool mapperA12IsMmc3 = false; // true=MMC3-style, false=MMC2/4-style (only when mapperNeedsA12)
         // Mapper 68 (Sunsoft #4): CHR ROM pages used as nametable tiles
@@ -38,8 +42,8 @@ namespace AprNes
         static public bool ntChrOverrideEnabled = false; // when true PPU reads NT from ntBankPtrs instead of ppu_ram
         // MMC5 CHR A/B auto-switch (for 8x16 sprites: A=sprites, B=background)
         static public bool chrABAutoSwitch = false;
-        static public byte*[] chrBankPtrsA = new byte*[8]; // A set (sprites, $5120-$5127)
-        static public byte*[] chrBankPtrsB = new byte*[8]; // B set (background, $5128-$512B)
+        static public byte** chrBankPtrsA = null; // A set (sprites, $5120-$5127) (unmanaged)
+        static public byte** chrBankPtrsB = null; // B set (background, $5128-$512B) (unmanaged)
         static public bool chrBGUseASet = false;           // MMC5 lastChrReg: true=use A set for BG
         // MMC5 Extended Attribute Mode (ExRAM mode 1)
         static public bool extAttrEnabled = false;
@@ -223,6 +227,9 @@ namespace AprNes
             if (sprFetchAttr != null) { Marshal.FreeHGlobal((IntPtr)sprFetchAttr); sprFetchAttr = null; }
             if (sprXPos      != null) { Marshal.FreeHGlobal((IntPtr)sprXPos);      sprXPos      = null; }
             if (expansionChannels != null) { Marshal.FreeHGlobal((IntPtr)expansionChannels); expansionChannels = null; }
+            if (chrBankPtrs  != null) { Marshal.FreeHGlobal((IntPtr)chrBankPtrs);  chrBankPtrs  = null; }
+            if (chrBankPtrsA != null) { Marshal.FreeHGlobal((IntPtr)chrBankPtrsA); chrBankPtrsA = null; }
+            if (chrBankPtrsB != null) { Marshal.FreeHGlobal((IntPtr)chrBankPtrsB); chrBankPtrsB = null; }
             if (ntscScanBuf  != null) { Marshal.FreeHGlobal((IntPtr)ntscScanBuf);  ntscScanBuf  = null; }
             if (NES_MEM      != null) { Marshal.FreeHGlobal((IntPtr)NES_MEM);      NES_MEM      = null; }
             if (Vertical           != null) { Marshal.FreeHGlobal((IntPtr)Vertical);           Vertical           = null; }
@@ -484,6 +491,10 @@ prerender_sprite0_x = 0;
                 // runs BEFORE initAPU() is called below.
                 expansionChannels = (int*)Marshal.AllocHGlobal(sizeof(int) * 8);
                 for (int i = 0; i < 8; i++) expansionChannels[i] = 0;
+                chrBankPtrs      = (byte**)Marshal.AllocHGlobal(sizeof(byte*) * 8);
+                chrBankPtrsA     = (byte**)Marshal.AllocHGlobal(sizeof(byte*) * 8);
+                chrBankPtrsB     = (byte**)Marshal.AllocHGlobal(sizeof(byte*) * 8);
+                for (int i = 0; i < 8; i++) { chrBankPtrs[i] = null; chrBankPtrsA[i] = null; chrBankPtrsB[i] = null; }
                 // P1_joypad_status/P2_joypad_status removed — shift register model uses static bytes
                 NES_MEM          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 65536);
 

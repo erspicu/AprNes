@@ -249,7 +249,7 @@ namespace AprNes
                             ppuOctalLatch = (byte)ppuAddressBus;
 
                         // MMC5 CHR A/B switch at first tile of each group
-                        if ((cx == 1 || cx == 321) && chrABAutoSwitch) { byte*[] src = Spritesize8x16 ? (chrBGUseASet ? chrBankPtrsA : chrBankPtrsB) : chrBankPtrsA; for (int i = 0; i < 8; i++) chrBankPtrs[i] = src[i]; }
+                        if ((cx == 1 || cx == 321) && chrABAutoSwitch) { byte** src = Spritesize8x16 ? (chrBGUseASet ? chrBankPtrsA : chrBankPtrsB) : chrBankPtrsA; *(PtrBlock8*)chrBankPtrs = *(PtrBlock8*)src; }
                     }
                 }
 

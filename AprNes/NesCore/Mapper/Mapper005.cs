@@ -518,7 +518,7 @@ namespace AprNes
             FillCHRBankPtrs(NesCore.chrBankPtrs, chrA);
         }
 
-        void FillCHRBankPtrs(byte*[] dst, bool useA)
+        void FillCHRBankPtrs(byte** dst, bool useA)
         {
             switch (chrMode)
             {

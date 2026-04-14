@@ -330,6 +330,10 @@ namespace AprNes
                 // expansionChannels: needed by mapper Reset() before initAPU()
                 expansionChannels = (int*)Marshal.AllocHGlobal(sizeof(int) * 8);
                 for (int i = 0; i < 8; i++) expansionChannels[i] = 0;
+                chrBankPtrs      = (byte**)Marshal.AllocHGlobal(sizeof(byte*) * 8);
+                chrBankPtrsA     = (byte**)Marshal.AllocHGlobal(sizeof(byte*) * 8);
+                chrBankPtrsB     = (byte**)Marshal.AllocHGlobal(sizeof(byte*) * 8);
+                for (int i = 0; i < 8; i++) { chrBankPtrs[i] = null; chrBankPtrsA[i] = null; chrBankPtrsB[i] = null; }
                 sprShiftL        = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 sprShiftH        = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 sprXCounter      = (int* )Marshal.AllocHGlobal(sizeof(int)  * 8);
