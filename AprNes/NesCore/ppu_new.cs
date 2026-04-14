@@ -331,10 +331,9 @@ namespace AprNes
                     {
                         bool renderEnabled = showSpr || showBG;
                         bool canDecrement = !skippedPreRenderDot341;
-                        // SWAR fast path: when all X counters are zero (or canDecrement is false),
-                        // batch-shift all 8 sprite shift registers as a single ulong operation
-                        ulong* xc = (ulong*)sprXCounter;
-                        if (!canDecrement || (xc[0] | xc[1] | xc[2] | xc[3]) == 0)
+                        ulong v = *(ulong*)sprXCounter;
+                        // Fast path: all counters 0 (or can't decrement) → pure SWAR shift.
+                        if (!canDecrement || v == 0)
                         {
                             if (renderEnabled)
                             {
@@ -344,14 +343,23 @@ namespace AprNes
                         }
                         else
                         {
-                            int renderShift = renderEnabled ? 1 : 0;
-                            for (int s = 0; s < 8; s++)
+                            // Slow path — pure SWAR, no loop:
+                            // dec_mask[i] = 1 if sprXCounter[i] > 0 else 0 (byte-wise > 0 test).
+                            ulong dec_mask = ((v | ((v & 0x7F7F7F7F7F7F7F7FUL) + 0x7F7F7F7F7F7F7F7FUL))
+                                             & 0x8080808080808080UL) >> 7;
+                            // Decrement all non-zero counters in one op (no cross-byte borrow:
+                            // dec_mask[i] is 0 whenever v[i] == 0).
+                            *(ulong*)sprXCounter = v - dec_mask;
+
+                            if (renderEnabled)
                             {
-                                int isZero = sprXCounter[s] == 0 ? 1 : 0;
-                                sprXCounter[s] -= 1 - isZero;
-                                int doShift = isZero & renderShift;
-                                sprShiftL[s] <<= doShift;
-                                sprShiftH[s] <<= doShift;
+                                // Byte-smear: dec_mask[i]=1 → 0xFF; 0 → 0x00. Then invert:
+                                // mask_0[i] = 0xFF where counter was 0 (shift applies), else 0x00 (keep).
+                                ulong mask_0 = ~(dec_mask * 255UL);
+                                ulong sl = *(ulong*)sprShiftL;
+                                ulong sh = *(ulong*)sprShiftH;
+                                *(ulong*)sprShiftL = (((sl << 1) & 0xFEFEFEFEFEFEFEFEUL) & mask_0) | (sl & ~mask_0);
+                                *(ulong*)sprShiftH = (((sh << 1) & 0xFEFEFEFEFEFEFEFEUL) & mask_0) | (sh & ~mask_0);
                             }
                         }
                     }
@@ -607,9 +615,8 @@ namespace AprNes
             {
                 if (!(ShowSprites || ShowBackGround))
                 {
-                    // SWAR: clear 8 ints (32 bytes) as 4 ulongs
-                    ulong* xc = (ulong*)sprXCounter;
-                    xc[0] = 0; xc[1] = 0; xc[2] = 0; xc[3] = 0;
+                    // sprXCounter is 8 bytes = one ulong write
+                    *(ulong*)sprXCounter = 0;
                 }
                 // SWAR: check 8+8 bytes in one 64-bit OR
                 spriteAnyActive = ((*(ulong*)sprShiftH) | (*(ulong*)sprShiftL)) != 0;

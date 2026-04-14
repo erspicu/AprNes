@@ -265,7 +265,7 @@ namespace AprNes
         // TriCNES: PPU_SpriteShiftRegisterL/H, PPU_SpriteShifterCounter, PPU_SpriteAttribute
         static byte* sprShiftL;       // Low bitplane shift register
         static byte* sprShiftH;       // High bitplane shift register
-        static int* sprXCounter;        // X position countdown (>0=waiting, 0=shifting)
+        static byte* sprXCounter;       // X position countdown — byte per slot (8 total = 1 ulong)
         static byte* sprFetchAttr;     // Attribute byte per slot (palette, priority, flip)
         static byte* sprXPos;           // X position per slot (for counter init at dot 339)
         static int sprSlotCount = 0;                   // Number of valid sprites fetched (from evalSpriteCount)

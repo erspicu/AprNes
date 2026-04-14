@@ -482,7 +482,7 @@ prerender_sprite0_x = 0;
                 InitFlipTable();
                 sprShiftL        = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 sprShiftH        = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
-                sprXCounter      = (int* )Marshal.AllocHGlobal(sizeof(int)  * 8);
+                sprXCounter      = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 sprFetchAttr     = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 sprXPos          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 ntscScanBuf      = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
