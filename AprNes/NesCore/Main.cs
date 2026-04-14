@@ -649,38 +649,139 @@ prerender_sprite0_x = 0;
             nestedTick2Fn = &NestedTick2_NTSC;
             AlignPhaseForFastPath();
 
-            const int ExitCheckInterval = 120000; // ~60ms @ 1.79MHz
+            // One unrolled call = 12 MC. Divide gated batch count (120000) by 12.
+            const int ExitCheckInterval = 10000; // ~60ms @ 1.79MHz
             while (!exit)
             {
                 for (int i = 0; i < ExitCheckInterval; i++)
-                    MasterClockTickInlineNTSC();
+                    MasterClockTickUnrolledNTSC();
             }
             Console.WriteLine("exit..");
         }
 
-        // ARCHITECTURAL NOTE — why no "structural unroll" version of the 12-MC kernel:
+        // 12-MC structural unroll for NTSC. Enabled by Phase 1's NestedTickN
+        // de-recursion: since cpu_step_one_cycle no longer calls back into
+        // mcTickFn (it calls self-contained NestedTickN which leaves a
+        // deterministic counter state), the outer can detect which branch to
+        // take by inspecting mcCpuClock after cpu_step returns:
+        //   mcCpu==12 → no nesting, run full 12-MC sequence
+        //   mcCpu==10 → NestedTick2 ran, skip MC 0 events, run MC 2-10 tail
+        //   mcCpu==5  → NestedTick7 ran, skip MC 0-6 events, run MC 7-10 tail
         //
-        // PPU register handlers (ppu_r_2002, ppu_r_2007, ppu_w_2000/2001/2005/2006)
-        // internally call MasterClockTick() 2-7 times to model TriCNES's
-        // EmulateUntilEndOfRead / EmulateNMasterClockCycles time advancement.
+        // Each CPU cycle has at most one bus access, so at most one nested
+        // variant fires per outer call. The 3 cases cover all possibilities.
+        // Counter writes between events preserve the slow-path values that
+        // PPU register handlers would observe via mcCpu&3 / mcPpu&3 (but
+        // those handlers are only invoked during cpu_step, where counters
+        // are already correct by the time they're consulted).
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void MasterClockTickUnrolledNTSC()
+        {
+            // ── MC 0: CPU gate (may trigger NestedTickN via cpu_step) ──
+            mcCpuClock = 12;
+            bool isDmcActive = dmcDmaRunning & (dmcStatusEnabled | dmcImplicitAbortActive);
+            if (cpuIsRead & (isDmcActive | spriteDmaTransfer)) DmaOneCycle();
+            else cpu_step_one_cycle();
+            if (dmcDmaRunning && dmcImplicitAbortActive) dmcImplicitAbortActive = false;
+            MapperObj.CpuCycle();
+
+            int state = mcCpuClock; // 12 / 10 / 5
+
+            if (state == 12)
+            {
+                // No nesting — fire full 12-MC event sequence.
+                apu_step();
+                mcApuPutCycle = !mcApuPutCycle;
+                mcPpuClock = 4;
+                ppu_step_new();                            // MC 0 PPU full
+
+                mcCpuClock = 10; mcPpuClock = 2;
+                ppu_half_step_new();                       // MC 2
+
+                mcCpuClock = 8; mcPpuClock = 0;
+                NMILine |= NMIable && isVblank;
+                if (operationCycle == 0 && !(isVblank && NMIable)) NMILine = false;
+                mcPpuClock = 4;
+                ppu_step_new();                            // MC 4 PPU full
+
+                mcCpuClock = 6; mcPpuClock = 2;
+                ppu_half_step_new();                       // MC 6
+
+                mcCpuClock = 5;
+                IRQLine = irqLineCurrent;
+                if (statusframeint && !apuintflag) irqLineCurrent = true;
+                MapperObj.CpuClockRise();                  // MC 7 IRQ
+
+                mcCpuClock = 4; mcPpuClock = 4;
+                ppu_step_new();                            // MC 8 PPU full
+
+                mcCpuClock = 2; mcPpuClock = 2;
+                ppu_half_step_new();                       // MC 10
+            }
+            else if (state == 10)
+            {
+                // NestedTick2 fired MC 0 APU + PPU full. State now (10, 2).
+                // Tail: MC 2 half, MC 4 NMI + PPU full, MC 6 half, MC 7 IRQ,
+                //       MC 8 PPU full, MC 10 half.
+                ppu_half_step_new();                       // MC 2
+
+                mcCpuClock = 8; mcPpuClock = 0;
+                NMILine |= NMIable && isVblank;
+                if (operationCycle == 0 && !(isVblank && NMIable)) NMILine = false;
+                mcPpuClock = 4;
+                ppu_step_new();                            // MC 4
+
+                mcCpuClock = 6; mcPpuClock = 2;
+                ppu_half_step_new();                       // MC 6
+
+                mcCpuClock = 5;
+                IRQLine = irqLineCurrent;
+                if (statusframeint && !apuintflag) irqLineCurrent = true;
+                MapperObj.CpuClockRise();                  // MC 7
+
+                mcCpuClock = 4; mcPpuClock = 4;
+                ppu_step_new();                            // MC 8
+
+                mcCpuClock = 2; mcPpuClock = 2;
+                ppu_half_step_new();                       // MC 10
+            }
+            else // state == 5: NestedTick7 fired MC 0-6 events. State (5, 1).
+            {
+                // Tail: MC 7 IRQ, MC 8 PPU full, MC 10 half.
+                IRQLine = irqLineCurrent;
+                if (statusframeint && !apuintflag) irqLineCurrent = true;
+                MapperObj.CpuClockRise();                  // MC 7
+
+                mcCpuClock = 4; mcPpuClock = 4;
+                ppu_step_new();                            // MC 8
+
+                mcCpuClock = 2; mcPpuClock = 2;
+                ppu_half_step_new();                       // MC 10
+            }
+
+            // End state (0, 0) — next iteration's MC 0 CPU gate starts fresh.
+            mcCpuClock = 0;
+            mcPpuClock = 0;
+        }
+
+        // ARCHITECTURAL NOTE — structural unroll of the 12-MC kernel:
         //
-        // A full unroll bundles 12 ticks into one function call, but nested
-        // MasterClockTick invocations (from inside cpu_step_one_cycle) consume
-        // unknown additional ticks. The outer unrolled code cannot detect or
-        // compensate — events get fired at the wrong absolute master clock
-        // position, breaking VBL/NMI/sprite timing tests (vbl_nmi_timing,
-        // sprite_hit_tests).
+        // Phase 1 (commit fe341df) replaced the PPU register handlers' calls
+        // to mcTickFn (which recursively re-entered MasterClockTickInlineNTSC)
+        // with self-contained NestedTickN functions that produce a
+        // deterministic end counter state (NestedTick2 → mcCpu=10,
+        // NestedTick7 → mcCpu=5). De-recursion made the outer's post-cpu_step
+        // state a reliable dispatch signal.
         //
-        // The gated form (MasterClockTickInlineNTSC × N) handles nesting
-        // naturally: each call processes exactly 1 tick with self-aware gates;
-        // when nested calls consume extra ticks, the outer for-loop simply
-        // runs fewer of its own logical ticks — total master-clock progress
-        // remains correct.
+        // Phase 2 (this commit) leverages that signal: MasterClockTickUnrolledNTSC
+        // runs one 12-MC window per call, choosing one of 3 tails based on
+        // mcCpu after cpu_step. Each case covers all remaining events of the
+        // 12-MC window that the nested didn't already fire.
         //
-        // The gate checks (if mcCpu==0/8/5/12, if mcPpu==0/2) are NOT redundant.
-        // They are the mechanism that lets each tick know its position. Cannot
-        // be eliminated without removing TriCNES-style intra-instruction time
-        // advancement (a much larger architectural change with no clear win).
+        // The gated form (MasterClockTickInlineNTSC) is retained as the single-
+        // tick backend used by AlignPhaseForFastPath for cold-start phase
+        // alignment; it's also the fallback behavior for PAL/Dendy/FDS which
+        // don't have their own unrolled variants yet.
 
         // Run the legacy slow path until counters land at the start-of-window
         // state for the fast path (mcCpuClock==0 && mcPpuClock==0 — about to
