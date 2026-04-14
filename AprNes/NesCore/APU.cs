@@ -526,10 +526,14 @@ namespace AprNes
 
             // TriCNES: halt flags updated from registers EVERY APU cycle (lines 1139-1142)
             // Not just at HalfFrame — allows mid-frame halt changes to take effect next cycle
-            lenctrHalt0 = (apuRegister[0x0] & 0x20) != 0;
-            lenctrHalt1 = (apuRegister[0x4] & 0x20) != 0;
-            lenctrHalt2 = (apuRegister[0x8] & 0x80) != 0;
-            lenctrHalt3 = (apuRegister[0xC] & 0x20) != 0;
+            // SWAR: 4 byte loads → 2 ulong loads. apuRegister is a contiguous 16-byte buffer.
+            // x64 little-endian: byte 0 in low byte of ulong, byte 4 in bits 32-39, etc.
+            ulong rL = *(ulong*)apuRegister;          // bytes 0..7  (pulse0/1 regs)
+            ulong rH = *(ulong*)(apuRegister + 8);    // bytes 8..15 (tri/noise/dmc regs)
+            lenctrHalt0 = (rL & 0x0000_0000_0000_0020UL) != 0; // byte 0 (pulse0 ctrl) bit 5
+            lenctrHalt1 = (rL & 0x0000_0020_0000_0000UL) != 0; // byte 4 (pulse1 ctrl) bit 5
+            lenctrHalt2 = (rH & 0x0000_0000_0000_0080UL) != 0; // byte 8 (tri ctrl)    bit 7
+            lenctrHalt3 = (rH & 0x0000_0020_0000_0000UL) != 0; // byte C (noise ctrl)  bit 5
 
             // 生成音效樣本
             if (AudioMode > 0)
