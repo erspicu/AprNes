@@ -598,6 +598,14 @@ prerender_sprite0_x = 0;
         // through this pointer.
         static public unsafe delegate*<void> mcTickFn = null;
 
+        // Specialized "nested tick" dispatch for PPU register handlers that do
+        // TriCNES EmulateNMasterClockCycles(N). Set alongside mcTickFn at each
+        // Run_X entry. NTSC uses fully-unrolled variants (no internal call to
+        // mcTickFn → no recursion). Other regions fall back to a for-loop of
+        // mcTickFn (same behavior as before this refactor).
+        static public unsafe delegate*<void> nestedTick7Fn = null;  // $2002/$2007/$2004 read, $2007 write
+        static public unsafe delegate*<void> nestedTick2Fn = null;  // $2000 write
+
         static public unsafe void run()
         {
             // Safety net: FDS hardware is NTSC-only. The UI should have caught
@@ -637,6 +645,8 @@ prerender_sprite0_x = 0;
         static unsafe void Run_NTSC()
         {
             mcTickFn = &MasterClockTickInlineNTSC;
+            nestedTick7Fn = &NestedTick7_NTSC;
+            nestedTick2Fn = &NestedTick2_NTSC;
             AlignPhaseForFastPath();
 
             const int ExitCheckInterval = 120000; // ~60ms @ 1.79MHz
@@ -737,6 +747,100 @@ prerender_sprite0_x = 0;
             mcPpuClock--;
         }
 
+        // ════════════════════════════════════════════════════════════════════
+        // NTSC NestedTick variants — for PPU register handlers (ppu_r_2002,
+        // ppu_r_2007, ppu_r_2004, ppu_w_2000, ppu_w_2007) that perform
+        // TriCNES EmulateNMasterClockCycles(N) intra-instruction time
+        // advancement.
+        //
+        // Called only from inside cpu_step_one_cycle (which itself is only
+        // invoked from MasterClockTickInlineNTSC's CPU gate at mcCpu==0 →
+        // immediately reset to 12). Therefore the entry state is ALWAYS
+        // (mcCpu=12, mcPpu=0). The N-step event sequence from this fixed
+        // starting point is fully deterministic — no need for per-tick gates,
+        // no recursion back through mcTickFn.
+        //
+        // Counter values are pinned to the "during-event" slow-path values
+        // before each event call (so PPU register handler &3 reads see the
+        // correct alignment). End state matches what 7 (or 2) gated ticks
+        // would leave behind, so the outer MasterClockTickInlineNTSC's
+        // remaining gates (IRQ at mcCpu==5 etc.) fire correctly after return.
+        // ════════════════════════════════════════════════════════════════════
+
+        // 7-tick nested. Used by $2002 read, $2007 read, $2004 read, $2007 write.
+        // Trace (start state (12, 0), each call decrements 1 of mcCpu/mcPpu):
+        //   call 1 (12, 0): APU + toggle, mcPpu→4, PPU full       → (11, 3)
+        //   call 2 (11, 3): no events                              → (10, 2)
+        //   call 3 (10, 2): PPU half                               → (9, 1)
+        //   call 4 (9, 1):  no events                              → (8, 0)
+        //   call 5 (8, 0):  NMI check, mcPpu→4, PPU full          → (7, 3)
+        //   call 6 (7, 3):  no events                              → (6, 2)
+        //   call 7 (6, 2):  PPU half                               → (5, 1)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void NestedTick7_NTSC()
+        {
+            // ── Call 1: APU + PPU full ──
+            // mcCpu=12 (set by outer's CPU gate), mcPpu=0 (carry-over)
+            apu_step();
+            mcApuPutCycle = !mcApuPutCycle;
+            mcPpuClock = 4;
+            ppu_step_new();
+
+            // ── Call 3: PPU half (mcCpu=10, mcPpu=2) ──
+            mcCpuClock = 10;
+            mcPpuClock = 2;
+            ppu_half_step_new();
+
+            // ── Call 5: NMI check + PPU full (mcCpu=8) ──
+            mcCpuClock = 8;
+            mcPpuClock = 0;
+            NMILine |= NMIable && isVblank;
+            if (operationCycle == 0 && !(isVblank && NMIable)) NMILine = false;
+            mcPpuClock = 4;
+            ppu_step_new();
+
+            // ── Call 7: PPU half (mcCpu=6, mcPpu=2) ──
+            mcCpuClock = 6;
+            mcPpuClock = 2;
+            ppu_half_step_new();
+
+            // End state matches gated equivalent of 7 ticks from (12, 0).
+            mcCpuClock = 5;
+            mcPpuClock = 1;
+        }
+
+        // 2-tick nested. Used by $2000 write.
+        // Trace:
+        //   call 1 (12, 0): APU + toggle, mcPpu→4, PPU full       → (11, 3)
+        //   call 2 (11, 3): no events                              → (10, 2)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void NestedTick2_NTSC()
+        {
+            // ── Call 1: APU + PPU full ──
+            apu_step();
+            mcApuPutCycle = !mcApuPutCycle;
+            mcPpuClock = 4;
+            ppu_step_new();
+
+            // End state.
+            mcCpuClock = 10;
+            mcPpuClock = 2;
+        }
+
+        // ── Fallback wrappers for PAL/Dendy/FDS (still goes through mcTickFn
+        // → has recursion via MasterClockTickInline<Region>, behavior identical
+        // to pre-refactor). NTSC will replace these with the unrolled variants
+        // above. PAL/Dendy/FDS-specialized variants are future work (Phase 1B).
+        static unsafe void NestedTick7_Fallback()
+        {
+            for (int i = 0; i < 7; i++) mcTickFn();
+        }
+
+        static unsafe void NestedTick2_Fallback()
+        {
+            for (int i = 0; i < 2; i++) mcTickFn();
+        }
+
         // FDS runs on NTSC master clock timing (12 MC CPU, 4 MC PPU). Only
         // difference: fds_CpuCycle() replaces MapperObj.CpuCycle() (FDS uses
         // FdsChrMapper whose CpuCycle is empty; the FDS-side disk/IRQ/audio
@@ -790,6 +894,8 @@ prerender_sprite0_x = 0;
         static unsafe void Run_FDS()
         {
             mcTickFn = &MasterClockTickInlineFDS;
+            nestedTick7Fn = &NestedTick7_Fallback;
+            nestedTick2Fn = &NestedTick2_Fallback;
             AlignPhaseForFastPath();
 
             const int ExitCheckInterval = 120000;
@@ -857,6 +963,8 @@ prerender_sprite0_x = 0;
         static unsafe void Run_Dendy()
         {
             mcTickFn = &MasterClockTickInlineDendy;
+            nestedTick7Fn = &NestedTick7_Fallback;
+            nestedTick2Fn = &NestedTick2_Fallback;
             AlignPhaseForFastPath();
 
             const int ExitCheckInterval = 120000;
@@ -923,6 +1031,8 @@ prerender_sprite0_x = 0;
         static unsafe void Run_PAL()
         {
             mcTickFn = &MasterClockTickInlinePAL;
+            nestedTick7Fn = &NestedTick7_Fallback;
+            nestedTick2Fn = &NestedTick2_Fallback;
             AlignPhaseForFastPath();
 
             const int ExitCheckInterval = 120000;
