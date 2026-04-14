@@ -11,4 +11,4 @@ C:\ai_project\AprNes\temp\PerfView.exe /nogui /accepteula ^
   /merge:true /zip:false ^
   /kernelEvents:Profile ^
   /clrEvents:Jit,JitTracing ^
-  run "C:\ai_project\AprNes\tools\analyze\bench_profile_ava.bat %SIZE%"
+  run C:\ai_project\AprNes\tools\analyze\bench_profile_ava.bat %SIZE%
