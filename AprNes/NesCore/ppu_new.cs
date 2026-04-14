@@ -763,8 +763,9 @@ namespace AprNes
             bool isActiveScanline = scanline < 240 || scanline == preRenderLine;
 
             // ── BG shift register shift ──
-            if (isActiveScanline && isRendering
-                && ((hsDot > 0 && hsDot <= 257) || (hsDot > 320 && hsDot <= 336)))
+            // Range magic: (uint)(hsDot-1) < 257 covers 1..257; (uint)(hsDot-321) < 16 covers 321..336
+            if (isRendering && isActiveScanline
+                && ((uint)(hsDot - 1) < 257u || (uint)(hsDot - 321) < 16u))
             {
                 renderLow  <<= 1;
                 renderHigh = (renderHigh << 1) | 1;
@@ -773,33 +774,34 @@ namespace AprNes
             }
 
             // ── CommitShiftRegistersAndBitPlanes — TriCNES line 1691 (inside _EmulateHalfPPU) ──
-            // Process commit flags set by tile fetch in previous full dot, then load shift registers.
+            // Hardware fetch pipeline is strictly sequential within a half-step:
+            // at most one commitXFetch flag is true, so else-if short-circuits the rest.
             if (commitNTFetch)
             {
                 commitNTFetch = false;
                 NTVal = renderTemp;
                 // TriCNES line 3661-3669: update PAR_CHR tile number from bus low byte
                 ppuPAR_CHR &= 0b1000000001111; // keep bit12 + fine Y bits 0-2
-                if (ppu_cycles_x < 256 || ppu_cycles_x > 320)
+                // Range magic: (uint)(hsDot-256) > 64 ≡ hsDot<256 || hsDot>320
+                if ((uint)(hsDot - 256) > 64u)
                     ppuPAR_CHR |= (ushort)((byte)(ppuAddressBus) << 4); // BG: tile from bus
                 else
                     ppuPAR_CHR |= (ushort)(secondaryOAM[(evalOam2Addr & 0x1C) + 1] << 4); // Sprite: tile from OAM2
             }
-            if (commitATFetch)
+            else if (commitATFetch)
             {
                 commitATFetch = false;
-                byte atRaw = renderTemp;
                 if (extAttrEnabled && extAttrNTOffset < 960) {
                     byte exVal = extAttrRAM[extAttrNTOffset];
                     extAttrChrBank = (exVal & 0x3F) | (extAttrChrUpperBits << 6);
                     ATVal = (byte)((exVal >> 6) & 3);
                 } else {
-                    ATVal = (byte)((atRaw >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
+                    ATVal = (byte)((renderTemp >> (((vram_addr >> 4) & 0x04) | (vram_addr & 0x02))) & 0x03);
                 }
                 pendingAttrLatch = ATVal;
             }
-            if (commitPatLowFetch) { commitPatLowFetch = false; pendingTileLow = renderTemp; }
-            if (commitPatHighFetch)
+            else if (commitPatLowFetch) { commitPatLowFetch = false; pendingTileLow = renderTemp; }
+            else if (commitPatHighFetch)
             {
                 commitPatHighFetch = false;
                 pendingTileHigh = renderTemp;
@@ -816,9 +818,11 @@ namespace AprNes
             ppuVSET_Latch2 = !ppuVSET_Latch1;
 
             // ── OAM buffer update (redundant branch eliminated) ──
-            if (isRendering && scanline >= 0 && scanline < 240)
+            // Range magic: (uint)scanline < 240 rejects preRenderLine/negative in one compare
+            if (isRendering && (uint)scanline < 240u)
             {
-                if (hsDot == 0 || hsDot > 320) ppuOamBuffer = secondaryOAM[0];
+                // Range magic: (uint)(hsDot-1) >= 320 covers hsDot==0 || hsDot>320
+                if ((uint)(hsDot - 1) >= 320u) ppuOamBuffer = secondaryOAM[0];
                 else if (hsDot <= 64)          ppuOamBuffer = 0xFF;
                 else                           ppuOamBuffer = oamCopyBuffer;
             }
