@@ -431,25 +431,23 @@ namespace AprNes
                 // Controller strobe reload (TriCNES: GET cycle = transitioning to PUT)
                 ProcessControllerStrobe();
                 // Pulse & Noise timers — silent channel fast-path
+                int p0 = _pulsePeriod[0], lc0 = lengthctr[0];
+                if (--_pulseTimer[0] < 0) { _pulseTimer[0] = p0; _pulseSeq[0] = (_pulseSeq[0] + 1) & 7; }
+                _pulseOut[0] = (lc0 > 0 && p0 >= 8 && sweepsilence[0] == 0)
+                    ? DUTYLOOKUP[_pulseDuty[0] * 8 + _pulseSeq[0]] : 0;
+
+                int p1 = _pulsePeriod[1], lc1 = lengthctr[1];
+                if (--_pulseTimer[1] < 0) { _pulseTimer[1] = p1; _pulseSeq[1] = (_pulseSeq[1] + 1) & 7; }
+                _pulseOut[1] = (lc1 > 0 && p1 >= 8 && sweepsilence[1] == 0)
+                    ? DUTYLOOKUP[_pulseDuty[1] * 8 + _pulseSeq[1]] : 0;
+
+                if (--_noiseTimer < 0)
                 {
-                    int p0 = _pulsePeriod[0], lc0 = lengthctr[0];
-                    if (--_pulseTimer[0] < 0) { _pulseTimer[0] = p0; _pulseSeq[0] = (_pulseSeq[0] + 1) & 7; }
-                    _pulseOut[0] = (lc0 > 0 && p0 >= 8 && sweepsilence[0] == 0)
-                        ? DUTYLOOKUP[_pulseDuty[0] * 8 + _pulseSeq[0]] : 0;
-
-                    int p1 = _pulsePeriod[1], lc1 = lengthctr[1];
-                    if (--_pulseTimer[1] < 0) { _pulseTimer[1] = p1; _pulseSeq[1] = (_pulseSeq[1] + 1) & 7; }
-                    _pulseOut[1] = (lc1 > 0 && p1 >= 8 && sweepsilence[1] == 0)
-                        ? DUTYLOOKUP[_pulseDuty[1] * 8 + _pulseSeq[1]] : 0;
-
-                    if (--_noiseTimer < 0)
-                    {
-                        _noiseTimer = noiseperiod[_noisePeriodIdx] >> 1;
-                        int fb = (_noiseLfsr ^ (_noiseLfsr >> (_noiseMode ? 6 : 1))) & 1;
-                        _noiseLfsr = (ushort)((_noiseLfsr >> 1) | (fb << 14));
-                    }
-                    _noiseOut = (lengthctr[3] > 0 && (_noiseLfsr & 1) == 0) ? 1 : 0;
+                    _noiseTimer = noiseperiod[_noisePeriodIdx] >> 1;
+                    int fb = (_noiseLfsr ^ (_noiseLfsr >> (_noiseMode ? 6 : 1))) & 1;
+                    _noiseLfsr = (ushort)((_noiseLfsr >> 1) | (fb << 14));
                 }
+                _noiseOut = (lengthctr[3] > 0 && (_noiseLfsr & 1) == 0) ? 1 : 0;
 
                 // DMC clock (timer -2 per GET cycle, output, buffer→shifter, reload DMA)
                 clockdmc();
@@ -474,15 +472,13 @@ namespace AprNes
             if (dmcStatusDelay > 0) apuDmcStatusFn();
 
             // Triangle timer (every CPU cycle) — cached triActive condition (used 2x)
+            bool triActive = linearctr > 0 && lengthctr[2] > 0 && _triPeriod >= 2;
+            if (--_triTimer < 0)
             {
-                bool triActive = linearctr > 0 && lengthctr[2] > 0 && _triPeriod >= 2;
-                if (--_triTimer < 0)
-                {
-                    _triTimer = _triPeriod;
-                    if (triActive) _triSeq = (_triSeq + 1) & 31;
-                }
-                _triOut = triActive ? TRI_SEQ[_triSeq] : 0;
+                _triTimer = _triPeriod;
+                if (triActive) _triSeq = (_triSeq + 1) & 31;
             }
+            _triOut = triActive ? TRI_SEQ[_triSeq] : 0;
 
             // ── Frame Counter + quarter/half frame processing ──
             // setvolumes() is called inside setlength() and processLenCtrReloadNonHalf() — not per-cycle
