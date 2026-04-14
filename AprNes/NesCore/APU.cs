@@ -254,6 +254,8 @@ namespace AprNes
         // =====================================================================
         static void initAPU()
         {
+            // Set audio output dispatch fn based on current AudioMode
+            ApuRefreshOutputFn();
             // Allocate pointer arrays (null-check pattern for re-init safety)
             if (_pulseTimer  == null) _pulseTimer  = (int*)Marshal.AllocHGlobal(sizeof(int) * 2);
             if (_pulsePeriod == null) _pulsePeriod = (int*)Marshal.AllocHGlobal(sizeof(int) * 2);
@@ -535,57 +537,68 @@ namespace AprNes
             lenctrHalt2 = (rH & 0x0000_0000_0000_0080UL) != 0; // byte 8 (tri ctrl)    bit 7
             lenctrHalt3 = (rH & 0x0000_0020_0000_0000UL) != 0; // byte C (noise ctrl)  bit 5
 
-            // 生成音效樣本
-            if (AudioMode > 0)
+            // 生成音效樣本 — dispatched via function pointer set by ApuRefreshOutputFn()
+            apuOutputFn();
+        }
+
+        // ── Audio output dispatch (function pointer set when AudioMode changes) ──
+        static delegate*<void> apuOutputFn = &ApuOutputCatchup;
+
+        public static void ApuRefreshOutputFn()
+        {
+            apuOutputFn = AudioMode > 0 ? &ApuOutputPushPlus : &ApuOutputCatchup;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void ApuOutputPushPlus()
+        {
+            // Authentic / Modern: 每 APU cycle 推入 AudioPlus (需要 per-cycle 精度)
+            if (expansionChannelCount > 0)
             {
-                // Authentic / Modern: 每 APU cycle 推入 AudioPlus (需要 per-cycle 精度)
-                if (expansionChannelCount > 0)
+                float gain = ap_mode01ExpGain;
+                int sum = 0;
+                for (int i = 0; i < expansionChannelCount; i++)
                 {
-                    float gain = ap_mode01ExpGain;
-                    int sum = 0;
-                    for (int i = 0; i < expansionChannelCount; i++)
-                    {
-                        if (ChannelEnabled[5 + i])
-                            sum += (int)(expansionChannels[i] * gain);
-                    }
-                    mapperExpansionAudio = sum;
+                    if (ChannelEnabled[5 + i])
+                        sum += (int)(expansionChannels[i] * gain);
                 }
-                int mask = ChannelEnableMask;
-                AudioPlus_PushApuCycle(
-                    (mask & 1)  != 0 ? volume[0] * _pulseOut[0] : 0,
-                    (mask & 2)  != 0 ? volume[1] * _pulseOut[1] : 0,
-                    (mask & 4)  != 0 ? _triOut : 0,
-                    (mask & 8)  != 0 ? volume[3] * _noiseOut : 0,
-                    (mask & 16) != 0 ? dmcvalue : 0,
-                    mapperExpansionAudio);
+                mapperExpansionAudio = sum;
             }
-            else
+            int mask = ChannelEnableMask;
+            AudioPlus_PushApuCycle(
+                (mask & 1)  != 0 ? volume[0] * _pulseOut[0] : 0,
+                (mask & 2)  != 0 ? volume[1] * _pulseOut[1] : 0,
+                (mask & 4)  != 0 ? _triOut : 0,
+                (mask & 8)  != 0 ? volume[3] * _noiseOut : 0,
+                (mask & 16) != 0 ? dmcvalue : 0,
+                mapperExpansionAudio);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void ApuOutputCatchup()
+        {
+            // Pure Digital: catchup — only compute output at sample rate (~40 cycle interval)
+            _sampleAccum += APU_SAMPLE_RATE;
+            if (_sampleAccum < _cpuFreqInt) return;
+            _sampleAccum -= _cpuFreqInt;
+            if (expansionChannelCount > 0)
             {
-                // Pure Digital: catchup — only compute output at sample rate (~40 cycle interval)
-                _sampleAccum += APU_SAMPLE_RATE;
-                if (_sampleAccum >= _cpuFreqInt)
+                float gain = ap_mode01ExpGain;
+                int sum = 0;
+                for (int i = 0; i < expansionChannelCount; i++)
                 {
-                    _sampleAccum -= _cpuFreqInt;
-                    if (expansionChannelCount > 0)
-                    {
-                        float gain = ap_mode01ExpGain;
-                        int sum = 0;
-                        for (int i = 0; i < expansionChannelCount; i++)
-                        {
-                            if (ChannelEnabled[5 + i])
-                                sum += (int)(expansionChannels[i] * gain);
-                        }
-                        mapperExpansionAudio = sum;
-                    }
-                    int mask = ChannelEnableMask;
-                    generateSample(
-                        (mask & 1)  != 0 ? volume[0] * _pulseOut[0] : 0,
-                        (mask & 2)  != 0 ? volume[1] * _pulseOut[1] : 0,
-                        (mask & 4)  != 0 ? _triOut : 0,
-                        (mask & 8)  != 0 ? volume[3] * _noiseOut : 0,
-                        (mask & 16) != 0 ? dmcvalue : 0);
+                    if (ChannelEnabled[5 + i])
+                        sum += (int)(expansionChannels[i] * gain);
                 }
+                mapperExpansionAudio = sum;
             }
+            int mask = ChannelEnableMask;
+            generateSample(
+                (mask & 1)  != 0 ? volume[0] * _pulseOut[0] : 0,
+                (mask & 2)  != 0 ? volume[1] * _pulseOut[1] : 0,
+                (mask & 4)  != 0 ? _triOut : 0,
+                (mask & 8)  != 0 ? volume[3] * _noiseOut : 0,
+                (mask & 16) != 0 ? dmcvalue : 0);
         }
 
         // =====================================================================
