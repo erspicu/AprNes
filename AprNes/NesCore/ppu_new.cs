@@ -278,30 +278,45 @@ namespace AprNes
                             if (bgColor == 0) bgPalette = 0;
                         }
 
-                        int sprColor = 0, sprPalette = 0, sprSlot = -1;
-                        bool sprPriority = false;
+                        // Loopless OAM multiplexer — SWAR pick of first (lowest-index) sprite with
+                        // active shift (X counter == 0 OR skippedPreRenderDot341) AND non-empty bit7.
                         if (cx <= 256 && showSpr && (cx > 8 || ShowSprLeft8) && spriteAnyActive)
                         {
-                            for (int i = 0; i < 8; i++)
-                            {
-                                if (sprXCounter[i] == 0 || skippedPreRenderDot341)
-                                {
-                                    int h = sprShiftH[i], l = sprShiftL[i];
-                                    if ((h | l) >= 128)
-                                    {
-                                        int attr = sprFetchAttr[i];
-                                        sprColor = ((h >> 7) << 1) | (l >> 7);
-                                        sprPalette = (attr & 3) | 4;
-                                        sprPriority = (attr & 0x20) == 0;
-                                        sprSlot = i;
-                                        break;
-                                    }
-                                }
-                            }
+                            ulong xc = *(ulong*)sprXCounter;
+                            // active_mask: 0x80 per byte where counter == 0 (or forced when skip flag)
+                            ulong has_bits = ((xc & 0x7F7F7F7F7F7F7F7FUL) + 0x7F7F7F7F7F7F7F7FUL) | xc;
+                            ulong active_mask = skippedPreRenderDot341
+                                ? 0x8080808080808080UL
+                                : (~has_bits & 0x8080808080808080UL);
+                            // pixel_mask: 0x80 per byte where (H|L) bit7 is set (equiv to original (h|l) >= 128)
+                            ulong pixel_mask = (*(ulong*)sprShiftH | *(ulong*)sprShiftL) & 0x8080808080808080UL;
+                            ulong valid = active_mask & pixel_mask;
 
-                            if (sprColor != 0)
+                            if (valid != 0)
                             {
-                                if (canDetectSprite0Hit && sprSlot == 0 && sprZeroInSlots && showBG && bgColor != 0)
+                                // Isolate lowest set bit → identifies lowest-index sprite (little-endian)
+                                ulong lowest = valid & (ulong)(-(long)valid);
+                                int i;
+                                uint lo32 = (uint)lowest;
+                                if (lo32 != 0)
+                                {
+                                    if ((lo32 & 0xFFFFu) != 0) i = (lo32 & 0x80u) != 0 ? 0 : 1;
+                                    else                       i = (lo32 & 0x800000u) != 0 ? 2 : 3;
+                                }
+                                else
+                                {
+                                    uint hi32 = (uint)(lowest >> 32);
+                                    if ((hi32 & 0xFFFFu) != 0) i = (hi32 & 0x80u) != 0 ? 4 : 5;
+                                    else                       i = (hi32 & 0x800000u) != 0 ? 6 : 7;
+                                }
+
+                                byte h = sprShiftH[i], l = sprShiftL[i];
+                                int attr = sprFetchAttr[i];
+                                int sprColor = ((h >> 7) << 1) | (l >> 7);
+                                int sprPalette = (attr & 3) | 4;
+                                bool sprPriority = (attr & 0x20) == 0;
+
+                                if (canDetectSprite0Hit && i == 0 && sprZeroInSlots && showBG && bgColor != 0)
                                 { if ((ShowSprLeft8 || cx > 8) && cx < 256) { pendingSprite0Hit = true; canDetectSprite0Hit = false; } }
 
                                 bool ow = (bgColor == 0) | sprPriority;
