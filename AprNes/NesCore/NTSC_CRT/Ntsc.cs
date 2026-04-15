@@ -745,8 +745,13 @@ namespace AprNes
                 {
                     float* cwQ = combinedQ + tModQ * kWinQ; int n = 0;
                     var accQ0 = new Vector<float>(0f); var accQ1 = new Vector<float>(0f); int stride2Q = VS * 2;
+#if NET10_0_OR_GREATER
+                    for (; n <= wQ - stride2Q; n += stride2Q) { accQ0 = Vector.MultiplyAddEstimate(*(Vector<float>*)(cwQ + n), *(Vector<float>*)(wvQ + n), accQ0); accQ1 = Vector.MultiplyAddEstimate(*(Vector<float>*)(cwQ + n + VS), *(Vector<float>*)(wvQ + n + VS), accQ1); }
+                    for (; n <= wQ - VS; n += VS) accQ0 = Vector.MultiplyAddEstimate(*(Vector<float>*)(cwQ + n), *(Vector<float>*)(wvQ + n), accQ0);
+#else
                     for (; n <= wQ - stride2Q; n += stride2Q) { accQ0 += *(Vector<float>*)(cwQ + n) * *(Vector<float>*)(wvQ + n); accQ1 += *(Vector<float>*)(cwQ + n + VS) * *(Vector<float>*)(wvQ + n + VS); }
                     for (; n <= wQ - VS; n += VS) accQ0 += *(Vector<float>*)(cwQ + n) * *(Vector<float>*)(wvQ + n);
+#endif
                     float sumQ = Vector.Dot(accQ0 + accQ1, new Vector<float>(1f)); for (; n < wQ; n++) sumQ += cwQ[n] * wvQ[n];
                     qDotBuf[d] = -2f * sumQ; wvQ += kSampDot;
 
@@ -777,7 +782,11 @@ namespace AprNes
                     {
                         yChunk[k] = hannY[0] * wvY[0] + hannY[1] * wvY[1] + hannY[2] * wvY[2] + hannY[3] * wvY[3] + hannY[4] * wvY[4] + hannY[5] * wvY[5];
                         float* cwI = combinedI + tModI * kWinI; int n = 0; var acc = new Vector<float>(0f);
+#if NET10_0_OR_GREATER
+                        for (; n <= kWinI - VS; n += VS) acc = Vector.MultiplyAddEstimate(*(Vector<float>*)(cwI + n), *(Vector<float>*)(wvI + n), acc);
+#else
                         for (; n <= kWinI - VS; n += VS) acc += *(Vector<float>*)(cwI + n) * *(Vector<float>*)(wvI + n);
+#endif
                         float sumI = Vector.Dot(acc, new Vector<float>(1f)); for (; n < kWinI; n++) sumI += cwI[n] * wvI[n];
                         iChunk[k] = 2f * sumI; qChunk[k] = qDotBuf[(p + k) >> 2]; wvY++; wvI++;
 
@@ -805,7 +814,11 @@ namespace AprNes
                     {
                         yChunk[k] = hannY[0] * wvY[0] + hannY[1] * wvY[1] + hannY[2] * wvY[2] + hannY[3] * wvY[3] + hannY[4] * wvY[4] + hannY[5] * wvY[5];
                         float* cwI = combinedI + tModI * kWinI; int n = 0; var acc = new Vector<float>(0f);
+#if NET10_0_OR_GREATER
+                        for (; n <= kWinI - VS; n += VS) acc = Vector.MultiplyAddEstimate(*(Vector<float>*)(cwI + n), *(Vector<float>*)(wvI + n), acc);
+#else
                         for (; n <= kWinI - VS; n += VS) acc += *(Vector<float>*)(cwI + n) * *(Vector<float>*)(wvI + n);
+#endif
                         float sumI = Vector.Dot(acc, new Vector<float>(1f)); for (; n < kWinI; n++) sumI += cwI[n] * wvI[n];
                         iChunk[k] = 2f * sumI; qChunk[k] = qDotBuf[(p + k) >> 2]; wvY++; wvI++;
 
