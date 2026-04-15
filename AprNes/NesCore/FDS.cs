@@ -498,6 +498,28 @@ namespace AprNes
             init_function();
 
             // Override CPU-side memory map for FDS
+#if NET10_0_OR_GREATER
+            for (int address = 0x4020; address < 0x4100; address++)
+            {
+                mem_write_fun[address] = &fds_RegWrite;
+                mem_read_fun[address]  = &fds_RegRead;
+            }
+            for (int address = 0x4100; address < 0x6000; address++)
+            {
+                mem_write_fun[address] = &Write_NoOp;
+                mem_read_fun[address]  = &Read_OpenBus;
+            }
+            for (int address = 0x6000; address < 0xE000; address++)
+            {
+                mem_write_fun[address] = &fds_PrgRamWrite;
+                mem_read_fun[address]  = &fds_PrgRamRead;
+            }
+            for (int address = 0xE000; address < 0x10000; address++)
+            {
+                mem_write_fun[address] = &Write_NoOp; // BIOS is read-only
+                mem_read_fun[address]  = &fds_BiosReadWithCheck;
+            }
+#else
             for (int address = 0x4020; address < 0x4100; address++)
             {
                 mem_write_fun[address] = fds_RegWrite;
@@ -505,8 +527,8 @@ namespace AprNes
             }
             for (int address = 0x4100; address < 0x6000; address++)
             {
-                mem_write_fun[address] = (addr, val) => { };
-                mem_read_fun[address] = (addr) => cpubus;
+                mem_write_fun[address] = Write_NoOp;
+                mem_read_fun[address] = Read_OpenBus;
             }
             for (int address = 0x6000; address < 0xE000; address++)
             {
@@ -515,9 +537,10 @@ namespace AprNes
             }
             for (int address = 0xE000; address < 0x10000; address++)
             {
-                mem_write_fun[address] = (addr, val) => { }; // BIOS is read-only
+                mem_write_fun[address] = Write_NoOp; // BIOS is read-only
                 mem_read_fun[address] = fds_BiosReadWithCheck;
             }
+#endif
         }
 
         // ── Memory access handlers ─────────────────────────────────────────

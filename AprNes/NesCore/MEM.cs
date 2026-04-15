@@ -238,40 +238,80 @@ namespace AprNes
             dmcSetReadBuffer(val);
         }
 
+#if NET10_0_OR_GREATER
+        // .NET 10: native function pointer arrays — calli IL opcode, no delegate invoke overhead
+        static delegate*<ushort, byte>[] mem_read_fun = null;
+        static delegate*<ushort, byte, void>[] mem_write_fun = null;
+#else
+        // .NET Framework 4.8.1: managed delegate arrays
         static Action<ushort, byte>[] mem_write_fun = null;
         static Func<ushort, byte>[] mem_read_fun = null;
+#endif
 
-        // ppu_read_fun/ppu_write_fun removed — replaced by PpuBusRead/PpuBusWrite in PPU.cs
+        // ── Static helpers (replace previously-lambda bodies) ──
+        // Needed for .NET 10 fp binding (&Name syntax requires static target).
+        static byte Read_NesRam(ushort addr) { return NES_MEM[addr & 0x7ff]; }
+        static void Write_NesRam(ushort addr, byte val) { NES_MEM[addr & 0x7ff] = val; }
+        static byte Read_OpenBus(ushort addr) { return cpubus; }
+        static void Write_NoOp(ushort addr, byte val) { }
+
+        // ── Static wrappers for mapper instance methods ──
+        // IMapper methods live on MapperObj (static field). fp requires static target,
+        // so we forward through trivial static wrappers. JIT inlines these for free.
+        static byte Wrap_MapperR_ExpansionROM(ushort addr) => MapperObj.MapperR_ExpansionROM(addr);
+        static byte Wrap_MapperR_RAM(ushort addr) => MapperObj.MapperR_RAM(addr);
+        static byte Wrap_MapperR_RPG(ushort addr) => MapperObj.MapperR_RPG(addr);
+        static void Wrap_MapperW_ExpansionROM(ushort addr, byte val) => MapperObj.MapperW_ExpansionROM(addr, val);
+        static void Wrap_MapperW_RAM(ushort addr, byte val) => MapperObj.MapperW_RAM(addr, val);
+        static void Wrap_MapperW_PRG(ushort addr, byte val) => MapperObj.MapperW_PRG(addr, val);
 
         static void init_function()
         {
+#if NET10_0_OR_GREATER
+            mem_write_fun = new delegate*<ushort, byte, void>[0x10000];
+            mem_read_fun  = new delegate*<ushort, byte>[0x10000];
+
+            for (int address = 0; address < 0x10000; address++)
+            {
+                if      (address < 0x2000) mem_write_fun[address] = &Write_NesRam;
+                else if (address < 0x4020) mem_write_fun[address] = &IO_write;
+                else if (address < 0x4100) mem_write_fun[address] = &Write_NoOp;              // $4020-$40FF open bus
+                else if (address < 0x6000) mem_write_fun[address] = &Wrap_MapperW_ExpansionROM;
+                else if (address < 0x8000) mem_write_fun[address] = &Wrap_MapperW_RAM;
+                else                       mem_write_fun[address] = &Wrap_MapperW_PRG;
+            }
+            for (int address = 0; address < 0x10000; address++)
+            {
+                if      (address < 0x2000) mem_read_fun[address] = &Read_NesRam;
+                else if (address < 0x4020) mem_read_fun[address] = &IO_read;
+                else if (address < 0x4100) mem_read_fun[address] = &Read_OpenBus;             // $4020-$40FF open bus
+                else if (address < 0x6000) mem_read_fun[address] = &Wrap_MapperR_ExpansionROM;
+                else if (address < 0x8000) mem_read_fun[address] = &Wrap_MapperR_RAM;
+                else                       mem_read_fun[address] = &Wrap_MapperR_RPG;
+            }
+#else
             mem_write_fun = new Action<ushort, byte>[0x10000];
-            mem_read_fun = new Func<ushort, byte>[0x10000];
-
-            // ppu_write_fun/ppu_read_fun arrays removed (replaced by PpuBusRead/PpuBusWrite)
+            mem_read_fun  = new Func<ushort, byte>[0x10000];
 
             for (int address = 0; address < 0x10000; address++)
             {
-                if (address < 0x2000) mem_write_fun[address] = new Action<ushort, byte>((addr, val) => { NES_MEM[addr & 0x7ff] = val; });
-                else if (address < 0x4020) mem_write_fun[address] = new Action<ushort, byte>(IO_write);
-                else if (address < 0x4100) mem_write_fun[address] = new Action<ushort, byte>((addr, val) => { }); // $4020-$40FF: open bus (no effect on write)
-                else if (address < 0x6000) mem_write_fun[address] = new Action<ushort, byte>(MapperObj.MapperW_ExpansionROM);
-                else if (address < 0x8000) mem_write_fun[address] = new Action<ushort, byte>(MapperObj.MapperW_RAM);
-                else mem_write_fun[address] = new Action<ushort, byte>(MapperObj.MapperW_PRG);
+                if      (address < 0x2000) mem_write_fun[address] = Write_NesRam;
+                else if (address < 0x4020) mem_write_fun[address] = IO_write;
+                else if (address < 0x4100) mem_write_fun[address] = Write_NoOp;
+                else if (address < 0x6000) mem_write_fun[address] = Wrap_MapperW_ExpansionROM;
+                else if (address < 0x8000) mem_write_fun[address] = Wrap_MapperW_RAM;
+                else                       mem_write_fun[address] = Wrap_MapperW_PRG;
             }
             for (int address = 0; address < 0x10000; address++)
             {
-                if (address < 0x2000) mem_read_fun[address] = new Func<ushort, byte>((addr) => { return NES_MEM[addr & 0x7ff]; });
-                else if (address < 0x4020) mem_read_fun[address] = new Func<ushort, byte>(IO_read);
-                else if (address < 0x4100) mem_read_fun[address] = new Func<ushort, byte>((addr) => { return cpubus; }); // $4020-$40FF: CPU open bus
-                else if (address < 0x6000) mem_read_fun[address] = new Func<ushort, byte>(MapperObj.MapperR_ExpansionROM); // $4100-$5FFF: mapper expansion ROM
-                else if (address < 0x8000) mem_read_fun[address] = new Func<ushort, byte>(MapperObj.MapperR_RAM);
-                else mem_read_fun[address] = new Func<ushort, byte>(MapperObj.MapperR_RPG);
+                if      (address < 0x2000) mem_read_fun[address] = Read_NesRam;
+                else if (address < 0x4020) mem_read_fun[address] = IO_read;
+                else if (address < 0x4100) mem_read_fun[address] = Read_OpenBus;
+                else if (address < 0x6000) mem_read_fun[address] = Wrap_MapperR_ExpansionROM;
+                else if (address < 0x8000) mem_read_fun[address] = Wrap_MapperR_RAM;
+                else                       mem_read_fun[address] = Wrap_MapperR_RPG;
             }
-
-
-            // PPU bus read/write lambdas removed — replaced by PpuBusRead/PpuBusWrite in PPU.cs
-            // $2007 register behavior (buffer, increment) handled in ppu_r_2007/ppu_w_2007
+#endif
         }
     }
 }
