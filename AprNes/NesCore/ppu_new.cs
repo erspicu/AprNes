@@ -389,12 +389,14 @@ namespace AprNes
                     else ScreenBuf1x[pos] = prevPrevPrevDotColor;
                 }
                 if (AnalogEnabled && cx == 260)
-                    DecodeScanline(scanline, ntscScanBuf, ppuEmphasis);
+                    Ntsc_CaptureScanline(scanline, ntscScanBuf, ppuEmphasis);
             }
 
             // ── Frame render at SL240 cx1 ──
             if (scanline == 240 && cx == 1)
             {
+                // Parallel-demod all 240 captured scanlines before Crt_Render reads linearBuffer.
+                if (AnalogEnabled) Ntsc_FlushPendingRows();
                 RenderScreen();
                 frame_count++;
                 if (AnalogEnabled) { Ntsc_SetFrameCount(frame_count); Crt_SetFrameCount(frame_count); }

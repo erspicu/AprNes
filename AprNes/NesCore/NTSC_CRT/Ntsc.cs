@@ -2,6 +2,7 @@ using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 
 namespace AprNes
 {
@@ -133,14 +134,10 @@ namespace AprNes
             {
                 loLevels = (float*)Marshal.AllocHGlobal(4 * sizeof(float));
                 loLevels[0] = -0.12f; loLevels[1] = 0.00f; loLevels[2] = 0.31f; loLevels[3] = 0.72f;
-                // Per-scanline scratch buffers (was stackalloc-per-call; zero-init was forced
-                // by .NET Framework 4.8.1 IL `init` prefix → ~125 MB/s L1 churn at 4x analog).
-                // Safe as static because DecodeScanline runs on the single PPU thread.
-                ntsc_waveBuf = (float*)Marshal.AllocHGlobal(kBufLen * sizeof(float));
-                ntsc_cBuf    = (float*)Marshal.AllocHGlobal(kBufLen * sizeof(float));
-                ntsc_dotY    = (float*)Marshal.AllocHGlobal(256 * sizeof(float));
-                ntsc_dotI    = (float*)Marshal.AllocHGlobal(256 * sizeof(float));
-                ntsc_dotQ    = (float*)Marshal.AllocHGlobal(256 * sizeof(float));
+                // Row-capture buffers for deferred parallel demodulation.
+                // Scratch buffers (wave/cBuf/dotY/I/Q) are now per-thread via [ThreadStatic].
+                ntsc_rowPalettes = (byte*)Marshal.AllocHGlobal(kSrcH * 256);
+                ntsc_rowEmphasis = (byte*)Marshal.AllocHGlobal(kSrcH);
                 hiLevels = (float*)Marshal.AllocHGlobal(4 * sizeof(float));
                 hiLevels[0] = 0.40f; hiLevels[1] = 0.68f; hiLevels[2] = 1.00f; hiLevels[3] = 1.00f;
                 iPhase = (float*)Marshal.AllocHGlobal(16 * sizeof(float));
@@ -348,20 +345,62 @@ namespace AprNes
             }
         }
 
-        // Per-scanline scratch — allocated once in Ntsc_Init to dodge stackalloc zero-init.
-        static float* ntsc_waveBuf;
-        static float* ntsc_cBuf;
-        static float* ntsc_dotY;
-        static float* ntsc_dotI;
-        static float* ntsc_dotQ;
+        // Per-scanline scratch — [ThreadStatic] so each Parallel.For worker owns its own copy.
+        // Lazy-allocated on first use per thread (thread pool threads persist for app lifetime).
+        [ThreadStatic] static float* tls_waveBuf;
+        [ThreadStatic] static float* tls_cBuf;
+        [ThreadStatic] static float* tls_dotY;
+        [ThreadStatic] static float* tls_dotI;
+        [ThreadStatic] static float* tls_dotQ;
 
+        // Per-scanline capture buffers — PPU thread snapshots palette + emphasis here, then
+        // at frame end all 240 rows are demodulated in parallel.
+        static byte* ntsc_rowPalettes;    // kSrcH × 256 bytes
+        static byte* ntsc_rowEmphasis;    // kSrcH bytes
+
+        static void EnsureThreadScratch()
+        {
+            if (tls_waveBuf != null) return;
+            tls_waveBuf = (float*)Marshal.AllocHGlobal(kBufLen * sizeof(float));
+            tls_cBuf    = (float*)Marshal.AllocHGlobal(kBufLen * sizeof(float));
+            tls_dotY    = (float*)Marshal.AllocHGlobal(256 * sizeof(float));
+            tls_dotI    = (float*)Marshal.AllocHGlobal(256 * sizeof(float));
+            tls_dotQ    = (float*)Marshal.AllocHGlobal(256 * sizeof(float));
+        }
+
+        // Fast path: PPU thread snapshots the ntscScanBuf + emphasis at cx==260 of each scanline.
+        // Actual demodulation is deferred to Ntsc_FlushPendingRows() at frame end for parallel dispatch.
+        public static void Ntsc_CaptureScanline(int sl, byte* palBuf, byte emphasisBits)
+        {
+            if (sl < 0 || sl >= kSrcH) return;
+            Buffer.MemoryCopy(palBuf, ntsc_rowPalettes + sl * 256, 256, 256);
+            ntsc_rowEmphasis[sl] = emphasisBits;
+        }
+
+        // Called at frame end (sl=240 cx=1) before Crt_Render — runs all 240 row demodulations in parallel.
+        public static void Ntsc_FlushPendingRows()
+        {
+            Parallel.For(0, kSrcH, sl =>
+            {
+                EnsureThreadScratch();
+                byte* palBuf = ntsc_rowPalettes + sl * 256;
+                byte emph = ntsc_rowEmphasis[sl];
+                if (ntsc_ultraAnalog)
+                    DecodeScanline_Physical(sl, palBuf, emph, tls_waveBuf, tls_cBuf);
+                else
+                    DecodeScanline_Fast(sl, palBuf, emph, tls_dotY, tls_dotI, tls_dotQ);
+            });
+        }
+
+        // Legacy serial entry (kept for correctness fallback / non-benchmark callers).
         public static void DecodeScanline(int sl, byte* palBuf, byte emphasisBits)
         {
             if (sl < 0 || sl >= kSrcH) return;
+            EnsureThreadScratch();
             if (ntsc_ultraAnalog)
-                DecodeScanline_Physical(sl, palBuf, emphasisBits, ntsc_waveBuf, ntsc_cBuf);
+                DecodeScanline_Physical(sl, palBuf, emphasisBits, tls_waveBuf, tls_cBuf);
             else
-                DecodeScanline_Fast(sl, palBuf, emphasisBits, ntsc_dotY, ntsc_dotI, ntsc_dotQ);
+                DecodeScanline_Fast(sl, palBuf, emphasisBits, tls_dotY, tls_dotI, tls_dotQ);
         }
 
         static void DecodeScanline_Fast(int sl, byte* palBuf, byte emphasisBits, float* dotY, float* dotI, float* dotQ)
