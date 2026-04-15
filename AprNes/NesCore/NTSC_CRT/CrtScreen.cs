@@ -234,34 +234,50 @@ namespace AprNes
 
             float alpha = HBeamSpread * 0.5f;
             float center = 1f - HBeamSpread;
-            // kPlane defined in Ntsc partial (kOutW * kSrcH)
+
+            var vAlpha = new Vector<float>(alpha);
+            var vCenter = new Vector<float>(center);
+            int VS = Vector<float>.Count;
 
             Parallel.For(0, 3 * Crt_SrcH, i =>
             {
                 int plane = i / Crt_SrcH;
-                int row = i % Crt_SrcH; // 簡化：直接使用取餘數
+                int row = i % Crt_SrcH;
                 float* p = lb + plane * kPlane + row * Crt_SrcW;
 
-                float prev = p[0];
-                int limit = Crt_SrcW - 1; // 把終點提早 1 格
+                // Snapshot row to a stackalloc buffer — breaks the in-place
+                // Read-After-Write hazard that blocked SIMD in the scalar version.
+                // Crt_SrcW = 1024 → 4KB stackalloc, free on modern CPUs.
+                float* src = stackalloc float[Crt_SrcW];
+                Buffer.MemoryCopy(p, src, Crt_SrcW * sizeof(float), Crt_SrcW * sizeof(float));
 
-                // ★ 技巧 1：主迴圈剝離 (Loop Peeling)
-                // 在這個迴圈裡，x + 1 絕對不會越界，所以直接拿 p[x + 1]，連 if 和 ? : 都免了！
-                for (int x = 0; x < limit; x++)
+                // Left edge: original used prev=p[0] on first iter → src[0]*(α+c) + src[1]*α
+                p[0] = src[0] * (alpha + center) + src[1] * alpha;
+
+                int x = 1;
+                if (Vector.IsHardwareAccelerated)
                 {
-                    float cur = p[x];
-                    float next = p[x + 1]; // 100% 安全，無分支
-                    p[x] = prev * alpha + cur * center + next * alpha;
-                    prev = cur;
+                    // SIMD 3-tap: all three taps are unaligned reads from `src`,
+                    // written to disjoint positions in `p`. On AVX2 this is
+                    // 8 pixels per iteration (vmovups x3 + fma pattern).
+                    int vecEnd = Crt_SrcW - 1 - VS;
+                    for (; x <= vecEnd; x += VS)
+                    {
+                        var vPrev = *(Vector<float>*)(src + x - 1);
+                        var vCur  = *(Vector<float>*)(src + x);
+                        var vNext = *(Vector<float>*)(src + x + 1);
+                        *(Vector<float>*)(p + x) = vPrev * vAlpha + vCur * vCenter + vNext * vAlpha;
+                    }
                 }
 
-                // ★ 技巧 2：處理尾巴 (Epilogue)
-                // 專門處理剛剛被剝離出來的「最後一個像素」
-                // 在原本邏輯中，最後一個像素的 next 等於 cur
-                float lastCur = p[limit];
+                // Scalar tail (up to VS-1 pixels)
+                int limitMinus1 = Crt_SrcW - 1;
+                for (; x < limitMinus1; x++)
+                    p[x] = src[x - 1] * alpha + src[x] * center + src[x + 1] * alpha;
 
-                // 代數簡化：lastCur * center + lastCur * alpha 可以合併為 lastCur * (center + alpha)
-                p[limit] = prev * alpha + lastCur * (center + alpha);
+                // Right edge: original epilogue — lastCur * (center + alpha) collapses the
+                // duplicated tail term since next would equal cur at the boundary.
+                p[limitMinus1] = src[limitMinus1 - 1] * alpha + src[limitMinus1] * (center + alpha);
             });
         }
 
