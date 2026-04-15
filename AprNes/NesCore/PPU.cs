@@ -521,10 +521,10 @@ namespace AprNes
             int vNibble = vAddr & 0xF;
             int actionIndex = (bgColor << 4) | vNibble;
 
-            byte* c = stackalloc byte[32];
-            ulong* src = (ulong*)(ppu_ram + 0x3F00);
-            ulong* dst = (ulong*)c;
-            dst[0] = src[0]; dst[1] = src[1]; dst[2] = src[2]; dst[3] = src[3];
+            // All switch cases only touch c[0x0..0xF]; upper 16 bytes were previously
+            // round-tripped through a stackalloc copy for no reason. Operate on
+            // ppu_ram directly — same observable semantics, no 32-byte copy in/out.
+            byte* c = ppu_ram + 0x3F00;
 
             switch (actionIndex)
             {
@@ -532,8 +532,13 @@ namespace AprNes
                 case 0x04: case 0x05: case 0x06: case 0x07:
                 case 0x08: case 0x09: case 0x0A: case 0x0B:
                 case 0x0C: case 0x0D: case 0x0E: case 0x0F:
-                    c[vNibble] = (byte)((c[0] & c[vNibble & 0xC]) | (c[0] & c[vNibble]) | (c[vNibble & 0xC] & c[vNibble]));
+                {
+                    // Majority gate simplification: (A&B)|(A&C)|(B&C) ≡ (A&B)|((A|B)&C).
+                    // Saves one AND; also caches the three loads into locals.
+                    byte a = c[0], b = c[vNibble & 0xC], cc = c[vNibble];
+                    c[vNibble] = (byte)((a & b) | ((a | b) & cc));
                     break;
+                }
                 case 0x10: c[0x0]=(byte)((c[0x1]&c[0xD])|c[0x0]); c[0x4]=c[0x5]; c[0x8]=c[0x9]; c[0xC]=c[0xD]; break;
                 case 0x12: c[0x2]=(byte)((c[0x2]|c[0xD])&c[0x3]); c[0x3]=(byte)((c[0x1]|c[0x2])&c[0x3]); c[0x6]=(byte)((c[0x6]|c[0x5])&c[0x7]); c[0xA]=(byte)((c[0xA]|c[0x9])&c[0xB]); c[0xE]=c[0xD]; c[0xF]=c[0xD]; break;
                 case 0x13: c[0x3]&=(byte)(c[0x1]|c[0xD]); c[0xF]=c[0xD]; break;
@@ -572,7 +577,6 @@ namespace AprNes
                 case 0x3E: c[0x2]=c[0x3]; c[0x6]=c[0x7]; c[0xA]=c[0xB]; c[0xE]=c[0xF]; break;
             }
 
-            src[0] = dst[0]; src[1] = dst[1]; src[2] = dst[2]; src[3] = dst[3];
             RebuildPaletteCache();
         }
 
