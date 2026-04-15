@@ -512,9 +512,61 @@ namespace AprNes
         static void ProcessRowMask_SWAR(uint* row, int ty, int dstW, uint udim, bool isSM)
         {
             int phase = (isSM && (ty & 1) != 0) ? 1 : 0;
-            uint keepMask = phase == 1 ? 0x0000FF00u : 0x00FF0000u;
+            int tx = 0;
 
-            for (int tx = 0; tx < dstW; tx++)
+            if (Avx2.IsSupported)
+            {
+                int vecW = 8;
+                Vector256<uint> vUdim   = Vector256.Create(udim);
+                Vector256<uint> vMaskRB = Vector256.Create(0x00FF00FFu);
+                Vector256<uint> vMaskG  = Vector256.Create(0x0000FF00u);
+                Vector256<uint> vAlpha  = Vector256.Create(0xFF000000u);
+                Vector256<uint> vAllOnes = Vector256.Create(0xFFFFFFFFu);
+
+                // keepMask 8-lane patterns — RGB cycles per pixel.
+                // After 8 pixels, phase advances by +8 mod 3 = +2.
+                const uint R_ = 0x00FF0000u, G_ = 0x0000FF00u, B_ = 0x000000FFu;
+                Vector256<uint> vKeepP0 = Vector256.Create(R_, G_, B_, R_, G_, B_, R_, G_);
+                Vector256<uint> vKeepP1 = Vector256.Create(G_, B_, R_, G_, B_, R_, G_, B_);
+                Vector256<uint> vKeepP2 = Vector256.Create(B_, R_, G_, B_, R_, G_, B_, R_);
+
+                int phaseIdx = phase; // 0 or 1 initial
+                int vecEnd = dstW - vecW + 1;
+                for (; tx < vecEnd; tx += vecW)
+                {
+                    Vector256<uint> vPx = Avx.LoadVector256(row + tx);
+
+                    Vector256<uint> vDimRB = Avx2.And(
+                        Avx2.ShiftRightLogical(Avx2.MultiplyLow(Avx2.And(vPx, vMaskRB), vUdim), 8),
+                        vMaskRB);
+                    Vector256<uint> vDimG = Avx2.And(
+                        Avx2.ShiftRightLogical(Avx2.MultiplyLow(Avx2.And(vPx, vMaskG), vUdim), 8),
+                        vMaskG);
+
+                    Vector256<uint> vKeep = phaseIdx == 0 ? vKeepP0 : (phaseIdx == 1 ? vKeepP1 : vKeepP2);
+                    Vector256<uint> vNotKeep = Avx2.Xor(vKeep, vAllOnes);
+
+                    Vector256<uint> vResult = Avx2.Or(
+                        vAlpha,
+                        Avx2.Or(Avx2.And(vPx, vKeep), Avx2.And(Avx2.Or(vDimRB, vDimG), vNotKeep)));
+
+                    Avx.Store(row + tx, vResult);
+
+                    phaseIdx = (phaseIdx + 2) % 3;
+                }
+
+                // Rebuild scalar keepMask for tail from phaseIdx.
+                // vKeepP0[0]=R, vKeepP1[0]=G, vKeepP2[0]=B
+            }
+
+            // Scalar tail (also full fallback). Reconstruct keepMask from starting phase+tx cycle.
+            uint keepMask;
+            int cyclePos = ((phase + tx) % 3 + 3) % 3;
+            if      (cyclePos == 0) keepMask = 0x00FF0000u; // R
+            else if (cyclePos == 1) keepMask = 0x0000FF00u; // G
+            else                    keepMask = 0x000000FFu; // B
+
+            for (; tx < dstW; tx++)
             {
                 uint px = row[tx];
 
@@ -530,49 +582,145 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ProcessRowMaskPhosphor_SWAR(uint* row, uint* prw, int ty, int dstW, uint udim, uint udec, bool isSM)
         {
-            // 1. 決定起始遮罩 (ShadowMask 奇數行從 G 開始，否則從 R 開始)
             int phase = (isSM && (ty & 1) != 0) ? 1 : 0;
-            uint keepMask = phase == 1 ? 0x0000FF00u : 0x00FF0000u;
+            int tx = 0;
 
-            for (int tx = 0; tx < dstW; tx++)
+            if (Avx2.IsSupported)
+            {
+                int vecW = 8;
+                Vector256<uint> vUdim    = Vector256.Create(udim);
+                Vector256<uint> vUdec    = Vector256.Create(udec);
+                Vector256<uint> vMaskRB  = Vector256.Create(0x00FF00FFu);
+                Vector256<uint> vMaskG   = Vector256.Create(0x0000FF00u);
+                Vector256<uint> vMaskR   = Vector256.Create(0x00FF0000u);
+                Vector256<uint> vMaskB   = Vector256.Create(0x000000FFu);
+                Vector256<uint> vAlpha   = Vector256.Create(0xFF000000u);
+                Vector256<uint> vAllOnes = Vector256.Create(0xFFFFFFFFu);
+
+                const uint R_ = 0x00FF0000u, G_ = 0x0000FF00u, B_ = 0x000000FFu;
+                Vector256<uint> vKeepP0 = Vector256.Create(R_, G_, B_, R_, G_, B_, R_, G_);
+                Vector256<uint> vKeepP1 = Vector256.Create(G_, B_, R_, G_, B_, R_, G_, B_);
+                Vector256<uint> vKeepP2 = Vector256.Create(B_, R_, G_, B_, R_, G_, B_, R_);
+
+                int phaseIdx = phase;
+                int vecEnd = dstW - vecW + 1;
+                for (; tx < vecEnd; tx += vecW)
+                {
+                    Vector256<uint> vPx  = Avx.LoadVector256(row + tx);
+                    Vector256<uint> vPrv = Avx.LoadVector256(prw + tx);
+
+                    // Phosphor decay (prv × udec)
+                    Vector256<uint> vDecRB = Avx2.And(
+                        Avx2.ShiftRightLogical(Avx2.MultiplyLow(Avx2.And(vPrv, vMaskRB), vUdec), 8),
+                        vMaskRB);
+                    Vector256<uint> vDecG = Avx2.And(
+                        Avx2.ShiftRightLogical(Avx2.MultiplyLow(Avx2.And(vPrv, vMaskG), vUdec), 8),
+                        vMaskG);
+
+                    // Mask dim (px × udim)
+                    Vector256<uint> vDimRB = Avx2.And(
+                        Avx2.ShiftRightLogical(Avx2.MultiplyLow(Avx2.And(vPx, vMaskRB), vUdim), 8),
+                        vMaskRB);
+                    Vector256<uint> vDimG = Avx2.And(
+                        Avx2.ShiftRightLogical(Avx2.MultiplyLow(Avx2.And(vPx, vMaskG), vUdim), 8),
+                        vMaskG);
+
+                    Vector256<uint> vKeep = phaseIdx == 0 ? vKeepP0 : (phaseIdx == 1 ? vKeepP1 : vKeepP2);
+                    Vector256<uint> vNotKeep = Avx2.Xor(vKeep, vAllOnes);
+
+                    // masked = (px & keep) | ((dim_RB | dim_G) & ~keep)
+                    Vector256<uint> vMasked = Avx2.Or(
+                        Avx2.And(vPx, vKeep),
+                        Avx2.And(Avx2.Or(vDimRB, vDimG), vNotKeep));
+
+                    // max(masked, dec) per channel
+                    Vector256<uint> vMaxR = Avx2.Max(Avx2.And(vMasked, vMaskR), Avx2.And(vDecRB, vMaskR));
+                    Vector256<uint> vMaxG = Avx2.Max(Avx2.And(vMasked, vMaskG), vDecG);
+                    Vector256<uint> vMaxB = Avx2.Max(Avx2.And(vMasked, vMaskB), Avx2.And(vDecRB, vMaskB));
+
+                    Vector256<uint> vResult = Avx2.Or(Avx2.Or(vMaxR, vMaxG), Avx2.Or(vMaxB, vAlpha));
+
+                    Avx.Store(row + tx, vResult);
+                    Avx.Store(prw + tx, vResult);
+
+                    phaseIdx = (phaseIdx + 2) % 3;
+                }
+            }
+
+            // Scalar tail (also fallback for non-Avx2)
+            uint keepMask;
+            int cyclePos = ((phase + tx) % 3 + 3) % 3;
+            if      (cyclePos == 0) keepMask = 0x00FF0000u;
+            else if (cyclePos == 1) keepMask = 0x0000FF00u;
+            else                    keepMask = 0x000000FFu;
+
+            for (; tx < dstW; tx++)
             {
                 uint px = row[tx];
                 uint prv = prw[tx];
 
-                // 2. SWAR 磷光衰減 (Phosphor Decay) - 全通道均勻處理
                 uint dec_RB = (((prv & 0x00FF00FFu) * udec) >> 8) & 0x00FF00FFu;
                 uint dec_G = (((prv & 0x0000FF00u) * udec) >> 8) & 0x0000FF00u;
 
-                // 3. SWAR 蔭罩衰減 (Mask Dimming) - 先全部衰減，再把要保留的通道「貼」回去
                 uint dim_RB = (((px & 0x00FF00FFu) * udim) >> 8) & 0x00FF00FFu;
                 uint dim_G = (((px & 0x0000FF00u) * udim) >> 8) & 0x0000FF00u;
 
-                // 合併：(保留通道的原色) | (其餘通道的衰減色)
                 uint masked = (px & keepMask) | ((dim_RB | dim_G) & ~keepMask);
 
-                // 4. 原地無分支比較 + 連鎖寫回 (Phosphor Max Blend)
                 row[tx] = prw[tx] = 0xFF000000u
                                   | Math.Max(masked & 0x00FF0000u, dec_RB & 0x00FF0000u)
                                   | Math.Max(masked & 0x0000FF00u, dec_G)
                                   | Math.Max(masked & 0x000000FFu, dec_RB & 0x000000FFu);
 
-                // 5. 遮罩旋轉魔法：R(FF0000) -> G(00FF00) -> B(0000FF) -> R(FF0000)
                 keepMask = (keepMask >> 8) | ((keepMask & 0xFFu) << 16);
             }
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ProcessRowPhosphor_SWAR(uint* row, uint* prw, int dstW, uint udec)
         {
-            for (int tx = 0; tx < dstW; tx++)
+            int tx = 0;
+            if (Avx2.IsSupported)
+            {
+                int vecW = 8; // 8 pixels per batch (Vector256<uint>)
+                Vector256<uint> vUdec     = Vector256.Create(udec);
+                Vector256<uint> vMaskRB   = Vector256.Create(0x00FF00FFu);
+                Vector256<uint> vMaskG    = Vector256.Create(0x0000FF00u);
+                Vector256<uint> vMaskR    = Vector256.Create(0x00FF0000u);
+                Vector256<uint> vMaskB    = Vector256.Create(0x000000FFu);
+                Vector256<uint> vAlpha    = Vector256.Create(0xFF000000u);
+
+                int vecEnd = dstW - vecW + 1;
+                for (; tx < vecEnd; tx += vecW)
+                {
+                    Vector256<uint> vPx  = Avx.LoadVector256(row + tx);
+                    Vector256<uint> vPrv = Avx.LoadVector256(prw + tx);
+
+                    // SWAR decay: ((prv & mask) * udec) >> 8 & mask, applied per channel group
+                    Vector256<uint> vDecRB = Avx2.And(
+                        Avx2.ShiftRightLogical(Avx2.MultiplyLow(Avx2.And(vPrv, vMaskRB), vUdec), 8),
+                        vMaskRB);
+                    Vector256<uint> vDecG = Avx2.And(
+                        Avx2.ShiftRightLogical(Avx2.MultiplyLow(Avx2.And(vPrv, vMaskG), vUdec), 8),
+                        vMaskG);
+
+                    // Per-channel max(current, decayed)
+                    Vector256<uint> vMaxR = Avx2.Max(Avx2.And(vPx, vMaskR), Avx2.And(vDecRB, vMaskR));
+                    Vector256<uint> vMaxG = Avx2.Max(Avx2.And(vPx, vMaskG), vDecG);
+                    Vector256<uint> vMaxB = Avx2.Max(Avx2.And(vPx, vMaskB), Avx2.And(vDecRB, vMaskB));
+
+                    Vector256<uint> vResult = Avx2.Or(Avx2.Or(vMaxR, vMaxG), Avx2.Or(vMaxB, vAlpha));
+
+                    Avx.Store(row + tx, vResult);
+                    Avx.Store(prw + tx, vResult);
+                }
+            }
+            // Scalar tail (also fallback for non-Avx2)
+            for (; tx < dstW; tx++)
             {
                 uint px = row[tx];
                 uint prv = prw[tx];
-
-                // 1. SWAR 均勻衰減乘法 (R+B 同時算，G 單獨算)
                 uint dec_RB = (((prv & 0x00FF00FFu) * udec) >> 8) & 0x00FF00FFu;
                 uint dec_G = (((prv & 0x0000FF00u) * udec) >> 8) & 0x0000FF00u;
-
-                // 2. 原地遮罩比較 + 連鎖寫回 (編譯器會自動轉成無分支 CMOV)
                 row[tx] = prw[tx] = 0xFF000000u
                                   | Math.Max(px & 0x00FF0000u, dec_RB & 0x00FF0000u)
                                   | Math.Max(px & 0x0000FF00u, dec_G)
