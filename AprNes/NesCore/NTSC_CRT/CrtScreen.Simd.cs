@@ -1,19 +1,24 @@
 // ════════════════════════════════════════════════════════════════════════
-// CrtScreen.Net10.cs — .NET 10 fork of CrtScreen.cs
+// CrtScreen.Simd.cs — .NET 10 SIMD-accelerated CRT pipeline
 // ════════════════════════════════════════════════════════════════════════
 // Fork origin: CrtScreen.cs @ commit 8a5f99d (pre-parallel-demod baseline)
 //
-// CrtScreen.cs (net48) is frozen in maintenance mode. All .NET 10 perf
-// work (Avx2.GatherVector256, [SkipLocalsInit], Vector256<T>, Fma
-// explicit, etc.) happens in THIS file.
+// Role in the acceleration ladder:
+//   • CrtScreen.cs           → net48 baseline (frozen, maintenance-only)
+//   • CrtScreen.Simd.cs      → THIS FILE. .NET 10 SIMD path.
+//                              Avx2.GatherVector256, Vector256<T>,
+//                              [SkipLocalsInit], Fma explicit, etc.
+//   • CrtScreen.Gpu.cs       → future. Avalonia/SkiaSharp SKSL shader
+//                              pipeline replaces the CPU pipeline wholesale.
 //
 // Algorithm correctness lives in the shared Ntsc.cs — bug fixes there
-// auto-propagate to both forks. CrtScreen's fork divergence is strictly
+// auto-propagate to all forks. CrtScreen's fork divergence is strictly
 // about "how to render", not "what to render".
 //
 // Build configuration:
-//   AprNes.csproj (net48)        → compiles CrtScreen.cs, ignores this file
-//   AprNesAvalonia.csproj (net10) → compiles THIS file, excludes CrtScreen.cs
+//   AprNes.csproj (net48)         → compiles CrtScreen.cs, ignores this file
+//   AprNesAvalonia.csproj (net10) → compiles this file, excludes CrtScreen.cs
+//   Future GPU build              → msbuild /p:CrtImpl=Gpu selects Gpu.cs
 // ════════════════════════════════════════════════════════════════════════
 using System;
 using System.Numerics;
