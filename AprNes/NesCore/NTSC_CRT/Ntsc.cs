@@ -569,31 +569,26 @@ namespace AprNes
                     n3 = ((ns >> 24) & 0xFF) * nScale - nOff;
                 }
 
-                // LTI filter (sequential: vVel/vPrev dependency cannot be broken)
+                // Pre-compute all four sample inputs up front — independent of the
+                // vVel/vPrev filter chain, so RyuJIT + CPU OoO engine can schedule
+                // them in parallel with the sequential filter that follows.
                 float x0 = src[0] * ePtr[0] + h0 + n0;
-                vVel = vVel * ringDamp + (x0 - vPrev) * SlewRate; vPrev += vVel;
-                waveBuf[baseIdx] = vPrev;
-
                 float x1 = src[1] * ePtr[1] + h1 + n1;
-                vVel = vVel * ringDamp + (x1 - vPrev) * SlewRate; vPrev += vVel;
-                waveBuf[baseIdx + 1] = vPrev;
-
                 float x2 = src[2] * ePtr[2] + h2 + n2;
-                vVel = vVel * ringDamp + (x2 - vPrev) * SlewRate; vPrev += vVel;
-                waveBuf[baseIdx + 2] = vPrev;
-
                 float x3 = src[3] * ePtr[3] + h3 + n3;
-                vVel = vVel * ringDamp + (x3 - vPrev) * SlewRate; vPrev += vVel;
-                waveBuf[baseIdx + 3] = vPrev;
+
+                // LTI filter: vVel/vPrev chain is sequential — can't be vectorised.
+                waveBuf[baseIdx]     = (vPrev += (vVel = vVel * ringDamp + (x0 - vPrev) * SlewRate));
+                waveBuf[baseIdx + 1] = (vPrev += (vVel = vVel * ringDamp + (x1 - vPrev) * SlewRate));
+                waveBuf[baseIdx + 2] = (vPrev += (vVel = vVel * ringDamp + (x2 - vPrev) * SlewRate));
+                waveBuf[baseIdx + 3] = (vPrev += (vVel = vVel * ringDamp + (x3 - vPrev) * SlewRate));
 
                 tMod += 4 + (((1 - tMod) >> 31) & -6);
             }
 
             for (int i = kLeadPad + kWaveLen; i < kBufLen; i++)
             {
-                vVel = vVel * ringDamp + (lastY - vPrev) * SlewRate;
-                vPrev += vVel;
-                waveBuf[i] = vPrev;
+                waveBuf[i] = (vPrev += (vVel = vVel * ringDamp + (lastY - vPrev) * SlewRate));
             }
         }
 
