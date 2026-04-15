@@ -766,6 +766,7 @@ namespace AprNes
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [SkipLocalsInit]
         static void ProcessRowConvergence(uint* dst, uint* src, int dstW, float maxOff, float halfW, float invHW)
         {
             float step = invHW * maxOff;
@@ -801,15 +802,13 @@ namespace AprNes
                     Vector256<int> vRxR  = Avx2.Min(Avx2.Max(Avx2.Add(vTx, vIoff), vZero), vMaxIdx);
                     Vector256<int> vRxB  = Avx2.Min(Avx2.Max(Avx2.Subtract(vTx, vIoff), vZero), vMaxIdx);
 
-                    // Manual gather (Zen 2 vpgatherdd slow)
-                    int* iB = stackalloc int[8]; Avx.Store(iB, vRxB);
-                    int* iR = stackalloc int[8]; Avx.Store(iR, vRxR);
+                    // Manual gather via GetElement (vpextrd, no memory round-trip)
                     Vector256<uint> vPixB = Vector256.Create(
-                        src[iB[0]], src[iB[1]], src[iB[2]], src[iB[3]],
-                        src[iB[4]], src[iB[5]], src[iB[6]], src[iB[7]]);
+                        src[vRxB.GetElement(0)], src[vRxB.GetElement(1)], src[vRxB.GetElement(2)], src[vRxB.GetElement(3)],
+                        src[vRxB.GetElement(4)], src[vRxB.GetElement(5)], src[vRxB.GetElement(6)], src[vRxB.GetElement(7)]);
                     Vector256<uint> vPixR = Vector256.Create(
-                        src[iR[0]], src[iR[1]], src[iR[2]], src[iR[3]],
-                        src[iR[4]], src[iR[5]], src[iR[6]], src[iR[7]]);
+                        src[vRxR.GetElement(0)], src[vRxR.GetElement(1)], src[vRxR.GetElement(2)], src[vRxR.GetElement(3)],
+                        src[vRxR.GetElement(4)], src[vRxR.GetElement(5)], src[vRxR.GetElement(6)], src[vRxR.GetElement(7)]);
                     // Middle pixel (G channel) is just src[tx..tx+7] — sequential load
                     Vector256<uint> vPixM = Avx.LoadVector256(src + tx);
 
@@ -845,6 +844,7 @@ namespace AprNes
             }
         }
 
+        [SkipLocalsInit]
         static void ApplyFullFrameCurvatureAndConvergence()
         {
             PrecomputeCurvature();
@@ -914,20 +914,16 @@ namespace AprNes
                             Vector256<int> vIdxM = Avx2.AndNot(vInvalid, Avx2.Add(vSrcRowOff, vSrcTx));
                             Vector256<int> vIdxR = Avx2.AndNot(vInvalid, Avx2.Add(vSrcRowOff, vRxR));
 
-                            // Manual scalar gather (Zen 2's vpgatherdd is microcoded slow —
-                            // 8 independent scalar loads pipeline better here).
-                            int* iB = stackalloc int[8]; Avx.Store(iB, vIdxB);
-                            int* iM = stackalloc int[8]; Avx.Store(iM, vIdxM);
-                            int* iR = stackalloc int[8]; Avx.Store(iR, vIdxR);
+                            // Manual gather via GetElement (vpextrd, no memory round-trip)
                             Vector256<int> vPixB = Vector256.Create(
-                                (int)tmp[iB[0]], (int)tmp[iB[1]], (int)tmp[iB[2]], (int)tmp[iB[3]],
-                                (int)tmp[iB[4]], (int)tmp[iB[5]], (int)tmp[iB[6]], (int)tmp[iB[7]]);
+                                (int)tmp[vIdxB.GetElement(0)], (int)tmp[vIdxB.GetElement(1)], (int)tmp[vIdxB.GetElement(2)], (int)tmp[vIdxB.GetElement(3)],
+                                (int)tmp[vIdxB.GetElement(4)], (int)tmp[vIdxB.GetElement(5)], (int)tmp[vIdxB.GetElement(6)], (int)tmp[vIdxB.GetElement(7)]);
                             Vector256<int> vPixM = Vector256.Create(
-                                (int)tmp[iM[0]], (int)tmp[iM[1]], (int)tmp[iM[2]], (int)tmp[iM[3]],
-                                (int)tmp[iM[4]], (int)tmp[iM[5]], (int)tmp[iM[6]], (int)tmp[iM[7]]);
+                                (int)tmp[vIdxM.GetElement(0)], (int)tmp[vIdxM.GetElement(1)], (int)tmp[vIdxM.GetElement(2)], (int)tmp[vIdxM.GetElement(3)],
+                                (int)tmp[vIdxM.GetElement(4)], (int)tmp[vIdxM.GetElement(5)], (int)tmp[vIdxM.GetElement(6)], (int)tmp[vIdxM.GetElement(7)]);
                             Vector256<int> vPixR = Vector256.Create(
-                                (int)tmp[iR[0]], (int)tmp[iR[1]], (int)tmp[iR[2]], (int)tmp[iR[3]],
-                                (int)tmp[iR[4]], (int)tmp[iR[5]], (int)tmp[iR[6]], (int)tmp[iR[7]]);
+                                (int)tmp[vIdxR.GetElement(0)], (int)tmp[vIdxR.GetElement(1)], (int)tmp[vIdxR.GetElement(2)], (int)tmp[vIdxR.GetElement(3)],
+                                (int)tmp[vIdxR.GetElement(4)], (int)tmp[vIdxR.GetElement(5)], (int)tmp[vIdxR.GetElement(6)], (int)tmp[vIdxR.GetElement(7)]);
 
                             // Byte blend: (B & 0xFF) | (M & 0xFF00) | (R & 0xFF0000) | 0xFF000000
                             Vector256<int> vBlend = Avx2.Or(
@@ -998,6 +994,7 @@ namespace AprNes
                         int tx = 0;
                         Vector256<int> vBlack = Vector256.Create(unchecked((int)0xFF000000u));
                         int vecW = Vector256<int>.Count; // 8
+
                         int vecEnd = dstW - vecW + 1;
                         for (; tx < vecEnd; tx += vecW)
                         {
@@ -1007,11 +1004,10 @@ namespace AprNes
                             Vector256<int> vMask = Avx2.ShiftRightArithmetic(vSrcIdx, 31);
                             // Safe index: srcIdx & ~mask (replace -1 sentinels with 0 for harmless gather)
                             Vector256<int> vSafe = Avx2.AndNot(vMask, vSrcIdx);
-                            // Manual scalar gather (Zen 2 vpgatherdd is microcoded slow)
-                            int* ix = stackalloc int[8]; Avx.Store(ix, vSafe);
+                            // Manual gather via GetElement (vpextrd, no memory round-trip)
                             Vector256<int> vPix = Vector256.Create(
-                                (int)tmp[ix[0]], (int)tmp[ix[1]], (int)tmp[ix[2]], (int)tmp[ix[3]],
-                                (int)tmp[ix[4]], (int)tmp[ix[5]], (int)tmp[ix[6]], (int)tmp[ix[7]]);
+                                (int)tmp[vSafe.GetElement(0)], (int)tmp[vSafe.GetElement(1)], (int)tmp[vSafe.GetElement(2)], (int)tmp[vSafe.GetElement(3)],
+                                (int)tmp[vSafe.GetElement(4)], (int)tmp[vSafe.GetElement(5)], (int)tmp[vSafe.GetElement(6)], (int)tmp[vSafe.GetElement(7)]);
                             // Blend: (pix & ~mask) | (BLACK & mask)
                             Vector256<int> vResult = Avx2.Or(
                                 Avx2.AndNot(vMask, vPix),
