@@ -512,15 +512,14 @@ namespace AprNes
         static void ProcessRowMask_SWAR(uint* row, int ty, int dstW, uint udim, bool isSM)
         {
             int phase = (isSM && (ty & 1) != 0) ? 1 : 0;
-            int tx = 0;
 
             if (Avx2.IsSupported)
             {
                 int vecW = 8;
-                Vector256<uint> vUdim   = Vector256.Create(udim);
-                Vector256<uint> vMaskRB = Vector256.Create(0x00FF00FFu);
-                Vector256<uint> vMaskG  = Vector256.Create(0x0000FF00u);
-                Vector256<uint> vAlpha  = Vector256.Create(0xFF000000u);
+                Vector256<uint> vUdim    = Vector256.Create(udim);
+                Vector256<uint> vMaskRB  = Vector256.Create(0x00FF00FFu);
+                Vector256<uint> vMaskG   = Vector256.Create(0x0000FF00u);
+                Vector256<uint> vAlpha   = Vector256.Create(0xFF000000u);
                 Vector256<uint> vAllOnes = Vector256.Create(0xFFFFFFFFu);
 
                 // keepMask 8-lane patterns — RGB cycles per pixel.
@@ -530,7 +529,8 @@ namespace AprNes
                 Vector256<uint> vKeepP1 = Vector256.Create(G_, B_, R_, G_, B_, R_, G_, B_);
                 Vector256<uint> vKeepP2 = Vector256.Create(B_, R_, G_, B_, R_, G_, B_, R_);
 
-                int phaseIdx = phase; // 0 or 1 initial
+                int phaseIdx = phase;
+                int tx = 0;
                 int vecEnd = dstW - vecW + 1;
                 for (; tx < vecEnd; tx += vecW)
                 {
@@ -555,27 +555,35 @@ namespace AprNes
                     phaseIdx = (phaseIdx + 2) % 3;
                 }
 
-                // Rebuild scalar keepMask for tail from phaseIdx.
-                // vKeepP0[0]=R, vKeepP1[0]=G, vKeepP2[0]=B
+                // Handle remainder (when dstW not multiple of 8).
+                // Rebuild scalar keepMask from final cyclePos.
+                uint keepMask;
+                int cyclePos = ((phase + tx) % 3 + 3) % 3;
+                if      (cyclePos == 0) keepMask = 0x00FF0000u;
+                else if (cyclePos == 1) keepMask = 0x0000FF00u;
+                else                    keepMask = 0x000000FFu;
+
+                for (; tx < dstW; tx++)
+                {
+                    uint px = row[tx];
+                    uint dim_RB = (((px & 0x00FF00FFu) * udim) >> 8) & 0x00FF00FFu;
+                    uint dim_G  = (((px & 0x0000FF00u) * udim) >> 8) & 0x0000FF00u;
+                    row[tx] = 0xFF000000u | (px & keepMask) | ((dim_RB | dim_G) & ~keepMask);
+                    keepMask = (keepMask >> 8) | ((keepMask & 0xFFu) << 16);
+                }
             }
-
-            // Scalar tail (also full fallback). Reconstruct keepMask from starting phase+tx cycle.
-            uint keepMask;
-            int cyclePos = ((phase + tx) % 3 + 3) % 3;
-            if      (cyclePos == 0) keepMask = 0x00FF0000u; // R
-            else if (cyclePos == 1) keepMask = 0x0000FF00u; // G
-            else                    keepMask = 0x000000FFu; // B
-
-            for (; tx < dstW; tx++)
+            else
             {
-                uint px = row[tx];
-
-                uint dim_RB = (((px & 0x00FF00FFu) * udim) >> 8) & 0x00FF00FFu;
-                uint dim_G = (((px & 0x0000FF00u) * udim) >> 8) & 0x0000FF00u;
-
-                row[tx] = 0xFF000000u | (px & keepMask) | ((dim_RB | dim_G) & ~keepMask);
-
-                keepMask = (keepMask >> 8) | ((keepMask & 0xFFu) << 16);
+                // Full scalar fallback (no Avx2).
+                uint keepMask = phase == 1 ? 0x0000FF00u : 0x00FF0000u;
+                for (int tx = 0; tx < dstW; tx++)
+                {
+                    uint px = row[tx];
+                    uint dim_RB = (((px & 0x00FF00FFu) * udim) >> 8) & 0x00FF00FFu;
+                    uint dim_G  = (((px & 0x0000FF00u) * udim) >> 8) & 0x0000FF00u;
+                    row[tx] = 0xFF000000u | (px & keepMask) | ((dim_RB | dim_G) & ~keepMask);
+                    keepMask = (keepMask >> 8) | ((keepMask & 0xFFu) << 16);
+                }
             }
         }
 
@@ -583,10 +591,10 @@ namespace AprNes
         static void ProcessRowMaskPhosphor_SWAR(uint* row, uint* prw, int ty, int dstW, uint udim, uint udec, bool isSM)
         {
             int phase = (isSM && (ty & 1) != 0) ? 1 : 0;
-            int tx = 0;
 
             if (Avx2.IsSupported)
             {
+                int tx = 0;
                 int vecW = 8;
                 Vector256<uint> vUdim    = Vector256.Create(udim);
                 Vector256<uint> vUdec    = Vector256.Create(udec);
@@ -645,57 +653,71 @@ namespace AprNes
 
                     phaseIdx = (phaseIdx + 2) % 3;
                 }
+
+                // Remainder (< 8 pixels). Rebuild scalar keepMask from final cyclePos.
+                uint keepMask;
+                int cyclePos = ((phase + tx) % 3 + 3) % 3;
+                if      (cyclePos == 0) keepMask = 0x00FF0000u;
+                else if (cyclePos == 1) keepMask = 0x0000FF00u;
+                else                    keepMask = 0x000000FFu;
+
+                for (; tx < dstW; tx++)
+                {
+                    uint px = row[tx];
+                    uint prv = prw[tx];
+                    uint dec_RB = (((prv & 0x00FF00FFu) * udec) >> 8) & 0x00FF00FFu;
+                    uint dec_G  = (((prv & 0x0000FF00u) * udec) >> 8) & 0x0000FF00u;
+                    uint dim_RB = (((px  & 0x00FF00FFu) * udim) >> 8) & 0x00FF00FFu;
+                    uint dim_G  = (((px  & 0x0000FF00u) * udim) >> 8) & 0x0000FF00u;
+                    uint masked = (px & keepMask) | ((dim_RB | dim_G) & ~keepMask);
+                    row[tx] = prw[tx] = 0xFF000000u
+                                      | Math.Max(masked & 0x00FF0000u, dec_RB & 0x00FF0000u)
+                                      | Math.Max(masked & 0x0000FF00u, dec_G)
+                                      | Math.Max(masked & 0x000000FFu, dec_RB & 0x000000FFu);
+                    keepMask = (keepMask >> 8) | ((keepMask & 0xFFu) << 16);
+                }
             }
-
-            // Scalar tail (also fallback for non-Avx2)
-            uint keepMask;
-            int cyclePos = ((phase + tx) % 3 + 3) % 3;
-            if      (cyclePos == 0) keepMask = 0x00FF0000u;
-            else if (cyclePos == 1) keepMask = 0x0000FF00u;
-            else                    keepMask = 0x000000FFu;
-
-            for (; tx < dstW; tx++)
+            else
             {
-                uint px = row[tx];
-                uint prv = prw[tx];
-
-                uint dec_RB = (((prv & 0x00FF00FFu) * udec) >> 8) & 0x00FF00FFu;
-                uint dec_G = (((prv & 0x0000FF00u) * udec) >> 8) & 0x0000FF00u;
-
-                uint dim_RB = (((px & 0x00FF00FFu) * udim) >> 8) & 0x00FF00FFu;
-                uint dim_G = (((px & 0x0000FF00u) * udim) >> 8) & 0x0000FF00u;
-
-                uint masked = (px & keepMask) | ((dim_RB | dim_G) & ~keepMask);
-
-                row[tx] = prw[tx] = 0xFF000000u
-                                  | Math.Max(masked & 0x00FF0000u, dec_RB & 0x00FF0000u)
-                                  | Math.Max(masked & 0x0000FF00u, dec_G)
-                                  | Math.Max(masked & 0x000000FFu, dec_RB & 0x000000FFu);
-
-                keepMask = (keepMask >> 8) | ((keepMask & 0xFFu) << 16);
+                // Full scalar fallback (no Avx2)
+                uint keepMask = phase == 1 ? 0x0000FF00u : 0x00FF0000u;
+                for (int tx = 0; tx < dstW; tx++)
+                {
+                    uint px = row[tx];
+                    uint prv = prw[tx];
+                    uint dec_RB = (((prv & 0x00FF00FFu) * udec) >> 8) & 0x00FF00FFu;
+                    uint dec_G  = (((prv & 0x0000FF00u) * udec) >> 8) & 0x0000FF00u;
+                    uint dim_RB = (((px  & 0x00FF00FFu) * udim) >> 8) & 0x00FF00FFu;
+                    uint dim_G  = (((px  & 0x0000FF00u) * udim) >> 8) & 0x0000FF00u;
+                    uint masked = (px & keepMask) | ((dim_RB | dim_G) & ~keepMask);
+                    row[tx] = prw[tx] = 0xFF000000u
+                                      | Math.Max(masked & 0x00FF0000u, dec_RB & 0x00FF0000u)
+                                      | Math.Max(masked & 0x0000FF00u, dec_G)
+                                      | Math.Max(masked & 0x000000FFu, dec_RB & 0x000000FFu);
+                    keepMask = (keepMask >> 8) | ((keepMask & 0xFFu) << 16);
+                }
             }
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ProcessRowPhosphor_SWAR(uint* row, uint* prw, int dstW, uint udec)
         {
-            int tx = 0;
             if (Avx2.IsSupported)
             {
-                int vecW = 8; // 8 pixels per batch (Vector256<uint>)
-                Vector256<uint> vUdec     = Vector256.Create(udec);
-                Vector256<uint> vMaskRB   = Vector256.Create(0x00FF00FFu);
-                Vector256<uint> vMaskG    = Vector256.Create(0x0000FF00u);
-                Vector256<uint> vMaskR    = Vector256.Create(0x00FF0000u);
-                Vector256<uint> vMaskB    = Vector256.Create(0x000000FFu);
-                Vector256<uint> vAlpha    = Vector256.Create(0xFF000000u);
+                int vecW = 8;
+                Vector256<uint> vUdec   = Vector256.Create(udec);
+                Vector256<uint> vMaskRB = Vector256.Create(0x00FF00FFu);
+                Vector256<uint> vMaskG  = Vector256.Create(0x0000FF00u);
+                Vector256<uint> vMaskR  = Vector256.Create(0x00FF0000u);
+                Vector256<uint> vMaskB  = Vector256.Create(0x000000FFu);
+                Vector256<uint> vAlpha  = Vector256.Create(0xFF000000u);
 
+                int tx = 0;
                 int vecEnd = dstW - vecW + 1;
                 for (; tx < vecEnd; tx += vecW)
                 {
                     Vector256<uint> vPx  = Avx.LoadVector256(row + tx);
                     Vector256<uint> vPrv = Avx.LoadVector256(prw + tx);
 
-                    // SWAR decay: ((prv & mask) * udec) >> 8 & mask, applied per channel group
                     Vector256<uint> vDecRB = Avx2.And(
                         Avx2.ShiftRightLogical(Avx2.MultiplyLow(Avx2.And(vPrv, vMaskRB), vUdec), 8),
                         vMaskRB);
@@ -703,7 +725,6 @@ namespace AprNes
                         Avx2.ShiftRightLogical(Avx2.MultiplyLow(Avx2.And(vPrv, vMaskG), vUdec), 8),
                         vMaskG);
 
-                    // Per-channel max(current, decayed)
                     Vector256<uint> vMaxR = Avx2.Max(Avx2.And(vPx, vMaskR), Avx2.And(vDecRB, vMaskR));
                     Vector256<uint> vMaxG = Avx2.Max(Avx2.And(vPx, vMaskG), vDecG);
                     Vector256<uint> vMaxB = Avx2.Max(Avx2.And(vPx, vMaskB), Avx2.And(vDecRB, vMaskB));
@@ -713,40 +734,114 @@ namespace AprNes
                     Avx.Store(row + tx, vResult);
                     Avx.Store(prw + tx, vResult);
                 }
+
+                // Handle remainder (< 8 pixels)
+                for (; tx < dstW; tx++)
+                {
+                    uint px = row[tx];
+                    uint prv = prw[tx];
+                    uint dec_RB = (((prv & 0x00FF00FFu) * udec) >> 8) & 0x00FF00FFu;
+                    uint dec_G  = (((prv & 0x0000FF00u) * udec) >> 8) & 0x0000FF00u;
+                    row[tx] = prw[tx] = 0xFF000000u
+                                      | Math.Max(px & 0x00FF0000u, dec_RB & 0x00FF0000u)
+                                      | Math.Max(px & 0x0000FF00u, dec_G)
+                                      | Math.Max(px & 0x000000FFu, dec_RB & 0x000000FFu);
+                }
             }
-            // Scalar tail (also fallback for non-Avx2)
-            for (; tx < dstW; tx++)
+            else
             {
-                uint px = row[tx];
-                uint prv = prw[tx];
-                uint dec_RB = (((prv & 0x00FF00FFu) * udec) >> 8) & 0x00FF00FFu;
-                uint dec_G = (((prv & 0x0000FF00u) * udec) >> 8) & 0x0000FF00u;
-                row[tx] = prw[tx] = 0xFF000000u
-                                  | Math.Max(px & 0x00FF0000u, dec_RB & 0x00FF0000u)
-                                  | Math.Max(px & 0x0000FF00u, dec_G)
-                                  | Math.Max(px & 0x000000FFu, dec_RB & 0x000000FFu);
+                // Full scalar fallback (no Avx2)
+                for (int tx = 0; tx < dstW; tx++)
+                {
+                    uint px = row[tx];
+                    uint prv = prw[tx];
+                    uint dec_RB = (((prv & 0x00FF00FFu) * udec) >> 8) & 0x00FF00FFu;
+                    uint dec_G  = (((prv & 0x0000FF00u) * udec) >> 8) & 0x0000FF00u;
+                    row[tx] = prw[tx] = 0xFF000000u
+                                      | Math.Max(px & 0x00FF0000u, dec_RB & 0x00FF0000u)
+                                      | Math.Max(px & 0x0000FF00u, dec_G)
+                                      | Math.Max(px & 0x000000FFu, dec_RB & 0x000000FFu);
+                }
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ProcessRowConvergence(uint* dst, uint* src, int dstW, float maxOff, float halfW, float invHW)
         {
-            // 1. 迴圈外預計算常數 (Loop-Invariant Code Motion)
             float step = invHW * maxOff;
-            float baseOffset = -halfW * step + 1024.5f; // 預先扣除 halfW 並加上四捨五入常數
+            float baseOffset = -halfW * step + 1024.5f;
             int maxIdx = dstW - 1;
 
-            for (int tx = 0; tx < dstW; tx++)
+            if (Avx2.IsSupported)
             {
-                // 2. 完美契合 FMA (融合乘加) 的單行計算
-                int ioff = (int)(tx * step + baseOffset) - 1024;
+                int tx = 0;
+                int vecW = 8;
+                // Use fixed-point step (16.16) to SIMD compute ioff per lane
+                int stepFx = (int)(step * 65536f);
+                int baseFx = (int)((baseOffset - 1024f) * 65536f);
 
-                // 3. RyuJIT CMOV 無分支邊界限制 (Branchless Clamping)
-                int rxR = Math.Max(0, Math.Min(tx + ioff, maxIdx));
-                int rxB = Math.Max(0, Math.Min(tx - ioff, maxIdx));
+                Vector256<int> vStepOffsets = Vector256.Create(0, stepFx, 2*stepFx, 3*stepFx, 4*stepFx, 5*stepFx, 6*stepFx, 7*stepFx);
+                Vector256<int> vStep8   = Vector256.Create(stepFx * 8);
+                Vector256<int> vTxBase  = Vector256.Create(0, 1, 2, 3, 4, 5, 6, 7);
+                Vector256<int> vTxStep  = Vector256.Create(8);
+                Vector256<int> vMaxIdx  = Vector256.Create(maxIdx);
+                Vector256<int> vZero    = Vector256<int>.Zero;
+                Vector256<uint> vMaskB  = Vector256.Create(0x000000FFu);
+                Vector256<uint> vMaskG  = Vector256.Create(0x0000FF00u);
+                Vector256<uint> vMaskR  = Vector256.Create(0x00FF0000u);
+                Vector256<uint> vAlpha  = Vector256.Create(0xFF000000u);
 
-                // 4. SWAR 零位移、零轉型的極速像素組裝 (Zero-Shift Assembly)
-                dst[tx] = (src[rxB] & 0x000000FFu) | (src[tx] & 0x0000FF00u) | (src[rxR] & 0x00FF0000u) | 0xFF000000u;
+                Vector256<int> vIFx = Vector256.Create(baseFx) + vStepOffsets;
+                Vector256<int> vTx  = vTxBase;
+
+                int vecEnd = dstW - vecW + 1;
+                for (; tx < vecEnd; tx += vecW)
+                {
+                    Vector256<int> vIoff = Avx2.ShiftRightArithmetic(vIFx, 16);
+                    Vector256<int> vRxR  = Avx2.Min(Avx2.Max(Avx2.Add(vTx, vIoff), vZero), vMaxIdx);
+                    Vector256<int> vRxB  = Avx2.Min(Avx2.Max(Avx2.Subtract(vTx, vIoff), vZero), vMaxIdx);
+
+                    // Manual gather (Zen 2 vpgatherdd slow)
+                    int* iB = stackalloc int[8]; Avx.Store(iB, vRxB);
+                    int* iR = stackalloc int[8]; Avx.Store(iR, vRxR);
+                    Vector256<uint> vPixB = Vector256.Create(
+                        src[iB[0]], src[iB[1]], src[iB[2]], src[iB[3]],
+                        src[iB[4]], src[iB[5]], src[iB[6]], src[iB[7]]);
+                    Vector256<uint> vPixR = Vector256.Create(
+                        src[iR[0]], src[iR[1]], src[iR[2]], src[iR[3]],
+                        src[iR[4]], src[iR[5]], src[iR[6]], src[iR[7]]);
+                    // Middle pixel (G channel) is just src[tx..tx+7] — sequential load
+                    Vector256<uint> vPixM = Avx.LoadVector256(src + tx);
+
+                    Vector256<uint> vResult = Avx2.Or(
+                        Avx2.Or(Avx2.And(vPixB, vMaskB), Avx2.And(vPixM, vMaskG)),
+                        Avx2.Or(Avx2.And(vPixR, vMaskR), vAlpha));
+
+                    Avx.Store(dst + tx, vResult);
+
+                    vIFx = Avx2.Add(vIFx, vStep8);
+                    vTx  = Avx2.Add(vTx, vTxStep);
+                }
+
+                // Remainder (< 8 pixels)
+                for (; tx < dstW; tx++)
+                {
+                    int ioff = (int)(tx * step + baseOffset) - 1024;
+                    int rxR = Math.Max(0, Math.Min(tx + ioff, maxIdx));
+                    int rxB = Math.Max(0, Math.Min(tx - ioff, maxIdx));
+                    dst[tx] = (src[rxB] & 0x000000FFu) | (src[tx] & 0x0000FF00u) | (src[rxR] & 0x00FF0000u) | 0xFF000000u;
+                }
+            }
+            else
+            {
+                // Full scalar fallback (no Avx2)
+                for (int tx = 0; tx < dstW; tx++)
+                {
+                    int ioff = (int)(tx * step + baseOffset) - 1024;
+                    int rxR = Math.Max(0, Math.Min(tx + ioff, maxIdx));
+                    int rxB = Math.Max(0, Math.Min(tx - ioff, maxIdx));
+                    dst[tx] = (src[rxB] & 0x000000FFu) | (src[tx] & 0x0000FF00u) | (src[rxR] & 0x00FF0000u) | 0xFF000000u;
+                }
             }
         }
 
@@ -783,10 +878,10 @@ namespace AprNes
                     int* mapRow = map + rowOff;
                     int* colRow = col + rowOff;
                     uint* dstRow = dst + rowOff;
-                    int tx = 0;
 
                     if (Avx2.IsSupported)
                     {
+                        int tx = 0;
                         int vecW = 8;
                         Vector256<int> vStepOffsets = Vector256.Create(0, stepFx, 2*stepFx, 3*stepFx, 4*stepFx, 5*stepFx, 6*stepFx, 7*stepFx);
                         Vector256<int> vStep8       = Vector256.Create(stepFx * 8);
@@ -848,24 +943,44 @@ namespace AprNes
 
                             vIFx = Avx2.Add(vIFx, vStep8);
                         }
-                    }
 
-                    // Scalar tail (or full fallback if Avx2 unsupported)
-                    int iFx = baseFx + tx * stepFx;
-                    for (; tx < dstW; tx++)
+                        // Remainder (< 8 pixels)
+                        int iFx = baseFx + tx * stepFx;
+                        for (; tx < dstW; tx++)
+                        {
+                            int srcIdx = mapRow[tx];
+                            if (srcIdx < 0) { dstRow[tx] = 0xFF000000u; iFx += stepFx; continue; }
+                            int srcTx = colRow[tx];
+                            int srcRowOff = srcIdx - srcTx;
+                            int ioff = iFx >> 16;
+                            int rxR = Math.Max(0, Math.Min(srcTx + ioff, maxIdx));
+                            int rxB = Math.Max(0, Math.Min(srcTx - ioff, maxIdx));
+                            dstRow[tx] = (tmp[srcRowOff + rxB] & 0x000000FFu) |
+                                         (tmp[srcRowOff + srcTx] & 0x0000FF00u) |
+                                         (tmp[srcRowOff + rxR] & 0x00FF0000u) |
+                                         0xFF000000u;
+                            iFx += stepFx;
+                        }
+                    }
+                    else
                     {
-                        int srcIdx = mapRow[tx];
-                        if (srcIdx < 0) { dstRow[tx] = 0xFF000000u; iFx += stepFx; continue; }
-                        int srcTx = colRow[tx];
-                        int srcRowOff = srcIdx - srcTx;
-                        int ioff = iFx >> 16;
-                        int rxR = Math.Max(0, Math.Min(srcTx + ioff, maxIdx));
-                        int rxB = Math.Max(0, Math.Min(srcTx - ioff, maxIdx));
-                        dstRow[tx] = (tmp[srcRowOff + rxB] & 0x000000FFu) |
-                                     (tmp[srcRowOff + srcTx] & 0x0000FF00u) |
-                                     (tmp[srcRowOff + rxR] & 0x00FF0000u) |
-                                     0xFF000000u;
-                        iFx += stepFx;
+                        // Full scalar fallback (no Avx2)
+                        int iFx = baseFx;
+                        for (int tx = 0; tx < dstW; tx++)
+                        {
+                            int srcIdx = mapRow[tx];
+                            if (srcIdx < 0) { dstRow[tx] = 0xFF000000u; iFx += stepFx; continue; }
+                            int srcTx = colRow[tx];
+                            int srcRowOff = srcIdx - srcTx;
+                            int ioff = iFx >> 16;
+                            int rxR = Math.Max(0, Math.Min(srcTx + ioff, maxIdx));
+                            int rxB = Math.Max(0, Math.Min(srcTx - ioff, maxIdx));
+                            dstRow[tx] = (tmp[srcRowOff + rxB] & 0x000000FFu) |
+                                         (tmp[srcRowOff + srcTx] & 0x0000FF00u) |
+                                         (tmp[srcRowOff + rxR] & 0x00FF0000u) |
+                                         0xFF000000u;
+                            iFx += stepFx;
+                        }
                     }
                 });
             }
@@ -877,10 +992,10 @@ namespace AprNes
                     int rowOff = ty * dstW;
                     int* mapRow = map + rowOff;
                     uint* dstRow = dst + rowOff;
-                    int tx = 0;
 
                     if (Avx2.IsSupported)
                     {
+                        int tx = 0;
                         Vector256<int> vBlack = Vector256.Create(unchecked((int)0xFF000000u));
                         int vecW = Vector256<int>.Count; // 8
                         int vecEnd = dstW - vecW + 1;
@@ -903,15 +1018,26 @@ namespace AprNes
                                 Avx2.And(vMask, vBlack));
                             Avx.Store((int*)(dstRow + tx), vResult);
                         }
-                    }
 
-                    // Scalar tail (also fallback when Avx2 unsupported)
-                    for (; tx < dstW; tx++)
+                        // Remainder (< 8 pixels)
+                        for (; tx < dstW; tx++)
+                        {
+                            int srcIdx = mapRow[tx];
+                            int mask = srcIdx >> 31;
+                            int safeIdx = srcIdx & ~mask;
+                            dstRow[tx] = (tmp[safeIdx] & (uint)~mask) | (0xFF000000u & (uint)mask);
+                        }
+                    }
+                    else
                     {
-                        int srcIdx = mapRow[tx];
-                        int mask = srcIdx >> 31;
-                        int safeIdx = srcIdx & ~mask;
-                        dstRow[tx] = (tmp[safeIdx] & (uint)~mask) | (0xFF000000u & (uint)mask);
+                        // Full scalar fallback (no Avx2)
+                        for (int tx = 0; tx < dstW; tx++)
+                        {
+                            int srcIdx = mapRow[tx];
+                            int mask = srcIdx >> 31;
+                            int safeIdx = srcIdx & ~mask;
+                            dstRow[tx] = (tmp[safeIdx] & (uint)~mask) | (0xFF000000u & (uint)mask);
+                        }
                     }
                 });
             }
