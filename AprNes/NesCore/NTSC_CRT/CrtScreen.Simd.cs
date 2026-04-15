@@ -671,10 +671,20 @@ namespace AprNes
                             Vector256<int> vIdxM = Avx2.AndNot(vInvalid, Avx2.Add(vSrcRowOff, vSrcTx));
                             Vector256<int> vIdxR = Avx2.AndNot(vInvalid, Avx2.Add(vSrcRowOff, vRxR));
 
-                            // THE MAGIC: 3× 8-way gather = 24 pixel reads in 3 instructions
-                            Vector256<int> vPixB = Avx2.GatherVector256((int*)tmp, vIdxB, 4);
-                            Vector256<int> vPixM = Avx2.GatherVector256((int*)tmp, vIdxM, 4);
-                            Vector256<int> vPixR = Avx2.GatherVector256((int*)tmp, vIdxR, 4);
+                            // Manual scalar gather (Zen 2's vpgatherdd is microcoded slow —
+                            // 8 independent scalar loads pipeline better here).
+                            int* iB = stackalloc int[8]; Avx.Store(iB, vIdxB);
+                            int* iM = stackalloc int[8]; Avx.Store(iM, vIdxM);
+                            int* iR = stackalloc int[8]; Avx.Store(iR, vIdxR);
+                            Vector256<int> vPixB = Vector256.Create(
+                                (int)tmp[iB[0]], (int)tmp[iB[1]], (int)tmp[iB[2]], (int)tmp[iB[3]],
+                                (int)tmp[iB[4]], (int)tmp[iB[5]], (int)tmp[iB[6]], (int)tmp[iB[7]]);
+                            Vector256<int> vPixM = Vector256.Create(
+                                (int)tmp[iM[0]], (int)tmp[iM[1]], (int)tmp[iM[2]], (int)tmp[iM[3]],
+                                (int)tmp[iM[4]], (int)tmp[iM[5]], (int)tmp[iM[6]], (int)tmp[iM[7]]);
+                            Vector256<int> vPixR = Vector256.Create(
+                                (int)tmp[iR[0]], (int)tmp[iR[1]], (int)tmp[iR[2]], (int)tmp[iR[3]],
+                                (int)tmp[iR[4]], (int)tmp[iR[5]], (int)tmp[iR[6]], (int)tmp[iR[7]]);
 
                             // Byte blend: (B & 0xFF) | (M & 0xFF00) | (R & 0xFF0000) | 0xFF000000
                             Vector256<int> vBlend = Avx2.Or(
@@ -734,8 +744,11 @@ namespace AprNes
                             Vector256<int> vMask = Avx2.ShiftRightArithmetic(vSrcIdx, 31);
                             // Safe index: srcIdx & ~mask (replace -1 sentinels with 0 for harmless gather)
                             Vector256<int> vSafe = Avx2.AndNot(vMask, vSrcIdx);
-                            // GATHER: 8 pixel reads from tmp[] in ONE instruction
-                            Vector256<int> vPix = Avx2.GatherVector256((int*)tmp, vSafe, 4);
+                            // Manual scalar gather (Zen 2 vpgatherdd is microcoded slow)
+                            int* ix = stackalloc int[8]; Avx.Store(ix, vSafe);
+                            Vector256<int> vPix = Vector256.Create(
+                                (int)tmp[ix[0]], (int)tmp[ix[1]], (int)tmp[ix[2]], (int)tmp[ix[3]],
+                                (int)tmp[ix[4]], (int)tmp[ix[5]], (int)tmp[ix[6]], (int)tmp[ix[7]]);
                             // Blend: (pix & ~mask) | (BLACK & mask)
                             Vector256<int> vResult = Avx2.Or(
                                 Avx2.AndNot(vMask, vPix),
