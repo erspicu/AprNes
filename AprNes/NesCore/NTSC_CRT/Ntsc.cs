@@ -138,6 +138,7 @@ namespace AprNes
                 // Scratch buffers (wave/cBuf/dotY/I/Q) are now per-thread via [ThreadStatic].
                 ntsc_rowPalettes = (byte*)Marshal.AllocHGlobal(kSrcH * 256);
                 ntsc_rowEmphasis = (byte*)Marshal.AllocHGlobal(kSrcH);
+                ntsc_rowPhase0   = (int*)Marshal.AllocHGlobal(kSrcH * sizeof(int));
                 hiLevels = (float*)Marshal.AllocHGlobal(4 * sizeof(float));
                 hiLevels[0] = 0.40f; hiLevels[1] = 0.68f; hiLevels[2] = 1.00f; hiLevels[3] = 1.00f;
                 iPhase = (float*)Marshal.AllocHGlobal(16 * sizeof(float));
@@ -353,10 +354,14 @@ namespace AprNes
         [ThreadStatic] static float* tls_dotI;
         [ThreadStatic] static float* tls_dotQ;
 
-        // Per-scanline capture buffers — PPU thread snapshots palette + emphasis here, then
-        // at frame end all 240 rows are demodulated in parallel.
+        // Per-scanline capture buffers — PPU thread snapshots palette + emphasis + phase0 here,
+        // then at frame end all 240 rows are demodulated in parallel.
+        // CRITICAL: phase0 must be captured per-scanline on the PPU thread (scanPhase6 /
+        // scanPhaseBase are serial state — reading them from parallel workers would race
+        // and produce non-deterministic subcarrier phase, corrupting colour output).
         static byte* ntsc_rowPalettes;    // kSrcH × 256 bytes
         static byte* ntsc_rowEmphasis;    // kSrcH bytes
+        static int* ntsc_rowPhase0;       // kSrcH ints — captured subcarrier phase per scanline
 
         static void EnsureThreadScratch()
         {
@@ -368,13 +373,27 @@ namespace AprNes
             tls_dotQ    = (float*)Marshal.AllocHGlobal(256 * sizeof(float));
         }
 
-        // Fast path: PPU thread snapshots the ntscScanBuf + emphasis at cx==260 of each scanline.
-        // Actual demodulation is deferred to Ntsc_FlushPendingRows() at frame end for parallel dispatch.
+        // Fast path: PPU thread snapshots palette + emphasis + current subcarrier phase at
+        // cx==260 of each scanline. Advancing scanPhase6 / scanPhaseBase here (single-threaded)
+        // keeps the per-scanline phase sequence deterministic — subsequent parallel decode
+        // reads the captured phase0 per row, never touching the serial counters.
         public static void Ntsc_CaptureScanline(int sl, byte* palBuf, byte emphasisBits)
         {
             if (sl < 0 || sl >= kSrcH) return;
             Buffer.MemoryCopy(palBuf, ntsc_rowPalettes + sl * 256, 256, 256);
             ntsc_rowEmphasis[sl] = emphasisBits;
+            // Capture + advance per the path that'll decode this row.
+            // Ultra-analog → _Physical uses scanPhaseBase; else _Fast uses scanPhase6.
+            if (ntsc_ultraAnalog)
+            {
+                ntsc_rowPhase0[sl] = scanPhaseBase;
+                scanPhaseBase += 2 + (((3 - scanPhaseBase) >> 31) & -6);
+            }
+            else
+            {
+                ntsc_rowPhase0[sl] = scanPhase6;
+                scanPhase6 += 2 + (((3 - scanPhase6) >> 31) & -6);
+            }
         }
 
         // Called at frame end (sl=240 cx=1) before Crt_Render — runs all 240 row demodulations in parallel.
@@ -385,10 +404,11 @@ namespace AprNes
                 EnsureThreadScratch();
                 byte* palBuf = ntsc_rowPalettes + sl * 256;
                 byte emph = ntsc_rowEmphasis[sl];
+                int phase0 = ntsc_rowPhase0[sl];
                 if (ntsc_ultraAnalog)
-                    DecodeScanline_Physical(sl, palBuf, emph, tls_waveBuf, tls_cBuf);
+                    DecodeScanline_Physical_Worker(sl, palBuf, emph, phase0, tls_waveBuf, tls_cBuf);
                 else
-                    DecodeScanline_Fast(sl, palBuf, emph, tls_dotY, tls_dotI, tls_dotQ);
+                    DecodeScanline_Fast_Worker(sl, palBuf, emph, phase0, tls_dotY, tls_dotI, tls_dotQ);
             });
         }
 
@@ -410,6 +430,12 @@ namespace AprNes
             // ★ 符號位元擴展黑魔法
             scanPhase6 += 2 + (((3 - scanPhase6) >> 31) & -6);
 
+            DecodeScanline_Fast_Worker(sl, palBuf, emphasisBits, phase0, dotY, dotI, dotQ);
+        }
+
+        // Phase0 passed in — no shared-state mutation, safe to call from Parallel.For workers.
+        static void DecodeScanline_Fast_Worker(int sl, byte* palBuf, byte emphasisBits, int phase0, float* dotY, float* dotI, float* dotQ)
+        {
             GenerateSignal(palBuf, emphasisBits, dotY, dotI, dotQ);
             if ((AnalogOutputMode)ntsc_analogOutput == AnalogOutputMode.SVideo) DecodeAV_SVideo(sl, dotY, dotI, dotQ);
             else DecodeAV_Composite(sl, phase0, dotY, dotI, dotQ);
@@ -508,6 +534,12 @@ namespace AprNes
             // ★ 符號位元擴展黑魔法
             scanPhaseBase += 2 + (((3 - scanPhaseBase) >> 31) & -6);
 
+            DecodeScanline_Physical_Worker(sl, palBuf, emphasisBits, phase0, waveBuf, cBuf);
+        }
+
+        // Phase0 passed in — no shared-state mutation, safe to call from Parallel.For workers.
+        static void DecodeScanline_Physical_Worker(int sl, byte* palBuf, byte emphasisBits, int phase0, float* waveBuf, float* cBuf)
+        {
             if (ColorBurstJitter && (AnalogOutputMode)ntsc_analogOutput == AnalogOutputMode.RF)
             {
                 uint jns = (uint)(ntsc_frameCount * 2654435761u + (uint)sl * 340573321u);
