@@ -785,9 +785,16 @@ namespace AprNes
                         tModI += 1 + (((4 - tModI) >> 31) & -6);
                     }
                     var Y = *(Vector<float>*)yChunk; var I = *(Vector<float>*)iChunk; var Q = *(Vector<float>*)qChunk;
+#if NET10_0_OR_GREATER
+                    // .NET 10: FMA chain — vfmadd231 on AVX2+FMA hardware, scalar fallback otherwise
+                    *(Vector<float>*)(lbR + p) = Vector.Min(Vector.Max(Vector.MultiplyAddEstimate(vRQ, Q, Vector.MultiplyAddEstimate(vRI, I, vRY * Y)), vZeroN), vOneN);
+                    *(Vector<float>*)(lbG + p) = Vector.Min(Vector.Max(Vector.MultiplyAddEstimate(vGQ, Q, Vector.MultiplyAddEstimate(vGI, I, vGY * Y)), vZeroN), vOneN);
+                    *(Vector<float>*)(lbB + p) = Vector.Min(Vector.Max(Vector.MultiplyAddEstimate(vBQ, Q, Vector.MultiplyAddEstimate(vBI, I, vBY * Y)), vZeroN), vOneN);
+#else
                     *(Vector<float>*)(lbR + p) = Vector.Min(Vector.Max(vRY * Y + vRI * I + vRQ * Q, vZeroN), vOneN);
                     *(Vector<float>*)(lbG + p) = Vector.Min(Vector.Max(vGY * Y + vGI * I + vGQ * Q, vZeroN), vOneN);
                     *(Vector<float>*)(lbB + p) = Vector.Min(Vector.Max(vBY * Y + vBI * I + vBQ * Q, vZeroN), vOneN);
+#endif
                 }
             }
             else
@@ -806,10 +813,20 @@ namespace AprNes
                         tModI += 1 + (((4 - tModI) >> 31) & -6);
                     }
                     var Y = *(Vector<float>*)yChunk; var I = *(Vector<float>*)iChunk; var Q = *(Vector<float>*)qChunk;
+#if NET10_0_OR_GREATER
+                    // .NET 10: FMA chain for YIQ→RGB matrix and gamma curve
+                    var R = Vector.Min(Vector.Max(Vector.MultiplyAddEstimate(vRQ, Q, Vector.MultiplyAddEstimate(vRI, I, vRY * Y)), vZeroN), vOneN);
+                    var G = Vector.Min(Vector.Max(Vector.MultiplyAddEstimate(vGQ, Q, Vector.MultiplyAddEstimate(vGI, I, vGY * Y)), vZeroN), vOneN);
+                    var B = Vector.Min(Vector.Max(Vector.MultiplyAddEstimate(vBQ, Q, Vector.MultiplyAddEstimate(vBI, I, vBY * Y)), vZeroN), vOneN);
+                    R *= Vector.MultiplyAddEstimate(vGC, R, v1_minus_GC);
+                    G *= Vector.MultiplyAddEstimate(vGC, G, v1_minus_GC);
+                    B *= Vector.MultiplyAddEstimate(vGC, B, v1_minus_GC);
+#else
                     var R = Vector.Min(Vector.Max(vRY * Y + vRI * I + vRQ * Q, vZeroN), vOneN);
                     var G = Vector.Min(Vector.Max(vGY * Y + vGI * I + vGQ * Q, vZeroN), vOneN);
                     var B = Vector.Min(Vector.Max(vBY * Y + vBI * I + vBQ * Q, vZeroN), vOneN);
                     R *= (v1_minus_GC + vGC * R); G *= (v1_minus_GC + vGC * G); B *= (v1_minus_GC + vGC * B);
+#endif
                     var ri = Vector.ConvertToInt32(R * v255_0N);
                     var gi = Vector.ConvertToInt32(G * v255_0N);
                     var bi = Vector.ConvertToInt32(B * v255_0N);
