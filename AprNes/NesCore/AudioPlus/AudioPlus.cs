@@ -250,15 +250,18 @@ namespace AprNes
                     }
         }
 
+        // Pre-compute reciprocal → multiply replaces DIVSS (~11 cyc → MULSS ~4 cyc)
+        const float AUTHMIX_EXP_RECIP = 1.0f / 98302.0f;
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static float authMix_GetVoltage(int sq1, int sq2, int tri, int noise, int dmc, int expansionAudio)
         {
-            int pulseIdx = sq1 + sq2;
-            if (pulseIdx > 30) pulseIdx = 30;
-            float pulse = authMix_pulseTable[pulseIdx];
+            // volume[0..1] ≤ 15, _pulseOut[0..1] ≤ 1 → sq1+sq2 ≤ 30 by construction.
+            // The >30 clamp is dead code; dropped to save a cmp+cmov per call.
+            float pulse = authMix_pulseTable[sq1 + sq2];
             float tnd = authMix_tndTable[(tri << 11) | (noise << 7) | dmc];
-            double raw = pulse + tnd + (expansionAudio / 98302.0);
-            return (float)raw;
+            // Pure float: avoids CVTSS2SD/CVTSD2SS round-trip of double intermediate.
+            return pulse + tnd + expansionAudio * AUTHMIX_EXP_RECIP;
         }
 
         // ==================================================================
