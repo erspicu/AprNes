@@ -25,6 +25,8 @@ using System.Numerics;
 using System.Threading.Tasks;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.X86;
 
 namespace AprNes
 {
@@ -625,55 +627,130 @@ namespace AprNes
                 int baseFx = (int)((-halfW * step + 0.5f) * 65536f); // baseOffset - 1024, pre-subtracted
                 int maxIdx = dstW - 1;
 
+                // doConv path: per-pixel 3-channel chromatic shift. .NET 10 SIMD:
+                // triple Avx2.GatherVector256 per 8-pixel batch replaces 24 scalar loads.
                 Parallel.For(0, dstH, ty =>
                 {
                     int rowOff = ty * dstW;
-                    int iFx = baseFx; // accumulate instead of multiply per pixel
-                    for (int tx = 0; tx < dstW; tx++)
+                    int* mapRow = map + rowOff;
+                    int* colRow = col + rowOff;
+                    uint* dstRow = dst + rowOff;
+                    int tx = 0;
+
+                    if (Avx2.IsSupported)
                     {
-                        int dstIdx = rowOff + tx;
-                        int srcIdx = map[dstIdx];
+                        int vecW = 8;
+                        Vector256<int> vStepOffsets = Vector256.Create(0, stepFx, 2*stepFx, 3*stepFx, 4*stepFx, 5*stepFx, 6*stepFx, 7*stepFx);
+                        Vector256<int> vStep8       = Vector256.Create(stepFx * 8);
+                        Vector256<int> vMaxIdx      = Vector256.Create(maxIdx);
+                        Vector256<int> vZero        = Vector256<int>.Zero;
+                        Vector256<int> vBlack       = Vector256.Create(unchecked((int)0xFF000000u));
+                        Vector256<int> vMaskB       = Vector256.Create(0x000000FF);
+                        Vector256<int> vMaskG       = Vector256.Create(0x0000FF00);
+                        Vector256<int> vMaskR       = Vector256.Create(0x00FF0000);
 
-                        if (srcIdx < 0) { dst[dstIdx] = 0xFF000000u; iFx += stepFx; continue; }
+                        Vector256<int> vIFx = Vector256.Create(baseFx) + vStepOffsets;
 
-                        int srcTx = col[dstIdx];
+                        int vecEnd = dstW - vecW + 1;
+                        for (; tx < vecEnd; tx += vecW)
+                        {
+                            Vector256<int> vSrcIdx = Avx.LoadVector256(mapRow + tx);
+                            Vector256<int> vSrcTx  = Avx.LoadVector256(colRow + tx);
+                            Vector256<int> vSrcRowOff = Avx2.Subtract(vSrcIdx, vSrcTx);
+                            Vector256<int> vIoff      = Avx2.ShiftRightArithmetic(vIFx, 16);
+
+                            // rxR/rxB = clamp(srcTx ± ioff, 0, maxIdx)
+                            Vector256<int> vRxR = Avx2.Min(Avx2.Max(Avx2.Add(vSrcTx, vIoff), vZero), vMaxIdx);
+                            Vector256<int> vRxB = Avx2.Min(Avx2.Max(Avx2.Subtract(vSrcTx, vIoff), vZero), vMaxIdx);
+
+                            // Invalid mask: srcIdx < 0 → -1 per lane (will be blended to black)
+                            Vector256<int> vInvalid = Avx2.ShiftRightArithmetic(vSrcIdx, 31);
+
+                            // Gather indices (mask invalid lanes to 0 for safe gather)
+                            Vector256<int> vIdxB = Avx2.AndNot(vInvalid, Avx2.Add(vSrcRowOff, vRxB));
+                            Vector256<int> vIdxM = Avx2.AndNot(vInvalid, Avx2.Add(vSrcRowOff, vSrcTx));
+                            Vector256<int> vIdxR = Avx2.AndNot(vInvalid, Avx2.Add(vSrcRowOff, vRxR));
+
+                            // THE MAGIC: 3× 8-way gather = 24 pixel reads in 3 instructions
+                            Vector256<int> vPixB = Avx2.GatherVector256((int*)tmp, vIdxB, 4);
+                            Vector256<int> vPixM = Avx2.GatherVector256((int*)tmp, vIdxM, 4);
+                            Vector256<int> vPixR = Avx2.GatherVector256((int*)tmp, vIdxR, 4);
+
+                            // Byte blend: (B & 0xFF) | (M & 0xFF00) | (R & 0xFF0000) | 0xFF000000
+                            Vector256<int> vBlend = Avx2.Or(
+                                Avx2.Or(Avx2.And(vPixB, vMaskB), Avx2.And(vPixM, vMaskG)),
+                                Avx2.Or(Avx2.And(vPixR, vMaskR), vBlack));
+
+                            // Invalid lanes → pure black
+                            Vector256<int> vResult = Avx2.Or(
+                                Avx2.AndNot(vInvalid, vBlend),
+                                Avx2.And(vInvalid, vBlack));
+
+                            Avx.Store((int*)(dstRow + tx), vResult);
+
+                            vIFx = Avx2.Add(vIFx, vStep8);
+                        }
+                    }
+
+                    // Scalar tail (or full fallback if Avx2 unsupported)
+                    int iFx = baseFx + tx * stepFx;
+                    for (; tx < dstW; tx++)
+                    {
+                        int srcIdx = mapRow[tx];
+                        if (srcIdx < 0) { dstRow[tx] = 0xFF000000u; iFx += stepFx; continue; }
+                        int srcTx = colRow[tx];
                         int srcRowOff = srcIdx - srcTx;
-
                         int ioff = iFx >> 16;
-
                         int rxR = Math.Max(0, Math.Min(srcTx + ioff, maxIdx));
                         int rxB = Math.Max(0, Math.Min(srcTx - ioff, maxIdx));
-
-                        dst[dstIdx] = (tmp[srcRowOff + rxB] & 0x000000FFu) |
-                                      (tmp[srcRowOff + srcTx] & 0x0000FF00u) |
-                                      (tmp[srcRowOff + rxR] & 0x00FF0000u) |
-                                      0xFF000000u;
+                        dstRow[tx] = (tmp[srcRowOff + rxB] & 0x000000FFu) |
+                                     (tmp[srcRowOff + srcTx] & 0x0000FF00u) |
+                                     (tmp[srcRowOff + rxR] & 0x00FF0000u) |
+                                     0xFF000000u;
                         iFx += stepFx;
                     }
                 });
             }
             else
             {
-                // 若玩家沒開 Convergence，跑這條最乾淨的極速迴圈
+                // 若玩家沒開 Convergence，跑這條最乾淨的極速迴圈（.NET 10 SIMD: Avx2.GatherVector256）
                 Parallel.For(0, dstH, ty =>
                 {
                     int rowOff = ty * dstW;
-                    for (int tx = 0; tx < dstW; tx++)
+                    int* mapRow = map + rowOff;
+                    uint* dstRow = dst + rowOff;
+                    int tx = 0;
+
+                    if (Avx2.IsSupported)
                     {
-                        int dstIdx = rowOff + tx;
-                        int srcIdx = map[dstIdx];
+                        Vector256<int> vBlack = Vector256.Create(unchecked((int)0xFF000000u));
+                        int vecW = Vector256<int>.Count; // 8
+                        int vecEnd = dstW - vecW + 1;
+                        for (; tx < vecEnd; tx += vecW)
+                        {
+                            // Load 8 source indices at once
+                            Vector256<int> vSrcIdx = Avx.LoadVector256(mapRow + tx);
+                            // Sign-extend mask: -1 per lane where srcIdx < 0, else 0
+                            Vector256<int> vMask = Avx2.ShiftRightArithmetic(vSrcIdx, 31);
+                            // Safe index: srcIdx & ~mask (replace -1 sentinels with 0 for harmless gather)
+                            Vector256<int> vSafe = Avx2.AndNot(vMask, vSrcIdx);
+                            // GATHER: 8 pixel reads from tmp[] in ONE instruction
+                            Vector256<int> vPix = Avx2.GatherVector256((int*)tmp, vSafe, 4);
+                            // Blend: (pix & ~mask) | (BLACK & mask)
+                            Vector256<int> vResult = Avx2.Or(
+                                Avx2.AndNot(vMask, vPix),
+                                Avx2.And(vMask, vBlack));
+                            Avx.Store((int*)(dstRow + tx), vResult);
+                        }
+                    }
 
-                        // 1. 產生符號遮罩：
-                        // 若 srcIdx < 0 (越界)  -> mask 為 0xFFFFFFFF (-1)
-                        // 若 srcIdx >= 0 (安全) -> mask 為 0x00000000 (0)
+                    // Scalar tail (also fallback when Avx2 unsupported)
+                    for (; tx < dstW; tx++)
+                    {
+                        int srcIdx = mapRow[tx];
                         int mask = srcIdx >> 31;
-
-                        // 2. 越界保護 (Dummy Read Index)：
-                        // 若安全，保留 srcIdx；若越界，強制轉為 0 避免陣列越界。
                         int safeIdx = srcIdx & ~mask;
-
-                        // 3. 無分支像素選擇：
-                        dst[dstIdx] = (tmp[safeIdx] & (uint)~mask) | (0xFF000000u & (uint)mask);
+                        dstRow[tx] = (tmp[safeIdx] & (uint)~mask) | (0xFF000000u & (uint)mask);
                     }
                 });
             }
