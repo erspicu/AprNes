@@ -297,19 +297,11 @@ namespace AprNes
                             {
                                 // Isolate lowest set bit → identifies lowest-index sprite (little-endian)
                                 ulong lowest = valid & (ulong)(-(long)valid);
-                                int i;
-                                uint lo32 = (uint)lowest;
-                                if (lo32 != 0)
-                                {
-                                    if ((lo32 & 0xFFFFu) != 0) i = (lo32 & 0x80u) != 0 ? 0 : 1;
-                                    else                       i = (lo32 & 0x800000u) != 0 ? 2 : 3;
-                                }
-                                else
-                                {
-                                    uint hi32 = (uint)(lowest >> 32);
-                                    if ((hi32 & 0xFFFFu) != 0) i = (hi32 & 0x80u) != 0 ? 4 : 5;
-                                    else                       i = (hi32 & 0x800000u) != 0 ? 6 : 7;
-                                }
+                                // Branchless decode via de-Bruijn-style magic multiply:
+                                // lowest has exactly one bit set at position (8k+7) for k in 0..7.
+                                // (lowest>>7) becomes 1<<(8k); multiplying the magic constant by
+                                // 1<<(8k) shifts byte k into the top position; >>56 extracts it.
+                                int i = (int)((0x0001020304050607UL * (lowest >> 7)) >> 56);
 
                                 byte h = sprShiftH[i], l = sprShiftL[i];
                                 int attr = sprFetchAttr[i];
