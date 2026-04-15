@@ -133,6 +133,14 @@ namespace AprNes
             {
                 loLevels = (float*)Marshal.AllocHGlobal(4 * sizeof(float));
                 loLevels[0] = -0.12f; loLevels[1] = 0.00f; loLevels[2] = 0.31f; loLevels[3] = 0.72f;
+                // Per-scanline scratch buffers (was stackalloc-per-call; zero-init was forced
+                // by .NET Framework 4.8.1 IL `init` prefix → ~125 MB/s L1 churn at 4x analog).
+                // Safe as static because DecodeScanline runs on the single PPU thread.
+                ntsc_waveBuf = (float*)Marshal.AllocHGlobal(kBufLen * sizeof(float));
+                ntsc_cBuf    = (float*)Marshal.AllocHGlobal(kBufLen * sizeof(float));
+                ntsc_dotY    = (float*)Marshal.AllocHGlobal(256 * sizeof(float));
+                ntsc_dotI    = (float*)Marshal.AllocHGlobal(256 * sizeof(float));
+                ntsc_dotQ    = (float*)Marshal.AllocHGlobal(256 * sizeof(float));
                 hiLevels = (float*)Marshal.AllocHGlobal(4 * sizeof(float));
                 hiLevels[0] = 0.40f; hiLevels[1] = 0.68f; hiLevels[2] = 1.00f; hiLevels[3] = 1.00f;
                 iPhase = (float*)Marshal.AllocHGlobal(16 * sizeof(float));
@@ -340,19 +348,20 @@ namespace AprNes
             }
         }
 
+        // Per-scanline scratch — allocated once in Ntsc_Init to dodge stackalloc zero-init.
+        static float* ntsc_waveBuf;
+        static float* ntsc_cBuf;
+        static float* ntsc_dotY;
+        static float* ntsc_dotI;
+        static float* ntsc_dotQ;
+
         public static void DecodeScanline(int sl, byte* palBuf, byte emphasisBits)
         {
             if (sl < 0 || sl >= kSrcH) return;
             if (ntsc_ultraAnalog)
-            {
-                float* waveBuf = stackalloc float[kBufLen]; float* cBuf = stackalloc float[kBufLen];
-                DecodeScanline_Physical(sl, palBuf, emphasisBits, waveBuf, cBuf);
-            }
+                DecodeScanline_Physical(sl, palBuf, emphasisBits, ntsc_waveBuf, ntsc_cBuf);
             else
-            {
-                float* dotY = stackalloc float[256]; float* dotI = stackalloc float[256]; float* dotQ = stackalloc float[256];
-                DecodeScanline_Fast(sl, palBuf, emphasisBits, dotY, dotI, dotQ);
-            }
+                DecodeScanline_Fast(sl, palBuf, emphasisBits, ntsc_dotY, ntsc_dotI, ntsc_dotQ);
         }
 
         static void DecodeScanline_Fast(int sl, byte* palBuf, byte emphasisBits, float* dotY, float* dotI, float* dotQ)
