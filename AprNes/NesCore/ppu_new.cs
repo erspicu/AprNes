@@ -8,6 +8,7 @@
 //   _EmulateHalfPPU: BGshift→commitHalf→tileHalf→VSET_half→spr0_half→OAMbuf
 
 using System;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 
 namespace AprNes
@@ -265,13 +266,15 @@ namespace AprNes
 
                             if (valid != 0)
                             {
-                                // Isolate lowest set bit → identifies lowest-index sprite (little-endian)
+                                // valid's set bit is always at position (8k+7) for sprite index k=0..7.
+                                // tzcnt on .NET 10 (BMI1 hw) lowers to single `tzcnt` instruction.
+#if NET10_0_OR_GREATER
+                                int i = BitOperations.TrailingZeroCount(valid) >> 3;
+#else
+                                // Fallback: de-Bruijn-style magic multiply (net48, no BitOperations class).
                                 ulong lowest = valid & (ulong)(-(long)valid);
-                                // Branchless decode via de-Bruijn-style magic multiply:
-                                // lowest has exactly one bit set at position (8k+7) for k in 0..7.
-                                // (lowest>>7) becomes 1<<(8k); multiplying the magic constant by
-                                // 1<<(8k) shifts byte k into the top position; >>56 extracts it.
                                 int i = (int)((0x0001020304050607UL * (lowest >> 7)) >> 56);
+#endif
 
                                 byte h = sprShiftH[i], l = sprShiftL[i];
                                 int attr = sprFetchAttr[i];
@@ -279,7 +282,9 @@ namespace AprNes
                                 int sprPalette = (attr & 3) | 4;
                                 bool sprPriority = (attr & 0x20) == 0;
 
-                                if (canDetectSprite0Hit && i == 0 && sprZeroInSlots && showBG && bgColor != 0)
+                                // Condition reorder (E): `i == 0` is the rarest false (1/8), place first
+                                // for fastest short-circuit. Other checks fall through naturally.
+                                if (i == 0 && canDetectSprite0Hit && sprZeroInSlots && showBG && bgColor != 0)
                                 { if ((ShowSprLeft8 || cx > 8) && cx < 256) { pendingSprite0Hit = true; canDetectSprite0Hit = false; } }
 
                                 bool ow = (bgColor == 0) | sprPriority;
