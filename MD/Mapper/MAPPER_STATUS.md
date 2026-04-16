@@ -1,6 +1,6 @@
 # AprNes Mapper 實作狀態
 
-**已實作：67 個　　預備實作：14 個　　最後更新：2026-04-17**
+**已實作：68 個　　預備實作：13 個　　最後更新：2026-04-17**
 
 結果說明：✅ 正常　⚠️ 部分問題　❌ 有問題　❓ 待確認／不明
 
@@ -90,6 +90,7 @@
 | **232** | Camerica BF9096 | ✅ | Quattro Adventure (U), Quattro Sports (U) | 外層+內層二段 PRG；Aladdin variant |
 | **241** | BxROM / Subor | ✅ | 學生電腦 16-in-1, 12-in-1 Hwang Shinwei, ABM Study Card | 任何 PRG 寫入 → 32KB bank 切換；極簡；實作參考 Mesen2 |
 | **112** | Asder (Ntdec) | ✅ | 三國志, Cobra Mission, Fighting Hero III | $8000 reg select, $A000 data, $C000 outer CHR, $E000 mirror |
+| **177** | Henggedianzi | ✅ | 恒格电子 5 ROMs (Mei Guo Fu Hao, Xing He Zhan Shi etc.) | 32KB PRG + bit5 mirroring，極簡 |
 
 ---
 
