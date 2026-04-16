@@ -489,23 +489,22 @@ namespace AprNes
             }
         }
 
-        // Reverse bits in a byte — 256-byte LUT (unmanaged, no bounds check)
+        // 512-byte LUT: [0..255]=identity (no flip), [256..511]=bit-reversed (flip)
+        // Index = val | ((attr & 0x40) << 2) → 0x40 becomes 0x100, selecting flipped half.
         static byte* FlipTable;
         static void InitFlipTable()
         {
-            FlipTable = (byte*)Marshal.AllocHGlobal(256);
+            FlipTable = (byte*)Marshal.AllocHGlobal(512);
             for (int i = 0; i < 256; i++)
             {
+                FlipTable[i] = (byte)i;
                 int v = i;
                 v = ((v & 0xF0) >> 4) | ((v & 0x0F) << 4);
                 v = ((v & 0xCC) >> 2) | ((v & 0x33) << 2);
                 v = ((v & 0xAA) >> 1) | ((v & 0x55) << 1);
-                FlipTable[i] = (byte)v;
+                FlipTable[i + 256] = (byte)v;
             }
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static byte FlipByte(byte b) => FlipTable[b];
 
         // TriCNES v2: Palette corruption — hardware-tested lookup table.
         // Corrupts palette RAM when v register leaves palette range ($3F00+)
@@ -782,10 +781,9 @@ namespace AprNes
 
             byte oam2Read = secondaryOAM[evalOam2Addr];
 
-            // Pre-compute range check (single diff calculation)
+            // Pre-compute range check — unsigned-wrap trick: negative diff becomes huge unsigned value, fails < height
             int height = Spritesize8x16 ? 16 : 8;
-            int diff = (scanline & 0xFF) - oamCopyBuffer;
-            bool inRange = diff >= 0 && diff < height;
+            bool inRange = (uint)((scanline & 0xFF) - oamCopyBuffer) < (uint)height;
 
             if (evalTick == 0) // Tick 0: Y byte
             {
@@ -1044,11 +1042,9 @@ namespace AprNes
             oamCorruptWasRendering = prevRenderingEnabled;
             oamCorrupt2001Value = value;
             // Set delay based on alignment (TriCNES line 9518-9527)
-            switch (mcPpuClock & 3)
-            {
-                case 0: case 3: oamCorruptDelay = 2; break;
-                case 1: case 2: oamCorruptDelay = 3; break;
-            }
+            int align = mcPpuClock & 3;
+            if (align == 0 || align == 3) oamCorruptDelay = 2;
+            else                          oamCorruptDelay = 3;
 
             if (prevRenderingEnabled != newRenderingInstant)
             {
@@ -1067,8 +1063,7 @@ namespace AprNes
                     else
                     {
                         // Re-enabling rendering — suppression gate (TriCNES line 9564)
-                        int alignment = mcPpuClock & 3;
-                        if (oamCorruptPending && (alignment == 1 || alignment == 2))
+                        if (oamCorruptPending && (align == 1 || align == 2))
                             oamCorruptSuppressed = true;
 
                         // Sprite 0 hit now uses CalculatePixel model (no pre-computation needed)
@@ -1078,11 +1073,11 @@ namespace AprNes
             prevRenderingEnabled = newRenderingInstant;
 
             // Tier 2: Delayed mask flags (ShowBG/ShowSprites/Left8)
-            ppu2001UpdateDelay = ((mcPpuClock & 3) == 2) ? 3 : 2; // TriCNES: phase 2=3, others=2
+            ppu2001UpdateDelay = (align == 2) ? 3 : 2; // TriCNES: phase 2=3, others=2
             ppu2001PendingValue = value;
             // Emphasis bits: independent delay (TriCNES: PPU_Update2001EmphasisBitsDelay)
             // Alignment 0,3: 2 cycles; Alignment 1,2: 1 cycle
-            ppu2001EmphasisDelay = ((mcPpuClock & 3) == 0 || (mcPpuClock & 3) == 3) ? 2 : 1;
+            ppu2001EmphasisDelay = (align == 0 || align == 3) ? 2 : 1;
             ppu2001EmphasisPending = value;
         }
 

@@ -587,7 +587,8 @@ namespace AprNes
                         }
                         else
                         {
-                            byte tile = (sprFetchAttr[slot] & 0x40) != 0 ? FlipByte(val) : val;
+                            // Branchless flip: FlipTable[val | ((attr & 0x40) << 2)] selects identity/reversed half
+                            byte tile = FlipTable[val | ((sprFetchAttr[slot] & 0x40) << 2)];
                             if (slot >= sprSlotCount || ppuInRangeCheck >= (Spritesize8x16 ? 16 : 8))
                                 tile = 0;
                             if (sprPhase == 5) sprShiftL[slot] = tile;
