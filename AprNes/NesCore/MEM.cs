@@ -239,9 +239,10 @@ namespace AprNes
         }
 
 #if NET10_0_OR_GREATER
-        // .NET 10: native function pointer arrays — calli IL opcode, no delegate invoke overhead
-        static delegate*<ushort, byte>[] mem_read_fun = null;
-        static delegate*<ushort, byte, void>[] mem_write_fun = null;
+        // .NET 10: unmanaged native function pointer tables via AllocUnmanaged (64-byte aligned).
+        // Pointer indexing has no bounds check — `mem_read_fun[addr](addr)` compiles to calli.
+        static delegate*<ushort, byte>*       mem_read_fun  = null;
+        static delegate*<ushort, byte, void>* mem_write_fun = null;
 #else
         // .NET Framework 4.8.1: managed delegate arrays
         static Action<ushort, byte>[] mem_write_fun = null;
@@ -268,27 +269,26 @@ namespace AprNes
         static void init_function()
         {
 #if NET10_0_OR_GREATER
-            mem_write_fun = new delegate*<ushort, byte, void>[0x10000];
-            mem_read_fun  = new delegate*<ushort, byte>[0x10000];
+            // Allocate once, process-lifetime. 64-byte aligned via AllocUnmanaged on .NET 10.
+            if (mem_write_fun == null)
+                mem_write_fun = (delegate*<ushort, byte, void>*)AllocUnmanaged(0x10000 * sizeof(delegate*<ushort, byte, void>));
+            if (mem_read_fun == null)
+                mem_read_fun  = (delegate*<ushort, byte>*)AllocUnmanaged(0x10000 * sizeof(delegate*<ushort, byte>));
 
-            for (int address = 0; address < 0x10000; address++)
-            {
-                if      (address < 0x2000) mem_write_fun[address] = &Write_NesRam;
-                else if (address < 0x4020) mem_write_fun[address] = &IO_write;
-                else if (address < 0x4100) mem_write_fun[address] = &Write_NoOp;              // $4020-$40FF open bus
-                else if (address < 0x6000) mem_write_fun[address] = &Wrap_MapperW_ExpansionROM;
-                else if (address < 0x8000) mem_write_fun[address] = &Wrap_MapperW_RAM;
-                else                       mem_write_fun[address] = &Wrap_MapperW_PRG;
-            }
-            for (int address = 0; address < 0x10000; address++)
-            {
-                if      (address < 0x2000) mem_read_fun[address] = &Read_NesRam;
-                else if (address < 0x4020) mem_read_fun[address] = &IO_read;
-                else if (address < 0x4100) mem_read_fun[address] = &Read_OpenBus;             // $4020-$40FF open bus
-                else if (address < 0x6000) mem_read_fun[address] = &Wrap_MapperR_ExpansionROM;
-                else if (address < 0x8000) mem_read_fun[address] = &Wrap_MapperR_RAM;
-                else                       mem_read_fun[address] = &Wrap_MapperR_RPG;
-            }
+            // Range-based fill: one tight loop per memory region, replaces 65536× if-else chain.
+            for (int i = 0;      i < 0x2000;  i++) mem_write_fun[i] = &Write_NesRam;
+            for (int i = 0x2000; i < 0x4020;  i++) mem_write_fun[i] = &IO_write;
+            for (int i = 0x4020; i < 0x4100;  i++) mem_write_fun[i] = &Write_NoOp;                // $4020-$40FF open bus
+            for (int i = 0x4100; i < 0x6000;  i++) mem_write_fun[i] = &Wrap_MapperW_ExpansionROM;
+            for (int i = 0x6000; i < 0x8000;  i++) mem_write_fun[i] = &Wrap_MapperW_RAM;
+            for (int i = 0x8000; i < 0x10000; i++) mem_write_fun[i] = &Wrap_MapperW_PRG;
+
+            for (int i = 0;      i < 0x2000;  i++) mem_read_fun[i] = &Read_NesRam;
+            for (int i = 0x2000; i < 0x4020;  i++) mem_read_fun[i] = &IO_read;
+            for (int i = 0x4020; i < 0x4100;  i++) mem_read_fun[i] = &Read_OpenBus;               // $4020-$40FF open bus
+            for (int i = 0x4100; i < 0x6000;  i++) mem_read_fun[i] = &Wrap_MapperR_ExpansionROM;
+            for (int i = 0x6000; i < 0x8000;  i++) mem_read_fun[i] = &Wrap_MapperR_RAM;
+            for (int i = 0x8000; i < 0x10000; i++) mem_read_fun[i] = &Wrap_MapperR_RPG;
 #else
             mem_write_fun = new Action<ushort, byte>[0x10000];
             mem_read_fun  = new Func<ushort, byte>[0x10000];

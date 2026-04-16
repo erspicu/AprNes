@@ -28,9 +28,9 @@ namespace AprNes
         public static void FreeUnmanaged(IntPtr ptr) { if (ptr != IntPtr.Zero) NativeMemory.AlignedFree((void*)ptr); }
 #else
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static IntPtr AllocUnmanaged(int size) => NesCore.AllocUnmanaged(size);
+        public static IntPtr AllocUnmanaged(int size) => Marshal.AllocHGlobal(size);
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void FreeUnmanaged(IntPtr ptr) { if (ptr != IntPtr.Zero) NesCore.FreeUnmanaged(ptr); }
+        public static void FreeUnmanaged(IntPtr ptr) { if (ptr != IntPtr.Zero) Marshal.FreeHGlobal(ptr); }
 #endif
 
         public static event EventHandler VideoOutput;

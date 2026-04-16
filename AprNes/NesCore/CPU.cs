@@ -8,7 +8,8 @@ namespace AprNes
         static byte r_A = 0, r_X = 0, r_Y = 0, r_SP = 0xFD, flagN = 0, flagV = 0, flagD = 0, flagI = 1, flagZ = 0, flagC = 0;
         static ushort r_PC = 0;
         static byte opcode;
-        static unsafe delegate*<void>[] opFnPtrs = new delegate*<void>[256];
+        // 256-entry native function pointer table — unmanaged memory, no bounds check
+        static unsafe delegate*<void>* opFnPtrs;
 
         static public bool exit = false;
         static bool IRQLine = false;           // Latched from irqLineCurrent at CPUClock==5 (TriCNES: IRQLine)
@@ -1782,7 +1783,14 @@ namespace AprNes
 
         static unsafe void InitOpHandlers()
         {
-            delegate*<void>[] t =
+            // Allocate once; process-lifetime (matches other AllocUnmanaged buffers).
+            int tableSize = 256 * sizeof(delegate*<void>);
+            if (opFnPtrs == null)
+                opFnPtrs = (delegate*<void>*)AllocUnmanaged(tableSize);
+
+            // stackalloc with initializer preserves the 16×16 opcode matrix layout
+            // with zero GC allocation. Buffer.MemoryCopy blasts it into the native table.
+            delegate*<void>* t = stackalloc delegate*<void>[256]
             {
                 &Op_00                , &Op_01                , &Op_HLT               , &Op_03                , &Op_DOP_ZP            , &Op_05                , &Op_06                , &Op_07                ,  // 0x00-0x07
                 &Op_08                , &Op_09                , &Op_0A                , &Op_ANC               , &Op_0C                , &Op_0D                , &Op_0E                , &Op_0F                ,  // 0x08-0x0f
@@ -1817,7 +1825,7 @@ namespace AprNes
                 &Op_F0                , &Op_F1                , &Op_HLT               , &Op_F3                , &Op_DOP_ZPX           , &Op_F5                , &Op_F6                , &Op_F7                ,  // 0xf0-0xf7
                 &Op_F8                , &Op_F9                , &Op_NOP               , &Op_FB                , &Op_TOP_AbsX          , &Op_FD                , &Op_FE                , &Op_FF                  // 0xf8-0xff
             };
-            Array.Copy(t, opFnPtrs, 256);
+            Buffer.MemoryCopy(t, opFnPtrs, tableSize, tableSize);
         }
     }
 }
