@@ -12,7 +12,7 @@ namespace AprNes
                 case 25: case 67: case 72: case 76: case 77: case 79: case 80: case 82: case 87: case 89: case 93: case 95: case 97: case 184: case 185:
                 case 32: case 33: case 34: case 64: case 65: case 66: case 68: case 69: case 71: case 78: case 206:
                 case 70: case 75: case 88: case 90: case 118: case 119: case 140: case 152: case 154: case 180: case 209: case 210: case 211: case 228: case 232:
-                case 241:
+                case 241: case 112:
                     return true;
                 default:
                     return false;
@@ -88,6 +88,7 @@ namespace AprNes
                 case 152: return "Bandai 74161/32+mirror";
                 case 232: return "Camerica Quattro";
                 case 241: return "BxROM / Subor";
+                case 112: return "Asder (Ntdec)";
                 default: return "Unknown";
             }
         }
@@ -323,6 +324,10 @@ namespace AprNes
                 case 241: {
                     System.Console.WriteLine("Mapper241: BxROM / Subor");
                     return new Mapper241();
+                }
+                case 112: {
+                    System.Console.WriteLine("Mapper112: Asder / Ntdec");
+                    return new Mapper112();
                 }
                 default: throw new System.NotSupportedException("Mapper " + id + " not supported");
             }
