@@ -129,6 +129,7 @@
     <Compile Include="NesCore\Mapper\Mapper118.cs" />
     <Compile Include="NesCore\Mapper\Mapper140.cs" />
     <Compile Include="NesCore\Mapper\Mapper232.cs" />
+    <Compile Include="NesCore\Mapper\Mapper241.cs" />
     <Compile Include="NesCore\Mapper\Mapper013.cs" />
     <Compile Include="NesCore\Mapper\Mapper029.cs" />
     <Compile Include="NesCore\Mapper\Mapper067.cs" />
