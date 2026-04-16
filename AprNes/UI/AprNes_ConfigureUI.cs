@@ -435,7 +435,7 @@ namespace AprNes
                 {
                     if (NesCore.AnalogScreenBuf != null)
                     {
-                        System.Runtime.InteropServices.Marshal.FreeHGlobal((IntPtr)NesCore.AnalogScreenBuf);
+                        NesCore.FreeUnmanaged((IntPtr)NesCore.AnalogScreenBuf);
                         NesCore.AnalogScreenBuf = null;
                         NesCore.AnalogBufSize   = 0;
                     }

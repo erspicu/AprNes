@@ -119,22 +119,22 @@ namespace AprNes
 
         public static void Crt_Init()
         {
-            if (_weights != null) Marshal.FreeHGlobal((IntPtr)_weights);
-            if (_nearestY != null) Marshal.FreeHGlobal((IntPtr)_nearestY);
-            if (_boostRow != null) Marshal.FreeHGlobal((IntPtr)_boostRow);
-            _weights = (float*)Marshal.AllocHGlobal(Crt_DstH * sizeof(float));
-            _nearestY = (int*)Marshal.AllocHGlobal(Crt_DstH * sizeof(int));
-            _boostRow = (float*)Marshal.AllocHGlobal(Crt_DstH * sizeof(float));
+            if (_weights != null) NesCore.FreeUnmanaged((IntPtr)_weights);
+            if (_nearestY != null) NesCore.FreeUnmanaged((IntPtr)_nearestY);
+            if (_boostRow != null) NesCore.FreeUnmanaged((IntPtr)_boostRow);
+            _weights = (float*)NesCore.AllocUnmanaged(Crt_DstH * sizeof(float));
+            _nearestY = (int*)NesCore.AllocUnmanaged(Crt_DstH * sizeof(int));
+            _boostRow = (float*)NesCore.AllocUnmanaged(Crt_DstH * sizeof(float));
 
-            if (_curvTemp != null) Marshal.FreeHGlobal((IntPtr)_curvTemp);
-            if (_curvMap != null) Marshal.FreeHGlobal((IntPtr)_curvMap);
-            if (_curvMapCol != null) Marshal.FreeHGlobal((IntPtr)_curvMapCol);
-            _curvTemp = (uint*)Marshal.AllocHGlobal(Crt_DstW * Crt_DstH * sizeof(uint));
-            _curvMap = (int*)Marshal.AllocHGlobal(Crt_DstW * Crt_DstH * sizeof(int));
-            _curvMapCol = (int*)Marshal.AllocHGlobal(Crt_DstW * Crt_DstH * sizeof(int));
+            if (_curvTemp != null) NesCore.FreeUnmanaged((IntPtr)_curvTemp);
+            if (_curvMap != null) NesCore.FreeUnmanaged((IntPtr)_curvMap);
+            if (_curvMapCol != null) NesCore.FreeUnmanaged((IntPtr)_curvMapCol);
+            _curvTemp = (uint*)NesCore.AllocUnmanaged(Crt_DstW * Crt_DstH * sizeof(uint));
+            _curvMap = (int*)NesCore.AllocUnmanaged(Crt_DstW * Crt_DstH * sizeof(int));
+            _curvMapCol = (int*)NesCore.AllocUnmanaged(Crt_DstW * Crt_DstH * sizeof(int));
 
-            if (_prevFrame != null) Marshal.FreeHGlobal((IntPtr)_prevFrame);
-            _prevFrame = (uint*)Marshal.AllocHGlobal(Crt_DstW * Crt_DstH * sizeof(uint));
+            if (_prevFrame != null) NesCore.FreeUnmanaged((IntPtr)_prevFrame);
+            _prevFrame = (uint*)NesCore.AllocUnmanaged(Crt_DstW * Crt_DstH * sizeof(uint));
             _prevFrameValid = false;
 
             _cachedSigma = -1f; _cachedFrame = -1; _cachedCurvK = -1f;

@@ -12,25 +12,25 @@ namespace AprNes
         // ==================================================================
         static float* apm_AllocFloat(int count)
         {
-            float* p = (float*)Marshal.AllocHGlobal(count * sizeof(float));
+            float* p = (float*)NesCore.AllocUnmanaged(count * sizeof(float));
             for (int i = 0; i < count; i++) p[i] = 0f;
             return p;
         }
         static double* apm_AllocDouble(int count)
         {
-            double* p = (double*)Marshal.AllocHGlobal(count * sizeof(double));
+            double* p = (double*)NesCore.AllocUnmanaged(count * sizeof(double));
             for (int i = 0; i < count; i++) p[i] = 0.0;
             return p;
         }
         static int* apm_AllocInt(int count)
         {
-            int* p = (int*)Marshal.AllocHGlobal(count * sizeof(int));
+            int* p = (int*)NesCore.AllocUnmanaged(count * sizeof(int));
             for (int i = 0; i < count; i++) p[i] = 0;
             return p;
         }
         static uint* apm_AllocUint(int count)
         {
-            uint* p = (uint*)Marshal.AllocHGlobal(count * sizeof(uint));
+            uint* p = (uint*)NesCore.AllocUnmanaged(count * sizeof(uint));
             for (int i = 0; i < count; i++) p[i] = 0;
             return p;
         }
@@ -399,7 +399,7 @@ namespace AprNes
             cmf_presetCutoffs[0] = 14000; cmf_presetCutoffs[1] = 4700; cmf_presetCutoffs[2] = 20000;
             cmf_presetCutoffs[3] = 19000; cmf_presetCutoffs[4] = 12000; cmf_presetCutoffs[5] = 16000;
 
-            cmf_presetBuzz = (byte*)Marshal.AllocHGlobal(6);
+            cmf_presetBuzz = (byte*)NesCore.AllocUnmanaged(6);
             cmf_presetBuzz[0] = 0; cmf_presetBuzz[1] = 0; cmf_presetBuzz[2] = 1;
             cmf_presetBuzz[3] = 0; cmf_presetBuzz[4] = 0; cmf_presetBuzz[5] = 0;
         }
@@ -522,7 +522,7 @@ namespace AprNes
         {
             if (mfx_haasDelayBuf != null) return; // 已配置，共用記憶體
             mfx_haasDelayBuf = apm_AllocFloat(MFX_MAX_DELAY);
-            mfx_combBuf = (float**)Marshal.AllocHGlobal(MFX_COMB_COUNT * sizeof(float*));
+            mfx_combBuf = (float**)NesCore.AllocUnmanaged(MFX_COMB_COUNT * sizeof(float*));
             mfx_combPos = apm_AllocInt(MFX_COMB_COUNT);
             mfx_combLpfState = apm_AllocFloat(MFX_COMB_COUNT);
             for (int i = 0; i < MFX_COMB_COUNT; i++)
@@ -704,7 +704,7 @@ namespace AprNes
         static void mmix_Init()
         {
             if (mmix_chBuf != null) return; // 已配置，共用記憶體
-            mmix_chBuf = (float**)Marshal.AllocHGlobal(MMIX_TOTAL_CH * sizeof(float*));
+            mmix_chBuf = (float**)NesCore.AllocUnmanaged(MMIX_TOTAL_CH * sizeof(float*));
             for (int i = 0; i < MMIX_TOTAL_CH; i++)
                 mmix_chBuf[i] = apm_AllocFloat(MMIX_MAX_SAMPLES);
             mmix_panL = apm_AllocFloat(MMIX_TOTAL_CH);
@@ -1023,7 +1023,7 @@ namespace AprNes
         {
             if (ose_ringBuf != null) return; // 已配置，共用記憶體
             int ringSize = OSE_BUF_SIZE + OSE_TAPS;
-            ose_ringBuf = (float**)Marshal.AllocHGlobal(OSE_COUNT * sizeof(float*));
+            ose_ringBuf = (float**)NesCore.AllocUnmanaged(OSE_COUNT * sizeof(float*));
             ose_writePos = apm_AllocInt(OSE_COUNT);
             ose_inputPhaseFp = apm_AllocUint(OSE_COUNT);
             for (int i = 0; i < OSE_COUNT; i++)

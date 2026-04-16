@@ -177,13 +177,13 @@ public sealed unsafe class EmulatorEngine : IDisposable
             if (NesCore.AnalogScreenBuf == null || NesCore.AnalogBufSize != neededPx)
             {
                 if (NesCore.AnalogScreenBuf != null)
-                    { Marshal.FreeHGlobal((IntPtr)NesCore.AnalogScreenBuf); NesCore.AnalogScreenBuf = null; }
+                    { AprNes.NesCore.FreeUnmanaged((IntPtr)NesCore.AnalogScreenBuf); NesCore.AnalogScreenBuf = null; }
                 if (NesCore.AnalogScreenBufBack != null)
-                    { Marshal.FreeHGlobal((IntPtr)NesCore.AnalogScreenBufBack); NesCore.AnalogScreenBufBack = null; }
+                    { AprNes.NesCore.FreeUnmanaged((IntPtr)NesCore.AnalogScreenBufBack); NesCore.AnalogScreenBufBack = null; }
 
                 NesCore.AnalogBufSize       = neededPx;
-                NesCore.AnalogScreenBuf     = (uint*)Marshal.AllocHGlobal(sizeof(uint) * neededPx);
-                NesCore.AnalogScreenBufBack = (uint*)Marshal.AllocHGlobal(sizeof(uint) * neededPx);
+                NesCore.AnalogScreenBuf     = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * neededPx);
+                NesCore.AnalogScreenBufBack = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * neededPx);
             }
             NesCore.SyncAnalogConfig();
             NesCore.Ntsc_Init();
@@ -199,12 +199,12 @@ public sealed unsafe class EmulatorEngine : IDisposable
             // Analog→Digital: free NesCore analog buffers (mirrors AprNes WinForms)
             if (NesCore.AnalogScreenBuf != null)
             {
-                Marshal.FreeHGlobal((IntPtr)NesCore.AnalogScreenBuf);
+                AprNes.NesCore.FreeUnmanaged((IntPtr)NesCore.AnalogScreenBuf);
                 NesCore.AnalogScreenBuf = null;
             }
             if (NesCore.AnalogScreenBufBack != null)
             {
-                Marshal.FreeHGlobal((IntPtr)NesCore.AnalogScreenBufBack);
+                AprNes.NesCore.FreeUnmanaged((IntPtr)NesCore.AnalogScreenBufBack);
                 NesCore.AnalogScreenBufBack = null;
             }
             NesCore.AnalogBufSize = 0;
@@ -222,11 +222,11 @@ public sealed unsafe class EmulatorEngine : IDisposable
 
             if (_bufferSize != needed)
             {
-                if (_bufferA != IntPtr.Zero) Marshal.FreeHGlobal(_bufferA);
-                if (_bufferB != IntPtr.Zero) Marshal.FreeHGlobal(_bufferB);
+                if (_bufferA != IntPtr.Zero) AprNes.NesCore.FreeUnmanaged(_bufferA);
+                if (_bufferB != IntPtr.Zero) AprNes.NesCore.FreeUnmanaged(_bufferB);
 
-                _bufferA = Marshal.AllocHGlobal(needed);
-                _bufferB = Marshal.AllocHGlobal(needed);
+                _bufferA = AprNes.NesCore.AllocUnmanaged(needed);
+                _bufferB = AprNes.NesCore.AllocUnmanaged(needed);
                 _bufferSize = needed;
             }
 
@@ -576,8 +576,8 @@ public sealed unsafe class EmulatorEngine : IDisposable
 
         lock (_resizeLock)
         {
-            if (_bufferA != IntPtr.Zero) Marshal.FreeHGlobal(_bufferA);
-            if (_bufferB != IntPtr.Zero) Marshal.FreeHGlobal(_bufferB);
+            if (_bufferA != IntPtr.Zero) AprNes.NesCore.FreeUnmanaged(_bufferA);
+            if (_bufferB != IntPtr.Zero) AprNes.NesCore.FreeUnmanaged(_bufferB);
             _bufferA = _bufferB = _backBuffer = _frontBuffer = IntPtr.Zero;
             _bufferSize = 0;
         }

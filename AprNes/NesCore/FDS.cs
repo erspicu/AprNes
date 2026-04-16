@@ -292,7 +292,7 @@ namespace AprNes
                 fds_ParseDiskData(fdsData);
 
                 // Allocate mirroring control
-                Vertical = (int*)Marshal.AllocHGlobal(sizeof(int));
+                Vertical = (int*)NesCore.AllocUnmanaged(sizeof(int));
                 *Vertical = 0; // Horizontal mirroring (FDS default)
 
                 // PRG-ROM: not used in FDS, set to null
@@ -304,42 +304,42 @@ namespace AprNes
                 HasBattery = false; // FDS handles its own save
 
                 // Allocate BIOS ROM (8KB)
-                fdsBiosRom = (byte*)Marshal.AllocHGlobal(FDS_BIOS_SIZE);
+                fdsBiosRom = (byte*)NesCore.AllocUnmanaged(FDS_BIOS_SIZE);
                 for (int i = 0; i < FDS_BIOS_SIZE; i++) fdsBiosRom[i] = biosRom[i];
 
                 // Allocate PRG-RAM (32KB, $6000-$DFFF)
-                fdsPrgRam = (byte*)Marshal.AllocHGlobal(32768);
+                fdsPrgRam = (byte*)NesCore.AllocUnmanaged(32768);
                 for (int i = 0; i < 32768; i++) fdsPrgRam[i] = 0;
 
                 // Shared hardware allocations (same as init())
-                ScreenBuf1x      = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 61440);
+                ScreenBuf1x      = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * 61440);
                 if (AnalogEnabled)
                 {
                     SyncAnalogConfig();
                     AnalogBufSize   = Crt_DstW * Crt_DstH;
-                    AnalogScreenBuf = (uint*)Marshal.AllocHGlobal(sizeof(uint) * AnalogBufSize);
+                    AnalogScreenBuf = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * AnalogBufSize);
                 }
-                Buffer_BG_array  = (int* )Marshal.AllocHGlobal(sizeof(int)  * 61440);
-                NesColors        = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 64);
-                spr_ram          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
-                secondaryOAM     = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
-                corruptOamRow    = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
-                ppu_ram          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 0x4000);
-                palCache         = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 32);
+                Buffer_BG_array  = (int* )NesCore.AllocUnmanaged(sizeof(int)  * 61440);
+                NesColors        = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * 64);
+                spr_ram          = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 256);
+                secondaryOAM     = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 32);
+                corruptOamRow    = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 32);
+                ppu_ram          = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 0x4000);
+                palCache         = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * 32);
                 InitFlipTable();
                 // expansionChannels: needed by mapper Reset() before initAPU()
-                expansionChannels = (int*)Marshal.AllocHGlobal(sizeof(int) * 8);
+                expansionChannels = (int*)NesCore.AllocUnmanaged(sizeof(int) * 8);
                 for (int i = 0; i < 8; i++) expansionChannels[i] = 0;
-                chrBankPtrs      = (byte**)Marshal.AllocHGlobal(sizeof(byte*) * 8);
-                chrBankPtrsA     = (byte**)Marshal.AllocHGlobal(sizeof(byte*) * 8);
-                chrBankPtrsB     = (byte**)Marshal.AllocHGlobal(sizeof(byte*) * 8);
+                chrBankPtrs      = (byte**)NesCore.AllocUnmanaged(sizeof(byte*) * 8);
+                chrBankPtrsA     = (byte**)NesCore.AllocUnmanaged(sizeof(byte*) * 8);
+                chrBankPtrsB     = (byte**)NesCore.AllocUnmanaged(sizeof(byte*) * 8);
                 for (int i = 0; i < 8; i++) { chrBankPtrs[i] = null; chrBankPtrsA[i] = null; chrBankPtrsB[i] = null; }
-                sprShiftL        = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
-                sprShiftH        = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
-                sprXCounter      = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
-                sprFetchAttr     = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
+                sprShiftL        = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 8);
+                sprShiftH        = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 8);
+                sprXCounter      = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 8);
+                sprFetchAttr     = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 8);
                 // P1_joypad_status/P2_joypad_status removed — shift register model uses static bytes
-                NES_MEM          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 65536);
+                NES_MEM          = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 65536);
 
                 // Init the CHR-RAM shim mapper (needed for PPU function pointer setup)
                 MapperObj.MapperInit(null, null, ppu_ram, 0, 0, Vertical);
@@ -477,8 +477,8 @@ namespace AprNes
         /// </summary>
         static void fds_FreeMemory()
         {
-            if (fdsBiosRom != null) { Marshal.FreeHGlobal((IntPtr)fdsBiosRom); fdsBiosRom = null; }
-            if (fdsPrgRam != null)  { Marshal.FreeHGlobal((IntPtr)fdsPrgRam);  fdsPrgRam = null; }
+            if (fdsBiosRom != null) { NesCore.FreeUnmanaged((IntPtr)fdsBiosRom); fdsBiosRom = null; }
+            if (fdsPrgRam != null)  { NesCore.FreeUnmanaged((IntPtr)fdsPrgRam);  fdsPrgRam = null; }
             fdsDiskSides = null;
             fdsDiskHeaders = null;
             fdsSideCount = 0;

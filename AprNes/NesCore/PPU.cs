@@ -494,7 +494,7 @@ namespace AprNes
         static byte* FlipTable;
         static void InitFlipTable()
         {
-            FlipTable = (byte*)Marshal.AllocHGlobal(512);
+            FlipTable = (byte*)NesCore.AllocUnmanaged(512);
             for (int i = 0; i < 256; i++)
             {
                 FlipTable[i] = (byte)i;

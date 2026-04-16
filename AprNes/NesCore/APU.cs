@@ -106,7 +106,7 @@ namespace AprNes
         // One-shot allocation of unmanaged audio arrays. Process-lifetime.
         static NesCore()
         {
-            DefaultChipGain = (float*)Marshal.AllocHGlobal(sizeof(float) * DefaultChipGainCount);
+            DefaultChipGain = (float*)NesCore.AllocUnmanaged(sizeof(float) * DefaultChipGainCount);
             DefaultChipGain[0] = 0f;    // None
             DefaultChipGain[1] = 740f;  // VRC6:      max≈45140 (≈APU range 1/2)
             DefaultChipGain[2] = 3f;    // VRC7:      OPLL raw ±12285, ×3 → max≈36855
@@ -115,14 +115,14 @@ namespace AprNes
             DefaultChipGain[5] = 43f;   // MMC5 (future)
             DefaultChipGain[6] = 20f;   // FDS  (future)
 
-            ChannelVolume = (int*)Marshal.AllocHGlobal(sizeof(int) * ChannelCount);
+            ChannelVolume = (int*)NesCore.AllocUnmanaged(sizeof(int) * ChannelCount);
             for (int i = 0; i < ChannelCount; i++) ChannelVolume[i] = 70;
 
-            ChannelEnabled = (byte*)Marshal.AllocHGlobal(ChannelCount);
+            ChannelEnabled = (byte*)NesCore.AllocUnmanaged(ChannelCount);
             for (int i = 0; i < ChannelCount; i++) ChannelEnabled[i] = 1;
 
-            ntBankPtrs     = (byte**)Marshal.AllocHGlobal(sizeof(byte*) * 4);
-            ntBankWritable = (byte*)Marshal.AllocHGlobal(4);
+            ntBankPtrs     = (byte**)NesCore.AllocUnmanaged(sizeof(byte*) * 4);
+            ntBankWritable = (byte*)NesCore.AllocUnmanaged(4);
             for (int i = 0; i < 4; i++) { ntBankPtrs[i] = null; ntBankWritable[i] = 0; }
         }
 
@@ -272,37 +272,37 @@ namespace AprNes
             // Set audio output dispatch fn based on current AudioMode
             ApuRefreshOutputFn();
             // Allocate pointer arrays (null-check pattern for re-init safety)
-            if (_pulseTimer  == null) _pulseTimer  = (int*)Marshal.AllocHGlobal(sizeof(int) * 2);
-            if (_pulsePeriod == null) _pulsePeriod = (int*)Marshal.AllocHGlobal(sizeof(int) * 2);
-            if (_pulseSeq    == null) _pulseSeq    = (int*)Marshal.AllocHGlobal(sizeof(int) * 2);
-            if (_pulseDuty   == null) _pulseDuty   = (int*)Marshal.AllocHGlobal(sizeof(int) * 2);
-            if (_pulseOut    == null) _pulseOut    = (int*)Marshal.AllocHGlobal(sizeof(int) * 2);
-            if (expansionChannels == null) expansionChannels = (int*)Marshal.AllocHGlobal(sizeof(int) * 8);
-            if (volume       == null) volume       = (int*)Marshal.AllocHGlobal(sizeof(int) * 4);
-            if (SQUARELOOKUP == null) SQUARELOOKUP = (int*)Marshal.AllocHGlobal(sizeof(int) * 31);
-            if (TNDLOOKUP    == null) TNDLOOKUP    = (int*)Marshal.AllocHGlobal(sizeof(int) * 203);
-            if (noiseperiod  == null) noiseperiod  = (int*)Marshal.AllocHGlobal(sizeof(int) * 16);
-            if (lengthctr    == null) lengthctr    = (int*)Marshal.AllocHGlobal(sizeof(int) * 4);
-            if (lenctrload   == null) lenctrload   = (int*)Marshal.AllocHGlobal(sizeof(int) * 32);
-            if (apuRegister  == null) apuRegister  = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 16);
-            if (envelopeValue   == null) envelopeValue   = (int*)Marshal.AllocHGlobal(sizeof(int) * 4);
-            if (envelopeCounter == null) envelopeCounter = (int*)Marshal.AllocHGlobal(sizeof(int) * 4);
-            if (envelopePos     == null) envelopePos     = (int*)Marshal.AllocHGlobal(sizeof(int) * 4);
-            if (sweepperiod  == null) sweepperiod  = (int*)Marshal.AllocHGlobal(sizeof(int) * 2);
-            if (sweepshift   == null) sweepshift   = (int*)Marshal.AllocHGlobal(sizeof(int) * 2);
-            if (sweeppos     == null) sweeppos     = (int*)Marshal.AllocHGlobal(sizeof(int) * 2);
-            if (dmcperiods   == null) dmcperiods   = (int*)Marshal.AllocHGlobal(sizeof(int) * 16);
-            if (lenCtrEnable           == null) lenCtrEnable           = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 4);
-            if (envConstVolume         == null) envConstVolume         = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 4);
-            if (envelopeStartFlag      == null) envelopeStartFlag      = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 4);
-            if (sweepenable            == null) sweepenable            = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 2);
-            if (sweepnegate            == null) sweepnegate            = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 2);
-            if (sweepsilence           == null) sweepsilence           = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 2);
-            if (sweepreload            == null) sweepreload            = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 2);
-            if (TRI_SEQ    == null) { TRI_SEQ    = (int*)Marshal.AllocHGlobal(sizeof(int) * 32);
+            if (_pulseTimer  == null) _pulseTimer  = (int*)NesCore.AllocUnmanaged(sizeof(int) * 2);
+            if (_pulsePeriod == null) _pulsePeriod = (int*)NesCore.AllocUnmanaged(sizeof(int) * 2);
+            if (_pulseSeq    == null) _pulseSeq    = (int*)NesCore.AllocUnmanaged(sizeof(int) * 2);
+            if (_pulseDuty   == null) _pulseDuty   = (int*)NesCore.AllocUnmanaged(sizeof(int) * 2);
+            if (_pulseOut    == null) _pulseOut    = (int*)NesCore.AllocUnmanaged(sizeof(int) * 2);
+            if (expansionChannels == null) expansionChannels = (int*)NesCore.AllocUnmanaged(sizeof(int) * 8);
+            if (volume       == null) volume       = (int*)NesCore.AllocUnmanaged(sizeof(int) * 4);
+            if (SQUARELOOKUP == null) SQUARELOOKUP = (int*)NesCore.AllocUnmanaged(sizeof(int) * 31);
+            if (TNDLOOKUP    == null) TNDLOOKUP    = (int*)NesCore.AllocUnmanaged(sizeof(int) * 203);
+            if (noiseperiod  == null) noiseperiod  = (int*)NesCore.AllocUnmanaged(sizeof(int) * 16);
+            if (lengthctr    == null) lengthctr    = (int*)NesCore.AllocUnmanaged(sizeof(int) * 4);
+            if (lenctrload   == null) lenctrload   = (int*)NesCore.AllocUnmanaged(sizeof(int) * 32);
+            if (apuRegister  == null) apuRegister  = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 16);
+            if (envelopeValue   == null) envelopeValue   = (int*)NesCore.AllocUnmanaged(sizeof(int) * 4);
+            if (envelopeCounter == null) envelopeCounter = (int*)NesCore.AllocUnmanaged(sizeof(int) * 4);
+            if (envelopePos     == null) envelopePos     = (int*)NesCore.AllocUnmanaged(sizeof(int) * 4);
+            if (sweepperiod  == null) sweepperiod  = (int*)NesCore.AllocUnmanaged(sizeof(int) * 2);
+            if (sweepshift   == null) sweepshift   = (int*)NesCore.AllocUnmanaged(sizeof(int) * 2);
+            if (sweeppos     == null) sweeppos     = (int*)NesCore.AllocUnmanaged(sizeof(int) * 2);
+            if (dmcperiods   == null) dmcperiods   = (int*)NesCore.AllocUnmanaged(sizeof(int) * 16);
+            if (lenCtrEnable           == null) lenCtrEnable           = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 4);
+            if (envConstVolume         == null) envConstVolume         = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 4);
+            if (envelopeStartFlag      == null) envelopeStartFlag      = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 4);
+            if (sweepenable            == null) sweepenable            = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 2);
+            if (sweepnegate            == null) sweepnegate            = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 2);
+            if (sweepsilence           == null) sweepsilence           = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 2);
+            if (sweepreload            == null) sweepreload            = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 2);
+            if (TRI_SEQ    == null) { TRI_SEQ    = (int*)NesCore.AllocUnmanaged(sizeof(int) * 32);
                 int[] tv = { 15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0, 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 };
                 for (int i = 0; i < 32; i++) TRI_SEQ[i] = tv[i]; }
-            if (DUTYLOOKUP == null) { DUTYLOOKUP = (int*)Marshal.AllocHGlobal(sizeof(int) * 32);
+            if (DUTYLOOKUP == null) { DUTYLOOKUP = (int*)NesCore.AllocUnmanaged(sizeof(int) * 32);
                 int[] dv = { 0,1,0,0,0,0,0,0, 0,1,1,0,0,0,0,0, 0,1,1,1,1,0,0,0, 1,0,0,1,1,1,1,1 };
                 for (int i = 0; i < 32; i++) DUTYLOOKUP[i] = dv[i]; }
 

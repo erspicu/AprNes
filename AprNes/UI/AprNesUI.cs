@@ -1809,17 +1809,17 @@ public string GetRomInfo()
                     {
                         if (NesCore.AnalogScreenBuf != null)
                         {
-                            System.Runtime.InteropServices.Marshal.FreeHGlobal((IntPtr)NesCore.AnalogScreenBuf);
+                            NesCore.FreeUnmanaged((IntPtr)NesCore.AnalogScreenBuf);
                             NesCore.AnalogScreenBuf = null;
                         }
                         if (NesCore.AnalogScreenBufBack != null)
                         {
-                            System.Runtime.InteropServices.Marshal.FreeHGlobal((IntPtr)NesCore.AnalogScreenBufBack);
+                            NesCore.FreeUnmanaged((IntPtr)NesCore.AnalogScreenBufBack);
                             NesCore.AnalogScreenBufBack = null;
                         }
                         NesCore.AnalogBufSize       = needed;
-                        NesCore.AnalogScreenBuf     = (uint*)System.Runtime.InteropServices.Marshal.AllocHGlobal(sizeof(uint) * needed);
-                        NesCore.AnalogScreenBufBack = (uint*)System.Runtime.InteropServices.Marshal.AllocHGlobal(sizeof(uint) * needed);
+                        NesCore.AnalogScreenBuf     = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * needed);
+                        NesCore.AnalogScreenBufBack = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * needed);
                     }
                 }
                 NesCore.SyncAnalogConfig();
@@ -2274,17 +2274,17 @@ public string GetRomInfo()
                 {
                     if (NesCore.AnalogScreenBuf != null)
                     {
-                        System.Runtime.InteropServices.Marshal.FreeHGlobal((IntPtr)NesCore.AnalogScreenBuf);
+                        NesCore.FreeUnmanaged((IntPtr)NesCore.AnalogScreenBuf);
                         NesCore.AnalogScreenBuf = null;
                     }
                     if (NesCore.AnalogScreenBufBack != null)
                     {
-                        System.Runtime.InteropServices.Marshal.FreeHGlobal((IntPtr)NesCore.AnalogScreenBufBack);
+                        NesCore.FreeUnmanaged((IntPtr)NesCore.AnalogScreenBufBack);
                         NesCore.AnalogScreenBufBack = null;
                     }
                     NesCore.AnalogBufSize       = needed;
-                    NesCore.AnalogScreenBuf     = (uint*)System.Runtime.InteropServices.Marshal.AllocHGlobal(sizeof(uint) * needed);
-                    NesCore.AnalogScreenBufBack = (uint*)System.Runtime.InteropServices.Marshal.AllocHGlobal(sizeof(uint) * needed);
+                    NesCore.AnalogScreenBuf     = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * needed);
+                    NesCore.AnalogScreenBufBack = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * needed);
                 }
                 NesCore.SyncAnalogConfig();
                 NesCore.Ntsc_Init();
@@ -2352,17 +2352,17 @@ public string GetRomInfo()
                 {
                     if (NesCore.AnalogScreenBuf != null)
                     {
-                        System.Runtime.InteropServices.Marshal.FreeHGlobal((IntPtr)NesCore.AnalogScreenBuf);
+                        NesCore.FreeUnmanaged((IntPtr)NesCore.AnalogScreenBuf);
                         NesCore.AnalogScreenBuf = null;
                     }
                     if (NesCore.AnalogScreenBufBack != null)
                     {
-                        System.Runtime.InteropServices.Marshal.FreeHGlobal((IntPtr)NesCore.AnalogScreenBufBack);
+                        NesCore.FreeUnmanaged((IntPtr)NesCore.AnalogScreenBufBack);
                         NesCore.AnalogScreenBufBack = null;
                     }
                     NesCore.AnalogBufSize       = needed;
-                    NesCore.AnalogScreenBuf     = (uint*)System.Runtime.InteropServices.Marshal.AllocHGlobal(sizeof(uint) * needed);
-                    NesCore.AnalogScreenBufBack = (uint*)System.Runtime.InteropServices.Marshal.AllocHGlobal(sizeof(uint) * needed);
+                    NesCore.AnalogScreenBuf     = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * needed);
+                    NesCore.AnalogScreenBufBack = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * needed);
                 }
                 NesCore.SyncAnalogConfig();
                 NesCore.Ntsc_Init();

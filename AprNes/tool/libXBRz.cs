@@ -94,12 +94,12 @@ namespace XBRz_speed
         {
             if (lTable_dist != null) return;
             width = _width; height = _height;
-            lTable_dist = (int*)Marshal.AllocHGlobal(sizeof(int) * 0x1000000);
-            _preProcBuffer = (byte*)Marshal.AllocHGlobal(sizeof(byte) * width * height);
+            lTable_dist = (int*)AprNes.NesCore.AllocUnmanaged(sizeof(int) * 0x1000000);
+            _preProcBuffer = (byte*)AprNes.NesCore.AllocUnmanaged(sizeof(byte) * width * height);
 
             // ★ 配置合併後的 uint 陣列
-            results_merged = (uint*)Marshal.AllocHGlobal(sizeof(uint) * width * height);
-            preProcBuffer_local = (byte*)Marshal.AllocHGlobal(sizeof(byte) * width);
+            results_merged = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * width * height);
+            preProcBuffer_local = (byte*)AprNes.NesCore.AllocUnmanaged(sizeof(byte) * width);
 
             for (int i = 0; i < 0x1000000; i++)
             {

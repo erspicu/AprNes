@@ -307,21 +307,21 @@ namespace NativeTools
                 },
                 lMin = min, lMax = max
             };
-            IntPtr ptr = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(DIPROPRANGE)));
+            IntPtr ptr = AprNes.NesCore.AllocUnmanaged(Marshal.SizeOf(typeof(DIPROPRANGE)));
             try
             {
                 Marshal.StructureToPtr(r, ptr, false);
                 GetVtMethod<VtDI8DevSetPropertyFn>(pDev, DI8DevSlot.SetProperty)
                     (pDev, DIPROP_RANGE, ptr);
             }
-            finally { Marshal.FreeHGlobal(ptr); }
+            finally { AprNes.NesCore.FreeUnmanaged(ptr); }
         }
 
         public static bool PollDevice(IntPtr pDev, out DIJOYSTATE state)
         {
             state = DefaultState();
             GetVtMethod<VtDI8DevPollFn>(pDev, DI8DevSlot.Poll)(pDev);
-            IntPtr ptr = Marshal.AllocHGlobal(80); // sizeof(DIJOYSTATE)
+            IntPtr ptr = AprNes.NesCore.AllocUnmanaged(80); // sizeof(DIJOYSTATE)
             try
             {
                 int hr = GetVtMethod<VtDI8DevGetStateFn>(pDev, DI8DevSlot.GetDeviceState)
@@ -336,7 +336,7 @@ namespace NativeTools
                 state = (DIJOYSTATE)Marshal.PtrToStructure(ptr, typeof(DIJOYSTATE));
                 return true;
             }
-            finally { Marshal.FreeHGlobal(ptr); }
+            finally { AprNes.NesCore.FreeUnmanaged(ptr); }
         }
 
         public static void ReleaseDevice(IntPtr pDev)
@@ -413,7 +413,7 @@ namespace NativeTools
                     { pguid = IntPtr.Zero, dwOfs = (uint)(48 + i), dwType = optB, dwFlags = 0 });
 
             int    objSize  = Marshal.SizeOf(typeof(DIOBJECTDATAFORMAT));
-            IntPtr pObjArr  = Marshal.AllocHGlobal(objs.Count * objSize);
+            IntPtr pObjArr  = AprNes.NesCore.AllocUnmanaged(objs.Count * objSize);
             for (int i = 0; i < objs.Count; i++)
                 Marshal.StructureToPtr(objs[i], IntPtr.Add(pObjArr, i * objSize), false);
 
@@ -426,13 +426,13 @@ namespace NativeTools
                 dwNumObjs  = (uint)objs.Count,
                 rgodf      = pObjArr
             };
-            pFormat = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(DIDATAFORMAT)));
+            pFormat = AprNes.NesCore.AllocUnmanaged(Marshal.SizeOf(typeof(DIDATAFORMAT)));
             Marshal.StructureToPtr(fmt, pFormat, false);
         }
 
         static IntPtr AllocGuid(Guid g)
         {
-            IntPtr p = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(Guid)));
+            IntPtr p = AprNes.NesCore.AllocUnmanaged(Marshal.SizeOf(typeof(Guid)));
             Marshal.StructureToPtr(g, p, false);
             return p;
         }

@@ -58,10 +58,10 @@ public unsafe class RenderPipeline : IDisposable
         bool needOutputBuf = _s1Filter != ResizeFilter.None || _s2Filter != ResizeFilter.None;
 
         if (needStage1Buf)
-            _stage1Buf = (uint*)Marshal.AllocHGlobal(sizeof(uint) * _stage1W * _stage1H);
+            _stage1Buf = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * _stage1W * _stage1H);
 
         if (needOutputBuf)
-            _output = (uint*)Marshal.AllocHGlobal(sizeof(uint) * OutputW * OutputH);
+            _output = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * OutputW * OutputH);
         else
             _output = _input;
 
@@ -147,8 +147,8 @@ public unsafe class RenderPipeline : IDisposable
 
     public void FreeMem()
     {
-        if (_stage1Buf != null) { Marshal.FreeHGlobal((IntPtr)_stage1Buf); _stage1Buf = null; }
-        if (_output != null && _output != _input) { Marshal.FreeHGlobal((IntPtr)_output); _output = null; }
+        if (_stage1Buf != null) { AprNes.NesCore.FreeUnmanaged((IntPtr)_stage1Buf); _stage1Buf = null; }
+        if (_output != null && _output != _input) { AprNes.NesCore.FreeUnmanaged((IntPtr)_output); _output = null; }
         _initialized = false;
     }
 

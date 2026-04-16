@@ -34,7 +34,7 @@ namespace AprNes
             PRG_ROM_count = _PRG_ROM_count; CHR_ROM_count = _CHR_ROM_count;
             Vertical = _Vertical;
             if (chrRam == null)
-                chrRam = (byte*)Marshal.AllocHGlobal(6 * 1024);
+                chrRam = (byte*)NesCore.AllocUnmanaged(6 * 1024);
         }
 
         public void Reset()
@@ -103,7 +103,7 @@ namespace AprNes
         }
         public void Cleanup()
         {
-            if (chrRam != null) { Marshal.FreeHGlobal((IntPtr)chrRam); chrRam = null; }
+            if (chrRam != null) { NesCore.FreeUnmanaged((IntPtr)chrRam); chrRam = null; }
         }
     }
 }

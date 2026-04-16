@@ -21,8 +21,8 @@ namespace ScanLineBuilder
             int bytes = pixelCount * sizeof(int);
             if (t_lineBufCap < bytes)
             {
-                if (t_lineBuf != IntPtr.Zero) Marshal.FreeHGlobal(t_lineBuf);
-                t_lineBuf = Marshal.AllocHGlobal(bytes);
+                if (t_lineBuf != IntPtr.Zero) AprNes.NesCore.FreeUnmanaged(t_lineBuf);
+                t_lineBuf = AprNes.NesCore.AllocUnmanaged(bytes);
                 t_lineBufCap = bytes;
             }
             return (int*)t_lineBuf;
@@ -33,7 +33,7 @@ namespace ScanLineBuilder
         public static void InitRates()
         {
             if (ratesInited) return;
-            rates = (byte*)Marshal.AllocHGlobal(256);
+            rates = (byte*)AprNes.NesCore.AllocUnmanaged(256);
             const float scanStr = 0.35f;
             const float bloom   = 0.70f;
             for (int i = 0; i < 256; i++)

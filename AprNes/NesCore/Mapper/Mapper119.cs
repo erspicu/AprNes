@@ -40,7 +40,7 @@ namespace AprNes
             Vertical = _Vertical;
             NES_MEM = NesCore.NES_MEM;
             if (chrRam == null)
-                chrRam = (byte*)Marshal.AllocHGlobal(8 * 1024);
+                chrRam = (byte*)NesCore.AllocUnmanaged(8 * 1024);
         }
 
         public void Reset()
@@ -231,7 +231,7 @@ namespace AprNes
         }
         public void Cleanup()
         {
-            if (chrRam != null) { Marshal.FreeHGlobal((IntPtr)chrRam); chrRam = null; }
+            if (chrRam != null) { NesCore.FreeUnmanaged((IntPtr)chrRam); chrRam = null; }
         }
     }
 }

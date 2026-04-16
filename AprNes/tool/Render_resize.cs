@@ -47,8 +47,8 @@ namespace AprNes
 
         public void freeMem()
         {
-            if (_stage1Buf != null) { Marshal.FreeHGlobal((IntPtr)_stage1Buf); _stage1Buf = null; }
-            if (_output != null && _output != _input) { Marshal.FreeHGlobal((IntPtr)_output); _output = null; }
+            if (_stage1Buf != null) { AprNes.NesCore.FreeUnmanaged((IntPtr)_stage1Buf); _stage1Buf = null; }
+            if (_output != null && _output != _input) { AprNes.NesCore.FreeUnmanaged((IntPtr)_output); _output = null; }
         }
 
         public Bitmap GetOutput()
@@ -65,10 +65,10 @@ namespace AprNes
             bool needOutputBuf = (_s1Filter != ResizeFilter.None) || (_s2Filter != ResizeFilter.None);
 
             if (needStage1Buf)
-                _stage1Buf = (uint*)Marshal.AllocHGlobal(sizeof(uint) * _stage1W * _stage1H);
+                _stage1Buf = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * _stage1W * _stage1H);
 
             if (needOutputBuf)
-                _output = (uint*)Marshal.AllocHGlobal(sizeof(uint) * _finalW * _finalH);
+                _output = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * _finalW * _finalH);
             else
                 _output = _input; // 1x: direct output from NES
 
@@ -96,10 +96,10 @@ namespace AprNes
             bool needOutputBuf = (_s1Filter != ResizeFilter.None) || (_s2Filter != ResizeFilter.None);
 
             if (needStage1Buf)
-                _stage1Buf = (uint*)Marshal.AllocHGlobal(sizeof(uint) * _stage1W * _stage1H);
+                _stage1Buf = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * _stage1W * _stage1H);
 
             if (needOutputBuf)
-                _output = (uint*)Marshal.AllocHGlobal(sizeof(uint) * _finalW * _finalH);
+                _output = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * _finalW * _finalH);
             else
                 _output = _input;
 

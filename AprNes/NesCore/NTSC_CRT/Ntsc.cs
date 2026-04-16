@@ -132,36 +132,36 @@ namespace AprNes
         {
             if (loLevels == null)
             {
-                loLevels = (float*)Marshal.AllocHGlobal(4 * sizeof(float));
+                loLevels = (float*)NesCore.AllocUnmanaged(4 * sizeof(float));
                 loLevels[0] = -0.12f; loLevels[1] = 0.00f; loLevels[2] = 0.31f; loLevels[3] = 0.72f;
                 // Row-capture buffers for deferred parallel demodulation.
                 // Scratch buffers (wave/cBuf/dotY/I/Q) are now per-thread via [ThreadStatic].
-                ntsc_rowPalettes = (byte*)Marshal.AllocHGlobal(kSrcH * 256);
-                ntsc_rowEmphasis = (byte*)Marshal.AllocHGlobal(kSrcH);
-                ntsc_rowPhase0   = (int*)Marshal.AllocHGlobal(kSrcH * sizeof(int));
-                hiLevels = (float*)Marshal.AllocHGlobal(4 * sizeof(float));
+                ntsc_rowPalettes = (byte*)NesCore.AllocUnmanaged(kSrcH * 256);
+                ntsc_rowEmphasis = (byte*)NesCore.AllocUnmanaged(kSrcH);
+                ntsc_rowPhase0   = (int*)NesCore.AllocUnmanaged(kSrcH * sizeof(int));
+                hiLevels = (float*)NesCore.AllocUnmanaged(4 * sizeof(float));
                 hiLevels[0] = 0.40f; hiLevels[1] = 0.68f; hiLevels[2] = 1.00f; hiLevels[3] = 1.00f;
-                iPhase = (float*)Marshal.AllocHGlobal(16 * sizeof(float));
-                qPhase = (float*)Marshal.AllocHGlobal(16 * sizeof(float));
-                linearBuffer = (float*)Marshal.AllocHGlobal(kOutW * kSrcH * 3 * sizeof(float));
-                cosTab6 = (float*)Marshal.AllocHGlobal(6 * sizeof(float));
-                sinTab6 = (float*)Marshal.AllocHGlobal(6 * sizeof(float));
-                hannY = (float*)Marshal.AllocHGlobal(kWinY * sizeof(float));
-                hannI = (float*)Marshal.AllocHGlobal(kWinI * sizeof(float));
-                hannQ = (float*)Marshal.AllocHGlobal(kWinQ * sizeof(float));
-                combinedI = (float*)Marshal.AllocHGlobal(6 * kWinI * sizeof(float));
-                combinedQ = (float*)Marshal.AllocHGlobal(6 * kWinQ * sizeof(float));
-                gammaLUT = (byte*)Marshal.AllocHGlobal(4096);
-                attenTab = (float*)Marshal.AllocHGlobal(4 * sizeof(float));
-                yBase = (float*)Marshal.AllocHGlobal(64 * sizeof(float));
-                iBase = (float*)Marshal.AllocHGlobal(64 * sizeof(float));
-                qBase = (float*)Marshal.AllocHGlobal(64 * sizeof(float));
-                waveTable = (float*)Marshal.AllocHGlobal(64 * 6 * 4 * sizeof(float));
-                cTable = (float*)Marshal.AllocHGlobal(64 * 6 * 4 * sizeof(float));
-                emphAtten = (float*)Marshal.AllocHGlobal(8 * 12 * sizeof(float));
-                yBaseE = (float*)Marshal.AllocHGlobal(64 * 8 * sizeof(float));
-                iBaseE = (float*)Marshal.AllocHGlobal(64 * 8 * sizeof(float));
-                qBaseE = (float*)Marshal.AllocHGlobal(64 * 8 * sizeof(float));
+                iPhase = (float*)NesCore.AllocUnmanaged(16 * sizeof(float));
+                qPhase = (float*)NesCore.AllocUnmanaged(16 * sizeof(float));
+                linearBuffer = (float*)NesCore.AllocUnmanaged(kOutW * kSrcH * 3 * sizeof(float));
+                cosTab6 = (float*)NesCore.AllocUnmanaged(6 * sizeof(float));
+                sinTab6 = (float*)NesCore.AllocUnmanaged(6 * sizeof(float));
+                hannY = (float*)NesCore.AllocUnmanaged(kWinY * sizeof(float));
+                hannI = (float*)NesCore.AllocUnmanaged(kWinI * sizeof(float));
+                hannQ = (float*)NesCore.AllocUnmanaged(kWinQ * sizeof(float));
+                combinedI = (float*)NesCore.AllocUnmanaged(6 * kWinI * sizeof(float));
+                combinedQ = (float*)NesCore.AllocUnmanaged(6 * kWinQ * sizeof(float));
+                gammaLUT = (byte*)NesCore.AllocUnmanaged(4096);
+                attenTab = (float*)NesCore.AllocUnmanaged(4 * sizeof(float));
+                yBase = (float*)NesCore.AllocUnmanaged(64 * sizeof(float));
+                iBase = (float*)NesCore.AllocUnmanaged(64 * sizeof(float));
+                qBase = (float*)NesCore.AllocUnmanaged(64 * sizeof(float));
+                waveTable = (float*)NesCore.AllocUnmanaged(64 * 6 * 4 * sizeof(float));
+                cTable = (float*)NesCore.AllocUnmanaged(64 * 6 * 4 * sizeof(float));
+                emphAtten = (float*)NesCore.AllocUnmanaged(8 * 12 * sizeof(float));
+                yBaseE = (float*)NesCore.AllocUnmanaged(64 * 8 * sizeof(float));
+                iBaseE = (float*)NesCore.AllocUnmanaged(64 * 8 * sizeof(float));
+                qBaseE = (float*)NesCore.AllocUnmanaged(64 * 8 * sizeof(float));
 
                 for (int c = 0; c < 16; c++) { double a = c * Math.PI / 6.0; iPhase[c] = -(float)Math.Cos(a); qPhase[c] = (float)Math.Sin(a); }
                 for (int k = 0; k < 6; k++) { double a = k * 2.0 * Math.PI / 6.0; cosTab6[k] = (float)Math.Cos(a); sinTab6[k] = (float)Math.Sin(a); }
@@ -366,11 +366,11 @@ namespace AprNes
         static void EnsureThreadScratch()
         {
             if (tls_waveBuf != null) return;
-            tls_waveBuf = (float*)Marshal.AllocHGlobal(kBufLen * sizeof(float));
-            tls_cBuf    = (float*)Marshal.AllocHGlobal(kBufLen * sizeof(float));
-            tls_dotY    = (float*)Marshal.AllocHGlobal(256 * sizeof(float));
-            tls_dotI    = (float*)Marshal.AllocHGlobal(256 * sizeof(float));
-            tls_dotQ    = (float*)Marshal.AllocHGlobal(256 * sizeof(float));
+            tls_waveBuf = (float*)NesCore.AllocUnmanaged(kBufLen * sizeof(float));
+            tls_cBuf    = (float*)NesCore.AllocUnmanaged(kBufLen * sizeof(float));
+            tls_dotY    = (float*)NesCore.AllocUnmanaged(256 * sizeof(float));
+            tls_dotI    = (float*)NesCore.AllocUnmanaged(256 * sizeof(float));
+            tls_dotQ    = (float*)NesCore.AllocUnmanaged(256 * sizeof(float));
         }
 
         // Fast path: PPU thread snapshots palette + emphasis + current subcarrier phase at

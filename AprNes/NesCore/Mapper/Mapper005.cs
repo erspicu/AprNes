@@ -88,10 +88,10 @@ namespace AprNes
 
             // Allocate unmanaged memory for ExRAM (1KB) and fill nametable (1KB)
             // Free any previous allocation to prevent leak on repeated MapperInit calls
-            if (exRamPtr != null) Marshal.FreeHGlobal((IntPtr)exRamPtr);
-            if (fillNTPtr != null) Marshal.FreeHGlobal((IntPtr)fillNTPtr);
-            exRamPtr = (byte*)Marshal.AllocHGlobal(1024);
-            fillNTPtr = (byte*)Marshal.AllocHGlobal(1024);
+            if (exRamPtr != null) NesCore.FreeUnmanaged((IntPtr)exRamPtr);
+            if (fillNTPtr != null) NesCore.FreeUnmanaged((IntPtr)fillNTPtr);
+            exRamPtr = (byte*)NesCore.AllocUnmanaged(1024);
+            fillNTPtr = (byte*)NesCore.AllocUnmanaged(1024);
             for (int i = 0; i < 1024; i++) { exRamPtr[i] = 0; fillNTPtr[i] = 0; }
 
             // Power-on defaults (per Mesen2/NESdev wiki)
@@ -721,8 +721,8 @@ namespace AprNes
         public void CpuClockRise() { }
         public void Cleanup()
         {
-            if (exRamPtr != null) { Marshal.FreeHGlobal((IntPtr)exRamPtr); exRamPtr = null; }
-            if (fillNTPtr != null) { Marshal.FreeHGlobal((IntPtr)fillNTPtr); fillNTPtr = null; }
+            if (exRamPtr != null) { NesCore.FreeUnmanaged((IntPtr)exRamPtr); exRamPtr = null; }
+            if (fillNTPtr != null) { NesCore.FreeUnmanaged((IntPtr)fillNTPtr); fillNTPtr = null; }
         }
     }
 }

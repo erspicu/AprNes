@@ -16,6 +16,23 @@ namespace AprNes
 
     unsafe public partial class NesCore
     {
+        // ── Unmanaged memory helpers ───────────────────────────────────────
+        // .NET 10: NativeMemory.AlignedAlloc/AlignedFree (64-byte aligned for SIMD/cache-line).
+        // net48 fallback: NesCore.AllocUnmanaged/FreeHGlobal (no guaranteed alignment).
+        // CRITICAL: alloc + free MUST be paired via these helpers (mixing AlignedAlloc with
+        // FreeHGlobal or vice-versa crashes the allocator). All project code must go through.
+#if NET10_0_OR_GREATER
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static IntPtr AllocUnmanaged(int size) => (IntPtr)NativeMemory.AlignedAlloc((nuint)size, 64);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void FreeUnmanaged(IntPtr ptr) { if (ptr != IntPtr.Zero) NativeMemory.AlignedFree((void*)ptr); }
+#else
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static IntPtr AllocUnmanaged(int size) => NesCore.AllocUnmanaged(size);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void FreeUnmanaged(IntPtr ptr) { if (ptr != IntPtr.Zero) NesCore.FreeUnmanaged(ptr); }
+#endif
+
         public static event EventHandler VideoOutput;
 
 
@@ -214,29 +231,29 @@ namespace AprNes
         {
             fds_FreeMemory();
             if (MapperObj != null) { MapperObj.Cleanup(); MapperObj = null; }
-            if (PRG_ROM      != null) { Marshal.FreeHGlobal((IntPtr)PRG_ROM);      PRG_ROM      = null; }
-            if (CHR_ROM      != null) { Marshal.FreeHGlobal((IntPtr)CHR_ROM);      CHR_ROM      = null; }
-            if (ScreenBuf1x  != null) { Marshal.FreeHGlobal((IntPtr)ScreenBuf1x);  ScreenBuf1x  = null; }
-            if (Buffer_BG_array != null) { Marshal.FreeHGlobal((IntPtr)Buffer_BG_array); Buffer_BG_array = null; }
-            if (NesColors    != null) { Marshal.FreeHGlobal((IntPtr)NesColors);    NesColors    = null; }
-            if (spr_ram      != null) { Marshal.FreeHGlobal((IntPtr)spr_ram);      spr_ram      = null; }
-            if (secondaryOAM != null) { Marshal.FreeHGlobal((IntPtr)secondaryOAM); secondaryOAM = null; }
-            if (corruptOamRow!= null) { Marshal.FreeHGlobal((IntPtr)corruptOamRow);corruptOamRow= null; }
-            if (ppu_ram      != null) { Marshal.FreeHGlobal((IntPtr)ppu_ram);      ppu_ram      = null; }
-            if (FlipTable    != null) { Marshal.FreeHGlobal((IntPtr)FlipTable);    FlipTable    = null; }
-            if (sprShiftL    != null) { Marshal.FreeHGlobal((IntPtr)sprShiftL);    sprShiftL    = null; }
-            if (sprShiftH    != null) { Marshal.FreeHGlobal((IntPtr)sprShiftH);    sprShiftH    = null; }
-            if (sprXCounter  != null) { Marshal.FreeHGlobal((IntPtr)sprXCounter);  sprXCounter  = null; }
-            if (sprFetchAttr != null) { Marshal.FreeHGlobal((IntPtr)sprFetchAttr); sprFetchAttr = null; }
-            if (expansionChannels != null) { Marshal.FreeHGlobal((IntPtr)expansionChannels); expansionChannels = null; }
-            if (chrBankPtrs  != null) { Marshal.FreeHGlobal((IntPtr)chrBankPtrs);  chrBankPtrs  = null; }
-            if (chrBankPtrsA != null) { Marshal.FreeHGlobal((IntPtr)chrBankPtrsA); chrBankPtrsA = null; }
-            if (chrBankPtrsB != null) { Marshal.FreeHGlobal((IntPtr)chrBankPtrsB); chrBankPtrsB = null; }
-            if (ntscScanBuf  != null) { Marshal.FreeHGlobal((IntPtr)ntscScanBuf);  ntscScanBuf  = null; }
-            if (NES_MEM      != null) { Marshal.FreeHGlobal((IntPtr)NES_MEM);      NES_MEM      = null; }
-            if (Vertical           != null) { Marshal.FreeHGlobal((IntPtr)Vertical);           Vertical           = null; }
-            if (AnalogScreenBuf     != null) { Marshal.FreeHGlobal((IntPtr)AnalogScreenBuf);     AnalogScreenBuf     = null; AnalogBufSize = 0; }
-            if (AnalogScreenBufBack != null) { Marshal.FreeHGlobal((IntPtr)AnalogScreenBufBack); AnalogScreenBufBack = null; }
+            if (PRG_ROM      != null) { NesCore.FreeUnmanaged((IntPtr)PRG_ROM);      PRG_ROM      = null; }
+            if (CHR_ROM      != null) { NesCore.FreeUnmanaged((IntPtr)CHR_ROM);      CHR_ROM      = null; }
+            if (ScreenBuf1x  != null) { NesCore.FreeUnmanaged((IntPtr)ScreenBuf1x);  ScreenBuf1x  = null; }
+            if (Buffer_BG_array != null) { NesCore.FreeUnmanaged((IntPtr)Buffer_BG_array); Buffer_BG_array = null; }
+            if (NesColors    != null) { NesCore.FreeUnmanaged((IntPtr)NesColors);    NesColors    = null; }
+            if (spr_ram      != null) { NesCore.FreeUnmanaged((IntPtr)spr_ram);      spr_ram      = null; }
+            if (secondaryOAM != null) { NesCore.FreeUnmanaged((IntPtr)secondaryOAM); secondaryOAM = null; }
+            if (corruptOamRow!= null) { NesCore.FreeUnmanaged((IntPtr)corruptOamRow);corruptOamRow= null; }
+            if (ppu_ram      != null) { NesCore.FreeUnmanaged((IntPtr)ppu_ram);      ppu_ram      = null; }
+            if (FlipTable    != null) { NesCore.FreeUnmanaged((IntPtr)FlipTable);    FlipTable    = null; }
+            if (sprShiftL    != null) { NesCore.FreeUnmanaged((IntPtr)sprShiftL);    sprShiftL    = null; }
+            if (sprShiftH    != null) { NesCore.FreeUnmanaged((IntPtr)sprShiftH);    sprShiftH    = null; }
+            if (sprXCounter  != null) { NesCore.FreeUnmanaged((IntPtr)sprXCounter);  sprXCounter  = null; }
+            if (sprFetchAttr != null) { NesCore.FreeUnmanaged((IntPtr)sprFetchAttr); sprFetchAttr = null; }
+            if (expansionChannels != null) { NesCore.FreeUnmanaged((IntPtr)expansionChannels); expansionChannels = null; }
+            if (chrBankPtrs  != null) { NesCore.FreeUnmanaged((IntPtr)chrBankPtrs);  chrBankPtrs  = null; }
+            if (chrBankPtrsA != null) { NesCore.FreeUnmanaged((IntPtr)chrBankPtrsA); chrBankPtrsA = null; }
+            if (chrBankPtrsB != null) { NesCore.FreeUnmanaged((IntPtr)chrBankPtrsB); chrBankPtrsB = null; }
+            if (ntscScanBuf  != null) { NesCore.FreeUnmanaged((IntPtr)ntscScanBuf);  ntscScanBuf  = null; }
+            if (NES_MEM      != null) { NesCore.FreeUnmanaged((IntPtr)NES_MEM);      NES_MEM      = null; }
+            if (Vertical           != null) { NesCore.FreeUnmanaged((IntPtr)Vertical);           Vertical           = null; }
+            if (AnalogScreenBuf     != null) { NesCore.FreeUnmanaged((IntPtr)AnalogScreenBuf);     AnalogScreenBuf     = null; AnalogBufSize = 0; }
+            if (AnalogScreenBufBack != null) { NesCore.FreeUnmanaged((IntPtr)AnalogScreenBufBack); AnalogScreenBufBack = null; }
         }
 
         /// <summary>
@@ -366,14 +383,14 @@ prerender_sprite0_x = 0;
                 Console.WriteLine("iNes header");
 
 
-                Vertical = (int*)Marshal.AllocHGlobal(sizeof(int));
+                Vertical = (int*)NesCore.AllocUnmanaged(sizeof(int));
 
                 PRG_ROM_count = rom_bytes[4];
                 Console.WriteLine("PRG-ROM count : " + PRG_ROM_count);
 
                 int PRG_ROM_count_needs = PRG_ROM_count;
                 if (PRG_ROM_count == 1) PRG_ROM_count_needs = 2;//min PRG ROM is 2
-                PRG_ROM = (byte*)Marshal.AllocHGlobal(sizeof(byte) * PRG_ROM_count_needs * 16384);
+                PRG_ROM = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * PRG_ROM_count_needs * 16384);
                 for (int i = 0; i < PRG_ROM_count * 16384; i++) PRG_ROM[i] = rom_bytes[16 + i];
                 if (PRG_ROM_count == 1) for (int i = 0; i < PRG_ROM_count * 16384; i++) PRG_ROM[i + 16384] = rom_bytes[16 + i]; // if only 1 RPG_ROM ,copy to another space
 
@@ -392,7 +409,7 @@ prerender_sprite0_x = 0;
 
                 if (CHR_ROM_count != 0)
                 {
-                    CHR_ROM = (byte*)Marshal.AllocHGlobal(sizeof(byte) * CHR_ROM_count * 8192);
+                    CHR_ROM = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * CHR_ROM_count * 8192);
                     for (int i = 0; i < CHR_ROM_count * 8192; i++)
                         CHR_ROM[i] = rom_bytes[PRG_ROM_count * 16384 + 16 + i];
                 }
@@ -462,42 +479,42 @@ prerender_sprite0_x = 0;
                 }
 
                 //init allocate
-                ScreenBuf1x      = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 61440);
+                ScreenBuf1x      = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * 61440);
                 if (AnalogEnabled)
                 {
                     SyncAnalogConfig();  // 確保 Crt_DstW/DstH 使用正確的 AnalogSize
                     AnalogBufSize   = Crt_DstW * Crt_DstH;
-                    AnalogScreenBuf     = (uint*)Marshal.AllocHGlobal(sizeof(uint) * AnalogBufSize);
-                    AnalogScreenBufBack = (uint*)Marshal.AllocHGlobal(sizeof(uint) * AnalogBufSize);
+                    AnalogScreenBuf     = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * AnalogBufSize);
+                    AnalogScreenBufBack = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * AnalogBufSize);
                 }
-                Buffer_BG_array  = (int* )Marshal.AllocHGlobal(sizeof(int)  * 61440);
-                NesColors        = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 64);
-                sprLineBuf       = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 256);
-                sprLinePri       = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
-                sprLineSet       = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
-                sprLinePalIdx    = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
-                spr_ram          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
-                secondaryOAM     = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
-                corruptOamRow    = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 32);
-                ppu_ram          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 0x4000);
-                palCache         = (uint*)Marshal.AllocHGlobal(sizeof(uint) * 32);
+                Buffer_BG_array  = (int* )NesCore.AllocUnmanaged(sizeof(int)  * 61440);
+                NesColors        = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * 64);
+                sprLineBuf       = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * 256);
+                sprLinePri       = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 256);
+                sprLineSet       = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 256);
+                sprLinePalIdx    = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 256);
+                spr_ram          = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 256);
+                secondaryOAM     = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 32);
+                corruptOamRow    = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 32);
+                ppu_ram          = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 0x4000);
+                palCache         = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * 32);
                 InitFlipTable();
-                sprShiftL        = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
-                sprShiftH        = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
-                sprXCounter      = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
-                sprFetchAttr     = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
-                ntscScanBuf      = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
+                sprShiftL        = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 8);
+                sprShiftH        = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 8);
+                sprXCounter      = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 8);
+                sprFetchAttr     = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 8);
+                ntscScanBuf      = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 256);
                 // Allocate expansionChannels early — Mapper024/019/069/085 etc.
                 // touch NesCore.expansionChannels[0..7] in their Reset(), which
                 // runs BEFORE initAPU() is called below.
-                expansionChannels = (int*)Marshal.AllocHGlobal(sizeof(int) * 8);
+                expansionChannels = (int*)NesCore.AllocUnmanaged(sizeof(int) * 8);
                 for (int i = 0; i < 8; i++) expansionChannels[i] = 0;
-                chrBankPtrs      = (byte**)Marshal.AllocHGlobal(sizeof(byte*) * 8);
-                chrBankPtrsA     = (byte**)Marshal.AllocHGlobal(sizeof(byte*) * 8);
-                chrBankPtrsB     = (byte**)Marshal.AllocHGlobal(sizeof(byte*) * 8);
+                chrBankPtrs      = (byte**)NesCore.AllocUnmanaged(sizeof(byte*) * 8);
+                chrBankPtrsA     = (byte**)NesCore.AllocUnmanaged(sizeof(byte*) * 8);
+                chrBankPtrsB     = (byte**)NesCore.AllocUnmanaged(sizeof(byte*) * 8);
                 for (int i = 0; i < 8; i++) { chrBankPtrs[i] = null; chrBankPtrsA[i] = null; chrBankPtrsB[i] = null; }
                 // P1_joypad_status/P2_joypad_status removed — shift register model uses static bytes
-                NES_MEM          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 65536);
+                NES_MEM          = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 65536);
 
                 // Compute PRG+CHR CRC32 (skip 16-byte iNES header, matching Mesen2 DB format)
                 uint romCrc = 0xFFFFFFFF;
