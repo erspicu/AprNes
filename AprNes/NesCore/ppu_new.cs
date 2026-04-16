@@ -483,22 +483,10 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void PpuPhase4_SpriteEvalAndInit()
         {
-            // TriCNES line 2491-2501: OAM corruption on first rendered dot after re-enable
-            if ((ShowBackGround_Instant || ShowSprites_Instant) && oamCorruptPending)
-            {
-                oamCorruptPending = false;
-                if (!oamCorruptSuppressed)
-                    ProcessOamCorruption();
-                oamCorruptSuppressed = false;
-            }
-
-            // TriCNES line 2528-2534: capture corruption index when delayed flag fires
-            if (oamCorruptDisabledFlag)
-            {
-                oamCorruptDisabledFlag = false;
-                oamCorruptPending = true;
-                oamCorruptIndex = evalOam2Addr;
-            }
+            // Cold path: OAM corruption flag handling — only fires when $2001 rendering toggle
+            //   creates a pending corruption event. 99%+ of calls skip entirely.
+            if (oamCorruptPending || oamCorruptDisabledFlag)
+                PpuPhase4_HandleOamCorruption();
 
             // Per-dot sprite evaluation
             bool evalScanline = (scanline >= 0 && scanline < 240) || scanline == preRenderLine;
@@ -614,85 +602,126 @@ namespace AprNes
             else if (scanline == preRenderLine && evalDot == 257) { sprSlotCount = evalSpriteCount; sprZeroInSlots = evalSprite0Visible; }
             if (scanline == preRenderLine && evalDot == 257 && ppuRenderingEnabled) PrecomputePreRenderSprites();
 
-            // Dot 339: sprite active flag + conditional counter init
-            // TriCNES v2: rendering ON at dot 339 → counters NOT touched here
-            //   (they were set during sprite fetch dots 257-320 via sprXCounter;
-            //    if fetch was skipped due to rendering off, counters keep their previous value)
-            // Rendering OFF at dot 339 → zero all counters (halted mode)
-            // This enables stale sprite shift register behavior: if rendering was off during
-            // sprite fetch but re-enabled before dot 339, the counter retains its old value
-            // (likely 0 = halted) and stale shift data outputs immediately.
-            if (evalDot == 339)
-            {
-                if (!(ShowSprites || ShowBackGround))
-                {
-                    // sprXCounter is 8 bytes = one ulong write
-                    *(ulong*)sprXCounter = 0;
-                }
-                // SWAR: check 8+8 bytes in one 64-bit OR
-                spriteAnyActive = ((*(ulong*)sprShiftH) | (*(ulong*)sprShiftL)) != 0;
-            }
+            // Cold path: dot 339 only (1/341 = 0.3% of calls)
+            if (evalDot == 339) PpuPhase4_Dot339();
 
-            // Garbage/Dummy NT fetch (TriCNES: PPU_Render_ShiftRegistersAndBitPlanes_DummyNT)
-            // dots 337-340 + dot 0: set bus to NT addr, do dummy fetch, update OctalLatch
-            if (evalDot >= 337 || evalDot == 0)
-            {
-                if (ShowBG_EvalDelay || ShowSpr_EvalDelay) // TriCNES: _Delayed gate
-                {
-                    // OctalLatch guard before (TriCNES line 3697-3700)
-                    if (ppu2007_PPU_READ) ppuOctalLatch = (byte)ppuAddressBus;
-
-                    if (evalDot == 0)
-                    {
-                        // Dot 0: idle/setup. Use NT address (A12=0) to maintain M2Filter
-                        // for correct MMC3 scanline counter behavior with BG at $1000.
-                        // TriCNES uses CHR PAR here but also fails mmc3_test #8.
-                        ppuAddressBus = 0x2000 | (vram_addr & 0x0FFF);
-                    }
-                    else
-                    {
-                        int dt = evalDot - 337;
-                        if (dt == 0 || dt == 2) // ALE: set NT address
-                        {
-                            ppuAddressBus = 0x2000 | (vram_addr & 0x0FFF);
-                        }
-                        else if (dt == 1) // READ: fetch NT (commit)
-                        {
-                            ppuAddressBus = 0x2000 | (vram_addr & 0x0FFF);
-                            renderTemp = (byte)PpuBusRead((ppuAddressBus & 0xFF00) | ppuOctalLatch);
-                            ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp;
-                            commitNTFetch = true;
-                        }
-                        else if (dt == 3) // READ: dummy fetch (no commit)
-                        {
-                            renderTemp = (byte)PpuBusRead((ppuAddressBus & 0xFF00) | ppuOctalLatch);
-                            ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp;
-                        }
-                    }
-
-                    // OctalLatch guard after (TriCNES line 3734-3737)
-                    if (ppu2007_PPU_ALE && !ppu2007_PPU_READ) ppuOctalLatch = (byte)ppuAddressBus;
-                }
-
-                if (mmc5Ref != null && (evalDot == 337 || evalDot == 339)) mmc5Ref.NotifyVramRead(0x2000 | (vram_addr & 0x0FFF));
-            }
+            // Cold path: dummy NT fetch — only dots 0, 337-340 (5/341 = 1.5% of calls)
+            if (evalDot >= 337 || evalDot == 0) PpuPhase4_DummyNTFetch(evalDot);
 
             // Per-cycle sprite overflow + scanline init
             if (scanline >= 0 && scanline < 240)
             {
-                if (evalDot == 1)
-                {
-                    int scanOff = scanline << 8;
-                    // SWAR: clear 256 ints (1024 bytes) as 128 ulongs
-                    ulong* bgp = (ulong*)(Buffer_BG_array + scanOff);
-                    for (int i = 0; i < 128; i++) bgp[i] = 0;
-                    // SWAR: fill 256 uints with backdrop color as 128 ulongs
-                    if (AnalogEnabled) { byte bgIdx = (byte)(ppu_ram[0x3f00] & 0x3f); for (int i = 0; i < 256; i++) ntscScanBuf[i] = bgIdx; }
-                    else { uint bgColor = palCache[0]; ulong fill = bgColor | ((ulong)bgColor << 32); ulong* sp = (ulong*)(ScreenBuf1x + scanOff); for (int i = 0; i < 128; i++) sp[i] = fill; }
-                    PrecomputeOverflow();
-                }
+                // Cold path: dot 1 scanline init (240 visible × 1 dot = 0.27% of calls)
+                if (evalDot == 1) PpuPhase4_VisibleScanlineDot1Init();
                 if (spriteOverflowCycle >= 0 && evalDot == spriteOverflowCycle) isSpriteOverflow = true;
             }
+        }
+
+        // ── PpuPhase4 cold helpers (NoInlining: keep them out of the hot path's IL budget) ──
+        // Called from PpuPhase4_SpriteEvalAndInit via Pattern A guards (condition at call site).
+
+        // OAM corruption handling — only invoked when oamCorruptPending or oamCorruptDisabledFlag is set.
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void PpuPhase4_HandleOamCorruption()
+        {
+            // TriCNES line 2491-2501: OAM corruption on first rendered dot after re-enable
+            if ((ShowBackGround_Instant || ShowSprites_Instant) && oamCorruptPending)
+            {
+                oamCorruptPending = false;
+                if (!oamCorruptSuppressed) ProcessOamCorruption();
+                oamCorruptSuppressed = false;
+            }
+            // TriCNES line 2528-2534: capture corruption index when delayed flag fires
+            if (oamCorruptDisabledFlag)
+            {
+                oamCorruptDisabledFlag = false;
+                oamCorruptPending = true;
+                oamCorruptIndex = evalOam2Addr;
+            }
+        }
+
+        // Visible scanline dot 1 init: clear BG buffer + fill backdrop + precompute overflow.
+        // Called once per visible scanline (240/89K dots = 0.27%).
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void PpuPhase4_VisibleScanlineDot1Init()
+        {
+            int scanOff = scanline << 8;
+            // Clear 256 uints (1024 bytes) — Unsafe.InitBlockUnaligned → rep stosb / AVX memset
+            System.Runtime.CompilerServices.Unsafe.InitBlockUnaligned(Buffer_BG_array + scanOff, 0, 1024);
+            if (AnalogEnabled)
+            {
+                // Fill 256 bytes with backdrop palette index
+                byte bgIdx = (byte)(ppu_ram[0x3f00] & 0x3f);
+                System.Runtime.CompilerServices.Unsafe.InitBlockUnaligned(ntscScanBuf, bgIdx, 256);
+            }
+            else
+            {
+                // Fill 256 uints with backdrop color — 4-byte pattern, JIT-unroll ulong loop
+                uint bgColor = palCache[0]; ulong fill = bgColor | ((ulong)bgColor << 32);
+                ulong* sp = (ulong*)(ScreenBuf1x + scanOff);
+                for (int i = 0; i < 128; i++) sp[i] = fill;
+            }
+            PrecomputeOverflow();
+        }
+
+        // Dot 339: sprite active flag + conditional counter init.
+        // Rendering ON  → counters retain fetch-set values
+        // Rendering OFF → zero all counters (halted mode, allows stale shift data behavior)
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void PpuPhase4_Dot339()
+        {
+            if (!(ShowSprites || ShowBackGround))
+            {
+                // sprXCounter is 8 bytes = one ulong write
+                *(ulong*)sprXCounter = 0;
+            }
+            // SWAR: check 8+8 bytes in one 64-bit OR
+            spriteAnyActive = ((*(ulong*)sprShiftH) | (*(ulong*)sprShiftL)) != 0;
+        }
+
+        // Garbage/Dummy NT fetch (TriCNES: PPU_Render_ShiftRegistersAndBitPlanes_DummyNT)
+        // dots 337-340 + dot 0: set bus to NT addr, do dummy fetch, update OctalLatch.
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void PpuPhase4_DummyNTFetch(int evalDot)
+        {
+            if (ShowBG_EvalDelay || ShowSpr_EvalDelay) // TriCNES: _Delayed gate
+            {
+                // OctalLatch guard before (TriCNES line 3697-3700)
+                if (ppu2007_PPU_READ) ppuOctalLatch = (byte)ppuAddressBus;
+
+                if (evalDot == 0)
+                {
+                    // Dot 0: idle/setup. Use NT address (A12=0) to maintain M2Filter
+                    // for correct MMC3 scanline counter behavior with BG at $1000.
+                    ppuAddressBus = 0x2000 | (vram_addr & 0x0FFF);
+                }
+                else
+                {
+                    int dt = evalDot - 337;
+                    if (dt == 0 || dt == 2) // ALE: set NT address
+                    {
+                        ppuAddressBus = 0x2000 | (vram_addr & 0x0FFF);
+                    }
+                    else if (dt == 1) // READ: fetch NT (commit)
+                    {
+                        ppuAddressBus = 0x2000 | (vram_addr & 0x0FFF);
+                        renderTemp = (byte)PpuBusRead((ppuAddressBus & 0xFF00) | ppuOctalLatch);
+                        ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp;
+                        commitNTFetch = true;
+                    }
+                    else if (dt == 3) // READ: dummy fetch (no commit)
+                    {
+                        renderTemp = (byte)PpuBusRead((ppuAddressBus & 0xFF00) | ppuOctalLatch);
+                        ppuAddressBus = (ppuAddressBus & 0xFF00) | renderTemp;
+                    }
+                }
+
+                // OctalLatch guard after (TriCNES line 3734-3737)
+                if (ppu2007_PPU_ALE && !ppu2007_PPU_READ) ppuOctalLatch = (byte)ppuAddressBus;
+            }
+
+            if (mmc5Ref != null && (evalDot == 337 || evalDot == 339))
+                mmc5Ref.NotifyVramRead(0x2000 | (vram_addr & 0x0FFF));
         }
 
         // ════════════════════════════════════════════════════════════════

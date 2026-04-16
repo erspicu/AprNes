@@ -74,6 +74,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <!-- System.Runtime.CompilerServices.Unsafe: Unsafe.InitBlockUnaligned etc.
+         Built-in on .NET 6+; net48 needs this NuGet package. -->
+    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.2" />
+  </ItemGroup>
+  <ItemGroup>
     <Compile Include="NesCore\APU.cs" />
     <Compile Include="NesCore\AudioPlus\AudioPlus.cs" />
     <Compile Include="tool\InterfaceGraphic.cs" />
