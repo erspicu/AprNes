@@ -101,19 +101,10 @@ namespace AprNes
             // ── Mapper + A12 (TriCNES line 1478-1479: START of _EmulatePPU, BEFORE SM) ──
             MapperObj.PpuClock();
             ppuA12Prev = (ppuAddressBus & 0x1000) != 0;
-            // ── Odd frame skip (TriCNES lines 1629-1643) ──
-            // PAL/Dendy: no dot skip (PAL phase alternation eliminates dot crawl naturally)
-            if (Region == RegionType.NTSC && oddSwap && (ShowBackGround || ShowSprites))
-            {
-                if (scanline == preRenderLine && cx == 340)
-                {
-                    if (mmc5Ref != null)
-                        mmc5Ref.NotifyVramRead(0x2000 | (vram_addr & 0x0FFF));
-                    scanline = 0;
-                    ppu_cycles_x = cx = 0;
-                    skippedPreRenderDot341 = true;
-                }
-            }
+            // Cold: NTSC odd-frame dot skip — fires once per ~2 frames at preRenderLine dot 340 (1/89K).
+            if (Region == RegionType.NTSC && oddSwap && (ShowBackGround || ShowSprites)
+                && scanline == preRenderLine && cx == 340)
+                PpuPhase_DoOddFrameSkip(ref cx);
             if (oddSwap && (ShowBackGround || ShowSprites) && scanline == 0 && cx == 2)
                 skippedPreRenderDot341 = false;
 
@@ -127,13 +118,8 @@ namespace AprNes
             // ── PPU_DATA_StateMachine — Phase 1 (TriCNES line 1513) ──
             PPU_DATA_Pipeline_Step(1);
 
-            // ── Delayed OAM corruption (TriCNES lines 1695-1711) ──
-            if (oamCorruptDelay != 0 && --oamCorruptDelay == 0 &&
-                oamCorruptWasRendering && isActiveScanline &&
-                !oamCorruptPending && (oamCorrupt2001Value & 0x18) == 0)
-            {
-                oamCorruptDisabledFlag = true;
-            }
+            // Cold: delayed OAM corruption trigger — fires only when $2001 toggled (<0.1% dots).
+            if (oamCorruptDelay != 0) PpuPhase_HandleDelayedOamCorruption(isActiveScanline);
 
             // ── Sprite evaluation (TriCNES line 1664, inside scanline gate) ──
             if (isActiveScanline)
@@ -152,27 +138,11 @@ namespace AprNes
                 ppuAddressBus = vram_addr;
             }
 
-            // ── $2001 delayed mask update (TriCNES lines 1681-1694) ──
-            if (ppu2001UpdateDelay > 0 && --ppu2001UpdateDelay == 0)
-            {
-                ppuGreyscale   = (ppu2001PendingValue & 0x01) != 0;
-                ShowBgLeft8    = (ppu2001PendingValue & 0x02) != 0;
-                ShowSprLeft8   = (ppu2001PendingValue & 0x04) != 0;
-                ShowBackGround = (ppu2001PendingValue & 0x08) != 0;
-                ShowSprites    = (ppu2001PendingValue & 0x10) != 0;
-                // TriCNES line 1691: re-sync Instant flags to Delayed
-                ShowBackGround_Instant = ShowBackGround;
-                ShowSprites_Instant = ShowSprites;
-            }
+            // Cold: $2001 delayed mask update — fires only on $2001 write (<0.5% dots).
+            if (ppu2001UpdateDelay > 0) PpuPhase_Apply2001Mask();
 
-            // ── $2001 emphasis delay (TriCNES lines 1712-1722) ──
-            if (ppu2001EmphasisDelay > 0 && --ppu2001EmphasisDelay == 0)
-            {
-                byte v = ppu2001EmphasisPending;
-                ppuEmphasis = (byte)((v >> 5) & 0x7);
-                if (Region != RegionType.NTSC)
-                    ppuEmphasis = (byte)((ppuEmphasis & 0x4) | ((ppuEmphasis & 1) << 1) | ((ppuEmphasis >> 1) & 1));
-            }
+            // Cold: $2001 emphasis delay — fires only on $2001 write (<0.5% dots).
+            if (ppu2001EmphasisDelay > 0) PpuPhase_Apply2001Emphasis();
 
             // ══════════════════════════════════════════════════════
             // Phase 5: Pipeline + commit + tile fetch + pixel + draw
@@ -392,15 +362,8 @@ namespace AprNes
                     Ntsc_CaptureScanline(scanline, ntscScanBuf, ppuEmphasis);
             }
 
-            // ── Frame render at SL240 cx1 ──
-            if (scanline == 240 && cx == 1)
-            {
-                // Parallel-demod all 240 captured scanlines before Crt_Render reads linearBuffer.
-                if (AnalogEnabled) Ntsc_FlushPendingRows();
-                RenderScreen();
-                frame_count++;
-                if (AnalogEnabled) { Ntsc_SetFrameCount(frame_count); Crt_SetFrameCount(frame_count); }
-            }
+            // Cold: frame render trigger — once per frame at SL240 cx1 (1/89K).
+            if (scanline == 240 && cx == 1) PpuPhase_FrameRender();
 
             // ── End of dot: update ppuRenderingEnabled ──
             ppuRenderingEnabled = ShowBackGround_Instant || ShowSprites_Instant;
@@ -473,6 +436,72 @@ namespace AprNes
                 pendingSprite0Hit = false;
                 pendingSprite0Hit2 = false;
             }
+        }
+
+        // ── ppu_step_new cold helpers (Pattern A: condition at call site, NoInlining) ──
+
+        // NTSC odd-frame dot skip — pre-render dot 341 becomes dot 0 of next frame's scanline 0.
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void PpuPhase_DoOddFrameSkip(ref int cx)
+        {
+            if (mmc5Ref != null)
+                mmc5Ref.NotifyVramRead(0x2000 | (vram_addr & 0x0FFF));
+            scanline = 0;
+            ppu_cycles_x = cx = 0;
+            skippedPreRenderDot341 = true;
+        }
+
+        // Delayed OAM corruption trigger (TriCNES 1695-1711) — fires on $2001 disable during rendering.
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void PpuPhase_HandleDelayedOamCorruption(bool isActiveScanline)
+        {
+            if (--oamCorruptDelay == 0 &&
+                oamCorruptWasRendering && isActiveScanline &&
+                !oamCorruptPending && (oamCorrupt2001Value & 0x18) == 0)
+            {
+                oamCorruptDisabledFlag = true;
+            }
+        }
+
+        // $2001 delayed mask update (TriCNES 1681-1694).
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void PpuPhase_Apply2001Mask()
+        {
+            if (--ppu2001UpdateDelay == 0)
+            {
+                ppuGreyscale   = (ppu2001PendingValue & 0x01) != 0;
+                ShowBgLeft8    = (ppu2001PendingValue & 0x02) != 0;
+                ShowSprLeft8   = (ppu2001PendingValue & 0x04) != 0;
+                ShowBackGround = (ppu2001PendingValue & 0x08) != 0;
+                ShowSprites    = (ppu2001PendingValue & 0x10) != 0;
+                // TriCNES line 1691: re-sync Instant flags to Delayed
+                ShowBackGround_Instant = ShowBackGround;
+                ShowSprites_Instant = ShowSprites;
+            }
+        }
+
+        // $2001 emphasis delay (TriCNES 1712-1722).
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void PpuPhase_Apply2001Emphasis()
+        {
+            if (--ppu2001EmphasisDelay == 0)
+            {
+                byte v = ppu2001EmphasisPending;
+                ppuEmphasis = (byte)((v >> 5) & 0x7);
+                if (Region != RegionType.NTSC)
+                    ppuEmphasis = (byte)((ppuEmphasis & 0x4) | ((ppuEmphasis & 1) << 1) | ((ppuEmphasis >> 1) & 1));
+            }
+        }
+
+        // Frame render at SL240 cx1 — once per frame (1/89K dots).
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void PpuPhase_FrameRender()
+        {
+            // Parallel-demod all 240 captured scanlines before Crt_Render reads linearBuffer.
+            if (AnalogEnabled) Ntsc_FlushPendingRows();
+            RenderScreen();
+            frame_count++;
+            if (AnalogEnabled) { Ntsc_SetFrameCount(frame_count); Crt_SetFrameCount(frame_count); }
         }
 
         // ════════════════════════════════════════════════════════════════
