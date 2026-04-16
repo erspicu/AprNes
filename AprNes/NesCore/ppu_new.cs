@@ -512,86 +512,10 @@ namespace AprNes
             }
             else if (ro && evalDot == 65 && ppuRenderingEnabled) { sprite0_eval_addr = spr_ram_add; }
 
-            // Dots 257-320: sprite fetch (Tier 4 gate, includes dummy BG fetch)
-            if (evalDot >= 257 && evalDot <= 320)
-            {
-                if (ShowBG_EvalDelay || ShowSpr_EvalDelay) spr_ram_add = 0;
-                if (evalDot == 257) evalOam2Addr = 0;
-                if (evalDot == 262) spriteSizeLatchedForFetch = Spritesize8x16;
-
-                int sprPhase = (evalDot - 257) & 7;
-                int slot = (evalDot - 257) >> 3;
-                bool sprFetchEnabled = ShowBG_EvalDelay || ShowSpr_EvalDelay;
-
-                // TriCNES line 2833-2836: OctalLatch guard before sprite switch
-                if (ppu2007_PPU_READ) ppuOctalLatch = (byte)ppuAddressBus;
-
-                // TriCNES sprite eval cases 0-7 (line 2855-2993) — even=ALE, odd=READ
-                if (sprFetchEnabled)
-                {
-                    oamCopyBuffer = secondaryOAM[evalOam2Addr];
-
-                    if ((sprPhase & 1) == 0)
-                    {
-                        // Even phases (0, 2, 4, 6): Address Latch Enable
-                        if (sprPhase < 4)
-                        {
-                            if (sprPhase == 0) ppuInRangeCheck = (ushort)((scanline & 0xFF) - oamCopyBuffer);
-                            else               sprFetchAttr[slot] = oamCopyBuffer; // Phase 2
-                            ppuPAR_NT = (ushort)(0x2000 | (vram_addr & 0x0FFF));
-                            ppuPAR_MUX = ppuPAR_NT;
-                        }
-                        else
-                        {
-                            PPU_CheckPAR();
-                            ppuPAR_CHR = (ushort)((ppuPAR_CHR & ~8) | ((sprPhase & 2) << 2));
-                            ppuPAR_MUX = ppuPAR_CHR;
-                        }
-                        ppuAddressBus = ppuPAR_MUX;
-                    }
-                    else
-                    {
-                        // Odd phases (1, 3, 5, 7): Memory Read
-                        if (sprPhase == 3) sprXCounter[slot] = oamCopyBuffer;
-
-                        ushort baseAddr = (sprPhase == 1) ? ppuPAR_NT : ((sprPhase == 3) ? ppuPAR_AT : ppuPAR_CHR);
-                        ppuAddressBus = (ushort)((baseAddr & 0xFF00) | ppuOctalLatch);
-
-                        if (sprPhase >= 5)
-                        {
-                            ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
-                            if (mapperNeedsA12 && (sprPhase == 5 || !mapperA12IsMmc3))
-                                NotifyMapperA12(ppuAddressBus);
-                        }
-
-                        byte val = PpuBusRead(ppuAddressBus);
-                        ppuAddressBus = (ppuAddressBus & 0xFF00) | val;
-
-                        if (sprPhase < 5)
-                        {
-                            renderTemp = val;
-                            if (sprPhase == 1) commitNTFetch = true;
-                            else               commitATFetch = true;
-                        }
-                        else
-                        {
-                            // Branchless flip: FlipTable[val | ((attr & 0x40) << 2)] selects identity/reversed half
-                            byte tile = FlipTable[val | ((sprFetchAttr[slot] & 0x40) << 2)];
-                            if (slot >= sprSlotCount || ppuInRangeCheck >= (Spritesize8x16 ? 16 : 8))
-                                tile = 0;
-                            if (sprPhase == 5) sprShiftL[slot] = tile;
-                            else               sprShiftH[slot] = tile;
-                        }
-                    }
-                }
-                // Branchless increment: phases 0,1,2,7 → mask 0x87 (10000111)
-                evalOam2Addr += (byte)((0x87 >> sprPhase) & 1);
-
-                // TriCNES line 2995-2998: OctalLatch guard after sprite switch
-                if (ppu2007_PPU_ALE && !ppu2007_PPU_READ) ppuOctalLatch = (byte)ppuAddressBus;
-
-                if (mmc5Ref != null) { if (sprPhase == 1) mmc5Ref.NotifyVramRead(0x2000); else if (sprPhase == 3) mmc5Ref.NotifyVramRead(0x23C0); else if (sprPhase == 5) mmc5Ref.NotifyVramRead(SpPatternTableAddr); else if (sprPhase == 7) mmc5Ref.NotifyVramRead(SpPatternTableAddr | 8); }
-            }
+            // Dots 257-320: sprite fetch (extracted — 64/341 = 19% of calls).
+            // IL-size win vs call-overhead tradeoff: helper is ~600 IL bytes, at 3M calls/sec
+            // the ~4-cycle call overhead ≈ 0.3% CPU, more than offset by hot function shrink.
+            if (evalDot >= 257 && evalDot <= 320) PpuPhase4_SpriteFetch(evalDot);
 
             // Dot 321 equivalent
             if (evalDot == 322 && scanline < 240 && (ShowBackGround_Instant || ShowSprites_Instant))
@@ -662,6 +586,94 @@ namespace AprNes
                 for (int i = 0; i < 128; i++) sp[i] = fill;
             }
             PrecomputeOverflow();
+        }
+
+        // Dots 257-320 sprite fetch — tier 4 gate, includes dummy BG fetch (evalDot in [257,320]).
+        // TriCNES sprite eval cases 0-7 (line 2855-2993): even phase = ALE, odd phase = READ.
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void PpuPhase4_SpriteFetch(int evalDot)
+        {
+            if (ShowBG_EvalDelay || ShowSpr_EvalDelay) spr_ram_add = 0;
+            if (evalDot == 257) evalOam2Addr = 0;
+            if (evalDot == 262) spriteSizeLatchedForFetch = Spritesize8x16;
+
+            int sprPhase = (evalDot - 257) & 7;
+            int slot = (evalDot - 257) >> 3;
+            bool sprFetchEnabled = ShowBG_EvalDelay || ShowSpr_EvalDelay;
+
+            // TriCNES line 2833-2836: OctalLatch guard before sprite switch
+            if (ppu2007_PPU_READ) ppuOctalLatch = (byte)ppuAddressBus;
+
+            if (sprFetchEnabled)
+            {
+                oamCopyBuffer = secondaryOAM[evalOam2Addr];
+
+                if ((sprPhase & 1) == 0)
+                {
+                    // Even phases (0, 2, 4, 6): Address Latch Enable
+                    if (sprPhase < 4)
+                    {
+                        if (sprPhase == 0) ppuInRangeCheck = (ushort)((scanline & 0xFF) - oamCopyBuffer);
+                        else               sprFetchAttr[slot] = oamCopyBuffer; // Phase 2
+                        ppuPAR_NT = (ushort)(0x2000 | (vram_addr & 0x0FFF));
+                        ppuPAR_MUX = ppuPAR_NT;
+                    }
+                    else
+                    {
+                        PPU_CheckPAR();
+                        ppuPAR_CHR = (ushort)((ppuPAR_CHR & ~8) | ((sprPhase & 2) << 2));
+                        ppuPAR_MUX = ppuPAR_CHR;
+                    }
+                    ppuAddressBus = ppuPAR_MUX;
+                }
+                else
+                {
+                    // Odd phases (1, 3, 5, 7): Memory Read
+                    if (sprPhase == 3) sprXCounter[slot] = oamCopyBuffer;
+
+                    ushort baseAddr = (sprPhase == 1) ? ppuPAR_NT : ((sprPhase == 3) ? ppuPAR_AT : ppuPAR_CHR);
+                    ppuAddressBus = (ushort)((baseAddr & 0xFF00) | ppuOctalLatch);
+
+                    if (sprPhase >= 5)
+                    {
+                        ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
+                        if (mapperNeedsA12 && (sprPhase == 5 || !mapperA12IsMmc3))
+                            NotifyMapperA12(ppuAddressBus);
+                    }
+
+                    byte val = PpuBusRead(ppuAddressBus);
+                    ppuAddressBus = (ppuAddressBus & 0xFF00) | val;
+
+                    if (sprPhase < 5)
+                    {
+                        renderTemp = val;
+                        if (sprPhase == 1) commitNTFetch = true;
+                        else               commitATFetch = true;
+                    }
+                    else
+                    {
+                        // Branchless flip: FlipTable[val | ((attr & 0x40) << 2)] selects identity/reversed half
+                        byte tile = FlipTable[val | ((sprFetchAttr[slot] & 0x40) << 2)];
+                        if (slot >= sprSlotCount || ppuInRangeCheck >= (Spritesize8x16 ? 16 : 8))
+                            tile = 0;
+                        if (sprPhase == 5) sprShiftL[slot] = tile;
+                        else               sprShiftH[slot] = tile;
+                    }
+                }
+            }
+            // Branchless increment: phases 0,1,2,7 → mask 0x87 (10000111)
+            evalOam2Addr += (byte)((0x87 >> sprPhase) & 1);
+
+            // TriCNES line 2995-2998: OctalLatch guard after sprite switch
+            if (ppu2007_PPU_ALE && !ppu2007_PPU_READ) ppuOctalLatch = (byte)ppuAddressBus;
+
+            if (mmc5Ref != null)
+            {
+                if      (sprPhase == 1) mmc5Ref.NotifyVramRead(0x2000);
+                else if (sprPhase == 3) mmc5Ref.NotifyVramRead(0x23C0);
+                else if (sprPhase == 5) mmc5Ref.NotifyVramRead(SpPatternTableAddr);
+                else if (sprPhase == 7) mmc5Ref.NotifyVramRead(SpPatternTableAddr | 8);
+            }
         }
 
         // Dot 339: sprite active flag + conditional counter init.
