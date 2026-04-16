@@ -267,7 +267,6 @@ namespace AprNes
         static byte* sprShiftH;       // High bitplane shift register
         static byte* sprXCounter;       // X position countdown — byte per slot (8 total = 1 ulong)
         static byte* sprFetchAttr;     // Attribute byte per slot (palette, priority, flip)
-        static byte* sprXPos;           // X position per slot (for counter init at dot 339)
         static int sprSlotCount = 0;                   // Number of valid sprites fetched (from evalSpriteCount)
         static bool spriteAnyActive = false;            // Fast-path: any sprite has non-zero shift data
 
@@ -372,7 +371,7 @@ namespace AprNes
                 if (ntChrOverrideEnabled)
                 {
                     int slot = (nt_addr >> 10) & 3;
-                    if (ntBankWritable[slot])
+                    if (ntBankWritable[slot] != 0)
                         ntBankPtrs[slot][nt_addr & 0x3FF] = val;
                 }
                 else

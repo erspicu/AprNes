@@ -221,17 +221,17 @@ namespace AprNes
                 if (ntReg[i] >= 0xE0)
                 {
                     NesCore.ntBankPtrs[i] = ppu_ram + 0x2000 + ((ntReg[i] & 0x01) << 10);
-                    NesCore.ntBankWritable[i] = true;
+                    NesCore.ntBankWritable[i] = 1;
                 }
                 else if (CHR_ROM_count > 0)
                 {
                     NesCore.ntBankPtrs[i] = CHR_ROM + ((ntReg[i] & total1kMask) << 10);
-                    NesCore.ntBankWritable[i] = false; // CHR-ROM is read-only
+                    NesCore.ntBankWritable[i] = 0; // CHR-ROM is read-only
                 }
                 else
                 {
                     NesCore.ntBankPtrs[i] = ppu_ram + (i << 10);
-                    NesCore.ntBankWritable[i] = true;
+                    NesCore.ntBankWritable[i] = 1;
                 }
             }
             NesCore.ntChrOverrideEnabled = true;

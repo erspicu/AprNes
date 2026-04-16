@@ -239,7 +239,7 @@ namespace AprNes.UI
         // ─────────────────────────────────────────────────────────
         // LoadFromNesCore — 從 NesCore 靜態欄位讀取設定到 UI 控制項
         // ─────────────────────────────────────────────────────────
-        void LoadFromNesCore()
+        unsafe void LoadFromNesCore()
         {
             // Authentic
             cboConsoleModel.SelectedIndex = Math.Max(0, Math.Min(6, NesCore.ConsoleModel));
@@ -264,7 +264,7 @@ namespace AprNes.UI
             for (int i = 0; i < NES_CH; i++)
             {
                 trkNes[i].Value = Math.Max(0, Math.Min(100, NesCore.ChannelVolume[i]));
-                chkNes[i].Checked = NesCore.ChannelEnabled[i];
+                chkNes[i].Checked = NesCore.ChannelEnabled[i] != 0;
                 lblNesVal[i].Text = trkNes[i].Value + "%";
             }
 
@@ -272,7 +272,7 @@ namespace AprNes.UI
             for (int i = 0; i < EXP_CH; i++)
             {
                 trkExp[i].Value = Math.Max(0, Math.Min(100, NesCore.ChannelVolume[NES_CH + i]));
-                chkExp[i].Checked = NesCore.ChannelEnabled[NES_CH + i];
+                chkExp[i].Checked = NesCore.ChannelEnabled[NES_CH + i] != 0;
                 lblExpVal[i].Text = trkExp[i].Value + "%";
             }
 
@@ -288,7 +288,7 @@ namespace AprNes.UI
         // ─────────────────────────────────────────────────────────
         // SaveToNesCore — 將 UI 控制項的值寫回 NesCore 靜態欄位
         // ─────────────────────────────────────────────────────────
-        void SaveToNesCore()
+        unsafe void SaveToNesCore()
         {
             // Authentic
             NesCore.ConsoleModel = cboConsoleModel.SelectedIndex;
@@ -313,7 +313,7 @@ namespace AprNes.UI
             for (int i = 0; i < NES_CH; i++)
             {
                 NesCore.ChannelVolume[i] = trkNes[i].Value;
-                NesCore.ChannelEnabled[i] = chkNes[i].Checked;
+                NesCore.ChannelEnabled[i] = (byte)(chkNes[i].Checked ? 1 : 0);
                 NesCore.SyncChannelEnableMask();
             }
 
@@ -321,7 +321,7 @@ namespace AprNes.UI
             for (int i = 0; i < EXP_CH; i++)
             {
                 NesCore.ChannelVolume[NES_CH + i] = trkExp[i].Value;
-                NesCore.ChannelEnabled[NES_CH + i] = chkExp[i].Checked;
+                NesCore.ChannelEnabled[NES_CH + i] = (byte)(chkExp[i].Checked ? 1 : 0);
             }
         }
 

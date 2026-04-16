@@ -564,7 +564,7 @@ namespace AprNes
                     else
                     {
                         // Odd phases (1, 3, 5, 7): Memory Read
-                        if (sprPhase == 3) { sprXPos[slot] = oamCopyBuffer; sprXCounter[slot] = oamCopyBuffer; }
+                        if (sprPhase == 3) sprXCounter[slot] = oamCopyBuffer;
 
                         ushort baseAddr = (sprPhase == 1) ? ppuPAR_NT : ((sprPhase == 3) ? ppuPAR_AT : ppuPAR_CHR);
                         ppuAddressBus = (ushort)((baseAddr & 0xFF00) | ppuOctalLatch);
@@ -615,7 +615,7 @@ namespace AprNes
 
             // Dot 339: sprite active flag + conditional counter init
             // TriCNES v2: rendering ON at dot 339 → counters NOT touched here
-            //   (they were set during sprite fetch dots 257-320 via sprXPos;
+            //   (they were set during sprite fetch dots 257-320 via sprXCounter;
             //    if fetch was skipped due to rendering off, counters keep their previous value)
             // Rendering OFF at dot 339 → zero all counters (halted mode)
             // This enables stale sprite shift register behavior: if rendering was off during
@@ -704,23 +704,26 @@ namespace AprNes
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         static void PPU_DATA_Pipeline_Step(int phase)
         {
+            // ── Phase 1 (Even latch) ──
             if (phase == 1)
             {
                 bool BLNK = (!ShowBackGround && !ShowSprites) || (scanline >= 240 && scanline < preRenderLine);
                 ppu2007_BLNK_Latch = BLNK;
-                bool H0_DASH = ((ppu_cycles_x - 1) & 1) != 0;
+                // ((x-1) & 1) != 0  ⇔  x is even
+                bool H0_DASH = (ppu_cycles_x & 1) == 0;
                 ppu2007_PaletteRAMEnable = ((ppuAddressBus & 0x3F00) == 0x3F00) && BLNK;
 
-                byte newREven = (byte)((ppu2007_Read_SR ? 1 : 0) | ((~readLatch << 1) & 0x14));
-                readLatch = (byte)((readLatch & 0x0A) | newREven);
-                ppu2007_PD_RB = (readLatch & 0x14) == 0x10;
-                ppu2007_ReadALE = (readLatch & 0x14) == 0x04;
+                // Derive flags from OLD latch (new bit 2 = ~old bit 1, new bit 4 = ~old bit 3):
+                //   (new & 0x14) == 0x10 ⇔ (old & 0x0A) == 0x02  (PD_RB)
+                //   (new & 0x14) == 0x04 ⇔ (old & 0x0A) == 0x08  (ALE)
+                ppu2007_PD_RB    = (readLatch  & 0x0A) == 0x02;
+                ppu2007_ReadALE  = (readLatch  & 0x0A) == 0x08;
+                ppu2007_WriteALE = (writeLatch & 0x0A) == 0x08;
+
+                readLatch  = (byte)((readLatch  & 0x0A) | (ppu2007_Read_SR  ? 1 : 0) | ((~readLatch  << 1) & 0x14));
+                writeLatch = (byte)((writeLatch & 0x0A) | (ppu2007_Write_SR ? 1 : 0) | ((~writeLatch << 1) & 0x14));
+
                 ppu2007_PPU_READ = ppu2007_PD_RB || (!BLNK && H0_DASH);
-
-                byte newWEven = (byte)((ppu2007_Write_SR ? 1 : 0) | ((~writeLatch << 1) & 0x14));
-                writeLatch = (byte)((writeLatch & 0x0A) | newWEven);
-                ppu2007_WriteALE = (writeLatch & 0x14) == 0x04;
-
                 ppu2007_TStep_Latch = ppu2007_DB_PAR;
                 ppu2007_PPU_ALE = ppu2007_ReadALE || ppu2007_WriteALE || (!BLNK && !H0_DASH);
 
@@ -729,45 +732,46 @@ namespace AprNes
                     ppuAddressBus = vram_addr;
                     ppuOctalLatch = (byte)vram_addr;
                 }
+                return;
             }
-            else
+
+            // ── Phase 2 / 3 common: bus read + phase 3 TStep ──
+            if (phase == 3)
             {
-                if (phase == 3)
+                ppu2007_TStep = ppu2007_TStep_Latch || ppu2007_PD_RB;
+                if (ppu2007_TStep)
                 {
-                    ppu2007_TStep = ppu2007_TStep_Latch || ppu2007_PD_RB;
-                    if (ppu2007_TStep)
-                    {
-                        vram_addr = (ushort)(vram_addr + VramaddrIncrement);
-                        if (!ppu2007_BLNK_Latch) Yinc();
-                    }
-                    ppu2007_PPU_ALE = ppu2007_ReadALE || ppu2007_WriteALE;
+                    vram_addr = (ushort)(vram_addr + VramaddrIncrement);
+                    if (!ppu2007_BLNK_Latch) Yinc();
                 }
+                ppu2007_PPU_ALE = ppu2007_ReadALE || ppu2007_WriteALE;
+            }
 
-                if (ppu2007_PD_RB)
-                {
-                    int addr = (ppuAddressBus & 0x3F00) | ppuOctalLatch;
-                    byte data = PpuBusRead(addr >= 0x3F00 ? addr & 0x2FFF : addr);
-                    ppu_2007_buffer = data;
-                    ppuAddressBus = (ppuAddressBus & 0xFF00) | data;
-                    if (ppu2007_PPU_ALE) ppuOctalLatch = data;
-                }
+            if (ppu2007_PD_RB)
+            {
+                int addr = (ppuAddressBus & 0x3F00) | ppuOctalLatch;
+                byte data = PpuBusRead(addr >= 0x3F00 ? addr & 0x2FFF : addr);
+                ppu_2007_buffer = data;
+                ppuAddressBus = (ppuAddressBus & 0xFF00) | data;
+                if (ppu2007_PPU_ALE) ppuOctalLatch = data;
+            }
 
-                if (phase == 2) return;
+            if (phase == 2) return;
 
-                byte newROdd = (byte)(((~readLatch) << 1) & 0x0A);
-                readLatch = (byte)((readLatch & 0x15) | newROdd);
-                if ((readLatch & 0x08) == 0) ppu2007_Read_SR = false;
+            // ── Phase 3 odd latch + write ──
+            // new bit 3 = ~(old bit 2), so "new & 0x08 == 0" ⇔ "old & 0x04 != 0"
+            if ((readLatch & 0x04) != 0) ppu2007_Read_SR = false;
+            readLatch = (byte)((readLatch & 0x15) | ((~readLatch << 1) & 0x0A));
 
-                byte newWOdd = (byte)(((~writeLatch) << 1) & 0x0A);
-                writeLatch = (byte)((writeLatch & 0x15) | newWOdd);
-                if ((writeLatch & 0x08) == 0) ppu2007_Write_SR = false;
+            if ((writeLatch & 0x04) != 0) ppu2007_Write_SR = false;
+            // (new writeLatch & 0x0A) == 0x02 ⇔ (old & 0x05) == 0x04
+            ppu2007_DB_PAR = (writeLatch & 0x05) == 0x04;
+            writeLatch = (byte)((writeLatch & 0x15) | ((~writeLatch << 1) & 0x0A));
 
-                ppu2007_DB_PAR = (writeLatch & 0x0A) == 0x02;
-                ppu2007_PPU_WRITE = !ppu2007_PaletteRAMEnable && ppu2007_DB_PAR;
-                if (ppu2007_DB_PAR)
-                {
-                    PpuBusWrite(ppuAddressBus, ppu2007SM_writeValue);
-                }
+            ppu2007_PPU_WRITE = !ppu2007_PaletteRAMEnable && ppu2007_DB_PAR;
+            if (ppu2007_DB_PAR)
+            {
+                PpuBusWrite(ppuAddressBus, ppu2007SM_writeValue);
             }
         }
 

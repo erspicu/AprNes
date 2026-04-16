@@ -725,7 +725,7 @@ namespace AprNes
             // ChannelEnabled=false → gain=0 (mute)
             const float CH_VOL_BASE = 70f;
             for (int i = 0; i < MMIX_NES_CH; i++)
-                mmix_chGain[i] = ChannelEnabled[i]
+                mmix_chGain[i] = ChannelEnabled[i] != 0
                     ? mmix_normScale[i] * (ChannelVolume[i] / CH_VOL_BASE)
                     : 0f;
 
@@ -734,19 +734,19 @@ namespace AprNes
             float baseGain = (ct > 0 && ct < Mode2ExpChNorm.Length)
                 ? Mode2ExpChNorm[ct] : 0f;
             for (int i = 0; i < MMIX_EXP_CH; i++)
-                mmix_chGain[MMIX_NES_CH + i] = ChannelEnabled[MMIX_NES_CH + i]
+                mmix_chGain[MMIX_NES_CH + i] = ChannelEnabled[MMIX_NES_CH + i] != 0
                     ? baseGain * (ChannelVolume[MMIX_NES_CH + i] / CH_VOL_BASE)
                     : 0f;
 
             // Mode 0/1: 擴展聲道 per-chip 平均增益 (respect ChannelEnabled)
             int expCount = expansionChannelCount;
-            if (expCount > 0 && ct > 0 && ct < DefaultChipGain.Length)
+            if (expCount > 0 && ct > 0 && ct < DefaultChipGainCount)
             {
                 float avgVol = 0f;
                 int activeCount = 0;
                 for (int i = 0; i < expCount; i++)
                 {
-                    if (ChannelEnabled[MMIX_NES_CH + i])
+                    if (ChannelEnabled[MMIX_NES_CH + i] != 0)
                     {
                         avgVol += ChannelVolume[MMIX_NES_CH + i];
                         activeCount++;

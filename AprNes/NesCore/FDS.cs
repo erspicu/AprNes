@@ -338,7 +338,6 @@ namespace AprNes
                 sprShiftH        = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 sprXCounter      = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 sprFetchAttr     = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
-                sprXPos          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 // P1_joypad_status/P2_joypad_status removed — shift register model uses static bytes
                 NES_MEM          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 65536);
 
@@ -351,7 +350,7 @@ namespace AprNes
                 mapperNeedsA12 = false;
                 mapperA12IsMmc3 = false;
                 ntChrOverrideEnabled = false;
-                for (int i = 0; i < 4; i++) ntBankWritable[i] = true;
+                for (int i = 0; i < 4; i++) ntBankWritable[i] = 1;
                 chrABAutoSwitch = false;
                 chrBGUseASet = false;
                 extAttrEnabled = false;

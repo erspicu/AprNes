@@ -935,7 +935,7 @@ namespace AprNes
         // AprNesAudioPlus.ini — 音效處理參數獨立設定檔
         // ────────────────────────────────────────────────────────────────────
 
-        void LoadAudioPlusIni()
+        unsafe void LoadAudioPlusIni()
         {
             InitChipDefaults();
             var cfg = new Dictionary<string, string>();
@@ -988,7 +988,8 @@ namespace AprNes
             for (int i = 0; i < 5; i++)
             {
                 NesCore.ChannelVolume[i] = ReadInt("ChVol_" + nesChKeys[i], 70, 0, 100);
-                NesCore.ChannelEnabled[i] = !cfg.ContainsKey("ChEn_" + nesChKeys[i]) || cfg["ChEn_" + nesChKeys[i]] != "0";
+                bool chEn = !cfg.ContainsKey("ChEn_" + nesChKeys[i]) || cfg["ChEn_" + nesChKeys[i]] != "0";
+                NesCore.ChannelEnabled[i] = (byte)(chEn ? 1 : 0);
                 NesCore.SyncChannelEnableMask();
             }
             // Expansion channel volumes: per-chip keys (ChVol_VRC6_0, ChVol_N163_0, etc.)
@@ -1025,19 +1026,19 @@ namespace AprNes
                 { _chipChVol[c, i] = 70; _chipChEn[c, i] = true; }
         }
 
-        void ApplyChipChannelSettings(int chipIdx)
+        unsafe void ApplyChipChannelSettings(int chipIdx)
         {
             if (chipIdx < 0 || chipIdx >= 7) chipIdx = 0;
             for (int i = 0; i < 8; i++)
             {
                 NesCore.ChannelVolume[5 + i] = _chipChVol[chipIdx, i];
-                NesCore.ChannelEnabled[5 + i] = _chipChEn[chipIdx, i];
+                NesCore.ChannelEnabled[5 + i] = (byte)(_chipChEn[chipIdx, i] ? 1 : 0);
             }
         }
 
         public void SaveAudioPlusIniPublic() { SaveAudioPlusIni(); }
 
-        void SaveAudioPlusIni()
+        unsafe void SaveAudioPlusIni()
         {
             string content =
                 "; ═══════════════════════════════════════════════════════════════\r\n" +
@@ -1116,7 +1117,7 @@ namespace AprNes
             for (int i = 0; i < 5; i++)
             {
                 content += "ChVol_" + nesChKeys[i] + "=" + NesCore.ChannelVolume[i] + "\r\n";
-                content += "ChEn_"  + nesChKeys[i] + "=" + (NesCore.ChannelEnabled[i] ? "1" : "0") + "\r\n";
+                content += "ChEn_"  + nesChKeys[i] + "=" + (NesCore.ChannelEnabled[i] != 0 ? "1" : "0") + "\r\n";
             }
 
             // Save current chip's expansion channel settings back to _chipChVol
@@ -1126,7 +1127,7 @@ namespace AprNes
                 for (int i = 0; i < 8; i++)
                 {
                     _chipChVol[curChip, i] = NesCore.ChannelVolume[5 + i];
-                    _chipChEn[curChip, i] = NesCore.ChannelEnabled[5 + i];
+                    _chipChEn[curChip, i] = NesCore.ChannelEnabled[5 + i] != 0;
                 }
             }
 

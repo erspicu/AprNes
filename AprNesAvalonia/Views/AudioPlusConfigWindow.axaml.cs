@@ -146,7 +146,7 @@ public partial class AudioPlusConfigWindow : Window
     }
 
     // ── Load NesCore → UI ──────────────────────────────────────────────
-    private void LoadFromNesCore()
+    private unsafe void LoadFromNesCore()
     {
         // Authentic
         CmbConsoleModel.SelectedIndex = Math.Clamp(NesCore.ConsoleModel, 0, 6);
@@ -171,7 +171,7 @@ public partial class AudioPlusConfigWindow : Window
         for (int i = 0; i < NES_CH; i++)
         {
             _slNes[i].Value = Math.Clamp(NesCore.ChannelVolume[i], 0, 100);
-            _chkNes[i].IsChecked = NesCore.ChannelEnabled[i];
+            _chkNes[i].IsChecked = NesCore.ChannelEnabled[i] != 0;
             _lblNesVal[i].Text = (int)_slNes[i].Value + "%";
         }
 
@@ -216,7 +216,7 @@ public partial class AudioPlusConfigWindow : Window
     }
 
     // ── Save UI → NesCore ──────────────────────────────────────────────
-    private void SaveToNesCore()
+    private unsafe void SaveToNesCore()
     {
         // Authentic
         NesCore.ConsoleModel    = CmbConsoleModel.SelectedIndex;
@@ -241,7 +241,7 @@ public partial class AudioPlusConfigWindow : Window
         for (int i = 0; i < NES_CH; i++)
         {
             NesCore.ChannelVolume[i]  = (int)_slNes[i].Value;
-            NesCore.ChannelEnabled[i] = _chkNes[i].IsChecked == true;
+            NesCore.ChannelEnabled[i] = (byte)(_chkNes[i].IsChecked == true ? 1 : 0);
         }
 
         // Save current chip's expansion channel settings back
@@ -259,18 +259,18 @@ public partial class AudioPlusConfigWindow : Window
         ApplyChipChannelSettings((int)NesCore.expansionChipType);
     }
 
-    private void ApplyChipChannelSettings(int chipIdx)
+    private unsafe void ApplyChipChannelSettings(int chipIdx)
     {
         if (chipIdx < 0 || chipIdx >= 7) chipIdx = 0;
         for (int i = 0; i < 8; i++)
         {
             NesCore.ChannelVolume[NES_CH + i]  = _chipChVol[chipIdx, i];
-            NesCore.ChannelEnabled[NES_CH + i] = _chipChEn[chipIdx, i];
+            NesCore.ChannelEnabled[NES_CH + i] = (byte)(_chipChEn[chipIdx, i] ? 1 : 0);
         }
     }
 
     // ── Save INI ───────────────────────────────────────────────────────
-    private void SaveAudioPlusIni()
+    private unsafe void SaveAudioPlusIni()
     {
         string path = Path.Combine(AppContext.BaseDirectory, "configure", "AprNesAudioPlus.ini");
 
@@ -300,7 +300,7 @@ public partial class AudioPlusConfigWindow : Window
         for (int i = 0; i < NES_CH; i++)
         {
             content += "ChVol_" + nesChKeys[i] + "=" + NesCore.ChannelVolume[i] + "\r\n";
-            content += "ChEn_"  + nesChKeys[i] + "=" + (NesCore.ChannelEnabled[i] ? "1" : "0") + "\r\n";
+            content += "ChEn_"  + nesChKeys[i] + "=" + (NesCore.ChannelEnabled[i] != 0 ? "1" : "0") + "\r\n";
         }
 
         // Per-chip expansion channels

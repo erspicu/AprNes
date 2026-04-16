@@ -40,8 +40,8 @@ namespace AprNes
         static public bool mapperNeedsA12  = false; // any A12 notification needed (MMC3 or MMC2/4)
         static public bool mapperA12IsMmc3 = false; // true=MMC3-style, false=MMC2/4-style (only when mapperNeedsA12)
         // Mapper 68 (Sunsoft #4): CHR ROM pages used as nametable tiles
-        static public byte*[] ntBankPtrs = new byte*[4]; // 4×1KB NT pointers (one per nametable slot)
-        static public bool[] ntBankWritable = new bool[4]; // per-slot write enable (false = CHR-ROM, true = CIRAM)
+        public static byte** ntBankPtrs;    // 4×1KB NT pointers (one per nametable slot, unmanaged)
+        public static byte*  ntBankWritable; // 4 bytes per-slot write enable (0=CHR-ROM, 1=CIRAM)
         static public bool ntChrOverrideEnabled = false; // when true PPU reads NT from ntBankPtrs instead of ppu_ram
         // MMC5 CHR A/B auto-switch (for 8x16 sprites: A=sprites, B=background)
         static public bool chrABAutoSwitch = false;
@@ -228,7 +228,6 @@ namespace AprNes
             if (sprShiftH    != null) { Marshal.FreeHGlobal((IntPtr)sprShiftH);    sprShiftH    = null; }
             if (sprXCounter  != null) { Marshal.FreeHGlobal((IntPtr)sprXCounter);  sprXCounter  = null; }
             if (sprFetchAttr != null) { Marshal.FreeHGlobal((IntPtr)sprFetchAttr); sprFetchAttr = null; }
-            if (sprXPos      != null) { Marshal.FreeHGlobal((IntPtr)sprXPos);      sprXPos      = null; }
             if (expansionChannels != null) { Marshal.FreeHGlobal((IntPtr)expansionChannels); expansionChannels = null; }
             if (chrBankPtrs  != null) { Marshal.FreeHGlobal((IntPtr)chrBankPtrs);  chrBankPtrs  = null; }
             if (chrBankPtrsA != null) { Marshal.FreeHGlobal((IntPtr)chrBankPtrsA); chrBankPtrsA = null; }
@@ -316,7 +315,7 @@ namespace AprNes
             // deferred CXinc flag
             // Per-sprite shift registers
             for (int i = 0; i < 8; i++)
-            { sprShiftL[i] = 0; sprShiftH[i] = 0; sprXCounter[i] = 0; sprFetchAttr[i] = 0; sprXPos[i] = 0; }
+            { sprShiftL[i] = 0; sprShiftH[i] = 0; sprXCounter[i] = 0; sprFetchAttr[i] = 0; }
             sprSlotCount = 0; sprZeroInSlots = false;
             // 3-dot pixel pipeline
             dotColor = prevDotColor = prevPrevDotColor = prevPrevPrevDotColor = 0;
@@ -487,7 +486,6 @@ prerender_sprite0_x = 0;
                 sprShiftH        = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 sprXCounter      = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 sprFetchAttr     = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
-                sprXPos          = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 8);
                 ntscScanBuf      = (byte*)Marshal.AllocHGlobal(sizeof(byte) * 256);
                 // Allocate expansionChannels early — Mapper024/019/069/085 etc.
                 // touch NesCore.expansionChannels[0..7] in their Reset(), which
@@ -528,7 +526,7 @@ prerender_sprite0_x = 0;
                 mapperNeedsA12  = a12mode != MapperA12Mode.None;
                 mapperA12IsMmc3 = a12mode == MapperA12Mode.MMC3;
                 ntChrOverrideEnabled = false;
-                for (int i = 0; i < 4; i++) ntBankWritable[i] = true;
+                for (int i = 0; i < 4; i++) ntBankWritable[i] = 1;
                 chrABAutoSwitch = false;
                 chrBGUseASet = false;
                 extAttrEnabled = false;

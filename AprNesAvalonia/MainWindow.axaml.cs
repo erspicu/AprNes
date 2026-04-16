@@ -355,17 +355,17 @@ public partial class MainWindow : Window
             { _chipChVol[c, i] = 70; _chipChEn[c, i] = true; }
     }
 
-    private void ApplyChipChannelSettings(int chipIdx)
+    private unsafe void ApplyChipChannelSettings(int chipIdx)
     {
         if (chipIdx < 0 || chipIdx >= 7) chipIdx = 0;
         for (int i = 0; i < 8; i++)
         {
             AprNes.NesCore.ChannelVolume[5 + i]  = _chipChVol[chipIdx, i];
-            AprNes.NesCore.ChannelEnabled[5 + i] = _chipChEn[chipIdx, i];
+            AprNes.NesCore.ChannelEnabled[5 + i] = (byte)(_chipChEn[chipIdx, i] ? 1 : 0);
         }
     }
 
-    private void LoadAudioPlusIni()
+    private unsafe void LoadAudioPlusIni()
     {
         InitChipDefaults();
         string iniPath = Path.Combine(ConfigDir, "AprNesAudioPlus.ini");
@@ -409,7 +409,8 @@ public partial class MainWindow : Window
         for (int i = 0; i < 5; i++)
         {
             AprNes.NesCore.ChannelVolume[i] = ReadInt("ChVol_" + nesChKeys[i], 70, 0, 100);
-            AprNes.NesCore.ChannelEnabled[i] = !(cfg.TryGetValue("ChEn_" + nesChKeys[i], out var en) && en == "0");
+            bool chEn = !(cfg.TryGetValue("ChEn_" + nesChKeys[i], out var en) && en == "0");
+            AprNes.NesCore.ChannelEnabled[i] = (byte)(chEn ? 1 : 0);
             AprNes.NesCore.SyncChannelEnableMask();
         }
 

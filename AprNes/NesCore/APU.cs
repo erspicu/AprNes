@@ -88,32 +88,49 @@ namespace AprNes
         // 讓 per-channel × gain 加總後落在 NES APU 混音範圍 (~0-98302)
         // Mode 2 再透過 ÷98302 正規化至 0-1.0 與 NES channel 對齊
         // N163: mapper 端已除以 (numCh+1)，所以增益固定 500
-        static readonly float[] DefaultChipGain = new float[]
-        {
-            0f,    // None
-            740f,  // VRC6:      max≈45140 (≈APU range 1/2)
-            3f,    // VRC7:      OPLL raw ±12285, ×3 → max≈36855
-            500f,  // Namco163:  mapper 已 ÷(numCh+1), ×500 → max≈60000
-            120f,  // Sunsoft5B: 原 sum×120, max≈63720
-            43f,   // MMC5      (future)
-            20f,   // FDS       (future)
-        };
+        public const int DefaultChipGainCount = 7;
+        static float* DefaultChipGain;
 
         // ── Per-channel 音量 (Mode 2 per-channel, Mode 0/1 per-chip average) ──
         // [0]=Pulse1, [1]=Pulse2, [2]=Triangle, [3]=Noise, [4]=DMC
         // [5..12]=Expansion ch0~ch7 (VRC6: P1/P2/Saw, N163: ch0~ch7, 5B: A/B/C, etc.)
         // 範圍 0~100, 0=靜音, 100=該聲道最大
-        static public int[] ChannelVolume = new int[] { 70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70 };
-        // Per-channel enable/disable (CheckBox mute)
+        public const int ChannelCount = 13;
+        public static int* ChannelVolume;
+        // Per-channel enable/disable (CheckBox mute, byte 0/1 for unmanaged)
         // [0]=Pulse1, [1]=Pulse2, [2]=Tri, [3]=Noise, [4]=DMC, [5..12]=Exp ch0~7
-        static public bool[] ChannelEnabled = new bool[] { true, true, true, true, true, true, true, true, true, true, true, true, true };
+        public static byte* ChannelEnabled;
         // Bitmask for main 5 channels (bit0=Pulse1..bit4=DMC) — avoids array bounds check
         static public int ChannelEnableMask = 0x1F;
+
+        // One-shot allocation of unmanaged audio arrays. Process-lifetime.
+        static NesCore()
+        {
+            DefaultChipGain = (float*)Marshal.AllocHGlobal(sizeof(float) * DefaultChipGainCount);
+            DefaultChipGain[0] = 0f;    // None
+            DefaultChipGain[1] = 740f;  // VRC6:      max≈45140 (≈APU range 1/2)
+            DefaultChipGain[2] = 3f;    // VRC7:      OPLL raw ±12285, ×3 → max≈36855
+            DefaultChipGain[3] = 500f;  // Namco163:  mapper 已 ÷(numCh+1), ×500 → max≈60000
+            DefaultChipGain[4] = 120f;  // Sunsoft5B: 原 sum×120, max≈63720
+            DefaultChipGain[5] = 43f;   // MMC5 (future)
+            DefaultChipGain[6] = 20f;   // FDS  (future)
+
+            ChannelVolume = (int*)Marshal.AllocHGlobal(sizeof(int) * ChannelCount);
+            for (int i = 0; i < ChannelCount; i++) ChannelVolume[i] = 70;
+
+            ChannelEnabled = (byte*)Marshal.AllocHGlobal(ChannelCount);
+            for (int i = 0; i < ChannelCount; i++) ChannelEnabled[i] = 1;
+
+            ntBankPtrs     = (byte**)Marshal.AllocHGlobal(sizeof(byte*) * 4);
+            ntBankWritable = (byte*)Marshal.AllocHGlobal(4);
+            for (int i = 0; i < 4; i++) { ntBankPtrs[i] = null; ntBankWritable[i] = 0; }
+        }
+
         /// <summary>Call after modifying ChannelEnabled[0..4] to sync bitmask.</summary>
         static public void SyncChannelEnableMask()
         {
-            ChannelEnableMask = (ChannelEnabled[0] ? 1 : 0) | (ChannelEnabled[1] ? 2 : 0) |
-                (ChannelEnabled[2] ? 4 : 0) | (ChannelEnabled[3] ? 8 : 0) | (ChannelEnabled[4] ? 16 : 0);
+            ChannelEnableMask = (ChannelEnabled[0] != 0 ? 1 : 0) | (ChannelEnabled[1] != 0 ? 2 : 0) |
+                (ChannelEnabled[2] != 0 ? 4 : 0) | (ChannelEnabled[3] != 0 ? 8 : 0) | (ChannelEnabled[4] != 0 ? 16 : 0);
         }
 
         // Mode 0/1 擴展音效增益 (從 ChannelVolume[5..] 平均值預算, 由 AudioPlus 更新)
@@ -556,7 +573,7 @@ namespace AprNes
                 int sum = 0;
                 for (int i = 0; i < expansionChannelCount; i++)
                 {
-                    if (ChannelEnabled[5 + i])
+                    if (ChannelEnabled[5 + i] != 0)
                         sum += (int)(expansionChannels[i] * gain);
                 }
                 mapperExpansionAudio = sum;
@@ -584,7 +601,7 @@ namespace AprNes
                 int sum = 0;
                 for (int i = 0; i < expansionChannelCount; i++)
                 {
-                    if (ChannelEnabled[5 + i])
+                    if (ChannelEnabled[5 + i] != 0)
                         sum += (int)(expansionChannels[i] * gain);
                 }
                 mapperExpansionAudio = sum;
