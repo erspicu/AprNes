@@ -1,6 +1,6 @@
 # AprNes Mapper 實作狀態
 
-**已實作：70 個　　預備實作：11 個　　最後更新：2026-04-17**
+**已實作：73 個　　預備實作：8 個　　最後更新：2026-04-17**
 
 結果說明：✅ 正常　⚠️ 部分問題　❌ 有問題　❓ 待確認／不明
 
@@ -105,6 +105,9 @@
 | **177** | Henggedianzi | ✅ | 恒格电子 5 ROMs (Mei Guo Fu Hao, Xing He Zhan Shi etc.) | 32KB PRG + bit5 mirroring，極簡 |
 | **164** | Waixing 164 | ✅ | Darkseed, FF5 hack, 寶可夢水晶版, Digital Dragon | $5000/$5100 兩暫存器組 PRG bank 高低 nibble |
 | **074** | MMC3 + 2KB CHR-RAM | ✅ | 足球小將 4 hacks (EverQuest hack 綠屏，ROM 可疑) | 獨立 Mapper004 copy + bank 0x08-0x09 redirect to 2KB CHR-RAM |
+| **191** | MMC3 + 2KB CHR-RAM (wrap) | ✅ | Double Dragon III (中), 熱血物語 (中), Mighty Final Fight (中) | 同 074，bank 0x80-0xFF wrap 到 2KB RAM |
+| **192** | MMC3 + 4KB CHR-RAM | ❓ | ROM 庫無對應遊戲 | 同 074，bank 0x08-0x0B redirect to 4KB CHR-RAM |
+| **194** | MMC3 + 2KB CHR-RAM | ❓ | ROM 庫無對應遊戲 | 同 074，bank 0x00-0x01 redirect to 2KB CHR-RAM |
 
 ---
 
