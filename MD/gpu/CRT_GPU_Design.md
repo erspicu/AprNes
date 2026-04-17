@@ -1,8 +1,8 @@
-# AprNes Avalonia — CRT GPU 加速設計（v2 修訂版）
+# AprNes Avalonia — CRT GPU 加速設計（v3 修訂版）
 
-日期：2026-04-17
+日期：2026-04-18
 適用專案：`AprNesAvalonia/`（Avalonia 11.3.13 + SkiaSharp 2.88.9 + .NET 10）
-狀態：**設計定案，等候動工**
+狀態：**設計定案，Phase 0 執行中**
 
 ---
 
@@ -15,7 +15,47 @@
 | 3 | **Shader 從檔案讀取** | 不硬編字串；新增 `AprNesAvalonia/Shaders/` 目錄放 `.sksl` 檔 |
 | 4 | **Phosphor decay v1 必備** | CPU 純量與 SIMD 都已實作（`CrtScreen.cs:63`、`CrtScreen.Simd.cs:87`）；GPU 版 v1 必須跟上 |
 | 5 | **Headless mode 要支援 GPU** | Skia runtime effect 在無視窗環境也能以 CPU rasterizer 執行，保 deterministic；真 GPU 在 headless 為 v2 目標 |
-| 6 | **動態派發機制** | 新設計：各重運算階段可獨立選 Scalar / SIMD / GPU，透過 config + capability detection 動態分配 |
+| 6 | **動態派發機制** | 各重運算階段可獨立選 Scalar / SIMD / GPU，透過 config + capability detection 動態分配 |
+| 7 | **AprNes vs AprNes Ava 分工** | AprNes (.NET 4.8.1) = 只走 Scalar；AprNes Ava (.NET 10) = 可選 Scalar / SIMD / GPU |
+| 8 | **Ava 開發期預設** | 預設 `CrtImpl = Gpu`（fallback Simd）；未完成期間暫時以 Simd 為預設 |
+| 9 | **ARM 平台考量** | .NET 10 on ARM → SIMD 用 NEON；透過 `Vector<T>` 跨平台抽象（AVX2 與 NEON 皆自動）|
+| 10 | **.NET 10 動態連結 method** | 以 `delegate*<>` 函式指標 / `ICrtBackend` 介面派發；runtime 決定實作 |
+
+---
+
+## 0.5 .NET 10 動態 Method 派發機制選型
+
+使用者提到 ".NET10 好像有一種呼叫同一隻 METHOD，但 method 可以動態連結到哪個真實實作的處理方式"。對應的 .NET 10 可用選項：
+
+| 選項 | 語法 | 開銷 | 適合本情境 |
+|------|------|:----:|:---------:|
+| **Function pointer** | `delegate*<void>` | ~0（直接跳轉）| ★★★ |
+| Static abstract members in interface | `interface IBackend { static abstract void Render(); }` + generic | 0（monomorphize）| ★★（要 generic，runtime 難切）|
+| Virtual interface dispatch | `ICrtBackend.Render()` | 1-2 ns（vtable）| ★★★（可讀性佳）|
+| Dynamic PGO / inlining | JIT 自動 | 0 | 不可預期 |
+
+**選定**：以 `ICrtBackend` 介面為主要派發（可讀性 + 可測試性），per-frame 調用不需要極致效能；內部熱路徑可用 `delegate*<>` 存底（若有需要）。
+
+```csharp
+internal interface ICrtBackend {
+    void Init();
+    void Render();
+    void ApplyProfile();
+    void Dispose();
+}
+
+internal sealed class CrtScalarBackend : ICrtBackend { ... }
+internal sealed class CrtSimdBackend   : ICrtBackend { ... }  // 只在 Ava 編譯
+internal sealed class CrtGpuBackend    : ICrtBackend { ... }  // 只在 Ava 編譯
+```
+
+### ARM 平台（NEON）考量
+`CrtScreen.Simd.cs` 目前直接用 `Avx2.GatherVector256` 等 x86 專屬 intrinsics。ARM 版需要：
+- **短期**：以 `Vector<T>`（`System.Numerics`）取代 `Vector256<T>` 寫法 — `Vector<T>` 自動對應 SSE/AVX/NEON 最大寬度
+- **長期**：若要 NEON 專屬最佳化，另建 `CrtScreen.Neon.cs` 用 `AdvSimd` intrinsics（對應 ARM64）
+- `CrtBackend` 工廠選 `CrtSimdBackend` 時再細分 x86 / ARM 版本
+
+目前 AprNesAvalonia 尚未在 ARM 上發布，`Vector<T>` 抽象就足夠。**NEON 專屬 backend** 列為 v4 目標。
 
 ---
 
@@ -28,12 +68,17 @@
 - 隨輸出解析度擴張近乎免費（fragment 平行度 >> AVX2 lane 數）
 - 未來 NTSC 合成（per-dot 1D composite 訊號）在 GPU 更自然
 
-### 三條路並存
-| Impl | 依賴 | 用途 |
-|------|------|------|
-| `Scalar` | 純 C#，net48 相容 | 最低相容性、WinForms 版保留 |
-| `Simd`（現役）| `Vector256<T>` / AVX2，.NET 10 | 生產預設 |
-| `Gpu`（新增）| SkiaSharp `SKRuntimeEffect`，Avalonia only | 實驗性，性能為主 |
+### 三條路並存（按專案區分）
+| 專案 | 可用 Impl | 預設 |
+|------|-----------|:----:|
+| **AprNes** (.NET 4.8.1 WinForms) | Scalar | Scalar（固定，無選項）|
+| **AprNesAvalonia** (.NET 10) | Scalar / Simd / Gpu | Gpu（fallback Simd；v1 未完前暫為 Simd）|
+
+| Impl | 依賴 | 跨平台 | 用途 |
+|------|------|:------:|------|
+| `Scalar` | 純 C# | ✅ | 最低相容性、WinForms 版唯一 |
+| `Simd` | `Vector<T>` + `Vector256` (x86) / `AdvSimd` (ARM) | ✅ | 生產預設；ARM 自動切 NEON |
+| `Gpu` | SkiaSharp `SKRuntimeEffect` | ✅（CPU fallback）| 實驗性，性能為主 |
 
 **不動** `CrtScreen.cs`、`CrtScreen.Simd.cs`。GPU 是 Avalonia 專屬的第三條路。
 
@@ -509,6 +554,85 @@ v1 完成必須通過：
 - [ ] TestRunner headless 模式走 GPU 不 crash（效能可接受）
 - [ ] Shader 檔案缺失時清楚報錯而非靜默 fallback
 - [ ] Config UI 切換即時生效（下一幀套用）
+
+---
+
+## 14. 分階段執行計畫（新增）
+
+將工作拆成 4 個 Phase，使用者可在鎖頻環境下先取得 scalar/SIMD baseline，避免被大重構擋住。
+
+### Phase 0 — 立即可 benchmark（最低風險，0.5 天）
+**目標**：AprNesAvalonia 能在同一個 build 裡切換 Scalar / SIMD，取 baseline 對比。
+
+**作法**：**MSBuild property 切換**（不改 code，只改 csproj）
+```xml
+<PropertyGroup>
+  <CrtImpl Condition="'$(CrtImpl)' == ''">Simd</CrtImpl>
+</PropertyGroup>
+
+<Compile Condition="'$(CrtImpl)' == 'Simd'"
+         Include="../AprNes/NesCore/**/*.cs"
+         Exclude="../AprNes/NesCore/NTSC_CRT/CrtScreen.cs" />
+<Compile Condition="'$(CrtImpl)' == 'Scalar'"
+         Include="../AprNes/NesCore/**/*.cs"
+         Exclude="../AprNes/NesCore/NTSC_CRT/CrtScreen.Simd.cs" />
+```
+
+使用：
+```bash
+dotnet build AprNesAvalonia/AprNesAvalonia.csproj -c Debug -p:CrtImpl=Simd
+# benchmark → 存結果
+dotnet build AprNesAvalonia/AprNesAvalonia.csproj -c Debug -p:CrtImpl=Scalar
+# benchmark → 存結果
+```
+
+**優點**：不動 code、0 風險、立即可用；scalar & SIMD 都能跑完整 test 套件
+**缺點**：需要重編才能切；不是 runtime dispatch
+
+**驗收**：
+- [x] `-p:CrtImpl=Simd` 編出的 exe 使用 SIMD CrtScreen
+- [x] `-p:CrtImpl=Scalar` 編出的 exe 使用 scalar CrtScreen
+- [x] 兩個 build 都能 headless 跑 `--analog --ultra-analog --analog-size 8 --analog-output RF --audio-dsp --audio-mode 2 --benchmark 30`
+
+### Phase 1 — Runtime dispatch 重構（Scalar/SIMD）（2-3 天）
+**目標**：同一 build 內 runtime 切換 Scalar / SIMD；CLI / ini 可指定。
+
+**架構**：
+1. 新增 `CrtScreen.Shared.cs`（partial class `NesCore`）：
+   - 所有公開 config 欄位：`VignetteStrength`、`PhosphorDecay`、`ShadowMaskMode` 等
+   - 所有解耦參數：`crt_analogOutput`、`crt_analogSize`、`crt_analogScreenBuf`、`crt_frameCount`
+   - 顯示尺寸：`Crt_SrcW/H`、`Crt_DstW/H`、`_fullscreenW/H`
+   - 公開 API：`Crt_Init`、`Crt_Render`、`Crt_ApplyConfig`、`Crt_UpdateScreenBuf` 等
+   - Backend enum + `Crt_SetBackend` / `Crt_GetBackend`
+2. 重構 `CrtScreen.cs`（改名為 `CrtScreen.Scalar.cs`）：
+   - `partial class NesCore` → `internal static class CrtScreenScalar`
+   - 移除 shared 欄位（已在 Shared）
+   - `Init/Render/ApplyProfile` 內部化
+   - 讀 shared 欄位透過 `NesCore.xxx` 限定
+3. 重構 `CrtScreen.Simd.cs` → `internal static class CrtScreenSimd`（同上）
+4. Shared 的 dispatch 以 `#if CRT_SIMD_AVAILABLE` 條件編譯：
+   ```csharp
+   public static void Crt_Render() {
+   #if CRT_SIMD_AVAILABLE
+       if (_crtBackend == CrtBackend.Simd) { CrtScreenSimd.Render(); return; }
+   #endif
+       CrtScreenScalar.Render();
+   }
+   ```
+5. `AprNesAvalonia.csproj` 加 `<DefineConstants>CRT_SIMD_AVAILABLE</DefineConstants>`
+6. `AprNes.csproj` 不加（仍只走 scalar）
+
+**驗收**：
+- [ ] AprNes 照常跑（只 scalar）
+- [ ] AprNesAvalonia 預設 SIMD，`--crt-strategy=scalar` 可 runtime 切
+- [ ] blargg 184/184 PASS 雙路徑都過
+- [ ] 截圖像素差 ≤ ±2/255
+
+### Phase 2 — GPU backend 加入（依 §6-§13，4-6 天）
+見前述 M0-M7 里程碑。Phase 1 完成後，第三個 backend 塞進 dispatch 即可。
+
+### Phase 3 — ARM NEON 專屬 backend（stretch，2-3 天）
+僅在 `RuntimeInformation.ProcessArchitecture == Arm64` 時啟用；用 `System.Runtime.Intrinsics.Arm.AdvSimd`。
 
 ---
 
