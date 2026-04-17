@@ -95,6 +95,7 @@ namespace AprNes
 
         public static void Crt_Init()
         {
+            System.Console.WriteLine("[CRT] backend = Scalar (CrtScreen.cs, Vector<T> auto-vectorized)");
             if (_weights != null) NesCore.FreeUnmanaged((IntPtr)_weights);
             if (_nearestY != null) NesCore.FreeUnmanaged((IntPtr)_nearestY);
             if (_boostRow != null) NesCore.FreeUnmanaged((IntPtr)_boostRow);

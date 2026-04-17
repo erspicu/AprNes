@@ -119,6 +119,7 @@ namespace AprNes
 
         public static void Crt_Init()
         {
+            System.Console.WriteLine("[CRT] backend = SIMD (CrtScreen.Simd.cs, Vector256/Avx2 intrinsics, .NET 10)");
             if (_weights != null) NesCore.FreeUnmanaged((IntPtr)_weights);
             if (_nearestY != null) NesCore.FreeUnmanaged((IntPtr)_nearestY);
             if (_boostRow != null) NesCore.FreeUnmanaged((IntPtr)_boostRow);
