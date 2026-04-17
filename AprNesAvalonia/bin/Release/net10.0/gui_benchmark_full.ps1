@@ -8,7 +8,8 @@
 param(
     [int]$Duration = 20,
     [int]$Cooldown = 10,
-    [string]$RomPath = ''
+    [string]$RomPath = '',
+    [int]$Size     = 8        # analog-size multiplier (2/4/6/8/10/...); see CRT_DstW/H = 256/210 * Size
 )
 
 $ErrorActionPreference = 'Continue'
@@ -41,10 +42,12 @@ $results    = @{}
 Write-Host ""
 Write-Host "=========================================================="
 Write-Host "  AprNesAvalonia GUI Benchmark (Phase 3A)"
-Write-Host "  ROM:       $RomPath"
-Write-Host "  Duration:  ${Duration}s per run"
-Write-Host "  Cooldown:  ${Cooldown}s between runs"
-Write-Host "  Flags:     ultra-analog + RF + 8x + CRT + DSP mode 2"
+$dstW = 256 * $Size
+$dstH = 210 * $Size
+Write-Host "  ROM:        $RomPath"
+Write-Host "  Duration:   ${Duration}s per run"
+Write-Host "  Cooldown:   ${Cooldown}s between runs"
+Write-Host "  Flags:      ultra-analog + RF + ${Size}x (${dstW}x${dstH}) + CRT + DSP mode 2"
 Write-Host "  Strategies: $($strategies -join ' / ')"
 Write-Host "=========================================================="
 
@@ -78,7 +81,7 @@ foreach ($strat in $strategies) {
             '--gui-benchmark', $Duration,
             '--analog', '--ultra-analog',
             '--analog-output', 'RF',
-            '--analog-size', '8',
+            '--analog-size', $Size,
             '--crt',
             '--audio-dsp', '--audio-mode', '2',
             '--crt-strategy', $strat
