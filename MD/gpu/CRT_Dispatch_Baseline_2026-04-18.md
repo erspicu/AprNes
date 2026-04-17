@@ -86,4 +86,4 @@ Audio: 5×256-tap FIR (per-channel) → Triangle Bass Boost (12dB) →
 - GPU backend 的 FPS（目標 ≥ 2x SIMD）
 - ARM NEON backend（如 Phase 3 實作）
 
-參考：[MD/gpu/CRT_GPU_Design.md](../gpu/CRT_GPU_Design.md)
+參考：[CRT_GPU_Design.md](CRT_GPU_Design.md)

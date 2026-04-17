@@ -118,4 +118,4 @@ var surface = SKSurface.Create(grContext, false, info);
 - Phase 3C NTSC GPU 化 FPS
 - ARM NEON scalar 驗證（如實際發布 ARM 版本）
 
-參考：[MD/gpu/CRT_GPU_Design.md](../gpu/CRT_GPU_Design.md)
+參考：[CRT_GPU_Design.md](CRT_GPU_Design.md)

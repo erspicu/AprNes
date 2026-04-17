@@ -72,7 +72,7 @@
 
 **Option 2**：Silk.NET offscreen GL → `GRContext.CreateGl()` → `SKSurface.Create(grContext, ...)`。架構複雜一點但 emu thread 和 headless 一致。
 
-詳見 [CRT_GPU_Design.md](../gpu/CRT_GPU_Design.md)。
+詳見 [CRT_GPU_Design.md](CRT_GPU_Design.md)。
 
 ---
 

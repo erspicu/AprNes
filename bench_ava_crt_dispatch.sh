@@ -29,7 +29,7 @@ DURATION=20
 JIT_DURATION=10
 COOLDOWN=30
 DATE=$(date +%Y-%m-%d)
-OUTFILE="MD/PerformanceWithAV/CRT_Dispatch_Baseline_${ANALOG_SIZE}x_${DATE}.md"
+OUTFILE="MD/gpu/CRT_Dispatch_Baseline_${ANALOG_SIZE}x_${DATE}.md"
 
 mkdir -p "$(dirname "$OUTFILE")"
 
