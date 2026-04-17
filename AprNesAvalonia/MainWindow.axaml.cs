@@ -89,6 +89,8 @@ public partial class MainWindow : Window
             GuiBenchmark.Trace("ctor: benchmark mode enabled");
             // Re-apply benchmark CLI flags AFTER ApplyIniSettings so CLI wins
             GuiBenchmark.ApplyOverrides();
+            // Mute audio playback: DSP can still run but nothing goes to WaveOut
+            _emu.AudioPlaybackMuted = true;
             Opened += (_, _) =>
             {
                 GuiBenchmark.Trace("Opened fired");
