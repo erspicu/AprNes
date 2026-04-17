@@ -66,7 +66,7 @@ Key references used during development:
     *   `FDS.cs` — Famicom Disk System support (BIOS validation, disk I/O state machine, IRQ timer, wavetable + FM audio).
     *   `Ntsc.cs` — NTSC composite video encoder/decoder (21.477 MHz waveform generation, FIR demodulation, SIMD batch YIQ-to-RGB).
     *   `CrtScreen.cs` — CRT electron beam optics (Gaussian scanline Bloom, curvature, phosphor persistence, SIMD pixel packing).
-    *   `Mapper/` — Cartridge mapper implementations (65 mappers, 61 verified).
+    *   `Mapper/` — Cartridge mapper implementations (79 mappers, 72 verified).
 *   **`AprNes/UI/`** — Windows Forms UI.
     *   `AprNesUI.cs` — Main window (FPS throttle, SRAM save/load, controller events).
     *   `AprNes_ConfigureUI.cs` — Keyboard/gamepad key binding UI.
@@ -182,7 +182,7 @@ python run_tests.py -j 10
 | Generic USB gamepad / joystick | DirectInput8 (raw vtable) | Auto-enumerated, excludes XInput devices |
 | Xbox 360 / One / Series | XInput (xinput1_4.dll) | Auto-detects players 0–3 |
 
-## Supported Mappers (61 verified)
+## Supported Mappers (72 verified)
 
 | Mapper | Representative Games |
 |--------|---------------------|
@@ -247,6 +247,17 @@ python run_tests.py -j 10
 | 140 (Jaleco JF-11/14) | Doraemon (J), Bio Senshi Dan (J) |
 | 154 (Namco 129) | Devil Man (J) |
 | 159 (Bandai LZ93D50) | Dragon Ball Z - Kyoushuu Saiya Jin (J) |
+| 74 (MMC3 + 2KB CHR-RAM bank 08-09) | Captain Tsubasa II (Chinese hacks), EverQuest (Ch) |
+| 96 (Bandai Oeka Kids) | Oeka Kids - Anpanman no Hiragana Daisuki (J), Oeka Kids - Anpanman to Oekaki Shiyou!! (J) |
+| 112 (Asder / Ntdec) | Cobra Mission, Fighting Hero III (Unl), Master Shooter, Chik Bik Ji Jin, Huang Di |
+| 126 (PowerJoy multicart) | PowerJoy 84-in-1 (PJ-008) |
+| 163 (Nanjing) | Final Fantasy VII (Ch), Diablo (NJ037), Da Hua Xi You, Chao Ji Ji Qi Ren Da Zhan A |
+| 164 (Waixing 164) | Final Fantasy V (Unl), Pokemon Crystal (Ch), Pokemon Diamond (Ch), Darkseed, Digital Dragon |
+| 176 (FK23C / Waixing multicart) | Super 12-in-1, 3-in-1 (ES-Q800C), 4-in-1 (BS-8088 / FK23Cxxxx / KT-220B) |
+| 177 (Henggedianzi) | Xing He Zhan Shi, Wang Zi Fu Chou Ji, Mei Guo Fu Hao, Shang Gu Shen Jian, Xing Zhan Qing Yuan |
+| 191 (MMC3 + 2KB CHR-RAM bank 0x80-0xFF wrap) | Double Dragon III (J/Chi_madcell), Downtown / Kunio-kun series (Chi_madcell), Mighty Final Fight (Chi_madcell), Q Boy (Sachen) |
+| 211 (JY Company) | 2-in-1 Donkey Kong Country + Jungle Book (Unl), 2-in-1 DKC4 + Jungle Book 2 (Unl) |
+| 241 (BxROM / Subor) | Hwang Shinwei 12-in-1, Russian Study Cartridge (7/14-in-1), Chao Ji Shu Biao Jin Ka (16-in-1), ABM Study Card |
 
 ---
 
@@ -316,7 +327,7 @@ AprNes 是一個以追求 cycle-accurate 精度為目標的 NES 硬體模擬研�
     *   `FDS.cs` — Famicom Disk System 支援（BIOS 驗證、磁碟 I/O 狀態機、IRQ 計時器、wavetable + FM 音效）。
     *   `Ntsc.cs` — NTSC 複合視訊編解碼器（21.477 MHz 波形生成、FIR 解調、SIMD 批次 YIQ 轉 RGB）。
     *   `CrtScreen.cs` — CRT 電子束光學模擬（高斯掃描線 Bloom、曲面變形、磷光持續、SIMD 像素打包）。
-    *   `Mapper/` — 各類遊戲卡匣控制晶片實作（65 種 Mapper，61 個通過人工驗證）。
+    *   `Mapper/` — 各類遊戲卡匣控制晶片實作（79 種 Mapper，72 個通過人工驗證）。
 *   **`AprNes/UI/`** — 基於 Windows Forms 的使用者介面。
     *   `AprNesUI.cs` — 主視窗（FPS 節流、SRAM 讀寫、手把事件）。
     *   `AprNes_ConfigureUI.cs` — 鍵盤/手把按鍵設定視窗。
@@ -432,7 +443,7 @@ python run_tests.py -j 10
 | 一般 USB 手把 / 老式搖桿 | DirectInput8（raw vtable） | 自動列舉，排除 XInput 裝置 |
 | Xbox 360 / Xbox One / Xbox Series | XInput（xinput1_4.dll） | 自動偵測 player 0–3 |
 
-## 支援的 Mapper（60 個通過人工驗證）
+## 支援的 Mapper（72 個通過人工驗證）
 
 | Mapper | 代表遊戲 |
 |--------|---------|
@@ -497,3 +508,14 @@ python run_tests.py -j 10
 | 140 (Jaleco JF-11/14) | 哆啦A夢（日）、Bio Senshi Dan（日） |
 | 154 (Namco 129) | 惡魔人（日） |
 | 159 (Bandai LZ93D50) | 七龍珠Z 強襲賽亞人（日） |
+| 74 (MMC3 + 2KB CHR-RAM bank 08-09) | 足球小將 II 系列中文化 hack、EverQuest（中） |
+| 96 (Bandai Oeka Kids / 太鼓筆) | Anpanman 平假名（日）、Anpanman 畫圖（日） |
+| 112 (Asder / Ntdec) | Cobra Mission、Fighting Hero III、Master Shooter、赤壁之戰、黃帝 |
+| 126 (PowerJoy multicart) | PowerJoy 84-in-1 (PJ-008) |
+| 163 (Nanjing / 南晶) | 太空戰士 VII（中）、暗黑破壞神 Diablo、大話西遊、超級機器人大戰 A |
+| 164 (Waixing 164) | 太空戰士 V（中）、口袋水晶版、口袋鑽石版、Darkseed、Digital Dragon |
+| 176 (FK23C / 外星多合一晶片) | 超級 12-in-1、3-in-1 (ES-Q800C)、4-in-1 (BS-8088 / FK23Cxxxx / KT-220B) |
+| 177 (恒格電子 Henggedianzi) | 星河戰士、王子復仇記、美國富豪、上古神劍、星戰情緣 |
+| 191 (MMC3 + 2KB CHR-RAM bank 0x80-0xFF wrap) | 雙截龍 III（中）、熱血物語／國夫君系列（中）、Mighty Final Fight（中）、Q Boy |
+| 211 (JY Company 211) | 2-in-1 Donkey Kong Country + Jungle Book、2-in-1 DKC4 + Jungle Book 2 |
+| 241 (BxROM / Subor) | 黃信維 12-in-1、俄羅斯學習卡帶 (7/14-in-1)、超級數學金卡 (16-in-1)、ABM 學習卡 |
