@@ -1,6 +1,6 @@
 # AprNes Mapper 實作狀態
 
-**已實作：78 個　　預備實作：4 個　　最後更新：2026-04-17**
+**已實作：79 個　　預備實作：3 個　　最後更新：2026-04-17**
 
 結果說明：✅ 正常　⚠️ 部分問題　❌ 有問題　❓ 待確認／不明
 
@@ -20,9 +20,7 @@
 - ❓ 已實裝但無 ROM 驗證：192 (MMC3 ChrRam 8-0xB), 194 (MMC3 ChrRam 0-1)
 
 ### 2026-04-17 session 嘗試失敗（暫緩）
-| Mapper | 失敗原因 |
-|:------:|--------|
-| 126 (PowerJoy multicart) | 多層選單跳轉 + 大型 ROM (4MB+) 多級 banking，測試 ROM 僅 1 顆 |
+無
 
 ---
 
@@ -110,6 +108,7 @@
 | **163** | Nanjing (南晶) | ✅ | FF7 中文、Diablo 暗黑破壞神、大話西遊、Chao Ji Ji Qi Ren | $5000/$5100/$5200/$5300 + $5101 toggle；copy protection read $5100/$5500 |
 | **173** | TXC 22211C | ❓ | 無測試 ROM | TXC chip copy-protection；$4100-$4103 accumulator + invert；$8000+ trigger output |
 | **176** | FK23C (Waixing) | ✅ | 12-in-1 / 3-in-1 ES-Q800C / 4-in-1 BS-8088 / 4-in-1 FK23Cxxxx S-0210A / 4-in-1 KT-220B 全數進選單 | MMC3 super-set 完整移植 Mesen2：5 PRG modes、MMC3/CNROM CHR、extended MMC3 mode (10 regs)、4-mode mirroring、$A001 WRAM config、IRQ 2-cycle delay、subtype 2 $46/$47 swap、32KB WRAM 4-bank remap ($6000-$7FFF + $4100-$5FFF) |
+| **126** | PowerJoy multicart | ✅ | PowerJoy 84-in-1 (PJ-008) 選單 + 80 Days 遊戲驗證 | MMC3 + 4 exReg ($6000-$7FFF，addr&3)；PRG transform (inner mask + outer 7-bit); PRG-lock (32KB linear / 16KB mirror); CHR outer bank bits 7-9 + 1KB/2KB MMC3 transform; CHR-lock 8KB linear; write-lock via exRegs[3].7 |
 
 ---
 

@@ -13,7 +13,7 @@ namespace AprNes
                 case 32: case 33: case 34: case 64: case 65: case 66: case 68: case 69: case 71: case 78: case 206:
                 case 70: case 75: case 88: case 90: case 118: case 119: case 140: case 152: case 154: case 180: case 209: case 210: case 211: case 228: case 232:
                 case 241: case 112: case 177: case 164: case 74: case 191: case 192: case 194: case 12:
-                case 96: case 163: case 173: case 176:
+                case 96: case 163: case 173: case 176: case 126:
                     return true;
                 default:
                     return false;
@@ -101,6 +101,7 @@ namespace AprNes
                 case 163: return "Nanjing (163)";
                 case 173: return "TXC 22211C";
                 case 176: return "FK23C (Waixing multicart)";
+                case 126: return "PowerJoy (MMC3+exRegs)";
                 default: return "Unknown";
             }
         }
@@ -384,6 +385,10 @@ namespace AprNes
                 case 176: {
                     System.Console.WriteLine("Mapper176: FK23C (Waixing multicart)");
                     return new Mapper176();
+                }
+                case 126: {
+                    System.Console.WriteLine("Mapper126: PowerJoy (MMC3+exRegs)");
+                    return new Mapper126();
                 }
                 default: throw new System.NotSupportedException("Mapper " + id + " not supported");
             }
