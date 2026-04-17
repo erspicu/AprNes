@@ -17,11 +17,16 @@ namespace AprNes
     //   - IRQ: A12 rising edge detector, 2-CPU-cycle delay before asserting
     //   - Subtype 1 default: PRG==CHR==1024KB → prgBaseBits=0x20
     //   - Subtype 2 quirk: 16MB PRG swaps MMC3 regs $46/$47
+    //   - 32KB WRAM (4x 8KB banks): bank 0 shares NES_MEM[$6000..$7FFF] (battery-compat);
+    //     banks 1-3 allocated. In wramConfig mode: $6000-$7FFF → bank wramBankSelect,
+    //     $4100-$5FFF → bank (wramBankSelect+1)&3. In non-config: $6000-$7FFF → bank 0.
+    //   - When wramConfig enabled + fk23Registers disabled: $4100-$5FFF becomes writable
+    //     WRAM instead of register area.
     //
-    // Not implemented (low-impact for tested ROMs):
-    //   - $4000-$5FFF WRAM bank remap when wramConfigEnabled (needs expansion-area hook)
+    // Not implemented (very low impact):
     //   - ramInFirstChrBank (CHR RAM overlay for first 8KB)
     //   - Subtype-specific CHR RAM size auto-detection (fixed 32KB CHR-RAM buffer used)
+    //   - Battery persistence for WRAM banks 1-3 (bank 0 saves via NES_MEM)
     //
     // Ref: Mesen2 Fk23C.h (407 lines).
     unsafe public class Mapper176 : IMapper
@@ -32,6 +37,11 @@ namespace AprNes
 
         // 32KB CHR-RAM overlay for selectChrRam / ramInFirstChrBank (pre-allocated)
         byte* CHR_RAM;
+
+        // 32KB WRAM split into 4x 8KB banks. Bank 0 aliases NES_MEM+$6000 for battery
+        // compatibility; banks 1-3 are private allocations.
+        byte* _extraWram;           // 24KB buffer holding banks 1,2,3 contiguously
+        byte* wramBank0, wramBank1, wramBank2, wramBank3;
 
         // --- FK23C control state ---
         byte prgBankingMode;
@@ -78,6 +88,14 @@ namespace AprNes
             // 32KB CHR-RAM overlay (Mesen2 allocates up to 256KB; 32KB is enough for typical multicarts)
             CHR_RAM = (byte*)System.Runtime.InteropServices.Marshal.AllocHGlobal(0x8000);
             for (int i = 0; i < 0x8000; i++) CHR_RAM[i] = 0;
+
+            // WRAM banks: bank 0 aliased to NES_MEM+$6000; banks 1-3 allocated (24KB).
+            _extraWram = (byte*)System.Runtime.InteropServices.Marshal.AllocHGlobal(3 * 0x2000);
+            for (int i = 0; i < 3 * 0x2000; i++) _extraWram[i] = 0;
+            wramBank0 = NES_MEM + 0x6000;
+            wramBank1 = _extraWram;
+            wramBank2 = _extraWram + 0x2000;
+            wramBank3 = _extraWram + 0x4000;
 
             InitState();
         }
@@ -130,13 +148,51 @@ namespace AprNes
 
         public void Reset() { InitState(); }
 
-        public byte MapperR_ExpansionROM(ushort address) { return NesCore.cpubus; }
+        byte* GetWramBank(int b)
+        {
+            switch (b & 3)
+            {
+                case 0: return wramBank0;
+                case 1: return wramBank1;
+                case 2: return wramBank2;
+                default: return wramBank3;
+            }
+        }
+
+        public byte MapperR_ExpansionROM(ushort address)
+        {
+            // In wramConfig mode, $4100-$5FFF reads WRAM bank (wramBankSelect+1)&3
+            if (wramConfigEnabled)
+            {
+                byte* bank = GetWramBank((wramBankSelect + 1) & 3);
+                return bank[address - 0x4000];
+            }
+            return NesCore.cpubus;
+        }
+
         public void MapperW_ExpansionROM(ushort address, byte value) { WriteRegister(address, value); }
-        public byte MapperR_RAM(ushort address) { return NES_MEM[address]; }
+
+        public byte MapperR_RAM(ushort address)
+        {
+            if (wramConfigEnabled)
+            {
+                byte* bank = GetWramBank(wramBankSelect);
+                return bank[address - 0x6000];
+            }
+            // Non-config: always readable from bank 0 (matches pre-10%-patch behavior)
+            return NES_MEM[address];
+        }
+
         public void MapperW_RAM(ushort address, byte value)
         {
-            // WRAM write protection (non-config mode): ignore write if protected
-            if (!wramConfigEnabled && wramEnabled && wramWriteProtected) return;
+            if (wramConfigEnabled)
+            {
+                byte* bank = GetWramBank(wramBankSelect);
+                bank[address - 0x6000] = value;
+                return;
+            }
+            // Non-config: respect write protection
+            if (wramWriteProtected) return;
             NES_MEM[address] = value;
         }
 
@@ -177,9 +233,10 @@ namespace AprNes
                 }
                 else
                 {
-                    // FK23C regs disabled + wramConfig enabled → $5000-$5FFF is writable WRAM
-                    // (Mesen2: "second 4 KiB of 8 KiB WRAM bank 2"). Store in NES_MEM at
-                    // translated address — since our WRAM remap isn't implemented, skip.
+                    // FK23C regs disabled + wramConfig enabled → $4100-$5FFF is writable WRAM,
+                    // mapped to bank (wramBankSelect+1)&3.
+                    byte* bank = GetWramBank((wramBankSelect + 1) & 3);
+                    bank[addr - 0x4000] = value;
                 }
                 return;
             }
@@ -452,6 +509,12 @@ namespace AprNes
             {
                 System.Runtime.InteropServices.Marshal.FreeHGlobal((System.IntPtr)CHR_RAM);
                 CHR_RAM = null;
+            }
+            if (_extraWram != null)
+            {
+                System.Runtime.InteropServices.Marshal.FreeHGlobal((System.IntPtr)_extraWram);
+                _extraWram = null;
+                wramBank0 = wramBank1 = wramBank2 = wramBank3 = null;
             }
         }
     }

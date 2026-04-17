@@ -109,7 +109,7 @@
 | **096** | Bandai Oeka Kids | ✅ | Anpanman Hiragana / Oekaki Shiyou | PPU 匯流排 $2xxx 遷移觸發 inner CHR bank latch（無需改 IMapper，沿用 PpuClock）|
 | **163** | Nanjing (南晶) | ✅ | FF7 中文、Diablo 暗黑破壞神、大話西遊、Chao Ji Ji Qi Ren | $5000/$5100/$5200/$5300 + $5101 toggle；copy protection read $5100/$5500 |
 | **173** | TXC 22211C | ❓ | 無測試 ROM | TXC chip copy-protection；$4100-$4103 accumulator + invert；$8000+ trigger output |
-| **176** | FK23C (Waixing) | ✅ | 12-in-1 / 3-in-1 ES-Q800C / 4-in-1 BS-8088 / 4-in-1 FK23Cxxxx S-0210A / 4-in-1 KT-220B 全數進選單 | MMC3 super-set 完整移植 Mesen2：5 PRG modes、MMC3/CNROM CHR、extended MMC3 mode (10 regs)、4-mode mirroring、$A001 WRAM config、IRQ 2-cycle delay、subtype 2 $46/$47 swap |
+| **176** | FK23C (Waixing) | ✅ | 12-in-1 / 3-in-1 ES-Q800C / 4-in-1 BS-8088 / 4-in-1 FK23Cxxxx S-0210A / 4-in-1 KT-220B 全數進選單 | MMC3 super-set 完整移植 Mesen2：5 PRG modes、MMC3/CNROM CHR、extended MMC3 mode (10 regs)、4-mode mirroring、$A001 WRAM config、IRQ 2-cycle delay、subtype 2 $46/$47 swap、32KB WRAM 4-bank remap ($6000-$7FFF + $4100-$5FFF) |
 
 ---
 
