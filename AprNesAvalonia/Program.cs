@@ -10,12 +10,15 @@ class Program
     public static int Main(string[] args)
     {
         // Headless mode: --rom / --perf → TestRunner (no GUI)
+        // EXCEPT when --gui-benchmark is present (GUI mode with auto-loaded ROM)
         bool headless = false;
+        bool guiBench = false;
         foreach (string a in args)
         {
-            if (a == "--rom" || a == "--perf")
-            { headless = true; break; }
+            if (a == "--gui-benchmark") { guiBench = true; }
+            else if (a == "--rom" || a == "--perf") { headless = true; }
         }
+        if (guiBench) headless = false;
 
         if (headless)
         {
@@ -24,28 +27,65 @@ class Program
             return TestRunner.Run(args);
         }
 
-        // GUI mode: honor --crt-strategy CLI flag (same syntax as TestRunner)
-        for (int i = 0; i < args.Length - 1; i++)
+        // GUI mode: parse CLI flags (subset of TestRunner's) for auto-config
+        for (int i = 0; i < args.Length; i++)
         {
-            if (args[i] == "--crt-strategy")
+            switch (args[i])
             {
-                string s = args[i + 1].ToLowerInvariant();
-                AprNes.NesCore.CrtBackend wanted = s switch
+                case "--crt-strategy" when i + 1 < args.Length:
                 {
-                    "scalar" => AprNes.NesCore.CrtBackend.Scalar,
-                    "simd"   => AprNes.NesCore.CrtBackend.Simd,
-                    "gpu"    => AprNes.NesCore.CrtBackend.Gpu,
-                    _        => AprNes.NesCore.Crt_GetBackend(),
-                };
-                AprNes.NesCore.Crt_SetBackend(wanted);
-
-                // Phase 3A: activate render-thread GPU path
-                if (wanted == AprNes.NesCore.CrtBackend.Gpu)
-                {
-                    AprNes.NesCore.CrtGpuRenderThreadActive = true;
-                    CrtGpuRenderThread.Init();
+                    string s = args[++i].ToLowerInvariant();
+                    AprNes.NesCore.CrtBackend wanted = s switch
+                    {
+                        "scalar" => AprNes.NesCore.CrtBackend.Scalar,
+                        "simd"   => AprNes.NesCore.CrtBackend.Simd,
+                        "gpu"    => AprNes.NesCore.CrtBackend.Gpu,
+                        _        => AprNes.NesCore.Crt_GetBackend(),
+                    };
+                    AprNes.NesCore.Crt_SetBackend(wanted);
+                    if (wanted == AprNes.NesCore.CrtBackend.Gpu)
+                    {
+                        AprNes.NesCore.CrtGpuRenderThreadActive = true;
+                        CrtGpuRenderThread.Init();
+                    }
+                    break;
                 }
-                break;
+                case "--gui-benchmark" when i + 1 < args.Length:
+                    if (int.TryParse(args[++i], out int secs)) GuiBenchmark.DurationSec = secs;
+                    break;
+                case "--rom" when i + 1 < args.Length:
+                    GuiBenchmark.RomPath = args[++i];
+                    break;
+                case "--analog":
+                    GuiBenchmark.AnalogEnabled = true;
+                    break;
+                case "--ultra-analog":
+                    GuiBenchmark.AnalogEnabled = true;
+                    GuiBenchmark.UltraAnalog = true;
+                    break;
+                case "--crt":
+                    GuiBenchmark.CrtEnabled = true;
+                    break;
+                case "--analog-size" when i + 1 < args.Length:
+                    if (int.TryParse(args[++i], out int sz)) GuiBenchmark.AnalogSize = sz;
+                    break;
+                case "--analog-output" when i + 1 < args.Length:
+                {
+                    string m = args[++i].ToUpperInvariant();
+                    GuiBenchmark.AnalogOutput = m switch
+                    {
+                        "RF"     => AprNes.AnalogOutputMode.RF,
+                        "SVIDEO" => AprNes.AnalogOutputMode.SVideo,
+                        _        => AprNes.AnalogOutputMode.AV,
+                    };
+                    break;
+                }
+                case "--audio-dsp":
+                    GuiBenchmark.AudioDsp = true;
+                    break;
+                case "--audio-mode" when i + 1 < args.Length:
+                    if (int.TryParse(args[++i], out int am)) GuiBenchmark.AudioMode = am;
+                    break;
             }
         }
 

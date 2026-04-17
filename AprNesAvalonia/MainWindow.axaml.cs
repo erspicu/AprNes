@@ -82,6 +82,47 @@ public partial class MainWindow : Window
         InitRecentROMs();
         UpdateMenuStates();
         UpdateRecordMenuVisibility();
+
+        // GUI benchmark auto-mode: load ROM, start timer, auto-close on expiry
+        if (GuiBenchmark.DurationSec > 0 && !string.IsNullOrEmpty(GuiBenchmark.RomPath))
+        {
+            GuiBenchmark.Trace("ctor: benchmark mode enabled");
+            // Re-apply benchmark CLI flags AFTER ApplyIniSettings so CLI wins
+            GuiBenchmark.ApplyOverrides();
+            Opened += (_, _) =>
+            {
+                GuiBenchmark.Trace("Opened fired");
+                Dispatcher.UIThread.Post(() =>
+                {
+                    GuiBenchmark.Trace($"UIThread.Post running; ROM exists={File.Exists(GuiBenchmark.RomPath)}");
+                    if (File.Exists(GuiBenchmark.RomPath))
+                    {
+                        LoadAndStartRom(GuiBenchmark.RomPath);
+                        GuiBenchmark.Trace("LoadAndStartRom returned");
+                        GuiBenchmark.Start();
+
+                        var timer = new DispatcherTimer
+                        {
+                            Interval = TimeSpan.FromSeconds(GuiBenchmark.DurationSec)
+                        };
+                        timer.Tick += (_, __) =>
+                        {
+                            GuiBenchmark.Trace("timer.Tick");
+                            timer.Stop();
+                            GuiBenchmark.Finish();
+                            Environment.Exit(0);
+                        };
+                        timer.Start();
+                        GuiBenchmark.Trace($"timer.Start (dur={GuiBenchmark.DurationSec}s)");
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine($"[GUI-BENCH] ROM not found: {GuiBenchmark.RomPath}");
+                        Environment.Exit(2);
+                    }
+                }, DispatcherPriority.Loaded);
+            };
+        }
     }
 
     // ═══ Settings ═══════════════════════════════════════════════════════════
@@ -548,6 +589,7 @@ public partial class MainWindow : Window
 
     private void OnFrameReady()
     {
+        GuiBenchmark.NotifyEmuFrame();
         // Hand the front buffer pointer to the control and request redraw.
         // Render Thread reads from front buffer via InstallPixels (zero-copy to GPU).
         // Emu Thread writes to back buffer — no contention.

@@ -50,6 +50,7 @@ public class EmuScreenControl : Control
 
         public void Render(ImmediateDrawingContext context)
         {
+            GuiBenchmark.NotifyRenderFrame();
             try
             {
                 var leaseFeature = context.TryGetFeature<ISkiaSharpApiLeaseFeature>();
