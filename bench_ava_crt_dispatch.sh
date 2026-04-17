@@ -3,11 +3,24 @@
 # Compares CrtImpl=Scalar vs CrtImpl=Simd on the same machine under locked-frequency.
 #
 # Fixed condition:
-#   --ultra-analog --analog-size 8 --analog-output RF --audio-dsp --audio-mode 2 --crt --accuracy A
+#   --ultra-analog --analog-size ${ANALOG_SIZE} --analog-output RF --audio-dsp --audio-mode 2 --crt --accuracy A
 #
 # 3-run protocol: discard JIT-warmup (Run 1) → avg(Run 2, Run 3)
+#
+# Usage:
+#   bash bench_ava_crt_dispatch.sh               # default 8x
+#   bash bench_ava_crt_dispatch.sh --size 4      # 4x
 
 set -e
+
+# ── Parse args ──
+ANALOG_SIZE=8
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --size) ANALOG_SIZE="$2"; shift 2 ;;
+        *) shift ;;
+    esac
+done
 
 # ── Config ──
 EXE="AprNesAvalonia/bin/Release/net10.0/AprNesAvalonia.exe"
@@ -16,7 +29,7 @@ DURATION=20
 JIT_DURATION=10
 COOLDOWN=30
 DATE=$(date +%Y-%m-%d)
-OUTFILE="MD/PerformanceWithAV/CRT_Dispatch_Baseline_${DATE}.md"
+OUTFILE="MD/PerformanceWithAV/CRT_Dispatch_Baseline_${ANALOG_SIZE}x_${DATE}.md"
 
 mkdir -p "$(dirname "$OUTFILE")"
 
@@ -31,7 +44,7 @@ run_bench() {
     local OUT
     OUT=$("$EXE" \
         --rom "$ROM" --benchmark "$DUR" \
-        --ultra-analog --analog-output RF --analog-size 8 --crt \
+        --ultra-analog --analog-output RF --analog-size "$ANALOG_SIZE" --crt \
         --accuracy A \
         --audio-dsp --audio-mode 2 2>&1)
     local FPS
@@ -52,7 +65,7 @@ for IMPL in Scalar Simd; do
     echo ""
 
     echo "============================================================"
-    echo "  Benchmark: CrtImpl=${IMPL}  (ultra 8x RF, DSP mode 2)"
+    echo "  Benchmark: CrtImpl=${IMPL}  (ultra ${ANALOG_SIZE}x RF, DSP mode 2)"
     echo "============================================================"
 
     # Run 1: JIT warmup
@@ -93,8 +106,11 @@ echo "=== Generating report: $OUTFILE ==="
 
 CPU_INFO=$(wmic cpu get name 2>/dev/null | tail -n +2 | head -1 | tr -d '\r' | sed 's/^ *//;s/ *$//' || echo "Unknown CPU")
 
+W=$((256 * ANALOG_SIZE))
+H=$((210 * ANALOG_SIZE))
+
 cat > "$OUTFILE" << MDEOF
-# AprNesAvalonia CRT Dispatch Baseline — ${DATE}
+# AprNesAvalonia CRT Dispatch Baseline (${ANALOG_SIZE}x) — ${DATE}
 
 **測試目的**：量測 Phase 0 的 MSBuild \`CrtImpl\` 切換下，Scalar 與 SIMD 兩條 CRT 管線 baseline FPS。電腦目前為**鎖頻狀態**，過往 MEMORY.md 中的數字已不適用，本檔為新基準。
 
@@ -111,7 +127,7 @@ cat > "$OUTFILE" << MDEOF
 | AnalogMode | ON + UltraAnalog (Level 3 物理路徑) |
 | CRT | ON (Stage 2 電子束光學) |
 | AnalogOutput | RF |
-| AnalogSize | 8x (2048×1680) |
+| AnalogSize | ${ANALOG_SIZE}x (${W}×${H}) |
 | **Audio DSP** | Mode 2 (Modern: 5×FIR + Bass Boost + Stereo + Haas + Reverb) |
 | 音效播放 | OFF (DSP 處理完後丟棄，不經 WaveOut) |
 | 畫面顯示 | OFF (headless) |
