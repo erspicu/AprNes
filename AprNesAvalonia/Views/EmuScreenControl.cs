@@ -68,7 +68,7 @@ public class EmuScreenControl : Control
                     AprNes.NesCore.CrtGpuRenderThreadActive &&
                     CrtGpuRenderThread.IsReady)
                 {
-                    CrtGpuRenderThread.Render(canvas, dstRect);
+                    CrtGpuRenderThread.Render(canvas, lease.GrContext, dstRect);
                     return;
                 }
 

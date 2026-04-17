@@ -30,9 +30,11 @@ internal static unsafe class CrtGpuRenderThread
     const int SrcH = 240;
 
     // Phosphor ping-pong lives on render thread (separate from CrtScreenGpu).
-    // _prevSurface holds previous rendered output; _prevImage is cached shader handle.
+    // _prevSurface holds previous rendered output. Allocated GPU-backed when
+    // possible (via GRContext from the lease), raster fallback otherwise.
     static SKSurface? _prevSurface;
     static int _prevW, _prevH;
+    static bool _prevIsGpu;
 
     public static void Init()
     {
@@ -57,12 +59,22 @@ internal static unsafe class CrtGpuRenderThread
 
     public static bool IsReady => _effect != null && _inputBitmap != null;
 
-    static void EnsurePrevSurface(int w, int h)
+    static void EnsurePrevSurface(GRContext? grContext, int w, int h)
     {
-        if (_prevSurface != null && _prevW == w && _prevH == h) return;
+        bool wantGpu = grContext != null;
+        if (_prevSurface != null && _prevW == w && _prevH == h && _prevIsGpu == wantGpu) return;
         _prevSurface?.Dispose();
         var info = new SKImageInfo(w, h, SKColorType.Bgra8888, SKAlphaType.Opaque);
-        _prevSurface = SKSurface.Create(info);
+        if (grContext != null)
+        {
+            _prevSurface = SKSurface.Create(grContext, false, info);  // GPU-backed
+            _prevIsGpu = true;
+        }
+        else
+        {
+            _prevSurface = SKSurface.Create(info);                     // raster fallback
+            _prevIsGpu = false;
+        }
         _prevSurface!.Canvas.Clear(SKColors.Black);
         _prevSurface.Canvas.Flush();
         _prevW = w; _prevH = h;
@@ -72,7 +84,7 @@ internal static unsafe class CrtGpuRenderThread
     /// Render CRT shader to the provided GPU canvas over the given destination
     /// rectangle. Called from Avalonia's render thread after leasing SkCanvas.
     /// </summary>
-    public static void Render(SKCanvas canvas, SKRect dstRect)
+    public static void Render(SKCanvas canvas, GRContext? grContext, SKRect dstRect)
     {
         if (!IsReady) return;
         if (linearBuffer == null) return;
@@ -81,7 +93,7 @@ internal static unsafe class CrtGpuRenderThread
         int dstH = (int)dstRect.Height;
         if (dstW <= 0 || dstH <= 0) return;
 
-        EnsurePrevSurface(dstW, dstH);
+        EnsurePrevSurface(grContext, dstW, dstH);
 
         // ── Stage 1: quantize linearBuffer → Bgra8888 input ──
         float* lbR = linearBuffer;
@@ -104,11 +116,11 @@ internal static unsafe class CrtGpuRenderThread
         using var inputShader = SKShader.CreateBitmap(
             _inputBitmap,
             SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
-
-        // Phase 3A diagnosis: phosphor writeback to raster prev surface was
-        // dominating cost. Bind a transparent-black dummy for uPrev and set
-        // uPhosphorDecay=0 so the shader's phosphor branch becomes a no-op.
-        using var prevShader = SKShader.CreateColor(SKColors.Black);
+        // Phosphor prev: when _prevSurface is GPU-backed, Snapshot is a GPU
+        // image → shader sampling stays on GPU (no raster fallback).
+        using var prevImage  = _prevSurface!.Snapshot();
+        using var prevShader = prevImage.ToShader(
+            SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
 
         // ── Stage 3: uniforms ──
         var uniforms = new SKRuntimeEffectUniforms(_effect!);
@@ -129,7 +141,7 @@ internal static unsafe class CrtGpuRenderThread
         uniforms["uCurvature"] = CurvatureStrength;
         uniforms["uConvergence"] = ConvergenceStrength;
         uniforms["uHBlurAlpha"] = HBeamSpread * 0.5f;
-        uniforms["uPhosphorDecay"] = 0f;   // Phase 3A: phosphor disabled until GPU prev surface
+        uniforms["uPhosphorDecay"] = PhosphorDecay;
 
         var children = new SKRuntimeEffectChildren(_effect!);
         children["uScreen"] = inputShader;
@@ -145,7 +157,16 @@ internal static unsafe class CrtGpuRenderThread
         canvas.DrawRect(0, 0, dstW, dstH, paint);
         canvas.Restore();
 
-        // ── Stage 5: (phosphor writeback removed — see Stage 2 comment) ──
+        // ── Stage 5: update phosphor history ──
+        // Re-render shader into _prevSurface (GPU-backed when grContext != null).
+        // Cost: one additional shader pass, but on GPU — no CPU raster pipeline.
+        if (PhosphorDecay > 0.001f)
+        {
+            var prevCanvas = _prevSurface.Canvas;
+            prevCanvas.Clear(SKColors.Black);
+            prevCanvas.DrawRect(0, 0, dstW, dstH, paint);
+            prevCanvas.Flush();
+        }
     }
 
     public static void Dispose()
