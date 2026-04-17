@@ -1,25 +1,41 @@
-# AprNes Avalonia — CRT GPU 加速設計
+# AprNes Avalonia — CRT GPU 加速設計（v2 修訂版）
 
 日期：2026-04-17
 適用專案：`AprNesAvalonia/`（Avalonia 11.3.13 + SkiaSharp 2.88.9 + .NET 10）
-狀態：**設計階段，尚未實作**
+狀態：**設計定案，等候動工**
+
+---
+
+## 0. 設計決策確認（來自使用者）
+
+| # | 決策 | 說明 |
+|:-:|------|------|
+| 1 | **v1 跳過 NTSC 合成** | 簡化 MVP，NTSC 延後到 v3 |
+| 2 | **Fallback 走 SIMD** | GPU 建立失敗（shader 編譯錯、GPU 不可用）自動切 `CrtImpl = Simd` |
+| 3 | **Shader 從檔案讀取** | 不硬編字串；新增 `AprNesAvalonia/Shaders/` 目錄放 `.sksl` 檔 |
+| 4 | **Phosphor decay v1 必備** | CPU 純量與 SIMD 都已實作（`CrtScreen.cs:63`、`CrtScreen.Simd.cs:87`）；GPU 版 v1 必須跟上 |
+| 5 | **Headless mode 要支援 GPU** | Skia runtime effect 在無視窗環境也能以 CPU rasterizer 執行，保 deterministic；真 GPU 在 headless 為 v2 目標 |
+| 6 | **動態派發機制** | 新設計：各重運算階段可獨立選 Scalar / SIMD / GPU，透過 config + capability detection 動態分配 |
 
 ---
 
 ## 1. 目的與定位
 
 ### 為什麼做
-目前 CRT 模擬（scanline / shadow mask / horizontal blur / phosphor decay / convergence / barrel distortion）在 CPU SIMD（`CrtScreen.Simd.cs`，`Vector256<T>` / AVX2）上執行，4x 解析度時仍佔用顯著 CPU 時間（參考 MEMORY.md：DSP Mode 2 4x 僅 82.65 FPS vs 無 DSP 109.59 FPS，CRT 佔 ~25% 幀時間）。用 GPU fragment shader 執行可：
+目前 CRT 模擬（scanline / shadow mask / horizontal blur / phosphor decay / convergence / barrel distortion）在 CPU SIMD（`CrtScreen.Simd.cs`，`Vector256<T>` / AVX2）上執行，4x 解析度時仍佔用顯著 CPU 時間（MEMORY.md：DSP Mode 2 4x 僅 82.65 FPS）。用 GPU fragment shader 可：
 
 - 釋放 CPU（騰出給 emulator core / APU / mapper）
-- 隨解析度擴張近乎免費（fragment 平行度 >> AVX2 lane 數）
-- 未來可做 NTSC 合成（per-dot 1D composite 訊號）在 CPU 上代價高，GPU 更適合
+- 隨輸出解析度擴張近乎免費（fragment 平行度 >> AVX2 lane 數）
+- 未來 NTSC 合成（per-dot 1D composite 訊號）在 GPU 更自然
 
-### 保留既有實作
-**不動** `CrtScreen.cs`（純量 baseline）與 `CrtScreen.Simd.cs`（SIMD 版）。GPU 是**第三條路**，實驗性質，風險隔離。Runtime config 切換：
-- `CrtImpl = Cpu` — 純量（net48 相容）
-- `CrtImpl = Simd` — .NET 10 SIMD（目前預設）
-- `CrtImpl = Gpu` — **新增**，Avalonia only
+### 三條路並存
+| Impl | 依賴 | 用途 |
+|------|------|------|
+| `Scalar` | 純 C#，net48 相容 | 最低相容性、WinForms 版保留 |
+| `Simd`（現役）| `Vector256<T>` / AVX2，.NET 10 | 生產預設 |
+| `Gpu`（新增）| SkiaSharp `SKRuntimeEffect`，Avalonia only | 實驗性，性能為主 |
+
+**不動** `CrtScreen.cs`、`CrtScreen.Simd.cs`。GPU 是 Avalonia 專屬的第三條路。
 
 ---
 
@@ -28,269 +44,387 @@
 | 層 | 技術 | 說明 |
 |----|------|------|
 | Host | Avalonia 11.3.13 | 已整合 |
-| 繪圖 | SkiaSharp 2.88.9 | 已作為 Avalonia backend |
+| 繪圖 | SkiaSharp 2.88.9 | Avalonia 內建 backend |
 | Shader | **SkSL**（SkiaSharp Shading Language）| `SKRuntimeEffect.CreateShader` |
 | 橋接 | `ISkiaSharpApiLeaseFeature` | 已用於 `EmuScreenControl.EmuDrawOperation` |
 | 資料 | `SKBitmap.InstallPixels` + `SKSurface` ping-pong | NES 輸入仍 zero-copy |
 
 ### SkSL 能力與限制
-- ✅ Fragment shader（`half4 main(float2 coord)`）
-- ✅ 多個 sampler（`uniform shader childTex`）
-- ✅ 純量 / vec2-4 uniform
-- ✅ 靜態分支、靜態展開迴圈
-- ❌ 無 compute shader、無 structured buffer
-- ❌ 動態長度迴圈要小心（用常數邊界）
-- ❌ 沒有 `textureLod` 細部控制 — 用 `child.eval(coord)` 搭配 `SKShaderTileMode`
+- ✅ Fragment shader（`half4 main(float2 coord)`）、多個 `uniform shader` child、`uniform` 純量 / vec2-4
+- ✅ Skia 在有 GPU 時走 GPU、無 GPU 時用 CPU rasterizer 執行 runtime effect（headless 可用）
+- ❌ 無 compute shader / structured buffer
+- ❌ 動態長度迴圈受限（常數邊界）
 
 ---
 
-## 3. 現有 CRT Pipeline 重點（CPU 版）
+## 3. 現有 CRT Pipeline（CPU 版）重點
 
 流程摘要（`CrtScreen.Simd.cs`）：
 ```
 NES 256x240 RGB
   ↓ (optional) NTSC Ntsc_FlushPendingRows → 1024x240 YIQ float
   ↓ Crt_Render (Parallel.For scanline)
-    - scanline 權重（垂直 sin/triangular）
-    - horizontal blur (RF/SVideo 模式)
-    - gamma + brightness boost（per AnalogOutput）
-    - mask（aperture grille / shadow mask LUT）
-    - phosphor decay（frame blend with _prevFrame）
-    - convergence（RGB sub-pixel 位移）
-    - curvature（barrel/pincushion，precomputed LUT）
+    - scanline 權重
+    - horizontal blur (RF/SVideo)
+    - gamma + brightness boost
+    - mask（aperture grille / shadow mask）
+    - phosphor decay（frame blend with _prevFrame，已實作）
+    - convergence
+    - curvature（barrel/pincushion LUT）
   ↓ uint* ARGB (up to 1024x840)
 送 Avalonia zero-copy path
 ```
 
-**關鍵參數**（需作為 SkSL uniform）：
-- `AnalogSize`（2/4/6/8x）
-- `AnalogOutput`（AV/SVideo/RF）
-- `MaskType`（None / ApertureGrille / ShadowMask）
-- `ScanlineStrength`、`Gamma`、`Brightness`、`Curvature`、`Convergence`
-- NTSC：`UltraAnalog`、`HueOffset`、`SaturationBoost`
+所有參數（`PhosphorDecay`、`ScanlineStrength`、`Gamma`、`Brightness`、`Convergence`、`Curvature`、`MaskType`、`AnalogOutput`、`AnalogSize`）都要能映射成 SkSL uniforms。
 
 ---
 
-## 4. GPU 版 Pipeline 設計
+## 4. 分階段 GPU Pipeline
 
 ### 總體策略：**分階段推進**
-v1 先做單一 fragment pass 覆蓋大部分 CRT 效果；NTSC 與 blur 分別為 v2、v3。
 
 ```
 v1 (MVP)              v2 (多 Pass)            v3 (NTSC)
 ============          ==============          ==============
 [NES 256x240]         [NES 256x240]           [NES 256x240]
     ↓                     ↓                        ↓
- CRT.sksl            ntsc_composite.sksl     ntsc_modulate.sksl
-(單 pass)             (256→1024 YIQ→RGB)     (YIQ 1D signal)
-    ↓                     ↓                        ↓
- [畫面]              hblur.sksl              ntsc_demod.sksl
-                     (separable gauss)       (phase-aware decode)
-                         ↓                        ↓
-                     crt_core.sksl            hblur.sksl
-                     (mask/scan/etc)              ↓
-                         ↓                    crt_core.sksl
-                     [畫面]                       ↓
-                                               [畫面]
+ crt_core.sksl        hblur.sksl              ntsc_modulate.sksl
+(單 pass，含           (separable gauss)       (composite 訊號)
+ phosphor)               ↓                        ↓
+    ↓                crt_core.sksl            ntsc_demod.sksl
+ [畫面]                   ↓                    (YIQ→RGB)
+                     [畫面]                        ↓
+                                             hblur.sksl
+                                                  ↓
+                                             crt_core.sksl
+                                                  ↓
+                                              [畫面]
 ```
 
-### v1 MVP — 單 Pass CRT Core
+### v1 MVP 必備功能
+- scanline 調變
+- mask（aperture grille / shadow mask）
+- gamma + brightness
+- convergence（RGB sub-pixel 位移）
+- barrel curvature
+- **phosphor decay**（ping-pong `SKSurface`）
 
-**Pass**：一個 SkSL fragment shader
-**輸入**：
-- `uniform shader uScreen`：NES 256×240 RGB（`SKBitmap.InstallPixels` zero-copy）
-- `uniform shader uPrevFrame`：上一幀完整畫面（for phosphor decay；首幀為全黑）
-- `uniform float2 uResolution`：輸出像素尺寸
-- `uniform float2 uInputSize`：256, 240
-- `uniform float uScanlineStrength, uGamma, uBrightness, uCurvature`
-- `uniform float3 uConvergenceOffset`：RGB 偏移（pixel 單位）
-- `uniform int uMaskType`：0/1/2
-- `uniform float uPhosphorDecay`：0..1
+### v1 不做
+- horizontal blur（v2）
+- NTSC 合成（v3）
+- 多 pass（v2 起）
 
-**輸出**：fragment ARGB，直接交給 Avalonia 的 `canvas`
+---
 
-**演算法大綱**（偽 SkSL）：
-```glsl
-half4 main(float2 fragCoord) {
-    // 1. UV 轉換 + 曲面變形
-    float2 uv = fragCoord / uResolution;
-    uv = barrel(uv, uCurvature);                 // 1-2 乘加
-    if (any(uv < 0) || any(uv > 1)) return 0;    // 螢幕外黑邊
+## 5. 檔案式 Shader 載入機制
 
-    // 2. 取樣 NES 原始像素（含 convergence 分色）
-    float2 nesUV = uv * uInputSize;
-    half3 rgb;
-    rgb.r = uScreen.eval(nesUV + uConvergenceOffset.xy * vec2(1, 0)).r;
-    rgb.g = uScreen.eval(nesUV).g;
-    rgb.b = uScreen.eval(nesUV - uConvergenceOffset.zz * vec2(1, 0)).b;
+### 目錄結構
+```
+AprNesAvalonia/
+  Shaders/
+    crt_core_v1.sksl      # v1 MVP 單 pass
+    hblur.sksl            # v2
+    ntsc_modulate.sksl    # v3
+    ntsc_demod.sksl       # v3
+    shadow_mask_lut.sksl  # v2 可選（shadow mask 查表）
+```
 
-    // 3. Scanline 垂直強度調變
-    float scanY = fract(uv.y * uInputSize.y);
-    float scan = mix(1.0, 0.5 + 0.5 * sin(scanY * 3.14159),
-                     uScanlineStrength);
-    rgb *= scan;
+### MSBuild 整合
+`AprNesAvalonia.csproj` 加：
+```xml
+<ItemGroup>
+  <None Include="Shaders\**\*.sksl">
+    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+  </None>
+</ItemGroup>
+```
 
-    // 4. Mask（aperture grille / shadow mask）
-    int mx = int(fragCoord.x) % 3;
-    half3 maskRGB;
-    if (uMaskType == 1) {
-        // aperture grille: column-based RGB stripe
-        maskRGB = (mx == 0) ? half3(1, 0.3, 0.3)
-                : (mx == 1) ? half3(0.3, 1, 0.3)
-                :             half3(0.3, 0.3, 1);
-    } else if (uMaskType == 2) {
-        // shadow mask: 2D pattern
-        int my = int(fragCoord.y) % 2;
-        maskRGB = shadowMaskLut(mx, my);
-    } else {
-        maskRGB = half3(1);
+執行期路徑：`{AppContext.BaseDirectory}/Shaders/crt_core_v1.sksl`
+
+### `ShaderLoader` 類別
+```csharp
+static class ShaderLoader {
+    static readonly Dictionary<string, SKRuntimeEffect> _cache = new();
+    static readonly string _shaderDir = Path.Combine(AppContext.BaseDirectory, "Shaders");
+
+    public static SKRuntimeEffect Load(string fileName) {
+        if (_cache.TryGetValue(fileName, out var eff)) return eff;
+        string path = Path.Combine(_shaderDir, fileName);
+        string src = File.ReadAllText(path);
+        eff = SKRuntimeEffect.CreateShader(src, out string errors);
+        if (eff == null)
+            throw new InvalidOperationException($"Shader compile failed [{fileName}]: {errors}");
+        _cache[fileName] = eff;
+        return eff;
     }
-    rgb *= maskRGB;
 
-    // 5. Gamma + brightness
-    rgb = pow(rgb, half3(uGamma));
-    rgb *= uBrightness;
-
-    // 6. Phosphor decay（與上一幀 blend）
-    half3 prev = uPrevFrame.eval(fragCoord).rgb;
-    rgb = mix(rgb, prev, uPhosphorDecay);
-
-    return half4(rgb, 1);
+    public static void Reset() {
+        foreach (var e in _cache.Values) e.Dispose();
+        _cache.Clear();
+    }
 }
 ```
 
-### v2 — 多 Pass（加上 horizontal blur）
-- 產生中繼 `SKSurface`（同輸出尺寸）
-- Pass 1：blur（分離式 Gaussian，3-5 tap）→ mid surface
-- Pass 2：讀 mid surface，執行 v1 核心 → 畫面
-
-### v3 — NTSC 合成模擬
-- Per-scanline 256 → 1024 複合訊號重建
-- Composite phase modulation（`sin/cos(2πf·x + phase)`）
-- Low-pass filter demodulation
-- 最重階段；僅在 `UltraAnalog=true` 時啟用
-- 可選用 raster scanline 逐列呼叫 shader，或單 pass 2D 處理
+### Hot reload（開發時期，stretch goal）
+`FileSystemWatcher` 監聽 `Shaders/*.sksl`，檔案變更呼叫 `ShaderLoader.Reset()`，下一次 Render 重編。Release build 關閉。
 
 ---
 
-## 5. 與 Avalonia 整合的具體作法
+## 6. 動態派發機制（核心新設計）
+
+### 動機
+不同硬體、不同使用情境下，最適策略不同：
+- 老 CPU + 好 GPU → Gpu
+- 新 CPU 無 GPU 或虛擬機 → Simd
+- 極度相容性需求（.NET Framework、headless deterministic） → Scalar
+
+不只 CRT core，未來 NTSC encode、horizontal blur、phosphor decay 都有可能各自選不同實作。所以派發機制要設計成 **per-stage 可獨立挑選**。
+
+### 核心抽象
+```csharp
+public enum PipelineStrategy { Scalar, Simd, Gpu }
+
+public interface ICrtStage : IDisposable {
+    PipelineStrategy Strategy { get; }
+    bool IsAvailable();                  // 硬體 / 函式庫 capability check
+    void Execute(CrtStageContext ctx);
+}
+
+public class CrtStageContext {
+    public IntPtr InputPtr;              // NES/前段輸出
+    public int InputW, InputH;
+    public IntPtr OutputPtr;             // CPU 路徑輸出
+    public SKSurface? GpuTarget;         // GPU 路徑輸出
+    public SKRect DstRect;
+    public CrtParams Params;             // uniforms 打包（strength、gamma...）
+    public FrameState Frame;             // _prevFrame / _prevSurface 等
+}
+```
+
+### 派發器
+```csharp
+public class CrtPipeline : IDisposable {
+    ICrtStage _crtCore;
+
+    public void Configure(CrtConfig cfg) {
+        _crtCore = TryCreate(cfg.CoreStrategy, cfg)
+                ?? TryCreate(PipelineStrategy.Simd, cfg)   // fallback #1
+                ?? TryCreate(PipelineStrategy.Scalar, cfg); // fallback #2
+    }
+
+    static ICrtStage? TryCreate(PipelineStrategy s, CrtConfig cfg) {
+        try {
+            ICrtStage stage = s switch {
+                PipelineStrategy.Gpu    => new CrtCoreStage_Gpu(cfg),
+                PipelineStrategy.Simd   => new CrtCoreStage_Simd(cfg),
+                PipelineStrategy.Scalar => new CrtCoreStage_Scalar(cfg),
+                _ => throw new ArgumentException(),
+            };
+            if (!stage.IsAvailable()) { stage.Dispose(); return null; }
+            return stage;
+        } catch (Exception ex) {
+            Log($"[CrtPipeline] {s} init failed: {ex.Message}");
+            return null;
+        }
+    }
+}
+```
+
+### Capability Detection
+`CrtCoreStage_Gpu.IsAvailable()` 檢查：
+1. SkiaSharp 版本 ≥ 2.88 （已預設）
+2. `SKRuntimeEffect.CreateShader` 能編出最簡 shader（執行期 smoke test）
+3. Shaders 目錄存在且至少有一個 `.sksl`
+
+`CrtCoreStage_Simd.IsAvailable()` 檢查：
+- `Avx2.IsSupported` 或 `Vector.IsHardwareAccelerated && Vector<float>.Count >= 8`
+
+`CrtCoreStage_Scalar.IsAvailable()` 恆 true。
+
+### Config 設計
+`AprNes.ini` 新增：
+```ini
+[CRT]
+CoreStrategy=Auto            ; Auto | Scalar | Simd | Gpu
+AutoPolicy=PreferGpu         ; PreferGpu | PreferSimd | PreferScalar
+; per-stage override（可選，未來擴充）
+; BlurStrategy=Gpu
+; PhosphorStrategy=Gpu
+```
+
+`Auto` 模式展開規則（由 `PolicyResolver`）：
+| AutoPolicy | 選擇順序 |
+|------------|---------|
+| PreferGpu（預設）| Gpu → Simd → Scalar |
+| PreferSimd | Simd → Gpu → Scalar |
+| PreferScalar | Scalar（僅相容性測試用）|
+
+UI：`AnalogConfigWindow` 新增下拉選單「CRT 實作：Auto / Scalar / SIMD / GPU」+ 小字說明當前實際選到的策略。
+
+### 執行期策略切換
+- Config 存檔後 → `CrtPipeline.Configure()` 重新執行（丟棄舊 stage，重建新的）
+- 避免 mid-frame 切換；在下一幀 begin 之前套用
+
+---
+
+## 7. Phosphor Decay（v1 必備）
+
+### CPU 版現況
+`CrtScreen.cs:63` 宣告 `PhosphorDecay = 0.15f`，`_prevFrame` uint\* buffer；`SWAR` 實作於 `ProcessRowPhosphor_SWAR`。SIMD 版等同設計（`CrtScreen.Simd.cs:87/117`）。
+
+### GPU 版設計
+- `_prevSurface` 持有 `SKSurface`（尺寸同輸出）
+- 每幀 Render 序：
+  1. Begin frame → target canvas
+  2. Fragment shader 讀 `uPrev`（前幀 surface snapshot）+ `uScreen`（NES 原始）
+  3. 輸出 blend 結果到 canvas
+  4. `canvas.Snapshot()` 結果 → 複製到 `_prevSurface`（下幀 `uPrev`）
+- Resize / strategy 切換時 → 重建 `_prevSurface` 並清零（與 CPU 版 `_prevFrameValid = false` 同語義）
+
+### 首幀處理
+`_prevSurface` 為全黑 → phosphor blend 結果 = 當幀 × (1 − decay)，與 CPU 版 `!_prevFrameValid` 首幀行為一致。
+
+---
+
+## 8. Headless GPU 支援
+
+### 為什麼可行
+Skia 的 `SKRuntimeEffect` 在 **有 GPU context 時走 GPU，無 GPU context 時 fallback 到 CPU rasterizer**。TestRunner / 無頭模式沒有視窗，Skia 仍可 create `SKSurface` on CPU backend，shader 於 CPU 執行 — 結果 deterministic。
+
+### 預期副作用
+- Headless 下 GPU 路徑不加速（同 CPU runtime effect 性能，約與純量相近）
+- 但仍可做 **shader 正確性驗證**：CI 截圖比對 SIMD 與 GPU 的像素差
+- 真正的 GPU 加速在 headless 要用 off-screen GPU context（v2 目標）
+
+### TestRunner 對應
+```csharp
+// TestRunner 初始化時
+CrtConfig cfg = new() { CoreStrategy = PipelineStrategy.Gpu };  // 允許 GPU
+// 若 headless 環境偵測失敗，Configure() 會 fallback 到 Simd
+```
+
+不再強制 TestRunner 走 Scalar/Simd；讓 strategy 自然 resolve。
+
+### Determinism 策略
+headless Skia CPU rasterizer 在同一版本 Skia + 同平台下 bit-exact；跨平台容差 ±1/255。比對時採容差 diff 而非 exact match。
+
+---
+
+## 9. 與 Avalonia 整合的具體作法
 
 ### 現況
 `AprNesAvalonia/Views/EmuScreenControl.cs`：
-- 已用 `ISkiaSharpApiLeaseFeature` → `SKCanvas`
-- 用 `SKBitmap.InstallPixels` 零拷貝 NES 畫面
-- 用 `canvas.DrawBitmap` 配 `SKFilterQuality.Low` 做放大
+- 用 `ISkiaSharpApiLeaseFeature` → `SKCanvas`
+- `SKBitmap.InstallPixels` 零拷貝 NES 畫面
+- `canvas.DrawBitmap` + `SKFilterQuality.Low`
 
-### 新增 GPU path
-1. **抽象層**：新增 `IEmuRenderer` 介面
+### 重構
+1. `IEmuRenderer` 介面：
    ```csharp
-   interface IEmuRenderer {
+   interface IEmuRenderer : IDisposable {
        void Render(SKCanvas canvas, IntPtr framePtr, int w, int h, SKRect dst);
-       void Dispose();
    }
    ```
-2. **實作兩個版本**：
-   - `BitmapBlitRenderer` — 包 `canvas.DrawBitmap`（現狀）
-   - `CrtGpuRenderer` — 新增，持有 `SKRuntimeEffect`、`_prevSurface`
-3. **EmuScreenControl** 持有 `IEmuRenderer`，依 config 切換
-4. `CrtGpuRenderer.Render()` 內部：
-   ```csharp
-   // 建 SKBitmap 指向 NES 原始像素（zero-copy）
-   // 建 child shader: nesShader = bmp.ToShader()
-   // 建 uniforms dictionary
-   // effect.ToShader(uniforms, children) → SKShader
-   // paint.Shader = shader; canvas.DrawRect(dst, paint)
-   // 將本幀結果拷到 _prevSurface（snapshot）供下幀 phosphor
-   ```
+2. 兩種實作：
+   - `BitmapBlitRenderer` ← 現狀（非 analog 模式）
+   - `CrtRenderer` ← analog 模式（內部包 `CrtPipeline`，動態派發 CPU/GPU）
+3. `EmuScreenControl` 依 `CrtMode (off/on)` 動態選 renderer
+4. Resize 偵測 → 通知 `CrtPipeline.Resize()` → 重建 GPU surfaces
 
-### Shader 檔案組織
-`AprNesAvalonia/Shaders/` 新增目錄：
-- `crt_core_v1.sksl`（v1 單 pass）
-- `hblur.sksl`（v2）
-- `ntsc_composite.sksl`、`ntsc_demod.sksl`（v3）
-- 以 `EmbeddedResource` 方式打包進 DLL，或純字串常數（看 SKRuntimeEffect API 哪個順手）
-
-### Fallback
-- `SKRuntimeEffect.CreateShader` 失敗（older GPU / software Skia）→ log warning、切回 SIMD path
-- 測試 exe 截圖模式（TestRunner）強制用 CPU path 以保證 deterministic
+### Shader 打包驗證
+Build 完成後，`bin/Debug/net10.0/Shaders/crt_core_v1.sksl` 應存在並可讀。
 
 ---
 
-## 6. 實作步驟（里程碑）
+## 10. 實作步驟（里程碑）
 
 ### M0 — 基礎骨架（0.5 天）
-- [ ] 新增 `MD/gpu/` 目錄（本文件）
-- [ ] 建立 `AprNesAvalonia/Shaders/` 目錄
-- [ ] 新增 `IEmuRenderer` 介面與現況 `BitmapBlitRenderer` 重構
-- [ ] Config 新增 `CrtImpl` 列舉 + UI toggle（`AnalogConfigWindow`）
+- [ ] 新增 `AprNesAvalonia/Shaders/` 目錄 + `crt_core_v1.sksl` 空檔
+- [ ] `.csproj` 加 `<None>` + `CopyToOutputDirectory=PreserveNewest`
+- [ ] `ShaderLoader` 類別（含快取、錯誤訊息）
+- [ ] `IEmuRenderer` + `BitmapBlitRenderer` 介面重構
+- [ ] `ICrtStage` / `CrtPipeline` / `PipelineStrategy` 列舉
+- [ ] Config 讀寫 `CoreStrategy` + `AutoPolicy`
+- [ ] `AnalogConfigWindow` 下拉選單 + 顯示實際生效策略
 
-### M1 — 最小 GPU Pass（1 天）
-- [ ] 寫最簡 SkSL：僅放大（等於現況但走 runtime effect）
-- [ ] `CrtGpuRenderer` 骨架：建 effect、uniforms、child shader、Render
-- [ ] 畫面正確顯示（與 CPU path 視覺一致）
-- [ ] 手動切換測試（config → GPU 跟 CPU 互切不當機）
+### M1 — GPU 最小可驗證 shader（1 天）
+- [ ] `crt_core_v1.sksl` 內容：僅做 UV 取樣 + gamma（其他關閉）
+- [ ] `CrtCoreStage_Gpu`：建 effect、bind `uScreen` child、執行單 pass
+- [ ] `CrtCoreStage_Simd` 包 `Crt_Render` 方法（橋接現有 SIMD code）
+- [ ] `CrtCoreStage_Scalar` 包 `CrtScreen.cs` 的 `Crt_Render`
+- [ ] 三條路畫面肉眼等效（差異在 gamma 誤差容忍內）
 
-### M2 — CRT 核心（1-2 天）
-- [ ] SkSL 加入：scanline、mask（aperture grille）、gamma、brightness、convergence、barrel curvature
-- [ ] Uniform 全數暴露並連到 config
-- [ ] 與 SIMD path 視覺比對（diff 像素 < 2% 容忍）
-- [ ] Benchmark vs SIMD：目標 ≥ 2x FPS 提升在 4x/6x
+### M2 — 派發器與 fallback（0.5 天）
+- [ ] `PolicyResolver`：Auto → 依 capability 決定
+- [ ] `CrtPipeline.Configure` fallback 鏈完整（Gpu 失敗自動退 Simd）
+- [ ] Log strategy 選擇結果到 console
+- [ ] 手動強制 config 指定 Gpu，若硬體不支援 → 自動降級不當機
 
-### M3 — Phosphor Decay（0.5 天）
-- [ ] Ping-pong `SKSurface`（上一幀 snapshot）
-- [ ] Child shader `uPrevFrame` 連線
-- [ ] 首幀預設黑
-- [ ] 視覺驗證拖影感與 CPU path 一致
+### M3 — CRT 核心 shader 完整化（1-2 天）
+- [ ] `crt_core_v1.sksl` 加：scanline、mask (aperture grille)、brightness、convergence、barrel curvature
+- [ ] Uniform 全數連到 `CrtParams`
+- [ ] 與 Simd 輸出逐像素比對（容差 ±2/255）
+- [ ] 所有 `AnalogOutput` 模式 (AV/SVideo/RF) 參數映射正確
 
-### M4 — Horizontal Blur（多 Pass；1 天）
-- [ ] 中繼 `SKSurface` 建立
-- [ ] `hblur.sksl`（3-5 tap separable Gaussian）
-- [ ] AV/SVideo/RF 依 blur 強度 uniform 差異
-- [ ] Benchmark 維持優勢
+### M4 — GPU Phosphor Decay（1 天）
+- [ ] `_prevSurface` ping-pong
+- [ ] `uPrev` child shader 連線
+- [ ] 首幀黑初始
+- [ ] Resize / config 變 → `_prevSurface` 重建
+- [ ] 視覺驗證拖影與 Simd 一致
 
-### M5 — Shadow Mask LUT（0.5 天）
-- [ ] 另一組 mask pattern（非 aperture grille）
-- [ ] 預先產生 8x8 SKBitmap 當 texture LUT 或直接在 shader 寫死
+### M5 — Shadow Mask + 細節（0.5 天）
+- [ ] Shadow mask 2D 圖案（非 aperture grille）
+- [ ] 用 hardcode pattern 或外部 8x8 SKBitmap LUT
 
-### M6 — NTSC Stretch Goal（2-3 天，可延後）
-- [ ] 1D composite modulation shader
-- [ ] 相位解調 shader
-- [ ] 3 pass 串聯（modulate → demod → crt_core）
-- [ ] `UltraAnalog` 開關走 GPU path
+### M6 — Headless GPU 驗證（0.5 天）
+- [ ] TestRunner 強制啟 GPU strategy 跑一輪 blargg
+- [ ] 比對截圖與 SIMD 版本（容差）
+- [ ] CI friendly：失敗輸出 diff 圖
 
-### M7 — 整合驗證與文件（1 天）
-- [ ] GPU 與 SIMD 在 10 款不同遊戲的視覺 screenshot 對照
-- [ ] Benchmark 表：2x/4x/6x/8x × {無 DSP, DSP mode 2} × {CPU SIMD, GPU}
-- [ ] 更新 `README.md` 說明 CRT 三種實作
+### M7 — Benchmark & 文件（0.5 天）
+- [ ] Benchmark 2x/4x/6x/8x × {Scalar, SIMD, GPU}
 - [ ] `MD/PerformanceWithAV/CRT_GPU_Benchmark_YYYY-MM-DD.md`
+- [ ] 更新 `README.md`
+
+### v2（多 Pass）預計
+- M8 — `hblur.sksl`（separable Gaussian，中繼 SKSurface）— 1 天
+- M9 — `CrtMultiPassOrchestrator`（串 Pass 1 → Pass 2）— 0.5 天
+- M10 — AV/SVideo/RF blur 差異化 — 0.5 天
+
+### v3（NTSC，stretch）預計
+- M11 — `ntsc_modulate.sksl`（composite 訊號）— 1 天
+- M12 — `ntsc_demod.sksl`（相位解調）— 1 天
+- M13 — `UltraAnalog` 模式走 GPU path — 0.5 天
 
 ---
 
-## 7. 風險與對策
+## 11. 風險與對策
 
 | 風險 | 機率 | 對策 |
 |------|:----:|------|
-| SkSL 某些版本 Skia 不支援 | 低 | `SKRuntimeEffect.CreateShader` 失敗偵測 + fallback |
-| Zero-copy `SKBitmap.InstallPixels` 做 shader child 失敗 | 中 | 備案：每幀 copy 到 `SKImage`（小幅效能損失，但 256×240 可接受）|
-| Avalonia Render Thread GPU context 不穩 | 中 | 用 `try/catch` 包所有 shader 呼叫；失敗切 CPU |
-| Phosphor decay 的 ping-pong `SKSurface` 在 resize 時破裂 | 中 | 監聽 `Bounds` 變更，重建 `SKSurface` |
-| NTSC 在 GPU 實作複雜度超估 | 高 | v3 為 stretch goal；做不完不影響 v1/v2 |
-| 不同 GPU 驅動程式對 SkSL 精度差異造成畫面微差 | 低 | 接受容差 ±2/255；不保證 bit-exact |
+| `SKRuntimeEffect.CreateShader` 在某 Skia 版本爆錯 | 低 | `CrtCoreStage_Gpu.IsAvailable()` smoke test；失敗自動 fallback |
+| `SKBitmap.InstallPixels` 做 child shader 在某些 GPU 驅動失敗 | 中 | 備案：每幀拷到 `SKImage`（256×240 微成本）|
+| Avalonia Render Thread 的 GPU context 在 resize 中斷裂 | 中 | 監聽 `Bounds` 變更 → 下一幀重建 `_prevSurface` |
+| Shader 檔案漏複製到 output | 中 | MSBuild `PreserveNewest`；`ShaderLoader` 檢查 File.Exists 並明確報錯 |
+| 不同 GPU 驅動 SkSL 精度差異 → 截圖不 bit-exact | 低 | 接受容差 ±2/255；測試比對用容差 diff |
+| Phosphor ping-pong 在 strategy 中途切換資料遺失 | 低 | 切換時 reset `_prevSurface`（同 CPU 版 `_prevFrameValid=false` 行為）|
+| Headless Skia 無 GPU context 但 config 指定 Gpu | 已設計處理 | Runtime effect 自動走 CPU rasterizer；功能正確但無加速 |
+| Hot reload 在執行中 race condition | 低 | 僅 Debug build 啟用；`lock(_cache)` 保護 |
 
 ---
 
-## 8. 效能目標
+## 12. 效能目標
 
-**基準**（現有 SIMD，摘自 MEMORY.md）：
-- Analog 2x no DSP：117.91 FPS
+**基準**（現有 SIMD，MEMORY.md 紀錄）：
 - Analog 4x no DSP：109.59 FPS
 - Analog 6x no DSP：82.38 FPS
 - Analog 8x no DSP：79.03 FPS
 - Analog 4x DSP Mode 2：82.65 FPS
 - Analog 8x DSP Mode 2：64.49 FPS
 
-**GPU 目標**（保守 2x，挑戰 3x）：
-| 模式 | SIMD | GPU 目標 | 挑戰目標 |
+**GPU 目標**（保守 2×，挑戰 3×）：
+| 模式 | SIMD | GPU 保守 | GPU 挑戰 |
 |------|:----:|:--------:|:--------:|
 | 4x no DSP | 109.59 | ≥ 220 | ≥ 330 |
 | 6x no DSP | 82.38 | ≥ 165 | ≥ 250 |
@@ -298,24 +432,29 @@ half4 main(float2 fragCoord) {
 | 4x DSP Mode 2 | 82.65 | ≥ 165 | ≥ 250 |
 | 8x DSP Mode 2 | 64.49 | ≥ 130 | ≥ 195 |
 
-（若 GPU path 不過基準 CPU 的 60%，則視為失敗並暫緩）
+若 GPU < 60% SIMD 基準 → 視為不達標，暫緩。
 
 ---
 
-## 9. 參考資料
+## 13. 驗收清單
+
+v1 完成必須通過：
+- [ ] 所有三個 strategy（Scalar / Simd / Gpu）都能獨立跑起來不當機
+- [ ] `Auto` mode 在 AVX2 + Skia GPU 環境 → 選到 `Gpu`
+- [ ] `Auto` mode 在僅 AVX2 環境 → 選到 `Simd`
+- [ ] `Auto` mode 在純量環境 → 選到 `Scalar`
+- [ ] GPU 視覺與 SIMD 差異 ≤ ±2/255 per channel
+- [ ] Phosphor decay 在 GPU 運作且 resize 後不 crash
+- [ ] TestRunner headless 模式走 GPU 不 crash（效能可接受）
+- [ ] Shader 檔案缺失時清楚報錯而非靜默 fallback
+- [ ] Config UI 切換即時生效（下一幀套用）
+
+---
+
+## 14. 參考資料
 
 - [Avalonia Custom Skia Rendering](https://docs.avaloniaui.net/docs/guides/graphics-and-animation/custom-drawing-operation)
-- [SkiaSharp SKRuntimeEffect](https://learn.microsoft.com/en-us/dotnet/api/skiasharp.skruntimeeffect)
-- [SkSL Specification](https://skia.org/docs/user/sksl/)
-- 同家族前例：RetroArch CRT-Royale GLSL、Mesen2 CRT shader、ShaderToy Mattias Gustavsson CRT 範例
+- [SkiaSharp SKRuntimeEffect API](https://learn.microsoft.com/en-us/dotnet/api/skiasharp.skruntimeeffect)
+- [SkSL Spec](https://skia.org/docs/user/sksl/)
 - 本專案：`CrtScreen.cs`、`CrtScreen.Simd.cs`、`Views/EmuScreenControl.cs`
-
----
-
-## 10. 決策點（開工前需確認）
-
-1. **v1 是否跳過 NTSC 合成？** → 建議：是（簡化問題，v3 再處理）
-2. **GPU fallback 是 SIMD 或純量？** → 建議：SIMD（config `CrtImpl = Simd`）
-3. **Shader 打包方式**：EmbeddedResource vs 字串常數？ → 建議：字串常數（簡單，易 debug；後期再改 EmbeddedResource）
-4. **Phosphor decay 需要嗎？** → 建議：v1 選配；CPU 版預設關，GPU 比照
-5. **Testing/headless 模式是否支援 GPU path？** → 建議：**否**，強制走 CPU SIMD 以保 deterministic
+- 同家族前例：RetroArch CRT-Royale GLSL、Mesen2 CRT shader
