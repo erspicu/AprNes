@@ -26,9 +26,16 @@
     <Compile Include="../AprNes/NesCore/*.cs" Link="NesCore/%(Filename)%(Extension)" />
     <Compile Include="../AprNes/NesCore/Mapper/*.cs" Link="NesCore/Mapper/%(Filename)%(Extension)" />
     <Compile Include="../AprNes/NesCore/AudioPlus/*.cs" Link="NesCore/AudioPlus/%(Filename)%(Extension)" />
-    <!-- NTSC_CRT: use CrtScreen.Net10.cs (.NET 10-optimized fork) instead of CrtScreen.cs -->
-    <Compile Include="../AprNes/NesCore/NTSC_CRT/*.cs"
+    <!-- NTSC_CRT: CrtImpl property selects which CrtScreen is compiled.
+         Values: Simd (default, .NET 10 SIMD fork) | Scalar (net48-compatible baseline).
+         Usage: dotnet build ... -p:CrtImpl=Scalar  -->
+    <Compile Condition="'$(CrtImpl)' != 'Scalar'"
+             Include="../AprNes/NesCore/NTSC_CRT/*.cs"
              Exclude="../AprNes/NesCore/NTSC_CRT/CrtScreen.cs"
+             Link="NesCore/NTSC_CRT/%(Filename)%(Extension)" />
+    <Compile Condition="'$(CrtImpl)' == 'Scalar'"
+             Include="../AprNes/NesCore/NTSC_CRT/*.cs"
+             Exclude="../AprNes/NesCore/NTSC_CRT/CrtScreen.Simd.cs"
              Link="NesCore/NTSC_CRT/%(Filename)%(Extension)" />
 
     <!-- 外部工具 -->
