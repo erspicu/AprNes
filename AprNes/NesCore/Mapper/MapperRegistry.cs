@@ -13,7 +13,7 @@ namespace AprNes
                 case 32: case 33: case 34: case 64: case 65: case 66: case 68: case 69: case 71: case 78: case 206:
                 case 70: case 75: case 88: case 90: case 118: case 119: case 140: case 152: case 154: case 180: case 209: case 210: case 211: case 228: case 232:
                 case 241: case 112: case 177: case 164: case 74: case 191: case 192: case 194: case 12:
-                case 96: case 163:
+                case 96: case 163: case 173:
                     return true;
                 default:
                     return false;
@@ -99,6 +99,7 @@ namespace AprNes
                 case 12:  return "DBDROM (MMC3 + CHR high-bit)";
                 case 96:  return "Bandai Oeka Kids";
                 case 163: return "Nanjing (163)";
+                case 173: return "TXC 22211C";
                 default: return "Unknown";
             }
         }
@@ -374,6 +375,10 @@ namespace AprNes
                 case 163: {
                     System.Console.WriteLine("Mapper163: Nanjing");
                     return new Mapper163();
+                }
+                case 173: {
+                    System.Console.WriteLine("Mapper173: TXC 22211C");
+                    return new Mapper173();
                 }
                 default: throw new System.NotSupportedException("Mapper " + id + " not supported");
             }

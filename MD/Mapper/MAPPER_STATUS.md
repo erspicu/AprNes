@@ -1,6 +1,6 @@
 # AprNes Mapper 實作狀態
 
-**已實作：76 個　　預備實作：5 個　　最後更新：2026-04-17**
+**已實作：77 個　　預備實作：5 個　　最後更新：2026-04-17**
 
 結果說明：✅ 正常　⚠️ 部分問題　❌ 有問題　❓ 待確認／不明
 
@@ -112,6 +112,7 @@
 | **012** | DBDROM | ⚠️ | DBZ 5 (Ch) 標題 OK；DBZ Super/Kirakira 待確認 | MMC3 + $5xxx CHR high-bit；Rev A IRQ |
 | **096** | Bandai Oeka Kids | ✅ | Anpanman Hiragana / Oekaki Shiyou | PPU 匯流排 $2xxx 遷移觸發 inner CHR bank latch（無需改 IMapper，沿用 PpuClock）|
 | **163** | Nanjing (南晶) | ✅ | FF7 中文、Diablo 暗黑破壞神、大話西遊、Chao Ji Ji Qi Ren | $5000/$5100/$5200/$5300 + $5101 toggle；copy protection read $5100/$5500 |
+| **173** | TXC 22211C | ❓ | 無測試 ROM | TXC chip copy-protection；$4100-$4103 accumulator + invert；$8000+ trigger output |
 
 ---
 
