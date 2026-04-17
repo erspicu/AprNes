@@ -107,12 +107,11 @@ namespace AprNes
 
         static void Crt_DispatchApplyProfile()
         {
+#if CRT_GPU_AVAILABLE
+            if (_crtBackend == CrtBackend.Gpu) { CrtScreenGpu.ApplyProfile(); return; }
+#endif
 #if CRT_SIMD_AVAILABLE
-            if (_crtBackend == CrtBackend.Simd || _crtBackend == CrtBackend.Gpu)
-            {
-                CrtScreenSimd.ApplyProfile();
-                return;
-            }
+            if (_crtBackend == CrtBackend.Simd) { CrtScreenSimd.ApplyProfile(); return; }
 #endif
             CrtScreenScalar.ApplyProfile();
         }
@@ -123,24 +122,22 @@ namespace AprNes
         public static void Crt_Init()
         {
             Console.WriteLine($"[CRT] dispatch backend = {_crtBackend}");
+#if CRT_GPU_AVAILABLE
+            if (_crtBackend == CrtBackend.Gpu) { CrtScreenGpu.Init(); return; }
+#endif
 #if CRT_SIMD_AVAILABLE
-            if (_crtBackend == CrtBackend.Simd || _crtBackend == CrtBackend.Gpu)
-            {
-                CrtScreenSimd.Init();
-                return;
-            }
+            if (_crtBackend == CrtBackend.Simd) { CrtScreenSimd.Init(); return; }
 #endif
             CrtScreenScalar.Init();
         }
 
         public static void Crt_Render()
         {
+#if CRT_GPU_AVAILABLE
+            if (_crtBackend == CrtBackend.Gpu) { CrtScreenGpu.Render(); return; }
+#endif
 #if CRT_SIMD_AVAILABLE
-            if (_crtBackend == CrtBackend.Simd || _crtBackend == CrtBackend.Gpu)
-            {
-                CrtScreenSimd.Render();
-                return;
-            }
+            if (_crtBackend == CrtBackend.Simd) { CrtScreenSimd.Render(); return; }
 #endif
             CrtScreenScalar.Render();
         }

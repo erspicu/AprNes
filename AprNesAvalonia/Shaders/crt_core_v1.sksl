@@ -1,0 +1,66 @@
+// ════════════════════════════════════════════════════════════════════════
+// crt_core_v1.sksl — minimal CRT simulation (Phase 2 Step 1, v1 MVP)
+// SkiaSharp 3.119.3-preview (Raster Pipeline, no SkVM)
+// ════════════════════════════════════════════════════════════════════════
+// Covers: bilinear upscale + brightness + gamma + scanline + mask + vignette
+// Deferred: phosphor decay, convergence, curvature, horizontal blur
+
+uniform shader uScreen;
+uniform float2 uSrcSize;
+uniform float2 uDstSize;
+uniform float  uScanlineStrength;
+uniform float  uBrightness;
+uniform float  uBloomStrength;
+uniform float  uGamma;
+uniform float  uMaskStrength;
+uniform float  uMaskType;        // 0=None, 1=ApertureGrille, 2=ShadowMask
+uniform float  uVignetteStrength;
+
+half4 main(float2 fragCoord)
+{
+    float2 uv   = (fragCoord + 0.5) / uDstSize;
+    float2 srcP = uv * uSrcSize;
+
+    half4 c = uScreen.eval(srcP);
+
+    // brightness boost with luminance-weighted bloom
+    float luma   = dot(half3(c.rgb), half3(0.3, 0.59, 0.11));
+    float factor = uBrightness + luma * uBloomStrength;
+    c.rgb = clamp(c.rgb * factor, 0.0, 1.0);
+
+    // gamma: V' = V * ((1 - GC) + GC * V)
+    c.rgb = c.rgb * ((1.0 - uGamma) + uGamma * c.rgb);
+
+    // scanline darkening
+    float srcY    = fragCoord.y * uSrcSize.y / uDstSize.y;
+    float fracY   = fract(srcY);
+    float scanW   = 1.0 - abs(fracY - 0.5) * 2.0;
+    float scanMul = mix(1.0, scanW, uScanlineStrength);
+    c.rgb *= scanMul;
+
+    // mask (SkSL 3.x: % not allowed on ints → use mod())
+    int maskTypeI = int(uMaskType + 0.5);
+    if (maskTypeI == 1) {
+        int col = int(mod(fragCoord.x, 3.0));
+        half3 maskCol = (col == 0) ? half3(1.0, 0.3, 0.3)
+                      : (col == 1) ? half3(0.3, 1.0, 0.3)
+                      :              half3(0.3, 0.3, 1.0);
+        c.rgb *= mix(half3(1.0), maskCol, uMaskStrength);
+    } else if (maskTypeI == 2) {
+        int col = int(mod(fragCoord.x, 3.0));
+        int row = int(mod(fragCoord.y, 2.0));
+        int idx = int(mod(float(col + row), 3.0));
+        half3 maskCol = (idx == 0) ? half3(1.0, 0.3, 0.3)
+                      : (idx == 1) ? half3(0.3, 1.0, 0.3)
+                      :              half3(0.3, 0.3, 1.0);
+        c.rgb *= mix(half3(1.0), maskCol, uMaskStrength);
+    }
+
+    // vignette
+    float2 cv     = uv - 0.5;
+    float  v2     = dot(cv, cv);
+    float  vigMul = 1.0 - uVignetteStrength * v2 * 4.0;
+    c.rgb *= clamp(vigMul, 0.0, 1.0);
+
+    return half4(c.rgb, 1.0);
+}
