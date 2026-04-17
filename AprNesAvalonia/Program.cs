@@ -24,6 +24,31 @@ class Program
             return TestRunner.Run(args);
         }
 
+        // GUI mode: honor --crt-strategy CLI flag (same syntax as TestRunner)
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i] == "--crt-strategy")
+            {
+                string s = args[i + 1].ToLowerInvariant();
+                AprNes.NesCore.CrtBackend wanted = s switch
+                {
+                    "scalar" => AprNes.NesCore.CrtBackend.Scalar,
+                    "simd"   => AprNes.NesCore.CrtBackend.Simd,
+                    "gpu"    => AprNes.NesCore.CrtBackend.Gpu,
+                    _        => AprNes.NesCore.Crt_GetBackend(),
+                };
+                AprNes.NesCore.Crt_SetBackend(wanted);
+
+                // Phase 3A: activate render-thread GPU path
+                if (wanted == AprNes.NesCore.CrtBackend.Gpu)
+                {
+                    AprNes.NesCore.CrtGpuRenderThreadActive = true;
+                    CrtGpuRenderThread.Init();
+                }
+                break;
+            }
+        }
+
         return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
 

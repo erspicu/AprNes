@@ -100,6 +100,9 @@ namespace AprNes
 
         internal static void Render()
         {
+            // Phase 3A: if render thread will handle CRT on GPU canvas, skip emu-thread work
+            if (CrtGpuRenderThreadActive) return;
+
             if (_effect == null || _inputBitmap == null)
             {
                 // shader not available → fallback to Simd

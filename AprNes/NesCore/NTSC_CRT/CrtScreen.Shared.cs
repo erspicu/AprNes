@@ -37,6 +37,15 @@ namespace AprNes
 
         public static CrtBackend Crt_GetBackend() => _crtBackend;
 
+        /// <summary>
+        /// Phase 3A: when true, emu-thread Crt_Render (for Gpu backend) skips entirely
+        /// and the render thread runs the SkSL shader directly on Avalonia's
+        /// GPU-backed SkCanvas via ISkiaSharpApiLeaseFeature. Only GUI mode sets this.
+        /// Headless leaves it false so CrtScreenGpu raster path continues to populate
+        /// crt_analogScreenBuf for --screenshot.
+        /// </summary>
+        public static bool CrtGpuRenderThreadActive = false;
+
         public static void Crt_SetBackend(CrtBackend b)
         {
 #if !CRT_SIMD_AVAILABLE
