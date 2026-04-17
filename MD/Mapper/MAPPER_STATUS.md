@@ -1,6 +1,6 @@
 # AprNes Mapper 實作狀態
 
-**已實作：73 個　　預備實作：8 個　　最後更新：2026-04-17**
+**已實作：76 個　　預備實作：5 個　　最後更新：2026-04-17**
 
 結果說明：✅ 正常　⚠️ 部分問題　❌ 有問題　❓ 待確認／不明
 
@@ -109,6 +109,9 @@
 | **191** | MMC3 + 2KB CHR-RAM (wrap) | ✅ | Double Dragon III (中), 熱血物語 (中), Mighty Final Fight (中) | 同 074，bank 0x80-0xFF wrap 到 2KB RAM |
 | **192** | MMC3 + 4KB CHR-RAM | ❓ | ROM 庫無對應遊戲 | 同 074，bank 0x08-0x0B redirect to 4KB CHR-RAM |
 | **194** | MMC3 + 2KB CHR-RAM | ❓ | ROM 庫無對應遊戲 | 同 074，bank 0x00-0x01 redirect to 2KB CHR-RAM |
+| **012** | DBDROM | ⚠️ | DBZ 5 (Ch) 標題 OK；DBZ Super/Kirakira 待確認 | MMC3 + $5xxx CHR high-bit；Rev A IRQ |
+| **096** | Bandai Oeka Kids | ✅ | Anpanman Hiragana / Oekaki Shiyou | PPU 匯流排 $2xxx 遷移觸發 inner CHR bank latch（無需改 IMapper，沿用 PpuClock）|
+| **163** | Nanjing (南晶) | ✅ | FF7 中文、Diablo 暗黑破壞神、大話西遊、Chao Ji Ji Qi Ren | $5000/$5100/$5200/$5300 + $5101 toggle；copy protection read $5100/$5500 |
 
 ---
 
