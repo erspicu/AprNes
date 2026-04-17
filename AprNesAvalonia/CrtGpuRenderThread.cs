@@ -104,9 +104,11 @@ internal static unsafe class CrtGpuRenderThread
         using var inputShader = SKShader.CreateBitmap(
             _inputBitmap,
             SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
-        using var prevImage  = _prevSurface!.Snapshot();
-        using var prevShader = prevImage.ToShader(
-            SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
+
+        // Phase 3A diagnosis: phosphor writeback to raster prev surface was
+        // dominating cost. Bind a transparent-black dummy for uPrev and set
+        // uPhosphorDecay=0 so the shader's phosphor branch becomes a no-op.
+        using var prevShader = SKShader.CreateColor(SKColors.Black);
 
         // ── Stage 3: uniforms ──
         var uniforms = new SKRuntimeEffectUniforms(_effect!);
@@ -127,7 +129,7 @@ internal static unsafe class CrtGpuRenderThread
         uniforms["uCurvature"] = CurvatureStrength;
         uniforms["uConvergence"] = ConvergenceStrength;
         uniforms["uHBlurAlpha"] = HBeamSpread * 0.5f;
-        uniforms["uPhosphorDecay"] = PhosphorDecay;
+        uniforms["uPhosphorDecay"] = 0f;   // Phase 3A: phosphor disabled until GPU prev surface
 
         var children = new SKRuntimeEffectChildren(_effect!);
         children["uScreen"] = inputShader;
@@ -143,16 +145,7 @@ internal static unsafe class CrtGpuRenderThread
         canvas.DrawRect(0, 0, dstW, dstH, paint);
         canvas.Restore();
 
-        // ── Stage 5: update phosphor history ──
-        // Copy current output into _prevSurface for next frame's uPrev read.
-        // We read back from the main canvas snapshot? That's expensive. Instead,
-        // re-render the same shader into _prevSurface (cheap — mostly just uniforms).
-        // Simpler: draw without the phosphor component into prev; for v1 just
-        // snapshot the current canvas region.
-        using var prevCanvas = _prevSurface.Canvas;
-        prevCanvas.Clear(SKColors.Black);
-        prevCanvas.DrawRect(0, 0, dstW, dstH, paint);
-        prevCanvas.Flush();
+        // ── Stage 5: (phosphor writeback removed — see Stage 2 comment) ──
     }
 
     public static void Dispose()
