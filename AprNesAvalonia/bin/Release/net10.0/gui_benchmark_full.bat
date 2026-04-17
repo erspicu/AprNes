@@ -1,7 +1,5 @@
 @echo off
 setlocal enabledelayedexpansion
-chcp 65001 >nul 2>&1
-title AprNesAvalonia GUI Benchmark (Scalar / SIMD / GPU) — Render-Thread Test
 
 set "EXE=%~dp0AprNesAvalonia.exe"
 set "ROM=%~dp0tools\benchmark\ny2011.nes"
@@ -9,21 +7,20 @@ if not exist "%ROM%" set "ROM=%~dp0..\..\..\..\etc\Mega Man 5 (USA).nes"
 
 if not exist "%EXE%" (
     echo ERROR: AprNesAvalonia.exe not found at %EXE%
-    pause & exit /b 1
+    pause
+    exit /b 1
 )
 if not exist "%ROM%" (
     echo ERROR: benchmark ROM not found
     echo   Expected: %~dp0tools\benchmark\ny2011.nes
     echo   Or:       %~dp0..\..\..\..\etc\Mega Man 5 (USA).nes
-    pause & exit /b 1
+    pause
+    exit /b 1
 )
 
 set "LOG=%~dp0gui_benchmark.log"
 set "TRACE=%~dp0gui_benchmark.trace.log"
 
-:: ============================================================
-:: Configuration
-:: ============================================================
 set TEST_SEC=20
 set COOL_SEC=10
 set "FLAGS_COMMON=--rom "%ROM%" --gui-benchmark %TEST_SEC% --analog --ultra-analog --analog-output RF --analog-size 8 --crt --audio-dsp --audio-mode 2"
@@ -37,9 +34,6 @@ echo   Flags:      ultra-analog + RF + 8x + CRT + DSP mode 2
 echo   Strategies: scalar / simd / gpu (render-thread D3D11)
 echo ============================================================
 echo.
-
-:: ── Helper: extract metric from gui_benchmark.log ──
-:: Uses findstr + for/f to pull the "XX.XX FPS presented" and "YY.YY FPS produced" numbers.
 
 set "STRATEGIES=scalar simd gpu"
 set "RUN_IDX=0"
@@ -64,15 +58,20 @@ for %%S in (%STRATEGIES%) do (
         if exist "%LOG%" (
             for /f "tokens=5 delims= " %%f in ('findstr /C:"FPS presented" "%LOG%"') do set "FPS_R=%%f"
             for /f "tokens=5 delims= " %%f in ('findstr /C:"FPS produced"  "%LOG%"') do set "FPS_E=%%f"
-            :: strip parenthesis
             set "FPS_R=!FPS_R:(=!"
             set "FPS_E=!FPS_E:(=!"
             echo   Presented: !FPS_R! FPS   Emu: !FPS_E! FPS
 
-            if %%R==2 set "!STRAT!_R2_R=!FPS_R!" & set "!STRAT!_R2_E=!FPS_E!"
-            if %%R==3 set "!STRAT!_R3_R=!FPS_R!" & set "!STRAT!_R3_E=!FPS_E!"
+            if %%R==2 (
+                set "!STRAT!_R2_R=!FPS_R!"
+                set "!STRAT!_R2_E=!FPS_E!"
+            )
+            if %%R==3 (
+                set "!STRAT!_R3_R=!FPS_R!"
+                set "!STRAT!_R3_E=!FPS_E!"
+            )
         ) else (
-            echo   WARNING: gui_benchmark.log not found — run %%R failed
+            echo   WARNING: gui_benchmark.log not found - run %%R failed
         )
 
         if %%R LSS 3 (
@@ -91,7 +90,7 @@ echo ============================================================
 echo   GUI BENCHMARK SUMMARY (avg of Run 2 + Run 3)
 echo ============================================================
 echo.
-echo   strategy  | presented FPS    | emu FPS
+echo   strategy  ^| presented FPS    ^| emu FPS
 echo   ----------+------------------+--------------
 
 for %%S in (%STRATEGIES%) do (
@@ -108,7 +107,7 @@ for %%S in (%STRATEGIES%) do (
 )
 
 echo.
-echo Full per-run logs: %LOG% (last run only — overwritten each iteration)
-echo Lifecycle trace:   %TRACE%
+echo Full per-run log: %LOG% (last run only, overwritten each iteration)
+echo Lifecycle trace:  %TRACE%
 echo.
 pause
