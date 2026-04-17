@@ -1,11 +1,27 @@
 // ════════════════════════════════════════════════════════════════════════
-// crt_core_v1.sksl — minimal CRT simulation (Phase 2 Step 1, v1 MVP)
+// crt_core_v1.sksl — Phase 2 Step 2 (single-pass CRT core, no phosphor)
 // SkiaSharp 3.119.3-preview (Raster Pipeline, no SkVM)
 // ════════════════════════════════════════════════════════════════════════
-// Covers: bilinear upscale + brightness + gamma + scanline + mask + vignette
-// Deferred: phosphor decay, convergence, curvature, horizontal blur
+// Covers CPU SIMD feature parity:
+//   ✓ Barrel curvature (UV warp)
+//   ✓ 3-tap horizontal blur (HBeamSpread)
+//   ✓ RGB convergence (per-channel horizontal shift)
+//   ✓ Brightness + luminance-weighted bloom + gamma
+//   ✓ Scanline darkening
+//   ✓ Mask: aperture grille / shadow mask
+//   ✓ Vignette
+//   ✗ Phosphor decay (Step 3 ping-pong surface)
+//
+// Pipeline order matches CrtScreen.Simd:
+//   1. curvature warp UV
+//   2. hblur sample (3-tap on source neighbors)
+//   3. per-channel convergence offset
+//   4. gamma + bloom
+//   5. scanline + mask
+//   6. vignette
 
 uniform shader uScreen;
+uniform shader uPrev;              // previous frame at dst resolution (for phosphor decay)
 uniform float2 uSrcSize;
 uniform float2 uDstSize;
 uniform float  uScanlineStrength;
@@ -13,39 +29,73 @@ uniform float  uBrightness;
 uniform float  uBloomStrength;
 uniform float  uGamma;
 uniform float  uMaskStrength;
-uniform float  uMaskType;        // 0=None, 1=ApertureGrille, 2=ShadowMask
+uniform float  uMaskType;          // 0=None, 1=ApertureGrille, 2=ShadowMask
 uniform float  uVignetteStrength;
+uniform float  uCurvature;         // 0..0.5, matches CurvatureStrength
+uniform float  uConvergence;       // pixel offset (dst-space)
+uniform float  uHBlurAlpha;        // HBeamSpread * 0.5; 0 disables blur
+uniform float  uPhosphorDecay;     // 0..1; 0 disables phosphor blend
+
+// Returns sampled RGB at source-pixel position srcP.
+// Applies 3-tap horizontal blur if uHBlurAlpha > 0.
+half3 sampleWithBlur(float2 srcP)
+{
+    half3 c  = uScreen.eval(srcP).rgb;
+    if (uHBlurAlpha <= 0.001) return c;
+    half3 cl = uScreen.eval(float2(srcP.x - 1.0, srcP.y)).rgb;
+    half3 cr = uScreen.eval(float2(srcP.x + 1.0, srcP.y)).rgb;
+    float center = 1.0 - 2.0 * uHBlurAlpha;
+    return cl * half(uHBlurAlpha) + c * half(center) + cr * half(uHBlurAlpha);
+}
 
 half4 main(float2 fragCoord)
 {
-    float2 uv   = (fragCoord + 0.5) / uDstSize;
-    float2 srcP = uv * uSrcSize;
+    // ── 1. curvature warp (barrel distortion) ──
+    float2 uv = (fragCoord + 0.5) / uDstSize;
+    float2 cc = uv - 0.5;
+    float  f  = 1.0 + uCurvature * dot(cc, cc);
+    float2 warpedUV = cc * f + 0.5;
 
-    half4 c = uScreen.eval(srcP);
+    // out-of-bounds → black (matches CPU branchless sentinel)
+    if (warpedUV.x < 0.0 || warpedUV.x > 1.0 || warpedUV.y < 0.0 || warpedUV.y > 1.0)
+        return half4(0.0, 0.0, 0.0, 1.0);
 
-    // brightness boost with luminance-weighted bloom
-    float luma   = dot(half3(c.rgb), half3(0.3, 0.59, 0.11));
+    float2 srcP = warpedUV * uSrcSize;
+
+    // ── 2+3. per-channel convergence with per-channel hblur ──
+    // Convergence: R sampled shifted +off, B shifted -off, G centered
+    // off is in SOURCE pixel units (convert from dst via uSrcSize/uDstSize)
+    float convPx  = uConvergence * (uSrcSize.x / uDstSize.x);
+    float2 srcR   = float2(srcP.x + convPx, srcP.y);
+    float2 srcB   = float2(srcP.x - convPx, srcP.y);
+    half3 rgbC = sampleWithBlur(srcP);
+    half3 rgbR = sampleWithBlur(srcR);
+    half3 rgbB = sampleWithBlur(srcB);
+    half3 c = half3(rgbR.r, rgbC.g, rgbB.b);
+
+    // ── 4. brightness + luminance-weighted bloom ──
+    float luma   = dot(half3(c), half3(0.3, 0.59, 0.11));
     float factor = uBrightness + luma * uBloomStrength;
-    c.rgb = clamp(c.rgb * factor, 0.0, 1.0);
+    c = clamp(c * factor, 0.0, 1.0);
 
-    // gamma: V' = V * ((1 - GC) + GC * V)
-    c.rgb = c.rgb * ((1.0 - uGamma) + uGamma * c.rgb);
+    // ── 5. gamma: V' = V * ((1 - GC) + GC * V) ──
+    c = c * ((1.0 - uGamma) + uGamma * c);
 
-    // scanline darkening
+    // ── 6. scanline darkening ──
     float srcY    = fragCoord.y * uSrcSize.y / uDstSize.y;
     float fracY   = fract(srcY);
     float scanW   = 1.0 - abs(fracY - 0.5) * 2.0;
     float scanMul = mix(1.0, scanW, uScanlineStrength);
-    c.rgb *= scanMul;
+    c *= scanMul;
 
-    // mask (SkSL 3.x: % not allowed on ints → use mod())
+    // ── 7. mask ──
     int maskTypeI = int(uMaskType + 0.5);
     if (maskTypeI == 1) {
         int col = int(mod(fragCoord.x, 3.0));
         half3 maskCol = (col == 0) ? half3(1.0, 0.3, 0.3)
                       : (col == 1) ? half3(0.3, 1.0, 0.3)
                       :              half3(0.3, 0.3, 1.0);
-        c.rgb *= mix(half3(1.0), maskCol, uMaskStrength);
+        c *= mix(half3(1.0), maskCol, uMaskStrength);
     } else if (maskTypeI == 2) {
         int col = int(mod(fragCoord.x, 3.0));
         int row = int(mod(fragCoord.y, 2.0));
@@ -53,14 +103,21 @@ half4 main(float2 fragCoord)
         half3 maskCol = (idx == 0) ? half3(1.0, 0.3, 0.3)
                       : (idx == 1) ? half3(0.3, 1.0, 0.3)
                       :              half3(0.3, 0.3, 1.0);
-        c.rgb *= mix(half3(1.0), maskCol, uMaskStrength);
+        c *= mix(half3(1.0), maskCol, uMaskStrength);
     }
 
-    // vignette
+    // ── 8. vignette ──
     float2 cv     = uv - 0.5;
     float  v2     = dot(cv, cv);
     float  vigMul = 1.0 - uVignetteStrength * v2 * 4.0;
-    c.rgb *= clamp(vigMul, 0.0, 1.0);
+    c *= clamp(vigMul, 0.0, 1.0);
 
-    return half4(c.rgb, 1.0);
+    // ── 9. phosphor decay: max(current, prev * decay) ──
+    // Matches CrtScreen.Simd ProcessRowMaskPhosphor_SWAR max blend.
+    if (uPhosphorDecay > 0.001) {
+        half3 prev = uPrev.eval(fragCoord).rgb;
+        c = max(c, prev * half(uPhosphorDecay));
+    }
+
+    return half4(c, 1.0);
 }

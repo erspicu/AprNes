@@ -38,9 +38,11 @@ namespace AprNes
         const int SrcW = 1024;
         const int SrcH = 240;
 
-        // Output: Crt_DstW × Crt_DstH SKSurface (CPU raster); SIMD variant of
-        // "GPU" still requires a buffer we can blit into crt_analogScreenBuf
+        // Output + phosphor ping-pong (Step 3): _prevSurface holds frame N-1,
+        // _outputSurface receives frame N. After render we swap references so
+        // next frame's uPrev reads what we just wrote.
         static SKSurface? _outputSurface;
+        static SKSurface? _prevSurface;
         static int _outputW, _outputH;
 
         internal static void ApplyProfile()
@@ -87,8 +89,12 @@ namespace AprNes
             if (_outputSurface != null && w == _outputW && h == _outputH) return;
 
             _outputSurface?.Dispose();
+            _prevSurface?.Dispose();
             var info = new SKImageInfo(w, h, SKColorType.Bgra8888, SKAlphaType.Opaque);
             _outputSurface = SKSurface.Create(info);
+            _prevSurface   = SKSurface.Create(info);
+            _prevSurface!.Canvas.Clear(SKColors.Black);   // first-frame prev = all-black
+            _prevSurface.Canvas.Flush();
             _outputW = w; _outputH = h;
         }
 
@@ -124,12 +130,15 @@ namespace AprNes
             }
             _inputBitmap.NotifyPixelsChanged();
 
-            // ── Stage 2: build SKShader from input bitmap (bilinear sampling) ──
+            // ── Stage 2: build SKShader from input bitmap + previous-frame surface ──
             using var inputShader = SKShader.CreateBitmap(
                 _inputBitmap,
                 SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
+            using var prevImage  = _prevSurface!.Snapshot();
+            using var prevShader = prevImage.ToShader(
+                SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
 
-            // ── Stage 3: set uniforms + child ──
+            // ── Stage 3: set uniforms + children ──
             var uniforms = new SKRuntimeEffectUniforms(_effect);
             uniforms["uSrcSize"] = new[] { (float)SrcW, (float)SrcH };
             uniforms["uDstSize"] = new[] { (float)_outputW, (float)_outputH };
@@ -145,9 +154,14 @@ namespace AprNes
                 _                          => 0,
             });
             uniforms["uVignetteStrength"] = VignetteStrength;
+            uniforms["uCurvature"] = CurvatureStrength;
+            uniforms["uConvergence"] = ConvergenceStrength;
+            uniforms["uHBlurAlpha"] = HBeamSpread * 0.5f;
+            uniforms["uPhosphorDecay"] = PhosphorDecay;
 
             var children = new SKRuntimeEffectChildren(_effect);
             children["uScreen"] = inputShader;
+            children["uPrev"]   = prevShader;
 
             using var runtimeShader = _effect.ToShader(uniforms, children);
 
@@ -167,9 +181,11 @@ namespace AprNes
                 0, 0);
             if (!ok)
             {
-                // Very unexpected; surface supports raster readback by construction.
                 Console.Error.WriteLine("[CRT GPU] SKSurface.ReadPixels failed; frame lost");
             }
+
+            // ── Stage 6: ping-pong swap for next frame's phosphor read ──
+            (_prevSurface, _outputSurface) = (_outputSurface, _prevSurface);
         }
     }
 }
