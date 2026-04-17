@@ -122,11 +122,17 @@ internal static unsafe class CrtGpuRenderThread
         using var prevShader = prevImage.ToShader(
             SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
 
-        // ── Stage 3: uniforms ──
+        // ── Stage 3: uniforms (full CPU parity — see crt_core_v1.sksl header) ──
         var uniforms = new SKRuntimeEffectUniforms(_effect!);
         uniforms["uSrcSize"] = new[] { (float)SrcW, (float)SrcH };
         uniforms["uDstSize"] = new[] { (float)dstW, (float)dstH };
-        uniforms["uScanlineStrength"] = Math.Clamp(1.0f - 1.0f / (1.0f + BeamSigma), 0f, 1f);
+        // Gaussian beam: inv = 1 / (2*sigma^2); guarded against div-by-zero
+        float sigma = Math.Max(BeamSigma, 0.001f);
+        uniforms["uBeamInv"] = 1.0f / (2.0f * sigma * sigma);
+        // InterlaceJitter: ±0.25 dst-rows, scaled to src-rows for shader convenience
+        float scaleY    = (float)SrcH / dstH;
+        float jitterDst = InterlaceJitter ? (((crt_frameCount & 1) == 0) ? 0.25f : -0.25f) : 0f;
+        uniforms["uJitter"] = jitterDst * scaleY;
         uniforms["uBrightness"] = BrightnessBoost;
         uniforms["uBloomStrength"] = BloomStrength;
         uniforms["uGamma"] = GammaCoeff;
