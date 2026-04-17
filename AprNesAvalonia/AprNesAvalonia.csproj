@@ -11,6 +11,8 @@
     <!-- .NET 10: full JIT tiered compilation + PGO -->
     <TieredCompilation>true</TieredCompilation>
     <TieredPGO>true</TieredPGO>
+    <!-- CRT runtime dispatch: both Scalar + SIMD compiled; GPU backend to come -->
+    <DefineConstants>$(DefineConstants);CRT_SIMD_AVAILABLE</DefineConstants>
     <!-- ConfigWindow uses parameterized constructor only; XAML runtime loader not used -->
     <NoWarn>$(NoWarn);AVLN3001</NoWarn>
     <!-- Build timestamp embedded into assembly metadata (immune to copy/rename) -->
@@ -26,16 +28,11 @@
     <Compile Include="../AprNes/NesCore/*.cs" Link="NesCore/%(Filename)%(Extension)" />
     <Compile Include="../AprNes/NesCore/Mapper/*.cs" Link="NesCore/Mapper/%(Filename)%(Extension)" />
     <Compile Include="../AprNes/NesCore/AudioPlus/*.cs" Link="NesCore/AudioPlus/%(Filename)%(Extension)" />
-    <!-- NTSC_CRT: CrtImpl property selects which CrtScreen is compiled.
-         Values: Simd (default, .NET 10 SIMD fork) | Scalar (net48-compatible baseline).
-         Usage: dotnet build ... -p:CrtImpl=Scalar  -->
-    <Compile Condition="'$(CrtImpl)' != 'Scalar'"
-             Include="../AprNes/NesCore/NTSC_CRT/*.cs"
-             Exclude="../AprNes/NesCore/NTSC_CRT/CrtScreen.cs"
-             Link="NesCore/NTSC_CRT/%(Filename)%(Extension)" />
-    <Compile Condition="'$(CrtImpl)' == 'Scalar'"
-             Include="../AprNes/NesCore/NTSC_CRT/*.cs"
-             Exclude="../AprNes/NesCore/NTSC_CRT/CrtScreen.Simd.cs"
+    <!-- NTSC_CRT: runtime dispatch (Phase 1). All three files compiled.
+         Shared.cs provides partial-class dispatcher; Scalar + Simd impls
+         coexist as independent static classes (CrtScreenScalar / CrtScreenSimd).
+         Runtime switch via NesCore.Crt_SetBackend() or crt-strategy CLI. -->
+    <Compile Include="../AprNes/NesCore/NTSC_CRT/*.cs"
              Link="NesCore/NTSC_CRT/%(Filename)%(Extension)" />
 
     <!-- 外部工具 -->

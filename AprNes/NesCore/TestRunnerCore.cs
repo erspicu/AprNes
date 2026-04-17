@@ -243,6 +243,20 @@ namespace AprNes
                     case "--crt":
                         NesCore.CrtEnabled = true;
                         break;
+                    case "--crt-strategy":
+                        if (i + 1 < args.Length)
+                        {
+                            var s = args[++i].ToLowerInvariant();
+                            NesCore.CrtBackend wanted = s switch
+                            {
+                                "scalar" => NesCore.CrtBackend.Scalar,
+                                "simd"   => NesCore.CrtBackend.Simd,
+                                "gpu"    => NesCore.CrtBackend.Gpu,
+                                _        => NesCore.Crt_GetBackend(),
+                            };
+                            NesCore.Crt_SetBackend(wanted);
+                        }
+                        break;
                     case "--expected-crc":
                         if (i + 1 < args.Length)
                         {
@@ -299,7 +313,7 @@ namespace AprNes
                 Console.Error.WriteLine("       [--screenshot <out.png>] [--timed-screenshots \"path1:t1,path2:t2,...\"]");
                 Console.Error.WriteLine("       [--dump-ac-results] [--log <results.log>]");
                 Console.Error.WriteLine("       [--benchmark <seconds>] [--resize-stage1 <filter>] [--resize-stage2 <filter>] [--scanline]");
-                Console.Error.WriteLine("       [--analog] [--ultra-analog] [--analog-output <AV|RF|SVIDEO>] [--analog-size <N>] [--crt]");
+                Console.Error.WriteLine("       [--analog] [--ultra-analog] [--analog-output <AV|RF|SVIDEO>] [--analog-size <N>] [--crt] [--crt-strategy <scalar|simd|gpu>]");
                 Console.Error.WriteLine("       [--region <NTSC|PAL|Dendy>]");
                 Console.Error.WriteLine("       [--audio-dsp] [--audio-mode <0|1|2>] [--region <NTSC|PAL|DENDY>]");
                 Console.Error.WriteLine("       [--perf <rom> [seconds] [note]]");
