@@ -109,6 +109,12 @@ namespace AprNes
             if (oddSwap && (ShowBackGround || ShowSprites) && scanline == 0 && cx == 2)
                 skippedPreRenderDot341 = false;
 
+            // ⚠️ WARNING: The two Eval-delay blocks below (non-phase-3 and phase-3) are NOT
+            // redundant with each other. The intermediate PPU_DATA_Pipeline_Step(1) and
+            // PpuPhase4_SpriteEvalAndInit() read ShowBG_EvalDelay / ShowSpr_EvalDelay between
+            // them. Phase-3 alignment defers the update to AFTER sprite eval — merging these
+            // blocks breaks the TriCNES v2 phase-3 timing model and will break AC sprite tests.
+
             // ── Eval delay: non-phase-3 (TriCNES line 1506: BEFORE SM) ──
             if ((mcCpuClock & 3) != 3)
             {
@@ -127,6 +133,7 @@ namespace AprNes
                 PpuPhase4_SpriteEvalAndInit();
 
             // ── Eval delay: phase-3 (TriCNES lines 1667-1673) ──
+            // ⚠️ See WARNING above — do NOT merge with the non-phase-3 block.
             if ((mcCpuClock & 3) == 3)
             {
                 ShowBG_EvalDelay = ShowBackGround;
@@ -240,7 +247,8 @@ namespace AprNes
                         byte compositePalIdx = backdropIdx;
                         int bgColor = 0, bgPalette = 0;
 
-                        if (cx <= 256 && showBG && (cx > 8 || ShowBgLeft8))
+                        // (Outer gate `cx > 0 && cx <= 256` already guarantees cx ∈ [1,256] — inner `cx <= 256` redundant.)
+                        if (showBG && (cx > 8 || ShowBgLeft8))
                         {
                             int bit = 15 - FineX;
                             bgColor = (((renderHigh >> bit) & 1) << 1) | ((renderLow >> bit) & 1);
@@ -252,7 +260,7 @@ namespace AprNes
 
                         // Loopless OAM multiplexer — SWAR pick of first (lowest-index) sprite with
                         // active shift (X counter == 0 OR skippedPreRenderDot341) AND non-empty bit7.
-                        if (cx <= 256 && showSpr && (cx > 8 || ShowSprLeft8) && spriteAnyActive)
+                        if (showSpr && (cx > 8 || ShowSprLeft8) && spriteAnyActive)
                         {
                             ulong xc = *(ulong*)sprXCounter;
                             // active_mask: 0x80 per byte where counter == 0 (or forced when skip flag)
@@ -284,8 +292,11 @@ namespace AprNes
 
                                 // Condition reorder (E): `i == 0` is the rarest false (1/8), place first
                                 // for fastest short-circuit. Other checks fall through naturally.
+                                // `ShowSprLeft8 || cx > 8` is redundant — already guaranteed by the outer
+                                // sprite-mux gate at line 255. Only `cx < 256` remains (hardware quirk:
+                                // sprite 0 hit does NOT fire at cx=256).
                                 if (i == 0 && canDetectSprite0Hit && sprZeroInSlots && showBG && bgColor != 0)
-                                { if ((ShowSprLeft8 || cx > 8) && cx < 256) { pendingSprite0Hit = true; canDetectSprite0Hit = false; } }
+                                { if (cx < 256) { pendingSprite0Hit = true; canDetectSprite0Hit = false; } }
 
                                 bool ow = (bgColor == 0) | sprPriority;
                                 bgColor = ow ? sprColor : bgColor;
@@ -301,9 +312,10 @@ namespace AprNes
                             CorruptPalettes(bgColor, vram_addr);
                         }
 
-                        if ((showBG || showSpr) && cx <= 256)
+                        // (Outer gate guarantees cx in [1,256]; `cx <= 256` here is redundant — removed.)
+                        if (showBG || showSpr)
                         { int pa = (bgPalette << 2) | bgColor; if (bgColor == 0) pa = 0; compositeColor = palCache[pa]; compositePalIdx = (byte)(ppu_ram[0x3f00 + pa] & 0x3f); }
-                        else if (cx <= 256) { if ((vram_addr & 0x3F1F) >= 0x3F00) { int pa = vram_addr & 0x1F; if ((pa & 3) == 0) pa &= 0x0F; compositeColor = NesColors[ppu_ram[0x3f00 + pa] & 0x3f]; compositePalIdx = (byte)(ppu_ram[0x3f00 + pa] & 0x3f); } }
+                        else { if ((vram_addr & 0x3F1F) >= 0x3F00) { int pa = vram_addr & 0x1F; if ((pa & 3) == 0) pa &= 0x0F; byte idx = (byte)(ppu_ram[0x3f00 + pa] & 0x3f); compositeColor = NesColors[idx]; compositePalIdx = idx; } }
 
                         dotColor = compositeColor;
                         dotPalIdx = compositePalIdx;
