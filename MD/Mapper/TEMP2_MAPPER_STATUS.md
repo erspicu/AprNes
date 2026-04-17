@@ -175,4 +175,20 @@
 
 ---
 
+## 待做清單（TODO — 新增 mapper）
+
+| 優先級 | Mapper | 說明 |
+|:------:|:------:|------|
+| — | **027** | VRC4 非授權變體（World Hero unl 等）；可沿用現有 VRC4 (21/25) 實作擴充 |
+| — | **083** | Cony / Yoko（中文盜版晶片，Dragon Ball Party 等） |
+| — | **178** | Waixing San Guo Zhong Lie Zhuan（外星三國忠烈傳系列） |
+| — | **209** (改進) | 已實作但 3/4 ROM 有畫面問題；需補強 JY Company 規格（見高優先級） |
+
+**行動項目**：
+1. 準備 temp2 測試 ROM（027 / 083 / 178 目錄目前不存在，需放入 .nes 檔）
+2. 規格研究：優先查 `ref/Mesen2-master/Core/NES/Mappers/` 對應實作
+3. 依既有流程實作 → MapperRegistry 註冊 → csproj 加檔 → build → 截圖驗證 → 更新 MAPPER_STATUS.md / TEMP2_MAPPER_STATUS.md / README.md
+
+---
+
 截圖位置：`temp/m_scan/`（209/210/211）、`temp/m176_shots/`（176）、`temp/m126_shots/`（126）。
