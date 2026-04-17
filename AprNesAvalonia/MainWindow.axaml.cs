@@ -89,6 +89,10 @@ public partial class MainWindow : Window
             GuiBenchmark.Trace("ctor: benchmark mode enabled");
             // Re-apply benchmark CLI flags AFTER ApplyIniSettings so CLI wins
             GuiBenchmark.ApplyOverrides();
+            // Re-configure render pipeline with overridden analog size so the
+            // window + output buffers resize to match (e.g. --analog-size 8
+            // from CLI needs window 2048x1680 regardless of INI's 4x)
+            ApplyRenderPipeline();
             // Mute audio playback: DSP can still run but nothing goes to WaveOut
             _emu.AudioPlaybackMuted = true;
             Opened += (_, _) =>
