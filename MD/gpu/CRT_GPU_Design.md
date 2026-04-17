@@ -297,13 +297,71 @@ Skia 的 `SKRuntimeEffect` 在 **有 GPU context 時走 GPU，無 GPU context �
 - 真正的 GPU 加速在 headless 要用 off-screen GPU context（v2 目標）
 
 ### TestRunner 對應
-```csharp
-// TestRunner 初始化時
-CrtConfig cfg = new() { CoreStrategy = PipelineStrategy.Gpu };  // 允許 GPU
-// 若 headless 環境偵測失敗，Configure() 會 fallback 到 Simd
+
+#### CLI 入口（新增）
+為讓無頭模式能精確指定策略（benchmark、正確性比對），新增兩個 CLI flag：
+
+```
+--crt-strategy=<auto|scalar|simd|gpu>   指定主策略；預設 auto（讀 ini）
+--crt-force                              關閉 fallback：指定策略若不可用則 abort
+--crt-policy=<gpu|simd|scalar>           Auto mode 的偏好順序；預設讀 ini
 ```
 
-不再強制 TestRunner 走 Scalar/Simd；讓 strategy 自然 resolve。
+範例：
+```bash
+# 明確指定 GPU，capability 不足自動 fallback 到 SIMD
+AprNes.exe --rom test.nes --crt-strategy=gpu --wait-result
+
+# 強制 GPU（benchmark 比對用；無 GPU 就直接失敗）
+AprNes.exe --rom test.nes --crt-strategy=gpu --crt-force
+
+# Auto mode 但偏好 SIMD（避免測到 GPU 差異）
+AprNes.exe --rom test.nes --crt-strategy=auto --crt-policy=simd
+```
+
+#### 解析流程
+```csharp
+// TestRunner / Main 啟動時
+var cli = CommandLineArgs.Parse(args);
+CrtConfig cfg = CrtConfig.LoadFromIni();          // 先讀 ini
+cli.OverlayOnto(cfg);                              // CLI 覆寫 ini
+if (cli.ForceMode) cfg.AllowFallback = false;
+
+CrtPipeline pipeline = new();
+try { pipeline.Configure(cfg); }
+catch (CrtStrategyUnavailableException ex) {
+    if (!cfg.AllowFallback) {
+        Console.Error.WriteLine($"[CRT] force strategy {ex.Requested} unavailable; abort");
+        Environment.Exit(2);
+    }
+    // 回到 fallback chain
+}
+```
+
+#### 三軸矩陣（策略 × 環境 × force）
+
+| strategy | 有 GPU | 無 GPU / 無 AVX2 | force 行為 |
+|----------|:-----:|:-----------------:|-----------|
+| `gpu`    | ✅ 走 GPU | fallback → Simd / Scalar | force 時 abort |
+| `simd`   | 走 SIMD | 有 AVX2 走 SIMD，否則 fallback Scalar | force 時若無 AVX2 abort |
+| `scalar` | 走 Scalar | 走 Scalar | 恆可用 |
+| `auto`   | 依 policy 決定 | 依 policy 決定 | force 無意義（auto 本身含 fallback） |
+
+#### Headless 底層行為
+- 有視窗 + GPU：Skia 走 GPU 加速
+- 有視窗 無 GPU：Skia 走 CPU rasterizer（正確但無加速）
+- 無視窗（TestRunner）：Skia `SKSurface.Create()` 於 raster backend → CPU rasterizer
+- 三者語義相同，僅效能不同；正確性 bit-exact 於同版 Skia
+
+#### 典型使用場景
+| 場景 | 指令 |
+|------|------|
+| Blargg 測試（預設，跟 MEMORY.md 基準同） | `AprNes.exe --rom X.nes --wait-result` （ini 預設 auto）|
+| GPU 正確性 CI | `--crt-strategy=gpu --crt-force` |
+| SIMD 基準複現 | `--crt-strategy=simd --crt-force` |
+| 跨 strategy 截圖比對 | 分別跑 `scalar` / `simd` / `gpu` 三次，diff |
+
+不再強制 TestRunner 走某固定策略；讓 strategy 自然 resolve 且可 CLI override。
 
 ### Determinism 策略
 headless Skia CPU rasterizer 在同一版本 Skia + 同平台下 bit-exact；跨平台容差 ±1/255。比對時採容差 diff 而非 exact match。
@@ -344,7 +402,8 @@ Build 完成後，`bin/Debug/net10.0/Shaders/crt_core_v1.sksl` 應存在並可�
 - [ ] `ShaderLoader` 類別（含快取、錯誤訊息）
 - [ ] `IEmuRenderer` + `BitmapBlitRenderer` 介面重構
 - [ ] `ICrtStage` / `CrtPipeline` / `PipelineStrategy` 列舉
-- [ ] Config 讀寫 `CoreStrategy` + `AutoPolicy`
+- [ ] Config 讀寫 `CoreStrategy` + `AutoPolicy` + `AllowFallback`
+- [ ] CLI flag 解析：`--crt-strategy`、`--crt-force`、`--crt-policy`（AprNes.exe 與 AprNesAvalonia.exe 皆支援）
 - [ ] `AnalogConfigWindow` 下拉選單 + 顯示實際生效策略
 
 ### M1 — GPU 最小可驗證 shader（1 天）
@@ -443,6 +502,8 @@ v1 完成必須通過：
 - [ ] `Auto` mode 在 AVX2 + Skia GPU 環境 → 選到 `Gpu`
 - [ ] `Auto` mode 在僅 AVX2 環境 → 選到 `Simd`
 - [ ] `Auto` mode 在純量環境 → 選到 `Scalar`
+- [ ] CLI `--crt-strategy=gpu/simd/scalar/auto` 可從命令列覆寫 ini
+- [ ] CLI `--crt-force` 時 capability 不足明確 abort (exit code 2)
 - [ ] GPU 視覺與 SIMD 差異 ≤ ±2/255 per channel
 - [ ] Phosphor decay 在 GPU 運作且 resize 後不 crash
 - [ ] TestRunner headless 模式走 GPU 不 crash（效能可接受）
