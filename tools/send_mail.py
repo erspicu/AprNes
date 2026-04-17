@@ -20,8 +20,10 @@ Options:
     --from      Sender email (default: baxermux@gmail.com)
     --dry-run   Print email without sending
 
-Env:
-    GMAIL_APP_PASSWORD  Gmail App Password
+Password resolution order (first hit wins):
+    1. --password CLI arg
+    2. File at C:\\key\\gmail.txt (stripped)
+    3. $GMAIL_APP_PASSWORD env var
 """
 
 import argparse
@@ -37,7 +39,24 @@ from email import encoders
 
 DEFAULT_FROM = "baxermux@gmail.com"
 DEFAULT_TO = "baxermux@gmail.com"
-DEFAULT_PASSWORD = os.environ.get('GMAIL_APP_PASSWORD', '')
+PASSWORD_FILE = r"C:\key\gmail.txt"
+
+
+def load_password():
+    """Read password from PASSWORD_FILE, falling back to env var."""
+    try:
+        with open(PASSWORD_FILE, 'r', encoding='utf-8') as f:
+            pw = f.read().strip()
+            if pw:
+                return pw
+    except FileNotFoundError:
+        pass
+    except OSError as e:
+        print(f"Warning: could not read {PASSWORD_FILE}: {e}", file=sys.stderr)
+    return os.environ.get('GMAIL_APP_PASSWORD', '')
+
+
+DEFAULT_PASSWORD = load_password()
 
 def markdown_to_html(md_text):
     """Simple markdown to HTML conversion (no external deps)."""
@@ -101,7 +120,11 @@ def attach_file(msg, filepath):
 
 def send_email(from_addr, to_addr, subject, body, content_type='plain',
                password=None, dry_run=False, attachments=None):
-    password = password or os.environ.get('GMAIL_APP_PASSWORD', DEFAULT_PASSWORD)
+    password = password or DEFAULT_PASSWORD or os.environ.get('GMAIL_APP_PASSWORD', '')
+    if not password and not dry_run:
+        raise RuntimeError(
+            f"Gmail app password not found. Place it in {PASSWORD_FILE} "
+            f"or set GMAIL_APP_PASSWORD env var, or pass --password.")
 
     msg = MIMEMultipart('mixed')
     msg['From'] = from_addr
@@ -149,6 +172,7 @@ def main():
     parser.add_argument('--stdin', action='store_true', help='Read body from stdin')
     parser.add_argument('--html', action='store_true', help='Convert markdown to HTML')
     parser.add_argument('--attach', '-a', nargs='+', help='Attach files (images, zips, etc.)')
+    parser.add_argument('--password', '-p', help=f'Override password (default: read {PASSWORD_FILE})')
     parser.add_argument('--dry-run', action='store_true', help='Print without sending')
     args = parser.parse_args()
 
@@ -172,6 +196,7 @@ def main():
         content_type = 'html'
 
     send_email(args.from_addr, args.to, args.subject, body, content_type,
+               password=args.password,
                dry_run=args.dry_run, attachments=args.attach)
 
 
