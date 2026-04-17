@@ -23,7 +23,9 @@ set "TRACE=%~dp0gui_benchmark.trace.log"
 
 set TEST_SEC=20
 set COOL_SEC=10
-set "FLAGS_COMMON=--rom "%ROM%" --gui-benchmark %TEST_SEC% --analog --ultra-analog --analog-output RF --analog-size 8 --crt --audio-dsp --audio-mode 2"
+:: Store flags without ROM (ROM contains parens that break for-block parsing).
+:: Inside the for loop use !ROM! + !FLAGS_COMMON! (delayed expansion) instead of %VAR%.
+set "FLAGS_COMMON=--gui-benchmark %TEST_SEC% --analog --ultra-analog --analog-output RF --analog-size 8 --crt --audio-dsp --audio-mode 2"
 
 echo ============================================================
 echo   AprNesAvalonia GUI Benchmark
@@ -53,7 +55,7 @@ for %%S in (%STRATEGIES%) do (
         echo --- !LABEL!  [strategy=!STRAT!] ---
         del "%LOG%" 2>nul
 
-        "%EXE%" %FLAGS_COMMON% --crt-strategy !STRAT!
+        "%EXE%" --rom "!ROM!" !FLAGS_COMMON! --crt-strategy !STRAT!
 
         if exist "%LOG%" (
             for /f "tokens=5 delims= " %%f in ('findstr /C:"FPS presented" "%LOG%"') do set "FPS_R=%%f"
