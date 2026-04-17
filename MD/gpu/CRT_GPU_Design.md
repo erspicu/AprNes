@@ -636,6 +636,109 @@ dotnet build AprNesAvalonia/AprNesAvalonia.csproj -c Debug -p:CrtImpl=Scalar
 
 ---
 
+## 15. NTSC GPU 適配性分析（基於 Ntsc.cs survey）
+
+Phase 0 baseline 顯示：只加速 CRT 頂多 1.05x（阿姆達爾定律）。要有意義加速必須把 NTSC 的一部分也搬到 GPU。但 NTSC 是 **時序密集的訊號處理**，並非所有 method 都適合 GPU。以下為逐 method 分類。
+
+### 15.1 NTSC 總體瓶頸結構
+
+| 模式 | CPU 熱點 | GPU 潛力 |
+|------|---------|:-------:|
+| Analog（非 UltraAnalog）| 調色盤 LUT、demod、YIQ→RGB | **高**（~80% 可搬）|
+| UltraAnalog Fast | 加上 IIR chroma filter | 中（可 refactor 為 FIR）|
+| UltraAnalog Physical (RF/SVideo) | 加上 slew-rate 波形模擬（序列 IIR）| 低（根本性 CPU-bound）|
+
+### 15.2 Method 分類表
+
+#### CPU-ONLY（序列狀態 / PPU 驅動，不能搬 GPU）
+
+| Method | 行 | 不能搬原因 |
+|--------|:-:|-----------|
+| `Ntsc_CaptureScanline` | 380 | PPU 於 cx==260 逐 scanline 呼叫；寫 `scanPhase6`/`scanPhaseBase` 序列相位狀態。Race 會破壞色相 |
+| `DecodeScanline_Fast`（legacy）| 426 | 更新共用 phase 狀態（已被 `Ntsc_FlushPendingRows` 取代，列入只為記錄）|
+| `DecodeScanline_Physical`（legacy）| 530 | 同上 |
+| `RunWaveformLoop` | 601 | 4-sample 鬆弛率濾波 IIR：`vPrev`、`vVel` 前後依賴；第 N 取樣輸出是 N+1 輸入 |
+| `RunWaveformLoop_SVideo` | 682 | 同上，S-Video 變體的 slew chain |
+
+**關鍵**：UltraAnalog + RF/SVideo 的 **physical waveform simulation** 核心就在 `RunWaveformLoop*` 裡。這是 **RF 雜訊、buzz、slew-limiting** 等類比特徵的真正來源，不能搬 GPU。
+
+#### GPU-MAYBE（需 refactor 掉 IIR 才能搬）
+
+| Method | 行 | Refactor 方向 |
+|--------|:-:|--------------|
+| `RunDecodeLoop` | 491 | IIR chroma filter `iF += ChromaBlur * (chroma * c - iF)`；改為 2-3 tap 分離式 FIR（Hamming 窗），畫質損失 <1% |
+| `DecodeAV_SVideo` | 514 | 同上，較簡單的 chroma path |
+| `Ntsc_FlushPendingRows` | 400 | 主派發者，本身無狀態；但 worker 內部才是重點 |
+
+#### GPU-OK（純無狀態計算，可直搬 SkSL）
+
+| Method | 行 | 功能 |
+|--------|:-:|------|
+| `Ntsc_Init` / `UpdateColorTemp` / `UpdateGammaLUT` | 131/230/244 | LUT 預計算；上傳為 texture/uniform |
+| `GenerateSignal` | 444 | 調色盤 → YIQ LUT 查表 |
+| `DecodeScanline_Fast_Worker` | 437 | 無狀態 dispatcher（phase0 param）|
+| `DecodeScanline_Physical_Worker` | 541 | 無狀態 dispatcher + RF jitter（確定性）|
+| `DemodulateRow_Core` | 732 | YIQ→RGB + 6-tap Hann 窗，標準 separable filter |
+| `YiqToRgb` | 857 | 矩陣乘 + gamma LUT，per-pixel |
+| `ResampleH_Bilinear` | 295 | 水平 bilinear 重取樣 |
+| `VerticalFillRows` | 313 | 垂直 bilinear 插值 |
+
+### 15.3 天然的 CPU/GPU 切分點
+
+```
+PPU ---cx==260---> Ntsc_CaptureScanline (CPU-ONLY)
+                      ↓ 寫入 palBuf + phase 狀態
+              Ntsc_FlushPendingRows (CPU orchestrator)
+                      ↓ Parallel.For 240 rows
+        ┌─────────────┴─────────────┐
+        │ Fast path                 │ Physical path
+        │   GenerateSignal (OK)     │   RunWaveformLoop (CPU-ONLY)
+        │   RunDecodeLoop (MAYBE)   │     ↓
+        │   DecodeAV_SVideo (MAYBE) │   DemodulateRow_Core (OK)
+        └─────────────┬─────────────┘
+                      ↓ linearBuffer[Y/I/Q]  ← 天然 CPU/GPU 邊界！
+                   CRT stage
+                      ↓
+                 AnalogScreenBuf
+```
+
+### 15.4 Phase 2 修正策略
+
+原計畫「只搬 CRT」→ 1.05x 速度上限。修正為**依照類比模式切分**：
+
+| 模式 | GPU 策略 | 預期加速 |
+|------|----------|:-------:|
+| Analog (non-Ultra) | 全 GPU：GenerateSignal + RunDecodeLoop→FIR + DemodulateRow + YiqToRgb + CRT | **1.8-2.5x** |
+| UltraAnalog Fast | GPU：除 IIR 外全部；IIR refactor 為 FIR | **1.5-2x** |
+| UltraAnalog Physical (RF/SVideo) | **混合**：slew loop 留 CPU，demod + CRT 去 GPU | **1.2-1.3x** |
+
+### 15.5 Phase 2 工作項（取代原 M11-M13）
+
+- [ ] M11 — 定義 `INtscBackend` 抽象（Scalar / Simd / Gpu）
+- [ ] M12 — CPU 端 `linearBuffer` → GPU texture 上傳（per-frame，`SKImage.FromPixels`）
+- [ ] M13 — Fast path shader：`ntsc_fast.sksl`（palette LUT + FIR chroma + demod）
+- [ ] M14 — Physical path：**只做 demod + YiqToRgb 去 GPU**，slew loop 留 CPU 寫 `linearBuffer`
+- [ ] M15 — `crt_core.sksl` 接在 NTSC GPU 輸出之後，免來回 CPU
+- [ ] M16 — 三模式加速量測，對比 Phase 0 baseline
+
+### 15.6 風險與取捨
+
+| 風險 | 對策 |
+|------|------|
+| IIR → FIR 視覺差異 | 先做 A/B 截圖比對；差異 ≤ ±2/255 才採用 |
+| Physical mode CPU↔GPU 來回拷貝成本 | `linearBuffer` 以 `SKBitmap.InstallPixels` 零拷貝上傳；Physical mode 上限可能只有 1.2x，用戶該接受 |
+| CPU-only slew loop 在 ARM 效能 | `RunWaveformLoop*` 用 `Vector<T>`，NEON 自動加速，短期不做 NEON 專屬 |
+| Shader LUT 容量限制 | palette LUT 64×8 = 512 entries × 3 floats = 6KB，遠低於任何 GPU 限制 |
+
+### 15.7 建議優先序
+
+1. **先做 Analog (non-Ultra) 的 GPU path** — 最乾淨、加速比最高、技術風險最低
+2. UltraAnalog Fast 接著做 — 只需要 IIR→FIR 重寫
+3. UltraAnalog Physical 最後做 — 需要設計 CPU↔GPU 混合 pipeline，最複雜，加速比最低
+4. **不做**：`RunWaveformLoop*` 的 GPU 化（本質不適合）
+
+---
+
 ## 14. 參考資料
 
 - [Avalonia Custom Skia Rendering](https://docs.avaloniaui.net/docs/guides/graphics-and-animation/custom-drawing-operation)
