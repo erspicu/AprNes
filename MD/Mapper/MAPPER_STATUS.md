@@ -1,6 +1,6 @@
 # AprNes Mapper 實作狀態
 
-**已實作：77 個　　預備實作：5 個　　最後更新：2026-04-17**
+**已實作：78 個　　預備實作：4 個　　最後更新：2026-04-17**
 
 結果說明：✅ 正常　⚠️ 部分問題　❌ 有問題　❓ 待確認／不明
 
@@ -22,10 +22,6 @@
 ### 2026-04-17 session 嘗試失敗（暫緩）
 | Mapper | 失敗原因 |
 |:------:|--------|
-| 012 (DBDROM) | MMC3 + CHR bank 擴展位元；原理與 074 類似可參考 074 做獨立 impl（本 session 時間用盡未做）|
-| 096 (Oeka Kids) | 需 PPU VRAM address hook；IMapper 介面未支援，需新增 `NotifyVramAddressChange` |
-| 163 (Nanjing) | 同 096 需 VRAM hook + copy protection read ($5100/$5500) |
-| 176 (FK23C) | 400+ 行複雜 mapper (Mesen2)：MMC3 + 多 banking mode + WRAM banking + extended MMC3 mode |
 | 126 (PowerJoy multicart) | 多層選單跳轉 + 大型 ROM (4MB+) 多級 banking，測試 ROM 僅 1 顆 |
 
 ---
@@ -113,6 +109,7 @@
 | **096** | Bandai Oeka Kids | ✅ | Anpanman Hiragana / Oekaki Shiyou | PPU 匯流排 $2xxx 遷移觸發 inner CHR bank latch（無需改 IMapper，沿用 PpuClock）|
 | **163** | Nanjing (南晶) | ✅ | FF7 中文、Diablo 暗黑破壞神、大話西遊、Chao Ji Ji Qi Ren | $5000/$5100/$5200/$5300 + $5101 toggle；copy protection read $5100/$5500 |
 | **173** | TXC 22211C | ❓ | 無測試 ROM | TXC chip copy-protection；$4100-$4103 accumulator + invert；$8000+ trigger output |
+| **176** | FK23C (Waixing) | ⚠️ | 12-in-1 / 3-in-1 ES-Q800C / 4-in-1 KT-220B OK；4-in-1 BS-8088 / FK23Cxxxx S-0210A 綠屏 | MMC3 super-set：5 PRG banking modes、MMC3/CNROM CHR mode、prgBaseBits/chrBaseBits；未實作：extended MMC3 mode、WRAM banking、$5101 toggle |
 
 ---
 
