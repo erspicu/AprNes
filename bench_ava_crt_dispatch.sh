@@ -38,6 +38,8 @@ extract_fps() {
     echo "$1" | sed -n 's/.*= \([0-9.]*\) FPS.*/\1/p' | head -1
 }
 
+CURRENT_STRAT="simd"
+
 run_bench() {
     local LABEL="$1"
     local DUR="$2"
@@ -46,26 +48,29 @@ run_bench() {
         --rom "$ROM" --benchmark "$DUR" \
         --ultra-analog --analog-output RF --analog-size "$ANALOG_SIZE" --crt \
         --accuracy A \
-        --audio-dsp --audio-mode 2 2>&1)
+        --audio-dsp --audio-mode 2 \
+        --crt-strategy "$CURRENT_STRAT" 2>&1)
     local FPS
     FPS=$(extract_fps "$OUT")
-    # Label goes to stderr so caller can capture only the FPS on stdout
     echo "  ${LABEL}: ${FPS} FPS" >&2
     echo "$FPS"
 }
 
-# Results array: [Scalar_R1, Scalar_R2, Scalar_R3, Simd_R1, Simd_R2, Simd_R3]
+# Results array
 declare -A RESULTS
 
-for IMPL in Scalar Simd; do
-    echo "============================================================"
-    echo "  Building AprNesAvalonia Release with CrtImpl=${IMPL}"
-    echo "============================================================"
-    dotnet build AprNesAvalonia/AprNesAvalonia.csproj -c Release --nologo -v q -p:CrtImpl="$IMPL" 2>&1 | tail -3
-    echo ""
+# Phase 1+ uses runtime --crt-strategy; single Release build covers all backends
+echo "============================================================"
+echo "  Building AprNesAvalonia Release (all backends in one binary)"
+echo "============================================================"
+dotnet build AprNesAvalonia/AprNesAvalonia.csproj -c Release --nologo -v q 2>&1 | tail -3
+echo ""
 
+for IMPL in Scalar Simd Gpu; do
+    IMPL_LOWER=$(echo "$IMPL" | tr '[:upper:]' '[:lower:]')
+    CURRENT_STRAT="$IMPL_LOWER"
     echo "============================================================"
-    echo "  Benchmark: CrtImpl=${IMPL}  (ultra ${ANALOG_SIZE}x RF, DSP mode 2)"
+    echo "  Benchmark: --crt-strategy=${IMPL_LOWER}  (ultra ${ANALOG_SIZE}x RF, DSP mode 2)"
     echo "============================================================"
 
     # Run 1: JIT warmup
@@ -95,7 +100,7 @@ for IMPL in Scalar Simd; do
     echo ""
 
     # Cooldown before next strategy (skip after last)
-    if [[ "$IMPL" != "Simd" ]]; then
+    if [[ "$IMPL" != "Gpu" ]]; then
         echo "--- Cooling ${COOLDOWN}s before next strategy ---"
         sleep $COOLDOWN
     fi
@@ -157,7 +162,7 @@ Audio: 5×256-tap FIR (per-channel) → Triangle Bass Boost (12dB) →
 |:-------:|:-----------:|:-----:|:-----:|:------------:|:--------:|
 MDEOF
 
-for IMPL in Scalar Simd; do
+for IMPL in Scalar Simd Gpu; do
     AVG="${RESULTS[${IMPL}_AVG]}"
     REALTIME=$(awk "BEGIN{printf \"%.2f\", $AVG / 60.0988}")
     echo "| ${IMPL} | ${RESULTS[${IMPL}_R1]} | ${RESULTS[${IMPL}_R2]} | ${RESULTS[${IMPL}_R3]} | **${AVG}** | ${REALTIME}x |" >> "$OUTFILE"
@@ -166,15 +171,20 @@ done
 # Speedup analysis
 SCALAR_AVG="${RESULTS[Scalar_AVG]}"
 SIMD_AVG="${RESULTS[Simd_AVG]}"
-SPEEDUP=$(awk "BEGIN{printf \"%.2f\", $SIMD_AVG / $SCALAR_AVG}")
+GPU_AVG="${RESULTS[Gpu_AVG]}"
+S_VS_SIMD=$(awk "BEGIN{printf \"%.2f\", $SIMD_AVG / $SCALAR_AVG}")
+SIMD_VS_GPU=$(awk "BEGIN{printf \"%.2f\", $GPU_AVG / $SIMD_AVG}")
+S_VS_GPU=$(awk "BEGIN{printf \"%.2f\", $GPU_AVG / $SCALAR_AVG}")
 
 cat >> "$OUTFILE" << MDEOF
 
 ### Speedup 分析
 
-| 比較 | Scalar FPS | SIMD FPS | Speedup |
-|------|:----------:|:--------:|:-------:|
-| Scalar → SIMD | ${SCALAR_AVG} | ${SIMD_AVG} | **${SPEEDUP}x** |
+| 比較 | 基準 FPS | 目標 FPS | Speedup |
+|------|:--------:|:--------:|:-------:|
+| Scalar → SIMD | ${SCALAR_AVG} | ${SIMD_AVG} | **${S_VS_SIMD}x** |
+| SIMD → GPU   | ${SIMD_AVG} | ${GPU_AVG} | **${SIMD_VS_GPU}x** |
+| Scalar → GPU | ${SCALAR_AVG} | ${GPU_AVG} | **${S_VS_GPU}x** |
 
 > **NES 即時 FPS**：60.0988（NTSC）。平均 FPS ÷ 60.0988 = 即時倍率；≥ 1.0x 即可流暢運行。
 
@@ -194,5 +204,6 @@ echo ""
 echo "=== Done ==="
 echo "Scalar avg: ${SCALAR_AVG} FPS"
 echo "SIMD   avg: ${SIMD_AVG} FPS"
-echo "Speedup:   ${SPEEDUP}x"
-echo "Report:    ${OUTFILE}"
+echo "GPU    avg: ${GPU_AVG} FPS"
+echo "SIMD/Scalar: ${S_VS_SIMD}x   GPU/SIMD: ${SIMD_VS_GPU}x   GPU/Scalar: ${S_VS_GPU}x"
+echo "Report:     ${OUTFILE}"
