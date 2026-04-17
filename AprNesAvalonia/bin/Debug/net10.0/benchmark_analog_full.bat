@@ -1,10 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion
 chcp 65001 >nul 2>&1
-title AprNes Analog Full Benchmark (8x / Ultra / RF / CRT / DSP Mode 2)
+title AprNesAvalonia Analog Full Benchmark (8x / Ultra / RF / CRT / DSP Mode 2)
 
-if not exist "%~dp0AprNes.exe" (
-    echo ERROR: AprNes.exe not found at %~dp0
+if not exist "%~dp0AprNesAvalonia.exe" (
+    echo ERROR: AprNesAvalonia.exe not found at %~dp0
     pause
     exit /b 1
 )
@@ -15,15 +15,15 @@ if not exist "%~dp0tools\benchmark\ny2011.nes" (
 )
 
 :: ============================================================
-:: AprNes Analog Full Benchmark
-:: Config: NTSC / 8x (2048x1920) / Ultra Analog / RF Output / CRT / Audio DSP Mode 2 (Modern)
+:: AprNesAvalonia Analog Full Benchmark
+:: Config: NTSC / 8x / Ultra Analog / RF Output / CRT / Audio DSP Mode 2
 :: Maximum visual+audio processing load
 :: Protocol: JIT warmup - cooldown - run2 - cooldown - run3 - best of 3
 :: ============================================================
 
-set "EXE=%~dp0AprNes.exe"
+set "EXE=%~dp0AprNesAvalonia.exe"
 set "ROM=%~dp0tools\benchmark\ny2011.nes"
-set "TMPFILE=%TEMP%\aprnes_bench_analog_full.txt"
+set "TMPFILE=%TEMP%\aprnesava_bench_analog_full.txt"
 set JIT_SEC=20
 set TEST_SEC=20
 set COOL_SEC=30
@@ -31,9 +31,10 @@ set COOL_SEC=30
 set "FLAGS=--region NTSC --ultra-analog --analog-output RF --analog-size 8 --crt --audio-dsp --audio-mode 2"
 
 echo ============================================================
-echo   AprNes Analog Full Benchmark
+echo   AprNesAvalonia Analog Full Benchmark
 echo   ROM: ny2011.nes
 echo   Config:
+echo     Runtime:      .NET 10 (TieredPGO)
 echo     Region:       NTSC
 echo     Analog:       Ultra (NTSC v2 full decode)
 echo     Output:       RF (composite + CRT RF noise)
@@ -42,12 +43,6 @@ echo     Resolution:   8x (2048x1680)
 echo     Audio:        Mode 2 (Modern DSP, --audio-dsp enabled)
 echo   Protocol: JIT(%JIT_SEC%s) + Cool(%COOL_SEC%s) + Run2(%TEST_SEC%s) + Cool(%COOL_SEC%s) + Run3(%TEST_SEC%s)
 echo   Start: %date% %time:~0,8%
-for /f "delims=" %%v in ('"%EXE%" --version 2^>nul') do echo   %%v
-echo.
-echo   Hardware:
-for /f "delims=" %%c in ('powershell -NoProfile -Command "(Get-CimInstance Win32_Processor).Name" 2^>nul') do echo     CPU: %%c
-for /f "delims=" %%m in ('powershell -NoProfile -Command "[math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory/1GB)" 2^>nul') do echo     RAM: %%m GB
-for /f "delims=" %%g in ('powershell -NoProfile -Command "(Get-CimInstance Win32_VideoController).Name" 2^>nul') do echo     GPU: %%g
 echo ============================================================
 echo.
 
@@ -87,10 +82,11 @@ for /f %%a in ('powershell -NoProfile -Command "[math]::Max([math]::Max([double]
 
 :: -- Results Summary --
 echo ============================================================
-echo   ANALOG FULL BENCHMARK RESULTS
+echo   ANALOG FULL BENCHMARK RESULTS (AprNesAvalonia / .NET 10)
 echo ============================================================
 echo.
 echo   Configuration:
+echo     Runtime:      .NET 10 (TieredPGO)
 echo     Region:       NTSC
 echo     Analog:       Ultra (NTSC v2 full decode)
 echo     Output:       RF (composite + CRT RF noise)
