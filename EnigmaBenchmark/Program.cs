@@ -8,9 +8,29 @@ public static class Program
 {
     public static int Main(string[] args)
     {
+        // ── Parse --scope ──
+        CrackScope scope = CrackScope.Normal;
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i] == "--scope")
+            {
+                scope = args[i + 1].ToLowerInvariant() switch
+                {
+                    "quick"   => CrackScope.Quick,
+                    "normal"  => CrackScope.Normal,
+                    "hard"    => CrackScope.Hard,
+                    "extreme" => CrackScope.Extreme,
+                    _ => CrackScope.Normal,
+                };
+            }
+        }
+
         Console.WriteLine("================================================");
         Console.WriteLine("  EnigmaBenchmark — Phase A (CLI, timing only)");
         Console.WriteLine("================================================");
+        Console.WriteLine();
+        Console.WriteLine($"Scope                : {scope}  ({scope.Describe()})");
+        Console.WriteLine($"Total keys to search : {scope.TotalKeys():N0}");
         Console.WriteLine();
 
         // ── Prepare scenario ──
@@ -46,7 +66,6 @@ public static class Program
 
         int trueIc = IcScorer.ScoreInt(plaintext);
         Console.WriteLine($"True-plaintext IC    : {trueIc / 100000.0:F5} (threshold = {IcScorer.GermanThreshold:F4})");
-        Console.WriteLine($"Key space to search  : 60 wheel orders × 17,576 positions = 1,054,560 keys");
         Console.WriteLine();
 
         // ── Fixed-parts helper: cracker needs to know ring setting + plugboard + reflector ──
@@ -70,16 +89,18 @@ public static class Program
 
         var results = new List<(string name, CrackResult result)>();
 
+        // JIT warmup uses the SMALLEST scope to avoid wasting minutes on an
+        // extreme-scope warmup run
+        var warmupScope = CrackScope.Quick;
+
         foreach (var c in crackers)
         {
-            // JIT warmup — full run, result discarded
-            Console.Write($"  [{c.Name}] JIT warmup ... ");
-            _ = c.Crack(ciphertext, fixedParts);
+            Console.Write($"  [{c.Name}] JIT warmup ({warmupScope}) ... ");
+            _ = c.Crack(ciphertext, fixedParts, warmupScope);
             Console.WriteLine("done");
 
-            // Measured run
-            Console.Write($"  [{c.Name}] measured   ... ");
-            var r = c.Crack(ciphertext, fixedParts);
+            Console.Write($"  [{c.Name}] measured ({scope}) ... ");
+            var r = c.Crack(ciphertext, fixedParts, scope);
             Console.WriteLine($"{r.ElapsedSeconds:F3}s  ({r.KeysTried / r.ElapsedSeconds / 1000:F0} K keys/s)  found={r.Found}  bestIC={r.BestIc / 100000.0:F5}");
             results.Add((c.Name, r));
             Console.WriteLine();
