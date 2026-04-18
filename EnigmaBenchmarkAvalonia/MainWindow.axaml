@@ -31,7 +31,9 @@
             <StackPanel Orientation="Vertical" Spacing="8">
                 <StackPanel Orientation="Horizontal" Spacing="10">
                     <TextBlock VerticalAlignment="Center" Text="Cipher:" Foreground="#8A93A0" />
-                    <ComboBox x:Name="CipherBox" SelectedIndex="0" Width="340">
+                    <ComboBox x:Name="CipherBox" SelectedIndex="0" Width="380">
+                        <ComboBoxItem Content="Zimmermann / 0075 codebook (WWI, 1917)" />
+                        <ComboBoxItem Content="ADFGVX (WWI, 1918 — Painvin vs German Spring Offensive)" />
                         <ComboBoxItem Content="Enigma M3 (Wehrmacht)" />
                         <ComboBoxItem Content="Enigma M4 (U-Boot Shark)" />
                         <ComboBoxItem Content="Lorenz SZ42 (Tunny, χ-wheel recovery — Colossus stage 1)" />

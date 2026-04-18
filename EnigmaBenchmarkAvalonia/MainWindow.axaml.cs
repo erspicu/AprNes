@@ -60,7 +60,21 @@ public partial class MainWindow : Window
     {
         switch (CipherBox.SelectedIndex)
         {
-            case 3:   // T52e
+            case 0:   // Zimmermann / codebook
+            {
+                var cb = ZimmermannCodebook.Create(DefaultScenario.Zimmermann0075());
+                var cipher = cb.Encrypt(DefaultScenario.ZimmermannTargetPlain);
+                Reveal.SetCipherString(cipher.Length > 400 ? cipher[..400] + "…" : cipher);
+                break;
+            }
+            case 1:   // ADFGVX
+            {
+                var m = AdfgvxMachine.Create(DefaultScenario.AdfgvxGrid, DefaultScenario.AdfgvxKeyword);
+                var cipher = m.Encrypt(DefaultScenario.AdfgvxPlaintextFormatted);
+                Reveal.SetCipherString(cipher);
+                break;
+            }
+            case 5:   // T52e
             {
                 var plaintext = DefaultScenario.T52ePlaintextBytes;
                 var pins      = DefaultScenario.T52ePins();
@@ -71,7 +85,7 @@ public partial class MainWindow : Window
                 Reveal.SetCipherString(Baudot.Decode(cipher));
                 break;
             }
-            case 2:   // Lorenz
+            case 4:   // Lorenz
             {
                 var plaintext = DefaultScenario.LorenzPlaintextBytes;
                 var pins = DefaultScenario.LorenzChiPins();
@@ -81,7 +95,7 @@ public partial class MainWindow : Window
                 Reveal.SetCipherString(Baudot.Decode(cipher));
                 break;
             }
-            case 1:   // M4
+            case 3:   // M4
             {
                 var plaintext = DefaultScenario.M4PlaintextBytes;
                 var trueKey   = DefaultScenario.M4TrueKey();
@@ -89,7 +103,7 @@ public partial class MainWindow : Window
                 Reveal.SetCipher(ct);
                 break;
             }
-            default:  // M3
+            default:  // M3 (index 2 or unknown)
             {
                 var plaintext = DefaultScenario.PlaintextBytes;
                 var trueKey   = DefaultScenario.TrueKey();
@@ -190,10 +204,12 @@ public partial class MainWindow : Window
     {
         switch (CipherBox.SelectedIndex)
         {
-            case 3:  await RunBenchmarkT52e(scope);   break;
-            case 2:  await RunBenchmarkLorenz(scope); break;
-            case 1:  await RunBenchmarkM4(scope);     break;
-            default: await RunBenchmarkM3(scope);     break;
+            case 0:  await RunBenchmarkZimmermann(); break;
+            case 1:  await RunBenchmarkAdfgvx();     break;
+            case 2:  await RunBenchmarkM3(scope);    break;
+            case 3:  await RunBenchmarkM4(scope);    break;
+            case 4:  await RunBenchmarkLorenz(scope); break;
+            case 5:  await RunBenchmarkT52e(scope);   break;
         }
     }
 
@@ -206,6 +222,87 @@ public partial class MainWindow : Window
     {
         if (!RunGpu && !RunSimd && !RunParallel && !RunScalar)
             AppendColored("  (no backends selected — skipping)\n\n", BrushRed);
+    }
+
+    async Task RunBenchmarkZimmermann()
+    {
+        var codebook = ZimmermannCodebook.Create(DefaultScenario.Zimmermann0075());
+        var targetCipher = codebook.Encrypt(DefaultScenario.ZimmermannTargetPlain);
+        Reveal.SetCipherString(targetCipher.Length > 400 ? targetCipher[..400] + "…" : targetCipher);
+
+        // Build (plaintext, ciphertext) crib pairs using the same codebook.
+        var cribs = new List<(string, string)>();
+        foreach (var plain in DefaultScenario.ZimmermannCribsPlain)
+            cribs.Add((plain, codebook.Encrypt(plain)));
+
+        AppendColored("──── RUN  Zimmermann Telegram / Code 0075 (WWI, 1917) ────\n", BrushAmber);
+        AppendColored("Historical context: January 1917, Arthur Zimmermann offers Mexico\n"
+                    + "  Texas / New Mexico / Arizona if they attack the US. British Room 40\n"
+                    + "  intercepts the cable, but the codebook is not brute-force breakable;\n"
+                    + "  Nigel de Grey & Rev. Montgomery recover code groups word-by-word\n"
+                    + "  from accumulated known-plaintext intercepts. April 6 1917, US at war.\n\n", BrushMuted);
+        AppendColored($"Ciphertext groups: {targetCipher.Split(' ').Length}   "
+                    + $"Known-plaintext cribs: {cribs.Count}\n\n", BrushCyan);
+
+        var cracker = new ScalarCrackerZimmermann();
+        AppendColored("  [", BrushMuted);
+        AppendColored(cracker.Name, BrushCyan);
+        AppendColored("] measured… ", BrushMuted);
+
+        var r = await Task.Run(() => cracker.Crack(targetCipher, cribs));
+
+        AppendColored($"{r.ElapsedSeconds * 1000,6:F1}ms  ", BrushAmber);
+        AppendColored($"codebook entries recovered: {r.CodebookEntriesRecovered}   ", BrushGreen);
+        AppendColored($"decoded {r.DecodedGroups}/{r.TotalCodeGroupsInTarget} "
+                    + $"({r.DecodedRatio * 100:F1}%)\n\n", BrushCyan);
+
+        AppendColored("Recovered plaintext (? marks unrecovered code groups):\n", BrushMuted);
+        AppendColored("  " + r.PartialPlaintext + "\n\n", BrushText);
+
+        AppendColored("歷史教訓: Room 40 的優勢不是算力，是存取（accumulated intercepts）\n"
+                    + "  + 情報運作（把「墨西哥偷的」假故事賣給美國以保護監聽源）。即便\n"
+                    + "  演算法本身無法暴力破解，金鑰載體（codebook）與 traffic 存取\n"
+                    + "  決定了一切。\n", BrushMuted);
+    }
+
+    async Task RunBenchmarkAdfgvx()
+    {
+        var plain = DefaultScenario.AdfgvxPlaintextFormatted;
+        var grid  = DefaultScenario.AdfgvxGrid;
+        var kw    = DefaultScenario.AdfgvxKeyword;
+        var m = AdfgvxMachine.Create(grid, kw);
+        var cipher = m.Encrypt(plain);
+        Reveal.SetCipherString(cipher);
+
+        int K = kw.Length;
+        long totalKeys = 1;
+        for (int i = 2; i <= K; i++) totalKeys *= i;
+
+        AppendColored($"──── RUN  ADFGVX (WWI, 1918)  ({totalKeys:N0} keyword orders) ────\n", BrushAmber);
+        AppendColored("Historical context: June 1918, Germany's Spring Offensive. Capt.\n"
+                    + "  Georges Painvin of the Bureau du Chiffre cracked the refreshed\n"
+                    + "  ADFGVX in a three-week sprint, lost ~15 kg from sleep deprivation,\n"
+                    + "  and handed France the decrypt that pinned the next attack's axis\n"
+                    + "  at Compiègne — stopping Ludendorff cold.\n\n", BrushMuted);
+        AppendColored($"True keyword : {kw}  "
+                    + $"(length {K} → {totalKeys:N0} permutations)\n\n", BrushCyan);
+
+        var cracker = new ScalarCrackerAdfgvx();
+        AppendColored("  [", BrushMuted);
+        AppendColored(cracker.Name, BrushCyan);
+        AppendColored("] measured… ", BrushMuted);
+
+        var r = await Task.Run(() => cracker.Crack(cipher, grid, K));
+
+        double kps = r.KeysTried / r.ElapsedSeconds / 1000;
+        AppendColored($"{r.ElapsedSeconds,6:F3}s  ({kps,5:F0} Kkeys/s)  ", BrushAmber);
+        AppendColored($"tried {r.KeysTried:N0}   ", BrushGreen);
+        AppendColored($"IC={r.BestIc / 100000.0:F5}\n\n", BrushCyan);
+
+        AppendColored("Decoded preview:\n", BrushMuted);
+        AppendColored("  " + r.DecodedPreview + "\n\n", BrushText);
+        AppendColored("歷史教訓: 單次金鑰重用就把 8! = 40,320 個可能性直接送給密碼分析。\n"
+                    + "  那就是德軍紀律崩壞那段時期 Painvin 抓到的破口。純統計攻擊。\n", BrushMuted);
     }
 
     async Task RunBenchmarkLorenz(CrackScope scope)

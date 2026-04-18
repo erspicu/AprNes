@@ -298,7 +298,115 @@
 
 <hr>
 
-<h2 id="ciphers">三場要被秒殺的歷史對決</h2>
+<h2 id="ciphers">六場密碼歷史對決</h2>
+
+<div class="cipher-card">
+  <div class="tag">1917 Jan · Auswärtiges Amt Berlin → Mexico City</div>
+  <h3>Zimmermann Telegram / Code 0075 <span class="status ready">已實作</span></h3>
+
+  <p>
+    <strong>1917 年 1 月 16 日</strong>，德國外交秘書 Arthur Zimmermann 發給駐墨西哥大使
+    Heinrich von Eckardt 一封電報。內容：若美國參戰，德國將資助墨西哥對美開戰，
+    歸還<strong>德州、新墨西哥州、亞利桑那州</strong>。這是一戰情報戰的最大單次翻盤。
+  </p>
+
+  <h4>密碼結構</h4>
+  <ul>
+    <li>不是機械密碼，是<strong>codebook</strong>——一本字典式對照表，
+      每個詞對應一組 4–5 位數字</li>
+    <li>德國外交部版本叫 <strong>0075</strong>（本專案模擬的就是這個），
+      Washington→Mexico 段還用了較弱的 <strong>13040</strong></li>
+    <li>電報路徑：Berlin → (Sweden relay / US cable) → Washington 德使館 → Mexico City。
+      每一跳重新加密一次；英國 Room 40 攔截的是 US cable 段</li>
+  </ul>
+
+  <h4>為什麼 codebook 不能被暴力破解</h4>
+  <p>
+    幾千個詞 × 多個 code group variants = keyspace 超出 10⁴⁰⁰ 量級，
+    完全無法窮舉。能破是因為 Room 40 已經<strong>累積數年德國外交電報</strong>，
+    靠重複片段（「AN SEINER EXZELLENZ」、「ZIMMERMANN」簽名）慢慢拼出
+    codebook 的局部。這是情報數量與耐心的勝利，不是計算力的勝利。
+  </p>
+
+  <h4>本專案的實作</h4>
+  <p>
+    簡化為一份約 70 詞的 pseudo-0075 codebook，把 Zimmermann 式電報編為 4 位數
+    code group。cracker 模擬 Room 40 方法：給它幾則「已破解」的前期電報作 crib，
+    單執行緒 linear pass 對齊後反推 codebook 條目，再把 target 訊息盡量解出來。
+    通常在<strong>毫秒級</strong>回報 70–90% 解碼率（decoded ratio）。
+  </p>
+
+  <p class="highlight-stat">
+    Keyspace = 無限（codebook 本身是金鑰） · Cracker path = crib-based dictionary recovery
+  </p>
+
+  <p>
+    這張牌的存在就是為了提醒一個冷酷事實：<strong>演算法再強，只要金鑰載體（codebook、
+    設定表、Kenngruppenbuch）外洩或可累積重建，整套系統崩潰</strong>。Bletchley 時代
+    同樣如此——擄獲的 U-Boat <em>Wetterkurzschlüssel</em> 比 Turing 的 Bombe 值錢得多。
+  </p>
+</div>
+
+<div class="cipher-card">
+  <div class="tag">1918 Mar–Jun · Kaiserliches Heer Western Front</div>
+  <h3>ADFGVX <span class="status ready">已實作</span></h3>
+
+  <p>
+    Fritz Nebel 上校 1918 年 3 月為德軍 Spring Offensive 設計。兩階段密碼，
+    強度理論上很高——直到 <strong>Capt. Georges Painvin</strong>（法軍 Bureau du Chiffre）
+    6 月 2 日破譯第一則，直接改變了戰爭走向。
+  </p>
+
+  <h4>加密流程</h4>
+  <ol>
+    <li><strong>Polybius 代換</strong>：6×6 格塞入 26 字母 + 10 數字，
+      每個明文字元 ↦ 一對 ADFGVX 字母（row, col）。
+      字母選 A D F G V X 是因為它們的摩斯碼<strong>彼此差異最大</strong>，
+      無線電傳輸錯誤率最低</li>
+    <li><strong>Columnar transposition</strong>：把代換結果寫進 keyword 下的列陣，
+      按 keyword 字母字典順序重排欄位，行序讀出</li>
+  </ol>
+
+  <h4>Painvin 的破口</h4>
+  <p>
+    雙階段密碼本應很硬，但德軍 operator 紀律鬆散——<strong>同一天、同一 keyword
+    下重複發送相近訊息</strong>（正式公文常用「An das Hauptquartier…」開頭）。
+    Painvin 用 "<strong>superimposition attack</strong>"：同長度候選對齊後，
+    從格式化前綴統計反推 transposition 的欄序，再回推 Polybius 格內容。
+    三週硬操，體重掉 15 公斤。
+  </p>
+
+  <h4>決定性的那則訊息</h4>
+  <p style="font-family: var(--mono); color: var(--amber); margin-left: 20px; border-left: 2px solid var(--amber); padding-left: 16px;">
+    "Munitionierung beschleunigen Punkt soweit nicht eingesehen auch bei Tag"<br>
+    — 加速運送彈藥，即使白天也繼續
+  </p>
+  <p>
+    這則電報讓法軍精準預判 Montdidier–Compiègne 之間的主攻軸線，調動預備隊堵上缺口。
+    德軍 Spring Offensive 就此停滯。史稱「<strong>Radiogram of Victory</strong>」。
+  </p>
+
+  <h4>本專案的實作</h4>
+  <p>
+    Benchmark 假設 Polybius 格已知（Painvin 當年還得順帶破，難度更高），
+    暴力搜 transposition 的欄序。keyword 長度 8 → 40,320 個排列，
+    <strong>單執行緒幾秒內</strong>解出。用 26-字母 IC 評分選最優。
+  </p>
+
+  <p class="highlight-stat">
+    Keyspace = K! = 8! = 40,320 排列 · 評分 = 標準 26-bucket IC
+  </p>
+
+  <p>
+    現代的眼光看這根本不是硬仗——但 1918 年當時，這是人類首次用<strong>純統計方法</strong>
+    單點破掉整台外場密碼機的工程實例。Painvin 的技術路線（從重複模式反推置換結構）
+    後來 Rejewski、Tutte、Beurling 都走過。
+  </p>
+</div>
+
+<hr>
+
+<h3>三場 WWII 機械 × 電子戰</h3>
 
 <p>
   這個 benchmark 選了三款德軍最引以為豪、盟軍最頭痛、戰後才解密的密碼系統。每一個都有自己的傳奇與殤。
@@ -465,6 +573,64 @@
 </p>
 
 <div class="people-section">
+
+<h3>〇、一戰的先聲（1914–1918）</h3>
+
+<div class="person-card">
+  <h4>Georges Painvin <span class="lifespan">(1886–1980)</span></h4>
+  <p>
+    法軍砲兵上尉，巴黎理工學院礦業工程師出身，業餘研究密碼學。
+    1914 年戰爭爆發被徵召進 <strong>Bureau du Chiffre</strong>，從此進入密碼生涯。
+  </p>
+  <p>
+    1918 年 6 月德軍發起 Spring Offensive，更新 ADFGVX 的 Polybius 格與 keyword，
+    法軍密碼組瞬間瞎掉。Painvin 關在巴黎一間辦公室三週，把兩則同日、同 keyword
+    的深度電文強行重疊比對，一格一格反推出 keyword 欄序與 Polybius 本身。
+    <strong>6 月 2 日破譯的「Radiogram of Victory」</strong>揭露德軍主攻軸線在
+    Montdidier–Compiègne 之間。
+  </p>
+  <p>
+    出關時 Painvin 體重掉 <strong>15 公斤</strong>，頭髮花白，身體徹底垮掉，
+    戰後他自己說：「<em>那是一生中最痛苦的幾天，我幾乎是靠意志力在跟那疊紙筆死磕</em>。」
+    戰後他婉拒留在情報界，回到工業界當鍋爐公司 Compagnie des Compteurs 的總裁，
+    活到 93 歲。法國 1973 年授 Grand Officer of the Legion of Honour，
+    1978 年美國 NSA 也公開承認他的貢獻——那時距離他破 ADFGVX 已經 60 年。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>"Blinker" Hall <span class="lifespan">(Admiral Sir Reginald Hall, 1870–1943)</span></h4>
+  <p>
+    皇家海軍情報局 (NID) 局長，<strong>Room 40</strong> 的推手與政治保護傘。
+    眨眼成癖（Blinker）但政治手腕極精。1917 年 Zimmermann 電報到手，
+    Hall 面臨兩難：直接交給美國會洩漏英國竊聽美國海底電纜的事實。
+    他設計了<strong>墨西哥電報局偷竊版本</strong>的假故事，讓美國以為情報是
+    第三國意外得到，保住了 Room 40 的竊聽源。
+  </p>
+  <p>
+    Hall 的政治運作能力可能比 Room 40 的技術能力更重要。他對時任國務卿
+    Walter Page 的說服文件至今還是情報史課程的教材。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Nigel de Grey & Rev. William Montgomery <span class="lifespan">(1886–1951 / 1871–1930)</span></h4>
+  <p>
+    Room 40 的兩位 Zimmermann 電報解譯者。de Grey 是 Heinemann 出版社編輯出身，
+    Montgomery 是長老會牧師、基督教神學學者——兩人都不是傳統軍情報人員，
+    靠累積德國外交電報逐詞重建 codebook。
+  </p>
+  <p>
+    1917 年 1 月 17 日上午他們手上是部分解出的 Zimmermann 訊息片段——
+    看到「<em>MEXIKO</em>」、「<em>TEXAS</em>」、「<em>ARIZONA</em>」這幾個詞時，
+    de Grey 衝去找 Hall：「<strong>Do you want to bring America into the war?</strong>」
+    史上最重要的外交解碼對話之一。
+  </p>
+  <p>
+    兩人戰時工作 30 年後才得公開。Montgomery 1930 年過世時家屬仍不知他戰時做過什麼；
+    de Grey 戰後繼續在 GCHQ 服務，1951 年退休。
+  </p>
+</div>
 
 <h3>一、波蘭人：故事真正的起點（1932–1939）</h3>
 

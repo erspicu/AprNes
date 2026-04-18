@@ -176,4 +176,85 @@ public static class DefaultScenario
 
     /// <summary>Ground-truth wheel starts; W7..W10 are the "unknown" four.</summary>
     public static readonly int[] T52eWheelStart = { 10, 20, 30, 40, 50, 55, 17, 0, 0, 0 };
+
+    // ──────────────────────────────────────────────────────────────────────
+    //  ADFGVX scenario — 1918 Spring Offensive, German Army field cipher.
+    //  Plaintext style matches Painvin's June 1918 "Radiogram of Victory":
+    //  short supply-chain order with urgent-tone formulaic vocabulary.
+    // ──────────────────────────────────────────────────────────────────────
+
+    /// <summary>Plaintext — letters and digits only, no spaces.</summary>
+    public const string AdfgvxPlaintextFormatted =
+        "MUNITIONIERUNGBESCHLEUNIGENPUNKTSOWEITNICHTEINGESEHENAUCHBEITAG7UHRFRUEH";
+
+    /// <summary>Polybius grid — 6×6 mixed alphanumeric, daily key (known at crack time).</summary>
+    public const string AdfgvxGrid = "K3OBUY5QWXEAP7ZF9JS4NM1CDVTHRG8L26IO";
+    // row/col labels are A D F G V X; reading this grid row-by-row:
+    //      A D F G V X
+    //   A  K 3 O B U Y
+    //   D  5 Q W X E A
+    //   F  P 7 Z F 9 J
+    //   G  S 4 N M 1 C
+    //   V  D V T H R G
+    //   X  8 L 2 6 I O
+
+    /// <summary>Transposition keyword. Length 8 → 40,320 permutations, seconds on single core.</summary>
+    public const string AdfgvxKeyword = "MAUERWEG";
+
+    // ──────────────────────────────────────────────────────────────────────
+    //  Zimmermann Telegram scenario — January 1917. Room-40-style codebook
+    //  attack: given a few known-plaintext intercepts, recover codebook
+    //  entries, apply to the target message.
+    // ──────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Simplified 0075-style codebook. Words include formulaic diplomatic
+    /// headers ("AN SEINER EXZELLENZ"), geographic terms, and enough
+    /// vocabulary to encode the short Zimmermann-style message below.
+    /// Codes are deterministic 4-digit groups (sequential from 1234).
+    /// </summary>
+    public static Dictionary<string, string> Zimmermann0075()
+    {
+        var words = new[]
+        {
+            "AN","SEINER","EXZELLENZ","DEM","KAISERLICHEN","MINISTER","GESANDTER",
+            "IN","MEXIKO","STADT","BERLIN","WASHINGTON","VOM","JANUAR",
+            "NEUNZEHNHUNDERTSIEBZEHN","STOP","PUNKT","KOMMA",
+            "AUSWAERTIGES","AMT","REGIERUNG","VEREINIGTE","STAATEN",
+            "PRAESIDENT","WILSON","KRIEG","BUENDNIS","ZIMMERMANN",
+            "BITTE","TEILEN","PRAESIDENTEN","CARRANZA","MIT",
+            "BEABSICHTIGEN","UNBESCHRAENKTE","UBOOTKRIEG","BEGINNEN",
+            "ERSTEN","FEBRUAR","NICHT","GELINGT","NEUTRAL","BLEIBEN",
+            "UNSERSEITS","GEMEINSAM","FUEHREN","FRIEDENSSCHLUSS",
+            "VERLORENE","GEBIETE","TEXAS","NEUMEXIKO","ARIZONA",
+            "ZURUECKGEWINNEN","GROSSZUEGIG","FINANZIELL","UNTERSTUETZEN",
+            "JAPAN","AUFFORDERN","EBENFALLS","TEILNAHME","ANZUBIETEN",
+            "SIE","WOLLEN","ABSOLUTE","GEHEIMHALTUNG","BEWAHREN",
+            "DIES","UEBERAUS","WICHTIG","STRENGVERTRAULICH",
+        };
+        var cb = new Dictionary<string, string>(words.Length);
+        int code = 1234;
+        foreach (var w in words) { cb[w] = code.ToString("D4"); code += 7; }  // non-sequential stride
+        return cb;
+    }
+
+    /// <summary>The target message — a short fictional Zimmermann-style telegram.</summary>
+    public const string ZimmermannTargetPlain =
+        "AN SEINER EXZELLENZ DEM KAISERLICHEN GESANDTER IN MEXIKO STADT STOP " +
+        "WIR BEABSICHTIGEN UNBESCHRAENKTE UBOOTKRIEG BEGINNEN ERSTEN FEBRUAR STOP " +
+        "BITTE TEILEN PRAESIDENTEN CARRANZA MIT KOMMA WENN VEREINIGTE STAATEN " +
+        "NICHT NEUTRAL BLEIBEN KOMMA BUENDNIS UNSERSEITS ZURUECKGEWINNEN " +
+        "TEXAS NEUMEXIKO ARIZONA STOP STRENGVERTRAULICH ZIMMERMANN";
+
+    /// <summary>
+    /// "Already broken" previous intercepts providing crib material. Room 40
+    /// accumulated these over months before the Zimmermann Telegram itself.
+    /// </summary>
+    public static readonly string[] ZimmermannCribsPlain =
+    {
+        "AN SEINER EXZELLENZ AUSWAERTIGES AMT BERLIN VOM JANUAR STOP",
+        "REGIERUNG VEREINIGTE STAATEN PRAESIDENT WILSON STOP",
+        "BITTE TEILEN MIT KOMMA GEHEIMHALTUNG WICHTIG STOP",
+        "ZIMMERMANN STOP",
+    };
 }
