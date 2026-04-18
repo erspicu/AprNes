@@ -1,0 +1,117 @@
+================================================================
+  EnigmaBenchmark — Default Enigma M3 Key Configuration
+================================================================
+
+本檔定義 sample_scenario_default.txt 使用的 Enigma 加密設定。
+格式對齊二戰德軍 Tagesschluessel（日密鑰）紀錄方式。
+
+--------------------------------------------------------
+機型
+--------------------------------------------------------
+
+Enigma M3（Wehrmacht 三轉子版，1940 年代標準軍用）
+
+--------------------------------------------------------
+Walzenlage（轉子選擇與順序）
+--------------------------------------------------------
+
+左 = III    中 = IV    右 = I
+
+可選 rotor：I, II, III, IV, V（從 5 個選 3 個，60 種組合）
+本配置：III 裝在最左（慢轉），I 裝在最右（快轉）
+
+--------------------------------------------------------
+Ringstellung（轉子內環偏移）
+--------------------------------------------------------
+
+III = 24 (X)    IV = 13 (M)    I = 22 (V)
+
+數字為轉子字母環相對起始位置，1-26 對應 A-Z。
+本配置三個 ring 分別設 X / M / V。
+
+--------------------------------------------------------
+UKW（Reflector）
+--------------------------------------------------------
+
+UKW-B
+
+Enigma M3 可選 UKW-B 或 UKW-C（固定接線，使用者僅能選哪個）。
+本配置用 UKW-B（二戰期間最常見）。
+
+--------------------------------------------------------
+Steckerverbindungen（Plugboard 10 對字母對調）
+--------------------------------------------------------
+
+AP  BR  CM  FZ  GK  IV  JU  LS  NT  OX
+
+共 10 對：
+  A ↔ P      B ↔ R      C ↔ M      F ↔ Z      G ↔ K
+  I ↔ V      J ↔ U      L ↔ S      N ↔ T      O ↔ X
+
+未列出的字母（D, E, H, Q, W, Y）不對調（直通）。
+
+--------------------------------------------------------
+Grundstellung（起始位置）
+--------------------------------------------------------
+
+Q W E（輸入時三個轉子的初始顯示字母）
+
+左 = Q    中 = W    右 = E
+
+--------------------------------------------------------
+Benchmark 破解時的搜索空間（scope 設定）
+--------------------------------------------------------
+
+考量互動性與展示效果，benchmark 僅暴力搜索以下部分：
+
+✓ Walzenlage        60 種組合
+✓ Grundstellung     26³ = 17,576 種位置
+
+總計：60 × 17,576 ≈ 1,054,560 組合（~10⁶）
+
+固定（benchmark 假設已知）：
+✗ Ringstellung      假設知道 = X M V
+✗ Steckerverbindungen 假設知道 = 上述 10 對
+✗ Reflector         假設知道 = UKW-B
+
+理由：完整 Enigma key space 約 10¹⁷（主要是 plugboard），
+對互動 benchmark 不實際；簡化到 10⁶ 正好讓三個 backend
+（Scalar ~1-3s / SIMD ~200ms / SkSL ~50-500ms）產生可觀
+而且互動性足夠的差距。
+
+--------------------------------------------------------
+破解評分函數
+--------------------------------------------------------
+
+Index of Coincidence (IC)：
+  IC = Σᵢ nᵢ(nᵢ-1) / (N(N-1))
+  其中 nᵢ = 字母 i 出現次數, N = 總字元數
+
+德文明文 IC ≈ 0.0762
+隨機字母（加密成功前的誤試）IC ≈ 0.0385
+
+Benchmark 判定「破解成功」= 某組 key 的 IC > 0.065
+（留 ~15% 安全邊界，避免字頻波動引起 false positive）
+
+--------------------------------------------------------
+歷史參考
+--------------------------------------------------------
+
+本配置的 rotor wiring 和 reflector 都是**公開歷史資料**：
+
+Rotor I    EKMFLGDQVZNTOWYHXUSPAIBRCJ
+Rotor II   AJDKSIRUXBLHWTMCQGZNPYFVOE
+Rotor III  BDFHJLCPRTXVZNYEIWGAKMUSQO
+Rotor IV   ESOVPZJAYQUIRHXLNFTGKDCMWB
+Rotor V    VZBRGITYUPSDNHLXAWMJQOFECK
+UKW-B      YRUHQSLDPXNGOKMIEBFZCWVJAT
+UKW-C      FVPJIAOYEDRZXWGCTKUQSBNMHL
+
+Notch 位置（stepping trigger）：
+  Rotor I    Q→R
+  Rotor II   E→F
+  Rotor III  V→W
+  Rotor IV   J→K
+  Rotor V    Z→A
+
+（詳見 Wikipedia: Enigma rotor details）
