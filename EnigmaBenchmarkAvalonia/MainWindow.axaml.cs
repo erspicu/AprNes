@@ -57,6 +57,17 @@ public partial class MainWindow : Window
     {
         switch (CipherBox.SelectedIndex)
         {
+            case 3:   // T52e
+            {
+                var plaintext = DefaultScenario.T52ePlaintextBytes;
+                var pins      = DefaultScenario.T52ePins();
+                var sm        = DefaultScenario.T52eSwitchMap;
+                var start     = DefaultScenario.T52eWheelStart;
+                var machine   = T52eMachine.Create(pins, sm, start, ktf: false);
+                var cipher    = machine.EncryptFresh(plaintext, start);
+                Reveal.SetCipherString(Baudot.Decode(cipher));
+                break;
+            }
             case 2:   // Lorenz
             {
                 var plaintext = DefaultScenario.LorenzPlaintextBytes;
@@ -144,6 +155,7 @@ public partial class MainWindow : Window
     {
         switch (CipherBox.SelectedIndex)
         {
+            case 3:  await RunBenchmarkT52e(scope);   break;
             case 2:  await RunBenchmarkLorenz(scope); break;
             case 1:  await RunBenchmarkM4(scope);     break;
             default: await RunBenchmarkM3(scope);     break;
@@ -298,6 +310,135 @@ public partial class MainWindow : Window
         AppendColored($"  bestIC={r.BestIc/100000.0:F5}", BrushCyan);
         AppendColored(r.TimedOut ? "  [TIMEOUT]\n" : "\n",
                       r.TimedOut ? BrushRed : BrushText);
+    }
+
+    void AppendT52eResult(CrackResultT52e r)
+    {
+        double kps = r.KeysTried / r.ElapsedSeconds / 1000;
+        AppendColored($"{r.ElapsedSeconds,7:F3}s", BrushAmber);
+        AppendColored($" ({kps,7:F0} K/s)", BrushGreen);
+        AppendColored("  found=", BrushMuted);
+        AppendColored($"{r.Found}", r.Found ? BrushGreen : BrushRed);
+        AppendColored($"  bestIC={r.BestIc/100000.0:F5}", BrushCyan);
+        AppendColored(r.TimedOut ? "  [TIMEOUT]\n" : "\n",
+                      r.TimedOut ? BrushRed : BrushText);
+    }
+
+    async Task RunBenchmarkT52e(CrackScope scope)
+    {
+        var plaintext = DefaultScenario.T52ePlaintextBytes;
+        var pins      = DefaultScenario.T52ePins();
+        var sm        = DefaultScenario.T52eSwitchMap;
+        var trueStart = DefaultScenario.T52eWheelStart;
+
+        var encMachine = T52eMachine.Create(pins, sm, trueStart, ktf: false);
+        var ciphertext = encMachine.EncryptFresh(plaintext, trueStart);
+
+        Reveal.SetCipherString(Baudot.Decode(ciphertext));
+
+        // W1..W6 "known" (from prior Testery depth work); W7..W10 to be brute-forced.
+        var knownStart = (int[])trueStart.Clone();
+        knownStart[6] = 0; knownStart[7] = 0; knownStart[8] = 0; knownStart[9] = 0;
+
+        long totalKeys = (long)T52eMachine.PinCounts[6]
+                       * T52eMachine.PinCounts[7]
+                       * T52eMachine.PinCounts[8]
+                       * T52eMachine.PinCounts[9];
+
+        AppendColored($"──── RUN  T52e Sturgeon 4-wheel reduced brute force  "
+                    + $"({totalKeys:N0} keys) ────\n", BrushAmber);
+        AppendColored("Historical context: T52e was the only Sturgeon variant the\n"
+                    + "  Bletchley Testery never routinely broke in operation.\n"
+                    + "  The attack models prior recovery of 6 wheels via depths,\n"
+                    + "  then brute-forces the remaining four (W7..W10, pin counts\n"
+                    + "  67 × 69 × 71 × 73 ≈ 24 M combinations).\n\n", BrushMuted);
+        AppendColored("True W7..W10: ", BrushMuted);
+        AppendColored($"[{trueStart[6]}, {trueStart[7]}, {trueStart[8]}, {trueStart[9]}]\n\n", BrushCyan);
+
+        var results = new List<(string name, CrackResultT52e r)>();
+
+        // GPU first
+        SetStatus("Running GPU T52e (warmup)…", BrushAmber);
+        AppendColored("  [", BrushMuted);
+        AppendColored("SkSL GPU T52e", BrushCyan);
+        AppendColored("] warmup… ", BrushMuted);
+        await Bench.RunGpuT52eAsync(ciphertext, pins, sm, knownStart, scope);
+        AppendColored("done\n", BrushGreen);
+
+        SetStatus("Running GPU T52e…", BrushAmber);
+        AppendColored("  [", BrushMuted);
+        AppendColored("SkSL GPU T52e", BrushCyan);
+        AppendColored("] measured… ", BrushMuted);
+        var gpu = await Bench.RunGpuT52eAsync(ciphertext, pins, sm, knownStart, scope);
+        AppendT52eResult(gpu);
+        results.Add(("SkSL GPU T52e (Avalonia)", gpu));
+        AppendLine();
+
+        ICrackerT52e[] cpu =
+        {
+            new SimdCrackerT52e(),
+            new ParallelScalarCrackerT52e(),
+            new ScalarCrackerT52e(),
+        };
+        // Scalar single-thread is slow (~9 min for full 24M); cap it.
+        double[] timeouts = { 0, 120, 120 };
+        for (int i = 0; i < cpu.Length; i++)
+        {
+            var c = cpu[i];
+            double to = timeouts[i];
+
+            SetStatus($"Running {c.Name} (warmup)…", BrushAmber);
+            AppendColored("  [", BrushMuted);
+            AppendColored(c.Name, BrushCyan);
+            AppendColored("] warmup… ", BrushMuted);
+            await Task.Run(() => c.Crack(ciphertext, pins, sm, knownStart, scope, 3));
+            AppendColored("done\n", BrushGreen);
+
+            SetStatus($"Running {c.Name}…", BrushAmber);
+            AppendColored("  [", BrushMuted);
+            AppendColored(c.Name, BrushCyan);
+            AppendColored($"] measured (timeout {to}s)… ", BrushMuted);
+            var r = await Task.Run(() => c.Crack(ciphertext, pins, sm, knownStart, scope, to));
+            AppendT52eResult(r);
+            results.Add((c.Name, r));
+            AppendLine();
+        }
+
+        // Summary
+        SetStatus("Building summary…", BrushAmber);
+        AppendLine();
+        AppendColored("═══════════════ SUMMARY ═══════════════\n", BrushAmber);
+        double baseline = results[^1].r.ElapsedSeconds;
+        AppendColored($"{"Backend",-40}  {"Time",10}  {"K keys/s",10}  {"Speedup",8}\n", BrushDim);
+        AppendColored(new string('─', 74) + "\n", BrushDim);
+        foreach (var (name, r) in results)
+        {
+            double speedup = baseline / r.ElapsedSeconds;
+            double kps = r.KeysTried / r.ElapsedSeconds / 1000;
+            AppendColored($"{name,-40}  ", BrushText);
+            AppendColored($"{r.ElapsedSeconds,9:F3}s", BrushAmber);
+            AppendColored($"  {kps,10:F1}", BrushGreen);
+            AppendColored($"  {speedup,7:F2}x", BrushCyan);
+            AppendColored(r.TimedOut ? "  (TIMED OUT)\n" : "\n",
+                          r.TimedOut ? BrushRed : BrushText);
+        }
+        AppendLine();
+
+        // Per-backend key recovery
+        AppendColored("Per-backend key recovery:\n", BrushMuted);
+        foreach (var (name, r) in results)
+        {
+            bool m = r.WheelStart.Length == 10
+                  && r.WheelStart[6] == trueStart[6]
+                  && r.WheelStart[7] == trueStart[7]
+                  && r.WheelStart[8] == trueStart[8]
+                  && r.WheelStart[9] == trueStart[9];
+            AppendColored($"  {name,-40} ", BrushText);
+            AppendColored(m ? "✓ recovered\n" : "✗ miss\n", m ? BrushGreen : BrushRed);
+        }
+        AppendLine();
+
+        HistCard.IsVisible = true;
     }
 
     async Task RunBenchmarkM3(CrackScope scope)

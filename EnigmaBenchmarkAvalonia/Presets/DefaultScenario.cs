@@ -137,4 +137,43 @@ public static class DefaultScenario
 
     /// <summary>Ground-truth chi start positions for the Lorenz scenario.</summary>
     public static readonly int[] LorenzChiStart = { 17, 11, 23, 5, 19 };
+
+    // ──────────────────────────────────────────────────────────────────────
+    //  Siemens T52e "Sturgeon" scenario — Luftflotte 2 → OKL, 1944
+    //
+    //  Fictional but period-plausible Luftwaffe operational order. T52e was
+    //  the actual Sturgeon variant that Bletchley's Testery worked against
+    //  late in the war; typical traffic was high-level air force command.
+    //
+    //  Reduced-keyspace attack (matches paper §10 of T52e_TechnicalReport):
+    //    - Pin patterns + switch map known (from prior analysis/capture)
+    //    - Wheels W1..W6 starts known (from prior Testery depth work)
+    //    - Brute-force W7..W10 starts:  67×69×71×73 ≈ 23.95 M candidates
+    // ──────────────────────────────────────────────────────────────────────
+
+    public const string T52ePlaintextFormatted =
+        "AN LUFTWAFFENGRUPPE WEST GENERAL SPERRLE " +
+        "VON OBERKOMMANDO DER LUFTWAFFE BERLIN " +
+        "ZEITANGABE EINUNDZWANZIG EINHUNDERT UHR MEZ STOP " +
+        "FEINDLICHE LANDUNGSFLOTTE IM AERMELKANAL GESICHTET " +
+        "SCHWERPUNKT SUEDOESTLICH WIGHT ENTFERNUNG ACHTZIG SEEMEILEN STOP " +
+        "SOFORTIGE AUFKLAERUNG DURCH FERNAUFKLAERER " +
+        "GESCHWADER EINS UND DREI BEFOHLEN STOP " +
+        "ANGRIFFSVORBEREITUNG SAEMTLICHER BOMBERGESCHWADER " +
+        "LUFTFLOTTE ZWEI UND DREI SOFORT EINLEITEN " +
+        "KAMPFGRUPPEN STEHEN BEREIT STOP " +
+        "FIGHTER COMMAND REAKTION DURCH JAGDFLIEGER ABFANGEN " +
+        "JAGDGESCHWADER ZWANZIG EINUNDZWANZIG UND ZWEIUNDZWANZIG " +
+        "VOLLER EINSATZ STOP HEIL HITLER";
+
+    public static byte[] T52ePlaintextBytes => Baudot.Encode(T52ePlaintextFormatted);
+
+    /// <summary>Deterministic pin patterns seeded reproducibly per wheel.</summary>
+    public static byte[][] T52ePins() => T52eMachine.GenerateAllPins(seedBase: 0x5A);
+
+    /// <summary>Daily-key switch map: bijective permutation of {0..9}.</summary>
+    public static readonly int[] T52eSwitchMap = { 3, 7, 0, 5, 9, 2, 8, 1, 4, 6 };
+
+    /// <summary>Ground-truth wheel starts; W7..W10 are the "unknown" four.</summary>
+    public static readonly int[] T52eWheelStart = { 10, 20, 30, 40, 50, 55, 17, 0, 0, 0 };
 }

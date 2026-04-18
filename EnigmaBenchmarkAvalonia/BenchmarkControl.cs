@@ -25,7 +25,7 @@ namespace EnigmaBenchmarkAvalonia;
 /// </summary>
 public class BenchmarkControl : Control
 {
-    enum Cipher { M3, M4, Lorenz }
+    enum Cipher { M3, M4, Lorenz, T52e }
 
     sealed class Request
     {
@@ -34,6 +34,9 @@ public class BenchmarkControl : Control
         public EnigmaM3 M3Parts;
         public EnigmaM4 M4Parts;
         public byte[][] LorenzChiPins = Array.Empty<byte[]>();
+        public byte[][] T52ePins = Array.Empty<byte[]>();
+        public int[] T52eSwitchMap = Array.Empty<int>();
+        public int[] T52eKnownStart = Array.Empty<int>();
         public CrackScope Scope;
         public TaskCompletionSource<CrackResult> Tcs =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -91,6 +94,27 @@ public class BenchmarkControl : Control
     }
 
     volatile TaskCompletionSource<CrackResultLorenz>? _pendingLorenzTcs;
+    volatile TaskCompletionSource<CrackResultT52e>? _pendingT52eTcs;
+
+    /// <summary>Schedule a T52e reduced-keyspace crack (24 M candidates).</summary>
+    public Task<CrackResultT52e> RunGpuT52eAsync(
+        byte[] ciphertext, byte[][] pins, int[] switchMap, int[] knownStart, CrackScope scope)
+    {
+        var req = new Request
+        {
+            Cipher = Cipher.T52e,
+            Ciphertext = ciphertext,
+            T52ePins = pins,
+            T52eSwitchMap = switchMap,
+            T52eKnownStart = knownStart,
+            Scope = scope,
+        };
+        _pending = req;
+        _pendingT52eTcs = new TaskCompletionSource<CrackResultT52e>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        InvalidateVisual();
+        return _pendingT52eTcs.Task;
+    }
 
     public override void Render(DrawingContext context)
     {
@@ -98,10 +122,11 @@ public class BenchmarkControl : Control
         var req = _pending;
         if (req == null) return;
         var lorenzTcs = _pendingLorenzTcs;
+        var t52eTcs = _pendingT52eTcs;
         context.Custom(new BenchDrawOp(
             new Rect(Bounds.Size), req,
-            () => { _pending = null; _pendingLorenzTcs = null; },
-            lorenzTcs));
+            () => { _pending = null; _pendingLorenzTcs = null; _pendingT52eTcs = null; },
+            lorenzTcs, t52eTcs));
     }
 
     sealed class BenchDrawOp : ICustomDrawOperation
@@ -109,15 +134,18 @@ public class BenchmarkControl : Control
         readonly Request _req;
         readonly Action _clear;
         readonly TaskCompletionSource<CrackResultLorenz>? _lorenzTcs;
+        readonly TaskCompletionSource<CrackResultT52e>? _t52eTcs;
         public Rect Bounds { get; }
 
         public BenchDrawOp(Rect bounds, Request req, Action clear,
-                           TaskCompletionSource<CrackResultLorenz>? lorenzTcs)
+                           TaskCompletionSource<CrackResultLorenz>? lorenzTcs,
+                           TaskCompletionSource<CrackResultT52e>? t52eTcs)
         {
             Bounds = bounds;
             _req = req;
             _clear = clear;
             _lorenzTcs = lorenzTcs;
+            _t52eTcs = t52eTcs;
         }
 
         public void Render(ImmediateDrawingContext context)
@@ -141,11 +169,18 @@ public class BenchmarkControl : Control
 
                 if (_req.Cipher == Cipher.Lorenz)
                 {
-                    // Lorenz uses a different result type — dispatch through
-                    // the parallel TCS rather than the generic Tcs.
                     var lorenzResult = new GpuCrackerLorenz(gr).Crack(
                         _req.Ciphertext, _req.LorenzChiPins, _req.Scope);
                     _lorenzTcs?.TrySetResult(lorenzResult);
+                    return;
+                }
+
+                if (_req.Cipher == Cipher.T52e)
+                {
+                    var t52eResult = new GpuCrackerT52e(gr).Crack(
+                        _req.Ciphertext, _req.T52ePins, _req.T52eSwitchMap,
+                        _req.T52eKnownStart, _req.Scope);
+                    _t52eTcs?.TrySetResult(t52eResult);
                     return;
                 }
 
@@ -161,6 +196,8 @@ public class BenchmarkControl : Control
             {
                 if (_req.Cipher == Cipher.Lorenz)
                     _lorenzTcs?.TrySetException(ex);
+                else if (_req.Cipher == Cipher.T52e)
+                    _t52eTcs?.TrySetException(ex);
                 else
                     _req.Tcs.TrySetException(ex);
             }
