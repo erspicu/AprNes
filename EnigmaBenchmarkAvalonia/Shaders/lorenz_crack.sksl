@@ -1,0 +1,104 @@
+// ════════════════════════════════════════════════════════════════════════
+// lorenz_crack.sksl — Lorenz SZ40 chi-only brute force
+// ════════════════════════════════════════════════════════════════════════
+// Each output pixel = one (s0, s1, s2, s3) chi-start tuple; a uniform fixes
+// s4 per render pass (23 passes cover the full 22 M keyspace).
+//
+// Scorer: count positions where the decrypted byte matches Baudot SPACE (4)
+// or Baudot 'E' (1). Together these make up ~29 % of German teleprinter
+// text vs. ~6 % for random — 10σ-plus signal. Simple, small shader.
+// Correctness is enforced on the CPU side: top-K filtered by this cheap
+// metric, re-scored with full 32-bucket IC on the FULL ciphertext.
+//
+// SkSL runtime effects forbid bitwise ops (<< | ^ &), so we operate on the
+// five bits separately. `a XOR b` for a,b ∈ {0,1} is computed as
+//   xor = a + b - 2·a·b
+// A byte equals SPACE (00100) or E (00001) based on its bit pattern alone,
+// so no reassembly into an integer is needed.
+
+uniform shader uChiPins;   // 64 × 5 bitmap: row w has pin pattern of wheel w
+uniform shader uCipher;    // n × 1 bitmap: ciphertext Baudot values
+
+uniform float uCtLen;
+uniform float uS4;         // fixed per pass, 0..22
+
+int pinRead(float wheel, int pos) {
+    float2 p = float2(float(pos) + 0.5, wheel + 0.5);
+    half4 v = uChiPins.eval(p);
+    return int(float(v.r) * 255.0 + 0.5);
+}
+
+int cipherAt(int i) {
+    half4 v = uCipher.eval(float2(float(i) + 0.5, 0.5));
+    return int(float(v.r) * 255.0 + 0.5);
+}
+
+half4 main(float2 fragCoord) {
+    int x = int(fragCoord.x);
+    int y = int(fragCoord.y);
+
+    int s1 = x / 41;
+    int s0 = x - s1 * 41;
+    int s3 = y / 29;
+    int s2 = y - s3 * 29;
+    int s4 = int(uS4 + 0.5);
+    int ctLen = int(uCtLen + 0.5);
+
+    if (s1 >= 31 || s3 >= 26) return half4(0.0, 0.0, 0.0, 1.0);
+
+    int p0 = s0, p1 = s1, p2 = s2, p3 = s3, p4 = s4;
+
+    int hitCount = 0;
+
+    const int CAP = 180;
+    int iMax = (ctLen < CAP) ? ctLen : CAP;
+    for (int i = 0; i < CAP; i++) {
+        if (i >= iMax) break;
+
+        int b0 = pinRead(0.0, p0);
+        int b1 = pinRead(1.0, p1);
+        int b2 = pinRead(2.0, p2);
+        int b3 = pinRead(3.0, p3);
+        int b4 = pinRead(4.0, p4);
+
+        int c = cipherAt(i);
+        int cq = c / 2;   int c0 = c - cq * 2;
+        int cq2 = cq / 2; int c1 = cq - cq2 * 2;
+        int cq3 = cq2 / 2; int c2 = cq2 - cq3 * 2;
+        int cq4 = cq3 / 2; int c3 = cq3 - cq4 * 2;
+        int c4 = cq4 - (cq4 / 2) * 2;
+
+        // Per-bit XOR (a⊕b = a+b−2ab for {0,1})
+        int t0 = c0 + b0 - 2 * c0 * b0;
+        int t1 = c1 + b1 - 2 * c1 * b1;
+        int t2 = c2 + b2 - 2 * c2 * b2;
+        int t3 = c3 + b3 - 2 * c3 * b3;
+        int t4 = c4 + b4 - 2 * c4 * b4;
+
+        // hit = (t == 4)  →  (1-t0)(1-t1)(t2)(1-t3)(1-t4)
+        // hit = (t == 1)  →  (t0)(1-t1)(1-t2)(1-t3)(1-t4)
+        // Either adds 1 to the count; can't be both (t can only be one value).
+        int isSpace = (1 - t0) * (1 - t1) * t2 * (1 - t3) * (1 - t4);
+        int isE     = t0 * (1 - t1) * (1 - t2) * (1 - t3) * (1 - t4);
+        hitCount = hitCount + isSpace + isE;
+
+        p0 = p0 + 1; if (p0 >= 41) p0 = 0;
+        p1 = p1 + 1; if (p1 >= 31) p1 = 0;
+        p2 = p2 + 1; if (p2 >= 29) p2 = 0;
+        p3 = p3 + 1; if (p3 >= 26) p3 = 0;
+        p4 = p4 + 1; if (p4 >= 23) p4 = 0;
+    }
+
+    // Encode count directly (max = CAP = 180, fits easily in the low byte)
+    // but scale up so CPU-side float math doesn't round everything to zero.
+    int score = hitCount * 1000;
+
+    int r = score / 65536;
+    int g = (score / 256) - r * 256;
+    int b = score - (score / 256) * 256;
+
+    return half4(half(float(r) / 255.0),
+                 half(float(g) / 255.0),
+                 half(float(b) / 255.0),
+                 1.0);
+}

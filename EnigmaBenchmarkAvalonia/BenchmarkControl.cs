@@ -25,7 +25,7 @@ namespace EnigmaBenchmarkAvalonia;
 /// </summary>
 public class BenchmarkControl : Control
 {
-    enum Cipher { M3, M4 }
+    enum Cipher { M3, M4, Lorenz }
 
     sealed class Request
     {
@@ -33,6 +33,7 @@ public class BenchmarkControl : Control
         public byte[] Ciphertext = Array.Empty<byte>();
         public EnigmaM3 M3Parts;
         public EnigmaM4 M4Parts;
+        public byte[][] LorenzChiPins = Array.Empty<byte[]>();
         public CrackScope Scope;
         public TaskCompletionSource<CrackResult> Tcs =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -68,25 +69,55 @@ public class BenchmarkControl : Control
         return req.Tcs.Task;
     }
 
+    /// <summary>
+    /// Schedule a Lorenz chi-only crack. Returns the GENERIC CrackResult shape
+    /// (PL/PM/PR fields carry s0/s1/s2, RR/RM/RL carry s3/s4/ic — sloppy but
+    /// keeps the public await contract uniform with M3/M4).
+    /// </summary>
+    public Task<CrackResultLorenz> RunGpuLorenzAsync(byte[] ciphertext, byte[][] chiPins, CrackScope scope)
+    {
+        var req = new Request
+        {
+            Cipher = Cipher.Lorenz,
+            Ciphertext = ciphertext,
+            LorenzChiPins = chiPins,
+            Scope = scope,
+        };
+        _pending = req;
+        _pendingLorenzTcs = new TaskCompletionSource<CrackResultLorenz>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        InvalidateVisual();
+        return _pendingLorenzTcs.Task;
+    }
+
+    volatile TaskCompletionSource<CrackResultLorenz>? _pendingLorenzTcs;
+
     public override void Render(DrawingContext context)
     {
         base.Render(context);
         var req = _pending;
         if (req == null) return;
-        context.Custom(new BenchDrawOp(new Rect(Bounds.Size), req, () => _pending = null));
+        var lorenzTcs = _pendingLorenzTcs;
+        context.Custom(new BenchDrawOp(
+            new Rect(Bounds.Size), req,
+            () => { _pending = null; _pendingLorenzTcs = null; },
+            lorenzTcs));
     }
 
     sealed class BenchDrawOp : ICustomDrawOperation
     {
         readonly Request _req;
         readonly Action _clear;
+        readonly TaskCompletionSource<CrackResultLorenz>? _lorenzTcs;
         public Rect Bounds { get; }
 
-        public BenchDrawOp(Rect bounds, Request req, Action clear)
+        public BenchDrawOp(Rect bounds, Request req, Action clear,
+                           TaskCompletionSource<CrackResultLorenz>? lorenzTcs)
         {
             Bounds = bounds;
             _req = req;
             _clear = clear;
+            _lorenzTcs = lorenzTcs;
         }
 
         public void Render(ImmediateDrawingContext context)
@@ -108,6 +139,16 @@ public class BenchmarkControl : Control
                                 + $"GrContext={(gr != null ? "non-null" : "NULL")} "
                                 + $"Backend={(gr != null ? gr.Backend.ToString() : "n/a")}");
 
+                if (_req.Cipher == Cipher.Lorenz)
+                {
+                    // Lorenz uses a different result type — dispatch through
+                    // the parallel TCS rather than the generic Tcs.
+                    var lorenzResult = new GpuCrackerLorenz(gr).Crack(
+                        _req.Ciphertext, _req.LorenzChiPins, _req.Scope);
+                    _lorenzTcs?.TrySetResult(lorenzResult);
+                    return;
+                }
+
                 CrackResult result;
                 if (_req.Cipher == Cipher.M3)
                     result = new GpuCracker(gr).Crack(_req.Ciphertext, _req.M3Parts, _req.Scope);
@@ -118,7 +159,10 @@ public class BenchmarkControl : Control
             }
             catch (Exception ex)
             {
-                _req.Tcs.TrySetException(ex);
+                if (_req.Cipher == Cipher.Lorenz)
+                    _lorenzTcs?.TrySetException(ex);
+                else
+                    _req.Tcs.TrySetException(ex);
             }
             finally
             {

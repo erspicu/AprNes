@@ -73,4 +73,47 @@ public static class DefaultScenario
             ThinReflector = RotorData.UkwBThin,   // must pair w/ Beta
         };
     }
+
+    // ──────────────────────────────────────────────────────────────────────
+    //  Lorenz SZ40 "Tunny" scenario — Wolfsschanze → OKW, Dec 1944 style.
+    //  Fictional. The Ardennes offensive (Wacht am Rhein / Battle of the
+    //  Bulge) was exactly the kind of strategic order Lorenz actually
+    //  carried, and Bletchley's Tunny section was reading its traffic
+    //  by late 1944.
+    // ──────────────────────────────────────────────────────────────────────
+
+    public const string LorenzPlaintextFormatted =
+        "AN GENERALFELDMARSCHALL KEITEL OBERKOMMANDO DER WEHRMACHT BERLIN " +
+        "VON FUEHRERHAUPTQUARTIER WOLFSCHANZE OSTPREUSSEN " +
+        "ZEITANGABE SECHZEHN EINHUNDERTZWANZIG UHR MITTELEUROPAEISCHER ZEIT STOP " +
+        "DER FUEHRER HAT BEFOHLEN DIE UNTERNEHMUNG WACHT AM RHEIN " +
+        "BEGINNT AM SECHZEHNTEN DEZEMBER NEUNZEHNHUNDERTVIERUNDVIERZIG " +
+        "MIT OFFENSIVE DURCH DIE ARDENNEN STOP " +
+        "HEERESGRUPPE B UNTER GENERALFELDMARSCHALL MODEL WIRD DIE " +
+        "SECHSTE PANZERARMEE UND DIE FUENFTE PANZERARMEE KOMMANDIEREN " +
+        "ZIEL ANTWERPEN STOP LUFTWAFFE UNTERSTUETZUNG DURCH VERBAENDE " +
+        "DER SIEBENTEN JAGDDIVISION STOP " +
+        "ABSOLUTE GEHEIMHALTUNG IST BEFEHL HEIL HITLER";
+
+    public static byte[] LorenzPlaintextBytes => Baudot.Encode(LorenzPlaintextFormatted);
+
+    /// <summary>Deterministic "Kenngruppenbuch" for the scenario — pin patterns per wheel.</summary>
+    public static byte[][] LorenzChiPins()
+    {
+        // Stable PRNG seed so the scenario is reproducible run-to-run.
+        var rng = new Random(unchecked((int)0xDEADBEEF));
+        var pins = new byte[5][];
+        for (int w = 0; w < 5; w++)
+        {
+            int len = LorenzSZ40.ChiPinCounts[w];
+            pins[w] = new byte[len];
+            // Balanced pin distribution (roughly half 1s, half 0s) keeps the
+            // chi keystream close to uniformly random so scoring works.
+            for (int i = 0; i < len; i++) pins[w][i] = (byte)(rng.Next(2));
+        }
+        return pins;
+    }
+
+    /// <summary>Ground-truth chi start positions for the Lorenz scenario.</summary>
+    public static readonly int[] LorenzChiStart = { 17, 11, 23, 5, 19 };
 }

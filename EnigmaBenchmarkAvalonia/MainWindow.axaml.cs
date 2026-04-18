@@ -55,20 +55,35 @@ public partial class MainWindow : Window
     /// </summary>
     void PrepareReveal()
     {
-        byte[] ciphertext;
-        if (CipherBox.SelectedIndex == 1)   // M4
+        switch (CipherBox.SelectedIndex)
         {
-            var plaintext = DefaultScenario.M4PlaintextBytes;
-            var trueKey   = DefaultScenario.M4TrueKey();
-            ciphertext = trueKey.TransformFresh(plaintext, trueKey.PL, trueKey.PM, trueKey.PR);
+            case 2:   // Lorenz
+            {
+                var plaintext = DefaultScenario.LorenzPlaintextBytes;
+                var pins = DefaultScenario.LorenzChiPins();
+                var machine = LorenzSZ40.Create(pins, DefaultScenario.LorenzChiStart);
+                var cipher = machine.TransformFresh(plaintext, DefaultScenario.LorenzChiStart);
+                // Lorenz cipher bytes are Baudot 0-31 — decode to A-Z + '·'
+                Reveal.SetCipherString(Baudot.Decode(cipher));
+                break;
+            }
+            case 1:   // M4
+            {
+                var plaintext = DefaultScenario.M4PlaintextBytes;
+                var trueKey   = DefaultScenario.M4TrueKey();
+                var ct = trueKey.TransformFresh(plaintext, trueKey.PL, trueKey.PM, trueKey.PR);
+                Reveal.SetCipher(ct);
+                break;
+            }
+            default:  // M3
+            {
+                var plaintext = DefaultScenario.PlaintextBytes;
+                var trueKey   = DefaultScenario.TrueKey();
+                var ct = trueKey.TransformFresh(plaintext, trueKey.PL, trueKey.PM, trueKey.PR);
+                Reveal.SetCipher(ct);
+                break;
+            }
         }
-        else                                 // M3 (default)
-        {
-            var plaintext = DefaultScenario.PlaintextBytes;
-            var trueKey   = DefaultScenario.TrueKey();
-            ciphertext = trueKey.TransformFresh(plaintext, trueKey.PL, trueKey.PM, trueKey.PR);
-        }
-        Reveal.SetCipher(ciphertext);
     }
 
     async void OnStartClick(object? sender, RoutedEventArgs e)
@@ -127,10 +142,150 @@ public partial class MainWindow : Window
 
     async Task RunBenchmark(CrackScope scope)
     {
-        if (CipherBox.SelectedIndex == 1)
-            await RunBenchmarkM4(scope);
-        else
-            await RunBenchmarkM3(scope);
+        switch (CipherBox.SelectedIndex)
+        {
+            case 2:  await RunBenchmarkLorenz(scope); break;
+            case 1:  await RunBenchmarkM4(scope);     break;
+            default: await RunBenchmarkM3(scope);     break;
+        }
+    }
+
+    async Task RunBenchmarkLorenz(CrackScope scope)
+    {
+        var plaintext = DefaultScenario.LorenzPlaintextBytes;
+        var pins      = DefaultScenario.LorenzChiPins();
+        var trueStart = DefaultScenario.LorenzChiStart;
+
+        var encMachine = LorenzSZ40.Create(pins, trueStart);
+        var ciphertext = encMachine.TransformFresh(plaintext, trueStart);
+
+        Reveal.SetCipherString(Baudot.Decode(ciphertext));
+
+        long totalKeys = 1L * LorenzSZ40.ChiPinCounts[0]
+                           * LorenzSZ40.ChiPinCounts[1]
+                           * LorenzSZ40.ChiPinCounts[2]
+                           * LorenzSZ40.ChiPinCounts[3]
+                           * LorenzSZ40.ChiPinCounts[4];
+
+        AppendColored($"──── RUN  Lorenz SZ40 (Tunny, chi-only)  "
+                    + $"({totalKeys:N0} keys) ────\n", BrushAmber);
+        AppendColored("True χ start : ", BrushMuted);
+        AppendColored($"[{trueStart[0]}, {trueStart[1]}, {trueStart[2]}, "
+                    + $"{trueStart[3]}, {trueStart[4]}]  "
+                    + $"(pin counts 41/31/29/26/23)\n\n", BrushCyan);
+
+        var results = new List<(string name, CrackResultLorenz r)>();
+
+        // GPU first
+        SetStatus("Running GPU Lorenz (warmup)…", BrushAmber);
+        AppendColored("  [", BrushMuted);
+        AppendColored("SkSL GPU Lorenz", BrushCyan);
+        AppendColored("] warmup… ", BrushMuted);
+        await Bench.RunGpuLorenzAsync(ciphertext, pins, scope);
+        AppendColored("done\n", BrushGreen);
+
+        SetStatus("Running GPU Lorenz…", BrushAmber);
+        AppendColored("  [", BrushMuted);
+        AppendColored("SkSL GPU Lorenz", BrushCyan);
+        AppendColored("] measured… ", BrushMuted);
+        var gpu = await Bench.RunGpuLorenzAsync(ciphertext, pins, scope);
+        AppendLorenzResult(gpu);
+        results.Add(("SkSL GPU Lorenz (Avalonia)", gpu));
+        AppendLine();
+
+        // CPU backends — generous timeout on scalar since 22M × 700 chars is
+        // a lot for one thread.
+        ICrackerLorenz[] cpu =
+        {
+            new SimdCrackerLorenz(),
+            new ParallelScalarCrackerLorenz(),
+            new ScalarCrackerLorenz(),
+        };
+        double[] timeouts = { 0, 90, 90 };   // SIMD unlimited; others 90s
+        for (int i = 0; i < cpu.Length; i++)
+        {
+            var c = cpu[i];
+            double to = timeouts[i];
+
+            // Warmup at a capped scope — actually Lorenz scope isn't variable,
+            // so just do one fast run with a tight timeout to let JIT warm.
+            SetStatus($"Running {c.Name} (warmup)…", BrushAmber);
+            AppendColored("  [", BrushMuted);
+            AppendColored(c.Name, BrushCyan);
+            AppendColored("] warmup… ", BrushMuted);
+            await Task.Run(() => c.Crack(ciphertext, pins, scope, 3));
+            AppendColored("done\n", BrushGreen);
+
+            SetStatus($"Running {c.Name}…", BrushAmber);
+            AppendColored("  [", BrushMuted);
+            AppendColored(c.Name, BrushCyan);
+            AppendColored($"] measured (timeout {to}s)… ", BrushMuted);
+            var r = await Task.Run(() => c.Crack(ciphertext, pins, scope, to));
+            AppendLorenzResult(r);
+            results.Add((c.Name, r));
+            AppendLine();
+        }
+
+        // Summary
+        SetStatus("Building summary…", BrushAmber);
+        AppendLine();
+        AppendColored("═══════════════ SUMMARY ═══════════════\n", BrushAmber);
+        double baseline = results[^1].r.ElapsedSeconds;
+        AppendColored($"{"Backend",-40}  {"Time",10}  {"K keys/s",10}  {"Speedup",8}\n", BrushDim);
+        AppendColored(new string('─', 74) + "\n", BrushDim);
+        foreach (var (name, r) in results)
+        {
+            double speedup = baseline / r.ElapsedSeconds;
+            double kps = r.KeysTried / r.ElapsedSeconds / 1000;
+            AppendColored($"{name,-40}  ", BrushText);
+            AppendColored($"{r.ElapsedSeconds,9:F3}s", BrushAmber);
+            AppendColored($"  {kps,10:F1}", BrushGreen);
+            AppendColored($"  {speedup,7:F2}x", BrushCyan);
+            AppendColored(r.TimedOut ? "  (TIMED OUT)\n" : "\n",
+                          r.TimedOut ? BrushRed : BrushText);
+        }
+        AppendLine();
+
+        // Per-backend verification
+        AppendColored("Per-backend key recovery:\n", BrushMuted);
+        foreach (var (name, r) in results)
+        {
+            bool m = r.ChiStart.Length == 5
+                  && r.ChiStart[0] == trueStart[0]
+                  && r.ChiStart[1] == trueStart[1]
+                  && r.ChiStart[2] == trueStart[2]
+                  && r.ChiStart[3] == trueStart[3]
+                  && r.ChiStart[4] == trueStart[4];
+            AppendColored($"  {name,-40} ", BrushText);
+            AppendColored($"χ=[{r.ChiStart[0]},{r.ChiStart[1]},{r.ChiStart[2]},"
+                        + $"{r.ChiStart[3]},{r.ChiStart[4]}]"
+                        + $"  IC={r.BestIc/100000.0:F5}  ", BrushCyan);
+            AppendColored(m ? "✔\n" : "✘\n", m ? BrushGreen : BrushRed);
+        }
+        AppendLine();
+
+        // Historical card: Colossus ~1 hour per message in 1944
+        ShowHistoricalCard(results[0].r.ElapsedSeconds,
+                           "Colossus Mark II (1944)", "~1 hour", 3600.0);
+
+        // Reveal the plaintext (decode Baudot → string)
+        SetStatus("Decrypting…", BrushAmber);
+        var revealed = Baudot.Decode(plaintext);
+        await Reveal.RevealStringAsync(revealed,
+            "\u201CTo OKW Keitel from Wolfsschanze: Operation Watch on the Rhine "
+          + "begins 16 December 1944 — Ardennes offensive, Army Group B…\u201D");
+    }
+
+    void AppendLorenzResult(CrackResultLorenz r)
+    {
+        double kps = r.KeysTried / r.ElapsedSeconds / 1000;
+        AppendColored($"{r.ElapsedSeconds,7:F3}s", BrushAmber);
+        AppendColored($" ({kps,7:F0} K/s)", BrushGreen);
+        AppendColored("  found=", BrushMuted);
+        AppendColored($"{r.Found}", r.Found ? BrushGreen : BrushRed);
+        AppendColored($"  bestIC={r.BestIc/100000.0:F5}", BrushCyan);
+        AppendColored(r.TimedOut ? "  [TIMEOUT]\n" : "\n",
+                      r.TimedOut ? BrushRed : BrushText);
     }
 
     async Task RunBenchmarkM3(CrackScope scope)

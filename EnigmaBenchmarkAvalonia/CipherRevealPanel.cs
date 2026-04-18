@@ -88,8 +88,15 @@ public class CipherRevealPanel : Border
         int n = Math.Min(ciphertext.Length, PreviewChars);
         char[] buf = new char[n];
         for (int i = 0; i < n; i++) buf[i] = (char)('A' + ciphertext[i]);
-        _cipher = new string(buf);
-        _cipherText.Text = _cipher + (ciphertext.Length > n ? "…" : "");
+        SetCipherString(new string(buf), ciphertext.Length > n);
+    }
+
+    /// <summary>Direct string overload — useful when cipher bytes don't map 1:1 to A–Z (Lorenz Baudot).</summary>
+    public void SetCipherString(string cipher, bool truncated = false)
+    {
+        int n = Math.Min(cipher.Length, PreviewChars);
+        _cipher = cipher.Substring(0, n);
+        _cipherText.Text = _cipher + (truncated || cipher.Length > n ? "…" : "");
         _plainText.Text = "";
         _translation.Text = "";
     }
@@ -100,7 +107,14 @@ public class CipherRevealPanel : Border
         int n = Math.Min(plaintext.Length, PreviewChars);
         char[] buf = new char[n];
         for (int i = 0; i < n; i++) buf[i] = (char)('A' + plaintext[i]);
-        _plain = new string(buf);
+        await RevealStringAsync(new string(buf), translationCaption);
+    }
+
+    /// <summary>String-based reveal (for Lorenz / non-A-Z plaintexts).</summary>
+    public async Task RevealStringAsync(string plain, string translationCaption)
+    {
+        int n = Math.Min(plain.Length, PreviewChars);
+        _plain = plain.Substring(0, n);
 
         // 1.2 s total, batched so we don't hammer the UI thread per-char.
         const double totalMs = 1200.0;
