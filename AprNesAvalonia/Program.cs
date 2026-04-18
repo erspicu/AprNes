@@ -44,14 +44,16 @@ class Program
                     };
                     AprNes.NesCore.Crt_SetBackend(wanted);
                     if (wanted == AprNes.NesCore.CrtBackend.Gpu)
-                    {
                         AprNes.NesCore.CrtGpuRenderThreadActive = true;
-                        CrtGpuRenderThread.Init();
-                    }
                     break;
                 }
                 case "--gui-benchmark" when i + 1 < args.Length:
                     if (int.TryParse(args[++i], out int secs)) GuiBenchmark.DurationSec = secs;
+                    break;
+                case "--crt-shader" when i + 1 < args.Length:
+                    // Explicit shader filename; bypasses LoadLatest discovery.
+                    // e.g. --crt-shader crt_core_v1.sksl
+                    ShaderLoader.CliOverride = args[++i];
                     break;
                 case "--rom" when i + 1 < args.Length:
                     GuiBenchmark.RomPath = args[++i];
@@ -88,6 +90,11 @@ class Program
                     break;
             }
         }
+
+        // All CLI flags parsed; NOW init CrtGpuRenderThread so ShaderLoader.CliOverride
+        // (set via --crt-shader above) is honored.
+        if (AprNes.NesCore.CrtGpuRenderThreadActive)
+            CrtGpuRenderThread.Init();
 
         return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }

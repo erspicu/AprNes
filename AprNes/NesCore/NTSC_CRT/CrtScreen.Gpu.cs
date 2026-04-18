@@ -61,9 +61,10 @@ namespace AprNes
             Console.WriteLine("[CRT] backend = GPU (SkiaSharp SKRuntimeEffect, raster SKSurface)");
 
             // Compile shader (once; cached in ShaderLoader)
+            // Picks newest versioned crt_core_*.sksl, falls back to baseline v1.
             try
             {
-                _effect = ShaderLoader.Load("crt_core_v1.sksl");
+                _effect = ShaderLoader.LoadLatest("crt_core_", fallbackFile: "crt_core_v1.sksl");
             }
             catch (Exception ex)
             {

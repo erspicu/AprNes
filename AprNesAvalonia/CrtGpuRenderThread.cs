@@ -42,7 +42,9 @@ internal static unsafe class CrtGpuRenderThread
 
         try
         {
-            _effect = ShaderLoader.Load("crt_core_v1.sksl");
+            // Prefer newest versioned file (crt_core_YYYYMMDDHHMMSS_author.sksl);
+            // falls back to the baseline crt_core_v1.sksl if none exists.
+            _effect = ShaderLoader.LoadLatest("crt_core_", fallbackFile: "crt_core_v1.sksl");
             Console.WriteLine("[CRT-RT] shader loaded (render-thread GPU path)");
         }
         catch (Exception ex)
