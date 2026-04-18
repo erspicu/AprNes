@@ -64,12 +64,23 @@ half4 main(float2 fragCoord)
 
     float2 srcP = warpedUV * uSrcSize;
 
-    // ── 2+3. per-channel hblur + convergence ──
-    float convPx = uConvergence * (uSrcSize.x / uDstSize.x);
-    half3 rgbC = sampleWithBlur(srcP);
-    half3 rgbR = sampleWithBlur(float2(srcP.x + convPx, srcP.y));
-    half3 rgbB = sampleWithBlur(float2(srcP.x - convPx, srcP.y));
-    half3 c = half3(rgbR.r, rgbC.g, rgbB.b);
+    // ── 2+3. per-channel hblur + position-dependent convergence ──
+    // Matches CPU ProcessRowConvergence: offset is 0 at horizontal center,
+    // maximum (±uConvergence in dst-pixel units) at left/right edges —
+    // simulates CRT's pincushion convergence error.
+    // When uConvergence ≈ 0, skip the 3-sample path entirely (saves 2 evals).
+    half3 c;
+    if (abs(uConvergence) < 0.01) {
+        c = sampleWithBlur(srcP);
+    } else {
+        float halfW   = uDstSize.x * 0.5;
+        float relX    = (fragCoord.x - halfW) / halfW;           // -1 left, 0 center, +1 right
+        float convSrc = uConvergence * relX * (uSrcSize.x / uDstSize.x);
+        half3 rgbC = sampleWithBlur(srcP);
+        half3 rgbR = sampleWithBlur(float2(srcP.x + convSrc, srcP.y));
+        half3 rgbB = sampleWithBlur(float2(srcP.x - convSrc, srcP.y));
+        c = half3(rgbR.r, rgbC.g, rgbB.b);
+    }
 
     // ── 4. Gaussian beam weight with interlace jitter ──
     float scaleY = uSrcSize.y / uDstSize.y;
