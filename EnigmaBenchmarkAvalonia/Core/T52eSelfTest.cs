@@ -186,7 +186,18 @@ public static class T52eSelfTest
         int[] knownStart = (int[])trueStart.Clone();
         knownStart[6] = 0; knownStart[7] = 0; knownStart[8] = 0; knownStart[9] = 0;
 
-        var cracker = new Crackers.ScalarCrackerT52e();
+        int fails = 0;
+        fails += RunOne(new Crackers.ScalarCrackerT52e(), cipher, pins, switchMap, knownStart, trueStart);
+        fails += RunOne(new Crackers.ParallelScalarCrackerT52e(), cipher, pins, switchMap, knownStart, trueStart);
+        fails += RunOne(new Crackers.SimdCrackerT52e(), cipher, pins, switchMap, knownStart, trueStart);
+        return fails;
+    }
+
+    private static int RunOne(
+        Crackers.ICrackerT52e cracker,
+        byte[] cipher, byte[][] pins, int[] switchMap, int[] knownStart, int[] trueStart)
+    {
+        Console.Write($"[ .. ] {cracker.Name}: ");
         var sw = Stopwatch.StartNew();
         var result = cracker.Crack(cipher, pins, switchMap, knownStart,
                                    Crackers.CrackScope.Quick, timeoutSec: 60);
@@ -197,18 +208,15 @@ public static class T52eSelfTest
                   && result.WheelStart[8] == trueStart[8]
                   && result.WheelStart[9] == trueStart[9];
 
-        Console.WriteLine($"{result.KeysTried:N0} keys in {sw.Elapsed.TotalSeconds:F1}s, " +
-                          $"best IC {result.BestIc / 100000.0:F4}, " +
-                          $"recovered W7..W10 = [{result.WheelStart[6]},{result.WheelStart[7]}," +
-                          $"{result.WheelStart[8]},{result.WheelStart[9]}] " +
-                          $"(truth [{trueStart[6]},{trueStart[7]},{trueStart[8]},{trueStart[9]}])");
+        double kps = result.KeysTried / sw.Elapsed.TotalSeconds;
+        Console.WriteLine($"{result.KeysTried:N0} keys / {sw.Elapsed.TotalSeconds:F1}s " +
+                          $"({kps / 1000:F0} Kkeys/s), " +
+                          $"IC {result.BestIc / 100000.0:F4}, " +
+                          $"→ [{result.WheelStart[6]},{result.WheelStart[7]}," +
+                          $"{result.WheelStart[8]},{result.WheelStart[9]}]" +
+                          (match ? "  ✓ match" : "  ✗ MISMATCH"));
 
-        if (!match)
-        {
-            Console.WriteLine("[FAIL] end-to-end crack did not recover true key");
-            return 1;
-        }
-        Console.WriteLine("[ ok ] end-to-end crack recovered true key");
+        if (!match) { Console.WriteLine("[FAIL]"); return 1; }
         return 0;
     }
 
