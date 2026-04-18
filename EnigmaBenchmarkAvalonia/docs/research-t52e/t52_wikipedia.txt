@@ -1,0 +1,307 @@
+
+Siemens and Halske T52 - Wikipedia
+Jump to content
+Main menu
+ Main menu
+ move to sidebar
+ hide
+ Navigation
+Main page
+Contents
+Current events
+Random article
+About Wikipedia
+Contact us
+ Contribute
+Help
+Learn to edit
+Community portal
+Recent changes
+Upload file
+Special pages
+Search
+ Search
+Appearance
+Donate
+Create account
+Log in
+Personal tools
+Donate
+Create account
+Log in
+Contents
+ move to sidebar
+ hide
+ (Top)
+ 1
+ Operation
+ 2
+ Models
+ 3
+ Cryptanalysis
+ 4
+ See also
+ 5
+ References
+ Toggle References subsection
+ 5.1
+ Citations
+ 5.2
+ Sources
+ 6
+ External links
+Toggle the table of contents
+Siemens and Halske T52
+7 languages
+العربية
+Català
+Deutsch
+Français
+Norsk bokmål
+Русский
+Svenska
+ Edit links
+Article
+Talk
+ English
+Read
+Edit
+View history
+ Tools
+ Tools
+ move to sidebar
+ hide
+ Actions
+Read
+Edit
+View history
+ General
+What links here
+Related changes
+Upload file
+Permanent link
+Page information
+Cite this page
+Get shortened URL
+Expand all
+Edit interlanguage links
+ Print/export
+Download as PDF
+Printable version
+ In other projects
+Wikimedia Commons
+Wikidata item
+ Appearance
+ move to sidebar
+ hide
+Text
+SmallStandardLargeThis page always uses small font sizeWidth
+StandardWideThe content is as wide as possible for your browser window.Color (beta)
+AutomaticLightDarkThis page is always in light mode.
+ From Wikipedia, the free encyclopedia
+World War II German cipher machine and teleprinter
+"Sturgeon" exhibit at the US National Cryptologic Museum
+The Siemens & Halske T52, also known as the Geheimschreiber[1] ("secret teleprinter"), or Schlüsselfernschreibmaschine (SFM), was a World War II German cipher machine and teleprinter produced by the electrical engineering firm Siemens & Halske. The instrument and its traffic were codenamed Sturgeon by British cryptanalysts.
+While the Enigma machine was generally used by field units, the T52 was an online machine used by Luftwaffe and German Navy units, which could support the heavy machine, teletypewriter and attendant fixed circuits. It fulfilled a similar role to the Lorenz cipher machines in the German Army.
+The British cryptanalysts of Bletchley Park codenamed the German teleprinter ciphers Fish, with individual cipher-systems being given further codenames: just as the T52 was called Sturgeon, the Lorenz machine was codenamed Tunny.
+Operation[edit]
+The teleprinters of the day emitted each character as five parallel bits on five lines, typically encoded in the Baudot code or something similar. The T52 had ten pinwheels, which were stepped in a complex nonlinear way, based in later models on their positions from various relays in the past, but in such a way that they could never stall. Each of the five plaintext bits was then XORed with the XOR sum of 3 taps from the pinwheels, and then cyclically adjacent pairs of plaintext bits were swapped or not, according to XOR sums of three (different) output bits. The numbers of pins on all the wheels were coprime, and the triplets of bits that controlled each XOR or swap were selectable through a plugboard.
+This produced a much more complex cipher than the Lorenz machine, and also means that the T52 is not just a pseudorandom number generator-and-XOR cipher. For example, if a cipher clerk erred and sent two different messages using exactly the same settings—a depth of two in Bletchley jargon—this could be detected statistically but was not immediately and trivially solvable as it would be with the Lorenz.
+Models[edit]
+A T52d on display at the Imperial War Museum, London.
+Siemens produced several and mostly incompatible versions of the T52: the T52a and T52b, which differed only in their electrical noise suppression, and the T52c, T52d and T52e. While the T52a/b and T52c were cryptologically weak, the last two were more advanced devices; the movement of the wheels was intermittent, the decision on whether or not to advance them being controlled by logic circuits which took input data from the wheels themselves.
+In addition, a number of conceptual flaws, including very subtle ones, had been eliminated. One such flaw was the ability to reset the keystream to a fixed point, which led to key reuse by undisciplined machine operators.
+Cryptanalysis[edit]
+Following the occupation of Denmark and Norway, the Germans started to use a teleprinter circuit which ran through Sweden. The Swedes immediately tapped the line, in May 1940, and the mathematician and cryptographer Arne Beurling cracked the two earliest models in two weeks, using just pen and paper (a feat later replicated by Bill Tutte at Bletchley Park with the Lorenz teleprinter device used by the German High Command).[2] The telephone company Ericsson manufactured a number of T52 analogue machines[3] that could decode the messages once the key settings had been found by hand. The Swedes then read traffic in the system for three years, not only between Berlin and Oslo, but also between Germany and the German forces in Finland, and of course the German embassy in Stockholm. In total, the Swedes intercepted 500,000 German messages and decrypted 350,000.[3] However, poor security meant the Germans eventually became aware of this. An improvement in T52 security in 1942 was defeated by the Swedes. However, a second upgrade in mid-1943 was not, and the flow of decrypted messages came to an end.[3]
+The British first detected T52 traffic in the summer and autumn of 1942 on a link between Sicily and Libya, codenamed "Sturgeon", and another from the Aegean to Sicily, codenamed "Mackerel". Operators of both links were in the habit of enciphering several messages with the same machine settings, producing large numbers of depths. These depths were analysed by Michael Crum.[4]
+The British at Bletchley Park later also broke into Sturgeon, although they did not break it as regularly as they broke Enigma or Tunny. This was partly because the T52 was by far the most complex cipher of the three, but also because the Luftwaffe very often retransmitted Sturgeon messages using easier-to-attack (or already broken) ciphers, making it unnecessary to attack Sturgeon.
+See also[edit]
+SIGABA (United States)
+Typex (Britain)
+Siemens
+References[edit]
+Citations[edit]
+^ Beckman B. Codebreakers: Arne Beurling and the Swedish crypto program during World War II. Providence, RI: American Mathematical Society; 2002 Jan.
+^ Rijmenants, Dirk (2008), Focus: Siemens & Halske T-52, retrieved 18 November 2014
+^ Jump up to: a b c 
+ Gannon, Paul (2006). Colossus: Bletchley Park's Greatest Secret. Atlantic Books. pp. 157–158. ISBN 1-84354-330-3.
+^ The SAVILLE cryptographic algorithm; see note concerning Crum's career
+Sources[edit]
+Donald W. Davies, The Siemens and Halske T52e Cipher Machine (reprinted in Cryptology: Yesterday, Today and Tomorrow, Artech House, Norwood, 1987)
+Donald W. Davies, The Early Models of the Siemens and Halske T52 Cipher Machine (also reprinted in Cryptology: Yesterday, Today and Tomorrow)
+Donald W. Davies, New Information on the History of the Siemens and Halske T52 Cipher Machines (reprinted in Selections from Cryptologia: History, People, and Technology, Artech House, Norwood, 1998)
+External links[edit]
+Wikimedia Commons has media related to Siemens T-52 cipher machines.
+John Savard's page on the Geheimfernschreiber
+Photographs of Sturgeon
+Entry for "Sturgeon" in the Government Code and Cypher School Cryptographic Dictionary
+Bletchley Park's Sturgeon, the Fish that Laid No Eggs at The Rutherford Journal.
+v
+t
+eCipher machines
+Rotor machines
+CCM
+Enigma
+M-125 Fialka
+Hebern
+HX-63
+KL-7
+Lacida
+M-325
+Mercury
+NEMA
+OMI
+RED
+SG-39
+SG-41
+SIGABA
+SIGCUM
+Singlet
+Typex
+Mechanical
+Bazeries cylinder
+C-36
+C-52
+CD-57
+Cipher disk
+HC-9
+Kryha
+Jefferson disk
+M-94
+M-209
+Reihenschieber
+Scytale
+Teleprinter
+5-UCO
+BID 770
+DUDEK
+KW-26
+KW-37
+Lorenz SZ 40/42
+Siemens and Halske T52
+SIGTOT
+Secure voice
+BID 150
+FASCINATOR
+KY-3
+KY-58
+KY-68
+NESTOR
+OMNI
+SCIP
+Sectéra Secure Module
+SIGSALY
+STE
+STU-II
+STU-III
+VINSON
+Other
+JADE
+KG-84
+KL-43
+KL-51
+Noreen
+Red
+Purple
+Pinwheel
+Rockex
+Computer hardware
+AES instruction set
+Intel SHA extensions
+IBM 4758
+IBM 4764
+show
+v
+t
+eCryptography
+General
+History of cryptography
+Outline of cryptography
+Classical cipher
+Cryptographic protocol
+Authentication protocol
+Cryptographic primitive
+Cryptanalysis
+Cryptocurrency
+Cryptosystem
+Cryptographic nonce
+Cryptovirology
+Hash function
+Cryptographic hash function
+Key derivation function
+Secure Hash Algorithms
+Digital signature
+Kleptography
+Key (cryptography)
+Key exchange
+Key generator
+Key schedule
+Key stretching
+Keygen
+Machines
+Ransomware
+Random number generation
+Cryptographically secure pseudorandom number generator (CSPRNG)
+Pseudorandom noise (PRN)
+Secure channel
+Insecure channel
+Subliminal channel
+Encryption
+Decryption
+End-to-end encryption
+Harvest now, decrypt later
+Information-theoretic security
+Plaintext
+Codetext
+Ciphertext
+Shared secret
+Trapdoor function
+Trusted timestamping
+Key-based routing
+Onion routing
+Garlic routing
+Kademlia
+Mix network
+Mathematics
+Cryptographic hash function
+Block cipher
+Stream cipher
+Symmetric-key algorithm
+Authenticated encryption
+Public-key cryptography
+Quantum key distribution
+Quantum cryptography
+Post-quantum cryptography
+Message authentication code
+Random numbers
+Steganography
+ Category
+Retrieved from "https://en.wikipedia.org/w/index.php?title=Siemens_and_Halske_T52&oldid=1304298539"
+ Categories: 
+Encryption devices
+World War II military equipment of Germany
+Cryptographic hardware
+Signals intelligence of World War IIHidden categories: 
+Articles with short description
+Short description matches Wikidata
+Commons category link is on Wikidata
+ This page was last edited on 5 August 2025, at 05:17 (UTC).
+Text is available under the Creative Commons Attribution-ShareAlike 4.0 License;
+additional terms may apply. By using this site, you agree to the Terms of Use and Privacy Policy. Wikipedia® is a registered trademark of the Wikimedia Foundation, Inc., a non-profit organization.
+Privacy policy
+About Wikipedia
+Disclaimers
+Contact Wikipedia
+Legal & safety contacts
+Code of Conduct
+Developers
+Statistics
+Cookie statement
+Mobile view
+Edit preview settings
+Search
+ Search
+Toggle the table of contents
+ Siemens and Halske T52
+7 languages
+Add topic

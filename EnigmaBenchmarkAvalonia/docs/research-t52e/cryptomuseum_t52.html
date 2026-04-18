@@ -1,0 +1,2811 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"><html><head>
+    <link rel="stylesheet" type="text/css" href="https://www.cryptomuseum.com/balloon.css">
+    <title>T-52 Geheimschreiber</title>
+    <style type="text/css">
+    a {text-decoration:none}
+    a:hover {color:#123A99; text-decoration:underline}
+    sup {font-size: smaller; vertical-align: baseline; position: relative; bottom: 0.33em}
+    sub {font-size: smaller; vertical-align: baseline; position: relative; bottom: -0.25em}
+    pre {font-size: 13px; padding: 0px; margin: 0px;}
+    td.but1 a {color: black;}
+    td.but2 a {color: white;}
+    table.fixed {table-layout: fixed;}
+    table.fixed td {overflow: hidden; white-space: nowrap; text-overflow: ellipsis;}
+    body, table {
+      font-family: "Lucida Grande", "Lucida Sans Unicode", Helvetica, Arial, Verdana, sans-serif;
+      font-size: 12px;
+    }
+    
+    h4 {
+      font-size: 32px;
+      margin: 0px;
+      padding: 0px;
+    }
+    
+    div.quote {
+      font-family: monospace;
+      font-size: 14px;
+      color: #D60;
+      padding-left: 40px;
+      margin-bottom: 16px;
+    }
+    
+    div.censor {
+      position: relative;
+      display: inline;
+      color: green;
+      background-color: #ddd;
+    }
+    
+    div.key {
+      display: inline;
+      padding: 3px;
+      padding-left: 12px;
+      padding-right: 12px;
+      margin: 0px;
+      margin-right: 6px;
+      margin-bottom: 13px;
+      background: #ededed;
+      color: #aaa;
+      font-size: 12px;
+    
+      -webkit-border-radius: 4px;
+      -moz-border-radius: 4px;
+      -ms-border-radius: 4px;
+      -o-border-radius: 4px;
+      border-radius: 4px;
+    
+    }
+    
+    div.key:hover {
+      background: #60aaff;
+      color: white;
+    }
+    
+    a.key:hover {
+      text-decoration: none;
+    }
+    
+    div.button {
+      display: inline;
+      padding: 3px;
+      padding-left: 12px;
+      padding-right: 12px;
+      margin: 0px;
+      margin-right: 6px;
+      margin-bottom: 0px;
+      background: #60aaff;
+      color: #aaa;
+      color: white;
+      top: 0px;
+    
+      -webkit-border-radius: 4px;
+      -moz-border-radius: 4px;
+      -ms-border-radius: 4px;
+      -o-border-radius: 4px;
+      border-radius: 4px;
+    
+    }
+    
+    /* CSS hack to resize the container to the height of its children */
+    
+    .clear_float {
+      clear: both;
+      margin: 0;
+      padding: 0;
+      font-size: 0;
+      line-height: 0;
+    }
+    
+    div.right {
+      float: right;
+      margin-right: 0px;
+      margin-left: 6px;
+      margin-top: -3px;
+    }
+    
+    div.widget {
+      display: inline;
+      background: #eee;
+      padding-left: 4px;
+      padding-right: 4px;
+    
+      -webkit-border-radius: 3px;
+      -moz-border-radius: 3px;
+      -ms-border-radius: 3px;
+      -o-border-radius: 3px;
+      border-radius: 3px;
+    }
+    
+    /* Buttons at left hand side */
+    
+    div.menu {
+      width: 100%;
+      padding-left: 22px;
+      padding-top: 8px;
+    }
+    
+    div.menu a {
+      color: inherit;
+      text-decoration: none;
+    }
+    
+    div.menu a:hover {
+      underline: none;
+      text-decoration: none;
+    }
+    
+    div.menu div.but {
+      width: 134px;
+      height: 23px;
+      margin-bottom: 4px;
+      color: black;
+      background: #FFDE38;
+      text-align: center;
+      line-height: 23px;
+      cursor: pointer;
+    
+      -webkit-border-radius: 4px;
+      -moz-border-radius: 4px;
+      -ms-border-radius: 4px;
+      -o-border-radius: 4px;
+      border-radius: 4px;
+    }
+    
+    div.menu div.sub {
+      color: white;
+      background: #78C7FF;
+    }
+    
+    div.menu div.first {
+      font-weight: bold;
+      color: black;
+    }
+    
+    div.menu div.sel {
+      font-weight: bold;
+      background: #0D8FE6;
+      color: white;
+    }
+    
+    div.menu div.spacer {
+      height: 8px;
+      width: 100%;
+      padding: 0px;
+      margin: 0px;
+    }
+    
+    div.menu div.hidden {
+      display: none;
+    }
+    
+    div.menu div.submenu {
+      width: 134px;
+    }
+    
+    div.menu div.submenu:hover .hidden {
+      display: block;
+    }
+    
+    div.menu div.alt {
+      background: #ffaaaa;
+    }
+    
+    div.short {
+      color: #338833;
+      color: #aa66aa;
+      display: inline;
+      text-align: center;
+    }
+    
+    div.short:hover {
+      color: red;
+    }
+    
+    span.short {
+      color: #338833;
+      color: #aa66aa;
+      text-align: center;
+    }
+    
+    span.short:hover {
+      color: red;
+    }
+    
+    div.paper {
+      padding: 6px;
+      padding-bottom: 10px;
+      margin: 0px;
+      border-left: 8px solid #ddd;
+      margin-top: 8px;
+      margin-bottom: 22px;
+      padding-left: 10px;
+      font-size: 13px;
+      color: #666;
+    }
+    
+    div.paper div.title {
+      font-size: 15px;
+      min-height: 28px;
+      margin-bottom: 4px;
+      margin-top: 4px;
+      color: black;
+    }
+    
+    div.paper:hover {
+      border-left: 8px solid #fb0;
+      background-color: #fffcf8;
+    }
+    
+    div.paper:hover .pkey {
+      background-color: #ffcc88;
+      color: #886644;
+    }
+    
+    div.paper div.author {
+      margin-top: 8px;
+    }
+    
+    div.paper div.author ol,
+    div.paper div.author ul {
+      margin-top: 4px;
+      margin-bottom: 0px;
+    }
+    
+    div.paper div.hist {
+      margin-top: 8px;
+    }
+    
+    div.paper div.hist ul {
+      margin-top: 4px;
+      margin-bottom: 0px;
+      font-size: 11px;
+    }
+    
+    div.paper div.abstract {
+      font-size: 11px;
+      margin-left: 20px;
+    }
+    
+    div.paper div.quotation {
+      margin-left: 20px;
+    }
+    
+    div.paper div.spacer {
+      height: 8px;
+    }
+    
+    .ekey {
+    //  background-color: #eee;
+    //  border-color: #888;
+      color: #ddbb66;
+      font-size: 10px;
+      padding: 2px;
+      padding-left: 6px;
+      padding-right: 6px;
+    
+      -webkit-border-radius: 2px;
+      -moz-border-radius: 2px;
+      -ms-border-radius: 2px;
+      -o-border-radius: 2px;
+      border-radius: 2px;
+    }
+    
+    div.paper:hover .ekey {
+      color: #cc8844;;
+    }
+    
+    .hkey {
+      color: #67c;
+      font-size: 10px;
+      padding: 2px;
+      padding-left: 6px;
+      padding-right: 6px;
+    
+      -webkit-border-radius: 3px;
+      -moz-border-radius: 3px;
+      -ms-border-radius: 3px;
+      -o-border-radius: 3px;
+      border-radius: 3px;
+    }
+    
+    div.paper:hover .hkey {
+      color: #cc8844;
+    }
+    
+    .hkey:hover {
+      background-color: #efe8df;
+    }
+    
+    div.pkey {
+      display: inline;
+      padding: 3px;
+      padding-left: 12px;
+      padding-right: 12px;
+      margin: 0px;
+      margin-right: 0px;
+      margin-left: 6px;
+      margin-bottom: 4px;
+      background: #e0e0e0;
+      color: #777;
+      font-size: 12px;
+      top: -2px;
+    
+      -webkit-border-radius: 4px;
+      -moz-border-radius: 4px;
+      -ms-border-radius: 4px;
+      -o-border-radius: 4px;
+      border-radius: 4px;
+    
+    }
+    
+    div.pkey:hover,
+    div.paper:hover div.pkey:hover {
+      background: #60aaff;
+      color: white;
+    }
+    
+    a.pkey:hover {
+      text-decoration: none;
+    }
+    
+    div.legend {
+      display: inline-block;
+      text-align: center;
+      -webkit-border-radius: 4px;
+      -moz-border-radius: 4px;
+      -ms-border-radius: 4px;
+      -o-border-radius: 4px;
+      border-radius: 4px;
+      position: relative;
+      bottom: -1px;
+    }
+    
+    div.remark, div.red, div.blue, div.grey {
+      background-color: #ffe8e8;
+      color: #ff4444;
+      -webkit-border-radius: 3px;
+      -moz-border-radius: 3px;
+      -ms-border-radius: 3px;
+      -o-border-radius: 3px;
+      border-radius: 3px;
+      position: relative;
+      margin-top: 5px;
+      padding: 4px;
+      padding-bottom: 7px;
+      padding-left: 8px;
+      font-size: 11px;
+    }
+    
+    div.blue {
+      background-color: #e0f0ff;
+      color: #8090b0;
+    }
+    
+    div.grey {
+      background-color: #f0f0f0;
+      color: #777777;
+    }
+    
+    div.tred {
+      color: red;
+    }
+    
+    /* Vertical text in tables */
+    
+    table.table td.vert,
+    table.table tr.vert td {
+      width: 20px;
+      height: 120px;
+    }
+    
+    div.vert {
+      -webkit-transform: rotate(270deg);
+      -moz-transform: rotate(270deg);
+      -ms-transform: rotate(270deg);
+      -o-transform: rotate(270deg);
+      transform: rotate(270deg);
+      width: 100px;
+      height: 20px;
+      position: relative;
+      left: 22px;
+      bottom: 4px;
+      -webkit-transform-origin: left bottom 0;
+      transform-origin: left bottom 0;
+      text-align: left;
+    }
+    
+    
+    /* CSS code for slideshow */
+    
+    .slide {
+      display: none;
+      position: fixed;
+      z-index: 1;
+      padding-top: 100px;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: black;
+      background: rgba(0, 0, 0, 0.5);
+    }
+    
+    .slide_content {
+      position: relative;
+      background-color: #fefefe;
+      margin: auto;
+      margin-bottom: 200px;
+      padding: 0;
+      width: 90%;
+      max-width: 1000px;
+      align: center;
+    
+      border: 12px solid white;
+    
+      -webkit-box-shadow: 0px 20px 28px rgba(0, 0, 0, 0.6);
+      -moz-box-shadow: 0px 20px 28px rgba(0, 0, 0, 0.6);
+      -ms-box-shadow: 0px 20px 28px rgba(0, 0, 0, 0.6);
+      -o-box-shadow: 0px 20px 28px rgba(0, 0, 0, 0.6);
+      box-shadow: 0px 20px 28px rgba(0, 0, 0, 0.6);
+    }
+    
+    .slide_img {
+    }
+    
+    .slide_close,
+    .slide_close_left {
+      color: white;
+      position: absolute;
+      top: 10px;
+      right: 25px;
+      font-size: 35px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    
+    .slide_close_left {
+      left: 25px;
+    }
+    
+    .slide_close:hover,
+    .slide_close:focus,
+    .slide_close_left:hover,
+    .slide_close_left:focus {
+      color: #999;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    
+    .slide_main {
+      display: none;
+    }
+    
+    .slide_small {
+      max-width: 500px;
+      align: center;
+      border: 1px dotted red;
+    }
+    
+    .slide_next,
+    .slide_prev {
+      cursor: pointer;
+      background: rgba(128, 128, 128, 0.5);
+      position: absolute;
+      top: 50%;
+      width: auto;
+      padding: 16px;
+      margin-top: -50px;
+      color: white;
+      font-weight: bold;
+      font-size: 20px;
+      transition: 0.6s ease;
+      border-radius: 0 3px 3px 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    
+    .slide_next {
+      right: 0;
+      border-radius: 3px 0 0 3px;
+    }
+    
+    .slide_next:hover,
+    .slide_prev:hover {
+      background-color: rgba(0, 0, 0, 0.8);
+      text-decoration: none;
+      color: white;
+    }
+    
+    .slide_number {
+      color: #f2f2f2;
+      font-size: 20px;
+      padding: 8px 12px;
+      position: absolute;
+      top: -60px;
+      left: -20px;
+    }
+    
+    .slide_group {
+      color: #9f9f9f;
+      font-size: 32px;
+      display: inline;
+      margin-right: 6px;
+    }
+    
+    .slide_index {
+      color: #e0e0e0;
+      font-size: 32px;
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      margin-left: 330px;
+      margin-top: -20px;
+      cursor: pointer;
+    }
+    
+    .slide_caption {
+      text-align: center;
+      background-color: white;
+      color: #666;
+      font-size: 18px;
+      padding: 0px;
+    }
+    
+    .slide_demo {
+      opacity: 0.6;
+    }
+    
+    /* Special ticks in lists */
+    
+    ul.tick {
+      list-style: none;
+      padding: 0px;
+      padding-left: 13px;
+    }
+    
+    ul.tick li:before {
+      content: '\2022';
+      margin: 10px;
+    }
+    
+    ul.tick li.tick:before {
+      content: '\2714';
+      margin: 0;
+      padding-left: 9px;
+      padding-right: 7px;
+      color: #22aa22;
+    }
+    
+    ul.tick li.cross:before {
+      content: '\2718';
+      margin: 0;
+      padding-left: 9px;
+      padding-right: 9px;
+      color: #ff2222;
+    }
+    
+    /* Lists with prefixed counter */
+    
+    div.counter {
+      counter-increment: number;
+      counter-reset: subnum;
+    }
+    
+    ol.counter, {
+      counter-reset: number;
+      counter-reset: subnum;
+      list-style-position: outside;
+    }
+    
+    ol.counter li {
+      list-style: none;
+      counter-increment: subnum;
+    }
+    
+    ol.counter li:before {
+      content: counter(number) "." counter(subnum);
+      position: relative;
+      left: -15px;
+    }
+    
+    ol.counter_UL li:before {
+      content: counter(number, upper-latin) "." counter(subnum);
+    }
+    
+    ol.counter_LL li:before {
+      content: counter(number, lower-latin) "." counter(subnum);
+    }
+    
+    ol.counter_UR li:before {
+      content: counter(number, upper-roman) "." counter(subnum);
+    }
+    
+    ol.counter_LR li:before {
+      content: counter(number, lower-roman) "." counter(subnum);
+    }
+    
+    .tooltip-red {
+      --balloon-color: #cc0000;
+    }
+    
+    /* Tour icon with text */
+    
+    .tour:hover {
+      animation: tour 10s infinite linear;
+    }
+    
+    @keyframes tour {
+      from {
+        transform: rotate(0deg);
+      }
+      to {
+        transform: rotate(359deg);
+      }
+    }
+    
+    </style>
+    <link rel="icon" href="https://www.cryptomuseum.com/img/favicon.ico" type="image/ico">
+    <link rel="shortcut icon" href="https://www.cryptomuseum.com//img/favicon.ico">
+    <meta name="Keywords" content="T52, T-52, Geheimschreiber, SZ52, SZ-52">
+    <script language="JavaScript">
+    
+    function slideOpen(slidename) {
+      document.getElementById(slidename).style.display = "block";
+    }
+    
+    function slideClose(slidename) {
+      document.getElementById(slidename).style.display = "none";
+    }
+    
+    var slideIndex = 1;
+    //slideShow(slideIndex);
+    
+    function slideNext(slidename, n) {
+      slideShow(slidename, slideIndex += n);
+      event.cancelBubble=true;
+    }
+    
+    function slideCurrent(slidename, n) {
+      slideShow(slidename, slideIndex = n);
+      event.cancelBubble=true;
+    }
+    
+    function slideShow(slidename, n) {
+    
+      var i;
+      var slideId = document.getElementById(slidename);
+      var slides = slideId.getElementsByClassName("slide_main");
+      var alts = slideId.getElementsByClassName("slide_img");
+      var captionText = slideId.getElementsByClassName("dummy_caption");
+    
+      if (n > slides.length) {slideIndex = 1}
+      if (n < 1) {slideIndex = slides.length}
+    
+      for (i = 0; i < slides.length; i++) {
+        slides[i].style.display = "none";
+      }
+    
+      slides[slideIndex-1].style.display = "block";
+      captionText[0].innerHTML = alts[slideIndex-1].alt;
+    
+    }
+    
+    function slideCloseAll() {
+    
+      var i;
+      var slideId;
+      var slides = document.getElementsByClassName("slide");
+    
+      if (slides.length) {
+        for (i = 0; i < slides.length; i++) {
+          slideId = slides[i].id;
+          slideClose(slideId);
+        }
+      }
+    
+    }
+    
+    function getOpenSlide() {
+    
+      var open = 0;
+      var i;
+      var j;
+      var sub;
+      var slideId;
+      var slides = document.getElementsByClassName("slide");
+    
+      if (slides.length) {
+        for (i = 0; i < slides.length; i++) {
+          slideId = slides[i].id;
+          if (document.getElementById(slideId).style.display == "block") open = slideId;
+        }
+      }
+      return open;
+    
+    }
+    
+    
+    /*
+       This function handles key presses in the entire document and
+       is called from the onKeyDown handler of the <body> element.
+    */
+    
+    function slideKey(e) {
+    
+      var open = getOpenSlide();
+      var key = e.keyCode;
+    
+      if (open) {
+        if (key == 27) {slideCloseAll()};
+        if (key == 39) {slideNext(open, 1)};
+        if (key == 37) {slideNext(open, -1)};
+      }
+    
+    }
+    
+    </script>
+    <script language="JavaScript">
+    
+      function toggle_search() {
+      
+        var x = document.getElementById("search");
+        ios = /ipad|iphone|ipod/i.test(navigator.userAgent.toLowerCase());
+        frm = document.getElementById("searchForm");
+    
+        if (!ios) frm.target = '_blank';
+    
+        if (x.style.display == "none") {
+          x.style.display = "inline";
+          x = document.getElementById("q");
+          x.value = '';
+          x.focus();
+        } else {
+          x.style.display = "none";
+        }
+      
+      }
+    
+    </script>
+  </head>
+<body background="../../../" bgcolor="#FFFFFF" text="#000000" link="#123A99" vlink="#3659AD" onkeydown="slideKey(event);">    <table border="0" cellspacing="0" cellpadding="0" width="100%"><tbody><tr><td width="100%" align="center">
+    <a name="top_of_page"></a><table width="800" border="0" cellspacing="0" cellpadding="0">
+    
+      <tbody><tr>
+      </tr>
+    </tbody></table>
+    <table width="800" border="0" cellpadding="0" cellspacing="0">
+      <tbody><tr><td valign="top">
+      <table width="180" border="0" cellpadding="0" cellspacing="0">
+        <tbody><tr><td valign="top" align="center"><div data-balloon-pos="left" aria-label="Click for homepage"><a href="../../../index.htm"><img src="../../../svg/logo/wheel.svg" align="center" border="0"></a></div></td></tr>
+        <tr><td><div class="menu">
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Click here to return to the homepage" data-balloon-length="medium">
+          <div class="but" onclick="location.href='../../../index.htm';">Homepage</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Cipher machines and other cryptographic items" data-balloon-length="medium">
+          <div class="but sub first" onclick="location.href='../../../crypto/index.htm';">Crypto</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Alphabetic index of cryptographic devices" data-balloon-length="medium">
+          <div class="but sub" onclick="location.href='../../../crypto/list.htm';">Index</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Frequently used expressions and abbreviations" data-balloon-length="medium">
+          <div class="but sub" onclick="location.href='../../../crypto/glossary.htm';">Glossary</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="The ENIGMA cipher machine" data-balloon-length="medium">
+          <div class="but sub" onclick="location.href='../../../crypto/enigma/index.htm';">Enigma</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Machines from Boris Hagelin and/or Crypto AG" data-balloon-length="medium">
+          <div class="but sub" onclick="location.href='../../../crypto/hagelin/index.htm';">Hagelin</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Soviet rotor-based cipher machine M-125, codenamed Fialka" data-balloon-length="medium">
+          <div class="but sub" onclick="location.href='../../../crypto/fialka/index.htm';">Fialka</div>
+</div>
+          <div class="spacer"></div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Rotor-based cipher machines" data-balloon-length="medium">
+          <div class="but sel sub" onclick="location.href='../../../crypto/rotor.htm';">Rotor</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Pin-and-lug cipher machines" data-balloon-length="medium">
+          <div class="but sub" onclick="location.href='../../../crypto/pinwheel.htm';">Pin-wheel</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Tapeless Rotorless On-Line cipher machines" data-balloon-length="medium">
+          <div class="but sub" onclick="location.href='../../../crypto/trol/index.htm';">TROL</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Secure speech devices" data-balloon-length="medium">
+          <div class="but sub" onclick="location.href='../../../crypto/voice.htm';">Voice</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Telegraphy and computer data encryption" data-balloon-length="medium">
+          <div class="but sub" onclick="location.href='../../../crypto/data.htm';">Data</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Manual cipher systems" data-balloon-length="medium">
+          <div class="but sub" onclick="location.href='../../../crypto/manual.htm';">Hand</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="The unbreakable One-Time Pad" data-balloon-length="medium">
+          <div class="but sub" onclick="location.href='../../../crypto/otp/index.htm';">OTP</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Electronic Message Units" data-balloon-length="medium">
+          <div class="but sub" onclick="location.href='../../../crypto/emu.htm';">EMU</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Hardware Security Modules" data-balloon-length="medium">
+          <div class="but sub" onclick="location.href='../../../crypto/hsm.htm';">HSM</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Cipher machines based on One-Time Tape encryption" data-balloon-length="medium">
+          <div class="but sub" onclick="location.href='../../../crypto/ott.htm';">Mixers</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Secure telephones and privacy sets" data-balloon-length="medium">
+          <div class="but sub" onclick="location.href='../../../crypto/phone.htm';">Phones</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Bulk encryptors and IP-based networks" data-balloon-length="medium">
+          <div class="but sub" onclick="location.href='../../../crypto/ip.htm';">Bulk</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Key transfer devices" data-balloon-length="medium">
+          <div class="but sub" onclick="location.href='../../../crypto/fill.htm';">FILL</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Codebooks, procedures and key distribution material" data-balloon-length="medium">
+          <div class="but sub" onclick="location.href='../../../crypto/codebook/index.htm';">Codebooks</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Public and secret algorithms used in cryptography" data-balloon-length="medium">
+          <div class="but sub" onclick="location.href='../../../crypto/algo/index.htm';">Algorithms</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Cryptographic Processors" data-balloon-length="medium">
+          <div class="but sub" onclick="location.href='../../../crypto/chips.htm';">Chips</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Cryptanalytic Machines" data-balloon-length="medium">
+          <div class="but sub" onclick="location.href='../../../cam/index.htm';">Cryptanalysis</div>
+</div>
+          <div class="but sub" onclick="location.href='../../../crypto/toys.htm';">Toys</div>
+          <div class="but sub" onclick="location.href='../../../crypto/ww2.htm';">World War II</div>
+          <div class="spacer"></div>
+          <div class="submenu">
+          <div class="but sub">
+            <img src="../../../img/down.png" style="float: right; margin-right: 7px; margin-top: 7px;">
+            <img src="../../../img/down.png" style="float: left; margin-left: 7px; margin-top: 7px;">
+            Countries
+          </div>
+          <div class="hidden">
+            <div class="but sub" onclick="location.href='../../../crypto/cs.htm';">Czechoslovakia</div>
+            <div style="text-align: center;" data-balloon-pos="left" aria-label="Former East-Germany" data-balloon-length="medium">
+            <div class="but sub" onclick="location.href='../../../crypto/ddr/index.htm';">DDR</div>
+</div>
+            <div class="but sub" onclick="location.href='../../../crypto/france/index.htm';">France</div>
+            <div class="but sel sub" onclick="location.href='../../../crypto/germany/index.htm';">Germany</div>
+            <div style="text-align: center;" data-balloon-pos="left" aria-label="The Netherlands, Holland" data-balloon-length="medium">
+            <div class="but sub" onclick="location.href='../../../crypto/nl/index.htm';">Netherlands</div>
+</div>
+            <div class="but sub" onclick="location.href='../../../crypto/ru/index.htm';">Russia</div>
+            <div class="but sub" onclick="location.href='../../../crypto/swiss/index.htm';">Switzerland</div>
+            <div style="text-align: center;" data-balloon-pos="left" aria-label="United Kingdom" data-balloon-length="medium">
+            <div class="but sub" onclick="location.href='../../../crypto/uk/index.htm';">UK</div>
+</div>
+            <div style="text-align: center;" data-balloon-pos="left" aria-label="United States of America" data-balloon-length="medium">
+            <div class="but sub" onclick="location.href='../../../crypto/usa/index.htm';">USA</div>
+</div>
+            <div style="text-align: center;" data-balloon-pos="left" aria-label="Soviet Union" data-balloon-length="medium">
+            <div class="but sub" onclick="location.href='../../../crypto/ussr/index.htm';">USSR</div>
+</div>
+            <div style="text-align: center;" data-balloon-pos="left" aria-label="Former Yugoslav republic" data-balloon-length="medium">
+            <div class="but sub" onclick="location.href='../../../crypto/yugo/index.htm';">Yugoslavia</div>
+</div>
+          </div>
+          </div>
+          <div class="submenu">
+          <div class="but sub">
+            <img src="../../../img/down.png" style="float: right; margin-right: 7px; margin-top: 7px;">
+            <img src="../../../img/down.png" style="float: left; margin-left: 7px; margin-top: 7px;">
+            Manufacturers
+          </div>
+          <div class="hidden">
+            <div class="but sub" onclick="location.href='../../../crypto/ant/index.htm';">ANT</div>
+            <div class="but sub" onclick="location.href='../../../crypto/aristo/index.htm';">Aristo</div>
+            <div class="but sub" onclick="location.href='../../../crypto/ascom/index.htm';">Ascom</div>
+            <div class="but sub" onclick="location.href='../../../crypto/att/index.htm';">AT&amp;T</div>
+            <div style="text-align: center;" data-balloon-pos="left" aria-label="Brown, Boveri and Company" data-balloon-length="medium">
+            <div class="but sub" onclick="location.href='../../../crypto/bbc/index.htm';">BBC</div>
+</div>
+            <div class="but sub" onclick="location.href='../../../crypto/bosch/index.htm';">Bosch</div>
+            <div class="but sub" onclick="location.href='../../../crypto/compumatica/index.htm';">Compumatica</div>
+            <div class="but sub" onclick="location.href='../../../crypto/hagelin/index.htm';">Crypto&nbsp;AG</div>
+            <div class="but sub" onclick="location.href='../../../crypto/datotek/index.htm';">Datotek</div>
+            <div class="but sub" onclick="location.href='../../../crypto/foxit/fffe/index.htm';">Fox-IT</div>
+            <div style="text-align: center;" data-balloon-pos="left" aria-label="General Dynamics" data-balloon-length="medium">
+            <div class="but sub" onclick="location.href='../../../manuf/gd/index.htm';">GD</div>
+</div>
+            <div class="but sub" onclick="location.href='../../../manuf/gemalto/index.htm';">Gemalto</div>
+            <div class="but sub" onclick="location.href='../../../crypto/gretag/index.htm';">Gretag</div>
+            <div class="but sub" onclick="location.href='../../../crypto/harris/index.htm';">Harris</div>
+            <div class="but sub" onclick="location.href='../../../crypto/hell/index.htm';">HELL</div>
+            <div class="but sub" onclick="location.href='../../../crypto/itt/index.htm';">ITT</div>
+            <div class="but sub" onclick="location.href='../../../crypto/lorenz/index.htm';">Lorenz</div>
+            <div class="but sub" onclick="location.href='../../../crypto/lugagne/index.htm';">Lugagne</div>
+            <div class="but sub" onclick="location.href='../../../crypto/mel/index.htm';">MEL</div>
+            <div class="but sub" onclick="location.href='../../../crypto/mils/index.htm';">Mils</div>
+            <div class="but sub" onclick="location.href='../../../crypto/motorola/index.htm';">Motorola</div>
+            <div class="but sub" onclick="location.href='../../../manuf/mykotronx/index.htm';">Mykotronx</div>
+            <div class="but sub" onclick="location.href='../../../crypto/nokia/index.htm';">Nokia</div>
+            <div class="but sub" onclick="location.href='../../../crypto/omi/index.htm';">OMI</div>
+            <div class="but sub" onclick="location.href='../../../crypto/omnisec/index.htm';">Omnisec</div>
+            <div class="but sub" onclick="location.href='../../../crypto/philips/index.htm';">Philips</div>
+            <div class="but sub" onclick="location.href='../../../crypto/ptt/index.htm';">PTT</div>
+            <div style="text-align: center;" data-balloon-pos="left" aria-label="Rohde &amp; Schwarz" data-balloon-length="medium">
+            <div class="but sub" onclick="location.href='../../../crypto/rs/index.htm';">R&amp;S</div>
+</div>
+            <div class="but sub" onclick="location.href='../../../crypto/racal/index.htm';">Racal</div>
+            <div class="but sub" onclick="location.href='../../../crypto/randata/index.htm';">RanData</div>
+            <div class="but sub" onclick="location.href='../../../crypto/raytheon/index.htm';">Raytheon</div>
+            <div class="but sub" onclick="location.href='../../../crypto/rca/index.htm';">RCA</div>
+            <div class="but sub" onclick="location.href='../../../manuf/safenet/index.htm';">Safenet</div>
+            <div class="but sub" onclick="location.href='../../../manuf/secunet/index.htm';">Secunet</div>
+            <div class="but sel sub" onclick="location.href='../../../crypto/siemens/index.htm';">Siemens</div>
+            <div class="but sub" onclick="location.href='../../../crypto/stk/index.htm';">STK</div>
+            <div class="but sub" onclick="location.href='../../../crypto/tadiran/index.htm';">Tadiran</div>
+            <div class="but sub" onclick="location.href='../../../crypto/tait/index.htm';">Tait</div>
+            <div class="but sub" onclick="location.href='../../../manuf/tcc/index.htm';">TCC</div>
+            <div class="but sub" onclick="location.href='../../../crypto/telefunken/index.htm';">Telefunken</div>
+            <div class="but sub" onclick="location.href='../../../crypto/telsy/index.htm';">Telsy</div>
+            <div class="but sub" onclick="location.href='../../../crypto/teltron/index.htm';">Teltron</div>
+            <div class="but sub" onclick="location.href='../../../crypto/thales/index.htm';">Thales</div>
+            <div class="but sub" onclick="location.href='../../../manuf/tno/index.htm';">TNO</div>
+            <div class="but sub" onclick="location.href='../../../crypto/transvertex/index.htm';">Transvertex</div>
+            <div style="text-align: center;" data-balloon-pos="left" aria-label="Tele Security Timmann" data-balloon-length="medium">
+            <div class="but sub" onclick="location.href='../../../crypto/tst/index.htm';">TST</div>
+</div>
+            <div class="but sub" onclick="location.href='../../../crypto/tutus/index.htm';">Tutus Data AB</div>
+            <div class="but sub" onclick="location.href='../../../manuf/ultra/index.htm';">Ultra Electronics</div>
+            <div class="but sub" onclick="location.href='../../../manuf/utimaco/index.htm';">Utimaco</div>
+            <div class="but sub" onclick="location.href='../../../manuf/zellweger/index.htm';">Zellweger</div>
+            <div class="but sub" onclick="location.href='../../../manuf/index.htm';">OTHER</div>
+          </div>
+          </div>
+          <div class="spacer"></div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Clandestine agent radio sets" data-balloon-length="medium">
+          <div class="but" onclick="location.href='../../../spy/index.htm';">Spy radio</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="High-speed data transmitters" data-balloon-length="medium">
+          <div class="but" onclick="location.href='../../../burst/index.htm';">Burst encoders</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Intercept, direction finding, TSCM, wire-tapping, etc." data-balloon-length="medium">
+          <div class="but" onclick="location.href='../../../df/index.htm';">Intercept</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Under-cover related items" data-balloon-length="medium">
+          <div class="but" onclick="location.href='../../../covert/index.htm';">Covert</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Military radios and radio-related subjects" data-balloon-length="medium">
+          <div class="but" onclick="location.href='../../../radio/index.htm';">Radio</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Personal Computers" data-balloon-length="medium">
+          <div class="but" onclick="location.href='../../../pc/index.htm';">PC</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Digital telegraphy" data-balloon-length="medium">
+          <div class="but" onclick="location.href='../../../telex/index.htm';">Telex</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Regular, special, fixed and mobile telephone sets" data-balloon-length="medium">
+          <div class="but" onclick="location.href='../../../phone/index.htm';">Telephones</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Index of people mentioned on this website" data-balloon-length="medium">
+          <div class="but" onclick="location.href='../../../people/index.htm';">People</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Index of intelligence, security and law-enforcement agencies" data-balloon-length="medium">
+          <div class="but" onclick="location.href='../../../intel/index.htm';">Agencies</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Index of manufacturers" data-balloon-length="medium">
+          <div class="but" onclick="location.href='../../../manuf/index.htm';">Manufacturers</div>
+</div>
+          <div class="spacer"></div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="If you like the information presented on this website, please consider making a donation" data-balloon-length="medium">
+          <div class="but alt" onclick="location.href='../../../donate.htm';">DONATE</div>
+</div>
+          <div class="spacer"></div>
+          <div class="but" onclick="location.href='../../../pub/index.htm';">Publications</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Standard and reference documents" data-balloon-length="medium">
+          <div class="but" onclick="location.href='../../../ref/index.htm';">Standards</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Items of which we have more than one, or that do not fit in the collection" data-balloon-length="medium">
+          <div class="but" onclick="location.href='../../../sale/index.htm';">For sale</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Self-build kits for electronics enthusiasts" data-balloon-length="medium">
+          <div class="but" onclick="location.href='../../../kits/index.htm';">Kits</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Items that can be ordered via regular mail" data-balloon-length="medium">
+          <div class="but" onclick="location.href='../../../shop/index.htm';">Shop</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Latest news about cryptography, espionage, covert operations, book releases, etc." data-balloon-length="medium">
+          <div class="but" onclick="location.href='../../../news/index.htm';">News</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Scheduled events in which Crypto Museum is involved" data-balloon-length="medium">
+          <div class="but" onclick="location.href='../../../events/index.htm';">Events</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Items that are still missing in our collection" data-balloon-length="medium">
+          <div class="but" onclick="location.href='../../../wanted/index.htm';">Wanted</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="How to contact us" data-balloon-length="medium">
+          <div class="but" onclick="location.href='../../../contact/index.htm';">Contact</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Our mission statement -- Why we do this" data-balloon-length="medium">
+          <div class="but" onclick="location.href='../../../mission.htm';">About us</div>
+</div>
+          <div style="text-align: center;" data-balloon-pos="left" aria-label="Links to related websites that you might find interesting" data-balloon-length="medium">
+          <div class="but" onclick="location.href='../../../links/index.htm';">Links</div>
+</div>
+        </div>
+</td></tr>
+        <tr><td align="center">
+</td></tr>
+        <tr><td>
+        </td></tr>
+      </tbody></table>
+      </td><td valign="top">
+      <table width="100%" border="0" cellpadding="0" cellspacing="0">
+        <tbody><tr><td><table border="0" width="100%" cellpadding="0" cellspacing="0"><tbody><tr>
+        <td align="left" valign="bottom">
+<a href="https://www.twitter.com/cryptomuseum" target="_blank"><div style="display: inline-block; text-align: center;" data-balloon-pos="down" aria-label="Follow cryptomuseum on X (formerly known as Twitter)" data-balloon-length="medium"><img src="../../../svg/x_logo.svg" border="0" style="width: 20px; margin-bottom: 3px; margin-right: 2px;"></div></a>&nbsp;<a href="https://cryptomuseum.bsky.social" target="_blank"><div style="display: inline-block; text-align: center;" data-balloon-pos="down" aria-label="Follow us on Bluesky" data-balloon-length="medium"><img src="../../../svg/bluesky_logo.svg" border="0" style="width: 20px; margin-bottom: 3px; margin-right: 2px;"></div></a>&nbsp;<a href="https://www.youtube.com/user/cryptomuseum" target="_blank"><div style="display: inline-block; text-align: center;" data-balloon-pos="down" aria-label="Watch cryptomuseum on YouTube" data-balloon-length="medium"><img src="../../../img/sm/youtube_play_24.png" border="0" style="margin-bottom: 3px;"></div></a>&nbsp;<div style="display: inline-block; text-align: center;" data-balloon-pos="down" aria-label="Click to search this site" data-balloon-length="medium"><img src="../../../svg/search.svg" border="0" style="position: relative; bottom: 2px; left: 2px;" onclick="toggle_search()"></div>
+        &nbsp;<div id="search" style="display:none; position:absolute;  width: 250px;">
+
+        <form id="searchForm" action="https://www.google.com/search" method="get" style="display:inline; width:220px;">
+
+        <input type="hidden" name="sitesearch" value="https://www.cryptomuseum.com">
+        <input id="q" type="text" name="q" size="32" style="width: 192px;" placeholder="Enter your text and press Enter">
+        <div style="display:inline; position:relative; left: -20px;" onclick="document.getElementById('q').value = ''; document.getElementById('q').focus();" onmouseover="this.style.cursor='pointer'">×</div>
+        <input type="submit" value="Search" name="submit" style="display:none;">
+        </form>
+
+        </div>
+
+        </td>
+        <td align="right" valign="bottom" width="1">
+        <a href="../../../index.htm"><img src="../../../svg/logo/word.svg" align="right" alt="Click for homepage" border="0"></a>
+        </td>
+        </tr></tbody></table></td></tr>
+        <tr><td colspan="0">
+        <div style="width: 100%; height: 2px; background: #FFBB00; margin-top: 2px; margin-bottom: 2px;"></div>
+        </td></tr>
+        <tr><td colspan="0" height="14">
+        <img src="../../../img/blank.gif" width="1" height="14">
+        </td></tr>
+        <tr><td>
+<a class="key" href="../../index.htm"><div data-balloon-pos="up" aria-label="Shortcut to Crypto" class="key">Crypto</div></a><a class="key" href="../../rotor.htm"><div data-balloon-pos="up" aria-label="Shortcut to rotor machines" class="key">Rotor</div></a><a class="key" href="../../germany/index.htm"><div data-balloon-pos="up" aria-label="Shortcut to Germany" class="key">Germany</div></a><a class="key" href="../index.htm"><div data-balloon-pos="up" aria-label="Shortcut to Siemens" class="key">Siemens</div></a>&nbsp;&nbsp;        <div style="height: 20px;"></div>
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          <b>T-52 Geheimschreiber</b>
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+<b>Teleprinter cipher machine (STURGEON)</b>
+<br>
+<br>
+<b>T-52</b>, also known as <b>Schlüsselfernschreibmaschine (SFM) T52</b> <sup><font color="#FF8800">1</font></sup> and
+<b>T52 Geheimschreiber</b>, <sup><font color="#FF8800">2</font></sup> was an online
+<a href="../../rotor.htm"><span data-balloon-pos="up" aria-label="More about: rotor-based cipher machine">rotor-based cipher machine</span></a> for
+<a href="../../baudot.htm"><span data-balloon-pos="up" aria-label="More about: 5-bit teleprinter signals">5-bit teleprinter signals</span></a>
+(<a href="../../../telex"><span data-balloon-pos="up" aria-label="More about: telex">telex</span></a>), developed around 1930
+<a href="../index.htm"><span data-balloon-pos="up" aria-label="More about: by Siemens &amp; Halske">by Siemens &amp; Halske</span></a> in Berlin (Germany).
+During <a href="../../glossary.htm#ww2"><span data-balloon-pos="up" aria-label="More about: World War II">World War II</span></a> it was one of the
+main cipher machines of Nazi Germany, alongside
+<a href="../../enigma/i/index.htm"><span data-balloon-pos="up" aria-label="More about: Enigma">Enigma</span></a>,
+<a href="../../lorenz/sz40/index.htm"><span data-balloon-pos="up" aria-label="More about: Lorenz SZ-40/42">Lorenz SZ-40/42</span></a>
+and <a href="../t43/index.htm"><span data-balloon-pos="up" aria-label="More about: T-43">T-43</span></a>.
+After the war, the machine was reused in several countries,
+including <a href="#fr"><span data-balloon-pos="up" aria-label="Jump to: France">France</span></a> and <a href="#nl"><span data-balloon-pos="up" aria-label="Jump to: The Netherlands">The Netherlands</span></a>. Its traffic was
+known in Germany as <b><i>Sägefisch</i></b> (sawfish), and by the
+<a href="../../../bp"><span data-balloon-pos="up" aria-label="More about: Bletchley Park codebreakers">Bletchley Park codebreakers</span></a> as <b>Sturgeon</b>.
+          </font>
+          </td></tr>
+        </tbody></table>
+<br>        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+The machine is built around a
+<a href="../../../telex/siemens/t36"><span data-balloon-pos="up" aria-label="More about: Siemens T-36 teleprinter">Siemens T-36 teleprinter</span></a>,
+of which
+the keyboard and the paper strip printer are visible in the image
+on the right. Towards the rear is a large removable cipher
+unit with 10 irregularly stepping cipher rotors, each of which has
+a different number of segments.
+<br>
+<br>
+The T-52 is mounted on a large and heavy die-cast chassis,
+which is fitted onto a wooden base plate. For transport,
+the complete assembly could be placed in a wooden transit case
+with large metal grips at the sides. The total weight, inluding
+the transit case, is well over 100 kg.
+          </font></td>
+          <td>&nbsp;&nbsp;</td>
+          <td align="center" valign="top" width="100">
+          <table border="0" cellpadding="0" cellspacing="0"><tbody><tr><td align="center" valign="top">
+<a href="img/300355/008/full.jpg">            </a><div style="position: relative;" data-balloon-pos="up" aria-label="T-52d Geheimschreiber, courtesy Arthur Bauer [1]"><a href="img/300355/008/full.jpg">
+</a><a href="img/300355/008/full.jpg">            <div style="position: relative;" data-balloon-pos="up" aria-label="T-52d Geheimschreiber, courtesy Arthur Bauer [1]">
+            <img src="img/300355/008/small.jpg" style="
+             max-width: 618px;
+            " align="left" vspace="4" alt="T-52d Geheimschreiber, courtesy Arthur Bauer [1]" border="0" width="298" height="200">
+            </div>
+            </a>
+            </div></td></tr><tr><td align="center">
+          </td></tr></tbody></table>
+          </td></tr>
+        </tbody></table>
+<br>        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+During <span class="short" aria-label="World War II" data-balloon-pos="up"><a href="../../glossary.htm#ww2" class="short">WWII</a></span>, the T-52 was one of the main cipher machines of the
+Third Reich. It was used for battalion-level traffic and was mainly
+operated over land lines. Only the traffic that was send by radio
+could be intercepted. It was occasionally broken by
+<a href="#break"><span data-balloon-pos="up" aria-label="Jump to: Swedish codebreakers">Swedish codebreakers</span></a>, and later also by the
+codebreakers of <a href="../../../bp"><span data-balloon-pos="up" aria-label="More about: Bletchley Park">Bletchley Park</span></a> (<span class="short" aria-label="Bletchley Park" data-balloon-pos="up"><a href="../../../bp" class="short">BP</a></span>),
+but only when messages had been received <i>in depth</i>. <sup><font color="#FF8800">3</font></sup>
+<br>
+<br>
+The intelligence derived from the broken messages
+was not considered vital, as <span class="short" aria-label="Bletchley Park" data-balloon-pos="up"><a href="../../../bp" class="short">BP</a></span> was already able to read the
+tactical messages encrypted on the <a href="../../enigma/i"><span data-balloon-pos="up" aria-label="More about: Enigma">Enigma</span></a>, and
+also the high-grade traffic of the German High Command
+which was encrypted with the <a href="../../lorenz/sz40/index.htm"><span data-balloon-pos="up" aria-label="More about: Lorenz SZ-40/42">Lorenz SZ-40/42</span></a>.
+The rest was surplus.
+As initial version (T-52a) was not very secure,
+<a href="#models"><span data-balloon-pos="up" aria-label="Jump to: several improved models">several improved models</span></a> were released over time.
+The final versions (T-52d and T-52e) were so good that they
+were virtually unbreakable.
+<a href="#post"><span data-balloon-pos="up" aria-label="Jump to: After the war">After the war</span></a>, these models were recovered from surplus supplies
+and were <a href="#post"><span data-balloon-pos="up" aria-label="Jump to: reused by several countries">reused by several countries</span></a>.
+          </font>
+          </td></tr>
+        </tbody></table>
+<br>        <table width="50" cellspacing="0" cellpadding="0"><tbody><tr>
+        <td style="border-top: 1px solid #aaa;"><img src="../img/blank.gif" width="1" height="5"></td>
+        </tr></tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr><td>
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#888888"><small>
+          <ol>
+          <li>
+Schlüsselfernschreibmaschine = <b>Key Teletypewriter</b>.
+          </li>
+          <li>
+Geheimschreiber = <b>Secret Writer</b>.
+          </li>
+          <li>
+Two or more messages that have been encrypted with the same key.
+          </li></ol>
+          </small></font></td></tr>
+        </tbody></table>
+<div style="height: 20px;"></div><div style="position: relative;">        <div style="width: 100%; height: 2px; background: #FFBB00; margin-top: 2px; margin-bottom: 2px;"></div>
+        <table width="1" border="0" cellspacing="0" cellpadding="0" height="50">
+          <tbody><tr><td width="1" height="4"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr>
+          <td align="center" valign="top">
+<div data-balloon-pos="up" aria-label="T-52 Geheimschreiber">          <img src="img/300355/008/thumbnail.jpg" alt="T-52 Geheimschreiber" border="0" width="74" height="50" onclick="slideOpen('slide_1'); slideCurrent('slide_1', 1);" style="
+           cursor: pointer;" max-width:="" 618px;="" "="" title="image # 300355/008"></div>
+          </td>
+          <td width="4"><img src="../../../img/blank.gif" width="4" height="1"></td>
+          <td align="center" valign="top">
+<div data-balloon-pos="up" aria-label="Close-up of the 10 cipher wheels">          <img src="img/300248/034/thumbnail.jpg" alt="Close-up of the 10 cipher wheels" border="0" width="74" height="50" onclick="slideOpen('slide_1'); slideCurrent('slide_1', 2);" style="
+           cursor: pointer;" max-width:="" 618px;="" "="" title="image # 300248/034"></div>
+          </td>
+          <td width="4"><img src="../../../img/blank.gif" width="4" height="1"></td>
+          <td align="center" valign="top">
+<div data-balloon-pos="up" aria-label="Another view of the cipher wheels">          <img src="img/300248/035/thumbnail.jpg" alt="Another view of the cipher wheels" border="0" width="74" height="50" onclick="slideOpen('slide_1'); slideCurrent('slide_1', 3);" style="
+           cursor: pointer;" max-width:="" 618px;="" "="" title="image # 300248/035"></div>
+          </td>
+          <td width="4"><img src="../../../img/blank.gif" width="4" height="1"></td>
+          <td align="center" valign="top">
+<div data-balloon-pos="up" aria-label="T-52 printer">          <img src="img/300248/038/thumbnail.jpg" alt="T-52 printer" border="0" width="74" height="50" onclick="slideOpen('slide_1'); slideCurrent('slide_1', 4);" style="
+           cursor: pointer;" max-width:="" 618px;="" "="" title="image # 300248/038"></div>
+          </td>
+          <td width="4"><img src="../../../img/blank.gif" width="4" height="1"></td>
+          <td align="center" valign="top">
+<div data-balloon-pos="up" aria-label="Close-up of the T-52 printer">          <img src="img/300248/031/thumbnail.jpg" alt="Close-up of the T-52 printer" border="0" width="74" height="50" onclick="slideOpen('slide_1'); slideCurrent('slide_1', 5);" style="
+           cursor: pointer;" max-width:="" 618px;="" "="" title="image # 300248/031"></div>
+          </td>
+          <td width="4"><img src="../../../img/blank.gif" width="4" height="1"></td>
+          <td align="center" valign="top">
+<div data-balloon-pos="up" aria-label="T-52 print wheel">          <img src="img/300248/032/thumbnail.jpg" alt="T-52 print wheel" border="0" width="74" height="50" onclick="slideOpen('slide_1'); slideCurrent('slide_1', 6);" style="
+           cursor: pointer;" max-width:="" 618px;="" "="" title="image # 300248/032"></div>
+          </td>
+          <td width="4"><img src="../../../img/blank.gif" width="4" height="1"></td>
+          <td align="center" valign="top">
+<div data-balloon-pos="up" aria-label="Paper holder">          <img src="img/300248/036/thumbnail.jpg" alt="Paper holder" border="0" width="74" height="50" onclick="slideOpen('slide_1'); slideCurrent('slide_1', 7);" style="
+           cursor: pointer;" max-width:="" 618px;="" "="" title="image # 300248/036"></div>
+          </td>
+          </tr>
+          <tr><td width="1" height="4"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+        </tbody></table>
+        <div style="width: 100%; height: 2px; background: #FFBB00; margin-top: 2px; margin-bottom: 2px;"></div>
+<div class="slide_index" title="Click here to start slide show 'A'" onclick="slideOpen('slide_1'); slideCurrent('slide_1', 1);"><span data-balloon-pos="right" aria-label="Click here to start slide show">A</span></div></div><div style="height: 40px;"></div>
+<div id="slide_1" class="slide" onclick="slideClose('slide_1')"><span class="slide_close_left" onclick="slideClose('slide_1')">×</span>
+<div class="slide_content" onclick="slideNext('slide_1', -1)">
+<div class="slide_main">
+<div class="slide_number"><div class="slide_group">A</div> 1 / 7</div>
+<img class="slide_img" style="width: 100%;" onclick="slideNext('slide_1', 1);" src="img/300355/008/full.jpg" alt="T-52 Geheimschreiber">
+</div>
+<div class="slide_main">
+<div class="slide_number"><div class="slide_group">A</div> 2 / 7</div>
+<img class="slide_img" style="width: 100%;" onclick="slideNext('slide_1', 1);" src="img/300248/034/full.jpg" alt="Close-up of the 10 cipher wheels">
+</div>
+<div class="slide_main">
+<div class="slide_number"><div class="slide_group">A</div> 3 / 7</div>
+<img class="slide_img" style="width: 100%;" onclick="slideNext('slide_1', 1);" src="img/300248/035/full.jpg" alt="Another view of the cipher wheels">
+</div>
+<div class="slide_main">
+<div class="slide_number"><div class="slide_group">A</div> 4 / 7</div>
+<img class="slide_img" style="width: 100%;" onclick="slideNext('slide_1', 1);" src="img/300248/038/full.jpg" alt="T-52 printer">
+</div>
+<div class="slide_main">
+<div class="slide_number"><div class="slide_group">A</div> 5 / 7</div>
+<img class="slide_img" style="width: 100%;" onclick="slideNext('slide_1', 1);" src="img/300248/031/full.jpg" alt="Close-up of the T-52 printer">
+</div>
+<div class="slide_main">
+<div class="slide_number"><div class="slide_group">A</div> 6 / 7</div>
+<img class="slide_img" style="width: 100%;" onclick="slideNext('slide_1', 1);" src="img/300248/032/full.jpg" alt="T-52 print wheel">
+</div>
+<div class="slide_main">
+<div class="slide_number"><div class="slide_group">A</div> 7 / 7</div>
+<img class="slide_img" style="width: 100%;" onclick="slideNext('slide_1', 1);" src="img/300248/036/full.jpg" alt="Paper holder">
+</div>
+<a class="slide_prev" onclick="slideNext('slide_1', -1)">❮</a>
+<a class="slide_next" onclick="slideNext('slide_1', 1)">❯</a>
+<div class="slide_caption">
+<p class="dummy_caption"></p>
+</div>
+</div>
+</div>
+        <a name="features"></a>
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          <b>Features</b>
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+Although there are many different versions of the Geheimschreiber,
+we'll use the T-52d to show the position of the various parts and controls,
+as it is the most sophisticated and secure version of the machine.
+In the image below, the T-52d is shown from the front right.
+At the heart of the machine is a Siemens T-36 teleprinter (Fernschreiber)
+with its keyboard sticking out at the front.
+<br>
+          <br>
+          <table border="0" cellpadding="0" cellspacing="0" width="100%"><tbody><tr><td align="center" valign="top">
+<a href="img/t52d_large.jpg">            </a><div style="position: relative;" data-balloon-pos="up" aria-label="Layout of the T-52d Geheimschreiber. Courtesy Günter Hütter [6]." data-balloon-length="large"><a href="img/t52d_large.jpg">
+</a><a href="img/t52d_large.jpg">            <div style="position: relative;" data-balloon-pos="up" aria-label="Layout of the T-52d Geheimschreiber. Courtesy Günter Hütter [6]." data-balloon-length="large">
+            <img src="img/t52d_layout.png" style="
+             max-width: 618px;
+            " align="center" vspace="4" alt="Layout of the T-52d Geheimschreiber. Courtesy Günter Hütter [6]." border="0">
+            </div>
+            </a>
+            </div></td></tr><tr><td align="center">
+          </td></tr></tbody></table>
+<br>
+The 10 cipher wheels are clearly visible in the image above.
+The cipher mechanism is a complete unit that is mounted on the chassis
+to the rear of the teleprinter.
+Rather than printing onto sheets of paper, the T-52 produces its output
+on a paper-strip, which is fed from a holder at the right into the printer
+that is located just above the keyboard, leaving the machine on the left.
+<br>
+<br>
+          </font>
+          </td></tr>
+        </tbody></table>
+<br>        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          <b>Introduction</b>
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+During WWII, the German war machine heavily relied on cipher machines for
+secure communication, both over land lines and radio. Apart from a number
+of hand cipher methods, they mainly used three (later four) cipher machines
+for the bulk of their secure messages:
+          </font>
+          </td></tr>
+        </tbody></table>
+<br>        <table width="100%" border="0" cellspacing="0" cellpadding="4">
+          <tbody><tr>
+          <td>
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+          <ul>
+            <li><a href="../../enigma/index.htm">Enigma</a><br>
+The <a href="../../enigma/index.htm">enigma machine</a>
+was used at the lowest level of the command chain.
+Between 20,000 and 30,000 machines were built and used by several parts
+of the German Army and related organisations. Due to the sheer size of the
+German war theatre, the majority of enigma messages was sent over radio.
+            <p>
+</p></li><li><font color="#F52E00">T-52 Geheimschreiber</font><br>
+The Geheimschreiber made it possible to encrypt a teleprinter line (telex).
+Although it was possible to use such links over radio, the majority of T-52
+messages was sent over land lines. As a result, such messages were difficult
+to intercept. It was cryptographically more secure than the Lorenz SZ-40.
+            <p>
+            </p></li><li><a href="../../lorenz/sz40/index.htm">Lorenz SZ-40/42</a><br>
+Like the Geheimschreiber, the Lorenz Schlüssel Zusatz (SZ) was used for the
+protection of telex signals. It was a stand-alone wheel-based unit that was
+connected between the teleprinter and the line. The Germans used it at
+the highest level. The Lorenz machine was used over land lines as well as
+over radio.
+It was broken by <a href="../../../bp/index.htm">Bletchley Park</a>
+by means of the <a href="../../colossus/index.htm">Colossus</a>
+computer.
+            <p>
+            </p></li><li><a href="../t43/index.htm">Siemens T-43</a><br>
+This was a one-time pad machine (OTP) that was introduced relatively late
+in the war. It was used only on a few networks.
+<a href="../../../bp/index.htm">Bletchley Park</a> probably called this machine
+<b>Trasher</b>.
+Machines like the <a href="../t43/index.htm">T-43</a>
+are often called '<a href="../../mixer.htm">Mixers</a>'.
+          </li></ul>
+        </font></td></tr></tbody></table>
+<div style="height: 14px;"></div>        <a name="models"></a>
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          <b>Models</b>
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="4">
+          <tbody><tr>
+          <td>
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+          <ul>
+<li><font color="#F52E00">T-52a</font><br>
+This was the first version of the T-52. It was based on the T-36
+teletype and was only built in small quantities from 1932-1934.
+It appeared to cause radio interference. It was later modified
+with a filter and was then called T-52a/b.
+            <p>
+</p></li><li><font color="#F52E00">T-52b</font><br>
+The T-52b was a slighly improved version of the T-52a in which a filter
+against radio interference was added. As the machine is otherwise
+identical to the T-52a, the two versions are generally identified as
+T-52a/b. The T-52b was built from 1934-1942.
+            <p>
+</p></li><li><font color="#F52E00">T-52c (Cäsar)</font><br>
+The T-52c was developed in 1941. It had a simpler setting of the
+message key, but had the nasty side-effect that the number of
+possible alphabets was reduced dramatically.
+The T-52c had a switch to make it backwards compatible with
+the T-52a/b. The T-52c had the same cipher period as the T-52a/b
+and is sometimes called: the <i>Cäsarmaschine</i>.
+            <p>
+</p></li><li><font color="#F52E00">T-52ca</font><br>
+This was an improved version of the T-52c in which the number
+of alphabets was increased again by fixing a flaw.
+            <p>
+</p></li><li><font color="#F52E00">T-52d (Dora)</font><br>
+This is a serious improvement of the earlier T-52a/b.
+It features irregular wheel stepping of the cipher wheels
+and a so-called <i>Klartextfunction</i> (<span class="short" aria-label="Klartextfunktion (clear text function)" data-balloon-pos="up"><a href="#glos_ktf" class="short">KTF</a></span>).
+The T-52d was developed in 1942/43.
+            <p>
+</p></li><li><font color="#F52E00">T-52e (Emil) </font><br>
+The same improvements that converted the T-52a/b into the T-52d,
+were also applied to the T-52c. This resulted in the T-52e.
+            <p>
+</p></li><li><font color="#F52E00">T-52f</font><br>
+This version of the T-52 was developed but never taken into
+production. In May 1945 the design was ready but by then the
+war had ended <a href="#ref_4">[4]</a>.
+          </li></ul>
+        </font></td></tr></tbody></table>
+<div style="height: 14px;"></div>        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+Due to the nature of the various models and the later modifications,
+the T-52 can be divided into four distinct functional groups:
+          </font>
+          </td></tr>
+        </tbody></table>
+<br>        <table width="100%" border="0" cellspacing="0" cellpadding="4">
+          <tbody><tr>
+          <td>
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+          <ol>
+<li><font color="#F52E00">T-52a, T52b (T-52a/b)</font><br>
+</li><li><font color="#F52E00">T-52c, T52ca</font><br>
+</li><li><font color="#F52E00">T-52d</font><br>
+</li><li><font color="#F52E00">T-52e</font><br>
+          </li></ol>
+        </font></td></tr></tbody></table>
+<div style="height: 14px;"></div>        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          <b>Key setting</b>
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+0" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          Key elements
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+The following elements of the machine affect the encryption algorithm:
+          </font>
+          </td></tr>
+        </tbody></table>
+<br>        <table width="100%" border="0" cellspacing="0" cellpadding="4">
+          <tbody><tr>
+          <td>
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+          <ol type="a">
+<li><font color="#F52E00">Key generator</font><br>
+Each of the five bits of a plaintext character can be inverted under control
+of the contacts of certain notched discs of the 10 cipher rotors. This can be
+seen as a pseudo-random character stream – produced by the Key Generator (KG) –
+with is <span class="short tooltip-red" data-balloon-pos="up" aria-label="Exclusive-OR (modulo-2 addition)">XOR</span>-ed with the selected plaintext character. In the original
+German description, this operation is known as <i>Vertauschen</i> (swapping).
+            <p>
+</p></li><li><font color="#F52E00">Bit-swapping</font><br>
+The individual bits of the encrypted character can be swapped under control
+of the contacts of certain notched discs of the 10 cipher rotors.
+In the original German description, this function is called
+<i>Würfel-Verfahren</i> (dice operation, or scrambling).
+            <p>
+</p></li><li><font color="#F52E00">Plugboard</font><br>
+The function of the various notched discs of the 10 cipher rotors can be
+altered with the 20 plugs of the plugboard, that are arranged in a 2 × 10
+pattern.
+The configuration of the plugboard is specified in the current key list.
+            <p>
+</p></li><li><font color="#F52E00">Rotor start position</font><br>
+At the start of an encipherment, each of the 10 cipher rotors have to be set
+to a given start position, as specified in the current key list.
+            <p>
+</p></li><li><font color="#F52E00">Message key</font><br>
+Each message must be encrypted with a unique message key, identified with
+a trigram.
+            <p>
+</p></li><li><font color="#F52E00">KTF selector (mit/ohne)</font><br>
+This selector, which is not present on the T-52a/b/c, affects the stepping
+pattern of the rotors. <span class="short" aria-label="Klartextfunktion (clear text function)" data-balloon-pos="up"><a href="#glos_ktf" class="short">KTF</a></span> stands for <i>Klartekstfunktion</i>
+(clear text function).
+It has two settings: <b>'mit'</b> (with) and <b>'ohne'</b> (without). When set to <b>'mit'</b>
+(with), the selected cleartext character affects the rotor stepping.
+For this reason, it was generally recommended to set it to <b>'mit'</b>.
+          </li></ol>
+        </font></td></tr></tbody></table>
+<div style="height: 14px;"></div>        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+0" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          Key material
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="4">
+          <tbody><tr>
+          <td>
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+          <ul>
+<li><font color="#F52E00">Plugboard</font><br>
+            <p>
+</p></li><li><font color="#F52E00">Basic setting</font><br>
+          </li></ul>
+        </font></td></tr></tbody></table>
+<div style="height: 14px;"></div>        <a name="block"></a>
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          <b>Block diagram</b>
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+0" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          T-52d
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+Below is the block diagram of the T-52d. Note that for each character, 5
+bits are required which are shown here as a single line.
+The upper half shows the transmission path, which starts at the top right with
+the (+) and (-) lines, representing the logical (1) and (0) levels.
+These lines are fed to a key generator, described in the German
+documentation as <i>Sender Tauschen</i> (<span class="short tooltip-red" data-balloon-pos="up" aria-label="Sender Tauschen (transmitter key generator)">ST</span>), which means <i>transmitter
+swap</i>. Although this is technically correct — it swaps the 1s and 0s
+an arbitrary number of times — it is better described as a 5-bit pseudo-random
+generator (PRNG). The <span class="short tooltip-red" data-balloon-pos="up" aria-label="Sender Tauschen (transmitter key generator)">ST</span> key generator is formed by the rightmost five
+rotors (N6-N10) of which the bit order can be swapped with 10 cables of the
+plugboard.
+The resulting bit pattern is then fed to the keyboard, which consists
+of five single-pole double-throw (SPDT) switches (K1-K5). This effectively
+adds the pseudo-random bit stream from the <span class="short tooltip-red" data-balloon-pos="up" aria-label="Sender Tauschen (transmitter key generator)">ST</span> to the selected character by
+means of an exclusive-OR operation (XOR). This principle is also known as
+modulo-2 addition and as <a href="../../../crypto/vernam.htm"><span data-balloon-pos="up" aria-label="More about: Vernam Cipher">Vernam Cipher</span></a> <a href="#ref_7">[7]</a>.
+<br>
+<br>
+From the keyboard, the five bits are passed through a bit-swap
+function, described in the German documentation as <i>Sender Würfel</i> (<span class="short tooltip-red" data-balloon-pos="up" aria-label="Sender Würfelen (transmitter bit-swap)">SW</span>),
+which means <i>transmitter dice</i>. It is controlled by the left­most
+five rotors (N1-N5) and offers 2<sup>5</sup> (32) possibilities <sup><font color="#FF8800">1</font></sup> to swap the bits.
+In addition, the bits can be swapped by means of 10 cables on the plugboard.
+As there five plugs at either side of the <span class="short tooltip-red" data-balloon-pos="up" aria-label="Sender Würfelen (transmitter bit-swap)">SW</span> block, this offers an extra
+5! · 5! = 14400 static <sup><font color="#FF8800">2</font></sup> settings. Next, the resulting five bits are
+serialised by means of a rotating commutator, and then transmitted as a
+serial data stream (TX).
+<br>
+          <br>
+          <table border="0" cellpadding="0" cellspacing="0" width="100%"><tbody><tr><td align="center" valign="top">
+            <div style="position: relative;" data-balloon-pos="up" aria-label="Block diagram of the T-52d with KG-switch in G-position (cipher)" data-balloon-length="large" class="tooltip-red">
+            <div style="position: relative;" data-balloon-pos="up" aria-label="Block diagram of the T-52d with KG-switch in G-position (cipher)" data-balloon-length="large" class="tooltip-red">
+            <img src="svg/t52_block.svg" style="
+             max-width: 618px;
+            " align="center" vspace="4" alt="Block diagram of the T-52d with KG-switch in G-position (cipher)" border="0">
+            </div>
+            </div></td></tr><tr><td align="center">
+            <div style="margin-top: 4px; margin-bottom: 4px;">
+            <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+            <b>
+            <center>Block diagram of T52d shown in cipher mode</center>
+            </b>
+            </font>
+            </div>
+          </td></tr></tbody></table>
+<br>
+The lower half of the diagram shows the reception path. The serial data (RX) is
+first converted to five in­di­vidual bits, by means of a rotating
+commutator and a 5-bit memory consisting of five capa­citors. From there,
+the bits are passed through a bit-swap function (<span class="short tooltip-red" data-balloon-pos="up" aria-label="Empfänger Würfelen (receiver bit-swap)">EW</span>), which is the inverse
+of the bit-swap function (<span class="short tooltip-red" data-balloon-pos="up" aria-label="Sender Würfelen (transmitter bit-swap)">SW</span>) in the transmission path. To maintain
+reciprocity, the plugboards at either side of the <span class="short tooltip-red" data-balloon-pos="up" aria-label="Empfänger Würfelen (receiver bit-swap)">EW</span> are wired
+identically to the <span class="short tooltip-red" data-balloon-pos="up" aria-label="Sender Würfelen (transmitter bit-swap)">SW</span> plugboards. This is why each patch cable contains
+four wires. <sup><font color="#FF8800">3</font></sup> Next, the data is fed through the <span class="short tooltip-red" data-balloon-pos="up" aria-label="Empfänger Tauschen (reciver key generator)">ET</span> function, which
+– including the plugboards at either side – is identical to the <span class="short tooltip-red" data-balloon-pos="up" aria-label="Sender Tauschen (transmitter key generator)">ST</span> function
+in the transmission path. It swaps the logic (1) and (0) levels an arbitrary
+number of times, which is basically another <span class="short tooltip-red" data-balloon-pos="up" aria-label="Exclusive-OR (modulo-2 addition)">XOR</span> operation.
+<br>
+<br>
+The output of the <span class="short tooltip-red" data-balloon-pos="up" aria-label="Empfänger Tauschen (reciver key generator)">ET</span> now holds the decrypted plaintext character,
+but as this consists of just the charge of the memory capacitors, it does not
+have enough energy to drive the printer. For this reason, the bits
+are first copied into a latch, consisting of five polar relays <sup><font color="#FF8800">4</font></sup> (R1-R5).
+The data is then fed to the translator (German: Übersetzer) — a rotating
+cam shaft with switches — which releases the print hammer at the right
+moment, in synchronism with the rotating print head.
+<br>
+<br>
+The machine (transmission and reception) can be switched
+between <b>Klar</b> (plain) and <b>Geheim</b> (cipher). This is achieved with six switches
+(<span class="short" aria-label="Klar/Geheim (Plain/Cipher)" data-balloon-pos="up"><a href="#glos_kg" class="short">KG</a></span>a-f), each of which consists of a 5-pole double-throw switch (one
+pole for each bit). This means that a total of 30 contacts must be swapped when
+switching from <b>plain</b> to <b>cipher</b>.
+The <span class="short" aria-label="Klar/Geheim (Plain/Cipher)" data-balloon-pos="up"><a href="#glos_kg" class="short">KG</a></span>-switch is shown here in <b>Geheim</b> (cipher) position.
+          </font>
+          </td></tr>
+        </tbody></table>
+<br>        <table width="50" cellspacing="0" cellpadding="0"><tbody><tr>
+        <td style="border-top: 1px solid #aaa;"><img src="../img/blank.gif" width="1" height="5"></td>
+        </tr></tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr><td>
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#888888"><small>
+          <ol>
+          <li style="margin-bottom: 6px;">
+Theoretically there are 5! (120) possible bit orders, but due to the circuit
+  — there are just 5 switches with 2 position each — only 2<sup>5</sup> (32) orders are
+  used.
+          </li>
+          <li style="margin-bottom: 6px;">
+In this context, 'static' means that these settings are not changed during
+  encipherment.
+          </li>
+          <li style="margin-bottom: 6px;">
+Entering a plug into a socket of the plugboard, configures the transmission
+  path and the reception path simultaneously.
+          </li>
+          <li style="margin-bottom: 6px;">
+A polar relay is also known as a bistable relay. It can be driven by short
+  pulses (in this case the charge from a capacitor) and retains the last
+  setting, also when power is removed. In surviving T-52 machines, these
+  polar relays are the most common cause of reliability issues.
+  <font color="#E7E">➤</font>&nbsp;<a href="../../../pub/cm/trls43a">More</a>
+          </li></ol>
+          </small></font></td></tr>
+        </tbody></table>
+<div style="height: 20px;"></div>        <a name="work"></a>
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          <b>How it works</b>
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+The operation of the T-52 is not easily explained. It is a very complex
+machine and there are significant differences between the various
+models. The basic principles are best explained by first looking at
+the initial design and then introducing the improvements.
+          </font>
+          </td></tr>
+        </tbody></table>
+<br>        <a name="t52ab"></a>
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+0" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          T-52a/b
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+The T-52a was the first of the Siemens T-52 machines to see the
+light of day. It had limited cipher security, mainly because it
+exhibited regular stepping of the cipher wheels.
+          </font>
+          </td></tr>
+        </tbody></table>
+<br>        <a name="t52c"></a>
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+0" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          T-52c
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+The T-52c was an attempt to improve security of the rather insecure
+T-52a/b. A large box with 5 levers, used for setting the message key,
+was added to the left of the keyboard.
+However, the wheel combining logic, that was meant to improve
+security, did exactly the opposite: it weakened the cryptographic
+strength of the machine, as it reduced the total number of alphabets.
+          </font>
+          </td></tr>
+        </tbody></table>
+<br>        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+The image on the right shows the extremely rare T-52c variant.
+The 5-lever unit for setting the message key is
+<a href="img/300248/024/full.jpg"><span data-balloon-pos="up" aria-label="More about: clearly visible">clearly visible</span></a> at the front left.
+Also note the <a href="img/300248/018/full.jpg"><span data-balloon-pos="up" aria-label="More about: compatibility switch">compatibility switch</span></a>
+at the front right. It allows the machine to be used in combination
+with the older T-52a/b models.
+<br>
+<br>
+According to the <a href="img/300248/017/full.jpg"><span data-balloon-pos="up" aria-label="More about: serial number plate">serial number plate</span></a>,
+it is a 50 baud version that
+was built in 1944. This is remarkable, as by this time most
+machines had been replaced by the improved
+<b>d</b> and <b>e</b> models.
+          </font></td>
+          <td>&nbsp;&nbsp;</td>
+          <td align="center" valign="top" width="100">
+          <table border="0" cellpadding="0" cellspacing="0"><tbody><tr><td align="center" valign="top">
+<a href="img/300248/015/full.jpg">            </a><div style="position: relative;" data-balloon-pos="up" aria-label="Siemens T-52c"><a href="img/300248/015/full.jpg">
+</a><a href="img/300248/015/full.jpg">            <div style="position: relative;" data-balloon-pos="up" aria-label="Siemens T-52c">
+            <img src="img/300248/015/small.jpg" style="
+             max-width: 618px;
+            " align="left" vspace="4" alt="Siemens T-52c" border="0" width="298" height="224">
+            </div>
+            </a>
+            </div></td></tr><tr><td align="center">
+          </td></tr></tbody></table>
+          </td></tr>
+        </tbody></table>
+<br><div style="position: relative;">        <div style="width: 100%; height: 2px; background: #FFBB00; margin-top: 2px; margin-bottom: 2px;"></div>
+        <table width="1" border="0" cellspacing="0" cellpadding="0" height="56">
+          <tbody><tr><td width="1" height="4"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr>
+          <td align="center" valign="top">
+<div data-balloon-pos="up" aria-label="Siemens T-52c">          <img src="img/300248/015/thumbnail.jpg" alt="Siemens T-52c" border="0" width="74" height="56" onclick="slideOpen('slide_2'); slideCurrent('slide_2', 1);" style="
+           cursor: pointer;" max-width:="" 618px;="" "="" title="image # 300248/015"></div>
+          </td>
+          <td width="4"><img src="../../../img/blank.gif" width="4" height="1"></td>
+          <td align="center" valign="top">
+<div data-balloon-pos="up" aria-label="">          <img src="img/300248/021/thumbnail.jpg" border="0" width="74" height="56" onclick="slideOpen('slide_2'); slideCurrent('slide_2', 2);" style="
+           cursor: pointer;" max-width:="" 618px;="" "="" title="image # 300248/021"></div>
+          </td>
+          <td width="4"><img src="../../../img/blank.gif" width="4" height="1"></td>
+          <td align="center" valign="top">
+<div data-balloon-pos="up" aria-label="T-52c front view">          <img src="img/300248/016/thumbnail.jpg" alt="T-52c front view" border="0" width="74" height="50" onclick="slideOpen('slide_2'); slideCurrent('slide_2', 3);" style="
+           cursor: pointer;" max-width:="" 618px;="" "="" title="image # 300248/016"></div>
+          </td>
+          <td width="4"><img src="../../../img/blank.gif" width="4" height="1"></td>
+          <td align="center" valign="top">
+<div data-balloon-pos="up" aria-label="The 5 levers of the message key setting mechanism">          <img src="img/300248/024/thumbnail.jpg" alt="The 5 levers of the message key setting mechanism" border="0" width="74" height="56" onclick="slideOpen('slide_2'); slideCurrent('slide_2', 4);" style="
+           cursor: pointer;" max-width:="" 618px;="" "="" title="image # 300248/024"></div>
+          </td>
+          <td width="4"><img src="../../../img/blank.gif" width="4" height="1"></td>
+          <td align="center" valign="top">
+<div data-balloon-pos="up" aria-label="T-52a/b or T-52c selection">          <img src="img/300248/018/thumbnail.jpg" alt="T-52a/b or T-52c selection" border="0" width="74" height="56" onclick="slideOpen('slide_2'); slideCurrent('slide_2', 5);" style="
+           cursor: pointer;" max-width:="" 618px;="" "="" title="image # 300248/018"></div>
+          </td>
+          <td width="4"><img src="../../../img/blank.gif" width="4" height="1"></td>
+          <td align="center" valign="top">
+<div data-balloon-pos="up" aria-label="The 10 cipher wheels">          <img src="img/300248/026/thumbnail.jpg" alt="The 10 cipher wheels" border="0" width="74" height="56" onclick="slideOpen('slide_2'); slideCurrent('slide_2', 6);" style="
+           cursor: pointer;" max-width:="" 618px;="" "="" title="image # 300248/026"></div>
+          </td>
+          <td width="4"><img src="../../../img/blank.gif" width="4" height="1"></td>
+          <td align="center" valign="top">
+<div data-balloon-pos="up" aria-label="Large lever on the left">          <img src="img/300248/023/thumbnail.jpg" alt="Large lever on the left" border="0" width="74" height="56" onclick="slideOpen('slide_2'); slideCurrent('slide_2', 7);" style="
+           cursor: pointer;" max-width:="" 618px;="" "="" title="image # 300248/023"></div>
+          </td>
+          <td width="4"><img src="../../../img/blank.gif" width="4" height="1"></td>
+          <td align="center" valign="top">
+<div data-balloon-pos="up" aria-label="">          <img src="img/300248/017/thumbnail.jpg" border="0" width="74" height="56" onclick="slideOpen('slide_2'); slideCurrent('slide_2', 8);" style="
+           cursor: pointer;" max-width:="" 618px;="" "="" title="image # 300248/017"></div>
+          </td>
+          </tr>
+          <tr><td width="1" height="4"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+        </tbody></table>
+        <div style="width: 100%; height: 2px; background: #FFBB00; margin-top: 2px; margin-bottom: 2px;"></div>
+<div class="slide_index" title="Click here to start slide show 'B'" onclick="slideOpen('slide_2'); slideCurrent('slide_2', 1);"><span data-balloon-pos="right" aria-label="Click here to start slide show">B</span></div></div><div style="height: 40px;"></div>
+<div id="slide_2" class="slide" onclick="slideClose('slide_2')"><span class="slide_close_left" onclick="slideClose('slide_2')">×</span>
+<div class="slide_content" onclick="slideNext('slide_2', -1)">
+<div class="slide_main">
+<div class="slide_number"><div class="slide_group">B</div> 1 / 8</div>
+<img class="slide_img" style="width: 100%;" onclick="slideNext('slide_2', 1);" src="img/300248/015/full.jpg" alt="Siemens T-52c">
+</div>
+<div class="slide_main">
+<div class="slide_number"><div class="slide_group">B</div> 2 / 8</div>
+<img class="slide_img" style="width: 100%;" onclick="slideNext('slide_2', 1);" src="img/300248/021/full.jpg" alt="2 / 8">
+</div>
+<div class="slide_main">
+<div class="slide_number"><div class="slide_group">B</div> 3 / 8</div>
+<img class="slide_img" style="width: 100%;" onclick="slideNext('slide_2', 1);" src="img/300248/016/full.jpg" alt="T-52c front view">
+</div>
+<div class="slide_main">
+<div class="slide_number"><div class="slide_group">B</div> 4 / 8</div>
+<img class="slide_img" style="width: 100%;" onclick="slideNext('slide_2', 1);" src="img/300248/024/full.jpg" alt="The 5 levers of the message key setting mechanism">
+</div>
+<div class="slide_main">
+<div class="slide_number"><div class="slide_group">B</div> 5 / 8</div>
+<img class="slide_img" style="width: 100%;" onclick="slideNext('slide_2', 1);" src="img/300248/018/full.jpg" alt="T-52a/b or T-52c selection">
+</div>
+<div class="slide_main">
+<div class="slide_number"><div class="slide_group">B</div> 6 / 8</div>
+<img class="slide_img" style="width: 100%;" onclick="slideNext('slide_2', 1);" src="img/300248/026/full.jpg" alt="The 10 cipher wheels">
+</div>
+<div class="slide_main">
+<div class="slide_number"><div class="slide_group">B</div> 7 / 8</div>
+<img class="slide_img" style="width: 100%;" onclick="slideNext('slide_2', 1);" src="img/300248/023/full.jpg" alt="Large lever on the left">
+</div>
+<div class="slide_main">
+<div class="slide_number"><div class="slide_group">B</div> 8 / 8</div>
+<img class="slide_img" style="width: 100%;" onclick="slideNext('slide_2', 1);" src="img/300248/017/full.jpg" alt="8 / 8">
+</div>
+<a class="slide_prev" onclick="slideNext('slide_2', -1)">❮</a>
+<a class="slide_next" onclick="slideNext('slide_2', 1)">❯</a>
+<div class="slide_caption">
+<p class="dummy_caption"></p>
+</div>
+</div>
+</div>
+        <a name="t52d"></a>
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+0" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          T-52d
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+The T-52d was a well-designed machine. It was in fact a T-52a/b
+with much improved cipher security. Its cryptographic strength was
+considerably better than the <a href="../../lorenz/sz40/index.htm"><span data-balloon-pos="up" aria-label="More about: Lorenz SZ-40">Lorenz SZ-40</span></a>.
+Consequently, it was never broken by <a href="#break"><span data-balloon-pos="up" aria-label="Jump to: Swedish cryptanalists">Swedish cryptanalists</span></a>.
+It was however broken by <a href="#bp"><span data-balloon-pos="up" aria-label="Jump to: Bletchley Park">Bletchley Park</span></a>,
+but only if they had messages <i>in depth</i>.
+If the T-52d had been used from the beginning, <b>and</b> its operators had
+been better instructed, it seems unlikely that the machine would ever
+have been broken.
+          </font>
+          </td></tr>
+        </tbody></table>
+<br>        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+The image on the right shows the interior of a T-52d machine, after
+the black protective cover has been removed.
+At the right hand side of the machine, just behind the paper tape
+holder, the plugboard is clearly visible. This plugboard was normally
+protected by a lockable hood.
+          </font></td>
+          <td>&nbsp;&nbsp;</td>
+          <td align="center" valign="top" width="100">
+          <table border="0" cellpadding="0" cellspacing="0"><tbody><tr><td align="center" valign="top">
+<a href="img/t52d_large.jpg">            </a><div style="position: relative;" data-balloon-pos="up" aria-label="T-52d interior, courtesy Günter Hütter [6]"><a href="img/t52d_large.jpg">
+</a><a href="img/t52d_large.jpg">            <div style="position: relative;" data-balloon-pos="up" aria-label="T-52d interior, courtesy Günter Hütter [6]">
+            <img src="img/t52d_small.jpg" style="
+             max-width: 618px;
+            " align="left" vspace="4" alt="T-52d interior, courtesy Günter Hütter [6]" border="0" width="298" height="268">
+            </div>
+            </a>
+            </div></td></tr><tr><td align="center">
+          </td></tr></tbody></table>
+          </td></tr>
+        </tbody></table>
+<br>        <a name="break"></a>
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          <b>Breaking the T-52</b>
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+Although the T-52 provided extremely good security for its days, it was
+nevertheless broken during WWII. The first to break Siemens T-52a/b
+traffic, was a group of Swedish cryptanalists led by Professor Arne
+Beurling in June 1940.
+The Swedish were lucky in that, after the occupation of Norway and Denmark,
+the Germans started using land lines for their communication.
+          </font>
+          </td></tr>
+        </tbody></table>
+<br>        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+The lines ran through Sweden and as early as May 1940,
+the Swedes tapped these lines and
+intercepted all T-52 traffic to and from Oslo.
+The machine was broken with hand methods, based on a set of messages
+<i>in depth</i>, that were intercepted on 25 and 27 May 1940 <a href="#ref_2">[2]</a>.
+<br>
+<br>
+Once the messages were broken and the key was known, the bulk of information
+was deciphered on a T-52 emulator built by Vigo Waldemar Lindstein of the
+<a href="../../../manuf/ericsson"><span data-balloon-pos="up" aria-label="More about: Ericsson">Ericsson</span></a>
+company. After the war, Lindstein worked for
+<a href="../../hagelin/index.htm"><span data-balloon-pos="up" aria-label="More about: Hagelin">Hagelin</span></a> for several years as head of the
+Engineering division, until he started
+<a href="../../transvertex/index.htm"><span data-balloon-pos="up" aria-label="More about: Transvertex">Transvertex</span></a>. He developed the
+<a href="../../transvertex/hc9/index.htm"><span data-balloon-pos="up" aria-label="More about: HC-9">HC-9</span></a> cipher machine and was CEO of
+Transvertex until the company was taken over by
+<a href="../../../manuf/ericsson"><span data-balloon-pos="up" aria-label="More about: Ericsson">Ericsson</span></a> in 1969.
+          </font></td>
+          <td>&nbsp;&nbsp;</td>
+          <td align="center" valign="top" width="100">
+          <table border="0" cellpadding="0" cellspacing="0"><tbody><tr><td align="center" valign="top">
+            <div style="position: relative;" data-balloon-pos="up" aria-label="Professor Arne Beurling. Source unknown." class="tooltip-red">
+            <div style="position: relative;" data-balloon-pos="up" aria-label="Professor Arne Beurling. Source unknown." class="tooltip-red">
+            <img src="img/arne_beurling.jpg" style="
+             max-width: 618px;
+            " align="left" vspace="4" alt="Professor Arne Beurling. Source unknown." border="0" width="298" height="248">
+            </div>
+            </div></td></tr><tr><td align="center">
+          </td></tr></tbody></table>
+          </td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+<br>
+In 1943, the Germans discovered the weaknesses of the T-52a/b and c,
+and were informed that their ciphers were being read by the Swedes.
+They then introduced the T-52d, which featured irregular stepping of
+the cipher wheels. It appeared to be too much for Beurling and his team.
+<br>
+<br>
+          </font>
+          </td></tr>
+        </tbody></table>
+<br>        <a name="bp"></a>
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          <b>Bletchley Park</b>
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+The British cryptanalists at <a href="../../../bp/index.htm"><span data-balloon-pos="up" aria-label="More about: Bletchley Park (BP)">Bletchley Park (BP)</span></a>
+were less fortunate than their Swedish collegues, mainly because the
+T-52 was primarily used over land lines, to which the British, unlike the
+Swedes, had no access.
+Over time however, the T-52 also occasionally appeared on radio links.
+          </font>
+          </td></tr>
+        </tbody></table>
+<br>        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+The first break by <a href="../../../bp/index.htm"><span data-balloon-pos="up" aria-label="More about: BP">BP</span></a> came in mid-1942.
+In the summer of 1942, the Germans started using the T-52 on the radio link
+between Sicily (Italy) and Libya, and later between Aegean and Sicily.
+As the operators were sending multiple messages <i>in depth</i> (i.e.
+with the same initial settings) BP cryptanalyst Michael Crum <sup><font color="#FF8800">1</font></sup> managed
+to achieve a break and reconstruct the machine <a href="#ref_4">[4]</a>.
+<br>
+<br>
+BP called all German teleprinter traffic <b>'FISH'</b>.
+Whilst the <a href="../../lorenz/sz40/index.htm"><span data-balloon-pos="up" aria-label="More about: Lorenz SZ-40">Lorenz SZ-40</span></a>
+traffic was codenamed <b>'TUNNY'</b>,
+the intercepted messages from the T-52 Geheimschreiber
+were called <b>'STURGEON'</b>.
+          </font></td>
+          <td>&nbsp;&nbsp;</td>
+          <td align="center" valign="top" width="100">
+          <table border="0" cellpadding="0" cellspacing="0"><tbody><tr><td align="center" valign="top">
+<a href="../../../bp/index.htm">            </a><div style="position: relative;" data-balloon-pos="up" aria-label="The Mansion at Bletchley Park"><a href="../../../bp/index.htm">
+</a><a href="../../../bp/index.htm">            <div style="position: relative;" data-balloon-pos="up" aria-label="The Mansion at Bletchley Park">
+            <img src="../../../bp/img/500006/005/small.jpg" style="
+             max-width: 618px;
+            " align="left" vspace="4" alt="The Mansion at Bletchley Park" border="0" width="298" height="200">
+            </div>
+            </a>
+            </div></td></tr><tr><td align="center">
+          </td></tr></tbody></table>
+          </td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+<br>
+Over time, all T-52 models encountered by BP, were eventually broken,
+including the much improved T-52d,
+but only if they had received messages <i>in depth</i>.
+In practice, BP found that most messages that were sent over T-52 links,
+were also sent via <a href="../../enigma/i/index.htm"><span data-balloon-pos="up" aria-label="More about: Enigma">Enigma</span></a>
+or <a href="../../lorenz/sz40/index.htm"><span data-balloon-pos="up" aria-label="More about: Lorenz SZ-40">Lorenz SZ-40</span></a>.
+As they were better equipped to break these two,
+the value of broken T-52 messages was limited.
+          </font>
+          </td></tr>
+        </tbody></table>
+<br>        <table width="50" cellspacing="0" cellpadding="0"><tbody><tr>
+        <td style="border-top: 1px solid #aaa;"><img src="../img/blank.gif" width="1" height="5"></td>
+        </tr></tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr><td>
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#888888"><small>
+          <ol>
+          <li>
+After the war, Michael Crum worked for <a href="../../../intel/index.htm#gchq"><span data-balloon-pos="up" aria-label="More about: GCHQ">GCHQ</span></a>
+and was involved in the development of the
+<a href="../../usa/saville.htm"><span data-balloon-pos="up" aria-label="More about: SAVILLE cryptographic algorithm">SAVILLE cryptographic algorithm</span></a>.
+SAVILLE became known as an <a href="../../usa/nsa.htm#types"><span data-balloon-pos="up" aria-label="More about: NSA Type 1">NSA Type 1</span></a> algorithm.
+          </li></ol>
+          </small></font></td></tr>
+        </tbody></table>
+<div style="height: 20px;"></div>        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+<br>
+          </font>
+          </td></tr>
+        </tbody></table>
+        <a name="post"></a>
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          <b>Post-war use</b>
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+The story of the T-52 does not finish at the end of WWII. Instead a large
+number of machines found their way into the armies and security services
+of a number of countries. The machine is known to have been used by the
+French Foreign Office and by the Dutch Navy. The East-Germans intended to
+use the machine, but it is uncertain whether they actually did.
+Even the British Navy considered using the machine, but turned it
+down for unknown reasons after a series of tests <a href="#ref_4">[4]</a>.
+<br>
+          <br>
+          <table border="0" cellpadding="0" cellspacing="0" width="100%"><tbody><tr><td align="center" valign="top">
+<a href="../../../manuf/mils/index.htm">            </a><div style="position: relative;" data-balloon-pos="up" aria-label="Willy Reichert's first company logo after WWII. Click for more information" data-balloon-length="large"><a href="../../../manuf/mils/index.htm">
+</a><a href="../../../manuf/mils/index.htm">            <div style="position: relative;" data-balloon-pos="up" aria-label="Willy Reichert's first company logo after WWII. Click for more information" data-balloon-length="large">
+            <img src="../../../manuf/mils/img/logo_re.png" style="
+             max-width: 618px;
+            " align="center" vspace="4" alt="Willy Reichert's first company logo after WWII. Click for more information" border="0">
+            </div>
+            </a>
+            </div></td></tr><tr><td align="center">
+          </td></tr></tbody></table>
+          </font>
+          </td></tr>
+        </tbody></table>
+<br>        <a name="fr"></a>
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+0" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          France
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+The French were by far the largest post-war user of the T-52.
+Approximately 380 machines survived the war, 280 of which were left behind
+in Germany. Although these machines had to be destroyed, they were 'just'
+dismantled and the various parts ended up on the surplus market.
+Around 1948, electromechanical firm
+<a href="../../../manuf/mils/index.htm"><span data-balloon-pos="up" aria-label="More about: Willy Reichert">Willy Reichert</span></a>
+in Trier (Germany) bought large
+amounts of the surplus stock and re-assembled a substantial quantity
+of T-52d and T-52e machines. More than 235 re-assembled machines were
+subsequently sold to the French Foreign Office between 1949 and 1953.
+Some of these machines appeared on the surplus market again years later.
+          </font>
+          </td></tr>
+        </tbody></table>
+<br>        <a name="nl"></a>
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+0" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          Netherlands
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+The Dutch Navy started using the T-52d during the 1950s. It is currently
+unknown how long and for what purpose they were used, but it is most
+likely that they were used on teleprinter lines between The Netherlands
+and the Dutch East-Indies (Indonesia). It is also unclear at present who
+supplied the machines to the Dutch. It's entirely possible that they
+were also supplied by <a href="../../../manuf/mils/index.htm"><span data-balloon-pos="up" aria-label="More about: Reichert">Reichert</span></a>,
+but they may also belong to the 100
+machines that were not left behind in Germany after <span class="short" aria-label="World War II" data-balloon-pos="up"><a href="../../glossary.htm#ww2" class="short">WWII</a></span>.
+<br>
+<br>
+          </font>
+          </td></tr>
+        </tbody></table>
+<br>        <a name="sim"></a>
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          <b>T-52 Simulator</b>
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+A good simulation of a T-52d has been produced by the Crypto Simulation
+Group (CSG). The simulator runs under Windows and is available from
+<a href="http://cryptocellar.org/"><span data-balloon-pos="up" aria-label="cryptocellar.org (off-site)">Frode Weierud's website</span></a>.
+          </font>
+          </td></tr>
+        </tbody></table>
+<br>        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+On 23 March 2000, the CSG even managed to interface the simulator to a real
+T-52d machine, after which the compatibility of the simulator was confirmed.
+For this they used the RS-232 port of the PC and a simple relay-based
+telex interface.
+The simulator is suitable for Windows.
+<br>
+<br><font color="#E7E">➤</font>&nbsp;<a href="http://cryptocellar.org/simula/t52/">Download T-52d Simulator (off-site)</a>
+          </font></td>
+          <td>&nbsp;&nbsp;</td>
+          <td align="center" valign="top" width="100">
+          <table border="0" cellpadding="0" cellspacing="0"><tbody><tr><td align="center" valign="top">
+<a href="http://cryptocellar.org/simula/t52/">            </a><div style="position: relative;" data-balloon-pos="up" aria-label="Screenshot of the T-52d Simulator. Click to download." data-balloon-length="large"><a href="http://cryptocellar.org/simula/t52/">
+</a><a href="http://cryptocellar.org/simula/t52/">            <div style="position: relative;" data-balloon-pos="up" aria-label="Screenshot of the T-52d Simulator. Click to download." data-balloon-length="large">
+            <img src="img/t52_sim.gif" style="
+             max-width: 618px;
+            " align="left" vspace="4" alt="Screenshot of the T-52d Simulator. Click to download." border="0" width="298" height="224">
+            </div>
+            </a>
+            </div></td></tr><tr><td align="center">
+          </td></tr></tbody></table>
+          </td></tr>
+        </tbody></table>
+<br>        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          <b>Glossary</b>
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+
+
+<div style="height: 4px;"></div>        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+        <tbody><tr>
+        <td width="40" align="right" valign="top">
+        <a name="glos_ame"></a>
+        <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#FF8800"><b>AME</b></font>
+        </td>
+        <td width="6">&nbsp;</td>
+        <td valign="top">
+        <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555"><b>Allgemeine Magnet Empfänger — General Magnet Receiver</b>
+        <br>
+
+<div style="height: 12px;"></div>        </font></td></tr>
+        <tr>
+        <td width="40" align="right" valign="top">
+        <a name="glos_ams"></a>
+        <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#FF8800"><b>AMS</b></font>
+        </td>
+        <td width="6">&nbsp;</td>
+        <td valign="top">
+        <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555"><b>Allgemeine Magnet Sender — General Magnet Transmitter</b>
+        <br>
+
+<div style="height: 12px;"></div>        </font></td></tr>
+        <tr>
+        <td width="40" align="right" valign="top">
+        <a name="glos_amu"></a>
+        <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#FF8800"><b>AMÜ</b></font>
+        </td>
+        <td width="6">&nbsp;</td>
+        <td valign="top">
+        <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555"><b>Allgemeine Magnet Übersetzer — General Magnet Translator</b>
+        <br>
+
+<div style="height: 12px;"></div>        </font></td></tr>
+        <tr>
+        <td width="40" align="right" valign="top">
+        <a name="glos_gek"></a>
+        <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#FF8800"><b>GEK</b></font>
+        </td>
+        <td width="6">&nbsp;</td>
+        <td valign="top">
+        <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555"><b>Generator Empfanger Kontakt Key — Generator Receiver Contact</b>
+        <br>
+
+<div style="height: 12px;"></div>        </font></td></tr>
+        <tr>
+        <td width="40" align="right" valign="top">
+        <a name="glos_kg"></a>
+        <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#FF8800"><b>KG</b></font>
+        </td>
+        <td width="6">&nbsp;</td>
+        <td valign="top">
+        <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555"><b>Klar/Geheim — Plain/Cipher</b>
+        <br>
+This lever selects between <b>'Klar'</b> (plain) and <b>'Geheim'</b> (cipher).
+It consists of 30 double-throw switches that are mounted on a common axle.
+
+<div style="height: 12px;"></div>        </font></td></tr>
+        <tr>
+        <td width="40" align="right" valign="top">
+        <a name="glos_kli"></a>
+        <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#FF8800"><b>KLI</b></font>
+        </td>
+        <td width="6">&nbsp;</td>
+        <td valign="top">
+        <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555"><b>Klinken — Socket</b>
+        <br>
+This are the 20 sockets of the plugboard, into which the plugs (Stöpsel)
+must be inserted.
+
+<div style="height: 12px;"></div>        </font></td></tr>
+        <tr>
+        <td width="40" align="right" valign="top">
+        <a name="glos_ktf"></a>
+        <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#FF8800"><b>KTF</b></font>
+        </td>
+        <td width="6">&nbsp;</td>
+        <td valign="top">
+        <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555"><b>Klartekstfunktion — Clear text function</b>
+        <br>
+This function determines how the rotor stepping mechanism advances. It has
+two settings: <b>'mit'</b> (with) and <b>'ohne'</b> (without). When set to <b>'mit'</b>,
+rotor stepping is influenced by the selected plaintext character.
+
+<div style="height: 12px;"></div>        </font></td></tr>
+        <tr>
+        <td width="40" align="right" valign="top">
+        <a name="glos_sto"></a>
+        <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#FF8800"><b>STÖ</b></font>
+        </td>
+        <td width="6">&nbsp;</td>
+        <td valign="top">
+        <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555"><b>Stöpsel — Plug</b>
+        <br>
+These are the 20 plugs, or jacks, at the end of the 20 patch cables,
+that should be installed into the 20 sockets of the plugboard. Each pair of
+cables are related to one of the ten rotors. Each plug has 4 wire contacts:
+two for the transmitter and two for the receiver.
+
+<div style="height: 12px;"></div>        </font></td></tr>
+        </tbody></table>
+<div style="height: 20px;"></div>        <a name="spec"></a>
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          <b>Specifications</b>
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="4">
+          <tbody><tr>
+          <td valign="">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+          <ul>
+            <li><div style="display:inline-block; width:100px;">Device</div><a href="../../rotor.htm">Rotor cipher machine</a>            </li><li><div style="display:inline-block; width:100px;">Purpose</div><a href="../../data.htm#telex">Encryption of 5-bit teleprinter traffic</a>            </li><li><div style="display:inline-block; width:100px;">Model</div>T-52            </li><li><div style="display:inline-block; width:100px;">Codename</div>Geheimschreiber (secret writer)            </li><li><div style="display:inline-block; width:100px;">Manufacturer</div><a href="../../../manuf/siemens">Siemens &amp; Halske AG</a>            </li><li><div style="display:inline-block; width:100px;">Country</div><a href="../../germany">Germany</a>            </li><li><div style="display:inline-block; width:100px;">Years</div>1930-1946            </li><li><div style="display:inline-block; width:100px;">Users</div>German Armed Forces, Dutch Navy, French Army            </li><li><div style="display:inline-block; width:100px;">Main</div>220V AC / 220 Watt            </li><li><div style="display:inline-block; width:100px;">Power</div>220V DC (motor), 2 × 60V DC for line voltages            </li><li><div style="display:inline-block; width:100px;">Rotors</div>10            </li><li><div style="display:inline-block; width:100px;">Weight</div>&gt; 100 kg          </li></ul>
+</font></td></tr></tbody></table>        <a name="nom"></a>
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+0" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          Nomenclature
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr>
+          <td valign="top" align="left">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+The following names were used to identify the T-52 and/or its traffic:
+          </font>
+          </td></tr>
+        </tbody></table>
+<br>        <table width="100%" border="0" cellspacing="0" cellpadding="4">
+          <tbody><tr>
+          <td valign="">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+          <ul>
+            <li>Ttyp52            </li><li>T-52            </li><li>G-Schreiber            </li><li>Geheimschreiber            </li><li>Geheimfernschreiber            </li><li><span class="short tooltip-red" data-balloon-pos="up" aria-label="Schlüsselfernschreibmaschine">SFM</span>            </li><li>Schlüsselfernschreibmaschine            </li><li>Ln 25330            </li><li>Sägefisch <sup><font color="#FF8800">1</font></sup>            </li><li>Sturgeon <sup><font color="#FF8800">2</font></sup>          </li></ul>
+</font></td></tr></tbody></table>        <table width="50" cellspacing="0" cellpadding="0"><tbody><tr>
+        <td style="border-top: 1px solid #aaa;"><img src="../img/blank.gif" width="1" height="5"></td>
+        </tr></tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr><td>
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#888888"><small>
+          <ol>
+          <li>
+Sägefisch (sawfish) was the German name for the T52 traffic.
+          </li>
+          <li>
+Sturgeon was the British name for the T52 traffic.
+          </li></ol>
+          </small></font></td></tr>
+        </tbody></table>
+<div style="height: 20px;"></div>        <a name="spec_ver"></a>
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+0" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          Versions
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="4">
+          <tbody><tr>
+          <td valign="">
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+          <ul>
+            <li>T-52a            </li><li>T-52b            </li><li>T-52c            </li><li>T-52ca            </li><li>T-52d            </li><li>T-52e            </li><li><s>T-52f</s> <sup><font color="#FF8800">1</font></sup>          </li></ul>
+</font></td></tr></tbody></table>        <table width="50" cellspacing="0" cellpadding="0"><tbody><tr>
+        <td style="border-top: 1px solid #aaa;"><img src="../img/blank.gif" width="1" height="5"></td>
+        </tr></tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr><td>
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#888888"><small>
+          <ol>
+          <li>
+Never taken into production, as the war ended before the design was finised.
+          </li></ol>
+          </small></font></td></tr>
+        </tbody></table>
+<div style="height: 20px;"></div>        <a name="patents"></a>
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          <b>Patents</b>
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="4">
+          <tbody><tr>
+          <td>
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+          <ul>
+            <li><a href="files/de615016a.pdf"><b>DE615016</b> - 18 July 1930</a><br>
+First patent related to the T-52, filed by Siemens und Halske
+in Berlin-Siemensstadt.
+It lists August Jipp and Ehrhard Roßberg as the inventors.
+It was filed on 18 July 1930 and published on 29 May 1935.
+<br>
+            <table border="0" cellpadding="0" cellspacing="0" width="100%"><tbody><tr><td align="center" valign="bottom">
+<a href="files/us1912983.pdf">              </a><div style="position: relative;" data-balloon-pos="up" aria-label="Drawing from US Patent 1,912,983 - Click to download" data-balloon-length="large"><a href="files/us1912983.pdf">
+</a><a href="files/us1912983.pdf">              <div style="position: relative;" data-balloon-pos="up" aria-label="Drawing from US Patent 1,912,983 - Click to download" data-balloon-length="large">
+              <img src="img/t52_patent.pjg" style="
+               max-width: 618px;
+              " align="center" vspace="4" alt="Drawing from US Patent 1,912,983 - Click to download" border="0" width="209" height="116">
+              </div>
+              </a>
+              </div></td></tr><tr><td align="center">
+            </td></tr></tbody></table>
+            <p>
+            </p></li><li><a href="files/us1912983.pdf"><b>US1912983</b> - 16 June 1931</a><br>
+The same patent was also filed in the US, where the device was
+called 'Secret Telegraph System'. The patent was filed on
+16 June 1931 and was published on 6 June 1933.
+It lists August Jipp, Ehrhard Roßberg and Eberhard Hettler
+as the inventors.
+            <p>
+            </p></li><li><a href="files/de591974.pdf"><b>DE591974</b> - 11 October 1930</a><br>
+This patent is similar to DE615015. It was filed later but has
+a lower file number. The patent was approved 2 years before
+DE615015.
+            <p>
+            </p></li><li><a href="files/de666436.pdf"><b>DE666436</b> - 13 September 1930</a><br>
+The is the patent for the additional security added to the
+T-52d, the so-called <span class="short" aria-label="Klartextfunktion (clear text function)" data-balloon-pos="up"><a href="#glos_ktf" class="short">KTF</a></span> (<i>Klartextfunction,</i>
+Clear Text Function). It was filed on 13 September 1930 and
+was published on 29 September 1938. Eberhard Roßberg is listed
+as the inventor.
+<br>
+            <table border="0" cellpadding="0" cellspacing="0" width="100%"><tbody><tr><td align="center" valign="bottom">
+<a href="files/de666436.pdf">              </a><div style="position: relative;" data-balloon-pos="up" aria-label="This is the patent for the KTF extention in the T-52d. Click to download." data-balloon-length="large"><a href="files/de666436.pdf">
+</a><a href="files/de666436.pdf">              <div style="position: relative;" data-balloon-pos="up" aria-label="This is the patent for the KTF extention in the T-52d. Click to download." data-balloon-length="large">
+              <img src="img/t52_ktf.jpg" style="
+               max-width: 618px;
+              " align="center" vspace="4" alt="This is the patent for the KTF extention in the T-52d. Click to download." border="0" width="136" height="97">
+              </div>
+              </a>
+              </div></td></tr><tr><td align="center">
+            </td></tr></tbody></table>
+          </li></ul>
+        </font></td></tr></tbody></table>
+<div style="height: 14px;"></div>        <a name="doc"></a>
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          <b>Documentation</b>
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="4">
+          <tbody><tr>
+          <td>
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+          <ol type="A">
+            <a name="doc_1"></a>
+            <li><a href="files/Geheimzusatz_FSM_T52_OKM_1937.pdf">Der Geheimzusatz der Siemens-Fernschreibmaschine T. typ. 52 <sup><font color="#FF8800">1,3</font></sup> </a><br>
+Preliminary description of Siemens T-52 (German).<br>
+Oberkommando der Kriegsmarine. M.Dv.Nr.35. Berlin, 1937.
+            <p>
+            <a name="doc_2"></a>
+            </p></li><li><a href="files/T52_geraeteuebersicht.pdf">Geräteübersicht, Geheimfernschreiber T-52d <sup><font color="#FF8800">3</font></sup> </a><br>
+Overview of T52-related devices, including Anschlußgerat G (German).<br>
+II. Geräteübersicht 1942. pp. 77-93.
+            <p>
+            <a name="doc_3"></a>
+            </p></li><li><a href="files/T52d_TechDoc_1944.pdf">Die Siemens-Schlüsselfernschreibmaschine SFM T-52d (T. typ. 52d)</a><br>
+M.Dv.Nr.35 IV. D. (Luft) T.g. Kdos.9105d. Berlin, March 1944.
+<br><font color="#E7E">➤</font>&nbsp;<a href="files/T52d_Appendix_1_2_1944.pdf">Appendex 1 and 2</a>
+            <p>
+            <a name="doc_4"></a>
+            </p></li><li><a href="files/T52_opr_NL.pdf">Gebruikersvoorschrift Siemens geheimschriftsysteem (Dutch)</a><br>
+Koninklijke Marine (Royal Dutch Navy). Undated but probably 1946.
+            <p>
+            <a name="doc_5"></a>
+            </p></li><li><a href="files/T52d_circuit_1937.pdf">T-52d, circuit diagram</a><br>
+Extracted from <a href="#ref_1">[1]</a>.
+            <p>
+            <a name="doc_6"></a>
+            </p></li><li><a href="files/T52e_circuit.pdf">T-52e, circuit diagrams</a><br>
+High-quality copies of the full T-52e circuit diagrams. <sup><font color="#FF8800">2</font></sup> <br>
+Siemens &amp; Halske. Berlin 1943/44.
+            <p>
+            <a name="doc_7"></a>
+            </p></li><li><a href="files/FA_Geraet_G_schema.pdf">Fernschreib-Anschlussgerät G, circuit diagram</a><br>
+Siemens &amp; Halske. Berlin, 20 February 1940.
+            <p>
+            <a name="doc_8"></a>
+            </p></li><li><a href="files/T52e_TechDesc_EN.pdf">The Siemens and Halske T52e Cipher Machine</a><br>
+Detailed description with hand-made drawings (English).<br>
+Unknown author. December 1984.
+            <p>
+            <a name="doc_9"></a>
+            </p></li><li><a href="files/FAG_D764_5_19390816.pdf">Merkblatt Fernschreib-Anschlußgerät</a><br>
+D 764/5. 16 August 1939. Reprinted 1942.
+            <p>
+            <a name="doc_10"></a>
+</p></li><li><font color="#F52E00">Das Fernschreib-Anschlußgerät <sup><font color="#FF8800">3</font></sup> </font><br>
+Circuit diagrams (German).<br>
+D 7115/2. 1 February 1943. <font color="#F52E00">Wanted</font>
+          </li></ol>
+        </font></td></tr></tbody></table>
+<div style="height: 14px;"></div>        <table width="50" cellspacing="0" cellpadding="0"><tbody><tr>
+        <td style="border-top: 1px solid #aaa;"><img src="../img/blank.gif" width="1" height="5"></td>
+        </tr></tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr><td>
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#888888"><small>
+          <ol>
+          <li style="margin-bottom: 6px;">
+This document is stamped by the German Kriegsmarine (Kommando der Marine
+  an der Nordsee),<br>
+  and has an inlay of 12 January 1944, with stamps of the Dutch Navy.
+          </li>
+          <li style="margin-bottom: 6px;">
+These documents contain the signature of
+  <a href="../../../manuf/mils/index.htm"><span data-balloon-pos="up" aria-label="More about: Willi Reichert">Willi Reichert</span></a> and were kindly supplied
+  by Wolfgang Mache. Included is a copy of the circuit diagram of the
+  <a href="../../../telex/siemens/t36"><span data-balloon-pos="up" aria-label="More about: T-36 teletypewriter">T-36 teletypewriter</span></a>,
+  dated 1 September 1932.
+          </li>
+          <li style="margin-bottom: 6px;">
+Document kindly provided by Günter Hütter <a href="#ref_6">[6]</a>.
+          </li></ol>
+          </small></font></td></tr>
+        </tbody></table>
+<div style="height: 20px;"></div>        <a name="keys"></a>
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+0" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          Key material
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="4">
+          <tbody><tr>
+          <td>
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+          <ol type="a">
+            <li><a href="files/T52de_Reichsschluessel_Nr3.pdf">Wehrmacht-Fernschreibgrundschlüssel SFM T-52 d/e, Reichsschlüssel Nr. 3 <sup><font color="#FF8800">1</font></sup> </a><br>
+Basic keys for the T-52 d/e. National Key Number 3 (German).<br>
+S/N: 00739. Geheime Kommandosache. Date unknown.
+            <p>
+            </p></li><li><a href="files/T52de_Schluessel_Norway_4.pdf">d/e Wehrmachtfernschreib-Spruchschlüssel SFM T52d/e — Norwegen Nr. 4</a><br>
+S/N 104 or 841. Date unknown. Crypto Museum Collection #303640.
+            <p>
+            </p></li><li><a href="files/T52de_Keys_Norway_1945Q1_163.pdf">Norwegen Ersatz - Wehrmachtfernschreib-Ersatz Spruchschlüssel 1945/I SFM T52d/e <sup><font color="#FF8800">1</font></sup> </a><br>
+Replacement keys for the T-52d/e in Norway 1945 Q1 (German).<br>
+S/N: 163 Geheim. Norway, 1st edition, 1 January - 31 March 1945.
+            <p>
+            </p></li><li><a href="files/T52de_Keys_1945Q1_1501.pdf">Ersatz - Wehrmachtfernschreib-Ersatz Spruchschlüssel 1945/1 SFM T52d/e <sup><font color="#FF8800">1</font></sup> </a><br>
+Replacement keys for the T-52d/e in Norway 1945 Q1 (German).<br>
+S/N: 1501 Geheim. 1st edition, 1 January - 31 March 1945.
+            <p>
+            </p></li><li><a href="files/T52de_Keys_194503_1476.pdf">d/e Wehrmachtfernschreib-Spruchschlüssel SFM T52d/e March 1945 <sup><font color="#FF8800">1</font></sup> </a><br>
+Replacement keys for the T-52d/e in Norway 1945 Q1 (German).<br>
+S/N: 1476 Geheim. 1st edition,March 1945.
+          </li></ol>
+        </font></td></tr></tbody></table>
+<div style="height: 14px;"></div>        <table width="50" cellspacing="0" cellpadding="0"><tbody><tr>
+        <td style="border-top: 1px solid #aaa;"><img src="../img/blank.gif" width="1" height="5"></td>
+        </tr></tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr><td>
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#888888"><small>
+          <ol>
+          <li>
+Document kindly provided by Günter Hütter <a href="#ref_6">[6]</a>.
+          </li></ol>
+          </small></font></td></tr>
+        </tbody></table>
+<div style="height: 20px;"></div>        <a name="ref"></a>
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          <b>References</b>
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="4">
+          <tbody><tr>
+          <td>
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+          <ol>
+            <a name="ref_1"></a>
+            <li><a href="http://www.cdvandt.org">Foundation for German Communication and Related Technologies</a><br>
+T-52d featured on this page courtesy Arthur Bauer.
+            <p>
+            <a name="ref_2"></a>
+</p></li><li><font color="#F52E00">Bengt Beckman, <i>Codebreakers,</i></font><br>
+<i>Arne Beurling and the Swedish Crypto Program During WWII.</i><br>
+2002, ISBN 0-8218-2889-4.<br>
+Original Swedish Title: Svenska Kryptobedrifter.
+1996, ISBN 91-0-056229-7.
+            <p>
+            <a name="ref_3"></a>
+</p></li><li><font color="#F52E00">CG McKay and Bengt Beckman, <i>Swedish signal intelligence 1900-1945</i></font><br>
+2003. ISBN 0-7146-5211-5 (hard cover).
+            <p>
+            <a name="ref_4"></a>
+            </p></li><li><a href="http://cryptocellar.org/pubs/sturgeon.pdf">Frode Weierud, <i>BP's Sturegeon, The FISH That Laid No Eggs</i></a><br>
+The Rutherford Journal, Volume 1, 2005-2006. PDF version, p. 29.
+            <p>
+            <a name="ref_5"></a>
+            </p></li><li><a href="files/mache_t52.pdf">Wolfgang Mache, <i>Der Siemens-Geheimschreiber,</i></a><br>
+<i>Ein Beitrag zur Geschichte der Telekommunikation,<br>
+1992: 60 Jahre Schlüsselfernschreibmaschine</i> (German).<br>
+Archiv für deutsche Postgeschichte Heft 2, 1992, pp. 85-94.
+<br><font color="#E7E">➤</font>&nbsp;<a href="files/mache_t52_en.pdf">English translation <sup><font color="#FF8800">1</font></sup> </a>
+            <p>
+            <a name="ref_6"></a>
+</p></li><li><font color="#F52E00">Günter Hütter, T-52 documentation (listed above)</font><br>
+Austria, 2008-2021.
+            <p>
+            <a name="ref_7"></a>
+            </p></li><li><a href="../../../crypto/vernam.htm">Paul Reuvers and Marc Simons, <i>The Vernam Cipher</i></a><br>
+Siemens &amp; Halske, Wernerwerk. 11 August 2012.
+          </li></ol>
+        </font></td></tr></tbody></table>
+<div style="height: 14px;"></div>        <table width="50" cellspacing="0" cellpadding="0"><tbody><tr>
+        <td style="border-top: 1px solid #aaa;"><img src="../img/blank.gif" width="1" height="5"></td>
+        </tr></tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tbody><tr><td>
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#888888"><small>
+          <ol>
+          <li>
+Published in NCVA Cryptolog, Corvallis, Oregon, Winter 1990.
+          </li></ol>
+          </small></font></td></tr>
+        </tbody></table>
+<div style="height: 20px;"></div>        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          <b>Further information</b>
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+0" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          This website
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="4">
+          <tbody><tr>
+          <td>
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+          <ul>
+            <li><a href="../../../telex/siemens/t36">T36 teleprinter</a><br>
+</li><li><font color="#F52E00">Solid State Replacement for <b>Trls43a</b> Polar Relay</font><br>
+            </li><li><a href="../index.htm">Other Siemens cipher machines</a><br>
+            </li><li><a href="../../germany/index.htm">Other German cipher machines</a><br>
+            </li><li><a href="../../rotor.htm">Other rotor-based cipher machines</a><br>
+            </li><li><a href="../../index.htm">Other cipher machines</a><br>
+          </li></ul>
+        </font></td></tr></tbody></table>
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+          <tbody><tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+          <tr>
+          <td align="left" valign="center">
+          <font size="+0" face="Lucida Grande,Arial,Verdana,sans-serif" color="#F52E00">
+          Other websites
+          </font>
+          </td>
+          </tr>
+          <tr><td colspan="2" height="1"><img src="../../../img/blank.gif" width="1" height="1"></td></tr>
+          <tr><td height="4"><img src="../../../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="4">
+          <tbody><tr>
+          <td>
+          <font size="-1" face="Lucida Grande,Arial,Verdana,sans-serif" color="#555555">
+          <ul>
+            <li><a href="http://jproc.ca/crypto/sturg.html">T-52 on Jerry Proc's crypto pages</a><br>
+            </li><li><a href="http://en.wikipedia.org/wiki/Siemens_and_Halske_T52">T-52 on Wikipedia</a><br>
+            </li><li><a href="http://www.quadibloc.com/crypto/te0302.htm">T-52 technical backgrounds, by John Savard</a><br>
+          </li></ul>
+        </font></td></tr></tbody></table>
+<div style="height: 14px;"></div>        </td></tr>
+      </tbody></table>
+      <table border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tbody><tr><td colspan="3" width="100%">
+        <div style="width: 100%; height: 2px; background: #FFBB00; margin-top: 2px; margin-bottom: 2px;"></div>
+        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tbody><tr><td><img src="../img/blank.gif" width="1" height="4"></td></tr>
+        </tbody></table>
+        </td></tr>
+        <tr>
+        <td align="center" width="100%">
+        <font size="-2" face="Lucida Grande,Arial,Verdana,sans-serif" color="#777777">
+        Any links shown in <font color="#F52E00">red</font> are currently unavailable. 
+        If you like the information on this website, why not make a <a href="http://www.cryptomuseum.com/donate.htm"><span data-balloon-pos="up" aria-label="www.cryptomuseum.com (off-site)">donation</span></a>?<br> 
+         
+        © Crypto Museum. Created: Wednesday 05 August 2009. Last changed: Monday, 23 June 2025 - 16:31 CET.
+        <br>
+        </font>
+        </td></tr>
+        <tr><td><img src="../img/blank.gif" width="1" height="4"></td></tr>
+        <tr><td align="center">
+        <a href="../../../index.htm"><img src="../../../svg/logo/wheel_small.svg" align="center" alt="Click for homepage" vspace="4" border="0"></a>
+        </td></tr>
+      </tbody></table>
+      </td></tr>
+    </tbody></table>
+    
+  </td>
+  </tr></tbody></table>
+  
+
+</body></html>

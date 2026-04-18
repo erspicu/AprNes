@@ -1,0 +1,685 @@
+
+ T-52 Geheimschreiber
+ Homepage
+ Crypto
+ Index
+ Glossary
+ Enigma
+ Hagelin
+ Fialka
+ Rotor
+ Pin-wheel
+ TROL
+ Voice
+ Data
+ Hand
+ OTP
+ EMU
+ HSM
+ Mixers
+ Phones
+ Bulk
+ FILL
+ Codebooks
+ Algorithms
+ Chips
+ Cryptanalysis
+ Toys
+ World War II
+ Countries
+ Czechoslovakia
+ DDR
+ France
+ Germany
+ Netherlands
+ Russia
+ Switzerland
+ UK
+ USA
+ USSR
+ Yugoslavia
+ Manufacturers
+ ANT
+ Aristo
+ Ascom
+ AT&T
+ BBC
+ Bosch
+ Compumatica
+ Crypto AG
+ Datotek
+ Fox-IT
+ GD
+ Gemalto
+ Gretag
+ Harris
+ HELL
+ ITT
+ Lorenz
+ Lugagne
+ MEL
+ Mils
+ Motorola
+ Mykotronx
+ Nokia
+ OMI
+ Omnisec
+ Philips
+ PTT
+ R&S
+ Racal
+ RanData
+ Raytheon
+ RCA
+ Safenet
+ Secunet
+ Siemens
+ STK
+ Tadiran
+ Tait
+ TCC
+ Telefunken
+ Telsy
+ Teltron
+ Thales
+ TNO
+ Transvertex
+ TST
+ Tutus Data AB
+ Ultra Electronics
+ Utimaco
+ Zellweger
+ OTHER
+ Spy radio
+ Burst encoders
+ Intercept
+ Covert
+ Radio
+ PC
+ Telex
+ Telephones
+ People
+ Agencies
+ Manufacturers
+ DONATE
+ Publications
+ Standards
+ For sale
+ Kits
+ Shop
+ News
+ Events
+ Wanted
+ Contact
+ About us
+ Links
+ ×
+CryptoRotorGermanySiemens   
+ T-52 Geheimschreiber
+Teleprinter cipher machine (STURGEON)
+T-52, also known as Schlüsselfernschreibmaschine (SFM) T52 1 and
+T52 Geheimschreiber, 2 was an online
+rotor-based cipher machine for
+5-bit teleprinter signals
+(telex), developed around 1930
+by Siemens & Halske in Berlin (Germany).
+During World War II it was one of the
+main cipher machines of Nazi Germany, alongside
+Enigma,
+Lorenz SZ-40/42
+and T-43.
+After the war, the machine was reused in several countries,
+including France and The Netherlands. Its traffic was
+known in Germany as Sägefisch (sawfish), and by the
+Bletchley Park codebreakers as Sturgeon.
+The machine is built around a
+Siemens T-36 teleprinter,
+of which
+the keyboard and the paper strip printer are visible in the image
+on the right. Towards the rear is a large removable cipher
+unit with 10 irregularly stepping cipher rotors, each of which has
+a different number of segments.
+The T-52 is mounted on a large and heavy die-cast chassis,
+which is fitted onto a wooden base plate. For transport,
+the complete assembly could be placed in a wooden transit case
+with large metal grips at the sides. The total weight, inluding
+the transit case, is well over 100 kg.
+During WWII, the T-52 was one of the main cipher machines of the
+Third Reich. It was used for battalion-level traffic and was mainly
+operated over land lines. Only the traffic that was send by radio
+could be intercepted. It was occasionally broken by
+Swedish codebreakers, and later also by the
+codebreakers of Bletchley Park (BP),
+but only when messages had been received in depth. 3
+The intelligence derived from the broken messages
+was not considered vital, as BP was already able to read the
+tactical messages encrypted on the Enigma, and
+also the high-grade traffic of the German High Command
+which was encrypted with the Lorenz SZ-40/42.
+The rest was surplus.
+As initial version (T-52a) was not very secure,
+several improved models were released over time.
+The final versions (T-52d and T-52e) were so good that they
+were virtually unbreakable.
+After the war, these models were recovered from surplus supplies
+and were reused by several countries.
+Schlüsselfernschreibmaschine = Key Teletypewriter.
+Geheimschreiber = Secret Writer.
+Two or more messages that have been encrypted with the same key.
+A
+×
+A 1 / 7
+A 2 / 7
+A 3 / 7
+A 4 / 7
+A 5 / 7
+A 6 / 7
+A 7 / 7
+❮
+❯
+ Features
+Although there are many different versions of the Geheimschreiber,
+we'll use the T-52d to show the position of the various parts and controls,
+as it is the most sophisticated and secure version of the machine.
+In the image below, the T-52d is shown from the front right.
+At the heart of the machine is a Siemens T-36 teleprinter (Fernschreiber)
+with its keyboard sticking out at the front.
+The 10 cipher wheels are clearly visible in the image above.
+The cipher mechanism is a complete unit that is mounted on the chassis
+to the rear of the teleprinter.
+Rather than printing onto sheets of paper, the T-52 produces its output
+on a paper-strip, which is fed from a holder at the right into the printer
+that is located just above the keyboard, leaving the machine on the left.
+ Introduction
+During WWII, the German war machine heavily relied on cipher machines for
+secure communication, both over land lines and radio. Apart from a number
+of hand cipher methods, they mainly used three (later four) cipher machines
+for the bulk of their secure messages:
+Enigma
+The enigma machine
+was used at the lowest level of the command chain.
+Between 20,000 and 30,000 machines were built and used by several parts
+of the German Army and related organisations. Due to the sheer size of the
+German war theatre, the majority of enigma messages was sent over radio.
+T-52 Geheimschreiber
+The Geheimschreiber made it possible to encrypt a teleprinter line (telex).
+Although it was possible to use such links over radio, the majority of T-52
+messages was sent over land lines. As a result, such messages were difficult
+to intercept. It was cryptographically more secure than the Lorenz SZ-40.
+Lorenz SZ-40/42
+Like the Geheimschreiber, the Lorenz Schlüssel Zusatz (SZ) was used for the
+protection of telex signals. It was a stand-alone wheel-based unit that was
+connected between the teleprinter and the line. The Germans used it at
+the highest level. The Lorenz machine was used over land lines as well as
+over radio.
+It was broken by Bletchley Park
+by means of the Colossus
+computer.
+Siemens T-43
+This was a one-time pad machine (OTP) that was introduced relatively late
+in the war. It was used only on a few networks.
+Bletchley Park probably called this machine
+Trasher.
+Machines like the T-43
+are often called 'Mixers'.
+ Models
+T-52a
+This was the first version of the T-52. It was based on the T-36
+teletype and was only built in small quantities from 1932-1934.
+It appeared to cause radio interference. It was later modified
+with a filter and was then called T-52a/b.
+T-52b
+The T-52b was a slighly improved version of the T-52a in which a filter
+against radio interference was added. As the machine is otherwise
+identical to the T-52a, the two versions are generally identified as
+T-52a/b. The T-52b was built from 1934-1942.
+T-52c (Cäsar)
+The T-52c was developed in 1941. It had a simpler setting of the
+message key, but had the nasty side-effect that the number of
+possible alphabets was reduced dramatically.
+The T-52c had a switch to make it backwards compatible with
+the T-52a/b. The T-52c had the same cipher period as the T-52a/b
+and is sometimes called: the Cäsarmaschine.
+T-52ca
+This was an improved version of the T-52c in which the number
+of alphabets was increased again by fixing a flaw.
+T-52d (Dora)
+This is a serious improvement of the earlier T-52a/b.
+It features irregular wheel stepping of the cipher wheels
+and a so-called Klartextfunction (KTF).
+The T-52d was developed in 1942/43.
+T-52e (Emil) 
+The same improvements that converted the T-52a/b into the T-52d,
+were also applied to the T-52c. This resulted in the T-52e.
+T-52f
+This version of the T-52 was developed but never taken into
+production. In May 1945 the design was ready but by then the
+war had ended [4].
+Due to the nature of the various models and the later modifications,
+the T-52 can be divided into four distinct functional groups:
+T-52a, T52b (T-52a/b)
+T-52c, T52ca
+T-52d
+T-52e
+ Key setting
+ Key elements
+The following elements of the machine affect the encryption algorithm:
+Key generator
+Each of the five bits of a plaintext character can be inverted under control
+of the contacts of certain notched discs of the 10 cipher rotors. This can be
+seen as a pseudo-random character stream – produced by the Key Generator (KG) –
+with is XOR-ed with the selected plaintext character. In the original
+German description, this operation is known as Vertauschen (swapping).
+Bit-swapping
+The individual bits of the encrypted character can be swapped under control
+of the contacts of certain notched discs of the 10 cipher rotors.
+In the original German description, this function is called
+Würfel-Verfahren (dice operation, or scrambling).
+Plugboard
+The function of the various notched discs of the 10 cipher rotors can be
+altered with the 20 plugs of the plugboard, that are arranged in a 2 × 10
+pattern.
+The configuration of the plugboard is specified in the current key list.
+Rotor start position
+At the start of an encipherment, each of the 10 cipher rotors have to be set
+to a given start position, as specified in the current key list.
+Message key
+Each message must be encrypted with a unique message key, identified with
+a trigram.
+KTF selector (mit/ohne)
+This selector, which is not present on the T-52a/b/c, affects the stepping
+pattern of the rotors. KTF stands for Klartekstfunktion
+(clear text function).
+It has two settings: 'mit' (with) and 'ohne' (without). When set to 'mit'
+(with), the selected cleartext character affects the rotor stepping.
+For this reason, it was generally recommended to set it to 'mit'.
+ Key material
+Plugboard
+Basic setting
+ Block diagram
+ T-52d
+Below is the block diagram of the T-52d. Note that for each character, 5
+bits are required which are shown here as a single line.
+The upper half shows the transmission path, which starts at the top right with
+the (+) and (-) lines, representing the logical (1) and (0) levels.
+These lines are fed to a key generator, described in the German
+documentation as Sender Tauschen (ST), which means transmitter
+swap. Although this is technically correct — it swaps the 1s and 0s
+an arbitrary number of times — it is better described as a 5-bit pseudo-random
+generator (PRNG). The ST key generator is formed by the rightmost five
+rotors (N6-N10) of which the bit order can be swapped with 10 cables of the
+plugboard.
+The resulting bit pattern is then fed to the keyboard, which consists
+of five single-pole double-throw (SPDT) switches (K1-K5). This effectively
+adds the pseudo-random bit stream from the ST to the selected character by
+means of an exclusive-OR operation (XOR). This principle is also known as
+modulo-2 addition and as Vernam Cipher [7].
+From the keyboard, the five bits are passed through a bit-swap
+function, described in the German documentation as Sender Würfel (SW),
+which means transmitter dice. It is controlled by the left­most
+five rotors (N1-N5) and offers 25 (32) possibilities 1 to swap the bits.
+In addition, the bits can be swapped by means of 10 cables on the plugboard.
+As there five plugs at either side of the SW block, this offers an extra
+5! · 5! = 14400 static 2 settings. Next, the resulting five bits are
+serialised by means of a rotating commutator, and then transmitted as a
+serial data stream (TX).
+ Block diagram of T52d shown in cipher mode
+The lower half of the diagram shows the reception path. The serial data (RX) is
+first converted to five in­di­vidual bits, by means of a rotating
+commutator and a 5-bit memory consisting of five capa­citors. From there,
+the bits are passed through a bit-swap function (EW), which is the inverse
+of the bit-swap function (SW) in the transmission path. To maintain
+reciprocity, the plugboards at either side of the EW are wired
+identically to the SW plugboards. This is why each patch cable contains
+four wires. 3 Next, the data is fed through the ET function, which
+– including the plugboards at either side – is identical to the ST function
+in the transmission path. It swaps the logic (1) and (0) levels an arbitrary
+number of times, which is basically another XOR operation.
+The output of the ET now holds the decrypted plaintext character,
+but as this consists of just the charge of the memory capacitors, it does not
+have enough energy to drive the printer. For this reason, the bits
+are first copied into a latch, consisting of five polar relays 4 (R1-R5).
+The data is then fed to the translator (German: Übersetzer) — a rotating
+cam shaft with switches — which releases the print hammer at the right
+moment, in synchronism with the rotating print head.
+The machine (transmission and reception) can be switched
+between Klar (plain) and Geheim (cipher). This is achieved with six switches
+(KGa-f), each of which consists of a 5-pole double-throw switch (one
+pole for each bit). This means that a total of 30 contacts must be swapped when
+switching from plain to cipher.
+The KG-switch is shown here in Geheim (cipher) position.
+Theoretically there are 5! (120) possible bit orders, but due to the circuit
+ — there are just 5 switches with 2 position each — only 25 (32) orders are
+ used.
+In this context, 'static' means that these settings are not changed during
+ encipherment.
+Entering a plug into a socket of the plugboard, configures the transmission
+ path and the reception path simultaneously.
+A polar relay is also known as a bistable relay. It can be driven by short
+ pulses (in this case the charge from a capacitor) and retains the last
+ setting, also when power is removed. In surviving T-52 machines, these
+ polar relays are the most common cause of reliability issues.
+ ➤ More
+ How it works
+The operation of the T-52 is not easily explained. It is a very complex
+machine and there are significant differences between the various
+models. The basic principles are best explained by first looking at
+the initial design and then introducing the improvements.
+ T-52a/b
+The T-52a was the first of the Siemens T-52 machines to see the
+light of day. It had limited cipher security, mainly because it
+exhibited regular stepping of the cipher wheels.
+ T-52c
+The T-52c was an attempt to improve security of the rather insecure
+T-52a/b. A large box with 5 levers, used for setting the message key,
+was added to the left of the keyboard.
+However, the wheel combining logic, that was meant to improve
+security, did exactly the opposite: it weakened the cryptographic
+strength of the machine, as it reduced the total number of alphabets.
+The image on the right shows the extremely rare T-52c variant.
+The 5-lever unit for setting the message key is
+clearly visible at the front left.
+Also note the compatibility switch
+at the front right. It allows the machine to be used in combination
+with the older T-52a/b models.
+According to the serial number plate,
+it is a 50 baud version that
+was built in 1944. This is remarkable, as by this time most
+machines had been replaced by the improved
+d and e models.
+B
+×
+B 1 / 8
+B 2 / 8
+B 3 / 8
+B 4 / 8
+B 5 / 8
+B 6 / 8
+B 7 / 8
+B 8 / 8
+❮
+❯
+ T-52d
+The T-52d was a well-designed machine. It was in fact a T-52a/b
+with much improved cipher security. Its cryptographic strength was
+considerably better than the Lorenz SZ-40.
+Consequently, it was never broken by Swedish cryptanalists.
+It was however broken by Bletchley Park,
+but only if they had messages in depth.
+If the T-52d had been used from the beginning, and its operators had
+been better instructed, it seems unlikely that the machine would ever
+have been broken.
+The image on the right shows the interior of a T-52d machine, after
+the black protective cover has been removed.
+At the right hand side of the machine, just behind the paper tape
+holder, the plugboard is clearly visible. This plugboard was normally
+protected by a lockable hood.
+ Breaking the T-52
+Although the T-52 provided extremely good security for its days, it was
+nevertheless broken during WWII. The first to break Siemens T-52a/b
+traffic, was a group of Swedish cryptanalists led by Professor Arne
+Beurling in June 1940.
+The Swedish were lucky in that, after the occupation of Norway and Denmark,
+the Germans started using land lines for their communication.
+The lines ran through Sweden and as early as May 1940,
+the Swedes tapped these lines and
+intercepted all T-52 traffic to and from Oslo.
+The machine was broken with hand methods, based on a set of messages
+in depth, that were intercepted on 25 and 27 May 1940 [2].
+Once the messages were broken and the key was known, the bulk of information
+was deciphered on a T-52 emulator built by Vigo Waldemar Lindstein of the
+Ericsson
+company. After the war, Lindstein worked for
+Hagelin for several years as head of the
+Engineering division, until he started
+Transvertex. He developed the
+HC-9 cipher machine and was CEO of
+Transvertex until the company was taken over by
+Ericsson in 1969.
+In 1943, the Germans discovered the weaknesses of the T-52a/b and c,
+and were informed that their ciphers were being read by the Swedes.
+They then introduced the T-52d, which featured irregular stepping of
+the cipher wheels. It appeared to be too much for Beurling and his team.
+ Bletchley Park
+The British cryptanalists at Bletchley Park (BP)
+were less fortunate than their Swedish collegues, mainly because the
+T-52 was primarily used over land lines, to which the British, unlike the
+Swedes, had no access.
+Over time however, the T-52 also occasionally appeared on radio links.
+The first break by BP came in mid-1942.
+In the summer of 1942, the Germans started using the T-52 on the radio link
+between Sicily (Italy) and Libya, and later between Aegean and Sicily.
+As the operators were sending multiple messages in depth (i.e.
+with the same initial settings) BP cryptanalyst Michael Crum 1 managed
+to achieve a break and reconstruct the machine [4].
+BP called all German teleprinter traffic 'FISH'.
+Whilst the Lorenz SZ-40
+traffic was codenamed 'TUNNY',
+the intercepted messages from the T-52 Geheimschreiber
+were called 'STURGEON'.
+Over time, all T-52 models encountered by BP, were eventually broken,
+including the much improved T-52d,
+but only if they had received messages in depth.
+In practice, BP found that most messages that were sent over T-52 links,
+were also sent via Enigma
+or Lorenz SZ-40.
+As they were better equipped to break these two,
+the value of broken T-52 messages was limited.
+After the war, Michael Crum worked for GCHQ
+and was involved in the development of the
+SAVILLE cryptographic algorithm.
+SAVILLE became known as an NSA Type 1 algorithm.
+ Post-war use
+The story of the T-52 does not finish at the end of WWII. Instead a large
+number of machines found their way into the armies and security services
+of a number of countries. The machine is known to have been used by the
+French Foreign Office and by the Dutch Navy. The East-Germans intended to
+use the machine, but it is uncertain whether they actually did.
+Even the British Navy considered using the machine, but turned it
+down for unknown reasons after a series of tests [4].
+ France
+The French were by far the largest post-war user of the T-52.
+Approximately 380 machines survived the war, 280 of which were left behind
+in Germany. Although these machines had to be destroyed, they were 'just'
+dismantled and the various parts ended up on the surplus market.
+Around 1948, electromechanical firm
+Willy Reichert
+in Trier (Germany) bought large
+amounts of the surplus stock and re-assembled a substantial quantity
+of T-52d and T-52e machines. More than 235 re-assembled machines were
+subsequently sold to the French Foreign Office between 1949 and 1953.
+Some of these machines appeared on the surplus market again years later.
+ Netherlands
+The Dutch Navy started using the T-52d during the 1950s. It is currently
+unknown how long and for what purpose they were used, but it is most
+likely that they were used on teleprinter lines between The Netherlands
+and the Dutch East-Indies (Indonesia). It is also unclear at present who
+supplied the machines to the Dutch. It's entirely possible that they
+were also supplied by Reichert,
+but they may also belong to the 100
+machines that were not left behind in Germany after WWII.
+ T-52 Simulator
+A good simulation of a T-52d has been produced by the Crypto Simulation
+Group (CSG). The simulator runs under Windows and is available from
+Frode Weierud's website.
+On 23 March 2000, the CSG even managed to interface the simulator to a real
+T-52d machine, after which the compatibility of the simulator was confirmed.
+For this they used the RS-232 port of the PC and a simple relay-based
+telex interface.
+The simulator is suitable for Windows.
+➤ Download T-52d Simulator (off-site)
+ Glossary
+ AME
+ Allgemeine Magnet Empfänger — General Magnet Receiver
+ AMS
+ Allgemeine Magnet Sender — General Magnet Transmitter
+ AMÜ
+ Allgemeine Magnet Übersetzer — General Magnet Translator
+ GEK
+ Generator Empfanger Kontakt Key — Generator Receiver Contact
+ KG
+ Klar/Geheim — Plain/Cipher
+This lever selects between 'Klar' (plain) and 'Geheim' (cipher).
+It consists of 30 double-throw switches that are mounted on a common axle.
+ KLI
+ Klinken — Socket
+This are the 20 sockets of the plugboard, into which the plugs (Stöpsel)
+must be inserted.
+ KTF
+ Klartekstfunktion — Clear text function
+This function determines how the rotor stepping mechanism advances. It has
+two settings: 'mit' (with) and 'ohne' (without). When set to 'mit',
+rotor stepping is influenced by the selected plaintext character.
+ STÖ
+ Stöpsel — Plug
+These are the 20 plugs, or jacks, at the end of the 20 patch cables,
+that should be installed into the 20 sockets of the plugboard. Each pair of
+cables are related to one of the ten rotors. Each plug has 4 wire contacts:
+two for the transmitter and two for the receiver.
+ Specifications
+DeviceRotor cipher machine 
+PurposeEncryption of 5-bit teleprinter traffic 
+ModelT-52 
+CodenameGeheimschreiber (secret writer) 
+ManufacturerSiemens & Halske AG 
+CountryGermany 
+Years1930-1946 
+UsersGerman Armed Forces, Dutch Navy, French Army 
+Main220V AC / 220 Watt 
+Power220V DC (motor), 2 × 60V DC for line voltages 
+Rotors10 
+Weight> 100 kg 
+ Nomenclature
+The following names were used to identify the T-52 and/or its traffic:
+Ttyp52 
+T-52 
+G-Schreiber 
+Geheimschreiber 
+Geheimfernschreiber 
+SFM 
+Schlüsselfernschreibmaschine 
+Ln 25330 
+Sägefisch 1 
+Sturgeon 2 
+Sägefisch (sawfish) was the German name for the T52 traffic.
+Sturgeon was the British name for the T52 traffic.
+ Versions
+T-52a 
+T-52b 
+T-52c 
+T-52ca 
+T-52d 
+T-52e 
+T-52f 1 
+Never taken into production, as the war ended before the design was finised.
+ Patents
+DE615016 - 18 July 1930
+First patent related to the T-52, filed by Siemens und Halske
+in Berlin-Siemensstadt.
+It lists August Jipp and Ehrhard Roßberg as the inventors.
+It was filed on 18 July 1930 and published on 29 May 1935.
+US1912983 - 16 June 1931
+The same patent was also filed in the US, where the device was
+called 'Secret Telegraph System'. The patent was filed on
+16 June 1931 and was published on 6 June 1933.
+It lists August Jipp, Ehrhard Roßberg and Eberhard Hettler
+as the inventors.
+DE591974 - 11 October 1930
+This patent is similar to DE615015. It was filed later but has
+a lower file number. The patent was approved 2 years before
+DE615015.
+DE666436 - 13 September 1930
+The is the patent for the additional security added to the
+T-52d, the so-called KTF (Klartextfunction,
+Clear Text Function). It was filed on 13 September 1930 and
+was published on 29 September 1938. Eberhard Roßberg is listed
+as the inventor.
+ Documentation
+Der Geheimzusatz der Siemens-Fernschreibmaschine T. typ. 52 1,3 
+Preliminary description of Siemens T-52 (German).
+Oberkommando der Kriegsmarine. M.Dv.Nr.35. Berlin, 1937.
+Geräteübersicht, Geheimfernschreiber T-52d 3 
+Overview of T52-related devices, including Anschlußgerat G (German).
+II. Geräteübersicht 1942. pp. 77-93.
+Die Siemens-Schlüsselfernschreibmaschine SFM T-52d (T. typ. 52d)
+M.Dv.Nr.35 IV. D. (Luft) T.g. Kdos.9105d. Berlin, March 1944.
+➤ Appendex 1 and 2
+Gebruikersvoorschrift Siemens geheimschriftsysteem (Dutch)
+Koninklijke Marine (Royal Dutch Navy). Undated but probably 1946.
+T-52d, circuit diagram
+Extracted from [1].
+T-52e, circuit diagrams
+High-quality copies of the full T-52e circuit diagrams. 2 
+Siemens & Halske. Berlin 1943/44.
+Fernschreib-Anschlussgerät G, circuit diagram
+Siemens & Halske. Berlin, 20 February 1940.
+The Siemens and Halske T52e Cipher Machine
+Detailed description with hand-made drawings (English).
+Unknown author. December 1984.
+Merkblatt Fernschreib-Anschlußgerät
+D 764/5. 16 August 1939. Reprinted 1942.
+Das Fernschreib-Anschlußgerät 3 
+Circuit diagrams (German).
+D 7115/2. 1 February 1943. Wanted
+This document is stamped by the German Kriegsmarine (Kommando der Marine
+ an der Nordsee),
+ and has an inlay of 12 January 1944, with stamps of the Dutch Navy.
+These documents contain the signature of
+ Willi Reichert and were kindly supplied
+ by Wolfgang Mache. Included is a copy of the circuit diagram of the
+ T-36 teletypewriter,
+ dated 1 September 1932.
+Document kindly provided by Günter Hütter [6].
+ Key material
+Wehrmacht-Fernschreibgrundschlüssel SFM T-52 d/e, Reichsschlüssel Nr. 3 1 
+Basic keys for the T-52 d/e. National Key Number 3 (German).
+S/N: 00739. Geheime Kommandosache. Date unknown.
+d/e Wehrmachtfernschreib-Spruchschlüssel SFM T52d/e — Norwegen Nr. 4
+S/N 104 or 841. Date unknown. Crypto Museum Collection #303640.
+Norwegen Ersatz - Wehrmachtfernschreib-Ersatz Spruchschlüssel 1945/I SFM T52d/e 1 
+Replacement keys for the T-52d/e in Norway 1945 Q1 (German).
+S/N: 163 Geheim. Norway, 1st edition, 1 January - 31 March 1945.
+Ersatz - Wehrmachtfernschreib-Ersatz Spruchschlüssel 1945/1 SFM T52d/e 1 
+Replacement keys for the T-52d/e in Norway 1945 Q1 (German).
+S/N: 1501 Geheim. 1st edition, 1 January - 31 March 1945.
+d/e Wehrmachtfernschreib-Spruchschlüssel SFM T52d/e March 1945 1 
+Replacement keys for the T-52d/e in Norway 1945 Q1 (German).
+S/N: 1476 Geheim. 1st edition,March 1945.
+Document kindly provided by Günter Hütter [6].
+ References
+Foundation for German Communication and Related Technologies
+T-52d featured on this page courtesy Arthur Bauer.
+Bengt Beckman, Codebreakers,
+Arne Beurling and the Swedish Crypto Program During WWII.
+2002, ISBN 0-8218-2889-4.
+Original Swedish Title: Svenska Kryptobedrifter.
+1996, ISBN 91-0-056229-7.
+CG McKay and Bengt Beckman, Swedish signal intelligence 1900-1945
+2003. ISBN 0-7146-5211-5 (hard cover).
+Frode Weierud, BP's Sturegeon, The FISH That Laid No Eggs
+The Rutherford Journal, Volume 1, 2005-2006. PDF version, p. 29.
+Wolfgang Mache, Der Siemens-Geheimschreiber,
+Ein Beitrag zur Geschichte der Telekommunikation,
+1992: 60 Jahre Schlüsselfernschreibmaschine (German).
+Archiv für deutsche Postgeschichte Heft 2, 1992, pp. 85-94.
+➤ English translation 1 
+Günter Hütter, T-52 documentation (listed above)
+Austria, 2008-2021.
+Paul Reuvers and Marc Simons, The Vernam Cipher
+Siemens & Halske, Wernerwerk. 11 August 2012.
+Published in NCVA Cryptolog, Corvallis, Oregon, Winter 1990.
+ Further information
+ This website
+T36 teleprinter
+Solid State Replacement for Trls43a Polar Relay
+Other Siemens cipher machines
+Other German cipher machines
+Other rotor-based cipher machines
+Other cipher machines
+ Other websites
+T-52 on Jerry Proc's crypto pages
+T-52 on Wikipedia
+T-52 technical backgrounds, by John Savard
+ Any links shown in red are currently unavailable. 
+ If you like the information on this website, why not make a donation?
+ © Crypto Museum. Created: Wednesday 05 August 2009. Last changed: Monday, 23 June 2025 - 16:31 CET.

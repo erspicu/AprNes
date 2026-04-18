@@ -1,0 +1,511 @@
+The Siemens Cipher  NCVA CRYPTOLOG, Corvallis, Oregon, Winter 1990   *ttVk\
+Teletype in the         .fiVwoJt Cx^pttAo^tc .et<yu_» AibcdAJbr_vi)
+History of
+Telecommunications
+
+      Today when one hears the word America in discussions of        Let us not trouble now to go into the numerous events in
+   countries that have produced great inventions in               the evolution of telegraphy from 1833 to the start-stop
+   communications technology what people associate with it
+   are names like Samuel Finley Morse for the telegraph,          teleprinter of the 1920s in detail. But emphasis should be
+   Alexander Graham Bell for the telephone, and John              given to the essentials. Some systems established milestones
+   William Mauchly for the computer. All this is a one-sided      and other sooner or later were replaced. Thus, for example,
+   view, however, and does not do justice to any serious history  the needle telegraphs did not achieve lasting prevalence,
+   of technology. It is true that the men I have just named have  whereas the American painter Samuel Morse, in the years
+   made widely known and immortal contributions, but in           from 1837 to 1844, in creating so-called recording
+
+   regard to the title of the inventor or the first we must       telegraphs and inventing the alphabet that is named after
+   differentiate.                                                 him made an inestimable contribution that is still influential
+                                                                  at the present time. Morse gave credit publicly to the
+      It was from this point of view I welcomed and supported     German Steinheil, who first proved to use the ground as the
+   the article by Dr. Jarotskiy of the Post Office in Moscow in   return loop, which saved the installation of a second wire
+   remembrance of the 150;/i birthday of Johann Philipp Reis,     and eased the introduction of the Morse system in the US
+   born 7 January 1834 in the Barbarossa town of Gelnhausen,      Continent in 1844.
+   as a pioneer in telephony in No. 1/1984 of the technical
+                                                                     Still more successful was the technology of the type
+   journal Electrical Communications. The author made use of
+   a quotation, you see which I would like to share with you.     printing telegraphs that came into use in 1854. A well
+                                                                  known representative of this type of equipment is the so-
+      It runs: "A Critical history of technology would generally  called Hughes printer, a very remarkable device with a life
+   show that hardly any invention of the ISf/i and 19(/i          in service of almost 8 decades.
+   centuries belongs to one individual or another."
+                                                                     I have been told that there are several members
+      Incidentally, this quotation comes from, a gentleman who
+   is known to all of you, he is the jurist, philosopher and      represented in your Association who were trained on this
+   Utopian Karl H. Marx.                                          machine here in Muerwik at the Torpedo Communications
+                                                                  School before the beginning of the 1930s. If you should ever
+      I think we must agree with Marx, because his comment        come to Frankfurt am Main some time, I recommend to
+   also holds true to a remarkable extent in regard to the
+   development of telegraph equipment.                            you a visit to the Federal Postal Museum. There on display
+                                                                  are two different models of the Hughes printer, in working
+      The processes of the development of telephone and           condition. In 1900 there were already 3500 of his teletypes
+                                                                  in existence in the whole world when Edward Hughes dies a
+   computer technology also bring up a multitude of names,        millionaire and one of the leading consultants in telegraphy.
+   which I will not enumerate here.                               As early as 1895, Hughes printers were being developed
+                                                                  further at Siemens, and by the beginning of the teletype
+      Instead, let us stay in the realm of technology. Its rapid
+   development was based on discoveries by scientists whose       generation of the 1920s they were being built. A parallel
+   names, gentlemen, you know as well as I do. I remind you of    development in 1903, that of the Siemens automatic
+   Galvani, Oerstedt, Faraday, Henry, Ohm, and Ampere, to'        telegraphs with a speed of 2000 characters per minutes, (i.e.,
+   name only a few.                                               33 characters per second), was far in advance of its time. It
+                                                                  was followed in 1924 at Siemens by the 56 Baud keyboard
+    But how did it begin?
+    On the question of origin in the field of' pre-Philipp Reis   printing telegraph, which still came in two pieces (i.e.,
+ electrical telegraphy, I may emphasize its germ in Germany,
+ namely the electrochemical telegraphy of the physician and
+ member of the Royal Academy of Sciences at Munich,
+ Samuel Thomas von Soemmerring, born in 1755 at Thorn.
+    After the invention of the electrical pile by the Italian
+
+ physicist Volta in 1800, Soemmerring succeeded in setting
+ up an impressive but slow parallel-wire telegraphic system
+ over a distance of around 1000 meters, making use of the
+ releasing of gas. Soemmerring demonstrated his method in
+ Munich at the Academy in 1809, but he was unable to make
+
+ any headway against the optical telegraphy (i.e. semaphore)
+ which was dominant at that time, (e.g., the Chappe System,
+ used by Napoleon Bonaparte at that time). However, his
+ labors were of inspirational value for the later telegraph
+ systems that Schilling von Canstatt and Moritz Jacobi
+  developed in Petersburg. They determined the further
+  progress of two-wire telegraphy. For electrical telegraphy, in
+, Russia 21 October 1982 was the 150th anniversary of the
+ invention of the electromagnetic telegraph, the day when
+ the German-Russian Baron Paul Schilling von Canstatt
+
+ successfully demonstrated his six-pin apparatus for the
+I Russian alphabet to the Czar and the Academy in
+
+ Petersburg in 1832. After his death in 1837 his work was
+ continued until 1874 by Jacobi, a Prussian master builder in
+
+ Koenigsberg and from 1837 on a scientist in St. Petersburg.
+Sender  Empfanger                                                electrical teletype machine, "T type 25", whose further
+
+c                                                                development - available in 1932 - is familiar to all of you
+                                                                 gentlemen. I refer to the T of "T type 36." Until now it
+                                    Sauerstoffblasen             remained unclear why it was this particular machine, which
+                                                                 later served as the basic module for a secret teletype
+ iV JESS _ _ = .
+                                                                 machine, that attracted the interest of the Navy in the first
+* »; f| 1                                                        place. The Navy preferred the electrical machine over the
+                                                                 mechanical machine because of its superior stability at sea.
+   Soemmerring's electrochemical telegraph. Munich, 1809.
+Later improved by Schweigger for use over only two wires,           This machine superseded the Hughes printer that had
+1811 (but not realized).                                         been in use up to then, and the sounder. The change from
+                                                                 the piano-like keyboard to a completely new set of keys may
+  Schilling von Canstatt's 6-pin telegraph. Petersburg, 1832.    have caused a few problems at the time. Perhaps one or
+Courtesy: Deutsches Museum, Munich.                              another of you can confirm that.
+
+separate sender and receiver. See picture). That became the        Of the further developments that followed at Siemens, I
+starting point for the electrical teletype. You see, there was  would like to point out the following mass-production
+more demand for a machine that would send, receive, be
+operated by only one person, and still be cheap as well.        teletypes, all of them page printers:
+What was aimed at was a machine similar to the type bar            11933: T type 37a (successor to the T type 26a of 1929),
+carriage typewriter in common use at that time, which had          11957: T 100, 50 Baud capacity
+been factory made since the second half of the 19f/i century.      · 1961: T 100,100 Baud capacity,
+It was in this way that the start-stop teleprinter patents of      11976: T 1000, already highly integrated. <
+the German-American Krum originated in the USA,                    The following figures point to the worldwide significance
+financed by Morton and with the trademark MORKRUM,
+and in 1923 for Kleinschmidt, a German-American from            of these developments:
+Bremen. The two firms merged in 1924 to form the
+Morkrum-KJeinschmidt Corporation. Next came the                    By 1984 Siemens had supplied over 1 million teletype
+development of the "Teletypewriter Model 14," which was         machines and had become the unquestioned market leader
+imported under the name Springschreiber (i.e., start-stop
+teleprinter) in 1926 by Lorenz of Berlin. Lorenz copied the     among 13 manufacturers.
+'Teletype 14," and Siemens & Halske successfully met the           Our firm's share in the total number of 1.6 million telex
+challenge from America too. Between 1927 and 1933
+Wernerwerk of Berlin likewise developed a series of             machines in the world is 30%.
+different teletype machines in rapid succession. In the
+course of doing so, a transition was made from steps under         By the end of the second World War, 15,000 machines
+patent to taking new directions.                                had been produced; in recent years, 1978 to 1983, it was
+
+   In 1927, when the German licensee of the principle of the    70,000 machines a year, just on the average.
+lengthened stop signal in the mechanical teletype, patented        From this point of view of types of technology, we get the
+by Kleinschmidt, would not share his monopoly with other
+manufacturers, F. Geissler, a designer in our firm, had the     following distribution figures:
+idea of cleverly circumventing the Kleinschmidt patent             · 55% electromechanical, including Model T100
+through an electrical plan. There came into existence an           · 40% electronic, first generation
+                                                                   · 5% electronic, second generation, microprocessor
+
+                                                                controlled.
+                                                                   After this short outline of the history of the development
+
+                                                                of telegraphy, I would like to take up a machine that you all
+
+                                                                know, gentlemen, and which even yet -- almost 40 years
+                                                                after the end of the war -- is surrounded by secrets. I mean
+                                                                the Siemens cipher printer "T type 52", models "a" through
+                                                                "P. On the construction and manner of operation of this
+                                                                machine I do not need to say much. You, gentlemen, have
+                                                                worked with this machine during your time of active service.
+
+                                                                Many of you have been at Siemens in Berlin, and have taken
+                                                                part in the course of instruction there. Instead of going into
+                                                                that, allow me to make a few remarks on the development
+                                                                of this machine and the enemy efforts at decipherment.
+
+                                                                   In 1969 a colleague in our firm, Ehrhard Rossberg,
+
+                                                                director of the Technical Division of Switching Technology
+                                                                 of Siemens retired. The patent department marked the
+
+                                                                 departure of this extraordinarily skillful engineer with a
+                                                                 separate volume which contained more than 100 of his
+                                                                 patent descriptions. Mr. Rossberg, who was born in 1904,
+                                                                 attended the Chemnitz Industrial Academy after a period of
+                                                                . practical training, and came to Siemens & Halske in Berlin-
+                                                                 S/emenssfadt in 1926.
+
+                                                                   At Siemens, Mr. Rossberg was on the scene at the new.
+
+                                                                starting point of the T type 25 electrical teletype and in
+                                                                 1928, when the Navy in Kiel selected it. A productive
+                                                                 collaboration ensued shortly with additional, very successful
+
+                                                                 colleagues such as Honorary Dr. of Engineering Herbert
+                                                                 Wuesteney, Honorary Dr. of Engineering August Jipp,
+                                                                Eberhard Hettler, Fritz Geissler, and others.
+
+                                                                   The Navy, concerned because of the British
+
+                                                                decipherment successes in the first World War, made it a
+                                                                requirement that the electrical teletype should be provided
+                                                                with an enciphering device.
+       -1  :S                                                                A . __?': ' ' '
+        i 11] I»V~.
+                                                                        Mm
+ _d___J_-v
+                                                            ^pBpPf
+!_________:* """ ^-WC __H^____|
+                                                               '. ·. .' ' H »_ _B_ "g_r_._"T, ~' ~ -" : '
+                                                          ' ' -t's;_.^____i_________9i____fl' _9_P_P_R______i ________%-'^-i' _
+
+                           ·*    ^L Locher                          ^SSWSiSlir-
+
+                                                          i-'TluojUcil.Cf puUn .w^p£·r-·i"r'"' "'' ».;;' v.> :;- >-.;:
+                                                          -, Kontakteinrichtung
+
+                                                          .Sender
+                                                          . Empfanger
+                                                                                                                        I
+                                                          i Ubersetzer _!_____!_____ ____t_||"_'______
+
+                                                          iDruckwerk lSr_S| __J___S_T TMi
+
+   [l^fe                                                  Ubersetzerrelais ' ______['_P _Z__l^_____ii__*
+                                                          : Locherschaltrelais ( H__f ____ Bg9
+M t-J M6**sCt____________      i _4i ;
+                                                          1 Ausloserelais __j^__|
+
+                                                          Regler       K___EpQ$3              SJ®^
+
+1                              0Mi 1                      Weckerrelaise.rk  : 7?Sj|_J_:.._0__; _'_<ij_"'S*^|U_P_^___*'""'~'
+    \ -' .1 K _______ *..
+                                                          Tfype 25 without protective cover.
+
+; m * ff £ £ 2 2 ^ z - ^ * _»_»1W_%__» m m r ^ ! m
+--^p^52^ V "                                        111
+
+Sender                         Empf anger
+
+   Siemens high-speed telegraph. Berlin, 1903. Courtesy:
+Siemens.Museum, Munich, , . , . . , .
+
+                                                           Electrical teletype, Ttype 36. Berlin, 1932 (without casing).
+
+                                                             This idea was unusual, because at that time teletype text
+                                                          requiring protection were enciphered before transmission in
+                                                          a fussy and time-consuming manner. But what they had in
+                                                          mind now was the truly sensational development of what
+                                                          today is called an on-line machine. It is possible also to
+                                                          ascribe this to the design advantages of a the electrical
+                                                          teletype, whose creation was provoked (i.e., by the
+                                                          Kleinschmidt patent problem), but was fortunate.
+
+Siemens keyboard printing telegraph. Berlin, 1924.
+
+                                                             725 with cipher device. Berlin, 1930/31. (Laboratory
+                                                          model of the cipher printer).
+   On the way there, we come in 1930 to the first                  A further step in the development of the cipher printer
+                                                                 was the T type 52c, for which the Air Force gave
+applications for patent with the title Arrangement of            specifications in 1936.
+Switching for the Transmission of Information in Cipher.
+
+   A further application from the year 1931 contains the
+
+principle of irregular cam discs, i.e., cam discs of different
+sizes, set up chiefly on the basis of prime numbers. In the
+same year the patent application was filed in the USA by
+
+Jipp, Rossberg and Hettler, there US patent 1,912,983 was
+granted 6 June 1933.
+
+   Cipher printer, T52a/b, with power supply in the lid, before                   Cipher printer, T52c, without casing.
+WWIlIl.
+                                                                    In the meantime, the security authorities of the Third
+   It has been reported by severajl veterans that the Navy       Reich imposed secrecy measures which still make
+was the first service branch to be interested in using the       themselves felt today in the considerable scarcity of
+cipher teletype machine, also called a cipher printer            information.
+(Geheimschreiber), of G-Schreiber for short. The Navy
+wanted secure written communications, for example, from a           Nevertheless, after the signing of the German-Russian
+ship at the pier to the high command of the fleet.               treaty on 28 September 1939 in Moscow, the Siemens SFM
+                                                                 T52 cipher teletype machine was demonstrated and shown
+   I owe it to a fortunate circumstance that in 1982 in          opened up to Soviet military delegation in Berlin-
+Munich I was able to discover - or rather rescue - a             Sicmcnsstadt. (By order of the Reichs Government).
+photograph that shows the laboratory model from this first
+couple of developmental years. It still consisted of two            Development continued during the second World War
+separate machines, the T type 25 electrical teletype and the     Models T type 52d and T type 52e were created, and
+cipher device with 2 x 10 adjustable wheels. This attachment     towards the end of the war Model T type 52f was in the
+was later, in the commerical version of 1932, united with the    works, at least in specification form.
+T36, in one unit, the "T52".
+                                                                    In 1944 or '45 the technical documentation in the factory
+   Now we go to the introduction of the Siemens T type 52a       for the strictly secret T52 became lost. For one thing, the
+cipher teleprinter.                                              production facility in Berlin was badly hit by Allied bombs
+                                                                 in October 1944. But what stands today as the main reason
+   In 1932 the Hungarian armed forces were the next to be        for unsuccessful endeavors to obtain authentic records and
+supplied with machines and complete documentation.               technical descriptions in the rigorous security regulations
+                                                                 and their application before the occupation in 1945.
+   Navy tests soon showed that the cipher printer interfered
+with the sensitive radio receivers. For this reason the model       After the end of the war Dr. Wuesteney was brought to
+T type 52a/b with noise suppression circuitry was created in     the British headquarters in Berlin-Gatow and given the task,
+1934.
+
+                                                                 Cipher printer, T52c, without casing a Norway machine.
+together with Fricke, a Siemens mechanic who worked on                                                                                    Photos courtesy NSA
+T52 assembly, of reconstructing the circuit diagram of a
+T52. At the end of a week the British discontinued the             Bombe equipment installed at 3801 Nebraska Avenue,
+
+project without result, although they are said to have gotten   Washington, D.C.
+possession of no documents, but only machines, which Mr.
+Fricke, among others, serviced. The machines were later put        Knowledge of our own and indications from England
+to use on teletype connections between the British Sector in    over the past years have confirmed us more and more in the
+Berlin and the headquarters of the Army of the Rhine.           belief that the above-named author's investigations were in
+                                                                behalf of the Siemens & Halske Geheimschreiber
+   In Norway, too, a number of T52c's survived the end of
+the war, and were later put into use again there. Of these      inadequate. Recently our belief has become a certainty.
+there arc speciments in operating condition on display today    Because the third volume of the official British history of
+ in the Siemens Museum in Munich, in the Science Museum         the operations of the intelligence service in the second
+ in London, and in the Technology Museum in Oslo. The           World War has been published. In it, in Part I, of Volume 3
+ exhibit in the Military Museum at Dieppe-Pourville on the      the principal mission of the Colossus decipherment
+ other hand, a "d" (in phonetic alphabet Dora) machine
+                                                                computer is described: Actually, it was used in decrypting
+ (T52d), which I saw last month, is incomplete, poorly          German 5-character code messages. These messages
+                                                                however came not from the Siemens cipher printer, but
+maintained, and hence not in working condition, although        rather from another teletype cipher printer, the model SZ40
+the T rls 43a telegraph relays, for example, look like new.     and SZ42 cipher attachment from the firm of Lorenz - a
+                                                                machine, therefore, whith which you may have had less
+   From the former armed forces' telecommunications             contact, gentlemen.
+
+equipment depot which was in Elmshorn between 1948 and             In order to substantiate this statement further, at this
+1960, the remaining cipher printers, which had previously
+been demilitarized, i.e., partly dismantled, were brought to    point let a short review of the development of radio teletype
+Trier and there at the Electromechanical and Electronic         technology be permitted.
+Plant were put in circulation, as the French security
+authorities had decided on utilization of the cipher printers.     As a result of the constantly increasing distances between
+Trier supplied a total of 280 T52d's and e's, which is an       the fronts, in 1940 a need grew up in the German armed
+estimated 25% of all T52s supposed to have been produced        forces for a serviceable radio teletype system that cipher
+in Berlin up to 1944. The cipher printer was classified down
+to the present time, and may still be in use somewhere.         equipment could be incorporated into.
+                                                                   To meet this need, in the course of four years a series of
+Investigations become all the more difficult; informants
+prove to be a decided rarity.                                   various devices was developed and in varying quantitites was
+
+   This may be sufficient at this point as a presentation of     requested and operated by users, chiefly the Army. The first
+the development of the cipher printer.                           of these shortwave radio teletype sets with telegraphy
+                                                                 channels went by the covername of Saegeftsch (i.e. Sawfish)
+   But now to the question of the extent to which the enemy      on the German side, by the way. The British intelligence
+was able to break into our machine's cipher texts. I can         service found out this designation from a decrypted Enigma
+
+anticipate the answer: Up to the present time we have not        message, and for their part used the codeword fish for it.
+been able to obtain any reliable information - but let us        Since about 1978, this covername has been incorrectly
+
+neverthless attempt an approximation.                            applied to the Siemens cipher printer, and indeed even
+   Soon after the first opening of the British secret records    when in reality what is being discussed is the German 5-
+                                                                 charactef code traffic in general, or even the decipherment
+in 1975, 30 years after the second World War, the British        of Army communications done on the Lorenz cipher
+                                                                 attachment.
+journalist Brian Johnson wrote in his book Tlxe Secret War
+about technical facilities of the British decipherment center
+at Bletchley Park. According to that book, there were the
+so-called bombes for processing the Enigma material, and
+forerunners of the computer, designated Colossus, were
+available for deciphering the cipher printer texts. This
+statement went from one book to another, and was even
+broadcast by the BBC in both words and pictures.
+   It would be dishonest to the history of the field if it went     With that I come to my conclusion:
+unmentioned that the T52 designed by Siemens for wire               I believe it has become clear that we are only at the
+communications lines was also used in its "b" and "c" models
+for the first radio teletype trials ([19J40/41). It soon turned  beginning of the truth. The official British historiography
+                                                                 has up to now not been prepared to make any statement
+out, however, that both models were suited only for limited
+use. This was because if it happened, for example, that as a     regarding the extent of the decipherment of teletype texts.
+result of atmospheric disturbances even a single letter of       Might this perhaps be because they would have to admit to
+                                                                 not having had unqualifiedly splendid su^ccess? I ask you to
+cipher text was suppressed, then the encipherment's              consider: Up to the present time we still have no
+synchronization was thrown off and subsequent text was           information on how the attempts at decipherment turned
+decrypted incorrectly. The problem was overcome, however,        out in so far as they relate to the T type 52 "d" and "e" cipher
+with the Lorenz machines already mentioned.
+                                                                 printer of the "SFM T43" cipher teletype machine also
+   Thus when the British systematically monitored the            developed by Siemens late in World War II. Wernerwerk T
+German experimental radio teletype link between Vienna           in Berhn built the "T43" on the basis of two types of teletype
+and Athens in 1941, they thought they were on the trail of       machine. These were the T type 37f mechanical page
+the Siemens cipher printer. We must even concede today
+that British mathematicians had then already succeeded, by       printer and the T type 34n mechanical tape printer, of which
+awkward manual procedures, in deciphering German                 a hand full of machines started working in 1944 on a one
+
+teletype messages. In so doing,' tfiey realized that only        time-pad principle, e.g., between Paris and Berlin.
+automatic decrypting machines could give effective support
+to their own military operations. These were actually put
+into use in June 1942, and had to be constantly modified
+because of their severe rate'.of wear and breakdown.
+
+   The British were more' successful with the Colossus
+
+computer, which was not put into use until February 1944,
+however. An example on this point:
+
+                                                                    SFM T43, basic model of mechanical page printer, T type
+                                                                 37f.
+
+   SZ42, without cover. (1984 pictures, Na\y                     ____flt '
+Telecommunications School, Flensburg).                                                     _?.j 
+
+   Beginning on 6 January 1944 the radio teletype link            \': /_J9                                         ·: Mf^'-v
+belonging to the Commander in Chief in the west (Army               jflf
+Group D) between Paris and the OKW [Supreme                                                                                 HB Ifzbyr,:
+Command of the Armed Forces] in Berlin Straussbcrg radio         «--·"·*"T^^·_H__Hai j2sb ;                        P"**^^""
+station) was intercepted, and starting in March, about three
+months beore the beginning of the invasion, they were in a          V ...nj^TK [ 2                                 '<-, f ' .. · >*
+position to decrypt teletype enciphered on the SZ42
+(Schlvesselzosatz 42).                                           .-.. ·cftt^tel*'* _,'-|
+
+   But the "d" model of the Siemens cipher printer was also                                               1 ::f-'
+intended for radio teletype operation. Here is the proof: It
+is from among you, gentlemen, that valuable training                                  -$_?_*. -.fit'''-'' ' 
+materials from the Naval Communications School at                   SFM T43, basic model of mechanical tape printer, T type
+Waren-Mucritz dating from 1944 have been made available          34n.
+to the Archive of the Naval Telecommunication School.
+They contain operating directions for the machine just              Thus for the present the question remains open as to the
+mentioned. So far, however, it has remained unknown              extent to which the teletype decipherment added to the
+whether the Nav^y has at any time ever operated
+communications as we see them shown here. It would be            significance of the Enigma decipherment or qualified its
+very nice if this matter could be clarified with your kind       value. In the same way it must be kept for a later historical
+assistance.                                                      study to elucidate the degree-to which the decipherment
+                                                                 successes that have been presented influenced the strategy
+                                                                 and tactics of the Allied invasion.
+
+                                                                                                                                         _
+                              WORDS USED
+
+1.   Sender                   transmitter
+                              receiver
+     Empfaenger
+                              oxygen bubbles
+     Sauerstoffblasen         perforator
+                              56 Bauds
+3.   Locher
+                              keyboard unit
+4.   56Bd                     contact device
+                              transmitter
+5. a. Tasienwerk              receiver
+       b. Konlakieinrichtung  converter
+
+     c. Sender                printing mechanism
+                              converter relay -
+     d. Empfanger
+     e. Uberseizer            perforator switching relay
+                              release relay
+     f. Druckwerk             control
+                              relay controlling local bell circu t
+     Uberseizerrelais         synchronizing device
+                              radio teletype operation
+     h. Locherschalirelais
+                              tape reading device
+     i. Ausloserelais         feed device
+
+     k. Regler                punching device
+     1. Weckerrelais          synchronization switch
+
+12.  Gleichlaufeinrichtung
+
+     Funkfernschreibbeirieb
+
+14.  Abfuhleinrichtung
+
+     Vorschubeinrichtung
+
+     Sianzeinrichiung
+
+     Gleichlaufschalier
+
+             BIOGRAPHICAL SKETCH                                                                                                                             Photo by Hanntlovt
+
+   Wolfgang W. Mache, member of VDE/ITG, derived his                                                                                                         Wolfgang W. Machi
+interest in WWII cryptology from Brian Johnson's book 77ie
+Secret War (1978), whilst he wrote the Lexikon der Text- und     ALL PHOTOS COURTESY WOLFGANG W. MACHE/SlEMENS
+Datenkommunikalion (1980 Oldenbourg). He joined               EXCEPT THOSE CAPTIONED SEPARATELY.
+Siemens for telephone technician training, received a Dipl.
+                                                                                                                           By Wolfgang W. Mache
+lng. degree in Electricial Engineering (1955) and then
+worked in Siemens' Telecom development Centers,                  CRYPTOLOG Editor's note: Tins article was originally
+                                                              printed in CRYPTOLOGIA, and is reprinted with their
+Munich-Sendling for Power-line telephony and                  pennission, and the permission of the author. Tlie author
+FDM/TDM-ARQ radio teleprinter systems, a time of six          made several corrections to the original. Wolfgang Mache has
+                                                              also submitted an independent article to CRYPTOLOG
+years as Telecom Sales Manager in South America,              which will be printed in a future issue.
+Lima/Peru, he is in marketing in the field of data
+transmission and switching.                                      Tliis is a translation of a speech given by Mache at the 23rd
+                                                              Federal Meeting (Bundestreffen) of the KAMERADSCHAFT
+                                                              DER MARINEFERNSCHREIBER under the auspices of the
+                                                              MA RINEFERMELDESCHULE FLENSB UR G-MVER WIK,
+                                                              which is next lo the Elensburg Naval Base. It was (he third
+                                                              meeting of the German Naval Teleprinter Veterans
+                                                              Association, which was held on the 700th anniversary of the
+                                                              town of Flensburg. A number of former MARINE-
+                                                              NACHRICHTENHELFER1NNEN of World War II also
+                                                              attended.
+
+                                                                 77ie Siemens Company, Munich, was represented by
+                                                              engineers Karl-Heinz Schramm and the author Wolfgang
+                                                              Mache.
+
+                                                                 Tltese Siemens engineers were aware that the Gennan
+                                                               Naval Sen'ice was the first and most important customer of
+                                                              the first Siemens Electrical Teleprinter developed in 1928, and
+                                                               of the Siemens-Geheimschreiber T52a, before the Tfiird Reich
+                                                               appearred. A T52e in working order was donated to the
+                                                              schools SAMMLUNG, or collection of equipment dating
+                                                              back to the Reichsmarins. Ttie meeting was held under the
+                                                              auspices of Kz.S. Klaus Ehlert Technical assistance was
+                                                              given by Kapitaenleutnant Joachim Timm. Timm retired in
+                                                              1987 from the Bundesmarine. Kapitaenleutnant Timni*is
+                                                              currently researching the probability that the Gennan Navy
+                                                              used a typewriter-type cipher unit prior to 1914. . .
+
+                                                                                                           7
+                                                Control dumber 1135
+   STAFF INFORMATION SECRET!
+   The Siemens SFM T52d Cipher Teletype Machine
+   SECRET STAFF INFORMATION!
+   1. This is a state secret within the meaning of Section 88
+'of the Reichs Criminal Code.
+   2. To be forwarded only by hand carrying or addressed by
+name, in double envelope, and upon written
+acknowledgement of receipt.
+   3. Transmission by courier or by a trust person if
+possible; with a declared valuation of more than 1000
+Reichsmarks if mailed.
+   4. Reproduction of any kind or taking extracts is
+forbidden.
+   5. Storage is upon the responsibility of the recipient, to be
+in a safe or under exceptional conditions in a steel locker
+with a combination lock.
+   6. Violations of these rules will be most severely
+punished.
+    Printed Naval Regulation No. 35 IV
+   Cover sheet for the Siemens SFM T52d Cipher Teletype
+Machine.
+
+             I
+
