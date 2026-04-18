@@ -1,8 +1,8 @@
 # NTSC GPU 化移植設計
 
 **日期**：2026-04-18
-**狀態**：設計討論（Phase 3A CRT GPU 已完成的後續延伸）
-**背景**：Phase 3A 把 CRT 搬到 GPU 後 emu thread 得到 1.7-2.0× 加速。NTSC 階段仍在 CPU，是否有價值進一步 GPU 化？
+**狀態**：**最終結論 — 不實作**（Phase 3A+3B 收尾；本檔作為未來若重啟的完整技術藍圖保留）
+**背景**：Phase 3A 把 CRT 搬到 GPU 後 emu thread 得到 1.7-2.0× 加速，Phase 3B phosphor 優化讓 10x presented 達 58 FPS（接近 vsync）。NTSC 階段仍在 CPU；本檔評估繼續 GPU 化的可行性，**結論是放棄**。關鍵理由見 §12。
 
 ---
 
@@ -265,12 +265,92 @@ Option A/B/C 都不破壞這條路。
 
 ---
 
-## 11. 結論
+## 11. 結論（原設計完成時的推論）
 
-- 目前最大的 GPU 優化空間在 **phosphor writeback 改成 snapshot-copy**（Phase B），不是 NTSC
+- 目前最大的 GPU 優化空間在 **phosphor writeback 改成 snapshot-copy**（Phase 3B），不是 NTSC
 - NTSC 有時序依賴的部分（slew IIR、phase）永遠在 CPU，這是 NES 物理模擬的本質
 - 若真要把 NTSC 部分搬 GPU，**Option C（Fast path only）是唯一合理的切法**，且**務必維持一次 shader pass**（依用戶原則 #4）— 避免 CPU↔GPU 反覆搬遷
 - AprNes .NET 4.8.1 版**永遠不受影響**，scalar 路徑完全獨立
+
+---
+
+## 12. 為什麼最終決定不實作 Phase 3C（2026-04-18 最終決議）
+
+深入研讀 `Ntsc.cs` 的 `DecodeAV_Composite` + `RunDecodeLoop` 後，發現原先估計過於樂觀。最終決定**停在 Phase 3A+3B，不實作 Phase 3C**。
+
+### 12.1 技術障礙：不是兩個 IIR，是**三個**
+
+原先以為 fast path 只有 chroma IIR filter，實際上 `RunDecodeLoop` 內每 dst pixel 有：
+
+```csharp
+iF += ChromaBlur * (chroma * c - iF);       // IIR #1: Chroma I 低通
+qF += ChromaBlur * (-chroma * s - qF);      // IIR #2: Chroma Q 低通
+yV = yV * ringDamp + (dotY[d] - yF) * SlewRate;
+yF += yV;                                    // IIR #3: Y slew（2 階）
+```
+
+**三個都是前值依賴（serial dependence）**，全部要 GPU 化都得 refactor 成 FIR。
+
+### 12.2 Y slew 的 2 階 IIR 難以 FIR 近似
+
+| Filter | IIR→FIR 可行性 | 預期畫質損失 |
+|--------|:-------------:|:------------:|
+| Chroma I 低通 | ✓ 3-tap FIR OK | < 1%（肉眼不可辨）|
+| Chroma Q 低通 | ✓ 3-tap FIR OK | < 1% |
+| **Y slew 2 階** | △ FIR 近似勉強 | **2-5%（可見）** |
+
+Y slew 是 `yV` 累積速度項，模擬**類比濾波器的阻尼響應**（軟過渡）。FIR 難以完整還原這個特性 — 近似後硬邊會回來，失去部分 CRT 軟焦感。這正是 UltraAnalog 區別於 fast 的**核心特徵**，破壞它等於失去「好看」的類比味。
+
+### 12.3 Phase 3A+3B 已擷取主要收益
+
+Phase 3A+3B 完成後的狀態（AMD Ryzen 7 3700X，locked freq，D3D11）：
+
+| 尺寸 | Presented | Emu | 相對 SIMD |
+|:----:|:---------:|:---:|:--------:|
+| 8x | ~59 (vsync) | 121 | emu 1.69× |
+| 10x | **58** (近 vsync) | 99 | **presented 1.82× / emu 2.0×** |
+
+**所有實用解析度都達到 vsync 上限或非常接近**。Phase 3C 剩下的只有 emu thread 可能再 +10-15%（100 → 110-115 FPS），但：
+- emu thread 已 100+ FPS 遠超 NES 60 Hz 所需
+- 多出來的 CPU 預算目前無應用場景
+- **邊際報酬遞減**
+
+### 12.4 工作量 vs 風險比不值得
+
+完整 Phase 3C 實作估計：
+
+| 子步驟 | 時間 | 風險 |
+|:------:|:----:|:----:|
+| 3 個 IIR→FIR refactor（CPU 先做）+ 畫質 A/B 驗證 | 1-2 天 | Y slew 品質 |
+| SkSL 實作 palette LUT + FIR demod + 整合 CRT | 2-3 天 | Shader 複雜度超出 SkSL 限制 |
+| Runtime dispatch（雙 shader 選擇）+ 整合測試 | 1-2 天 | Regression |
+| **合計** | **4-7 天** | **中-高** |
+
+對比 Phase 3B（0.5 天無風險、presented 58 FPS）— Phase 3C 的 cost/benefit 比不划算。
+
+### 12.5 未來若重啟的條件
+
+本檔完整保留技術細節。未來若下列情境成立可重啟：
+1. 出現 **> 12x 解析度** 實用需求（例如 8K 顯示）→ emu CPU 可能成為限制
+2. 出現 **更重的 audio DSP / mapper** 吃滿 CPU → NTSC 搬走可救場
+3. 對 Y slew 畫質損失有**明確的接受度測試**（使用者主觀比對結果 OK）
+
+屆時：
+- §4 Option C 架構與 §5 shader 範例可直接施工
+- §10 實作步驟為完整 roadmap
+- §9 時間估計可能因熟悉度提升而縮短
+
+### 12.6 決議摘要
+
+**停在 Phase 3A+3B。**
+
+- ✅ CRT 完全 GPU 化
+- ✅ Phosphor snapshot 優化
+- ✅ Runtime dispatch 架構（scalar/simd/gpu）就緒
+- ✅ Shader 版本機制（filename 選最新）就緒
+- ❌ NTSC GPU 化（本檔延後至未來情境）
+
+這是**合理停損**：收下已到手的 80% 收益，不追風險高報酬遞減的 20%。
 
 ---
 

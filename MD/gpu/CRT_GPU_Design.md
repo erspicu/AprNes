@@ -1,8 +1,21 @@
 # AprNes Avalonia — CRT GPU 加速設計（v3 修訂版）
 
 日期：2026-04-18
-適用專案：`AprNesAvalonia/`（Avalonia 11.3.13 + SkiaSharp 2.88.9 + .NET 10）
-狀態：**設計定案，Phase 0 執行中**
+適用專案：`AprNesAvalonia/`（Avalonia 11.3.13 + SkiaSharp 3.119.3-preview + .NET 10）
+狀態：**Phase 0-3A+3B 已完成，Phase 3C 決議不實作**（見 [NTSC_GPU_Porting_Design.md §12](NTSC_GPU_Porting_Design.md)）
+
+## 完成狀態快覽
+
+| Phase | 內容 | 狀態 |
+|:-----:|:----:|:----:|
+| 0 | MSBuild build-time CrtImpl 切換 | ✅ |
+| 1 | Runtime dispatch (scalar/simd/gpu)，Shared + 靜態類別 | ✅ |
+| 2 | SkSL GPU backend (raster SKSurface headless) | ✅ |
+| 3A | Avalonia render-thread D3D11 真 GPU | ✅ |
+| 3B | Phosphor writeback snapshot 優化（蕭師 shader 單 pass） | ✅ |
+| **3C** | **NTSC fast-path GPU 化** | **❌ 不實作**（見 NTSC doc §12） |
+
+最終成果：10x 解析度下 presented 58 FPS（逼近 vsync），emu thread 相對 SIMD 2.0× 加速。
 
 ---
 
