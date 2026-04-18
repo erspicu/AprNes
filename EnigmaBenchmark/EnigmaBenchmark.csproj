@@ -14,4 +14,17 @@
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Match AprNesAvalonia so the GPU backend uses the same Skia/SkSL stack
+         as the CRT renderer the user is really comparing. -->
+    <PackageReference Include="SkiaSharp" Version="3.119.3-preview.1.1" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="3.119.3-preview.1.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Shaders\*.sksl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

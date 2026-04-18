@@ -83,6 +83,7 @@ public static class Program
             new ScalarCracker(),
             new ParallelScalarCracker(),
             new SimdCracker(),
+            new GpuCracker(),
         };
 
         Console.WriteLine("Running crackers (2 runs each: Run 1 = JIT warmup, Run 2 = measured)");

@@ -1,0 +1,41 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:EnigmaBenchmarkAvalonia"
+        x:Class="EnigmaBenchmarkAvalonia.MainWindow"
+        Title="Enigma Benchmark — Avalonia (GPU-ready)"
+        Width="960" Height="620"
+        WindowStartupLocation="CenterScreen">
+
+    <Grid RowDefinitions="Auto,Auto,*" Margin="12">
+        <!-- Controls row -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+            <TextBlock VerticalAlignment="Center" Text="Scope:" />
+            <ComboBox x:Name="ScopeBox" SelectedIndex="0" Width="120">
+                <ComboBoxItem Content="Quick" />
+                <ComboBoxItem Content="Normal" />
+                <ComboBoxItem Content="Hard" />
+                <ComboBoxItem Content="Extreme" />
+            </ComboBox>
+            <Button x:Name="StartBtn" Content="Start Benchmark" Padding="16,4" />
+            <TextBlock x:Name="StatusLabel" VerticalAlignment="Center"
+                       Text="Ready" Foreground="#80FF80" Margin="12,0,0,0" />
+        </StackPanel>
+
+        <!-- Hidden but still in the visual tree so its render loop fires.
+             1×1 placeholder; GPU cracker renders offscreen during its DrawOp. -->
+        <local:BenchmarkControl Grid.Row="1" x:Name="Bench" Width="1" Height="1" />
+
+        <!-- Log -->
+        <Border Grid.Row="2" BorderBrush="#40FFFFFF" BorderThickness="1"
+                Background="#101418" CornerRadius="4">
+            <ScrollViewer x:Name="LogScroll">
+                <TextBlock x:Name="Log"
+                           FontFamily="Consolas,Cascadia Mono,monospace"
+                           FontSize="12"
+                           Foreground="#E0E0E0"
+                           Padding="12"
+                           TextWrapping="NoWrap" />
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</Window>

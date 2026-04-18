@@ -1,0 +1,204 @@
+// ════════════════════════════════════════════════════════════════════════
+// enigma_crack.sksl — Enigma M3 brute-force cracker (fragment-as-compute)
+// SkiaSharp 3.119.3-preview
+// ════════════════════════════════════════════════════════════════════════
+// One output pixel = one full Enigma M3 trial decryption.
+//
+//   Pixel (x, y) in a 676 × 26 tile encodes:
+//     x = PM*26 + PR    (middle-ring start × right-ring start, 0..675)
+//     y = PL            (left-ring start, 0..25)
+//
+// A single render pass fixes (WL, WM, WR, RL, RM, RR) via uniforms, so one
+// pass trials 26³ = 17,576 keys. The CPU side dispatches one pass per
+// (wheel-order × ring-setting) combination.
+//
+// Per-pixel work:
+//   1. decrypt all ciphertext chars with the per-pixel start positions
+//   2. build a 26-bucket histogram of the plaintext letters
+//   3. compute Index of Coincidence, scale by 100_000, pack into RGB24
+//
+// Output encoding (RGBA8):
+//   R = (icInt >> 16) & 0xFF
+//   G = (icInt >>  8) & 0xFF
+//   B =  icInt        & 0xFF
+//   A = 255
+// CPU readback reassembles via  icInt = R*65536 + G*256 + B.
+
+// ── Data tables (as child shaders — each sampled with float2 coord) ──
+// uRotors: 26 × 11 RGBA8 — rows 0..4 = Fwd I..V, rows 5..9 = Rev I..V,
+// row 10 = reflector UKW-B. R channel holds the substituted letter 0..25
+// as byte, so decode with  int(r*255 + 0.5).
+uniform shader uRotors;
+// uPlugboard: 26 × 1 — R channel holds pair-mapped letter 0..25.
+uniform shader uPlugboard;
+// uCipher: ctLen × 1 — R channel holds ciphertext letter 0..25.
+uniform shader uCipher;
+
+// ── Per-pass config ──
+uniform float  uCtLen;     // ciphertext length (≤ 285 in default scenario)
+uniform float  uWL;        // wheel-order indices into uRotors rows
+uniform float  uWM;
+uniform float  uWR;
+uniform float  uRL;        // ring settings 0..25
+uniform float  uRM;
+uniform float  uRR;
+uniform float  uNotchL;    // notch positions for WL/WM/WR (reserved; only WM/WR used)
+uniform float  uNotchM;
+uniform float  uNotchR;
+
+// ── Rotor table helpers ──
+// Gather at (col + 0.5, row + 0.5) to hit pixel centres; R channel × 255 → int.
+int rotorRead(float row, int col) {
+    float2 p = float2(float(col) + 0.5, row + 0.5);
+    half4 v = uRotors.eval(p);
+    return int(float(v.r) * 255.0 + 0.5);
+}
+
+int fwd(float rotorIdx, int x) { return rotorRead(rotorIdx, x); }
+int rev(float rotorIdx, int x) { return rotorRead(rotorIdx + 5.0, x); }
+int refl(int x)                { return rotorRead(10.0, x); }
+
+int plug(int x) {
+    half4 v = uPlugboard.eval(float2(float(x) + 0.5, 0.5));
+    return int(float(v.r) * 255.0 + 0.5);
+}
+
+int cipherAt(int i) {
+    half4 v = uCipher.eval(float2(float(i) + 0.5, 0.5));
+    return int(float(v.r) * 255.0 + 0.5);
+}
+
+// Mod 26 helper — input range –25..+77 covers  (letter + pos − ring + 26).
+int mod26(int x) {
+    if (x >= 52) x -= 52;
+    if (x >= 26) x -= 26;
+    if (x <   0) x += 26;
+    return x;
+}
+
+// One full Enigma M3 forward pass on char c with current (PL,PM,PR,RL,RM,RR).
+int encrypt(int c, int PL, int PM, int PR,
+            int RL, int RM, int RR,
+            float WL_, float WM_, float WR_) {
+    c = plug(c);
+
+    // Right rotor forward
+    int s = mod26(c + PR - RR);
+    c = fwd(WR_, s);
+    c = mod26(c - PR + RR);
+
+    // Middle rotor forward
+    s = mod26(c + PM - RM);
+    c = fwd(WM_, s);
+    c = mod26(c - PM + RM);
+
+    // Left rotor forward
+    s = mod26(c + PL - RL);
+    c = fwd(WL_, s);
+    c = mod26(c - PL + RL);
+
+    // Reflector UKW-B
+    c = refl(c);
+
+    // Left rotor reverse
+    s = mod26(c + PL - RL);
+    c = rev(WL_, s);
+    c = mod26(c - PL + RL);
+
+    // Middle rotor reverse
+    s = mod26(c + PM - RM);
+    c = rev(WM_, s);
+    c = mod26(c - PM + RM);
+
+    // Right rotor reverse
+    s = mod26(c + PR - RR);
+    c = rev(WR_, s);
+    c = mod26(c - PR + RR);
+
+    return plug(c);
+}
+
+half4 main(float2 fragCoord) {
+    // ── Decode pixel coord → (PL, PM, PR) start positions ──
+    int px = int(fragCoord.x);
+    int py = int(fragCoord.y);
+    int PL = py;
+    int PM = px / 26;
+    int PR = px - PM * 26;
+
+    int RL = int(uRL + 0.5);
+    int RM = int(uRM + 0.5);
+    int RR = int(uRR + 0.5);
+    int notchM = int(uNotchM + 0.5);
+    int notchR = int(uNotchR + 0.5);
+    int ctLen  = int(uCtLen + 0.5);
+
+    // SkSL requires constant array indices; histogram is 26 named ints.
+    int h0=0, h1=0, h2=0, h3=0, h4=0, h5=0, h6=0, h7=0, h8=0, h9=0,
+        h10=0, h11=0, h12=0, h13=0, h14=0, h15=0, h16=0, h17=0, h18=0,
+        h19=0, h20=0, h21=0, h22=0, h23=0, h24=0, h25=0;
+
+    // ── Main decrypt loop ──
+    // SkSL runtime effects require both array indices and loop bounds to be
+    // compile-time constants, and the whole program must fit within Skia's
+    // program-size limit. We cap at 96 chars here — more than enough for IC
+    // to separate German from random (IC gap is ~0.023, easily resolved at
+    // 96 chars). CPU side must clamp ctLen ≤ CAP before passing uniforms.
+    const int CAP = 96;
+    int iMax = (ctLen < CAP) ? ctLen : CAP;
+    for (int i = 0; i < CAP; i++) {
+        if (i >= iMax) break;
+
+        // Step rotors BEFORE encrypting (matches EnigmaM3.Step semantics)
+        bool midNotch   = (PM == notchM);
+        bool rightNotch = (PR == notchR);
+        if (midNotch) {
+            PL = PL + 1; if (PL >= 26) PL = 0;
+            PM = PM + 1; if (PM >= 26) PM = 0;
+        } else if (rightNotch) {
+            PM = PM + 1; if (PM >= 26) PM = 0;
+        }
+        PR = PR + 1; if (PR >= 26) PR = 0;
+
+        int c = cipherAt(i);
+        int p = encrypt(c, PL, PM, PR, RL, RM, RR, uWL, uWM, uWR);
+
+        // Bucket dispatch — branchless compare-and-add.
+        h0  += int(p ==  0); h1  += int(p ==  1); h2  += int(p ==  2);
+        h3  += int(p ==  3); h4  += int(p ==  4); h5  += int(p ==  5);
+        h6  += int(p ==  6); h7  += int(p ==  7); h8  += int(p ==  8);
+        h9  += int(p ==  9); h10 += int(p == 10); h11 += int(p == 11);
+        h12 += int(p == 12); h13 += int(p == 13); h14 += int(p == 14);
+        h15 += int(p == 15); h16 += int(p == 16); h17 += int(p == 17);
+        h18 += int(p == 18); h19 += int(p == 19); h20 += int(p == 20);
+        h21 += int(p == 21); h22 += int(p == 22); h23 += int(p == 23);
+        h24 += int(p == 24); h25 += int(p == 25);
+    }
+
+    // ── Index of Coincidence ──
+    //   ic_scaled = ( Σ n_i*(n_i−1) * 100_000 ) / ( L*(L−1) )
+    int sum = h0*(h0-1) + h1*(h1-1) + h2*(h2-1) + h3*(h3-1) + h4*(h4-1)
+            + h5*(h5-1) + h6*(h6-1) + h7*(h7-1) + h8*(h8-1) + h9*(h9-1)
+            + h10*(h10-1) + h11*(h11-1) + h12*(h12-1) + h13*(h13-1)
+            + h14*(h14-1) + h15*(h15-1) + h16*(h16-1) + h17*(h17-1)
+            + h18*(h18-1) + h19*(h19-1) + h20*(h20-1) + h21*(h21-1)
+            + h22*(h22-1) + h23*(h23-1) + h24*(h24-1) + h25*(h25-1);
+
+    int denom = iMax * (iMax - 1);
+    int icInt = 0;
+    if (denom > 0) {
+        // Floating-point divide — sum × 100_000 fits easily in float32.
+        float icf = (float(sum) * 100000.0) / float(denom);
+        icInt = int(icf + 0.5);
+    }
+
+    // Pack 24-bit int into RGB8.
+    int r = (icInt / 65536)       ;  // high byte
+    int g = (icInt / 256) - r*256 ;  // middle byte
+    int b = icInt - (icInt/256)*256; // low byte
+
+    return half4(half(float(r) / 255.0),
+                 half(float(g) / 255.0),
+                 half(float(b) / 255.0),
+                 1.0);
+}
