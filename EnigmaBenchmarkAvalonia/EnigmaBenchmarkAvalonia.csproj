@@ -28,5 +28,11 @@
     <PackageReference Include="Avalonia.Fonts.Inter"       Version="11.3.13" />
     <PackageReference Include="SkiaSharp"                  Version="3.119.3-preview.1.1" />
     <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="3.119.3-preview.1.1" />
+
+    <!-- Force patched transitive dep. Avalonia 11.3.x pulls Tmds.DBus.Protocol 0.21.2
+         which has CVE GHSA-xrw6-gwf8-vvr9 (D-Bus peer can cause DoS on Linux).
+         Not exploitable on Windows where this package is not loaded, but we patch
+         it anyway to keep `dotnet build` warning-free. 0.21.3 is API-compatible. -->
+    <PackageReference Include="Tmds.DBus.Protocol"         Version="0.21.3" />
   </ItemGroup>
 </Project>

@@ -9,6 +9,11 @@ class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        if (args.Length > 0 && args[0] == "--t52e-test")
+        {
+            return EnigmaBenchmark.Core.T52eSelfTest.Run();
+        }
+
         // Catch absolutely everything — a silent async-void exception has
         // been killing the process after benchmark completion without any
         // log line; we need the stack trace to diagnose.
