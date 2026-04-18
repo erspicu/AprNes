@@ -12,13 +12,8 @@
     <TieredPGO>true</TieredPGO>
   </PropertyGroup>
 
-  <!-- Share cracker / scenario / shader source with the console project -->
   <ItemGroup>
-    <Compile Include="../EnigmaBenchmark/Core/*.cs"     Link="Core/%(Filename)%(Extension)" />
-    <Compile Include="../EnigmaBenchmark/Crackers/*.cs" Link="Crackers/%(Filename)%(Extension)" />
-    <Compile Include="../EnigmaBenchmark/Presets/*.cs"  Link="Presets/%(Filename)%(Extension)" />
-
-    <None Include="../EnigmaBenchmark/Shaders/*.sksl" Link="Shaders/%(Filename)%(Extension)">
+    <None Update="Shaders\*.sksl">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
