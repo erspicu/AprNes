@@ -165,6 +165,32 @@
     font-size: 13px;
     color: var(--amber);
   }
+  .person-card {
+    background: var(--surface);
+    border-left: 3px solid var(--cyan);
+    border-radius: 4px;
+    padding: 14px 20px;
+    margin: 16px 0;
+  }
+  .person-card h4 {
+    margin: 0 0 4px;
+    color: var(--amber);
+    font-size: 17px;
+  }
+  .person-card .lifespan {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: 6px;
+  }
+  .person-card p:first-of-type { margin-top: 8px; }
+  .person-card p:last-child     { margin-bottom: 2px; }
+  .people-section h3 {
+    margin-top: 44px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  .people-section h3:first-of-type { border-top: none; padding-top: 0; }
   .backend-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -234,6 +260,7 @@
   <ol>
     <li><a href="#about">這是什麼？</a></li>
     <li><a href="#ciphers">三場要被秒殺的歷史對決</a></li>
+    <li><a href="#people">破解的人們 — 電影沒拍到的故事</a></li>
     <li><a href="#backends">四條運算路線</a></li>
     <li><a href="#numbers">歷史 vs 現在</a></li>
     <li><a href="#why">為什麼做這個</a></li>
@@ -424,6 +451,350 @@
   <p>
     shader 每 key 候選對密文前 180 字元做一個簡化 dottage——計數「空格」(Baudot 4) 和 "E" (Baudot 1) 的出現次數。德文電傳這兩個字元合計約 29%，隨機只有 6.25%，信號強度 10σ+。GPU 粗篩後 CPU 再用 32-bucket full-text IC 重排決選，確保正解不會被噪音淹沒。
   </p>
+</div>
+
+<hr>
+
+<h2 id="people">破解的人們 — 電影沒拍到的故事</h2>
+
+<p>
+  《The Imitation Game》把整段二戰密碼破解的榮耀幾乎都算在 Alan Turing 一個人頭上。
+  真實故事遠比那部電影複雜：<strong>三條獨立的攻擊鏈、四個國家、跨越十多年、
+  數百位數學家工程師女性操作員</strong>，共同撕開了德國「永遠安全」的密碼系統。
+  以下是電影沒拍到、書本沒賣到的那些人。
+</p>
+
+<div class="people-section">
+
+<h3>一、波蘭人：故事真正的起點（1932–1939）</h3>
+
+<div class="person-card">
+  <h4>Marian Rejewski <span class="lifespan">(1905–1980)</span></h4>
+  <p>
+    華沙大學數學系畢業，22 歲被吸收進波蘭密碼局 Biuro Szyfrów。
+    <strong>1932 年 12 月</strong>他做到了當時所有歐洲密碼專家都失敗的事——
+    破譯 Enigma。用的不是窮舉，是<strong>置換群論</strong>：他從 Enigma 日鑰
+    指示碼的循環結構（他稱為 "characteristic"）反推出整台機器的內部接線。
+  </p>
+  <p>
+    這是前無古人的數學突破。法國情報員 Gustave Bertrand 透過德國叛徒
+    Hans-Thilo Schmidt 提供的操作手冊只描述 Enigma 的<em>外觀</em>——
+    Rejewski 必須從雜訊般的密文指示碼反推<em>內部</em>每條線的接法。
+    他當時 27 歲。
+  </p>
+  <p>
+    1938 年 Rejewski 與 Henryk Zygalski、Jerzy Różycki 三人搭檔打造了
+    「<strong>Bomba kryptologiczna</strong>」——電機式 Enigma 破譯機，
+    領先英國 Bombe 整整兩年。
+  </p>
+  <p>
+    <strong>1939 年 7 月 25–26 日</strong>，華沙南郊 Pyry 森林秘密會議，
+    波蘭人把所有成果——理論、Bomba 設計圖、仿造 Enigma 實機——交給了
+    英法情報代表。兩個月後德國入侵波蘭。整個 Bletchley Park 的 Enigma 計畫
+    <strong>完全建立在波蘭人的基礎上</strong>。
+  </p>
+  <p>
+    戰爭期間 Rejewski 流亡法國、西班牙、葡萄牙、最後到英國空軍做一般通訊工作。
+    英國<strong>從沒邀請他加入 Bletchley</strong>——怕盟友人員洩密。戰後他
+    回到波蘭，在共產政權下低調當保險公司會計，直到 1967 年才公開談及戰時工作。
+    英國官方直到 1976 年才正式承認波蘭人的貢獻。Rejewski 1980 年在華沙去世，
+    終生未獲得他應得的榮譽。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Jerzy Różycki <span class="lifespan">(1909–1942)</span></h4>
+  <p>
+    Rejewski 的同事，發明「<strong>clock method</strong>」——從 indicator
+    推 Enigma 右輪身份的技巧。1942 年 1 月 9 日他搭乘的客輪 <em>Lamoricière</em>
+    在地中海失蹤，享年 32 歲。戰前破譯三巨頭裡唯一沒活到戰後的。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Henryk Zygalski <span class="lifespan">(1908–1978)</span></h4>
+  <p>
+    發明「<strong>Zygalski sheets</strong>」——打孔穿疊的紙板，疊合後能
+    幾何式消去不可能的 rotor 組合。戰後留在英國當數學老師，從沒被英國政府
+    正式致謝過。
+  </p>
+</div>
+
+<h3>二、Bletchley 的內圈（1939–1945）</h3>
+
+<div class="person-card">
+  <h4>Alan Turing <span class="lifespan">(1912–1954)</span></h4>
+  <p>
+    Hut 8 首席密碼分析師，King's College 研究員。最重要的貢獻是把 Rejewski
+    的 Bomba 邏輯重新架構成英國 <strong>Bombe</strong>——並加上
+    「<strong>crib attack</strong>」（猜明文含有「wetter」「eins」等常見字），
+    破解速度從「週」壓到「小時」。
+  </p>
+  <p>
+    1942 年 M4 Shark 出現後，Turing 與 Joan Clarke、Hugh Alexander 組隊
+    重新攻入 U-Boat 通訊。戰後他設計 ACE（世界最早的儲存程式電腦之一），
+    寫下現代計算理論與人工智慧奠基文獻。<strong>1952 年</strong>因同性戀罪
+    被定罪接受化學閹割，1954 年氰化物自殺，享年 41。
+  </p>
+  <p>
+    2009 年英國首相 Brown 公開道歉，2013 年女王赦免，2019 年他的頭像印上
+    £50 英鎊鈔票。但這一切都來得太晚。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Gordon Welchman <span class="lifespan">(1906–1985)</span></h4>
+  <p>
+    Hut 6 主管，劍橋數學家。Turing 原版 Bombe 只測<em>一個</em> stecker pair
+    的假設；Welchman 加上「<strong>diagonal board</strong>」——26×26 的電路
+    網格，讓 Bombe 能同時測多個 plugboard 矛盾，<strong>整體加速 10× 以上</strong>。
+    沒有 diagonal board，Bombe 不會快到有實戰價值。
+  </p>
+  <p>
+    Welchman 也設計了 Bletchley 的整體流程組織。戰後他到 MIT 工作；
+    1982 年出版 <em>The Hut Six Story</em>，被英美情報界嚴厲批評「洩密」，
+    美國安全許可被撤銷，鬱鬱以終。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Dilly Knox <span class="lifespan">(Alfred Dillwyn Knox, 1884–1943)</span></h4>
+  <p>
+    GC&amp;CS 老一代元老，一戰時破過德國海軍密碼。Bletchley 時期他帶領
+    「<strong>the Cottage</strong>」小組專攻非商用 Enigma 變體：
+    <strong>義大利海軍 Enigma</strong>（1940 年 3 月破）、
+    <strong>Abwehr Enigma</strong>（1941 年 12 月破）。
+  </p>
+  <p>
+    1941 年 3 月 Knox 小組破出的義大利訊息讓英國艦隊在 <strong>Matapan 海角</strong>
+    伏擊並殲滅義大利地中海艦隊——盟軍第一場大型 Ultra 情報勝利。
+  </p>
+  <p>
+    Knox 終身為淋巴瘤所苦，1943 年 2 月病逝。臨終拒絕去醫院——要繼續解碼。
+    他的組員多為女性（Mavis Lever、Margaret Rock），戰時被稱
+    「<em>Dilly's fillies</em>」（Dilly 的小馬），實際上都是劍橋頂尖語言學才女。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Mavis Batey（née Lever） <span class="lifespan">(1921–2013)</span></h4>
+  <p>
+    Knox 的 Cottage 小組成員，19 歲入 Bletchley。1941 年她個人破掉
+    義大利海軍 Enigma 的關鍵訊息——operator 測試鍵盤打了一連串 L，
+    暴露 Enigma<strong>「字母不能加密成自己」</strong>的結構性弱點。
+    這則訊息直接引爆 Matapan 海戰。
+  </p>
+  <p>
+    她後來也破解 Abwehr Enigma 與 D-Day 前西班牙 Abwehr 通訊——這些
+    解讀確認了「德軍相信盟軍會在 Calais 登陸」，是
+    <strong>Operation Fortitude</strong>（諾曼第欺敵）成功的關鍵驗證。
+    戰後成為英國知名園林史學家。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Joan Clarke <span class="lifespan">(1917–1996)</span></h4>
+  <p>
+    Hut 8 數學家，Turing 最親密的工作夥伴。兩人 1941 年短暫訂婚，
+    Turing 坦白同性傾向後解除婚約。Clarke 獨立優化了
+    「<strong>Banburismus</strong>」——深度分析 U-Boat 密信的核心技術，
+    M4 Shark 的破譯主要靠她把原始手續壓到可規模化程度。
+  </p>
+  <p>
+    因為是女性，Clarke 薪資遠低於男同事，職稱被迫叫「linguist」而非
+    「cryptanalyst」（因為當時「女人不做密碼分析」）。戰後她嫁給 GCHQ
+    同事 Jock Murray，一生留在英國情報界。
+  </p>
+</div>
+
+<h3>三、Lorenz / Tunny 的三位天才（1941–1945）</h3>
+
+<div class="person-card">
+  <h4>John Tiltman <span class="lifespan">(1894–1982)</span></h4>
+  <p>
+    Bletchley 的「<strong>首席密碼分析師</strong>」頭銜正式授予人。
+    1941 年 8 月 30 日兩則 Lorenz 訊息因 operator 誤操作共用同一金鑰
+    （depth），Tiltman 從這個 depth 手工逆推出 4000 字符長度的完整金鑰流
+    ——但他不知道機器結構，只有金鑰本身。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Bill Tutte <span class="lifespan">(1917–2002)</span></h4>
+  <p>
+    Tiltman 的 4000 字元金鑰落到年輕數學家 Tutte 手上。接下來
+    <strong>三個月</strong>，Tutte 純用鉛筆、方格紙、與統計直覺
+    反推出 Lorenz SZ40 的完整內部結構——12 個 pinwheel 的接線、步進邏輯、
+    全部 keystream 生成公式。他<strong>從沒看過機器一眼</strong>。
+  </p>
+  <p>
+    這是 20 世紀密碼學最純粹的推理成就之一，被與 Rejewski、Beurling 並列
+    「<strong>憑統計與邏輯手工破解完整密碼機</strong>」的三人。戰後 Tutte
+    到加拿大 Waterloo 大學任教，在圖論（matroid theory）留下奠基性貢獻。
+    2002 年才有英國官方正式承認他的 Lorenz 工作。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Max Newman <span class="lifespan">(1897–1984)</span></h4>
+  <p>
+    劍橋拓撲學家，<strong>Turing 的博士指導老師</strong>。1942 年在 Bletchley
+    建立「<strong>Newmanry</strong>」小組，任務是機械化 Tutte 的統計攻擊。
+    他指導設計 "<strong>Heath Robinson</strong>" 機器——雙紙帶光學同步讀取
+    跑 χ-wheel 差分統計，但紙帶時常燒斷。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Tommy Flowers <span class="lifespan">(1905–1998)</span></h4>
+  <p>
+    <strong>電影從來沒好好拍過這個人</strong>。Flowers 來自 Post Office
+    Research Station, Dollis Hill——一個修電話交換機的工程師，
+    沒有大學學位，不是「Bletchley 那種劍橋菁英」。他看了 Newman 的
+    Heath Robinson 覺得「根本不對，應該全電子」，主動提案。
+  </p>
+  <p>
+    Bletchley 委員會拒絕：「1500 個真空管的機器？光熱身就會燒」。
+    Flowers <strong>自掏腰包、用自己的錢</strong>，帶 GPO 同事在 Dollis Hill
+    加班祕密打造，<strong>1943 年 12 月</strong>造出 <strong>Colossus Mark I</strong>。
+    1944 年 2 月第一次實戰跑 Tutte 攻擊，<strong>幾小時</strong>解完以前需要
+    幾週的 χ-wheel 復原。
+  </p>
+  <p>
+    到 D-Day 前夕共造了 10 台 Colossus。1944 年 6 月 5 日 Eisenhower 發出
+    登陸命令前，他<strong>親眼看了 Colossus 剛解出的 Hitler 命令</strong>——
+    「Panzergruppe West 調往 Normandy」方向，證明德軍仍相信 Calais 才是主攻——
+    才下令 D-Day 照原計畫 6 月 6 日執行。
+  </p>
+  <p>
+    戰後 Churchill 下令<strong>拆毀所有 Colossus</strong>、銷毀圖紙。
+    Flowers 連自己設計的機器都不能談。他戰後繼續在 GPO 做電子交換機，
+    默默無聞幾十年。英國政府直到<strong>2000 年</strong>才正式承認 Colossus
+    是世界第一台可程式化電子電腦——比美國 ENIAC 早兩年——但那時 Flowers
+    已經 95 歲、失智，兩年後過世。
+  </p>
+</div>
+
+<h3>四、瑞典的 Sturgeon：被遺忘的 T52 破譯者</h3>
+
+<div class="person-card">
+  <h4>Arne Beurling <span class="lifespan">(1905–1986)</span></h4>
+  <p>
+    瑞典烏普薩拉大學數學教授，分析學與調和分析領域世界級大師。1940 年 5 月
+    德國佔領挪威、丹麥後，經瑞典中繼的電傳都轉為密碼——瑞典 FRA（國家
+    通信情報局）攔截到一堆看不懂的訊息，那是 Siemens &amp; Halske T52a
+    "Sturgeon"。
+  </p>
+  <p>
+    Beurling 被徵召到 FRA，<strong>關在房間裡兩週，只給他紙、筆、和一疊密文</strong>。
+    兩週後他走出來，手上是 T52 的完整內部結構：10 個 pinwheel 的 XOR 網路、
+    步進邏輯、甚至反推出 key-setting switch 接線。他<strong>從沒看過機器、
+    沒有任何技術文件</strong>——純憑密文統計特性重建整台機器。
+  </p>
+  <p>
+    這是密碼分析史上最瘋狂的成就之一。連 Bletchley 聽說後都半信半疑。
+    Beurling 從沒公開談過方法，他著名金句：
+  </p>
+  <p style="color: var(--amber); font-style: italic; margin-left: 20px; border-left: 2px solid var(--amber); padding-left: 16px;">
+    "A magician doesn't reveal his tricks."
+  </p>
+  <p>
+    瑞典接下來<strong>三年</strong>（1940–1943）讀遍了所有經瑞典轉發的德軍
+    電傳——柏林跟奧斯陸、赫爾辛基、斯德哥爾摩德國大使館間所有通訊。
+    <strong>攔截 50 萬則、解密 35 萬則</strong>——跟 Bletchley 幾年的 Enigma
+    產出相當。1943 年中德國換裝 T52e 並啟用 KTF（明文相關步進）後，
+    瑞典解密量驟降到零。Beurling 晚年到普林斯頓高等研究院，戰時工作
+    要到 1980 年代才逐漸公開。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Michael Crum <span class="lifespan">(1910–1977)</span></h4>
+  <p>
+    Bletchley Park 對 Sturgeon 的主要攻擊者。1942 年夏英軍首次攔截
+    西西里 → 利比亞鏈路（代號 "<strong>Sturgeon</strong>"）與愛琴海 →
+    西西里鏈路（"<strong>Mackerel</strong>"）。operator 紀律鬆散，常常
+    用同一金鑰發多則訊息產生 depths——Crum 小組靠這些 depths 陸續破入 T52d/e。
+  </p>
+  <p>
+    攻擊從未達到 Enigma/Tunny 的規律程度：T52 太複雜，而且<strong>德國空軍
+    有個壞習慣——把 Sturgeon 訊息用較弱的 Enigma 重發</strong>，Bletchley
+    直接從 Enigma 拿明文就好，沒必要硬啃 T52。Crum 戰後加入英國 GCHQ
+    並參與設計 <strong>SAVILLE</strong> 密碼演算法——至今仍是英美機密。
+  </p>
+</div>
+
+<h3>五、幕後的人</h3>
+
+<div class="person-card">
+  <h4>Hans-Thilo Schmidt <span class="lifespan">(1888–1943)</span></h4>
+  <p>
+    德國外交部密碼局員工，代號「<strong>Asche</strong>」。1931–1938 年為了
+    還債、支撐奢華生活，把 Enigma 操作手冊、日鑰表、軍用型號接線資料
+    持續賣給<strong>法國情報局</strong>——Gustave Bertrand 上尉再轉手給
+    波蘭 Rejewski。沒有 Schmidt 提供的「rotor 日鑰格式」，Rejewski 的
+    置換群攻擊無從下手。
+  </p>
+  <p>
+    1943 年 3 月 Schmidt 被 Gestapo 識破被捕，同年在獄中服毒自殺。
+    他的叛變是盟軍情報優勢的真正起點——但動機是錢而非反法西斯理念，
+    歷史對他的評價複雜。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Gustave Bertrand <span class="lifespan">(1896–1976)</span></h4>
+  <p>
+    法國軍情報 SR 二局上尉，整個 1930 年代親手經營 Hans-Thilo Schmidt 這條
+    線人。1938 年他理解到法國自己破不了 Enigma，主動把 Schmidt 提供的文件
+    全部<strong>轉給波蘭</strong>——這個決定是 Enigma 被破的起點。戰後寫
+    <em>Enigma ou la plus grande énigme de la guerre 1939–1945</em>
+    （1973），是最早揭露 Bletchley 波蘭淵源的公開著作，比英國官方解密早 3 年。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Bletchley 的女性工作者（~7,500 位）</h4>
+  <p>
+    戰爭最高峰 Bletchley Park 僱用超過 <strong>10,000 人，其中 75% 是女性</strong>
+    ——Wrens（海軍女子部隊）、WAAF（空軍女子部隊）、牛津和劍橋徵召的女大生。
+    她們操作 Bombe 與 Colossus、值夜班、校對密文、做流量分析。
+  </p>
+  <p>
+    Joan Clarke、Mavis Batey、Margaret Rock、<strong>Jane Fawcett</strong>
+    （她破譯的訊息讓英國海軍追上並擊沉 <em>Bismarck</em>）、Ruth Briggs、
+    Pamela Rose……大多數人一輩子無法對配偶、父母、子女提起戰時做過什麼。
+    直到 1990 年代英國 Public Record Office 陸續解密，許多家屬才在老太太
+    過世後從遺物得知媽媽或奶奶破過 Enigma。
+  </p>
+</div>
+
+<h3>六、保密 30 年</h3>
+
+<p>
+  這些人從 1945 年 5 月 8 日起必須徹底閉嘴。
+  <strong>Official Secrets Act</strong> 讓 Bletchley 的一切維持機密
+  <strong>直到 1974 年</strong>——Churchill 個人命令：
+  「<em>Never ever, EVER, speak of this</em>」。戰後英國安全部門甚至
+  秘密監視前 Bletchley 員工是否有洩密傾向。
+</p>
+
+<ul>
+  <li>Turing 化學閹割後自殺，家人不知他戰時救了多少人命</li>
+  <li>Rejewski 1980 年死於華沙，逝世那週英國政府才公開承認他的貢獻</li>
+  <li>Flowers 看著 ENIAC 被稱「世界第一台電腦」而不能反駁</li>
+  <li>Beurling 在美國教書到 1986 年去世，瑞典戰時工作要到戰後 50 年才公開</li>
+  <li>Tutte 在加拿大當一輩子數學教授，學生沒人知道他做過什麼</li>
+  <li>Crum 設計的 SAVILLE 密碼演算法至今仍是機密</li>
+</ul>
+
+<p>
+  <strong>電影拍了 Turing——因為他的結局最戲劇化</strong>。
+  但 Turing 本人會第一個告訴你：<em>Rejewski 才是真正開始這一切的人。
+  Tutte 的 Lorenz 手解比我的 Enigma 攻擊更困難。Beurling 用兩週解完 T52 的
+  事情沒人做到過第二次。Flowers 蓋的 Colossus 是現代電腦的起點。</em>
+</p>
+
 </div>
 
 <hr>
