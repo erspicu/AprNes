@@ -29,19 +29,22 @@ uniform float  uS0, uS1, uS2, uS3, uS4, uS5;   // W1..W6 known starts
 
 const int CAP = 40;
 
+// Read texel as float — explicitly avoid half precision (fp16 has only 10
+// mantissa bits; the `a+b-2ab` XOR trick accumulates values that can drift
+// off {0,1} and then compare-with-zero fails on real GPU drivers).
 int pinRead(int wheel, int pos) {
-    half4 v = uPins.eval(float2(float(pos) + 0.5, float(wheel) + 0.5));
-    return int(float(v.r) * 255.0 + 0.5);
+    float4 v = float4(uPins.eval(float2(float(pos) + 0.5, float(wheel) + 0.5)));
+    return int(v.r * 255.0 + 0.5);
 }
 
 int cipherAt(int i) {
-    half4 v = uCipher.eval(float2(float(i) + 0.5, 0.5));
-    return int(float(v.r) * 255.0 + 0.5);
+    float4 v = float4(uCipher.eval(float2(float(i) + 0.5, 0.5)));
+    return int(v.r * 255.0 + 0.5);
 }
 
 int permInvAt(int row, int i) {
-    half4 v = uPermInv.eval(float2(float(row) + 0.5, float(i) + 0.5));
-    return int(float(v.r) * 255.0 + 0.5);
+    float4 v = float4(uPermInv.eval(float2(float(row) + 0.5, float(i) + 0.5)));
+    return int(v.r * 255.0 + 0.5);
 }
 
 int xorb(int a, int b) { return a + b - 2 * a * b; }
@@ -205,5 +208,5 @@ half4 main(float2 fragCoord) {
     return half4(half(float(r) / 255.0),
                  half(float(g) / 255.0),
                  half(float(b) / 255.0),
-                 1.0);
+                 half(1.0));
 }
