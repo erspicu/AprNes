@@ -75,11 +75,32 @@ public static class DefaultScenario
     }
 
     // ──────────────────────────────────────────────────────────────────────
-    //  Lorenz SZ40 "Tunny" scenario — Wolfsschanze → OKW, Dec 1944 style.
+    //  Lorenz SZ42 "Tunny" scenario — Wolfsschanze → OKW, Dec 1944 style.
+    //
     //  Fictional. The Ardennes offensive (Wacht am Rhein / Battle of the
     //  Bulge) was exactly the kind of strategic order Lorenz actually
     //  carried, and Bletchley's Tunny section was reading its traffic
     //  by late 1944.
+    //
+    //  ── Historical accuracy note ──────────────────────────────────────────
+    //  Real SZ42b has 12 pinwheels (5 χ + 5 ψ + 2 μ motor) and encrypts via
+    //       Z = P ⊕ χ ⊕ ψ
+    //  with ψ stepping conditioned on μ. Bletchley's attack proceeded in 3
+    //  stages:
+    //    1. χ-wheel start recovery  (Colossus, ~1 hr per message)
+    //    2. χ pattern deduction     (hand work, Testery)
+    //    3. ψ/μ recovery            (hand work, Testery)
+    //
+    //  Our scenario implements stage-1 only: the cipher used here is the
+    //  reduced Z = P ⊕ χ form. Attacking full SZ42b over the 22 M χ keyspace
+    //  doesn't work as a single brute force because the historical Δ-1+2
+    //  statistic collapses the effective keyspace to ~900 (only χ1 and χ2
+    //  participate in the signal) — that doesn't exercise the GPU at all.
+    //  So we model what Colossus actually *did* at Stage 1: 22 M χ starts,
+    //  IC-style statistical scoring, full-text CPU verification. The
+    //  benchmark's relative-speed story (GPU vs CPU backends) is valid;
+    //  just know that the machine simulation here is Colossus-stage-1 level,
+    //  not the full Tunny machine.
     // ──────────────────────────────────────────────────────────────────────
 
     public const string LorenzPlaintextFormatted =

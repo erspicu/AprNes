@@ -354,27 +354,28 @@
 
 <div class="cipher-card">
   <div class="tag">1941 – 1945 · Oberkommando der Wehrmacht（最高統帥部）</div>
-  <h3>Lorenz SZ40 / SZ42 "Tunny" <span class="status ready">已實作（chi-only 變體）</span></h3>
+  <h3>Lorenz SZ42 "Tunny" — χ-wheel recovery <span class="status ready">已實作（Colossus 第 1 階段）</span></h3>
 
   <p>
     Enigma 是戰術層級。Lorenz 是<strong>戰略</strong>層級——希特勒、OKW、OKH 跟前線集團軍司令之間的直接通訊。一台 Lorenz 的破譯價值超過一百則 Enigma。
   </p>
 
-  <h4>機器結構</h4>
+  <h4>機器結構（真實 SZ42b）</h4>
   <p>
-    Lorenz SZ40（Schlüsselzusatz，「密碼附加器」）不是像 Enigma 那種單字替換機，而是<strong>電傳串流密碼</strong>：
+    Lorenz SZ42（Schlüsselzusatz，「密碼附加器」）不是像 Enigma 那種單字替換機，而是<strong>電傳串流密碼</strong>：
   </p>
   <ul>
     <li>明文以 <strong>Baudot 5-bit</strong>（國際電報碼）表示</li>
-    <li>機器生成一串偽隨機 5-bit keystream，跟明文 XOR</li>
-    <li>Keystream 由 12 個<strong>pinwheel</strong>產生：
+    <li>機器生成一串 5-bit 偽隨機 keystream，跟明文 XOR</li>
+    <li>Keystream 由 12 個<strong>pinwheel</strong>聯合產生：
       <ul>
-        <li>5 個 χ（chi）輪：41, 31, 29, 26, 23 個 pin — 固定步進</li>
-        <li>5 個 ψ（psi）輪：43, 47, 51, 53, 59 個 pin — 條件步進</li>
-        <li>2 個 μ（mu）motor 輪：37, 61 個 pin — 控制 ψ 要不要動</li>
+        <li>5 個 <strong>χ</strong>（chi）輪：41, 31, 29, 26, 23 個 pin——每字元都前進</li>
+        <li>5 個 <strong>ψ</strong>（psi）輪：43, 47, 51, 53, 59 個 pin——條件前進（by μ）</li>
+        <li>2 個 <strong>μ</strong>（mu）motor 輪：37, 61 個 pin——控制 ψ 是否前進</li>
       </ul>
     </li>
-    <li>Keystream 不重複的週期是 <strong>約 1.6 × 10¹⁹</strong></li>
+    <li>SZ42b 的 "limitations"：χ₂ 前一字元的 bit 參與 ψ 前進條件——阻擋舊版 motor-only attack</li>
+    <li>加密公式：<code>Z[i] = P[i] ⊕ χ[i] ⊕ ψ[i]</code>；Keystream 週期 ≈ 1.6 × 10¹⁹</li>
   </ul>
 
   <p class="highlight-stat">
@@ -391,17 +392,37 @@
     <li>Colossus 共造了 <strong>10 台</strong>，1944 年起每天破譯 Lorenz 訊息；D-Day 前夕 Eisenhower 親口說「Ultra 情報價值十個陸軍師」</li>
   </ul>
 
-  <h4>Benchmark 怎麼做？</h4>
+  <h4>Bletchley 的三階段 pipeline</h4>
   <p>
-    完整 2<sup>501</sup> 不可能 brute-force。我們做 Colossus 做的事：只搜 χ-輪起始位置：
+    Lorenz 不是一口氣破掉。Tutte 把攻擊拆成三階段，每階段針對結構的一部分：
   </p>
+  <ol>
+    <li><strong>Stage 1：χ-輪起始位置回復</strong>（Colossus 做的事）<br>
+      對 41 × 31 × 29 × 26 × 23 = <strong>22,041,682</strong> 個候選，每個生成 χ stream，跟密文計算 Δ-statistic（Z ⊕ χ 的 bit 1 XOR bit 2 分佈偏差），找出最吻合「德文電傳 1+2 dottage」的那組。Colossus Mk II ~1 小時
+    </li>
+    <li><strong>Stage 2：χ 輪 pin pattern 推導</strong><br>
+      Stage 1 拿到 χ 起始位置後，用手工 + 統計方法反推 pin 本身（設計時才選的那組 0/1）
+    </li>
+    <li><strong>Stage 3：ψ 與 μ 輪回復</strong><br>
+      剝除 χ 後，殘餘 = P ⊕ ψ；Testery 的人員純手工做統計加 crib 攻擊，最終還原明文
+    </li>
+  </ol>
 
+  <h4>Benchmark 對應的是哪一段？</h4>
+  <p>
+    <strong>Stage 1：χ-wheel recovery。</strong>這正是 Colossus 存在的唯一理由——Tommy Flowers 設計它就是為了在一小時內跑完這 22 M 個候選。我們的 GPU shader 在幾秒內完成同樣的工作。
+  </p>
   <p class="highlight-stat">
     χ keyspace = 41 × 31 × 29 × 26 × 23 ≈ 22,041,682 組合
   </p>
 
   <p>
-    每個候選位置生成 χ stream，跟密文 XOR，用統計（Δ-method / 1+2 break）打分，跟 Enigma 的 IC 類似。這就是 Colossus 當年做的事——Colossus 跑一組要<strong>幾分鐘到一小時</strong>，GPU 預計 1 秒內。
+    為了專心比較硬體，scenario 的加密用簡化式 <code>Z = P ⊕ χ</code>（ψ = 0），ψ 與 μ 的完整 encryption + 解密會改變 signal 結構，把有效暴力搜尋 keyspace 壓縮成 χ₁+χ₂ pair 的 ~900 種——那就失去 GPU 秀肌肉的意義了。Colossus 當年在 Stage 1 看到的 Δ-signal 本質上跟我們 shader 看到的一樣；差別是 ψ/μ 的處理被推到 Stage 2/3 交給人。
+  </p>
+
+  <h4>統計 scorer</h4>
+  <p>
+    shader 每 key 候選對密文前 180 字元做一個簡化 dottage——計數「空格」(Baudot 4) 和 "E" (Baudot 1) 的出現次數。德文電傳這兩個字元合計約 29%，隨機只有 6.25%，信號強度 10σ+。GPU 粗篩後 CPU 再用 32-bucket full-text IC 重排決選，確保正解不會被噪音淹沒。
   </p>
 </div>
 

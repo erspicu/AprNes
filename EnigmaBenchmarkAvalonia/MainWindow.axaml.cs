@@ -167,8 +167,13 @@ public partial class MainWindow : Window
                            * LorenzSZ40.ChiPinCounts[3]
                            * LorenzSZ40.ChiPinCounts[4];
 
-        AppendColored($"──── RUN  Lorenz SZ40 (Tunny, chi-only)  "
+        AppendColored($"──── RUN  Lorenz SZ42 χ-recovery (Colossus stage 1)  "
                     + $"({totalKeys:N0} keys) ────\n", BrushAmber);
+        AppendColored("Historical context: Bletchley's Tunny attack had three\n",
+                      BrushMuted);
+        AppendColored("  stages — (1) χ-wheel recovery via Δ-statistics (this),\n"
+                    + "  (2) χ pattern deduction,  (3) ψ/μ recovery in the Testery.\n"
+                    + "  Colossus Mark II was built to do Stage 1 at speed.\n\n", BrushMuted);
         AppendColored("True χ start : ", BrushMuted);
         AppendColored($"[{trueStart[0]}, {trueStart[1]}, {trueStart[2]}, "
                     + $"{trueStart[3]}, {trueStart[4]}]  "
@@ -264,16 +269,23 @@ public partial class MainWindow : Window
         }
         AppendLine();
 
-        // Historical card: Colossus ~1 hour per message in 1944
+        // Colossus Mark II at Bletchley processed Stage 1 χ-recovery for a
+        // single message in roughly an hour — that's the number we compare
+        // against. Stage 2 (χ patterns) and Stage 3 (ψ+μ) were additional
+        // hours to days of hand work by the Testery.
         ShowHistoricalCard(results[0].r.ElapsedSeconds,
-                           "Colossus Mark II (1944)", "~1 hour", 3600.0);
+                           "Colossus II χ-stage (1944)", "~1 hour", 3600.0);
 
-        // Reveal the plaintext (decode Baudot → string)
+        // Reveal the plaintext (decode Baudot → string). In a real 1944
+        // Bletchley pipeline, recovering the plaintext required stages 2-3
+        // (χ pins + ψ/μ) after χ-start recovery. Our simplified scenario
+        // lets us display it immediately.
         SetStatus("Decrypting…", BrushAmber);
         var revealed = Baudot.Decode(plaintext);
         await Reveal.RevealStringAsync(revealed,
             "\u201CTo OKW Keitel from Wolfsschanze: Operation Watch on the Rhine "
-          + "begins 16 December 1944 — Ardennes offensive, Army Group B…\u201D");
+          + "begins 16 December 1944 — Ardennes offensive, Army Group B.  "
+          + "(Colossus stage 1 recovered χ starts; stages 2-3 follow.)\u201D");
     }
 
     void AppendLorenzResult(CrackResultLorenz r)
