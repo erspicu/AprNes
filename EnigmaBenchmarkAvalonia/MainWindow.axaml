@@ -30,10 +30,10 @@
                 Padding="14,10" Margin="0,0,0,14">
             <StackPanel Orientation="Horizontal" Spacing="10">
                 <TextBlock VerticalAlignment="Center" Text="Cipher:" Foreground="#8A93A0" />
-                <ComboBox x:Name="CipherBox" SelectedIndex="0" Width="160" IsEnabled="False">
+                <ComboBox x:Name="CipherBox" SelectedIndex="0" Width="200">
                     <ComboBoxItem Content="Enigma M3 (Wehrmacht)" />
-                    <ComboBoxItem Content="Enigma M4 (U-Boot Shark) — coming" />
-                    <ComboBoxItem Content="Lorenz SZ40 (Tunny) — coming" />
+                    <ComboBoxItem Content="Enigma M4 (U-Boot Shark)" />
+                    <ComboBoxItem Content="Lorenz SZ40 (Tunny) — coming" IsEnabled="False" />
                 </ComboBox>
                 <TextBlock VerticalAlignment="Center" Text="Scope:"
                            Foreground="#8A93A0" Margin="10,0,0,0" />

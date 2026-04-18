@@ -36,6 +36,28 @@ public static class RotorData
 
     public static readonly string[] RotorNames = { "I", "II", "III", "IV", "V" };
 
+    // ── Enigma M4 (U-Boot "Shark", 1942-02 to 1945) ───────────────────────
+    // M4 inserts a 4th "greek" rotor between the left rotor and the reflector.
+    // This rotor does NOT step during encryption — only its Ringstellung +
+    // Grundstellung vary. It must pair with a matching thin reflector:
+    //    Beta  ↔ UKW-B dünn
+    //    Gamma ↔ UKW-C dünn
+    // Wirings declassified post-war; cross-checked against Crypto Museum
+    // and Dirk Rijmenants' simulator.
+
+    public static readonly byte[][] GreekFwd =
+    {
+        MakeWiring("LEYJVCNIXWPBQMDRTAKZGFUHOS"), // Beta
+        MakeWiring("FSOKANUERHMBTIYCWLQPZXVGJD"), // Gamma
+    };
+    public static readonly byte[][] GreekRev = new byte[2][];
+
+    public static readonly byte[] UkwBThin = MakeWiring("ENKQAUYWJICOPBLMDXZVFTHRGS");
+    public static readonly byte[] UkwCThin = MakeWiring("RDOBJNTKVEHMLFCWZAXGYIPSUQ");
+
+    public static readonly string[] GreekNames    = { "Beta", "Gamma" };
+    public static readonly string[] ThinReflNames = { "B-thin", "C-thin" };
+
     static RotorData()
     {
         for (int r = 0; r < 5; r++)
@@ -43,6 +65,12 @@ public static class RotorData
             var inv = new byte[26];
             for (int i = 0; i < 26; i++) inv[Fwd[r][i]] = (byte)i;
             Rev[r] = inv;
+        }
+        for (int g = 0; g < 2; g++)
+        {
+            var inv = new byte[26];
+            for (int i = 0; i < 26; i++) inv[GreekFwd[g][i]] = (byte)i;
+            GreekRev[g] = inv;
         }
     }
 

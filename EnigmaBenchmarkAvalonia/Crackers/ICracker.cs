@@ -13,6 +13,15 @@ public struct CrackResult
     public int RM_Ring;                   // middle ring found (hard scope +)
     public int RL_Ring;                   // left ring found (extreme scope)
     public int BestIc;                    // × 100_000
+
+    // M4-only: greek wheel (0=Beta, 1=Gamma) + its start position. M3
+    // crackers leave these 0; callers ignore them for M3.
+    public int WG;
+    public int PG;
+
+    // Timeout: set by Scalar/Parallel/SIMD when they bail out on a budget
+    // before the full keyspace is searched.
+    public bool TimedOut;
 }
 
 public enum CrackScope

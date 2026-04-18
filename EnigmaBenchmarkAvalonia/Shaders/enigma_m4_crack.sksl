@@ -1,0 +1,193 @@
+// ════════════════════════════════════════════════════════════════════════
+// enigma_m4_crack.sksl — Enigma M4 (U-Boot Shark) brute-force cracker
+// ════════════════════════════════════════════════════════════════════════
+// One output pixel = one Enigma M4 trial decryption.
+//
+//   Pixel (x, y) in a 676 × 26 tile encodes:
+//     x = PM*26 + PR
+//     y = PL
+//
+// Each render pass fixes (WL, WM, WR, RL, RM, RR, WG, RG, PG) via uniforms.
+// Greek wheel + thin reflector are STATIC during encryption — only the
+// 3-rotor stack steps. Same IC → RGB24 encoding as the M3 shader.
+
+// ── Tables (as child shaders) ──
+// uRotors: 26 × 16 RGBA8
+//   rows 0..4  = Fwd I..V
+//   rows 5..9  = Rev I..V
+//   rows 10..11 = GreekFwd Beta, Gamma
+//   rows 12..13 = GreekRev Beta, Gamma
+//   rows 14..15 = UKW-B_thin, UKW-C_thin
+uniform shader uRotors;
+uniform shader uPlugboard;
+uniform shader uCipher;
+
+uniform float uCtLen;
+uniform float uWL;
+uniform float uWM;
+uniform float uWR;
+uniform float uWG;     // 0=Beta, 1=Gamma (row offset 10..11)
+uniform float uThinR;  // 0=UKW-B_thin (row 14), 1=UKW-C_thin (row 15)
+uniform float uRL;
+uniform float uRM;
+uniform float uRR;
+uniform float uRG;
+uniform float uPG;     // greek position — static for the whole ciphertext
+uniform float uNotchL;
+uniform float uNotchM;
+uniform float uNotchR;
+
+int rotorRead(float row, int col) {
+    float2 p = float2(float(col) + 0.5, row + 0.5);
+    half4 v = uRotors.eval(p);
+    return int(float(v.r) * 255.0 + 0.5);
+}
+
+int fwd(float rotorIdx, int x)   { return rotorRead(rotorIdx, x); }
+int rev(float rotorIdx, int x)   { return rotorRead(rotorIdx + 5.0, x); }
+int greekFwd(float gIdx, int x)  { return rotorRead(10.0 + gIdx, x); }
+int greekRev(float gIdx, int x)  { return rotorRead(12.0 + gIdx, x); }
+int thinRefl(float tIdx, int x)  { return rotorRead(14.0 + tIdx, x); }
+
+int plug(int x) {
+    half4 v = uPlugboard.eval(float2(float(x) + 0.5, 0.5));
+    return int(float(v.r) * 255.0 + 0.5);
+}
+
+int cipherAt(int i) {
+    half4 v = uCipher.eval(float2(float(i) + 0.5, 0.5));
+    return int(float(v.r) * 255.0 + 0.5);
+}
+
+int mod26(int x) {
+    if (x >= 52) x -= 52;
+    if (x >= 26) x -= 26;
+    if (x <   0) x += 26;
+    return x;
+}
+
+int encrypt(int c, int PL, int PM, int PR, int PG,
+            int RL, int RM, int RR, int RG,
+            float WL_, float WM_, float WR_, float WG_, float ThinR_) {
+    c = plug(c);
+
+    int s = mod26(c + PR - RR);
+    c = fwd(WR_, s);
+    c = mod26(c - PR + RR);
+
+    s = mod26(c + PM - RM);
+    c = fwd(WM_, s);
+    c = mod26(c - PM + RM);
+
+    s = mod26(c + PL - RL);
+    c = fwd(WL_, s);
+    c = mod26(c - PL + RL);
+
+    // Greek rotor forward (static — doesn't step)
+    s = mod26(c + PG - RG);
+    c = greekFwd(WG_, s);
+    c = mod26(c - PG + RG);
+
+    // Thin reflector
+    c = thinRefl(ThinR_, c);
+
+    // Greek rotor reverse
+    s = mod26(c + PG - RG);
+    c = greekRev(WG_, s);
+    c = mod26(c - PG + RG);
+
+    s = mod26(c + PL - RL);
+    c = rev(WL_, s);
+    c = mod26(c - PL + RL);
+
+    s = mod26(c + PM - RM);
+    c = rev(WM_, s);
+    c = mod26(c - PM + RM);
+
+    s = mod26(c + PR - RR);
+    c = rev(WR_, s);
+    c = mod26(c - PR + RR);
+
+    return plug(c);
+}
+
+half4 main(float2 fragCoord) {
+    int px = int(fragCoord.x);
+    int py = int(fragCoord.y);
+    int PL = py;
+    int PM = px / 26;
+    int PR = px - PM * 26;
+
+    int RL = int(uRL + 0.5);
+    int RM = int(uRM + 0.5);
+    int RR = int(uRR + 0.5);
+    int RG = int(uRG + 0.5);
+    int PG = int(uPG + 0.5);
+    int notchM = int(uNotchM + 0.5);
+    int notchR = int(uNotchR + 0.5);
+    int ctLen  = int(uCtLen + 0.5);
+
+    int h0=0, h1=0, h2=0, h3=0, h4=0, h5=0, h6=0, h7=0, h8=0, h9=0,
+        h10=0, h11=0, h12=0, h13=0, h14=0, h15=0, h16=0, h17=0, h18=0,
+        h19=0, h20=0, h21=0, h22=0, h23=0, h24=0, h25=0;
+
+    // M4 has one extra rotor pass (greek) vs M3 + thin reflector, so the
+    // unrolled shader is ~35 % larger per character. At CAP=64 the IC
+    // signal-to-noise at 1M-key Quick scope isn't strong enough — random
+    // fluctuations can lift a wrong-key IC above the true-key IC. 80 gives
+    // ~sqrt(80/64) = 1.12× better separation, hopefully below Skia's
+    // program-size ceiling. Fall back to 72 / 64 if the compiler rejects.
+    const int CAP = 80;
+    int iMax = (ctLen < CAP) ? ctLen : CAP;
+    for (int i = 0; i < CAP; i++) {
+        if (i >= iMax) break;
+
+        // Step (greek wheel stays put)
+        bool midNotch   = (PM == notchM);
+        bool rightNotch = (PR == notchR);
+        if (midNotch) {
+            PL = PL + 1; if (PL >= 26) PL = 0;
+            PM = PM + 1; if (PM >= 26) PM = 0;
+        } else if (rightNotch) {
+            PM = PM + 1; if (PM >= 26) PM = 0;
+        }
+        PR = PR + 1; if (PR >= 26) PR = 0;
+
+        int c = cipherAt(i);
+        int p = encrypt(c, PL, PM, PR, PG, RL, RM, RR, RG,
+                        uWL, uWM, uWR, uWG, uThinR);
+
+        h0  += int(p ==  0); h1  += int(p ==  1); h2  += int(p ==  2);
+        h3  += int(p ==  3); h4  += int(p ==  4); h5  += int(p ==  5);
+        h6  += int(p ==  6); h7  += int(p ==  7); h8  += int(p ==  8);
+        h9  += int(p ==  9); h10 += int(p == 10); h11 += int(p == 11);
+        h12 += int(p == 12); h13 += int(p == 13); h14 += int(p == 14);
+        h15 += int(p == 15); h16 += int(p == 16); h17 += int(p == 17);
+        h18 += int(p == 18); h19 += int(p == 19); h20 += int(p == 20);
+        h21 += int(p == 21); h22 += int(p == 22); h23 += int(p == 23);
+        h24 += int(p == 24); h25 += int(p == 25);
+    }
+
+    int sum = h0*(h0-1) + h1*(h1-1) + h2*(h2-1) + h3*(h3-1) + h4*(h4-1)
+            + h5*(h5-1) + h6*(h6-1) + h7*(h7-1) + h8*(h8-1) + h9*(h9-1)
+            + h10*(h10-1) + h11*(h11-1) + h12*(h12-1) + h13*(h13-1)
+            + h14*(h14-1) + h15*(h15-1) + h16*(h16-1) + h17*(h17-1)
+            + h18*(h18-1) + h19*(h19-1) + h20*(h20-1) + h21*(h21-1)
+            + h22*(h22-1) + h23*(h23-1) + h24*(h24-1) + h25*(h25-1);
+
+    int denom = iMax * (iMax - 1);
+    int icInt = 0;
+    if (denom > 0) {
+        float icf = (float(sum) * 100000.0) / float(denom);
+        icInt = int(icf + 0.5);
+    }
+
+    int r = (icInt / 65536);
+    int g = (icInt / 256) - r*256;
+    int b = icInt - (icInt/256)*256;
+
+    return half4(half(float(r) / 255.0),
+                 half(float(g) / 255.0),
+                 half(float(b) / 255.0),
+                 1.0);
+}

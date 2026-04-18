@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -7,7 +6,6 @@ using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
-using Avalonia.Threading;
 using SkiaSharp;
 using EnigmaBenchmark.Core;
 using EnigmaBenchmark.Crackers;
@@ -15,45 +13,55 @@ using EnigmaBenchmark.Crackers;
 namespace EnigmaBenchmarkAvalonia;
 
 /// <summary>
-/// Hosts the GPU cracker run. Avalonia only exposes the D3D11 GrContext inside
-/// a render callback via ISkiaSharpApiLease, so we:
+/// Hosts the GPU cracker run. Avalonia only exposes the GrContext inside a
+/// render callback via ISkiaSharpApiLease, so we:
 ///   1. Stash cracker inputs + a TaskCompletionSource
 ///   2. Trigger InvalidateVisual() to schedule a render frame
-///   3. In the DrawOp, lease the context, run GpuCracker once, publish result
-///   4. Resolve the TCS so the caller can await the GPU result
+///   3. In the DrawOp, lease the context, run the right cracker, publish result
+///   4. Resolve the TCS so the caller can await
 ///
-/// UI freezes for the duration of the GPU cracker run because the lease is
-/// synchronous within Render(). On real GPU hardware that's typically 1-3s,
-/// which is acceptable for a benchmark tool.
+/// One BenchmarkControl handles both M3 and M4 runs — `_pending` is a discriminated
+/// union of request shapes so the DrawOp can pick the correct cracker.
 /// </summary>
 public class BenchmarkControl : Control
 {
+    enum Cipher { M3, M4 }
+
     sealed class Request
     {
+        public Cipher Cipher;
         public byte[] Ciphertext = Array.Empty<byte>();
-        public EnigmaM3 FixedParts;
+        public EnigmaM3 M3Parts;
+        public EnigmaM4 M4Parts;
         public CrackScope Scope;
-        // RunContinuationsAsynchronously: without this, TrySetResult would
-        // fire the await continuation synchronously on the render thread,
-        // and any Avalonia UI update downstream would cross-thread-throw.
         public TaskCompletionSource<CrackResult> Tcs =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
     volatile Request? _pending;
 
-    /// <summary>
-    /// Schedule a GPU cracker run. Must be called from the UI thread (posts
-    /// an invalidate). The returned task completes on the render thread once
-    /// the DrawOp finishes.
-    /// </summary>
     public Task<CrackResult> RunGpuAsync(byte[] ciphertext, EnigmaM3 fixedParts, CrackScope scope)
     {
         var req = new Request
         {
+            Cipher = Cipher.M3,
             Ciphertext = ciphertext,
-            FixedParts = fixedParts,
-            Scope      = scope,
+            M3Parts = fixedParts,
+            Scope = scope,
+        };
+        _pending = req;
+        InvalidateVisual();
+        return req.Tcs.Task;
+    }
+
+    public Task<CrackResult> RunGpuM4Async(byte[] ciphertext, EnigmaM4 fixedParts, CrackScope scope)
+    {
+        var req = new Request
+        {
+            Cipher = Cipher.M4,
+            Ciphertext = ciphertext,
+            M4Parts = fixedParts,
+            Scope = scope,
         };
         _pending = req;
         InvalidateVisual();
@@ -63,10 +71,8 @@ public class BenchmarkControl : Control
     public override void Render(DrawingContext context)
     {
         base.Render(context);
-
         var req = _pending;
         if (req == null) return;
-
         context.Custom(new BenchDrawOp(new Rect(Bounds.Size), req, () => _pending = null));
     }
 
@@ -74,7 +80,6 @@ public class BenchmarkControl : Control
     {
         readonly Request _req;
         readonly Action _clear;
-
         public Rect Bounds { get; }
 
         public BenchDrawOp(Rect bounds, Request req, Action clear)
@@ -97,16 +102,18 @@ public class BenchmarkControl : Control
                 }
 
                 using var lease = leaseFeature.Lease();
-                var gr = lease.GrContext;   // may still be null if not a GPU backend
+                var gr = lease.GrContext;
 
-                // Diagnostic breadcrumbs so we can see whether the lease
-                // actually gave us a real GPU context. Result flows back via
-                // the exception channel if anything is null/wrong.
-                Console.WriteLine($"[BenchCtl] GrContext={(gr != null ? "non-null" : "NULL")} "
+                Console.WriteLine($"[BenchCtl] Cipher={_req.Cipher} "
+                                + $"GrContext={(gr != null ? "non-null" : "NULL")} "
                                 + $"Backend={(gr != null ? gr.Backend.ToString() : "n/a")}");
 
-                var cracker = new GpuCracker(gr);
-                var result = cracker.Crack(_req.Ciphertext, _req.FixedParts, _req.Scope);
+                CrackResult result;
+                if (_req.Cipher == Cipher.M3)
+                    result = new GpuCracker(gr).Crack(_req.Ciphertext, _req.M3Parts, _req.Scope);
+                else
+                    result = new GpuCrackerM4(gr).Crack(_req.Ciphertext, _req.M4Parts, _req.Scope);
+
                 _req.Tcs.TrySetResult(result);
             }
             catch (Exception ex)
