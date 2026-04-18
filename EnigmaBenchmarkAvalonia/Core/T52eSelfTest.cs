@@ -190,6 +190,7 @@ public static class T52eSelfTest
         fails += RunOne(new Crackers.ScalarCrackerT52e(), cipher, pins, switchMap, knownStart, trueStart);
         fails += RunOne(new Crackers.ParallelScalarCrackerT52e(), cipher, pins, switchMap, knownStart, trueStart);
         fails += RunOne(new Crackers.SimdCrackerT52e(), cipher, pins, switchMap, knownStart, trueStart);
+        fails += RunOne(new Crackers.GpuCrackerT52e(grContext: null), cipher, pins, switchMap, knownStart, trueStart);
         return fails;
     }
 
