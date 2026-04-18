@@ -384,8 +384,11 @@ public partial class MainWindow : Window
             new ParallelScalarCrackerT52e(),
             new ScalarCrackerT52e(),
         };
-        // Scalar single-thread is slow (~9 min for full 24M); cap it.
-        double[] timeouts = { 0, 120, 120 };
+        // T52e per-key work is ~5× Lorenz's (H/SR XOR network + 32-row perm
+        // lookup + 10 wheels stepping). Scalar needs ~9 min for full 24M.
+        // SIMD is unlimited; Parallel completes in ~60s; Scalar gets 900s
+        // (650s typical + safety margin).
+        double[] timeouts = { 0, 180, 900 };
         for (int i = 0; i < cpu.Length; i++)
         {
             var c = cpu[i];
