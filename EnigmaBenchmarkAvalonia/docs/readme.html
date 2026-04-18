@@ -242,10 +242,36 @@
   .toc ol { margin: 6px 0; padding-left: 22px; }
   .toc a { color: var(--cyan); text-decoration: none; }
   .toc a:hover { text-decoration: underline; color: var(--amber); }
+  .lang-switch {
+    position: absolute;
+    top: 24px; right: 32px;
+    font-size: 13px;
+  }
+  .lang-switch a {
+    color: var(--muted);
+    text-decoration: none;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-left: 4px;
+  }
+  .lang-switch a.active {
+    color: var(--amber);
+    border-color: var(--amber);
+  }
+  .lang-switch a:hover {
+    color: var(--amber);
+    border-color: var(--amber);
+  }
 </style>
 </head>
 <body>
 <div class="container">
+
+<div class="lang-switch">
+  <a href="readme.html" class="active">中文</a>
+  <a href="readme_en.html">English</a>
+</div>
 
 <header>
   <h1>EnigmaBenchmark</h1>

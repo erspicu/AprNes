@@ -1,0 +1,1415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EnigmaBenchmark — WWII German Ciphers × Modern Compute</title>
+<style>
+  :root {
+    --bg: #0e1116;
+    --surface: #151a22;
+    --surface-2: #1b212b;
+    --text: #d8dee4;
+    --muted: #8a93a0;
+    --amber: #ffd060;
+    --green: #80ff80;
+    --cyan: #80d0ff;
+    --red: #ff8888;
+    --border: #1f2430;
+    --mono: "Consolas", "Cascadia Mono", "JetBrains Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                 "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif;
+    line-height: 1.72;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 56px 32px 120px;
+  }
+  header h1 {
+    font-size: 52px;
+    letter-spacing: -0.02em;
+    margin: 0 0 8px;
+    font-weight: 700;
+    background: linear-gradient(90deg, var(--amber), var(--cyan));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .lead {
+    color: var(--text);
+    font-size: 19px;
+    margin: 0 0 6px;
+  }
+  .meta {
+    color: var(--muted);
+    font-size: 14px;
+    margin: 0 0 56px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+  }
+  h2 {
+    font-size: 28px;
+    margin: 64px 0 18px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    color: var(--amber);
+    font-weight: 600;
+  }
+  h3 {
+    font-size: 20px;
+    margin: 28px 0 10px;
+    color: var(--cyan);
+    font-weight: 600;
+  }
+  h4 {
+    font-size: 16px;
+    margin: 20px 0 8px;
+    color: var(--text);
+  }
+  p { margin: 10px 0 14px; }
+  ul { padding-left: 22px; margin: 10px 0; }
+  li { margin: 4px 0; }
+  code {
+    background: var(--surface-2);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--amber);
+  }
+  pre {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+  pre code { background: transparent; padding: 0; color: var(--text); }
+  blockquote {
+    margin: 18px 0;
+    padding: 10px 20px;
+    border-left: 3px solid var(--amber);
+    background: var(--surface);
+    color: var(--text);
+  }
+  blockquote p { margin: 0; }
+  a { color: var(--cyan); }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  th, td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    font-size: 14px;
+  }
+  th { background: var(--surface-2); font-weight: 600; color: var(--amber); }
+  tr:last-child td { border-bottom: none; }
+  .kv-table td:first-child { color: var(--muted); width: 40%; }
+  .num { text-align: right; font-family: var(--mono); color: var(--cyan); }
+  .footnote {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 60px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+  .status {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 10px;
+    border-radius: 10px;
+    vertical-align: middle;
+    margin-left: 8px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+  }
+  .status.ready    { background: rgba(128,255,128,0.14); color: var(--green); border: 1px solid rgba(128,255,128,0.32); }
+  .status.planned  { background: rgba(255,208,96,0.10); color: var(--amber); border: 1px solid rgba(255,208,96,0.28); }
+  .status.future   { background: rgba(138,147,160,0.13); color: var(--muted); border: 1px solid rgba(138,147,160,0.28); }
+  .cipher-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px 26px;
+    margin: 24px 0;
+  }
+  .cipher-card h3 { margin-top: 0; }
+  .cipher-card .tag {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.10em;
+    margin-bottom: 4px;
+  }
+  .cipher-card .highlight-stat {
+    display: inline-block;
+    margin: 8px 0 4px;
+    padding: 6px 12px;
+    background: var(--surface-2);
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--amber);
+  }
+  .person-card {
+    background: var(--surface);
+    border-left: 3px solid var(--cyan);
+    border-radius: 4px;
+    padding: 14px 20px;
+    margin: 16px 0;
+  }
+  .person-card h4 {
+    margin: 0 0 4px;
+    color: var(--amber);
+    font-size: 17px;
+  }
+  .person-card .lifespan {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: 6px;
+  }
+  .person-card p:first-of-type { margin-top: 8px; }
+  .person-card p:last-child     { margin-bottom: 2px; }
+  .people-section h3 {
+    margin-top: 44px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  .people-section h3:first-of-type { border-top: none; padding-top: 0; }
+  .backend-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+    margin: 14px 0 24px;
+  }
+  .backend {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 18px;
+  }
+  .backend h4 { margin: 0 0 6px; color: var(--amber); font-size: 15px; }
+  .backend p { margin: 0; font-size: 14px; color: var(--muted); }
+  .big-num {
+    font-family: var(--mono);
+    font-size: 34px;
+    color: var(--green);
+    font-weight: 700;
+    display: inline-block;
+    margin: 4px 12px 4px 0;
+  }
+  .big-num.red { color: var(--red); }
+  .vs {
+    color: var(--muted);
+    font-size: 18px;
+    margin: 0 8px;
+  }
+  .emph { color: var(--amber); }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 52px 0; }
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 22px;
+    margin: 20px 0 36px;
+    font-size: 14px;
+  }
+  .toc ol { margin: 6px 0; padding-left: 22px; }
+  .toc a { color: var(--cyan); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; color: var(--amber); }
+  .lang-switch {
+    position: absolute;
+    top: 24px; right: 32px;
+    font-size: 13px;
+  }
+  .lang-switch a {
+    color: var(--muted);
+    text-decoration: none;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-left: 4px;
+  }
+  .lang-switch a.active {
+    color: var(--amber);
+    border-color: var(--amber);
+  }
+  .lang-switch a:hover {
+    color: var(--amber);
+    border-color: var(--amber);
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="lang-switch">
+  <a href="readme.html">中文</a>
+  <a href="readme_en.html" class="active">English</a>
+</div>
+
+<header>
+  <h1>EnigmaBenchmark</h1>
+  <p class="lead">Top-tier WWII German ciphers <span style="color:var(--muted)">×</span> the GPU on your desk</p>
+  <p class="meta">
+    Back then: ten thousand people, a secret town, the first electronic computer ever built — for this exact problem.
+    Now: you press Start, and it's done in under a second.
+  </p>
+</header>
+
+<nav class="toc">
+  <strong style="color:var(--amber)">Contents</strong>
+  <ol>
+    <li><a href="#about">What is this?</a></li>
+    <li><a href="#ciphers">Six historic cipher showdowns</a></li>
+    <li><a href="#people">The codebreakers — the story the movies missed</a></li>
+    <li><a href="#backends">Four compute paths</a></li>
+    <li><a href="#numbers">Then vs. now</a></li>
+    <li><a href="#why">Why this project exists</a></li>
+    <li><a href="#run">How to run it</a></li>
+    <li><a href="#tech">Technical notes</a></li>
+    <li><a href="#credits">Credits</a></li>
+  </ol>
+</nav>
+
+<h2 id="about">What is this?</h2>
+
+<p>
+  EnigmaBenchmark runs a brute-force attack on some of WWII's most famous German cipher machines
+  using <strong>four different compute paths</strong>, side by side, in one window:
+</p>
+
+<ul>
+  <li>Single-threaded C# — the plainest version</li>
+  <li>All-core CPU parallelism — <code>Parallel.ForEach</code></li>
+  <li>AVX2 SIMD — <code>Vector256&lt;int&gt;</code> + <code>GatherVector256</code></li>
+  <li>SkSL shader on the GPU — the same path used by the
+      <a href="https://github.com/erspicu/AprNes" style="color:var(--cyan)">AprNes</a>
+      emulator's CRT filter</li>
+</ul>
+
+<p>
+  The point isn't to "show off benchmark numbers." It's to take one computation with real historical weight
+  and run it on four different hardware options so you can see, in concrete terms:
+</p>
+
+<blockquote>
+  The same SkSL shader finishes in <span class="emph">0.2 s</span> on the GPU
+  while the single-threaded C# version takes <span class="emph">11 s</span>.
+</blockquote>
+
+<p>
+  That's the physical reason AprNes's CRT filter lives on the GPU.
+</p>
+
+<hr>
+
+<h2 id="ciphers">Six historic cipher showdowns</h2>
+
+<div class="cipher-card">
+  <div class="tag">1917 Jan · Auswärtiges Amt Berlin → Mexico City</div>
+  <h3>Zimmermann Telegram / Code 0075 <span class="status ready">Implemented</span></h3>
+
+  <p>
+    <strong>16 January 1917</strong>: German Foreign Secretary Arthur Zimmermann cables ambassador
+    Heinrich von Eckardt in Mexico City. If the US enters the war, Germany will back a Mexican attack
+    in exchange for the return of <strong>Texas, New Mexico, and Arizona</strong>. It's the single
+    biggest intelligence swing of the war.
+  </p>
+
+  <h4>Cipher structure</h4>
+  <ul>
+    <li>Not a mechanical cipher — a <strong>codebook</strong>: a dictionary-style table where each word
+      is replaced by a 4- or 5-digit code group</li>
+    <li>The German Foreign Office version is <strong>0075</strong> (what this project simulates);
+      the Washington→Mexico leg was further enciphered in the weaker <strong>13040</strong></li>
+    <li>Route: Berlin → Sweden relay / US transatlantic cable → Washington embassy → Mexico City.
+      Re-enciphered at every hop. British Room 40 intercepted the US-cable leg.</li>
+  </ul>
+
+  <h4>Why a codebook can't be brute-forced</h4>
+  <p>
+    A few thousand words × multiple code-group variants = keyspace well past 10<sup>400</sup> —
+    totally unenumerable. The only reason it broke is that Room 40 had <strong>years of accumulated
+    German diplomatic traffic</strong>, and patient matching of recurring fragments ("AN SEINER
+    EXZELLENZ", "ZIMMERMANN" signatures) reconstructed the codebook piece by piece. This was a
+    victory of intelligence gathering and patience, not of compute.
+  </p>
+
+  <h4>How this project models it</h4>
+  <p>
+    A simplified ~70-word pseudo-0075 codebook; Zimmermann-style messages are encoded to 4-digit
+    code groups. The cracker mimics Room 40's method: given a handful of previously-broken intercepts
+    as crib material, it performs a single-threaded linear-pass word-by-code alignment to recover
+    dictionary entries, then applies those entries to the target message. Typical runtime:
+    <strong>milliseconds</strong>, 70–90 % decode ratio.
+  </p>
+
+  <p class="highlight-stat">
+    Keyspace = ∞ (the codebook itself is the key) · Cracker path = crib-based dictionary recovery
+  </p>
+
+  <p>
+    This card exists to underline one cold fact: <strong>no matter how strong the algorithm, once the
+    key carrier (codebook, settings sheet, Kenngruppenbuch) is leaked or reconstructable, the system
+    collapses</strong>. The same logic held at Bletchley — the captured U-boat
+    <em>Wetterkurzschlüssel</em> was worth more than any Bombe Turing ever built.
+  </p>
+</div>
+
+<div class="cipher-card">
+  <div class="tag">1918 Mar–Jun · Kaiserliches Heer Western Front</div>
+  <h3>ADFGVX <span class="status ready">Implemented</span></h3>
+
+  <p>
+    Designed in March 1918 by Oberstleutnant Fritz Nebel for Germany's Spring Offensive. A two-stage
+    cipher, theoretically very strong — until <strong>Captain Georges Painvin</strong> of the French
+    <em>Bureau du Chiffre</em> broke the first message on 2 June 1918, changing the course of the war.
+  </p>
+
+  <h4>Encryption flow</h4>
+  <ol>
+    <li><strong>Polybius substitution</strong>: a 6×6 grid filled with 26 letters + 10 digits;
+      each plaintext character ↦ a pair of ADFGVX letters (row, col). The letters A D F G V X were
+      chosen because their <strong>Morse codes are maximally distinct</strong> — minimising
+      radio transmission error.</li>
+    <li><strong>Columnar transposition</strong>: the substituted string is written into columns under
+      a keyword, columns are reordered alphabetically by the keyword, and the result is read out
+      row-by-row.</li>
+  </ol>
+
+  <h4>Painvin's opening</h4>
+  <p>
+    A two-stage cipher ought to be hard — but German operators were sloppy and <strong>repeatedly sent
+    similar messages on the same day under the same keyword</strong> (official cables loved to open with
+    "An das Hauptquartier…"). Painvin ran what he called a "<strong>superimposition attack</strong>":
+    aligning depths of equal length, using statistics on the formulaic prefixes to peel off the
+    transposition column order, then reverse-engineering the Polybius grid. Three brutal weeks of work
+    cost him 15 kg.
+  </p>
+
+  <h4>The decisive message</h4>
+  <p style="font-family: var(--mono); color: var(--amber); margin-left: 20px; border-left: 2px solid var(--amber); padding-left: 16px;">
+    "Munitionierung beschleunigen Punkt soweit nicht eingesehen auch bei Tag"<br>
+    — Speed up the ammunition shipment. Continue even in daylight.
+  </p>
+  <p>
+    This decrypt let France predict the German main axis between Montdidier and Compiègne and rush
+    reserves to close the gap. The Spring Offensive stalled. History calls it
+    the <strong>Radiogram of Victory</strong>.
+  </p>
+
+  <h4>How this project models it</h4>
+  <p>
+    The benchmark assumes the Polybius grid is known (Painvin had to recover that too — a harder,
+    separate attack) and brute-forces the transposition column order. A keyword of length 8 →
+    40,320 permutations, <strong>solved in seconds on a single thread</strong>. Candidates are scored
+    by 26-letter index of coincidence.
+  </p>
+
+  <p class="highlight-stat">
+    Keyspace = K! = 8! = 40,320 permutations · Score = standard 26-bucket IC
+  </p>
+
+  <p>
+    By modern standards this is trivial — but in 1918 it was the first documented case of a field
+    cipher machine being broken by <strong>pure statistical analysis</strong>. Painvin's technique —
+    reverse-engineer a permutation from recurring patterns — is the same path Rejewski, Tutte, and
+    Beurling would walk one generation later.
+  </p>
+</div>
+
+<hr>
+
+<h3>Three WWII mechanical × electronic battles</h3>
+
+<p>
+  This benchmark picks three of the ciphers Germany was most proud of, the Allies found most painful,
+  and which were declassified only decades after the war. Each has its own legend and tragedy.
+</p>
+
+<div class="cipher-card">
+  <div class="tag">1932 – 1945 · Wehrmacht / Heer / Luftwaffe</div>
+  <h3>Enigma M3 <span class="status ready">Implemented</span></h3>
+
+  <p>
+    The standard three-rotor Wehrmacht Enigma. Army, navy, air force, high command, foreign office,
+    intelligence — the nervous system of the entire Third Reich ran on this iron box. German High
+    Command's faith in Enigma was close to religious: they never believed it was broken, not even
+    after they'd lost.
+  </p>
+
+  <h4>Machine configuration</h4>
+  <table class="kv-table">
+    <tr><td>Rotors (Walzen)</td><td>I / II / III / IV / V (five-rotor Wehrmacht set)</td></tr>
+    <tr><td>Rotor order (Walzenlage)</td><td>pick 3 from 5 = <code>5×4×3 = 60</code> combinations</td></tr>
+    <tr><td>Reflector (Umkehrwalze)</td><td>UKW-B or UKW-C</td></tr>
+    <tr><td>Ring settings (Ringstellung)</td><td>A–Z per rotor, 26³ total</td></tr>
+    <tr><td>Grundstellung (start positions)</td><td>A–Z per rotor, 26³ total</td></tr>
+    <tr><td>Plugboard (Steckerbrett)</td><td>10 letter swap pairs</td></tr>
+    <tr><td>Mechanical quirk</td><td>Double-step anomaly — when the middle rotor hits its notch,
+      the middle <em>and</em> left rotor both step simultaneously</td></tr>
+  </table>
+
+  <h4>Keyspace</h4>
+  <p>
+    Full space: <code>60 × 26³ × 26³ × 150,738,274,937,250</code> (plugboard) ≈
+    <span class="emph">1.58 × 10²⁰</span>. The plugboard part can't be separated by IC scoring, so
+    the historical Rejewski / Turing attacks bypass it — as does this benchmark.
+  </p>
+  <p>
+    The benchmark assumes the plugboard is known (simulating a crib-based attack or the effect of
+    Turing's Bombe), and only brute-forces <strong>wheel order × grundstellung</strong>. That defines
+    the four scopes:
+  </p>
+
+  <table>
+    <tr><th>Scope</th><th>Search</th><th class="num">Keyspace</th></tr>
+    <tr><td>Quick</td><td>wheel × 26³</td><td class="num">1,054,560</td></tr>
+    <tr><td>Normal</td><td>+ right ring</td><td class="num">27,418,560</td></tr>
+    <tr><td>Hard</td><td>+ middle ring</td><td class="num">712,882,560</td></tr>
+    <tr><td>Extreme</td><td>+ left ring (full wheel × pos³ × ring³)</td><td class="num">18,534,946,560</td></tr>
+  </table>
+
+  <h4>History</h4>
+  <ul>
+    <li><strong>1932</strong>: three Polish mathematicians — Marian Rejewski, Jerzy Różycki, and
+      Henryk Zygalski — break Enigma for the first time using permutation theory, and build the
+      first <em>Bomba</em></li>
+    <li><strong>July 1939</strong>: the Poles hand everything over to the British at Bletchley Park,
+      just two months before the war starts</li>
+    <li><strong>1940 onward</strong>: Alan Turing and Gordon Welchman redesign the electromechanical
+      <strong>Bombe</strong>; the US Navy later builds its own</li>
+    <li>At its peak Bletchley Park employed over <strong>10,000 people</strong>, about 75 % of them
+      women</li>
+    <li>The whole operation stayed classified for 30 years — until Winterbotham's 1974 book
+      <em>The Ultra Secret</em> finally blew the lid</li>
+  </ul>
+</div>
+
+<div class="cipher-card">
+  <div class="tag">1942 Feb – 1945 · Kriegsmarine U-Boat (M4 "Shark")</div>
+  <h3>Enigma M4 <span class="status ready">Implemented</span></h3>
+
+  <p>
+    <strong>1 February 1942</strong>: the Kriegsmarine upgrades its U-boat comms to the four-rotor M4.
+    Bletchley Park goes completely blind for <strong>ten straight months</strong>, unable to read a
+    single U-boat order. Those ten months are called the "Second Happy Time" — German wolfpacks shredded
+    Allied supply lines across the North Atlantic.
+  </p>
+
+  <p>
+    Historians estimate that during those 10 months about <span class="emph">600 Allied merchant ships
+    carrying 3.5 million tons of supplies</span> went to the bottom. Had M4 held, Britain could have
+    been starved into negotiating peace by 1943.
+  </p>
+
+  <h4>M4 vs M3</h4>
+  <ul>
+    <li>Adds a <strong>thin "Greek" rotor</strong> (Beta or Gamma) on the far left. It
+      <strong>does not rotate</strong>, but has a start position.</li>
+    <li>Uses thin reflectors (UKW-B dünn / UKW-C dünn)</li>
+    <li>Beta must pair with UKW-B dünn, Gamma with UKW-C dünn</li>
+    <li>Keyspace is 26 × 2 × 2 = 104 × bigger than M3</li>
+  </ul>
+
+  <h4>How it was broken</h4>
+  <p>
+    October 1942: HMS Petard intercepts <strong>U-559</strong> in the Mediterranean. Able Seaman
+    Colin Grazier and Lieutenant Tony Fasson swim into the already-sinking boat and retrieve the
+    <em>Wetterkurzschlüssel</em> (weather short-signal codebook). Both men went down with the
+    submarine.
+  </p>
+  <p>
+    Using that codebook Bletchley reopens M4 on 13 December 1942. From that day the Atlantic
+    campaign tipped the other way.
+  </p>
+</div>
+
+<div class="cipher-card">
+  <div class="tag">1941 – 1945 · Oberkommando der Wehrmacht (Supreme High Command)</div>
+  <h3>Lorenz SZ42 "Tunny" — χ-wheel recovery <span class="status ready">Implemented (Colossus stage 1)</span></h3>
+
+  <p>
+    Enigma is tactical. Lorenz is <strong>strategic</strong> — direct links between Hitler, OKW, OKH,
+    and the army-group commanders on the front. A single Lorenz decrypt was worth a hundred Enigma
+    messages.
+  </p>
+
+  <h4>Real SZ42b machine</h4>
+  <p>
+    Lorenz SZ42 (Schlüsselzusatz, "cipher attachment") is not a character-substitution machine like
+    Enigma — it's a <strong>teleprinter stream cipher</strong>:
+  </p>
+  <ul>
+    <li>Plaintext is in <strong>Baudot 5-bit</strong> (ITA2 international teleprinter code)</li>
+    <li>The machine generates a 5-bit pseudo-random keystream and XORs it with plaintext</li>
+    <li>The keystream is produced by 12 <strong>pinwheels</strong>:
+      <ul>
+        <li>5 <strong>χ</strong> (chi) wheels: 41, 31, 29, 26, 23 pins — step every character</li>
+        <li>5 <strong>ψ</strong> (psi) wheels: 43, 47, 51, 53, 59 pins — step conditionally on μ</li>
+        <li>2 <strong>μ</strong> (mu) motor wheels: 37, 61 pins — control whether ψ advances</li>
+      </ul>
+    </li>
+    <li>SZ42b's "limitations" feed χ₂'s previous-character bit into the ψ-stepping condition —
+      blocking the older motor-only attack</li>
+    <li>Encryption: <code>Z[i] = P[i] ⊕ χ[i] ⊕ ψ[i]</code>; keystream period ≈ 1.6 × 10¹⁹</li>
+  </ul>
+
+  <p class="highlight-stat">
+    Full keyspace (including all pin patterns) ≈ 2<sup>501</sup>
+  </p>
+
+  <p>
+    Pure brute force is mathematically impossible. Bletchley didn't break Lorenz with compute —
+    they broke it with two acts of statistical genius:
+  </p>
+
+  <ul>
+    <li><strong>Bill Tutte</strong> reverse-engineered the entire Lorenz machine logic from a single
+      4,000-character repeat-key depth — <strong>using nothing but pencil and paper</strong>, and
+      never seeing the machine. That feat is regularly called one of the greatest single intellectual
+      achievements of WWII.</li>
+    <li><strong>Tommy Flowers</strong> at the Post Office Research Station built <strong>Colossus</strong>
+      — 1,500 valves, the world's first programmable electronic computer, purpose-built to run Tutte's
+      statistical attack.</li>
+    <li>Ten Colossi were eventually built. Starting in 1944 they broke Lorenz messages daily; the
+      night before D-Day, Eisenhower said Ultra intelligence was "worth ten army divisions".</li>
+  </ul>
+
+  <h4>Bletchley's three-stage pipeline</h4>
+  <p>
+    Lorenz wasn't broken in one shot. Tutte decomposed the attack into three stages, each targeting
+    a different part of the structure:
+  </p>
+  <ol>
+    <li><strong>Stage 1 — χ-wheel start recovery</strong> (what Colossus actually did)<br>
+      For each of 41 × 31 × 29 × 26 × 23 = <strong>22,041,682</strong> candidates, generate the χ
+      stream, XOR against ciphertext, compute a Δ-statistic (bit-1 XOR bit-2 of Z⊕χ distribution
+      deviation), and pick the tuple that best matches the "German teleprinter 1+2 dottage" signature.
+      Colossus Mk II: ~1 hour.</li>
+    <li><strong>Stage 2 — χ-wheel pin pattern recovery</strong><br>
+      Given Stage-1 start positions, reverse-engineer the pins themselves (the 0/1 patterns set at
+      daily key time) by hand plus statistics.</li>
+    <li><strong>Stage 3 — ψ and μ recovery</strong><br>
+      Strip χ: residual = P ⊕ ψ. Testery personnel finish the job by hand, statistics plus cribs,
+      recovering plaintext.</li>
+  </ol>
+
+  <h4>Which stage does the benchmark model?</h4>
+  <p>
+    <strong>Stage 1 — χ-wheel recovery.</strong> This is precisely what Colossus existed to do —
+    Tommy Flowers designed it to sweep those 22 M candidates in under an hour. Our GPU shader
+    finishes in a couple of seconds.
+  </p>
+  <p class="highlight-stat">
+    χ keyspace = 41 × 31 × 29 × 26 × 23 ≈ 22,041,682 combinations
+  </p>
+
+  <p>
+    To focus on hardware comparison, the scenario uses the simplified form <code>Z = P ⊕ χ</code>
+    (ψ = 0). Full SZ42b encryption would collapse the effective brute-force keyspace to ~900
+    χ₁×χ₂ pairs once Δ-statistics take over — that would defeat the benchmark's purpose. The
+    Δ-signal Colossus saw at Stage 1 is structurally the same one our shader sees; the difference
+    is that ψ/μ handling is kicked down the pipeline to humans in Stages 2 and 3.
+  </p>
+
+  <h4>Statistical scorer</h4>
+  <p>
+    The shader, for each key candidate, scores the first 180 ciphertext characters with a simplified
+    dottage — counting how often the decrypted byte matches SPACE (Baudot 4) or E (Baudot 1).
+    These two characters together are about 29 % of German teleprinter text versus 6.25 % random,
+    giving a 10σ+ signal. GPU pre-filter + CPU full-text 32-bucket IC re-rank guarantees the true
+    key surfaces out of noise.
+  </p>
+</div>
+
+<hr>
+
+<h2 id="people">The codebreakers — the story the movies missed</h2>
+
+<p>
+  <em>The Imitation Game</em> handed nearly all the credit for WWII cryptanalysis to Alan Turing.
+  The real story is much more complex: <strong>three independent attack chains, four countries,
+  more than a decade, and hundreds of mathematicians, engineers, and women operators</strong> —
+  together they tore open German systems that Berlin thought were "forever secure." Here are the
+  people the movies and most books miss.
+</p>
+
+<div class="people-section">
+
+<h3>0. The overture — WWI (1914–1918)</h3>
+
+<div class="person-card">
+  <h4>Georges Painvin <span class="lifespan">(1886–1980)</span></h4>
+  <p>
+    French artillery captain, École Polytechnique mining engineer by training, amateur cryptographer
+    by inclination. Called into the <strong>Bureau du Chiffre</strong> in 1914 and never looked back.
+  </p>
+  <p>
+    When the German Spring Offensive of June 1918 refreshed the ADFGVX Polybius grid and keyword,
+    the French cryptographic section was instantly blind. Painvin locked himself in a Paris office
+    for three weeks, brute-stacked two same-day same-keyword depth telegrams, and grid-by-grid
+    reverse-engineered both the keyword order and the Polybius itself. His
+    <strong>2 June "Radiogram of Victory"</strong> exposed the German main axis between
+    Montdidier and Compiègne.
+  </p>
+  <p>
+    When he emerged he had lost <strong>15 kg</strong>, his hair had gone grey, and his body was
+    broken. He later said: "<em>those were the worst days of my life; I kept going on willpower
+    alone, against a stack of paper</em>." He turned down the offer to stay in intelligence,
+    became CEO of Compagnie des Compteurs (boilers), and lived to 93. France made him a Grand
+    Officer of the Légion d'Honneur in 1973; the US NSA publicly acknowledged his work in 1978 —
+    60 years after ADFGVX fell.
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>"Blinker" Hall <span class="lifespan">(Admiral Sir Reginald Hall, 1870–1943)</span></h4>
+  <p>
+    Director of Naval Intelligence (NID), the political muscle behind <strong>Room 40</strong>.
+    He blinked compulsively (hence the nickname) and was a political operator of rare skill.
+    When the Zimmermann Telegram landed in his inbox in 1917, Hall faced a dilemma: handing it
+    straight to the US would reveal that Britain was tapping US transatlantic cables. He invented
+    the "<strong>stolen from a Mexican telegraph office</strong>" cover story, letting the US
+    believe the intelligence had reached them via a lucky third-party theft — and thereby
+    protected Room 40's source.
+  </p>
+  <p>
+    Hall's political savvy mattered as much as Room 40's technical capacity. His persuasion memo
+    to US Ambassador Walter Page is still studied in intelligence-history courses.
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Nigel de Grey &amp; Rev. William Montgomery <span class="lifespan">(1886–1951 / 1871–1930)</span></h4>
+  <p>
+    Room 40's two Zimmermann Telegram decoders. De Grey came from publishing (Heinemann);
+    Montgomery was a Presbyterian minister and Christian theology scholar. Neither was a
+    conventional military intelligence officer — both built up the 0075 codebook word by word from
+    accumulated German diplomatic intercepts.
+  </p>
+  <p>
+    On the morning of 17 January 1917 they were staring at a partial decrypt. When the words
+    "<em>MEXIKO</em>", "<em>TEXAS</em>", and "<em>ARIZONA</em>" appeared in clear,
+    de Grey rushed to Hall: "<strong>Do you want to bring America into the war?</strong>" —
+    one of the most consequential single sentences in the history of diplomatic decryption.
+  </p>
+  <p>
+    Neither man was publicly acknowledged for 30 years. Montgomery died in 1930 with his family
+    unaware of what he had done in the war; de Grey stayed at GCHQ and retired in 1951.
+  </p>
+</div>
+
+<h3>1. The Poles — where the story really starts (1932–1939)</h3>
+
+<div class="person-card">
+  <h4>Marian Rejewski <span class="lifespan">(1905–1980)</span></h4>
+  <p>
+    Warsaw University maths graduate, recruited at 22 into the Polish cipher bureau, Biuro Szyfrów.
+    In <strong>December 1932</strong> he did what every cryptographer in Europe had failed to do:
+    he broke Enigma. Not by exhaustion — by <strong>permutation-group theory</strong>. From the
+    cyclic structure of the daily indicator (what he called the "characteristic") he reverse-
+    engineered the entire internal wiring of the machine.
+  </p>
+  <p>
+    It was a mathematical achievement with no precedent. French intelligence, via the German
+    traitor Hans-Thilo Schmidt through Capt. Gustave Bertrand, had provided operator manuals
+    describing Enigma's <em>external</em> operation — Rejewski had to deduce the <em>internal</em>
+    wiring from the statistics of noisy indicators. He was 27.
+  </p>
+  <p>
+    In 1938 Rejewski, Henryk Zygalski, and Jerzy Różycki built the
+    "<strong>Bomba kryptologiczna</strong>" — an electromechanical Enigma-breaker that predated
+    the British Bombe by two full years.
+  </p>
+  <p>
+    On <strong>25–26 July 1939</strong>, at a secret meeting in the Pyry forest south of Warsaw,
+    the Poles handed over everything — the theory, the Bomba blueprints, copies of the Enigma
+    machine itself — to British and French intelligence. Germany invaded two months later.
+    The entire Bletchley Park Enigma effort <strong>rests on Polish foundations</strong>.
+  </p>
+  <p>
+    During the war Rejewski fled to France, Spain, Portugal, and finally Britain — where he
+    was parked in a Polish signals unit doing routine work. Bletchley
+    <strong>never invited him in</strong> — the British feared the security risk of Allied
+    personnel. After the war he returned to Poland and worked quietly as an insurance-company
+    accountant under Communist rule, not speaking publicly about his war work until 1967. Britain
+    did not officially acknowledge the Polish contribution until 1976. Rejewski died in Warsaw
+    in 1980, never receiving the recognition he was owed.
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Jerzy Różycki <span class="lifespan">(1909–1942)</span></h4>
+  <p>
+    Rejewski's colleague. Invented the "<strong>clock method</strong>" for identifying the Enigma
+    right rotor from the indicator. On 9 January 1942 the liner <em>Lamoricière</em> carrying him
+    vanished in the Mediterranean. He was 32 — the only member of the pre-war Polish
+    cryptologic trio who didn't live to see the war end.
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Henryk Zygalski <span class="lifespan">(1908–1978)</span></h4>
+  <p>
+    Inventor of the "<strong>Zygalski sheets</strong>" — perforated cardboard overlays that,
+    stacked, geometrically eliminated impossible rotor combinations. He stayed in Britain after
+    the war and taught mathematics; no British government ever officially thanked him.
+  </p>
+</div>
+
+<h3>2. The Bletchley inner circle (1939–1945)</h3>
+
+<div class="person-card">
+  <h4>Alan Turing <span class="lifespan">(1912–1954)</span></h4>
+  <p>
+    Chief cryptanalyst at Hut 8, King's College fellow. His most important contribution was
+    restructuring Rejewski's Bomba logic into the British <strong>Bombe</strong> — and adding
+    the "<strong>crib attack</strong>" (guess that the plaintext contains common words like
+    "wetter" or "eins") — which compressed break times from weeks to hours.
+  </p>
+  <p>
+    When M4 Shark appeared in 1942 Turing, Joan Clarke, and Hugh Alexander reopened the U-boat
+    traffic. After the war he designed ACE (one of the earliest stored-program computers) and
+    wrote the foundational papers of modern computing and artificial intelligence.
+    In <strong>1952</strong> he was convicted of gross indecency (the law against homosexuality
+    at the time), sentenced to chemical castration, and took his own life with cyanide in 1954.
+    He was 41.
+  </p>
+  <p>
+    In 2009 PM Gordon Brown issued a public apology; in 2013 the Queen pardoned him; in 2019 his
+    portrait went on the £50 note. All of it decades too late.
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Gordon Welchman <span class="lifespan">(1906–1985)</span></h4>
+  <p>
+    Head of Hut 6, Cambridge mathematician. Turing's original Bombe tested only <em>one</em>
+    stecker-pair hypothesis at a time; Welchman added the "<strong>diagonal board</strong>" —
+    a 26×26 electrical grid that let the Bombe test many plugboard contradictions at once,
+    speeding it up by a factor of <strong>10+</strong>. Without the diagonal board the Bombe
+    would never have been fast enough for wartime use.
+  </p>
+  <p>
+    Welchman also designed Bletchley's overall workflow organisation. After the war he went to
+    MIT; his 1982 book <em>The Hut Six Story</em> was denounced by the Anglo-American intelligence
+    community as a breach of secrecy, his US security clearance was revoked, and he died a
+    disappointed man.
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Dilly Knox <span class="lifespan">(Alfred Dillwyn Knox, 1884–1943)</span></h4>
+  <p>
+    GC&amp;CS veteran from the WWI generation, a German Navy code-breaker back in 1917. At
+    Bletchley he ran "<strong>the Cottage</strong>", a small group that specialised in
+    non-commercial Enigma variants. The Cottage broke the <strong>Italian naval Enigma</strong>
+    (March 1940) and the <strong>Abwehr Enigma</strong> (December 1941).
+  </p>
+  <p>
+    The Italian decrypt from March 1941 let the Royal Navy ambush and destroy the Italian
+    Mediterranean fleet at <strong>Cape Matapan</strong> — the first major Allied Ultra victory.
+  </p>
+  <p>
+    Knox suffered lymphoma for much of his life and died in February 1943. He refused to go to
+    hospital at the end — he wanted to keep breaking codes. His mostly-female team (Mavis Lever,
+    Margaret Rock) were called "<em>Dilly's fillies</em>" at the time; in fact they were Cambridge-
+    educated linguists of the first rank.
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Mavis Batey (née Lever) <span class="lifespan">(1921–2013)</span></h4>
+  <p>
+    Cottage team member, recruited into Bletchley at 19. In 1941 she personally broke the key
+    Italian naval Enigma message — an operator test transmission that consisted of a long string
+    of the letter L, exposing Enigma's structural weakness that
+    <strong>a letter can never encipher to itself</strong>. That decrypt triggered Cape Matapan.
+  </p>
+  <p>
+    She also broke Abwehr Enigma traffic and, in the run-up to D-Day, Spanish Abwehr messages —
+    confirming "the Germans still believe the landings will hit Calais", the critical validation
+    signal for <strong>Operation Fortitude</strong> (the Normandy deception). After the war she
+    became a distinguished historian of English gardens.
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Joan Clarke <span class="lifespan">(1917–1996)</span></h4>
+  <p>
+    Hut 8 mathematician and Turing's closest working partner. The two were briefly engaged in
+    1941; Turing broke off the engagement after admitting his sexual orientation. Clarke
+    independently optimised "<strong>Banburismus</strong>" — the core statistical-depth technique
+    used against U-boat traffic. M4 Shark was broken mainly thanks to her rendering the original
+    procedure into something that could be run at scale.
+  </p>
+  <p>
+    Because she was a woman, Clarke was paid far less than her male colleagues and was forced to
+    hold the job title "linguist" rather than "cryptanalyst" — at the time the institutional
+    position was that "women don't do cryptanalysis." After the war she married GCHQ colleague
+    Jock Murray and spent her entire career in British intelligence.
+  </p>
+</div>
+
+<h3>3. The three Lorenz geniuses (1941–1945)</h3>
+
+<div class="person-card">
+  <h4>John Tiltman <span class="lifespan">(1894–1982)</span></h4>
+  <p>
+    Bletchley's formally-titled <strong>Chief Cryptographer</strong>. On 30 August 1941 two
+    Lorenz messages were accidentally sent with the same key (a depth). Tiltman manually
+    recovered the entire 4,000-character keystream from that depth — but had no knowledge of
+    the machine's internal structure, only the keystream itself.
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Bill Tutte <span class="lifespan">(1917–2002)</span></h4>
+  <p>
+    Tiltman's 4,000-character keystream landed on the desk of a young mathematician named Tutte.
+    Over the next <strong>three months</strong> Tutte, armed with nothing but pencil, graph paper,
+    and statistical instinct, reverse-engineered the complete internal structure of Lorenz SZ40 —
+    the wiring of all 12 pinwheels, the stepping logic, the full keystream formula. He never
+    <strong>saw the machine once</strong>.
+  </p>
+  <p>
+    It is arguably the purest reasoning-based cryptographic achievement of the 20th century,
+    putting Tutte alongside Rejewski and Beurling as the three people who broke complete cipher
+    machines by statistical inference alone. After the war Tutte took a professorship at the
+    University of Waterloo and founded major parts of graph theory (matroid theory). British
+    authorities only formally acknowledged his Lorenz work in 2002.
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Max Newman <span class="lifespan">(1897–1984)</span></h4>
+  <p>
+    Cambridge topologist, and <strong>Alan Turing's PhD supervisor</strong>. In 1942 he set up
+    the "<strong>Newmanry</strong>" section at Bletchley, tasked with mechanising Tutte's
+    statistical attack. His team designed the "<strong>Heath Robinson</strong>" — a paper-tape
+    optical-reading machine that ran χ-wheel differential statistics. It worked, barely; tape
+    sync problems and burn-outs were constant.
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Tommy Flowers <span class="lifespan">(1905–1998)</span></h4>
+  <p>
+    <strong>The movies have never told this man's story properly.</strong> Flowers came from the
+    Post Office Research Station at Dollis Hill — an engineer who fixed telephone exchanges, with
+    no university degree, very much not "the Cambridge set" that Bletchley had been built from.
+    He looked at Newman's Heath Robinson and decided "this is wrong, it should be fully
+    electronic" — and proposed replacing it.
+  </p>
+  <p>
+    The Bletchley committee turned him down: "a 1500-valve machine would burn out before warm-up."
+    Flowers <strong>paid for it himself</strong>, with his own savings, and led a small team of
+    GPO engineers working secretly after-hours at Dollis Hill to build it. By
+    <strong>December 1943</strong> he had <strong>Colossus Mark I</strong> running.
+    In February 1944 Colossus ran Tutte's attack for real — recovering in <strong>hours</strong>
+    what had previously taken weeks.
+  </p>
+  <p>
+    Ten Colossi were eventually built. On the night of 5 June 1944, before issuing the final
+    D-Day go-order, <strong>Eisenhower personally read a Colossus decrypt</strong> confirming
+    that Hitler was moving Panzergruppe West toward Normandy — proof the German high command
+    still expected the main landings at Calais. Only then did he give the order to proceed on 6 June.
+  </p>
+  <p>
+    After the war Churchill ordered <strong>every Colossus destroyed</strong>, the blueprints
+    burned. Flowers could not even discuss the machine he had built. He stayed at the GPO building
+    electronic exchanges, unsung, for decades. British authorities only publicly acknowledged
+    Colossus as the world's first programmable electronic computer in <strong>2000</strong> —
+    two years before ENIAC by date, and decades ahead in architecture — but by then Flowers was
+    95 and had dementia. He died two years later.
+  </p>
+</div>
+
+<h3>4. The Swedish Sturgeon — the forgotten T52 break</h3>
+
+<div class="person-card">
+  <h4>Arne Beurling <span class="lifespan">(1905–1986)</span></h4>
+  <p>
+    Uppsala University professor of mathematics, a world-class figure in analysis and harmonic
+    analysis. In May 1940, after Germany occupied Norway and Denmark, teleprinter traffic relayed
+    through Sweden suddenly went encrypted — Sweden's FRA (national signals intelligence agency)
+    was intercepting messages encoded by the Siemens &amp; Halske T52a "Sturgeon".
+  </p>
+  <p>
+    FRA brought Beurling in. <strong>He was locked in a room for two weeks with paper, pencils,
+    and a stack of intercepts.</strong> Two weeks later he walked out with the complete internal
+    structure of T52 — the XOR network of all 10 pinwheels, the stepping logic, even the
+    reverse-engineered key-setting-switch wiring. He had <strong>never seen the machine and had no
+    technical documentation</strong> — he reconstructed the whole machine from pure statistical
+    properties of the ciphertext.
+  </p>
+  <p>
+    It is one of the most insane achievements in the history of cryptanalysis. When Bletchley
+    heard about it they half-refused to believe it. Beurling never publicly discussed his method.
+    His famous line:
+  </p>
+  <p style="color: var(--amber); font-style: italic; margin-left: 20px; border-left: 2px solid var(--amber); padding-left: 16px;">
+    "A magician doesn't reveal his tricks."
+  </p>
+  <p>
+    Over the next <strong>three years</strong> (1940–1943) Sweden read essentially every German
+    teleprinter transmission passing through its territory — the traffic between Berlin and Oslo,
+    Helsinki, Stockholm. <strong>500,000 messages intercepted, 350,000 decrypted</strong> —
+    comparable in scale to Bletchley's total Enigma output across multiple years. In mid-1943
+    Germany upgraded to T52e with KTF (plaintext-dependent stepping); Swedish decrypts dropped
+    to zero. Beurling later moved to the Institute for Advanced Study in Princeton; his war work
+    was only gradually declassified in the 1980s.
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Michael Crum <span class="lifespan">(1910–1977)</span></h4>
+  <p>
+    Bletchley Park's lead analyst against Sturgeon. In the summer of 1942 British intercept
+    stations first picked up T52 on the Sicily → Libya link (codenamed "<strong>Sturgeon</strong>")
+    and the Aegean → Sicily link ("<strong>Mackerel</strong>"). Operator discipline was poor —
+    same keys reused across multiple messages, producing depths — and Crum's group broke into
+    T52d/e through those depths.
+  </p>
+  <p>
+    The attack never reached the regularity of the Enigma or Tunny efforts: T52 was genuinely
+    too complex, and the Luftwaffe had a fatal habit of <strong>retransmitting Sturgeon messages
+    on weaker Enigma links</strong> — Bletchley could simply read the Enigma copy and skip the
+    T52 attack entirely. After the war Crum joined GCHQ and helped design the
+    <strong>SAVILLE</strong> cipher algorithm — still classified in both Britain and the US today.
+  </p>
+</div>
+
+<h3>5. The people behind the people</h3>
+
+<div class="person-card">
+  <h4>Hans-Thilo Schmidt <span class="lifespan">(1888–1943)</span></h4>
+  <p>
+    German Foreign Office code-bureau clerk, codename "<strong>Asche</strong>". Between 1931 and
+    1938, heavily in debt and living beyond his means, he sold Enigma operator manuals, daily key
+    sheets, and military-model wiring details to <strong>French intelligence</strong> — Captain
+    Gustave Bertrand — who relayed them to Rejewski in Warsaw. Without Schmidt's "daily-key format"
+    leak, Rejewski's permutation-group attack would have had no entry point.
+  </p>
+  <p>
+    In March 1943 the Gestapo identified Schmidt and arrested him. He took poison in prison
+    shortly after. His betrayal is arguably the true starting point of Allied signals-intelligence
+    dominance — but his motive was money, not anti-fascism, and history has judged him
+    complicated.
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Gustave Bertrand <span class="lifespan">(1896–1976)</span></h4>
+  <p>
+    Captain in the French Deuxième Bureau, personally handling Schmidt throughout the 1930s.
+    By 1938 he had grasped that France alone could not break Enigma, and took the unilateral
+    decision to <strong>pass everything Schmidt had provided to the Poles</strong> — the move
+    that unlocked Enigma. His 1973 memoir <em>Enigma ou la plus grande énigme de la guerre
+    1939–1945</em> was the first public disclosure of Bletchley's Polish origins, three years
+    before British declassification caught up.
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>The women of Bletchley Park (~7,500 of them)</h4>
+  <p>
+    At peak, Bletchley employed over <strong>10,000 people — about 75 % women</strong>: WRNS
+    (naval), WAAFs (air force), and women recruited from Oxford and Cambridge. They operated the
+    Bombes and Colossi, worked night shifts, proofread intercepts, ran traffic analysis.
+  </p>
+  <p>
+    Joan Clarke, Mavis Batey, Margaret Rock, <strong>Jane Fawcett</strong> (whose decrypt led the
+    Royal Navy to catch and sink the <em>Bismarck</em>), Ruth Briggs, Pamela Rose… most of them
+    could never tell spouses, parents, or children what they had done in the war. As Britain's
+    Public Record Office began declassifying in the 1990s, many families learned only after a
+    mother or grandmother had died that she had broken Enigma.
+  </p>
+</div>
+
+<h3>6. Thirty years of silence</h3>
+
+<p>
+  From 8 May 1945 onward, every single person listed above had to shut up.
+  The <strong>Official Secrets Act</strong> kept Bletchley classified
+  <strong>until 1974</strong> — Churchill's personal order: "<em>Never ever, EVER, speak of
+  this</em>." After the war British security services quietly monitored ex-Bletchley staff for
+  any signs of indiscretion.
+</p>
+
+<ul>
+  <li>Turing killed himself after chemical castration; his family never learned how many lives
+    he had saved</li>
+  <li>Rejewski died in Warsaw in 1980; the British government publicly acknowledged his
+    contribution that same week</li>
+  <li>Flowers watched ENIAC be declared "the first computer" and could not contradict it</li>
+  <li>Beurling taught in Princeton until 1986; his war work wasn't publicised in Sweden until
+    fifty years after the fact</li>
+  <li>Tutte taught mathematics in Canada for his entire career; none of his students knew</li>
+  <li>Crum's SAVILLE cipher is still classified today</li>
+</ul>
+
+<p>
+  <strong>The movie picked Turing because his ending was the most dramatic.</strong> But Turing
+  himself would be the first to tell you: <em>Rejewski is the one who actually started all this.
+  Tutte's pure-paper break of Lorenz was harder than anything I did on Enigma. Beurling breaking
+  T52 in two weeks alone has never been matched by anyone. Flowers's Colossus is where the
+  modern computer begins.</em>
+</p>
+
+</div>
+
+<hr>
+
+<h2 id="backends">Four compute paths</h2>
+
+<p>
+  One brute-force problem, four implementations. The <strong>algorithm is the same</strong> —
+  only the hardware-mapping differs:
+</p>
+
+<div class="backend-grid">
+  <div class="backend">
+    <h4>Scalar</h4>
+    <p>Single C# thread, plain loops, no optimisation. This is "how fast does C# actually go"
+       as your imagination would answer it.</p>
+  </div>
+  <div class="backend">
+    <h4>Parallel</h4>
+    <p><code>Parallel.ForEach</code> fans out the outer wheel-order × ring loop across the thread
+       pool. A 16-core CPU gets close-to-linear 7–9× speedup.</p>
+  </div>
+  <div class="backend">
+    <h4>SIMD (AVX2)</h4>
+    <p><code>Vector256&lt;int&gt;</code> processes 8 grundstellung lanes per instruction; the rotor
+       table is read via <code>Avx2.GatherVector256</code>. About 3–4× faster than Parallel.</p>
+  </div>
+  <div class="backend">
+    <h4>SkSL GPU</h4>
+    <p>Enigma rewritten as a Skia runtime-effect shader. One pixel = one full key trial. The
+       D3D11/OpenGL context is acquired through Avalonia's <code>ISkiaSharpApiLease</code>. This
+       is exactly the same shader pipeline AprNes's CRT filter uses.</p>
+  </div>
+</div>
+
+<h3>The SkSL GPU path</h3>
+
+<p>
+  Under Avalonia's GUI we get a real <code>GRContext</code> through
+  <code>ISkiaSharpApiLease</code>, and the shader runs directly on the GPU
+  (D3D11 / OpenGL). Deployment complexity is an order of magnitude lower than CUDA or Metal,
+  yet the compute throughput is in the same order of magnitude.
+</p>
+
+<hr>
+
+<h2 id="numbers">Then vs. now</h2>
+
+<h3>M3 Quick scope (~1,054,560 keys, 285-char ciphertext)</h3>
+
+<table>
+  <tr>
+    <th>Backend</th>
+    <th class="num">Time</th>
+    <th class="num">K keys/s</th>
+    <th class="num">Speedup</th>
+  </tr>
+  <tr>
+    <td>Scalar (single-thread)</td>
+    <td class="num">11.06 s</td>
+    <td class="num">95</td>
+    <td class="num">1.00×</td>
+  </tr>
+  <tr>
+    <td>Parallel (16 cores)</td>
+    <td class="num">1.59 s</td>
+    <td class="num">662</td>
+    <td class="num">6.94×</td>
+  </tr>
+  <tr>
+    <td>SIMD + Parallel</td>
+    <td class="num">0.51 s</td>
+    <td class="num">2,059</td>
+    <td class="num">21.59×</td>
+  </tr>
+  <tr>
+    <td><strong>SkSL GPU (OpenGL)</strong></td>
+    <td class="num" style="color:var(--green)"><strong>0.25 s</strong></td>
+    <td class="num" style="color:var(--green)"><strong>~4,200</strong></td>
+    <td class="num" style="color:var(--green)"><strong>44×</strong></td>
+  </tr>
+</table>
+
+<h3>M4 Quick scope (1,054,560 keys, ~270-char ciphertext)</h3>
+
+<table>
+  <tr>
+    <th>Backend</th>
+    <th class="num">Time</th>
+    <th class="num">K keys/s</th>
+    <th class="num">Speedup</th>
+  </tr>
+  <tr>
+    <td>Scalar M4 (single-thread)</td>
+    <td class="num">14.81 s</td>
+    <td class="num">71</td>
+    <td class="num">1.00×</td>
+  </tr>
+  <tr>
+    <td>Scalar M4 Parallel (16 cores)</td>
+    <td class="num">1.94 s</td>
+    <td class="num">544</td>
+    <td class="num">7.64×</td>
+  </tr>
+  <tr>
+    <td>SIMD M4 + Parallel</td>
+    <td class="num">0.58 s</td>
+    <td class="num">1,818</td>
+    <td class="num">25.52×</td>
+  </tr>
+  <tr>
+    <td><strong>SkSL M4 GPU (OpenGL)</strong></td>
+    <td class="num" style="color:var(--green)"><strong>0.044 s</strong></td>
+    <td class="num" style="color:var(--green)"><strong>24,005</strong></td>
+    <td class="num" style="color:var(--green)"><strong>337×</strong></td>
+  </tr>
+</table>
+
+<p style="color:var(--muted); font-size:13px;">
+  M4 has one extra shader step per character (the Greek rotor pass); CAP dropped from 96 to 80
+  to stay inside Skia's program-size budget. And 80-character IC gets noisy across a 1 M-key
+  search, so the GPU shader returns the top-256 candidates, and the CPU re-ranks them on the
+  full ciphertext — GPU pre-filter, CPU final decision.
+</p>
+
+<h3>Lorenz SZ40 chi-only (22,041,682 keys, ~620-char Baudot ciphertext)</h3>
+
+<table>
+  <tr>
+    <th>Backend</th>
+    <th class="num">Time</th>
+    <th class="num">K keys/s</th>
+    <th class="num">Note</th>
+  </tr>
+  <tr>
+    <td>Scalar Lorenz (single-thread)</td>
+    <td class="num">90 s+</td>
+    <td class="num">—</td>
+    <td>90 s timeout; full 22 M keyspace doesn't fit a single core</td>
+  </tr>
+  <tr>
+    <td>Scalar Lorenz Parallel (16 cores)</td>
+    <td class="num">~20–40 s</td>
+    <td class="num">500K+</td>
+    <td>All cores brute force</td>
+  </tr>
+  <tr>
+    <td>SIMD Lorenz + Parallel</td>
+    <td class="num">~1–3 s</td>
+    <td class="num">8M+</td>
+    <td>Precompute χ2⊕χ3⊕χ4⊕χ5 stream; inner loop reduces to one Vector256 XOR</td>
+  </tr>
+  <tr>
+    <td><strong>SkSL Lorenz GPU (OpenGL)</strong></td>
+    <td class="num" style="color:var(--green)"><strong>~0.5–2 s</strong></td>
+    <td class="num" style="color:var(--green)"><strong>10M+</strong></td>
+    <td>23 render passes + CPU top-512 rerank</td>
+  </tr>
+</table>
+
+<p style="color:var(--muted); font-size:13px;">
+  The Lorenz shader uses a minimal SPACE+E hit-count scorer (SkSL forbids bitwise ops, so per-bit
+  XOR is simulated with <code>a+b−2ab</code>; 32-bucket IC wouldn't fit inside the program-size
+  limit). That scorer has 10σ+ signal on German Baudot text, so truth is always in the top-K;
+  the CPU then re-ranks with full 32-bucket IC. This is structurally what Colossus did — χ stage
+  by statistics, ψ and μ left for later.
+</p>
+
+<p style="color:var(--muted); font-size:13px;">
+  Test rig: Windows 11 / .NET 10 / 16-core CPU / consumer GPU. Numbers vary noticeably with
+  hardware but the relative-speedup story holds.
+</p>
+
+<h3>Historical scale</h3>
+
+<table>
+  <tr><th>Task</th><th>1940s</th><th>Now (this benchmark)</th></tr>
+  <tr>
+    <td>Break one Enigma M3 key</td>
+    <td>One Turing Bombe: <strong>15–20 min</strong>; Bletchley had 200 at peak</td>
+    <td class="num" style="color:var(--green)">0.25 s</td>
+  </tr>
+  <tr>
+    <td>Break one Enigma M4 (Shark) key</td>
+    <td>Feb–Dec 1942: Bletchley <strong>completely blind for 10 months</strong> (U-559 codebook
+        retrieved at the cost of two lives); after that Bombe ~15 min</td>
+    <td class="num" style="color:var(--green)">0.044 s</td>
+  </tr>
+  <tr>
+    <td>Recover one Lorenz χ-wheel alignment</td>
+    <td>One Colossus Mark II: <strong>~1 hour</strong>; 10 Colossi built in total</td>
+    <td class="num" style="color:var(--green)">~1–2 s</td>
+  </tr>
+  <tr>
+    <td>Personnel</td>
+    <td><strong>~10,000 people</strong> working in secret for 5 years</td>
+    <td class="num" style="color:var(--green)">you press Start</td>
+  </tr>
+  <tr>
+    <td>Hardware</td>
+    <td>electromechanical Bombes + vacuum-tube Colossi</td>
+    <td class="num" style="color:var(--green)">one consumer GPU</td>
+  </tr>
+</table>
+
+<hr>
+
+<h2 id="why">Why this project exists</h2>
+
+<p>
+  On the surface this is a cross-domain stress test of the AprNes CRT shader pipeline —
+  we wanted to see whether the same SkSL / SIMD / Scalar stack produces a comparable relative-
+  speed profile under a completely different workload (cipher brute-force). Answer: yes.
+</p>
+
+<p>
+  But the real motivation is more emotional. These machines were the <strong>nervous system of
+  the Third Reich's war machine</strong>. They were the secret 10,000 people kept at the cost
+  of their whole youth. They are the reason the modern computer was invented in the first place.
+  Putting them against one GPU today and watching it finish in a blink isn't just "hardware got
+  better" —
+</p>
+
+<blockquote>
+  It's a vertigo of compressed time. What took tens of thousands of people, several years,
+  a secret town, and purpose-built machines to make "barely possible" — your gaming GPU now
+  processes while you sip a coffee. Standing on their shoulders isn't a metaphor. It's literal.
+</blockquote>
+
+<p>
+  The moment "0.25 s" sits next to "1942–1945" in the same line is the whole reason this project
+  exists.
+</p>
+
+<hr>
+
+<h2 id="run">How to run it</h2>
+
+<h3>From source</h3>
+<pre><code>cd EnigmaBenchmarkAvalonia
+dotnet build -c Release
+bin\Release\net10.0\EnigmaBenchmarkAvalonia.exe</code></pre>
+
+<p>Once the window opens:</p>
+<ol>
+  <li>Pick a cipher from the top dropdown (there are six — two WWI, four WWII)</li>
+  <li>Pick a Scope (Quick / Normal / Hard / Extreme — applies to Enigma variants)</li>
+  <li>Check which backends to run (SkSL GPU / SIMD / Parallel / Scalar)</li>
+  <li>Hit <strong>Start Benchmark</strong></li>
+  <li>Watch the log. GPU finishes first (~0.3 s), CPU backends follow in SIMD → Parallel → Scalar
+      order. The status line at top tells you which cracker is currently running.</li>
+</ol>
+
+<h3>System requirements</h3>
+<ul>
+  <li>.NET 10 SDK</li>
+  <li>Windows 10/11 (Avalonia is only verified here)</li>
+  <li>CPU with AVX2 (Intel Haswell 2013+, AMD Excavator 2015+)</li>
+  <li>Any GPU supporting D3D11 or OpenGL (integrated graphics is fine)</li>
+</ul>
+
+<hr>
+
+<h2 id="tech">Technical notes</h2>
+
+<h3>Enigma M3 correctness</h3>
+<ul>
+  <li>Rotor wirings taken from NSA / Bletchley Park declassified documents; every 26-byte table
+    matches other reference simulators (Cryptool, Enigma Simulator v7, etc.)</li>
+  <li>The double-step anomaly is correctly modelled (left rotor + middle rotor both step when
+    the middle rotor hits its notch)</li>
+  <li>Round-trip validation: encrypt twice with the same key, confirm you get the plaintext back.
+    This runs on every benchmark launch; if it fails, the benchmark won't start.</li>
+</ul>
+
+<h3>SkSL runtime-effect limits</h3>
+<ul>
+  <li><strong>Array indexing must be compile-time constant</strong>: the 26-bucket IC histogram
+    is unrolled to 26 named int variables (h0..h25), and each character performs 26 branchless
+    compare-and-add operations.</li>
+  <li><strong>Loop bounds must be compile-time constant</strong>: ciphertext processing is
+    capped at 96 characters. The full 285 characters would make the unrolled program exceed
+    Skia's program-size limit.</li>
+  <li>IC × 100,000 is packed into RGB24, then read back on the CPU and reassembled.</li>
+</ul>
+
+<h3>GPU thread rules</h3>
+<ul>
+  <li><code>GRContext</code> can only be acquired from the Avalonia render thread, and must be
+    returned there. It cannot cross threads.</li>
+  <li>The GPU cracker runs synchronously inside <code>ICustomDrawOperation.Render</code>
+    (~0.25 s); the UI is briefly frozen during that window.</li>
+  <li>Completion is signalled via a <code>TaskCompletionSource</code>, which
+    <strong>must</strong> be constructed with <code>RunContinuationsAsynchronously</code> —
+    otherwise the await continuation runs on the render thread and any subsequent UI update
+    throws a cross-thread exception.</li>
+</ul>
+
+<hr>
+
+<h2 id="credits">Credits</h2>
+
+<ul>
+  <li><strong>Marian Rejewski, Jerzy Różycki, Henryk Zygalski</strong> (Polish Cipher Bureau) —
+    the first people ever to break Enigma</li>
+  <li><strong>Alan Turing, Gordon Welchman, Hugh Alexander, Stuart Milner-Barry, I.J. Good</strong>
+    (Bletchley Park) — Bombe + statistical attacks</li>
+  <li><strong>Bill Tutte</strong> — reverse-engineered the entire Lorenz machine by hand</li>
+  <li><strong>Tommy Flowers</strong> (Post Office Research) — designed and built Colossus</li>
+  <li><strong>Lt. Tony Fasson, Able Seaman Colin Grazier</strong> (HMS Petard) — killed retrieving
+    the M4 codebook</li>
+  <li>The ~10,000 staff of Bletchley Park, many of whom took the secret to their graves</li>
+</ul>
+
+<p class="footnote">
+  Rotor wiring data: <a href="https://www.cryptomuseum.com/crypto/enigma/">Crypto Museum</a>,
+  <a href="http://users.telenet.be/d.rijmenants/">Dirk Rijmenants' Cipher Machines</a>.
+  Lorenz structure: Bletchley Park <em>General Report on Tunny</em> (1945, declassified 2000).
+  Historical events cross-checked against David Kahn's <em>The Codebreakers</em>,
+  F.H. Hinsley's <em>British Intelligence in the Second World War</em>, and the Bletchley Park
+  official archive.
+  <br><br>
+  This project is a companion to the
+  <a href="https://github.com/erspicu/AprNes">AprNes NES emulator</a>, demonstrating that its
+  CRT shader pipeline generalises well beyond graphics workloads.
+  <br><br>
+  <em>"We also have sound, incontestable proof of the truth of our observations... I only add
+  that the work I have accomplished was of great importance for the future conduct of the war.
+  If I have helped, I may say I have done my bit."</em> — Marian Rejewski, 1942
+</p>
+
+</div>
+</body>
+</html>
