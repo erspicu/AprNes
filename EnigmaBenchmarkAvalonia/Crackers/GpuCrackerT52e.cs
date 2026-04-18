@@ -88,12 +88,19 @@ public sealed class GpuCrackerT52e : ICrackerT52e
 
         var pixels = new uint[TileW * TileH];
 
-        // Top-K min-heap
-        const int TopK = 1024;
-        const int IcFloor = 12000;
+        // Top-K min-heap. IcFloor=0 so EVERY pixel's score is considered for
+        // top-K — if the GPU shader ever mis-reports (half-precision, unroll
+        // limits, etc.) a non-zero floor would silently drop the true key.
+        const int TopK = 2048;
+        const int IcFloor = 0;
         var topQ = new PriorityQueue<Candidate, int>();
 
         long keysTried = 0;
+
+        // Diagnostics — log max/mean/nonzero counts so we notice dead shaders.
+        long gpuScoreSum = 0;
+        int gpuScoreMax = 0;
+        int gpuNonZero = 0;
 
         int c9 = T52eMachine.PinCounts[9];  // 73
 
@@ -149,6 +156,9 @@ public sealed class GpuCrackerT52e : ICrackerT52e
                            | (int)( bgra       & 0xFF);
                     keysTried++;
 
+                    if (ic > 0) { gpuNonZero++; gpuScoreSum += ic; }
+                    if (ic > gpuScoreMax) gpuScoreMax = ic;
+
                     if (ic < IcFloor) continue;
 
                     if (topQ.Count < TopK)
@@ -163,6 +173,12 @@ public sealed class GpuCrackerT52e : ICrackerT52e
                 }
             }
         }
+
+        double gpuAvg = gpuNonZero > 0 ? (double)gpuScoreSum / gpuNonZero : 0;
+        Console.WriteLine(
+            $"[T52e GPU] nonzero={gpuNonZero:N0}/{keysTried:N0} " +
+            $"({100.0 * gpuNonZero / Math.Max(keysTried, 1):F1}%)  " +
+            $"max={gpuScoreMax}  avgNonZero={gpuAvg:F0}  topK={topQ.Count}");
 
         // CPU re-rank on full ciphertext
         var cand = new List<Candidate>(topQ.Count);
