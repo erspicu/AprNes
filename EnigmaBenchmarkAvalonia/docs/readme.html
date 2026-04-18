@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EnigmaBenchmark — 二戰德國密碼 × 現代算力</title>
+<style>
+  :root {
+    --bg: #0e1116;
+    --surface: #151a22;
+    --surface-2: #1b212b;
+    --text: #d8dee4;
+    --muted: #8a93a0;
+    --amber: #ffd060;
+    --green: #80ff80;
+    --cyan: #80d0ff;
+    --red: #ff8888;
+    --border: #1f2430;
+    --mono: "Consolas", "Cascadia Mono", "JetBrains Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                 "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif;
+    line-height: 1.72;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 56px 32px 120px;
+  }
+  header h1 {
+    font-size: 52px;
+    letter-spacing: -0.02em;
+    margin: 0 0 8px;
+    font-weight: 700;
+    background: linear-gradient(90deg, var(--amber), var(--cyan));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .lead {
+    color: var(--text);
+    font-size: 19px;
+    margin: 0 0 6px;
+  }
+  .meta {
+    color: var(--muted);
+    font-size: 14px;
+    margin: 0 0 56px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+  }
+  h2 {
+    font-size: 28px;
+    margin: 64px 0 18px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    color: var(--amber);
+    font-weight: 600;
+  }
+  h3 {
+    font-size: 20px;
+    margin: 28px 0 10px;
+    color: var(--cyan);
+    font-weight: 600;
+  }
+  h4 {
+    font-size: 16px;
+    margin: 20px 0 8px;
+    color: var(--text);
+  }
+  p { margin: 10px 0 14px; }
+  ul { padding-left: 22px; margin: 10px 0; }
+  li { margin: 4px 0; }
+  code, pre, kbd, samp {
+    font-family: var(--mono);
+    font-size: 13.5px;
+  }
+  code.inline, code:not(pre code) {
+    background: var(--surface);
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: var(--amber);
+    font-size: 13px;
+  }
+  pre {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    margin: 14px 0;
+    line-height: 1.5;
+  }
+  pre code { background: none; color: var(--text); padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--amber);
+    margin: 16px 0;
+    padding: 8px 18px;
+    color: var(--muted);
+    background: rgba(255,208,96,0.04);
+    font-style: italic;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 18px 0 28px;
+    font-size: 14.5px;
+  }
+  th, td {
+    text-align: left;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th {
+    background: var(--surface);
+    font-weight: 600;
+    color: var(--cyan);
+  }
+  td.num, th.num { text-align: right; font-family: var(--mono); }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .status {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 4px;
+    font-size: 11.5px;
+    font-family: var(--mono);
+    vertical-align: middle;
+    margin-left: 10px;
+    letter-spacing: 0.04em;
+  }
+  .status.ready    { background: rgba(128,255,128,0.14); color: var(--green); border: 1px solid rgba(128,255,128,0.32); }
+  .status.planned  { background: rgba(255,208,96,0.10); color: var(--amber); border: 1px solid rgba(255,208,96,0.28); }
+  .status.future   { background: rgba(138,147,160,0.13); color: var(--muted); border: 1px solid rgba(138,147,160,0.28); }
+  .cipher-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px 26px;
+    margin: 24px 0;
+  }
+  .cipher-card h3 { margin-top: 0; }
+  .cipher-card .tag {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.10em;
+    margin-bottom: 4px;
+  }
+  .cipher-card .highlight-stat {
+    display: inline-block;
+    margin: 8px 0 4px;
+    padding: 6px 12px;
+    background: var(--surface-2);
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--amber);
+  }
+  .backend-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+    margin: 18px 0;
+  }
+  .backend {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+  }
+  .backend h4 { margin: 0 0 6px; color: var(--cyan); }
+  .backend p { font-size: 14px; color: var(--muted); margin: 0; }
+  .kv-table td:first-child { color: var(--muted); width: 34%; font-family: var(--mono); font-size: 13px; }
+  .footnote {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 56px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+  .footnote a { color: var(--cyan); text-decoration: none; }
+  .footnote a:hover { text-decoration: underline; }
+  .big-num {
+    font-family: var(--mono);
+    font-size: 34px;
+    color: var(--green);
+    font-weight: 700;
+    display: inline-block;
+    margin: 4px 12px 4px 0;
+  }
+  .big-num.red { color: var(--red); }
+  .vs {
+    color: var(--muted);
+    font-size: 18px;
+    margin: 0 8px;
+  }
+  .emph { color: var(--amber); }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 52px 0; }
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 22px;
+    margin: 20px 0 36px;
+    font-size: 14px;
+  }
+  .toc ol { margin: 6px 0; padding-left: 22px; }
+  .toc a { color: var(--cyan); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; color: var(--amber); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>EnigmaBenchmark</h1>
+  <p class="lead">二戰德國頂級密碼系統 <span style="color:var(--muted)">×</span> 你書桌上這顆 GPU</p>
+  <p class="meta">
+    當年十萬人、一整座秘密城市、為此誕生的第一台電子電腦；現在，你按一下 Start，不到一秒鐘。
+  </p>
+</header>
+
+<nav class="toc">
+  <strong style="color:var(--amber)">目錄</strong>
+  <ol>
+    <li><a href="#about">這是什麼？</a></li>
+    <li><a href="#ciphers">三場要被秒殺的歷史對決</a></li>
+    <li><a href="#backends">四條運算路線</a></li>
+    <li><a href="#numbers">歷史 vs 現在</a></li>
+    <li><a href="#why">為什麼做這個</a></li>
+    <li><a href="#run">怎麼用</a></li>
+    <li><a href="#tech">技術備註</a></li>
+    <li><a href="#credits">致謝 / Credits</a></li>
+  </ol>
+</nav>
+
+<h2 id="about">這是什麼？</h2>
+
+<p>
+  EnigmaBenchmark 用 <strong>四種不同的運算路徑</strong>去暴力破解二戰德軍最著名的幾款密碼機。你會在同一個視窗裡直接看到：
+</p>
+
+<ul>
+  <li>單執行緒 C# — 最樸素的版本</li>
+  <li>全 CPU 多核平行 — <code>Parallel.ForEach</code></li>
+  <li>AVX2 SIMD — <code>Vector256&lt;int&gt;</code> + <code>GatherVector256</code></li>
+  <li>SkSL Shader 在 GPU 上跑 — 跟 <a href="https://github.com/erspicu/AprNes" style="color:var(--cyan)">AprNes</a> 模擬器的 CRT 濾鏡同一條路徑</li>
+</ul>
+
+<p>
+  重點不是「秀 benchmark 數字」，而是把同一件有歷史份量的計算工作放在四個硬體選項上實際跑一遍，讓你看到：
+</p>
+
+<blockquote>
+  同一段 SkSL shader，在 GPU 上 <span class="emph">0.2 秒</span>搞定的事情，
+  單核 C# 要 <span class="emph">11 秒</span>，Skia 的 CPU Raster Pipeline（沒 GPU 的 fallback）要 <span class="emph">39 秒</span>。
+</blockquote>
+
+<p>
+  這是 AprNes CRT 為什麼非走 GPU 不可的具象化。
+</p>
+
+<hr>
+
+<h2 id="ciphers">三場要被秒殺的歷史對決</h2>
+
+<p>
+  這個 benchmark 選了三款德軍最引以為豪、盟軍最頭痛、戰後才解密的密碼系統。每一個都有自己的傳奇與殤。
+</p>
+
+<div class="cipher-card">
+  <div class="tag">1932 – 1945 · Wehrmacht / Heer / Luftwaffe</div>
+  <h3>Enigma M3 <span class="status ready">已實作</span></h3>
+
+  <p>
+    德軍標準三轉輪 Enigma。海陸空三軍、指揮部、外交部、情報單位——整個第三帝國的神經系統都跑在這台鐵盒子上。德國統帥部對 Enigma 的信心近乎宗教：他們到戰敗都不相信 Enigma 被破解。
+  </p>
+
+  <h4>機器組態</h4>
+  <table class="kv-table">
+    <tr><td>轉輪庫（Walzen）</td><td>I / II / III / IV / V（Wehrmacht 五顆）</td></tr>
+    <tr><td>轉輪位置（Walzenlage）</td><td>從 5 顆選 3 顆排列 = <code>5×4×3 = 60</code> 種</td></tr>
+    <tr><td>反射器（Umkehrwalze）</td><td>UKW-B 或 UKW-C</td></tr>
+    <tr><td>環位設定（Ringstellung）</td><td>每個轉輪 A–Z，共 26³</td></tr>
+    <tr><td>起始位置（Grundstellung）</td><td>每個轉輪 A–Z，共 26³</td></tr>
+    <tr><td>插線板（Steckerbrett）</td><td>10 組字母對調</td></tr>
+    <tr><td>機械怪癖</td><td>Double-step anomaly — 中輪到 notch 時，左輪、中輪同時前進</td></tr>
+  </table>
+
+  <h4>Keyspace</h4>
+  <p>
+    完整組合空間是 <code>60 × 26³ × 26³ × 150,738,274,937,250</code>（plugboard）≈ <span class="emph">1.58 × 10²⁰</span>。
+    但插線板部分無法靠 IC 打分區分，實戰中戰後的 Rejewski / Turing 攻擊也是繞過它。
+  </p>
+  <p>
+    Benchmark 假設插線板已知（模擬 crib-based attack 或 Turing Bombe 的效果），只暴力搜 <strong>wheel order × grundstellung</strong>，這就是四個 scope 的定義：
+  </p>
+
+  <table>
+    <tr><th>Scope</th><th>鎖定</th><th class="num">Keyspace</th></tr>
+    <tr><td>Quick</td><td>wheel × 26³</td><td class="num">1,054,560</td></tr>
+    <tr><td>Normal</td><td>+ 右環</td><td class="num">27,418,560</td></tr>
+    <tr><td>Hard</td><td>+ 中環</td><td class="num">712,882,560</td></tr>
+    <tr><td>Extreme</td><td>+ 左環（完整 wheel × pos³ × ring³）</td><td class="num">18,534,946,560</td></tr>
+  </table>
+
+  <h4>歷史</h4>
+  <ul>
+    <li><strong>1932</strong>，波蘭密碼局三位數學家 Marian Rejewski、Jerzy Różycki、Henryk Zygalski 首次破解 Enigma（用傳統 permutation theory），設計了第一台 Bomba</li>
+    <li><strong>1939</strong> 7 月，波蘭人把成果交給英國 Bletchley Park，戰爭才開打兩個月</li>
+    <li><strong>1940</strong> 起，Alan Turing 與 Gordon Welchman 改良出電機式 <strong>Bombe</strong>，美國海軍後來也造了自己的 Bombe</li>
+    <li>整個戰爭期間，Bletchley Park 僱了超過 <strong>10,000 名員工</strong>，其中 75% 是女性</li>
+    <li>這個秘密被英國政府保守了 30 年——到 1974 年 Winterbotham 上校寫了《The Ultra Secret》才公開</li>
+  </ul>
+</div>
+
+<div class="cipher-card">
+  <div class="tag">1942 Feb – 1945 · Kriegsmarine U-Boot (M4 "Shark")</div>
+  <h3>Enigma M4 <span class="status planned">規劃中</span></h3>
+
+  <p>
+    <strong>1942 年 2 月 1 日</strong>，德國海軍把 U-Boat 通訊升級到四轉輪 M4。Bletchley Park 瞬間瞎掉，此後 <strong>整整十個月</strong>無法解讀 U-Boat 命令。那十個月叫「Second Happy Time」，德國 U-Boat 狼群在北大西洋撕裂盟軍補給線。
+  </p>
+
+  <p>
+    歷史學者估計，那 10 個月沉了約 <span class="emph">600 艘盟軍商船，載 3.5 百萬噸物資</span>。如果 M4 沒被破，英國可能在 1943 年就斷糧。
+  </p>
+
+  <h4>M4 跟 M3 的差別</h4>
+  <ul>
+    <li>加一個<strong>薄 greek 轉輪</strong>（Beta 或 Gamma）放在最左邊，<strong>不會轉</strong>，但有起始位置</li>
+    <li>反射器改成薄版（UKW-B dünn / UKW-C dünn）</li>
+    <li>Beta + UKW-B dünn 或 Gamma + UKW-C dünn 必須成對</li>
+    <li>Keyspace 比 M3 大 26 × 2 × 2 = 104 倍</li>
+  </ul>
+
+  <h4>怎麼被破的</h4>
+  <p>
+    1942 年 10 月，英國驅逐艦 HMS Petard 在地中海攔截 <strong>U-559</strong>，Able Seaman Colin Grazier 和 Lieutenant Tony Fasson 跳進正在下沉的潛艇搶出了 <em>Wetterkurzschlüssel</em>（氣象短信碼本）。兩人隨潛艇沉沒殉職。
+  </p>
+  <p>
+    Bletchley 靠這本碼本在 1942 年 12 月 13 日重新破開 M4。那一天起，大西洋戰役的天平倒過來了。
+  </p>
+</div>
+
+<div class="cipher-card">
+  <div class="tag">1941 – 1945 · Oberkommando der Wehrmacht（最高統帥部）</div>
+  <h3>Lorenz SZ40 / SZ42 "Tunny" <span class="status planned">規劃中</span></h3>
+
+  <p>
+    Enigma 是戰術層級。Lorenz 是<strong>戰略</strong>層級——希特勒、OKW、OKH 跟前線集團軍司令之間的直接通訊。一台 Lorenz 的破譯價值超過一百則 Enigma。
+  </p>
+
+  <h4>機器結構</h4>
+  <p>
+    Lorenz SZ40（Schlüsselzusatz，「密碼附加器」）不是像 Enigma 那種單字替換機，而是<strong>電傳串流密碼</strong>：
+  </p>
+  <ul>
+    <li>明文以 <strong>Baudot 5-bit</strong>（國際電報碼）表示</li>
+    <li>機器生成一串偽隨機 5-bit keystream，跟明文 XOR</li>
+    <li>Keystream 由 12 個<strong>pinwheel</strong>產生：
+      <ul>
+        <li>5 個 χ（chi）輪：41, 31, 29, 26, 23 個 pin — 固定步進</li>
+        <li>5 個 ψ（psi）輪：43, 47, 51, 53, 59 個 pin — 條件步進</li>
+        <li>2 個 μ（mu）motor 輪：37, 61 個 pin — 控制 ψ 要不要動</li>
+      </ul>
+    </li>
+    <li>Keystream 不重複的週期是 <strong>約 1.6 × 10¹⁹</strong></li>
+  </ul>
+
+  <p class="highlight-stat">
+    完整 keyspace（含所有 pin pattern）≈ 2<sup>501</sup>
+  </p>
+
+  <p>
+    純暴力是數學上絕對不可能的。Bletchley 不是靠算力破 Lorenz——是靠兩個天才的統計攻擊：
+  </p>
+
+  <ul>
+    <li><strong>Bill Tutte</strong> 從一份 4000 字母的錯誤重發訊息，<strong>只用紙筆</strong>推出 Lorenz 整台機器的邏輯結構，完全沒看過機器本尊。這一手被譽為「二戰最偉大的單一知性成就」之一</li>
+    <li><strong>Tommy Flowers</strong> 在 Post Office Research Station 造了 <strong>Colossus</strong>——1500 個真空管、世界第一台可程式化電子電腦，專為跑 Tutte 的統計攻擊法</li>
+    <li>Colossus 共造了 <strong>10 台</strong>，1944 年起每天破譯 Lorenz 訊息；D-Day 前夕 Eisenhower 親口說「Ultra 情報價值十個陸軍師」</li>
+  </ul>
+
+  <h4>Benchmark 怎麼做？</h4>
+  <p>
+    完整 2<sup>501</sup> 不可能 brute-force。我們做 Colossus 做的事：只搜 χ-輪起始位置：
+  </p>
+
+  <p class="highlight-stat">
+    χ keyspace = 41 × 31 × 29 × 26 × 23 ≈ 22,041,682 組合
+  </p>
+
+  <p>
+    每個候選位置生成 χ stream，跟密文 XOR，用統計（Δ-method / 1+2 break）打分，跟 Enigma 的 IC 類似。這就是 Colossus 當年做的事——Colossus 跑一組要<strong>幾分鐘到一小時</strong>，GPU 預計 1 秒內。
+  </p>
+</div>
+
+<hr>
+
+<h2 id="backends">四條運算路線</h2>
+
+<p>
+  同一個暴力搜尋問題，四種實作。<strong>演算法相同</strong>，只有「怎麼把它攤在硬體上」不同：
+</p>
+
+<div class="backend-grid">
+  <div class="backend">
+    <h4>Scalar</h4>
+    <p>單一 C# 執行緒、標準迴圈、沒有優化。這是你想像中「C# 跑起來大概多快」的樣子。</p>
+  </div>
+  <div class="backend">
+    <h4>Parallel</h4>
+    <p><code>Parallel.ForEach</code> 把外層 wheel-order × ring 當工作單元丟給 thread pool。16 核 CPU 大約線性加速到 7–9×。</p>
+  </div>
+  <div class="backend">
+    <h4>SIMD (AVX2)</h4>
+    <p><code>Vector256&lt;int&gt;</code> 一次算 8 個 grundstellung lane，rotor table 用 <code>Avx2.GatherVector256</code> 讀。比 Parallel 快 3–4×。</p>
+  </div>
+  <div class="backend">
+    <h4>SkSL GPU</h4>
+    <p>把 Enigma 寫成 Skia runtime effect shader，一個 pixel = 一把 key 的完整試解。透過 Avalonia <code>ISkiaSharpApiLease</code> 拿 D3D11/OpenGL context。這就是 AprNes CRT 濾鏡用的同一條 shader pipeline。</p>
+  </div>
+</div>
+
+<h3>SkSL 路徑的兩個模式</h3>
+
+<table>
+  <tr><th>模式</th><th>能拿到 GRContext？</th><th>實際在哪裡跑</th></tr>
+  <tr><td>Avalonia GUI（本專案預設）</td><td>能，靠 <code>ISkiaSharpApiLease</code></td><td class="num" style="color:var(--green)">真 GPU（D3D11 / OpenGL）</td></tr>
+  <tr><td>Console / 無視窗</td><td>不能</td><td class="num" style="color:var(--red)">Skia Raster Pipeline（CPU 軟體光柵化）</td></tr>
+</table>
+
+<p>
+  這個對照本身就是有教育意義的資料點：沒 GPU 的 SkSL <strong>比單執行緒 C# 還慢</strong>（~3.5×）。shader 不是魔法，是靠 GPU 的大規模平行硬體才有意義。
+</p>
+
+<hr>
+
+<h2 id="numbers">歷史 vs 現在</h2>
+
+<h3>Quick scope（~1,054,560 把 key，285-char 密文）</h3>
+
+<table>
+  <tr>
+    <th>實作</th>
+    <th class="num">時間</th>
+    <th class="num">K keys/s</th>
+    <th class="num">相對速度</th>
+  </tr>
+  <tr>
+    <td>Scalar（單執行緒）</td>
+    <td class="num">11.06 s</td>
+    <td class="num">95</td>
+    <td class="num">1.00×</td>
+  </tr>
+  <tr>
+    <td>Parallel（16 核）</td>
+    <td class="num">1.59 s</td>
+    <td class="num">662</td>
+    <td class="num">6.94×</td>
+  </tr>
+  <tr>
+    <td>SIMD + Parallel</td>
+    <td class="num">0.51 s</td>
+    <td class="num">2,059</td>
+    <td class="num">21.59×</td>
+  </tr>
+  <tr>
+    <td><strong>SkSL GPU（OpenGL）</strong></td>
+    <td class="num" style="color:var(--green)"><strong>0.25 s</strong></td>
+    <td class="num" style="color:var(--green)"><strong>~4,200</strong></td>
+    <td class="num" style="color:var(--green)"><strong>44×</strong></td>
+  </tr>
+  <tr>
+    <td>SkSL Raster（CPU fallback）</td>
+    <td class="num">39.1 s</td>
+    <td class="num">27</td>
+    <td class="num">0.28×</td>
+  </tr>
+</table>
+
+<p style="color:var(--muted); font-size:13px;">
+  測試平台：Windows 11 / .NET 10 / 16-core CPU / 消費級 GPU。數字會因硬體不同有明顯差異，但相對倍數大致成立。
+</p>
+
+<h3>歷史尺度的對照</h3>
+
+<table>
+  <tr><th>工作</th><th>1940 年代</th><th>現在（本 benchmark）</th></tr>
+  <tr>
+    <td>破一個 Enigma M3 key</td>
+    <td>一台 Turing Bombe 約 <strong>15–20 分鐘</strong>；Bletchley 高峰有 200 台</td>
+    <td class="num" style="color:var(--green)">0.25 秒</td>
+  </tr>
+  <tr>
+    <td>破一則 Lorenz χ-wheel 對位</td>
+    <td>一台 Colossus 約 <strong>數十分鐘</strong>；共造 10 台</td>
+    <td class="num" style="color:var(--green)">（預計）&lt; 1 秒</td>
+  </tr>
+  <tr>
+    <td>投入人力</td>
+    <td><strong>~10,000 人</strong>秘密工作 5 年</td>
+    <td class="num" style="color:var(--green)">你按一下</td>
+  </tr>
+  <tr>
+    <td>硬體</td>
+    <td>電機式 Bombe + 真空管 Colossus</td>
+    <td class="num" style="color:var(--green)">一張遊戲顯卡</td>
+  </tr>
+</table>
+
+<hr>
+
+<h2 id="why">為什麼做這個</h2>
+
+<p>
+  表面上，這是 AprNes 模擬器 CRT shader 管線的跨域壓力測試。我們想知道同一條 SkSL / SIMD / Scalar pipeline 放到一個完全不同的工作負載（密碼暴力搜尋）上，會不會有類似的相對性能輪廓。結果：會。
+</p>
+
+<p>
+  但真正的動機比較感性。這幾台密碼機當年是<strong>第三帝國戰爭機器的神經</strong>，是 10,000 個人用青春保守的秘密，是發明現代電腦的直接原因。把它們放到今天一顆 GPU 面前變成一眨眼的事，不只是「硬體進步了」這種陳腔濫調——
+</p>
+
+<blockquote>
+  那是一種時間被壓縮的眩暈感。當年幾萬人、幾年、一座秘密城市、幾台為此而生的機器，合力做一件「僅僅可能」的事。現在你打電動的 GPU 在你喝一口咖啡的時間之內處理掉。你踩在他們肩膀上，不是隱喻——就是字面的。
+</blockquote>
+
+<p>
+  0.25 秒旁邊並列著 1942–1945，那個瞬間就是整個專案存在的理由。
+</p>
+
+<hr>
+
+<h2 id="run">怎麼用</h2>
+
+<h3>從原始碼執行</h3>
+<pre><code>cd EnigmaBenchmarkAvalonia
+dotnet build -c Release
+bin\Release\net10.0\EnigmaBenchmarkAvalonia.exe</code></pre>
+
+<p>視窗開啟後：</p>
+<ol>
+  <li>選擇 Scope（Quick / Normal / Hard / Extreme）</li>
+  <li>按 <strong>Start Benchmark</strong></li>
+  <li>等結果出來。GPU 最先跑完（~0.3 秒），CPU 依 SIMD → Parallel → Scalar 順序後續跟上</li>
+  <li>右上角的狀態標籤會即時顯示目前在跑哪個 cracker</li>
+</ol>
+
+<h3>系統需求</h3>
+<ul>
+  <li>.NET 10 SDK</li>
+  <li>Windows 10/11（Avalonia 目前只在 Windows 上驗證過）</li>
+  <li>支援 AVX2 的 CPU（Intel Haswell 2013 之後、AMD Excavator 2015 之後）</li>
+  <li>任何支援 D3D11 或 OpenGL 的 GPU（整合顯卡也可以）</li>
+</ul>
+
+<hr>
+
+<h2 id="tech">技術備註</h2>
+
+<h3>Enigma M3 實作正確性</h3>
+<ul>
+  <li>五顆轉輪 wiring 取自 NSA / Bletchley Park 解密文件，每顆 26-byte 表都與其他模擬器（如 Cryptool、Enigma Simulator v7）相符</li>
+  <li>Double-step anomaly 已正確實作（中輪 notch 時左輪 + 中輪同時進位）</li>
+  <li>Round-trip 驗證：同一把 key 加密兩次回到明文 — 每次 benchmark 啟動時先跑一遍，通過才開始測</li>
+</ul>
+
+<h3>SkSL runtime effect 的限制</h3>
+<ul>
+  <li><strong>陣列索引必須是 compile-time constant</strong>：26-bucket IC 直方圖展開成 26 個命名 int（h0..h25），每字元做 26 次 branchless compare-and-add</li>
+  <li><strong>迴圈上限必須是 compile-time constant</strong>：密文處理上限寫死 96 字元。完整 285 字元會讓 unroll 後的 program 超過 Skia 的 size limit</li>
+  <li>IC × 100,000 後打包進 RGB24，CPU 端 readback 後重組回整數</li>
+</ul>
+
+<h3>GPU thread 規範</h3>
+<ul>
+  <li><code>GRContext</code> 只能從 Avalonia render thread 拿，用完就還。不能跨執行緒</li>
+  <li>GPU cracker 在 <code>ICustomDrawOperation.Render</code> 裡同步執行（~0.25 秒），期間 UI 暫時凍結</li>
+  <li>完成通知走 <code>TaskCompletionSource</code>；<strong>必須</strong>用 <code>RunContinuationsAsynchronously</code>，否則 await continuation 會在 render thread 執行，任何後續 UI 更新會 cross-thread throw</li>
+</ul>
+
+<hr>
+
+<h2 id="credits">致謝 / Credits</h2>
+
+<ul>
+  <li><strong>Marian Rejewski, Jerzy Różycki, Henryk Zygalski</strong>（波蘭密碼局）— 第一批破開 Enigma</li>
+  <li><strong>Alan Turing, Gordon Welchman, Hugh Alexander, Stuart Milner-Barry, I.J. Good</strong>（Bletchley Park）— Bombe + 統計破譯</li>
+  <li><strong>Bill Tutte</strong> — 徒手推出 Lorenz 整台機器結構</li>
+  <li><strong>Tommy Flowers</strong>（Post Office Research）— 設計並建造 Colossus</li>
+  <li><strong>Lt. Tony Fasson, Able Seaman Colin Grazier</strong>（HMS Petard）— 為 M4 碼本殉職</li>
+  <li>Bletchley Park 的 10,000 名員工，許多人把秘密帶進了墳墓</li>
+</ul>
+
+<p class="footnote">
+  Rotor wiring 資料來源：<a href="https://www.cryptomuseum.com/crypto/enigma/">Crypto Museum</a>、<a href="http://users.telenet.be/d.rijmenants/">Dirk Rijmenants' Cipher Machines</a>。
+  Lorenz 結構參考 Bletchley Park General Report on Tunny（1945，2000 年解密）。
+  歷史事件交叉確認自 David Kahn《The Codebreakers》、Hinsley《British Intelligence in the Second World War》、以及 Bletchley Park 官方檔案。
+  <br><br>
+  本專案為 <a href="https://github.com/erspicu/AprNes">AprNes NES 模擬器</a>的姊妹作，展示其 CRT shader 管線在非圖形工作負載下的表現。
+  <br><br>
+  <em>"We also have sound, incontestable proof of the truth of our observations... I only add that the work I have accomplished was of great importance for the future conduct of the war. If I have helped, I may say I have done my bit."</em> — Marian Rejewski, 1942
+</p>
+
+</div>
+</body>
+</html>

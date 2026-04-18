@@ -16,7 +16,7 @@
     <None Update="Shaders\*.sksl">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="Docs\**\*.*">
+    <None Update="docs\**\*.*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
