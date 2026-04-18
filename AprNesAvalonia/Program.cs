@@ -27,6 +27,11 @@ class Program
             return TestRunner.Run(args);
         }
 
+        // GUI default: Gpu backend + render-thread path (Phase 3A+3B).
+        // CLI --crt-strategy below can override (scalar/simd/gpu).
+        AprNes.NesCore.Crt_SetBackend(AprNes.NesCore.CrtBackend.Gpu);
+        AprNes.NesCore.CrtGpuRenderThreadActive = true;
+
         // GUI mode: parse CLI flags (subset of TestRunner's) for auto-config
         for (int i = 0; i < args.Length; i++)
         {
@@ -43,8 +48,9 @@ class Program
                         _        => AprNes.NesCore.Crt_GetBackend(),
                     };
                     AprNes.NesCore.Crt_SetBackend(wanted);
-                    if (wanted == AprNes.NesCore.CrtBackend.Gpu)
-                        AprNes.NesCore.CrtGpuRenderThreadActive = true;
+                    // Sync render-thread flag: active only when GPU selected
+                    AprNes.NesCore.CrtGpuRenderThreadActive =
+                        (wanted == AprNes.NesCore.CrtBackend.Gpu);
                     break;
                 }
                 case "--gui-benchmark" when i + 1 < args.Length:
