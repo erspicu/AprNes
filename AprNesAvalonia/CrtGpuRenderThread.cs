@@ -29,12 +29,15 @@ internal static unsafe class CrtGpuRenderThread
     const int SrcW = 1024;
     const int SrcH = 240;
 
-    // Phosphor ping-pong lives on render thread (separate from CrtScreenGpu).
-    // _prevSurface holds previous rendered output. Allocated GPU-backed when
-    // possible (via GRContext from the lease), raster fallback otherwise.
+    // Intermediate main surface: shader renders here (GPU-resident), then we
+    // blit to Avalonia canvas + blit to prev surface. Avoids re-running the
+    // full shader for phosphor history (Phase 3B optimization).
+    static SKSurface? _mainSurface;
+    // Phosphor ping-pong: _prevSurface holds previous rendered output. GPU-backed
+    // when possible, raster fallback otherwise.
     static SKSurface? _prevSurface;
-    static int _prevW, _prevH;
-    static bool _prevIsGpu;
+    static int _surfaceW, _surfaceH;
+    static bool _surfaceIsGpu;
 
     public static void Init()
     {
@@ -61,25 +64,32 @@ internal static unsafe class CrtGpuRenderThread
 
     public static bool IsReady => _effect != null && _inputBitmap != null;
 
-    static void EnsurePrevSurface(GRContext? grContext, int w, int h)
+    static void EnsureSurfaces(GRContext? grContext, int w, int h)
     {
         bool wantGpu = grContext != null;
-        if (_prevSurface != null && _prevW == w && _prevH == h && _prevIsGpu == wantGpu) return;
+        if (_mainSurface != null && _prevSurface != null &&
+            _surfaceW == w && _surfaceH == h && _surfaceIsGpu == wantGpu)
+            return;
+
+        _mainSurface?.Dispose();
         _prevSurface?.Dispose();
+
         var info = new SKImageInfo(w, h, SKColorType.Bgra8888, SKAlphaType.Opaque);
         if (grContext != null)
         {
-            _prevSurface = SKSurface.Create(grContext, false, info);  // GPU-backed
-            _prevIsGpu = true;
+            _mainSurface = SKSurface.Create(grContext, false, info);   // GPU-backed
+            _prevSurface = SKSurface.Create(grContext, false, info);   // GPU-backed
+            _surfaceIsGpu = true;
         }
         else
         {
-            _prevSurface = SKSurface.Create(info);                     // raster fallback
-            _prevIsGpu = false;
+            _mainSurface = SKSurface.Create(info);                      // raster fallback
+            _prevSurface = SKSurface.Create(info);
+            _surfaceIsGpu = false;
         }
-        _prevSurface!.Canvas.Clear(SKColors.Black);
+        _prevSurface!.Canvas.Clear(SKColors.Black);                     // first-frame prev = black
         _prevSurface.Canvas.Flush();
-        _prevW = w; _prevH = h;
+        _surfaceW = w; _surfaceH = h;
     }
 
     /// <summary>
@@ -95,7 +105,7 @@ internal static unsafe class CrtGpuRenderThread
         int dstH = (int)dstRect.Height;
         if (dstW <= 0 || dstH <= 0) return;
 
-        EnsurePrevSurface(grContext, dstW, dstH);
+        EnsureSurfaces(grContext, dstW, dstH);
 
         // ── Stage 1: quantize linearBuffer → Bgra8888 input ──
         float* lbR = linearBuffer;
@@ -157,22 +167,26 @@ internal static unsafe class CrtGpuRenderThread
 
         using var runtimeShader = _effect!.ToShader(uniforms, children);
 
-        // ── Stage 4: draw to the GPU canvas (Avalonia D3D11 backing on Windows) ──
-        // Shader's fragCoord space is local — translate so shader thinks origin is dst.Left,Top.
+        // ── Stage 4: render shader to intermediate main surface ──
+        // (Origin 0,0 — shader's fragCoord starts at 0, matching uv calc.)
         using var paint = new SKPaint { Shader = runtimeShader, IsAntialias = false };
-        canvas.Save();
-        canvas.Translate(dstRect.Left, dstRect.Top);
-        canvas.DrawRect(0, 0, dstW, dstH, paint);
-        canvas.Restore();
+        var mainCanvas = _mainSurface!.Canvas;
+        mainCanvas.Clear(SKColors.Black);
+        mainCanvas.DrawRect(0, 0, dstW, dstH, paint);
+        mainCanvas.Flush();
 
-        // ── Stage 5: update phosphor history ──
-        // Re-render shader into _prevSurface (GPU-backed when grContext != null).
-        // Cost: one additional shader pass, but on GPU — no CPU raster pipeline.
+        // ── Stage 5: blit main → Avalonia canvas (what the user sees) ──
+        // GPU→GPU texture copy; snapshot is a cheap handle on GPU image.
+        using var mainImg = _mainSurface.Snapshot();
+        canvas.DrawImage(mainImg, dstRect);
+
+        // ── Stage 6: blit main → prev surface for next frame's phosphor ──
+        // Phase 3B optimization: GPU texture copy instead of re-running the
+        // full shader. ~50% saving on shader work per frame.
         if (PhosphorDecay > 0.001f)
         {
-            var prevCanvas = _prevSurface.Canvas;
-            prevCanvas.Clear(SKColors.Black);
-            prevCanvas.DrawRect(0, 0, dstW, dstH, paint);
+            var prevCanvas = _prevSurface!.Canvas;
+            prevCanvas.DrawImage(mainImg, 0, 0);
             prevCanvas.Flush();
         }
     }
@@ -180,6 +194,7 @@ internal static unsafe class CrtGpuRenderThread
     public static void Dispose()
     {
         _inputBitmap?.Dispose(); _inputBitmap = null;
+        _mainSurface?.Dispose(); _mainSurface = null;
         _prevSurface?.Dispose(); _prevSurface = null;
         // _effect is owned by ShaderLoader cache; don't dispose here
     }
