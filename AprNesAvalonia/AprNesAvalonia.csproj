@@ -11,6 +11,8 @@
     <!-- .NET 10: full JIT tiered compilation + PGO -->
     <TieredCompilation>true</TieredCompilation>
     <TieredPGO>true</TieredPGO>
+    <!-- CRT runtime dispatch: all three backends compiled (Scalar + SIMD + GPU) -->
+    <DefineConstants>$(DefineConstants);CRT_SIMD_AVAILABLE;CRT_GPU_AVAILABLE</DefineConstants>
     <!-- ConfigWindow uses parameterized constructor only; XAML runtime loader not used -->
     <NoWarn>$(NoWarn);AVLN3001</NoWarn>
     <!-- Build timestamp embedded into assembly metadata (immune to copy/rename) -->
@@ -26,10 +28,17 @@
     <Compile Include="../AprNes/NesCore/*.cs" Link="NesCore/%(Filename)%(Extension)" />
     <Compile Include="../AprNes/NesCore/Mapper/*.cs" Link="NesCore/Mapper/%(Filename)%(Extension)" />
     <Compile Include="../AprNes/NesCore/AudioPlus/*.cs" Link="NesCore/AudioPlus/%(Filename)%(Extension)" />
-    <!-- NTSC_CRT: use CrtScreen.Net10.cs (.NET 10-optimized fork) instead of CrtScreen.cs -->
+    <!-- NTSC_CRT: runtime dispatch (Phase 1). All three files compiled.
+         Shared.cs provides partial-class dispatcher; Scalar + Simd impls
+         coexist as independent static classes (CrtScreenScalar / CrtScreenSimd).
+         Runtime switch via NesCore.Crt_SetBackend() or crt-strategy CLI. -->
     <Compile Include="../AprNes/NesCore/NTSC_CRT/*.cs"
-             Exclude="../AprNes/NesCore/NTSC_CRT/CrtScreen.cs"
              Link="NesCore/NTSC_CRT/%(Filename)%(Extension)" />
+
+    <!-- CRT GPU shaders (copy to output for File.ReadAllText at runtime) -->
+    <None Include="Shaders\*.sksl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
 
     <!-- 外部工具 -->
     <Compile Include="../AprNes/tool/WaveOutPlayer.cs" Link="Platform/WaveOutPlayer.cs" />
@@ -52,7 +61,8 @@
 
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.3.13" />
-    <PackageReference Include="SkiaSharp" Version="2.88.9" />
+    <PackageReference Include="SkiaSharp" Version="3.119.3-preview.1.1" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="3.119.3-preview.1.1" />
     <PackageReference Include="Avalonia.Desktop" Version="11.3.13" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.13" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.13" />

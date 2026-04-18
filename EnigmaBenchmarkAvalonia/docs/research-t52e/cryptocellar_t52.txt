@@ -1,0 +1,29 @@
+
+Frode Weierud’s CryptoCellar | Siemens and Halske T52 Cipher Machine
+T52d Simulator
+To Download a graphical computer simulation of this machine click
+ Here. 
+( Now Updated for Windows 3.1x/95/98/NT4/Win2000 )
+News Flash
+On 23 March 2000 we succeeded in interfacing the T52d simulator to
+an original Siemens T52d machine. The T52d machine was connected to
+the simulator via a simple relay interface connected to the RS-232
+port on a PC running the simulation program. The test was a complete
+success in both enciphering and deciphering messages sent in an on-line
+fashion between the Siemens T52d machine and the simulator. It is almost
+an uncanny feeling to see the code wheels on the real machine move in
+exact synchronism with the code wheels on the simulator.
+We are pursuing the tests and it is hoped that the experiences we gain
+will allow us to further improve the simulation program and enhance its
+look and feel.
+Therefore, we can now report that the present version, available for 
+download, is a fully functional and certified version.
+You can find more detailed information about this machine in the
+paper:
+Frode Weierud; Sturgeon, The FISH BP Never Really Caught,
+Proceedings on
+ Coding Theory and Cryptography ,
+Springer Verlag, 2000, ISBN: 3-540-66336-3.
+ Back to Frode’s CryptoCellar
+ Back to Simulator Index
+ Site visitors:

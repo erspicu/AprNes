@@ -1,0 +1,77 @@
+================================================================
+  EnigmaBenchmark — Default Sample Scenario (for benchmark runs)
+================================================================
+
+場景設定（虛構，但風格與格式對齊二戰德軍通訊慣例）
+--------------------------------------------------------
+
+時間：1942 年春季
+發送單位：BDU（Befehlshaber der Unterseeboote，U-boat 艦隊司令部）
+接收單位：狼群 NORDWIND（北風群組潛艇群）
+加密機：Enigma M3（三轉子，軍版）
+優先級：GEHEIM（機密）
+
+--------------------------------------------------------
+明文（PLAINTEXT — 按 Enigma 慣例處理）
+--------------------------------------------------------
+
+AN ALLE BOOTE GRUPPE NORDWIND STOP
+KURS NEUNUNDZWANZIG GRAD NORD DREIUNDDREISSIG GRAD WEST AENDERN STOP
+ANGRIFFSZIEL GELEITZUG OG VIERUNDZWANZIG VORAUSSICHTLICH EINUNDZWANZIG UHR MEZ X
+FEINDLICHE ZERSTOERER BEGLEITEN FRACHTER SECHZEHN STUECK STOP
+UEBERSCHWERE WETTERLAGE ERWARTET STOP
+FUNKSTILLE BIS ANGRIFF STOP
+BDU FUEHRUNG
+
+--------------------------------------------------------
+純字母去格式版（送入 Enigma 機器的實際輸入）
+--------------------------------------------------------
+
+ANALLEBOOTEGRUPPENORDWINDSTOPKURSNEUNUNDZWANZIGGRADNORDDREIUNDDREISSIGGRADWESTAENDERNSTOPANGRIFFSZIELGELEITZUGOGVIERUNDZWANZIGVORAUSSICHTLICHEINUNDZWANZIGUHRMEZXFEINDLICHEZERSTOERERBEGLEITENFRACHTERSECHZEHNSTUECKSTOPUEBERSCHWEREWETTERLAGEERWARTETSTOPFUNKSTILLEBISANGRIFFSTOPBDUFUEHRUNG
+
+字元數：約 310
+全大寫、純 A-Z 26 字母、無空白無標點
+
+--------------------------------------------------------
+二戰德軍 Enigma 明文格式慣例（本訊息所遵守）
+--------------------------------------------------------
+
+1. 只允許 A-Z 共 26 個拉丁字母（Enigma 轉子也只處理這 26 個）
+2. 德文變音轉寫：
+   Ä → AE    （本訊息：AENDERN = Ändern 改變）
+   Ö → OE    （本訊息：ZERSTOERER = Zerstörer 驅逐艦）
+   Ü → UE    （本訊息：UEBERSCHWERE = überschwere 超重；FUEHRUNG = Führung 指揮）
+   ß → SS    （本訊息：DREIUNDDREISSIG = 33）
+3. 數字拼寫成德文（0-9 → NULL/EINS/ZWEI/DREI/VIER/FUENF/SECHS/SIEBEN/ACHT/NEUN）：
+   本訊息範例：
+     NEUNUNDZWANZIG   = 29
+     DREIUNDDREISSIG  = 33
+     VIERUNDZWANZIG   = 24
+     EINUNDZWANZIG    = 21
+     SECHZEHN         = 16
+4. 標點：
+   句點（.） → X
+   逗號（,） → Y 或 ZZ（單位而異）
+   分段      → STOP（明文詞，不是真分段符）
+
+--------------------------------------------------------
+訊息內容中文翻譯（僅供理解，實際加密不用）
+--------------------------------------------------------
+
+致狼群 NORDWIND 全體 U 艇 停
+航向變更為北緯 29 度 西經 33 度 停
+攻擊目標：護航艦隊 OG-24，預計 MEZ 時間 21 時抵達 .
+敵護航驅逐艦伴隨 16 艘貨船 停
+預計有極端惡劣天氣 停
+攻擊開始前無線電靜默 .
+BDU 指揮部
+
+--------------------------------------------------------
+Benchmark 用途
+--------------------------------------------------------
+
+此明文 + 下述 enigma_config_default.txt 的 key 產生的密文，
+作為 EnigmaBenchmark Scalar / SIMD / SkSL 三個 backend 的
+**共同測試輸入**，以比較破解速度。
+
+明文長度 310 字足以讓 IC 分數穩定區分正確解與誤解。

@@ -3,67 +3,18 @@ using System.Numerics;
 using System.Threading.Tasks;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using static AprNes.NesCore;
+using CrtMaskType = AprNes.NesCore.CrtMaskType;
 
 namespace AprNes
 {
     // ============================================================
-    // CRT 電視光學模擬器（Stage 2） - .NET 4.8.1 Fused & SWAR 版
+    // CRT 電視光學模擬器（Stage 2） - Scalar / Vector<T> 版
+    // Phase 1: refactored to static class; dispatched via NesCore.Crt_Render
+    // Shared state (config, dimensions, profiles) lives in CrtScreen.Shared.cs
     // ============================================================
-    unsafe public partial class NesCore
+    unsafe internal static class CrtScreenScalar
     {
-        // ── 解耦參數 ────────────────────────
-        static int crt_analogOutput;
-        static int crt_analogSize = 4;
-        static uint* crt_analogScreenBuf;
-        static int crt_frameCount;
-
-        public static void Crt_ApplyConfig(int analogOutput, int analogSize, uint* analogScreenBuf)
-        {
-            crt_analogOutput = analogOutput;
-            crt_analogSize = analogSize;
-            crt_analogScreenBuf = analogScreenBuf;
-            Crt_ApplyProfile();
-        }
-
-        /// <summary>只更新 buffer 指標，不改 analogSize 等參數（用於 swap）</summary>
-        public static void Crt_UpdateScreenBuf(uint* buf) => crt_analogScreenBuf = buf;
-
-        public static void Crt_SetFrameCount(int fc) => crt_frameCount = fc;
-
-        public const int Crt_SrcW = 1024;
-        public const int Crt_SrcH = 240;
-        static int? _fullscreenW = null, _fullscreenH = null;
-        public static int Crt_DstW => _fullscreenW ?? 256 * crt_analogSize;
-        public static int Crt_DstH => _fullscreenH ?? 210 * crt_analogSize;
-
-        public static void Crt_SetFullscreenSize(int w, int h) { _fullscreenW = w; _fullscreenH = h; }
-        public static void Crt_ClearFullscreenSize() { _fullscreenW = null; _fullscreenH = null; }
-
-        // ── 端子參數組 ──────────────────────────
-        public static float RF_BeamSigma = 1.10f;
-        public static float RF_BloomStrength = 0.50f;
-        public static float RF_BrightnessBoost = 1.10f;
-        public static float AV_BeamSigma = 0.85f;
-        public static float AV_BloomStrength = 0.25f;
-        public static float AV_BrightnessBoost = 1.25f;
-        public static float SV_BeamSigma = 0.65f;
-        public static float SV_BloomStrength = 0.10f;
-        public static float SV_BrightnessBoost = 1.40f;
-
-        static float BeamSigma;
-        static float BloomStrength;
-        static float BrightnessBoost;
-
-        public static float VignetteStrength = 0.15f;
-        public static bool InterlaceJitter = true;
-        public enum CrtMaskType { None, ApertureGrille, ShadowMask }
-        public static CrtMaskType ShadowMaskMode = CrtMaskType.ApertureGrille;
-        public static float ShadowMaskStrength = 0.3f;
-        public static float CurvatureStrength = 0.12f;
-        public static float PhosphorDecay = 0.15f;
-        public static float HBeamSpread = 0.4f;
-        public static float ConvergenceStrength = 2.0f;
-
         // ── SIMD 常數向量 ────────────────────────────
         static readonly Vector<float> vOne = new Vector<float>(1f);
         static readonly Vector<float> vZero = new Vector<float>(0f);
@@ -93,8 +44,9 @@ namespace AprNes
         static uint* _prevFrame;
         static bool _prevFrameValid;
 
-        public static void Crt_Init()
+        internal static void Init()
         {
+            System.Console.WriteLine("[CRT] backend = Scalar (CrtScreen.cs, Vector<T> auto-vectorized)");
             if (_weights != null) NesCore.FreeUnmanaged((IntPtr)_weights);
             if (_nearestY != null) NesCore.FreeUnmanaged((IntPtr)_nearestY);
             if (_boostRow != null) NesCore.FreeUnmanaged((IntPtr)_boostRow);
@@ -116,7 +68,7 @@ namespace AprNes
             _cachedSigma = -1f; _cachedFrame = -1; _cachedCurvK = -1f;
         }
 
-        static void Crt_ApplyProfile()
+        internal static void ApplyProfile()
         {
             if (crt_analogOutput == (int)AnalogOutputMode.RF)
             { BeamSigma = RF_BeamSigma; BloomStrength = RF_BloomStrength; BrightnessBoost = RF_BrightnessBoost; }
@@ -281,7 +233,7 @@ namespace AprNes
             });
         }
 
-        public static unsafe void Crt_Render()
+        internal static unsafe void Render()
         {
             if (crt_analogScreenBuf == null || linearBuffer == null) return;
             if (_weights == null || _nearestY == null || _boostRow == null) return;

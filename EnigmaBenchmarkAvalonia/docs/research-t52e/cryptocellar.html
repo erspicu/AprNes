@@ -1,0 +1,573 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"><html><head>
+<meta name="google-site-verification" content="8qRIwiFwIqMjtYESWZTk4RhChV0OTBQbS9sq3sE88YY">
+<meta name="verify-v1" content="CDGaNeSZPxuEgBYDkKNVqYKvyb7xao/78dj4tWCSLa4=">
+<meta name="verify-v1" content="HHjDfeDbI1UjLJcMcDfbXi+EvmR/8k3g+whecgvWbzE=">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title> Crypto Cellar Research </title>
+<meta name="keywords" content="crypto,cryptography,cipher,code,code  breaker,cryptanalysis,cipher machine,Enigma,Alan Turing,
+Bletchley Park, Arne Beurling,T52,Geheimschreiber,Lorenz,T52,SZ40,SZ42,history,Frode Weierud,Фроде Вейруд">
+<meta name="description" content="Crypto Cellar Research is dedicated to the  history of cryptography, cipher machines and their simulation, cryptanalysis  and other code breaking techniques.">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link type="text/css" rel="stylesheet" href="assets/page.css">
+<style type="text/css">
+.style1 {
+	color: red;
+}
+.style2 {
+	font-family: "Times New Roman";
+}
+img {
+  display: inline-block;
+}
+</style>	
+
+<style> 
+   .cryptotour {width: 100px;height: 100px;position: relative;font-size: 12px;} .cryptoinfo {width: 100%;height: 100%;background-color:white;color: black;position: relative; text-align: center; transition: 0.5s ease-in-out;position:absolute;top:0px;left:0px;z-index:1; text-align: center;} .cryptotour_cover {background-color: green;width: 100%;height: 100%;position:absolute;top:0px;left:0px;z-index:2;} .cryptotour_gear {width: 70%;height: 70%;position: absolute;top: 5%;left: 15%;} .cryptotour_text {width: 90%;position: absolute;top: 90%;left: 50%;transform: translateY(-90%) translateX(-50%);} .cryptotour:hover .cryptotour_gear {animation: rotation 5s infinite linear;transform-origin: center;} .cryptotour:hover .cryptoinfo {transform: translate(-100%, 0);}@keyframes rotation {from {transform: rotate(0deg);}to {transform: rotate(359deg);}} 
+</style>
+
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-5VS6KCQNVS"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-5VS6KCQNVS');
+</script>
+
+<script type="text/javascript"> //<![CDATA[
+  var tlJsHost = ((window.location.protocol == "https:") ? "https://secure.trust-provider.com/" : "http://www.trustlogo.com/");
+  document.write(unescape("%3Cscript src='" + tlJsHost + "trustlogo/javascript/trustlogo.js' type='text/javascript'%3E%3C/script%3E"));
+//]]></script><script src="https://secure.trust-provider.com/trustlogo/javascript/trustlogo.js" type="text/javascript"></script><style type="text/css" media="screen">#comodoTL {display:block;font-size:8px;padding-left:18px;}</style>
+<script language="JavaScript" type="text/javascript">
+  TrustLogo("https://www.positivessl.com/images/seals/positivessl_trust_seal_lg_222x54.png", "POSDV", "none");
+</script></head><body><a href="javascript:if(window.open('https://secure.trust-provider.com/ttb_searcher/trustlogo?v_querytype=W&amp;v_shortname=POSDV&amp;v_search=https://cryptocellar.org/&amp;x=6&amp;y=5','tl_wnd_credentials'+(new Date()).getTime(),'toolbar=0,scrollbars=1,location=1,status=1,menubar=1,resizable=1,width=374,height=660,left=60,top=120')){};tLlB(tLTB);" onmouseover="tLeB(event,'https://secure.trust-provider.com/ttb_searcher/trustlogo?v_querytype=C&amp;v_shortname=POSDV&amp;v_search=https://cryptocellar.org/&amp;x=6&amp;y=5','tl_popupPOSDV')" onmousemove="tLXB(event)" onmouseout="tLTC('tl_popupPOSDV')" ondragstart="return false;"><img src="https://www.positivessl.com/images/seals/positivessl_trust_seal_lg_222x54.png" border="0" onmousedown="return tLKB(event,'https://secure.trust-provider.com/ttb_searcher/trustlogo?v_querytype=W&amp;v_shortname=POSDV&amp;v_search=https://cryptocellar.org/&amp;x=6&amp;y=5');" oncontextmenu="return tLLB(event);"></a><!----><div id="tl_popupPOSDV" name="tl_popupPOSDV" style="position:absolute;z-index:0;visibility: hidden;background-color: transparent;overflow:hidden;" onmouseover="tLoB('tl_popupPOSDV')" onmousemove="tLpC('tl_popupPOSDV')" onmouseout="tLpB('tl_popupPOSDV')">&nbsp;</div>
+
+
+
+
+
+<div style="float: right; position: relative; top: 2px; right: 0px; color: white;">
+  <a href="https://www.cryptool.org" id="cryptotour">
+   <div class="cryptotour">
+      <div class="cryptotour_cover">
+        <img class="cryptotour_gear rotate" src="/images/cryptotour_gear.png" alt="crypto tour gear logo">
+        <img class="cryptotour_text" src="/images/cryptotour_text.png" alt="crypto tour logo text">
+      </div>
+      <div class="cryptoinfo">
+        <strong><br>Crypto Tour<br>
+          Click these icons<br> to discover other<br> crypto related<br> sites</strong>
+      </div>
+    </div>
+  </a>
+</div>
+
+<div style="vertical-align: bottom; top: 10px;">
+   &nbsp;<br> 
+   <a target="_blank" href="https://ko-fi.com/cryptocellar">
+   	<img src="images/kofi_button_blue.png" border="0" title="Support me on Ko-fi." width="220" height="45"></a>
+</div>
+
+<hr>
+<div style="text-align: center;">
+<h1>Crypto Cellar Research</h1>
+<h1>Cryptology and Its History</h1>
+</div>
+
+<hr>
+
+<p align="center"><strong> 
+   <font face="Times New Roman" size="4" color="#FF0000">
+      <a href="Flossenbuerg/index.html">The Flossenburg Messages and The Murder of General Rabenau</a></font><br>
+   <font face="Times New Roman" size="4" color="#FF0000">
+		<a href="bgac/index.html">Breaking German Wehrmacht Ciphers</a></font><br>
+	<font face="Times New Roman" size="4" color="#FF0000">
+		<a href="Lorenz/index.html">The Lorenz Schlüsselzusatz SZ42 </a></font><br>	
+	<font face="Times New Roman" size="5" color="#FF0000">
+		<a href="enigma/index.html">The Enigma Collection</a></font><br>
+	   <img src="images/new.gif" style="float:none;width:31px;height:12px;">	
+	<font face="Times New Roman" size="5" color="#FF0000">
+		<a href="enigma/e-prod-history/index.html">Enigma Development and Production History</a></font>
+	   <img src="images/new.gif" style="float:none;width:31px;height:12px;"><br>			
+	   <img border="0" src="images/new.gif" style="float:none;width:31px;height:12px;">
+	<font face="Times New Roman" size="5" color="#FF0000">
+		<a href="wmc/index.html">Wehrmacht Manual Ciphers</a></font>
+	   <img border="0" src="images/new.gif" style="float:none;width:31px;height:12px;"><br>
+   	<img border="0" src="images/new.gif" style="float:none;width:31px;height:12px;">
+   	<font face="Times New Roman" size="5" color="#FF0000">
+   	<a href="rotor/index.html">Rotor Machines and Wired Wheels</a></font>
+   	<img border="0" src="images/new.gif" style="float:none;width:31px;height:12px;"><br>	
+	<font face="Times New Roman" size="4" color="#FF0000">
+		<a href="enigma/enigma-modern-breaking.html">Modern breaking of Enigma ciphertexts</a></font><br>
+		<font face="Times New Roman" size="5" color="#FF0000">
+	      <img src="images/new.gif" style="float:none;width:31px;height:12px;">
+		   <a href="biafra/index.html">The Biafran Ciphers</a></font>
+        <img src="images/new.gif" style="float:none;width:31px;height:12px;"><br>
+	<font face="Times New Roman" size="4" color="#FF0000">
+		<a href="bgac/scharnhorst.html">Scharnhorst’s Last Message?</a></font><br>
+	<font face="Times New Roman" size="4" color="#FF0000">
+		<a target="_blank" href="kryha/index.html">The Kryha Machine</a></font><br> 
+	<font face="Times New Roman" size="4" color="#FF0000">
+		<a href="research/index.html">The Research Corner</a></font><br>
+	</strong>
+</p>
+
+<p align="center">
+<table width="50%" align="center" border="1">
+  <tbody>
+  <tr>
+    <th align="middle" bgcolor="#6495ed" height="80"><font size="4" color="white">
+	Don’t forget to visit my Blog 
+	<a target="_blank" href="http://cryptocellartales.blogspot.com/">
+		CryptoCellar Tales.</a><br>
+	That is where I present the latest news, new ideas or work, <br>
+	and other more dynamic content.<br>
+   <a href="feedback.html">Contact information and feedback</a></font>
+	</th>
+  </tr>
+  </tbody>
+</table>
+
+</p><hr>
+<h2> The Alexander Papers </h2>
+<ul>
+  <li> <a href="alexander/index.html"> Documents by C.H.O’D. Alexander</a></li>
+  <li> <a href="alexander/mbarry.html">A Tribute to Hugh Alexander</a></li> 
+</ul>
+
+<hr>
+<h2> Turing’s Treatise on Enigma </h2>
+<ul>
+  <li> <a href="turing/index.html"> Turing’s Treatise on Enigma</a> 
+		<em>Preliminary Version</em></li>
+  <ul>
+    <li> <font color="green">Chapter 4 released on 9 May 2000.</font></li>
+  </ul>
+  <li> <a href="us-bombe/index.html"> Joseph Desch, Alan Turing and the US Bombes</a></li> 
+  <li> To learn more about Alan Turing visit 
+		<a href="http://www.turing.org.uk/turing/"> The Alan Turing Home Page </a></li>
+</ul>
+
+<hr>
+<h2> Historical Papers </h2>
+<ul>
+  <li> <a href="pubs/ulfving_weierud_secret.pdf"> Translation of Lars Ulfving’s paper on Swedish   Codebreaking </a></li>
+   <li> <span style="font-family: Times New Roman">
+      <a target="_blank" href="http://www.rutherfordjournal.org/article010106.html">
+      Bletchley Park’s Sturgeon, The FISH That Laid No Eggs</a></span><br>
+	   <font color="green">by Frode Weierud,
+	   <a target="_blank" href="http://www.rutherfordjournal.org/">The Rutherford 
+	   Journal</a>, Vol. 1, Dec. 2005 </font></li>
+	<li> <a href="tutte/tutte.html"> Professor William T. Tutte’s paper on FISH</a></li>
+   <li> <a href="http://www.alanturing.net/turing_archive/archive/index/tunnyreportindex.html" target="_blank">
+	   The General Report on Tunny</a> on Alan Turing.net </li>
+   <li> <a href="files/purple-history.pdf">
+      PURPLE History — “Preliminary Historical Report 
+	   On the Solution of the “B” Machine”</a><br>
+	   <font color="green">by William F. Friedman </font></li>
+   <li> <a target="_blank" href="https://media.defense.gov/2021/Jun/29/2002751422/-1/-1/0/ORIGINS_OF_NSA.PDF">
+	   “The Origins of the National Security Agency, 1940 – 1952”</a> 
+	   <font color="green">by Thomas L. Burns</font> </li>
+   <li> <a target="_blank" href="http://www.fas.org/irp/nsa/quest.pdf">
+	   “The Quest for Cryptologic Centralization and the Establishment of NSA:1940 –    1952"</a><br>
+	   <font color="green">by Thomas L. Burns. Public and redacted version of study above.</font></li>
+   <li> <a target="_blank" href="https://www.nsa.gov/Helpful-Links/NSA-FOIA/Declassification-Transparency-Initiatives/Historical-Releases/European-Axis-SIGINT/">
+      European Axis Signal Intelligence in World War II</a><br>
+      <font color="green">
+      As Revealed by “TICOM” Investigations and by Other Prisoner of War Interrogations       and <br>
+	   Captured Material, Principally German. In Nine Volumes. Chief, Army Security Agency, <br>
+	   1 May 1946, WDGAS-14.</font> </li>
+   <li> <a target="_blank" href="https://www.nsa.gov/Helpful-Links/NSA-FOIA/Declassification-Transparency-Initiatives/Historical-Releases/Gulf-of-Tonkin/">
+	   “The Gulf of Tonkin” Documents Released by NSA</a></li>
+   <li> <font color="green">Studies on Cryptology, NSA, Record Group 457,<br>
+	   Records of the National Security Agency.</font> </li>
+      <ul>
+         <li> <font color="green">Document SRH-006:</font> 
+	         <a href="http://www.metalab.unc.edu/pha/ultra/army-1.html" target="_blank">
+	         “Synthesis of Experiences in the Use of Ultra Intelligence<br>by U.S. Army 
+	         Field Commands in the European Theatre of Operations”</a></li>
+	      <li> <font color="green">Document SRH-142:</font> 
+	         <a href="http://www.metalab.unc.edu/pha/ultra/navy-1.html" target="_blank">
+	         “Ultra and the Campaign Against the U-Boats in World War II”</a></li>
+      </ul>
+   <li> <a target="_blank" href="https://media.defense.gov/2021/Jul/13/2002761763/-1/-1/0/KOREAN-WAR-SIGINT-BACKGROUND.PDF"> The Korean War: The SIGINT Background</a> <br>
+	   <font color="green">by David A. Hatch with Robert Louis Benson, NSA</font> </li>
+   <li> <a target="_blank" href="https://media.defense.gov/2021/Jul/13/2002761542/-1/-1/0/SIGSALY.PDF">
+	   SIGSALY Secure Digital Voice Communications in World War II</a></li>
+   <li> <a target="_blank" href="https://media.defense.gov/2021/Jul/13/2002761529/-1/-1/0/INVISIBLE_CRYPTOLOGISTS.PDF">
+	   The Invisible Cryptologists: African-Americans, WWII to 1956</a></li>
+   <li> <a target="_blank" href="https://www.nsa.gov/History/Cryptologic-History/Historical-Publications/">
+	   NSA Monographs and Other Historical Documents</a></li>
+      <ul>
+         <li> <a target="_blank" href="https://media.defense.gov/2021/Jul/13/2002761530/-1/-1/0/GERMAN_CIPHER.PDF">
+	         German Cipher Machines of World War II</a> 
+	         <font color="green">by David Mowry, NSA</font> </li>
+         <li> <a target="_blank" href="https://media.defense.gov/2021/Jul/13/2002762041/-1/-1/0/TSEC_KW26.PDF">
+	         Securing Record Communications: The TSEC/KW-26</a> 
+	         <font color="green">by Melville Klein, NSA</font> </li>
+         <li> <a target="_blank" href="https://media.defense.gov/2021/Jul/13/2002761539/-1/-1/0/EAVESDROPPING.PDF">
+	         Eavesdropping on Hell: Historical Guide to Western Communications<br>
+	         Intelligence and the Holocaust, 1939 – 1945</a>
+	         <font color="green">by Robert J. Hanyok, NSA</font> </li>
+	      <li> <a target="_blank" href="https://media.defense.gov/2021/Jun/29/2002751424/-1/-1/0/SPARTANS_IN_DARKNESS.PDF">
+	         Spartans in Darkness: American SIGINT and the Indochina War, 1945 – 1975</a><br>
+	         <font color="green">
+            by Robert J. Hanyok, Center for Cryptologic History, NSA, 2002</font></li>
+	      <li> <a target="_blank" href="https://www.nsa.gov/Helpful-Links/NSA-FOIA/Declassification-Transparency-Initiatives/Internal-Periodicals-Publications/#cryptologic-histories">
+	         American Cryptology during the Cold War, 1945 – 1989, </a><br>
+	         <font color="green">
+            by Thomas R. Johnson, NSA Cryptologic History Series VI, 1995</font></li>
+	         <ul>
+    	         <li> <a target="_blank" href="https://media.defense.gov/2021/Jun/29/2002751382/-1/-1/0/COLD_WAR_I.PDF">
+		            Book I: The Struggle for Centralization, 1945 – 1960</a></li>
+	            <li> <a target="_blank" href="https://media.defense.gov/2021/Jun/29/2002751383/-1/-1/0/COLD_WAR_II.PDF">
+		            Book II: Centralization Wins, 1960 – 1972</a></li>
+	            <li> <a target="_blank" href="https://media.defense.gov/2021/Jun/29/2002751385/-1/-1/0/COLD_WAR_III.PDF">
+		            Book III: Retrenchment and Reform, 1972 – 1980</a></li>
+	            <li> <a target="_blank" href="https://media.defense.gov/2021/Jun/29/2002751389/-1/-1/0/COLD_WAR_IV.PDF">
+		            Book IV: Cryptologic Rebirth, 1981 – 1989</a></li>
+	         </ul>
+      </ul>
+   <li> <font color="green">A Few NSA Monographs from the Pacific Theatre in WW II</font></li>
+      <ul>
+         <li> <a target="_blank" href="https://media.defense.gov/2021/Jul/13/2002761534/-1/-1/0/PEARL_HARBOR_REVISITED.PDF">
+	         Pearl Harbor Revisited: United States Navy Communications Intelligence 1924 – 1941</a></li>
+         <li> <a target="_blank" href="https://media.defense.gov/2021/Jul/13/2002761544/-1/-1/0/PRICELESS_ADVANTAGE.PDF">
+	         A Priceless Advantage: U.S. Navy Communications Intelligence and the 
+	         Battles of<br>Coral Sea, Midway, and the Aleutians</a></li>
+      </ul>
+   <li>  <a target="_blank" href="https://www.nsa.gov/Helpful-Links/NSA-FOIA/Declassification-Transparency-Initiatives/Historical-Releases/Friedman-Documents/">
+	   The William F. Friedman Collection</a>
+	<font color="green">(A Cryptological Gold Mine. Start digging!) </font></li>
+   <li> NSA Bibliographies <br>
+      &nbsp;&nbsp;&nbsp; (<font color="green">The Memory Hole Web Site was closed in 2009. 
+      I therefore provide local copies here.</font>)<br></li>
+      <ul>
+	      <li> <a href="NSA/nsa_cq_1982-96.pdf"> 
+	         <em>Cryptologic Quarterly Index</em></a> 
+	         <font color="green">(Spring 1982 – Winter 1996)</font> </li>
+	      <li> <a href="NSA/nsa_tj_1956-80.pdf">
+	         <em>NSA Technical Journal Cumulative Index</em></a> 
+	         <font color="green">(April 1956 – Fall 1980)</font> </li>
+	      <li> <a href="NSA/nsa_cs_1969-81.pdf"> 
+	         <em>Cryptologic Spectrum Index</em></a> 
+	         <font color="green">(1969 – 1981)</font> </li>
+	      <li> <a href="NSA/nsa_ca_2002-03.pdf">
+	         <em>Cryptologic Almanac Index</em></a> 
+	         <font color="green">(Jan/Feb 2002 – Apr/Jun 2003)</font> </li>
+	      <li> <a href="NSA/nsa_cch_publications.pdf">
+	         <em>Center for Cryptologic History Publications</em></a></li>
+      </ul>    
+   <li> <a target="_blank" href="http://www.codesandciphers.org.uk/index.htm">
+	   Documents published by Tony Sale</a></li>
+      <ul>
+	      <li> <a target="_blank" href="http://www.codesandciphers.org.uk/documents/cryptdict/index.htm">
+	         BP’s Cryptographic Dictionary</a></li>
+	      <li> <a target="_blank" href="http://www.codesandciphers.org.uk/documents/newman/newmix.htm">
+	         The Newmanry History</a> <font color="red">Part of the General Report on Tunny</font></li>
+	      <li> <a target="_blank" href="http://www.codesandciphers.org.uk/documents/small/smallix.htm">
+	         The Special FISH Report </a><font color="green"> by Albert W. Small (Dec. 1944)</font></li>
+      </ul>
+   <li>  <a href="Fried/index.html">
+	   Captain Walter J. Fried’s Fish Reports</a></li>		
+</ul>
+
+<hr>
+<h2> Cryptology Papers and Thesis </h2>
+<ul>
+   <li> <a target="_blank" href="http://www2.cmp.uea.ac.uk/~ajb/Download/MSc_thesis.pdf">
+	   The Applications of Genetic Algorithms in Cryptanalysis</a></li>
+   <li> <a target="_blank" href="cesg/ellis.pdf">
+	   The History of Non-Secret Encryption by J. H. Ellis, CESG, UK</a> 
+	   (<span class="style1">Local copy</span>)</li>
+   <li> <a target="_blank" href="cesg/possnse.pdf">
+	   The Possibility of Secure Non-Secret Digital Encryption by J. H. Ellis, CESG, UK</a> 
+	   (<span class="style1">Local copy</span>)</li>
+   <li> <a target="_blank" href="cesg/notense.pdf">
+	   A Note on ‘Non-Secret Encryption’ by C.C. Cocks, CESG, UK</a>
+	   (<span class="style1">Local copy</span>)</li>
+   <li> <a target="_blank" href="cesg/secenc.pdf">
+	   Non-Secret Encryption Using a Finite Field by M. J. Williamson, CESG, UK</a>
+	   (<span class="style1">Local copy</span>)</li>
+   <li> <a target="_blank" href="cesg/cheapnse.pdf">
+	   Thoughts on Cheaper Non-Secret Encryption by M. J. Williamson, CESG, UK</a> 
+	   (<span class="style1">Local copy</span>)</li>
+   <li> <img border="0" src="images/new.gif" style="float:left;width:31px;height:12px;">
+      <a target="_blank" href="http://cryptome.org/nsa-nse/nsa-nse-01.htm">
+	   NSA Documents on Non-Secret Encryption</a></li>
+   <li> <a href="pubs/pubs.html"> Frode’s Publications</a>
+	   <img border="0" src="images/updated.gif" style="float:left;width:44px;height:12px;"></li>
+</ul>
+
+<hr>
+<h2> Software and Simulations </h2>
+<ul>
+   <li> <a href="CSG/index.html"> <img height="70" width="120" src="CSG/csglogo1.gif" border="1" alt="Click to visit Crypto Simulation Group"> 
+	   Crypto Simulation Group </a> 
+	   &nbsp;&nbsp;(<a target="_blank" href="pubs/enigvar.pdf">
+	   <em>“Enigma Variations”</em></a><em>, Cryptologia, July 1998</em>)</li>
+   <li> <a href="simula/index.html"> CSG Cipher Machine Simulators for Windows </a></li>
+   <li> <font color="#FF0000"><blink><a href="simula/purple/index.html">CSG 
+	   PURPLE </a></blink></font><a href="simula/purple/index.html"> Simulator for 
+	   Windows</a></li>
+   <li> <a href="simula/cd57/index.html"> CSG Hagelin CD57 Simulator for Windows </a></li>
+   <li> <a href="simula/sigaba/index.html"> CSG Sigaba (ECM Mark II) Simulator 
+	   for Windows </a></li>
+   <li> <a href="simula/t52/index.html"> CSG Siemens T52d Simulator for Windows</a></li> 
+   <li> <a target="_blank" href="https://www.ciphermachinesandcryptology.com/en/cipherclassics.htm">Dirk Rijmenants’           Cipher Classics Tool for Windows</a></li>
+   <li> <a target="_blank" href="https://www.ciphermachinesandcryptology.com/en/enigmasim.htm">Dirk         Rijmenants’ Enigma Simulator</a></li>
+   <li> <a target="_blank" href="https://www.ciphermachinesandcryptology.com/en/m209sim.htm">Dirk         Rijmenants’ M-209 Simulator</a></li> 
+   <li> <a target="_blank" href="https://www.ciphermachinesandcryptology.com/en/bc-52.htm">Dirk           Rijmenants’ Hagelin BC-52 Simulator</a></li>
+   <li> <img border="0" src="images/new.gif" style="float:left;width:31px;height:12px;">
+      <a target="_blank" href="https://www.ciphermachinesandcryptology.com/en/kl-7sim.htm">Dirk           Rijmenants’ U.S. TSEC/KL-7 Simulator</a></li>
+	<li> <a target="_blank" href="https://ww2crypto.online">
+	   Brian Neal’s WW2 Cipher Machine Simulations in your Browser</a>&nbsp;(Enigma, Hagelin M-209, Purple)</li>
+   <li> <a href="../streams/today4_enigma_20060906.ram">
+	   Listen to A Real Bombe Running</a> (Audio Recoding by BBC/Radio 4)</li> 
+   <li> <a target="_blank" href="http://www.und.nodak.edu/org/crypto/crypto/">
+	   ACA’s Crypto Drop Box</a></li>
+</ul>
+
+<hr>
+<h2> Historical Cipher Machines </h2>
+
+<ul>
+   <li> <a target="_blank" href="http://www.maritime.org/ecm2.shtml">
+	   The Electronic Cipher Machine (ECM) Mark II</a></li>
+   <li> <a target="_blank" href="https://www.nsa.gov/about/cryptologic-heritage/historical-figures-publications/publications/assets/files/sigaba-ecm-ii/The_SIGABA_ECM_Cipher_Machine_A_Beautiful_Idea3.pdf">
+	   The SIGABA / ECM II Cipher Machine: “A Beautiful Idea”</a><br>
+	   <font color="green">by Timothy J. Mucklow, NSA, 2015</font></li>	
+   <li> <a target="_blank" href="http://w1tp.com/enigma/mfialka.htm">
+	   FIALKA — The Russian Rotor Machines M-125</a></li>
+   <li> <a target="_blank" href="http://www.cryptomuseum.com/crypto/fialka/">
+	   Paul Reuvers’s FIALKA Site. Detailed explanations.</a></li> 
+   <li> <a target="_blank" href="http://scz.bplaced.net/m125.html">
+	   FIALKA — As Described by a Former DDR Cipher Operator</a>
+	   <font color="red">(In German)</font></li>
+      <ul>
+         <li> <a target="_blank" href="http://scz.bplaced.net/">
+	         The Main Page — Der SAS- und Chiffrierdienst ( SCD )</a> 
+	         <font color="red">(In German)</font></li>
+      </ul>
+   <li> <a target="_blank" href="http://jproc.ca/crypto/index.html">
+	   Jerry Proc’s Crypto Machine Page</a></li>
+   <li> <a target="_blank" href="http://jproc.ca/rrp/codofdes.html">
+	   The KL7 Off-Line Crypto Unit</a></li>
+   <li> <a target="_blank" href="http://jproc.ca/rrp/mcentdes.html">
+	   The KWR37 On-Line Crypto Receiver</a></li>
+   <li> <img border="0" src="images/new.gif" style="float:left;width:31px;height:12px;">
+      <a target="_blank" href="https://www.ciphermachinesandcryptology.com/en/kl-7.htm">Dirk           Rijmenants’ U.S. TSEC/KL-7 ADONIS &amp; POLLUX Page</a><br>
+      <font color="green">(This an <u>outstanding</u> description of the KL-7) </font></li>
+   <li> <a href="BPAbwehr/Abwehr_theft.html">The Story of The Abwehr Enigma G-312</a></li>
+   <li> <a target="_blank" href="http://archive.hnsa.org/doc/crypto/ecm/index.htm">
+	   The SIGABA Manual (ECM Mark 2 and CCM Mark 1)</a></li>
+   <li> <a href="Kryha/index.html">The Kryha Machine</a></li>
+</ul>
+
+<hr>
+<h2> Dictionaries and Glossaries</h2>
+<ul>
+   <li> <b>Confused by Acronyms?</b><br> 
+      <a target="_blank" href="http://www.dtic.mil/doctrine/dod_dictionary/">
+	   DOD Dictionary of Military Terms </a>&nbsp;(<font color="green">PDF version below</font>)</li>
+   <li> <a target="_blank" href="http://www.dtic.mil/doctrine/new_pubs/jp1_02.pdf">
+	   Dictionary of Military and Associated Terms</a> <br>
+	   (<font color="green">DOD Joint Publication 1-02, 15 Nov. 2015</font>)</li>
+   <li> <a target="_blank" href="http://wcnjk.wp.mil.pl/plik/file/N_20130808_AAP6EN.pdf">
+	   NATO Glossary of Terms and Definitions (English and French)</a> <br>
+	   (<font color="green">NATO, AAP-6, 2014</font>)</li>
+   <li> <a target="_blank" href="http://www.dtic.mil/doctrine/doctrine/other/aap15.pdf">
+	   NATO Glossary of Abbreviations Used in NATO Documents and Publications</a> <br>
+	   (<font color="green">NATO, AAP-15, 2013</font>) </li>
+   <li> <a target="_blank" href="http://www.codesandciphers.org.uk/documents/cryptdict/">
+	   The Bletchley Park Cryptographic Dictionary (1944) </a></li>
+   <li> <a target="_blank" href="http://www.ciphersbyritter.com/GLOSSARY.HTM">
+	   Ritter’s Crypto Glossary and Dictionary of Technical Cryptography</a> </li>
+</ul>
+
+<hr>
+<h2> Kid’s Corner </h2>
+
+<ul>
+   <li> <a target="_blank" href="https://www.nsa.gov/kids/home.shtml">
+	   National Security Agency’s CryptoKids Page</a> (USA)</li>
+   <li> <a target="_blank" href="http://www.gchq.gov.uk/how_we_work/partnerships/supporting_education/Pages/index.aspx">
+	   GCHQ’s Support for Education</a> (UK)</li>
+   <li> <a target="_blank" href="http://www.secretcodebreaker.com/index.html">
+		Secret Code Breaker, Cryptography for All Ages</a> (USA)</li>
+</ul>
+
+<hr>
+<h2> Bits and Pieces </h2>
+<ul>
+   <li> <a target="_blank" href="https://www.cryptool.org/en/">
+	   <img src="images/CT.png" border="0" title="Click to visit CT-Portal." width="85" height="85" vspace="3"></a> &nbsp;
+	   <a target="_blank" href="https://www.cryptool.org/en/">
+	   The CrypTool Portal</a> — <br>
+	   <font color="green">The Hands-On Cryptology Site, Learn by Doing.</font></li>
+   <li> <a target="_blank" href="https://www.cryptool.org/en/ct2/">
+	   <img src="images/CT.png" border="0" title="Click to visit CrypTool 2." width="85" height="85" vspace="3"></a> &nbsp;
+	   <a target="_blank" href="https://www.cryptool.org/en/ct2/">
+	   CrypTool 2</a> — <br>
+	   <font color="green">The Swiss Army Knife of Cryptology.</font></li>       
+   <li> <a target="_blank" href="http://www.codesandciphers.org.uk/bletchleypark/index.htm">
+	   <img src="images/mansion.jpg" border="0" title="Click to visit Bletchley Park." width="157" height="94"></a> &nbsp;
+	   <a target="_blank" href="http://www.codesandciphers.org.uk/bletchleypark/index.htm">
+	   Visit Bletchley Park </a>&nbsp;<font color="green">A Guided Tour with Tony Sale</font></li>
+   <li> <a target="_blank" href="http://www.codesandciphers.org.uk/index.htm">
+	   <img src="images/tony.jpg" border="0" title="Click to visit WWII Codes and Ciphers." width="85" height="110" vspace="3"></a> &nbsp;
+	   <a target="_blank" href="http://www.codesandciphers.org.uk/index.htm">
+	   Tony Sale’s Codes and Ciphers Page</a></li>
+   <li> <a target="_blank" href="https://www.tnmoc.org/">
+	   <img src="images/tnmoc-logo.png" border="0" title="Click to visit TNMOC." width="85" height="110" vspace="3"></a> &nbsp;
+	   <a target="_blank" href="https://www.tnmoc.org/">
+	   The National Museum of Computing</a> — <br>
+	   <font color="green">The home of Colossus and the Turing-Welchman Bombe.</font></li>	
+   <li> <a target="_blank" href="https://www.tnmoc.org/colossus">
+	   <img src="images/tnmoc-logo.png" border="0" title="Click to see Colossus." width="85" height="110" vspace="3"></a> &nbsp;
+	   <a target="_blank" href="https://www.tnmoc.org/colossus">
+	   TNMOC — Colossus</a></li>
+   <li> <a target="_blank" href="https://www.tnmoc.org/bombe">
+	   <img src="images/tnmoc-logo.png" border="0" title="Click to see Turing-Welchman Bombe." width="85" height="110" vspace="3"></a> &nbsp;
+	   <a target="_blank" href="https://www.tnmoc.org/bombe">
+	   TNMOC — The Turing-Welchman Bombe</a></li>		
+   <li> <a target="_blank" href="https://sites.google.com/site/bomberebuilt/home">
+	   <img height="50" width="122" src="images/cantab.jpg" border="0" title="Click to visit The Bombe          Rebuild Project."></a> &nbsp;
+	   <a target="_blank" href="https://sites.google.com/site/bomberebuilt/home"> 
+  	   The Original Bombe Rebuild Project </a></li>
+   <li> <a href="images/BPBombe.jpg" target="_blank">
+	   <img border="0" src="images/BPBombeTN.jpg" width="133" height="100" vspace="3"></a>&nbsp; 
+	   <a name="BombeRebuild" href="streams/today4_enigma_20060906.ram">
+	   Inauguration of The Bombe Rebuild Project </a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+	   (<font face="Times New Roman" color="green">Audio Recoding by BBC/Radio 4 – needs        RealPlayer</font>)</li> 
+   <li> <a target="_blank" href="http://www.ellsbury.com/enigmabombe.htm">
+	   <img border="0" src="images/turingbombe.jpg" title="Click to visit Enigma and the Bombe" width="133" height="100"></a> &nbsp;
+	   <a target="_blank" href="http://www.ellsbury.com/enigmabombe.htm">
+	   The Enigma and the Bombe</a></li>
+   <li> <a target="_blank" href="http://bookstore.ams.org/SWCRY/">
+	   <img border="0" src="images/swcry.gif" title="Click to visit Swedish Codebreakers" width="72" height="100" align="bottom" vspace="5"></a>&nbsp; 
+	   <font color="green">Bengt Beckman,</font>&nbsp;
+	   <a target="_blank" href="http://bookstore.ams.org/SWCRY/"><br>
+	   <em>Codebreakers: Arne Beurling and the Swedish Crypto Program during World War 	                   II</em></a><br>
+	   <font color="green">Read my review of the Swedish edition: 
+	   <a href="pubs/beckrevw.pdf">
+	   Sweden, Cryptographic Superpower</a></font></li>
+   <li> <a target="_blank" href="http://www.amazon.co.uk/exec/obidos/ASIN/0593049101/qid=1001580603/sr=1-1/ref=sr_sp_re/026-4061264-3778849">
+	   <img border="0" src="images/ActionThisDay.jpg" align="bottom" width="72" height="112" title="Click to visit Amazon UK" vspace="5"></a>&nbsp; 
+	   <font color="green">Michael Smith and Ralph Erskine (eds.),</font><br>
+	   <em><a target="_blank" href="http://www.amazon.co.uk/exec/obidos/ASIN/0593049101/qid=1001580603/sr=1-1/ref=sr_sp_re/202-1021409-1473453">
+	   Action This Day: Bletchley Park from the breaking of the Enigma Code<br> 
+	   to the birth of the modern computer</a></em>
+	   <br>&nbsp;&nbsp;&nbsp; <a href="ActionContents.html">
+	   List of Contents</a></li>
+   <li> <a target="_blank" href="https://www.amazon.co.uk/Essential-Turing-B-J-Copeland/dp/0198250797/">
+	   <img border="0" src="images/Essential_Turing.jpg" title="Click to visit The Essetial Turing" width="63" height="95"></a> 
+	   <font color="green">B. Jack Copeland (Editor),</font><br>
+	   <em><a target="_blank" href="https://www.amazon.co.uk/Essential-Turing-B-J-Copeland/dp/0198250797/">
+	   The Essential Turing: Classic Writings on Minds and Computers</a></em><br>
+	   <a target="_blank" href="Turing/0-19-825080-0.pdf">
+	   Read a sample chapter; Jack Copeland on Enigma</a></li>
+   <li> <a target="_blank" href="http://www.oup.co.uk/isbn/9780199578146">
+	   <img border="0" src="images/0-19-284055-X.gif" title="Click to visit Colossus" width="63" height="96"></a> 
+	   <font color="green">B. Jack Copeland (Editor),</font> <br>
+	   <em><a target="_blank" href="http://www.oup.co.uk/isbn/9780199578146">
+	   Colossus: The Secrets of Bletchley Park’s code-breaking computers</a></em><br>
+	   <font color="green">Or read about it online: </font><br>
+	   <a target="_blank" href="http://www.colossus-computer.com/colossus1.html">
+	   Colossus: The First Large Scale Electronic Computer</a></li>
+   <li> <a target="_blank" href="http://www.paulgannonbooks.co.uk/styled-4/">
+	   <img border="0" src="images/Colossus_BP.jpg" title="Click to visit Colossus" width="63" height="96"></a> 
+	   <a target="_blank" href="http://www.paulgannonbooks.co.uk">Paul Gannon,</a> <br>
+	   <em><a target="_blank" href="http://www.paulgannonbooks.co.uk/styled-4/">
+	   Colossus: Bletchley Park’s Greatest Secret</a></em></li>
+   <li> <a target="_blank" href="http://www.secretcodebreaker.com/index.html">
+	   <img height="108" width="104" src="images/SBCode.gif" border="0" title="Click to visit The Secret        Code Breaker."></a> &nbsp;
+	   <a target="_blank" href="http://www.secretcodebreaker.com/index.html">
+  	   Secret Code Breaker Online</a><br>
+	   <font color="green">Cryptography for All Ages, Age 8 and Up</font></li>
+   <li> <img border="0" src="images/cipherchal.jpg" title="Cipher Challenge Cracked" align="middle" width="72" height="112">&nbsp;
+  	   <a target="_blank" href="http://simonsingh.net/cryptography/cipher-challenge/">
+	   The Cipher Challenge Cracked</a><br>
+	   <img border="0" src="images/swedenf.gif" width="30" height="19" hspace="10" vspace="3">
+	   <font color="green">Swedish Codebreakers still show their excellence,</font><br>
+	   <a href="files/codebook_solution.pdf">
+	   “How we Cracked the Code Book Ciphers</a>”<br>
+	   <font color="green">or read the</font> 
+	   <a target="_blank" href="http://codebook.org/codebook_solution.html">HTML Version</a></li>
+   <li> <a target="_blank" href="INS.html">
+	   <img border="0" src="images/INS.jpg" title="Click for Index to INS" align="middle" style="margin: 3px 0px" width="73" height="104"></a>&nbsp;
+  	   <a href="INS.html">Index to Intelligence and National Security</a> </li>
+   <li> <a target="_blank" href="IJIC.html">
+	   <img border="0" src="images/IJIC.jpg" title="Click for Index to IJIC" width="73" height="105" align="middle" style="margin: 3px 0px"></a>&nbsp;
+  	   <a href="IJIC.html">Index to International Journal of Intelligence and 	                            CounterIntelligence</a></li>
+   <li> <a href="DSDpuzzle.html"> Want to be a Cryptanalyst? </a> <font color="green">Take 
+	   <a target="_blank" href="http://www.dsd.gov.au/">DSD’s </a>“Aptitude                    Test”.</font></li>
+   <li> <font color="green">Cryptology Books by Randall K. Nichols (LANAKI)
+	   <br>Former President of 
+	   <a target="_blank" href="http://www.cryptogram.org/">The American Cryptogram 	                      Association</a></font>:</li> 
+      <ul>
+         <li> <a target="_top" href="http://www.amazon.com/exec/obidos/ASIN/0079137598/comsecsolutionsc">
+	         The ICSA Guide To Cryptography and Commercial Computer Security Systems</a></li>
+         <li> <a target="_top" href="http://www.amazon.com/exec/obidos/ASIN/0894122630/comsecsolutionsc">
+	         Classical Cryptography Course Volume I</a></li>
+         <li> <a target="_top" href="http://www.amazon.com/exec/obidos/ASIN/0894122649/comsecsolutionsc">
+	    Classical Cryptography Course Volume II</a></li>
+      </ul>
+   <li> <a target="_blank" href="http://www.usna.edu/Users/math/wdj/_files/documents/papers/cryptoday.html">
+	   <img height="109" width="70" src="images/cryptoday.jpg" border="0" style="margin-top: 10px" title="Click to see the contents of Coding Theory and Cryptography.">
+ 	   Coding Theory and Cryptography:<br>
+	   From Enigma and Geheimschreiber to Quantum Theory </a><br>
+	   <font color="green">The proceedings of the Conference on Coding Theory, 
+	   Cryptography, and Number Theory<br>
+	   held at the U.S. Naval Academy during October 25-26, 1998.</font> <br>
+	   <a href="pubs/cryptoday.pdf">
+	   List of Contents in PDF Format</a></li>
+</ul>
+
+<hr>
+<h2> Crypto Links </h2>
+
+<ul>
+   <li> <a target="_blank" href="http://cryptome.org/"> Crypto News — JYA Cryptome</a></li>
+   <li> <a href="blogs.html">Crypto Blogs</a></li>
+   <li> <a target="_blank" href="http://www.fas.org/blog/secrecy/"> Secrecy News Blog</a></li>
+   <li> <a href="http://www.schneier.com/"> Bruce Schneier’s <em>Schneier on Security</em>          Blog</a></li>
+   <li> <a href="historical.html"> Historical Interests </a></li>
+   <li> <a href="studygrps.html"> Academic Study Groups </a></li>
+   <li> <a href="archives.html"> The Archives and Other Resources </a></li>
+   <li> <a href="agencies.html"> Government Agencies </a></li>
+   <li> <a href="commercial.html"> Commercial Crypto </a></li>
+   <li> <a href="cryptopub.html"> Crypto Publications </a></li>
+   <li> <a href="histopub.html"> History Publications </a></li>
+   <li> <a href="society.html"> Cryptological Societies </a></li>
+   <li> <a href="sigint.html"> Military Signal Intelligence Units </a></li>
+   <li> <a href="infowar.html"> Information Warfare </a></li>
+</ul>
+
+<hr>
+
+<p align="center"> <b><font size="4">Site visitors:&nbsp;&nbsp;</font></b> 		
+<!-- Default Statcounter code for Crypto Cellar Research https://cryptocellar.org -->
+<script type="text/javascript">
+var sc_project=1434569; 
+var sc_invisible=0; 
+var sc_security="4da9465e"; 
+var scJsHost = "https://";
+document.write("<sc"+"ript type='text/javascript' src='" +
+scJsHost+
+"statcounter.com/counter/counter.js'></"+"script>");
+</script><script type="text/javascript" src="https://statcounter.com/counter/counter.js"></script><span class="statcounter"><a id="sc_counter_1434569" class="statcounter" href="https://www.statcounter.com/" target="_blank"><img src="data:image/gif;base64,iVBORw0KGgoAAAANSUhEUgAAAEQAAAAQAQMAAACVwksQAAAABlBMVEUAAAD///+l2Z/dAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAAUUlEQVQImX3NOwrAMAwDUJHB4KXSDXpV90N/k4/cJJSO8aKHwTIwHCtGIwm4uW5lBvTUyK5VkfFp00l27W3bdf3Kdhrw4nLlUpt5zAc5jf/jBeucGYTboVVZAAAAAElFTkSuQmCC" alt="StatCounter - Free Web Tracker and Counter" border="0"></a></span>
+<noscript><div class="statcounter"><a title="Web Analytics"
+href="https://statcounter.com/" target="_blank"><img
+class="statcounter"
+src="https://c.statcounter.com/1434569/0/4da9465e/0/"
+alt="Web Analytics"></a></div></noscript>
+<!-- End of Statcounter Code -->
+</p>		
+
+<hr>
+	
+
+
+</body></html>

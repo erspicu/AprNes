@@ -1,0 +1,1696 @@
+                                 THE SIEMENS AND HALSKE T52e CIPHER MACHINE
+
+  A series of cipher machines designated T52 was manufactured by Siemens and
+  Halske between 1934 and 1944. They were built around the T36 teleprinter,
+  to which were added encipherment and decipherment mechanisms. The machine
+  could be used like a teleprinter, enciphering its output to the telegraph
+  line and, when it was receiving from the telegraph line, deciphering the
+  message before printing it. So the T52 machines operated ?on-line1 and
+  when two machines were connected by a telegraph line (or equivalent
+  communications path) they could be used like standard teleprinters, sending
+ messages in cipher from one to the other. As with teleprinters, only one
+  direction of transmission could be used at a time but the operator did not
+ have to switch from send to receive, or from encipher to decipher. The
+ use of the keyboard established the sending and enciphering mode.
+
+ The T36 teleprinter dates from about 1928. A patent for a fsecret telegraph
+ system' based on modifying the T36 was filed in Germany on 17 July 1930 by
+ Jipp, Rossberg and Hettler, and assigned to Siemens and Halske. This became
+ US patent 1,912,983 dated 6 June, 1933- The basic principles of the T52
+ machines can be found in this patent.
+
+ The design of the T52 machines was continually improved, particularly under
+ the stimulus of the 1939-45 war. Models a, b, c, d, e and f have been
+ repprted. It is said that a model known as a/b was in use at the beginning
+ of the war and that model T52f was never put into production because the
+ factory was bombed in October 1944.
+
+This report is based on a close examination of two machines, one in Munich
+at the Werner von Siemens Institute for the History of the House-of Siemens and
+the other in the Science Museum, London. Both machines came from Norway and
+were probably part of a group of machines in use in Oslo at the end of the
+war. The assistance of the Siemens Institute and the Science Museum is
+gratefully acknowledged and so is the help of the Norwegian Technical Museum
+in Oslo.
+
+Both machines examined are models T52e. They have a three-position control
+switch which enables them to be set for operation as model e, in clear or as
+d machines. In this sense, they could be called models d/e. Somewhat
+          -2
+
+surprising, the Science Museu* machine has a label giving it as T52c It
+differs fro. the Munich machine in a few respects which will be detailed at
+the end of the report. It sees to have been modified from an earlier model
+and has vestiges of earlier mechanisms which will be described later.
+
+te Science Museum machine has serial number 43996 and the Munich machine
+serial number 67323*
+
+There are believed to be similar machines elsewhere in Vest Germany, at
+the Norwegian Technical Museum in Oslo and at Crypto AG in Zug, Switzerland.
+
+PHYSICAL  L AY O U T  ,,.-..
+
+Figure 1 shows the plan view of the machine. It contains 6 sub-units
+which are attached to a heavy base.
+
+The base contains, at its back, sockets for the tape-reader and punch and
+large resistors for the motor AG supplies. ' At the front it has two control
+knobs operating large multi-contact switches. 0»e of these connects th,.
+input of the machine either to the tape-reader or the keyboard. The other
+switch sets the machine in one of the three conditions T52d, clear or T52e.
+
+The various sub-units except the keyboard connect electrically to the base
+through jackpoints. Within the base is a mass of wiring connecting the
+jackooints and also the control switches mentioned above and a set of
+capacitors. The six sub-units will next be described, followed by a
+description of the function as a whole.
+
+Wherever possible in this report the names used for the parts are those
+originally used or have been taken from documentation of the T36 machine
+Where the correct name is not known our invented name will be marked » the
+ report by the symbol (*)·
+
+ 1 The T36 Teleprinter Mechanism
+ The centre of the machine contains the T36 mechanism on its ow. base, which
+ can be detached by removing two bolts. This mechanism has a.drive motor
+ with a speed regulator, driving 3 camshafts through a gearbox. «e have
+                                                         -3-
+
+called these the transmit, receive and translate/print camshafts respectively.
+Each camshaft rotates when a clutch is released by a magnet (AMs, AMe, AMU)
+shown in the diagram. The translate/print camshaft has, attached to its
+front end, a type wheel containing raised letters and figures. A magnet
+DM hits the paper tape against the inked type wheel, on-the-fly. Details
+of the printing mechanism and its circuit are given later.
+
+2. Keyboard
+The keyboard fits into the base and, unlike the other sub-units, is connected
+by wires to terminal points, not by jacks. It operates five changeover
+contacts S1-S5 and a trip contact. Its mechanism is linked by a lever and
+a wire linkage to a cam on the transmit camshaft. Details will be given
+later.
+
+Together, the T36 mechanism and the keyboard, with relays R1-R5, AR and KLR
+are the standard mechanism of the T36 teleprinter. The remainder of the
+units to be described are special to the T52e. The relays U and RR3 {*)
+are not found in the T36 teleprinter and are part of the T52.
+
+3. Coding Wheels and Cams
+At the back of the machine is a large frame containing, at the top, ten
+independently moving wheels which are stepped on by pawl mechanisms. Each
+wheel has a different number of steps for a complete rotation. For wheels
+W1-W10 (*) the number of steps is 47, 53, 59, 61, 64, 65, 67, 69, 71 and 73
+r e s p e c t i v e l y.
+
+Each wheel has a cam which operates two sets of changeover contacts shown in
+Figure 2 which we have called A and B (*). The cam profiles generate a pseudo
+random binaiy sequence. The positions of the wheels can be set by operating
+the large lever shown at the front of the machine. Wheel positions can be
+read from numbers as shown at the right of Figure 2 where the indicator, the
+thumb wheel used for setting, the ratchet wheel and the cam are shown. Note
+that there would be room for additional cam wheels to the right of the existing
+ one.
+
+As shown in Figure 2, the contact sets A and B are spaced about 1/3 revolution
+ apart on the cam. Reading from contact sets A, Figure 3 shows the pseudo
+ random cam - sequences as taken from the Munich machine. In the figures
+                                                           -4-
+
+ which follow, contacts A and B are shown in their unoperated or zero position,
+ ie the low condition of the cam surface.
+
+ The separation between the A and B contacts is indicated in Figure 3.
+ When the wheels are set at position 1, the A contacts read state 1 of this
+ figure and the B contacts read the state at the black square. The spacing
+ between A and B contacts is given. Note that the output sequence at
+ contacts B is delayed by approximately 1/3 revolution compared with that at
+ contact A.
+
+ In the Science Museum model, the pattern of coding on the cams is the same,
+ but the wheel numbering does not agree. Details are given later*
+
+ Figure 2 shows the interposer mechanism operated by a magnet M (*) which
+ can inhibit the motion of a cam. Normally, all the pawl carriers PC (*)
+ are dropped by the rotation of the drive shaft DS (*) allowing the pawls to
+ fall and then positively rotate the coding wheels when they return. When M
+ is operated an interposer prevents the pawl carrier from dropping and the
+ wheel does not rotate. Each wheel has such a magnet. For setting the
+ wheels, the unlocking shaft US (*) rotates anti-clockwise lifting the pawl
+from the ratchet wheel. A sprung roller pressing on this wheel locates and
+holds the wheel during setting. In the Munich machine, but not the Science
+Museum machine, there is an additional pawl preventing counter-rotation.
+This makes the mechanism more reliable but allows the wheels to be manually
+set only in the forward direction, which is inconvenient.
+
+The movement of the pawl carriers by shaft DS is derived from a cam driven by
+a motor through a one-cycle clutch which is released by magnet AMC (*). There
+are other cams on this shaft which operate contacts, to be described in detail
+later.
+
+The frame containing the motor, drive mechanism and coding wheels can be
+tilted backwards against stops when two bolts are removed from the front
+feet, the link to the unlocking lever is lifted off and a safety latch on
+the left of the machine is released. This gives access to the rear of the
+T36 mechanism. By removing a clip and a shaft, the coding wheel mechanism
+could be detached for maintenance or replacement.
+                                                       -5-
+
+ 4. The Relay and Key-setting Box
+ On the right of the machine there is a black box with a lockable lid containing
+ 20 relays and 10 rotary switches, shown on Figure 1.
+
+ The switches are used to set the fbasic key1 of the machine. The 10 switches
+ are labelled ABCDEFGHJ and K. They correspond in reverse sequence
+ to the wheels W10 to W1 respectively. Each switch has 10 positions which
+ are labelled 1, 3, 5, 7, 9 followed by the Roman numberals I, II, III, IV, V.
+The reason for this notation will be conjectured later.
+
+The jackpoints of this relay and key setting box, which can be removed by
+ detaching two bolts, are included in our circuit diagrams using a notation,
+which is our own, shown in Figure 21.
+
+5. KTF Unit
+At the front left of the machine is a small box containing a switch with 10
+ changeover contacts KT1-KT10. It can be removed by releasing four bolts.
+The switch is labelled fwith» and 'without1 KTF. The meaning of fKTFf is
+unknown but its function will be described later. Only contacts KT1, KT3,
+KT5 and KT7 of the switch are in use but the others have been used at one
+time then disconnected. The precise way in which the KTF switch is included
+in the machine's circuits was probably changed from time to time as an
+additional security feature. This is the reason why all the connections via
+the KTF jack are shown in the circuit diagram of Figure 10, where the KTF
+contacts appear.
+
+6. Power Supplies
+The machine appears to require three D.C. power supplies as well as 220V A.C.
+Two of the D.C. supplies come from outside the machine and one is internal.
+This internal supply was measured as 150 volts in the Munich machine and 120
+volts in the Science Museum machine. It provides the source of power for
+the 20 relays in the black box.
+
+THE CONNECTING PLUC, EXTERNAL SUPPLIES AND CIRCUIT NOTATION
+From the back of the base of the machine a flexible cable is joined to a 13 pin
+plug. We believe that, in operation, this was attached to a line-connection
+unit to which were attached power units and the telegraph line. This line-
+                                                       -6-
+
+connection unit contains additonal relays U, ER,V, D and Th for which we have
+obtained the circuit from the documentation of the T36 teleprinter.
+
+In our circuit diagrams the notation P1-P13 (*) is used for the points of
+this connection plug. The function of the 13 connections is shown in Figure
+20 together with our notation for other components shown in our circuit
+diagrams. We also show here our notation for the internal power supply and
+the two external power supplies which enter through this plug.
+
+All connections to this plug except the earth wire go through filters located
+in the base of the machine at the right side. The two AC connections have
+the standard filter and one extra filter each. The DC resistance of each
+filter is about 12 ohms.
+
+The notation +N and -N comes from the documentation of the T36 teleprinter.
+The notation for the other power supplies is our own. The cam contacts on
+the pawl drive shaft have been denoted by Greek letters since we do not know
+the original notation. The other nomenclature of Figure 20 is authentic.
+
+LOGICAL PLAN OF THE MACHINE
+Figure 4 shows, in schematic form, the plan of operation of the machine.
+
+Encipherment and decipherment take place in the contacts of relays SR1-SR10.
+The keyboard contacts (or tape-reader contacts if this is switched in)
+generate five signals which after encipherment are sampled by cam contacts
+F2-F6 on the transmit camshaft. When transmitting, the relay U (which is
+in the line-connection unit) is operated so that the telegraph signal leaves
+on 'line a1. At the same time the signal operates the polarised relay ER
+which generates the copy of the telegraph signal which enters the 'receive1
+section of the T52 machine. Here, it is sampled by the receive cam contacts
+F10-F14 and, passing through the 'decipher1 contacts of SR1-SR10, the five
+samples operate the relays R1-R5 which then store the plaintext character.
+The outputs of these relays operate the translate and print unit.
+
+When receiving, the U relay is released, the ER relay operates from 'line a'
+and a repeated signal enters the receive cams. During transmission, the
+ transmitted ciphertext is received and deciphered to generate the local printout.
+                                                               -7-
+
+Printing locally from a deciphered character checks the correct operation
+of the contacts of relays SR1-SR10 but does not verify that the correct SR
+relays are operated.
+
+Details of the encipherment and decipherment method will be given later. The
+remainder of the system is concerned with generating pseudo-random binary
+sequences for the 10 channels SR1-SR10.
+
+The sources of the pseudo-randomness are the B contact outputs of the 10
+coding wheels W1-W10 shown in the figure. The movement of these coding wheels
+is controlled by the interposer magnets M1-M10 which are operated by logical
+functions of the outputs from coding wheel contacts A1-A10. This feedback
+mechanism generates a long sequence of pseudo-random data from the wheels.
+Part of the logic of the interposer magnets is provided by the KTF circuits
+using a relay contact RR3 derived from the third telegraph element of the
+plaintext as stored on relay R3- Thus, when KTF is switched on, the motion
+of the coding wheels depends on an earlier plaintext character. In such an
+operation, errors on the line will affect the wheel motion at the receiver and
+put the two machines out of synchronism. For this "reason, if the line is bad,
+KTF can be switched off. Without KTF, the synchronism of wheel positions
+at sender and receiver is dependent on having the same initial setting and
+then stepping both sets of wheels whenever any character is sent.
+
+The B contacts from the coding wheels (at a different place on their
+circumference) provide the signals which, after transformation, operate the
+relays SR1-SR10. The B outputs are first transposed by the key-setting
+switches according to the setting of the basic key. The transposed channels
+are called X1-X10 (*). The H relays are logical functions of these channels,
+and the SR relays are logical functions of the H relays, when the machine is
+operating as a T52e. In the clear position, the relays SR are set so that
+the characters are not transformed. In the T52d setting, the SR1-SR10
+relays are operated directly by the channels X1-X10.
+
+Figure 4 also shows the relative timing of the camshaft movements. When
+transmitting, the receive camshaft operates very soon after the transmit
+camshaft. (When the machine is receiving, the transmit camshaft does not turn
+
+                                                                                                                                                                  \
+                                                 -8-
+
+ at all). Near the start of the motion of the receive camshaft, cam F37
+ operates the magnet (AMC) which releases the coding wheel pawl mechanism.
+ Near the end of the receive camshaft motion, cam F20 operates the magnet
+ AMu which releases the translate/print camshaft. At the end of these cycles,
+ the motion of the camshafts can be repeated almost at once. Experimentally
+ it was found that about 6 characters could be sent per second. The relays
+ R1-R5 hold the character to be printed during the delayed motion of the print
+ camshaft. The timing will be shown in more detail later.
+
+ To summarise, the 10 coding wheels control their own motion by feedback from
+ contacts A through the logic of the interposer magnets. From their contacts
+ B, they produce signals which, after transposition by the key-setting switches
+ and logical operations due to the H relays, generate the 10 pseudo-random
+ binary sequences of the SR relays which carry out the encipherment and decipherment
+ functions. Receiving a character involves the receive camshaft and decipher
+ logic, the relays R1-R5 and the translate and print logic. When a character
+ is transmitted, it is at the same time received, deciphered and printed in
+ clear form.
+
+ENCIFHER-TRANSMIT CIRCUIT
+Figure 5 shows the circuit used to transmit an enciphered character. The
+plaintext character is generated by the keyboard contacts S1-S5 or by the
+tape-reader if this is used. The circuits involving the tape-reader are not
+shown. With the voltages shown on the contacts cf S1-S5, if they were
+connected directly through to the contacts F2-F6 they would generate the 5
+information-carrying elements of the telegraph signal on the transmit circuit,
+which leaves the machine on pin P9 of the connection plug.
+
+In the rest state, relay AR is off and a positive signal appears on the transmit
+circuit. The telegraph signals are derived from a power supply T (*) through
+current limiters. When any key is depressed, relay AR operates and places
+the negative or 'start' element on the transmit line through contact F1. At
+the same time, current goes to the release magnet AMs, starting the transmit
+cycle, the timing of which is shown in Figure 6. Relay AR is soon released
+so that at the end of the cycle cam F1 again transmits the stop signal of
+positive polarity.
+    Encipherment is carried out by the changeover contacts shown in our diagram
+    in the rectangular boxes associated with each of the 10 relays SR1-SR10.
+    The contents of one box are shown and the particular contacts used can be
+    identified in the plan of the SR relays shown in Figure 7. Each box either
+   transposes two lines or connects them straight through. In the non-enciphering
+   or 'clear' condition, SR6-SR10 are released but SR1-SR5 are operated and for
+   this reason the connection points of the latter relays are located differently
+   in our diagram so that the 'clear' connection is straight through.
+
+   The operation of individual relays of the set SR6-SR10 reverses the positive
+. and negative connections to the corresponding send contacts S1-S5. This
+
+   effect can be expressed as a modulo 2 addition (or exclusive or) of the 5
+  encipherment channels with the 5 elements of the telegraph code. This is a
+  typical Vernam cipher operation.
+
+  The relays SR1-SR5 carry out transpositions of the 5 telegraph elements. The
+  32 different settings of these five channels produce 32 different transpositions
+  out of the 120 possible.
+
+  The combination of Vernam addition with transposition of the signal elements
+  is the principle described in the early patent of Jipp and others. However,
+ in that patent there were 10 binary channels generating transpositions. (This
+ was unnecessary, since 8 channels can easily be made to generate the complete
+ set of 120 transpositions.) In the T52e machine, with 5 transposition channels,
+ the full set of transpositions is not employed.
+
+ Figure 6 gives details of the contact timing of the transmit camshaft. A
+ cam on this shaft restores the trip contact and locks the keyboard during the
+ motion of the camshaft. The contacts S1-S5 are allowed to move to their correct
+ positions only when the keyboard has been locked and just in time for the sending
+ of the 5 information-bearing elements by cam contacts F2-F6.
+
+RECEIVE-DECIPHER CIRCUIT
+In Figure 7, the received signals pass from right to left so that the SR
+contacts can be shown in the same relative positions as in Figure 5.
+                                                           - 10 -
+
+ The first negative-going signal on the receive line from P13 operates the
+ receive released magnet AMe through F9 and the camshaft then turns. The
+ five information-bearing elements of the signal are sampled by the short
+ operations of cam contacts F10-F14 of which the timing is shown in Figure 8.
+ These signals are stored as charges on the 5 capacitors shown. The capacitors
+ are in the base of the machine, towards the back.
+
+Near the end of the cycle, 5 simultaneously closing contacts F15-F19 connect
+ the stored charges on the capacitors through the decipherment circuit to the
+ polarised relays R1-R5 shown on the left of the figure. These are bistable
+ relays which hold the value of the received character until the next one is
+ received. The circuits of the relays SR1-SR10 used in this decipher circuit,
+being identical to the encipher circuit, ensure that a true plaintext character
+is stored on the polarised relays. The current pulse to set these relays
+lasts 2-3 ms only.
+
+The timing diagram for the receive camshaft is shown in Figure 8. It includes
+cam contact F37 which releases the pawl drive mechanism and cam contact F20
+which releases the translate/print camshaft, almost one cycle later than the
+receive camshaft.
+
+Figure 9 shows, for each of the 32 possible settings of the SR1-SR5 relays
+the way in which the plaintext signal elements 1-5 are transposed to produce
+the ciphertext elements. Note that the final entry, in which all the relays
+SR1-SR5 are operated, does not transpose the elements. This is the condition
+obtained by setting the main control switch to the clear position.
+
+LOGIC OF THE INTERPOSER MAGNETS
+Figure 10 shows the circuits of the interposer magnets M1-M10. These magnets
+are operated by relay logic from the cam contacts A1-A10 together with the KTF
+switch. Contacts KT1, KT3, KT5 and KT7 belong to the KTF switch and are
+shown in the circuit in the 'without KTF' position. The circuit also shows
+the jack points of the KTF unit which we have given the designation E (*).
+
+With KTF off, the magnet operation is dependent only on the contacts A1-A10
+and the effective circuit is shown at the top of Figure 11. Also included
+in the actual circuit of Figure 10 is a cam $ (*) which is on the pawl drive
+                                                         11
+
+ camshaft and releases when the coding wheels are being moved, to protect their
+ A contacts from arcing. There is also a switch contact which releases these
+ circuits when the machine is set for operation in clear. The pawl-drive
+ motor is also switched off in the 'clear' condition. The supply for
+ the M magnets is the +N, -N supply, provided externally.
+
+The timing of the operation of the pawl carriers and of cam 8 is shown in
+Figure 16. All the interposer magnets have their current removed from 90°
+ onwards, but the interposers are effective earlier, when the pawl carriers
+begin to drop, at about 30-40° · When the current to the M magnets is
+ removed, the force exerted by the pawl carrier extensions on the operative
+interposers prevents them from detaching and letting the pawl carriers drop.
+
+With the KTF switch on, the operation of magnets M1, M8, M9 and M10 is
+dependent on element 3 of the coded plaintext character which was last
+received. This is the character stored on relays R1-R5 from the previous
+cycle. If there has been a long pause, the character will have been printed
+but the setting of the relays R1-R5 is not changed until late in the receive
+cycle so the old setting is effective in the interposer logic circuit. With
+KTF a plaintext character has no effect on encipherment in the cycle in which
+it has been sent. In the next cycle it can alter the wheel movements at both
+sender and receiver. The effect on encipherment and decipherment takes place
+for the next character, 2 characters later than the one causing the change.
+
+The contact RR3 belongs to an extra relay, the circuit of which can be seen
+in Figure 21, which slaves the R3 relay. A second contact on RR3 functions
+in place of the R3 contact in the circuit for translating and printing the
+stored character.
+
+We remarked earlier that the wiring of the KTF switch had been altered. All
+10 contacts have been in use at some time. Some may have been used in the
+negative supply circuits of M1, M7, M8, M9 and M10 where there are now fTXed
+connections in the KTF box.
+
+Figure 11(a) gives an example of the wheel motion produced-by the action of the
+interposers. In this example, KTF is off and the starting position has all
+                                                            - 12 -
+
+ the wheels set at '1'. The M magnet operations are shown, and the consequent
+ output from the A contacts. In all, 25 successive states of the wheels and
+ 24 operations of the pawl-drive mechanism are shown. When an M magnet is
+ operated, the corresponding wheel does not move and, in the next state, the
+A contact holds its previous position. These wheel positions which are
+ identical with the previous positions are shown by broken lines in the figure.
+This sequence was verified by experiment on both machines examined, though the
+numbering difference meant that the Science Museum machine did not start at
+all ones.
+
+The logic of the M magnets can be verified. For example, M4 operates whenever
+A2 and A3 are operated, as in phases 1, 7, 8, 9, 10 etc. in the figure. At the
+right of the figure, the final positions of the wheels in the Munich machine
+after the 24 operations are listed.
+
+Because of this feedback from the A contacts to the interposer magnets, the
+motion of the cams is complex and will not repeat for a very long time. A
+choice of relatively prime numbers for the numbers of steps in the coding
+wheels is not significant when a complex sequence of movements like this is
+employed. This 'relatively prime' feature is perhaps left over from an
+early version in which the stopping of the coding wheel movements by an
+interposer was not employed.
+
+CIRCUITS OF RELAYS H AND SR
+The circuits of these relays are shown in Figures 12 and 13· The logical
+effect of these circuits is shown in Figures 14 and 15 and the timing of the
+cams on the pawl drive mechanism which control these operations is shown in
+Figure 16.
+
+The incoming signals are derived from the B contacts, operated by the coding
+wheels. In the on state, the outputs from these contacts are from the V+
+supply, interrupted by the contact y to disconnect the B contacts when the
+wheels are in motion. In the off state, these contacts connect to the V-
+voltage (when the machine is operating as T52e). These positive or negative
+signals are applied to the wipers of the key-setting switches, designated
+ABCDEFGHJ and K as shown.
+                                                           - 13 -
+
+The outputs of the key-setting switches are connected by 10 busbars from the
+contacts of all the switches. The switches are set to act as a transposition
+of the 10 channels.
+
+If the setting of the switches is not a permutation, two of the inputs will
+be connected together by joining to a common busbar and, with appropriate
+setting of the B contacts, this will connect the Vf to the V- supply. The
+power supply has been designed to withstand this short circuit, with some
+
+                                                                                   tt
+
+overheating, but the relay U then releases and prevents the teleprinter
+operating from its keyboard. To avoid such short circuits causing arcing
+at the key-setting contacts, the lid of the box containing these switches has
+a lid contact which breaks the negative supply. For test purposes, the lid
+contact can be depressed and locked but the switches should never be operated
+in this condition or arcing on their contacts may damage them. The outputs
+of the key-setting switches consists of the 10 circuits which we have called
+X1-X10, which correspond to the switch settings 1, 3, 5i 7, 9i I., II, HI, IV,
+V respectively.
+
+In the T52e operation of the machine, each H relay is connected between two of
+the X circuits. Since the relay can be operated by a current in either
+direction, it becomes a modulo 2 sum (exclusive or function) of the two X
+outputs. The logical expressions thus generated are shown on the left side
+of Figure 14, for example the first row indicates that H1 = X1 + X2, with
+modulo 2 addition.
+
+Figure 12 also shows that the X circuits are connected through to the SR relays
+directly when the machine is operating as T52d. In this case, the H relays
+do not operate. In the 'clear' condition the relays SR1-SR5 are operated
+directly and the SR6-10 relays released.
+
+Figure 13 shows that the operation of each SR relay is a modulo 2 sum (exclusive
+or function) of two of the H relays. These logical relationships are summarised
+in the right hand side of Figure 14, for example SR1 = H1 + H8, with modulo 2
+addition.
+
+Cam contact <x* on the pawl drive camshaft breaks during the wheel movement,
+                                                            - 14 -
+
+    leaving the SR relays held through their make contacts and cam B . Thus
+    the movement of the wheels during the pawl-drive cycle and the release of
+    the H relays when contact y breaks does not affect the state of the SR relays
+    until late in the cycle when cam p releases and cam .04 remakes.
+
+    The 9 cam contacts /X in the hold circuits and the 9 cam contacts X in
+    the make circuits are provided to avoid 'sneak circuits' through the H
+   contacts or the hold contacts when the main cams are released.
+
+   Combining together the logic of the H coils and the H contacts, the state
+   of each SR relay can be seen to be the modulo 2 sum of 4 of the X channels.
+   These functions are summarised in Figure 15. The functions are such that
+   the modulo 2 sum of all the SR relays is zero, as we would expect, but we
+   find a further linear relationship between the SR relays and a consequent
+  third relationship. These linear relationships are shown on the right hand
+  side of Figure 15.
+
+  The logical relations which make each SR relay depend on four X outputs are
+  a new feature in the T52e, not present in the T52d. The purpose of the
+  relations is easily deduced. Even though the coding cam sequences are
+ reasonably random, the outputs on contacts B are not, because the stopping'of
+ the wheels makes it more likely that 0 will be followed by 0 than by 1. Such
+ strong statistical properties in the sequences controlling Vernam addition
+ and element transposition are a weakness in the cipher. It is easily seen
+ that the modulo 2 sum of four of those channels has a much better statistical
+ distribution. Evidently the H and SR relays and the logical relations
+ summarised in Figure 15, which were first introduced in the T52e model,
+ increased the strength of the cipher.
+
+Figure 16 shows the timing of the cam contacts on the pawl-drive mechanism
+and the period when wheel movement takes place. The location of the cam
+contacts is also shown in this figure.
+
+It is important that the SR relays should not alter their positions before 330*
+on the transmit camshaft. At this time, the transmit camshaft has completed
+the sending of its 5th information-bearing element by cam F6. The pawl-drive
+camshaft is delayed until 5* when its magnet receives current and then, we
+                                                           - 15 -
+
+estimate, until 35° by magnet operation. (The AMs magnet must take 10 mS
+to operate, if the start pulse is to be of correct length. . The AMC magnet
+can be assumed at least to take the same time.) This places the break of
+hold contacts fi and ajl at 285° + 35° = 320° . Therefore the release of
+the SR relays must not be faster than 3*3 nfi, which is reasonable, but the
+margins are close.
+
+It is possible that contact & is out of adjustment, since it does not overlap
+contact c6. In slow operation of the camshaft, all the SR relays release.
+The 'on' period of cam A could be lengthened at both ends by an adjustment.
+Figure 16 shows the measured values on the Science Museum machine. The
+timings of Figures 6 and 8, except for cam F37, come from T36 teleprinter
+documentation.
+
+TRANSLATE AND PRINT CIRCUITS
+The circuit used for translating and printing is, with one small change, the
+same as for the T36 teleprinter. The circuit is shown in Figure 17 and its
+operation depends on the timing of the translation cams shown in Figure 18.
+
+The purpose of this circuit is to operate the printer magnet IM at the correct
+instant, depending on the state of the relays R1-R5. In the T52e circuit,
+a contact of the slave relay RR3 takes the place of R3 in this translate
+circuit.
+
+When the position of the R contacts and the state of the F cam contacts
+coincides, a circuit is produced from the negative supply at P11 through to
+the print magnet. The print current is provided by the charge stored in the
+capacitor C10, which is re-charged through the cam F27 at the end of the
+cycle. Parallel circuits are provided for the letters/figures shift magnets
+Bu and Zi and the bell relay KLR. The magnet VUM also operates in these cases
+to stop the paper feed. The cam F39 is fitted but the 'who are you' unit is
+absent.
+
+CONTROL OF THE RELEASE MAGNETS
+Figure 19 summarises the control of the release magnets and shows the circuit
+of AR and other relays in.the external unit.
+                                                     - 16 -
+
+The keyboard trip contact is operated by depressing any key that is active and,
+if the short-circuit detection relay U is operated, AR and the external relay U
+will operate. When AR is operated, the transmit release magnet is operated
+and, through the transmit circuit, ER and the receive circuit, the receive
+release magnet is operated soon afterwards. The operation of the receive
+camshaft releases the pawl-drive by F37 and magnet AMC and the translate
+
+                                                                           ri
+
+print shaft by F20 and magnet AMu.
+
+The need for the relay ER, which reproduces the telegraph signal for the
+receive circuits, can now be understood. In the receive-decipher circuits
+of Figure 7 this signal charges the five capacitors which store the character
+for printing. It also operates the release magnet AMe. These impose loads
+on the signal which would distort it if the signal from the line was used
+directly. In particular, the capacitors demand large initial currents,
+limited only by the resistors which generate the Ov signal of the N supply,
+see Figure 20. This distortion would affect incoming signals from the line
+and outgoing signals, which are also received for local printing. The ER
+relay ensures that the signal entering the receive circuit always comes from
+a local, low impedance source, the N supply.
+
+At the same time that ER first operates, during the start element of a transmitted
+or received character, relay D in the external unit operates and holds. Relay
+V also operates and shortly afterwards the thermal relay operates. When N
+has ceased to operate for a sufficient time, the thermal relay will release
+and thus release relay V. This circuit activates the motors on the first
+occasion that a character is received and keeps them running for a short while
+after characters have ceased to arrive.
+
+DIFFERENCES BETWEEN THE TWO T52 MACHINES
+There are some minor differences between the Munich and Science Museum machines
+ such as the absence of the reverse motion pawls in the Science Museum machine
+ and a few differences in the electrical noise suppression arrangements.
+
+Functionally there is one significant difference between these two machines.
+ Although the patterns of the 10 coding cams are the same, they are differently
+ placed relative to the cam numbering. Since the wheel settings are determined
+                                                           - 17 -
+
+  by the numbering of the cam wheels, these two machines could not be used to
+   communicate with one another except by converting the initial wheel settings
+  from one to the other.
+
+  The differences in numbering are in each case close to one-third of a wheel
+  revolution which suggests that they were produced by assembling the cam
+  mechanism relative to the numbering wheel with the three connecting bolts
+  going through different holes.
+
+ To produce the equivalent of the Munich machine wheels set all to ones,
+ the Science Museum machine wheels would have to be set to the values:-
+
+                                            32, 18, 1, 21, 43, 44, 61, 23, 24, 49
+
+ It is odd that wheel 7 numbering (underlined) is displaced by just one step
+ when it could easily have been adjusted for coincidence.
+
+ An important compatability feature for the coding wheels is the set of
+ displacements between the A and B sets of contacts shown on Figure 3 by the
+ black squares. These are identical in the Munich and Science Museum machines.
+
+ The Science Museum machine has an unused gear wheel fixed to the right hand end
+ of the shaft which holds the coding wheels. A flat on this shaft, engaging
+ with a bolt prevents it moving. Small bronze cams with one notch in each cam
+are fitted adjacent to the left side of each indicator wheel. When the fixing
+bolt was removed, these cams were found to rotate with the unused gear wheel
+though stiffly. It is therefore possible that they formed part of an earlier
+mechanism in which the central shaft, instead of being fixed, rotated in the
+three bearings provided. This would account for the oil holes in two of the
+bearings which now have no purpose. In the third bearing the oil hole has
+been replaced by the fixing bolt.
+
+There is a set of radial slots on the inside of each indicator wheel in the
+Science Museum machine but not the Munich one. Having one slot per step of
+the wheel suggests that this is not just an accident of manufacture. It is
+possible that the gear wheel, cams and slots were part of an earlier wheel
+drive mechanism.
+                                                             - 18 -
+
+     DEVELOPMENT OF THE T52 SERIES OF MACHINES
+     There are some clues to the way the T52 machine developed between 1934 and 1944
+. but at present, insufficient information to give definite conclusions. We
+     know about the T52d because the machines examined can work in this fashion.
+
+    The 1930 patent described the basic encipherment principle, consisting of
+    Vernam addition followed by transposition of elements. The circuits shown
+    were based on the T36 teleprinter. The transposition scheme in the patent
+    used 10 sets of contacts instead of the 5 sets (SR1-SR5) shown in Figures 5
+    and 7. Using 10 sets, the patent shows two alternative transposer layouts.
+    The method of obtaining the pseudo-random sequences for operating the 15 sets
+    of contacts (5 Vernam and 10 transposer) is not clearly stated, but depends
+    on cam wheels.
+
+   The use of 5 transposing relays in the T52e machine can be traced back to
+   the T52dI where relays SR1-SR5 are operated directly by outputs 1,3579
+   of the key-setting switchboard (Figure 12). The strange notation 1, 3|' 5\ 7
+   9, I, II, III, IV, V is then probably explained. Roman numbers were used'
+   for the Vernam channels and the ten transposer channels were originally
+  numbered 1-10, then the even-numbered transposer units were dropped at some
+  stage. The two transposer layouts in the patent do not, unfortunately
+  gave confirmation since they cannot be related to the T52d/e layout by deleting
+  transposer units.
+
+ In Cryptologia, Volume 3, No. 4, October 1979, page 210 a photograph taken by
+ David Kahn shows a T52 machine as displayed in Bonn at the conference on World
+ War II cryptology, in November 1978. It is not known which of the models a-d
+ thxs was. This machine has no internal power supply and no H and SR relays
+ The KTF switch is there, in a different place. The key-setting rotary
+ swatches wer* absent and in their place, under a locked black cover, was a
+ set of plugs, inserted into a set of sockets. The plugs and sockets can be
+seen an a photograph provided by Dr E HUttenhain, showing a machine of the same
+type as the 'Bonn' machine though not an identical one. The front two plugs
+are seen to be labelled E and K in this photograph.
+
+A striking feature of this early T52 model is the presence of two sets of 'B'
+contacts and four cams. We can guess at the presence of two sets of 'A'
+                                                             - 19 -
+
+  contacts, probably running on cams 2 and 4 (counting from the ratchet side).
+  Mounting slots for such extra contacts are present in the T52e.
+
+  The Bonn machine photograph seems to show cams 1 and 3 with the same pattern,
+  and cams 2 and 4 also identical, but it is difficult to be sure.
+
+ In the absence of the SR relays, the coding wheel cams had to operate 4
+ changeover contacts. How these were disposed on the 4 cams and how wheel
+ movement was controlled cannot be deduced.
+
+ Unfortunately, the information about the T52 from two prisoneers-of war,
+ reproduced in the Cryptologia article is so full of errors -that it cannot
+ be used to improve our knowledge of T52 development.
+
+ ADJUSTMENT AND MAINTENANCE
+ Most aspects of maintenance, such as the lubrication and adjustment of
+ contacts, are obvious. Possibly the plastic cam surfaces should be lightly
+ greased to reduce wear.
+
+The T36 gearbox contains a helical gear and this needs lubrication, though very
+little lubricant has been used on it. It can be inspected and greased by
+removing the lid of the gearbox. The speed regulator rotor is first removed
+by slackening one bolt. The brush assembly should be left attached to the lid,
+because its fixing screws also retain the top bearing. One screw on the lid
+covers an oil hole. When replacing the speed regulator rotor, the brushes
+must be retracted. Only one or two drops of oil or a small direct application
+of grease to the gears is necessary.
+
+The speed regulators can be adjusted with a stroboscope. The white patches
+provided for this purpose pass by at 250 per second on both regulators. To
+adjust speed while the motors are running, hold still the larger knurled ring
+then adjust the smaller ring. The speed is not altered by holding these parts
+still. There is less ambiguity of measurement if the shaft speed is checked,
+and this is 2500 rpra for the T36 motor and 1500 rpm for the pawl-drive motor.
+The gear ratios from motors to clutches are 5 : 1 for the T36 mechanism and 3: 1
+for the pawl-drive mechanism, so both camshafts operate at 500 rpm. One sixth
+                                                                  - 20
+
+    of a revolution is the time of one telegraph element, which is 20 mS.
+
+· TEST CIRCUIT FOR OPERATION OF THE T52e MACHINE
+    In the absence of the line-connecting unit, it is possible to test the operation
+    of the T52e machine with one external power supply taking the place of the T and
+    N supplies.. The connections to the plug we have called P are shown in Figure 22.
+
+    The use of a 240V, 50 Hz, AC supply seems to be harmless because the spe.ed
+   regulators can handle the small increase of voltage. The DC output of the
+   rectifier across the reservoir capacitor should be approximately 120V but is
+   not critical. The resistor in the supply to P12, simulating the coil resistance
+   of relay U of the line-connecting unit, is essential to avoid a short-circuit
+   of the supply.
+
+   By connecting P9 to P13 and using a common supply in place of the T and N
+   supplies, the need for relay ER is avoided. This would not be satisfactory
+   for transmission.over a pair of lines but it enables local printing from the
+  keyboard to operate correctly.
+
+  The motors operate whenever the supply is connected, in the absence of the
+  control relays in the line-connecting unit.
+
+  ACKNOWLEDGEMENTS
+  Dr Goetzeler of the Werner von Siemens Institute for the History of the
+ House of Siemens in Munich provided the facilities for examining the T52e machine
+  in their collection. Dr Schoen and Mr Bayer of that institute also gave useful
+ help. Dr Pramm of the Norsk Technisk Museum in Oslo allowed the examination
+ of their machine. Dr Strimpel of the Science Museum provided the opportunity
+ to examine their machine at length, enabling much of the detail to be filled in.
+
+ Prof. Randell of Newcastle University provided notes of a conversation with
+ Mr Fricke on the manufacture of these machines and Dr HUttenhain of Bonn
+ provided useful information about the T52 and. a photograph of an early model.
+ The help of all these people is gratefully acknowledged.
+       H - A ^ e - 6 Tc r ^ ^ e r f C a v ^ t o * - t ^ e - f r - A ^ j ^ t - c ^ ^ f ^ ^ - ff
+
+                                                                                                                    &-70  £«·!**/
+                                                                                                                   J<0
+                    3o     RO        I**           210                                          270         3So
+                    --i--
+                                     L_            L_                                           l_             L.
+                       10
+                 30                                                                                         no
+
+F2               30              10          l5"o
+F3
+F+         2S              So        iro
+           Lo
+F5"    10                                                                                                          ^-rAv^/NMi-j eU^G*\W 2.
+F£
+                    30                                     110                                         270
+F7                                                                                              21c
+                                                   x\o
+Crt»n
+                           keyboard Uckcil >1vip can Hurt restore.I                                                 330
+                                                                                                            350
+                           qo        --I--                                                       i
+                                                                      2\Q                       370                  33*
+
+                                                                                                                                          c\h L.0, |orfci'k*Yk-i-i''4tJt-h**
+
+                                                                                                                      5+0
+
+                                                                                                                   3i0
+d) ®H
+
+ 6
+
+ON     \" l
+
+1, *vT ,» N tfL
+                         " VA ^ v e                                               3 relaw RR3 coM-ac*
+      L o ^ ' t c ^ j ^ j ^ k n o p + ^ < » Ts % e
+
+                                                                                            Coding wheel
+                                                                                             Co>\tY\Gr5
+
+                                                                                            Al -AI0
+
+                                           tea               ten              10
+                                           in ter            Coding
+                                    ry nostr                                      Coc*lf\g
+                                                            W\ -WIO
+                                                            a*4 drive.            wheel
+
+ ms.  Jj] receive                                   tU-MlO                        0 Cont-a.cV-5  key
+        P-20
+F                                                                                 Bt-Bio
+                        3 prCr»nl-
+37
+          ] aj<t<^\«, wh«| p*uls
+                                                                                                 10 *-    -XI-XlO
+
+                                                                                                   \re\a.ys:
+                                                                                            10 H l - H I O - d /klar/e
+
+                                                            SR.1-SR10 CoM'KeJCS
+
+                  1  'CAMt                          F2-6                                             10   S<U-S*Uo
+                                                                                                                        RR.3
+      SI-S5-                                                                      Fio-14-        ^2
+          \
+                                                                                            detip^c.*"     rd A.y j            awa
+                                                                                                                              pnnt"
+                                                            -o l»w«.<\ T                                  £l-R5
+
+                                                                   -O L.ir\e      £*»*r          fatot
+
+                                                    /777
+                                                 Z                                  £
+
+    --Io                                         ·~4          4>                    t*
+
+                            U>                        nt  T7
+
+^0                                                            L. ~ J                        D
+
+                                                                                            DS
+
+«a                                                                                          1 DS
+
+                                                                                                                          si
+
+                                                                                                                          CL
+
+SD                                                                                      -- I ^ DS ID
+
+                                                                                                                          O
+
+                                                                                        O*                                3
+
+SD                                                                          ^                                             io '
+                                                              0>
+                        <P
+                                                                                 O                                        in
+5°
+                                                                              o
+                                                          ""1 H
+
+                                                                                            O S )i
+
+SD                                                                               (3
+
+2D                                               -4                                                                   Do
+
+                                                                        3
+
+                                                                       <rs
+
+                                                          4*
+
+                                                                                                         D2
+
+                                             _0
+                            -j
+
+    ->4
+    to
+I  '
+
+                                                                                   H
+
+                                                                                   5
+
+                                                                                         ~P
+
+                                                                                               C
+
+                                                                                        K>
+
+                                                                                   3
+                                                                                   I
+
+                                                                                   *I
+
+                                                                                   X
+                                                                                   n
+
+                                 tzzt  CO
+
+                                       rCL
+
+"tKwr^b-VjKttl C                         blWVt Ui ^j yj (p >                                  "lnAiCA^or
+                                                                                   ] KaJ-cVc* wheel
+               Cc^r-i >jV,c*I C        H
+
+                                                              II
+                                           XA                 o
+
+                                       Trr 3
+                                                                               v^
+                                      OlM ^%a                                                                                                              L*d
+
+^?A>V4 ^0^^X7 9%-^") 'try -i»/w                               -- S» *·df*                                                                                  Ud
+
+                                                                                                              - ^ M« w»2                                   ltd
+
+                                                                                 _nJiT                                      4                                 i?d
+                                                                                                                                                              nd
+                                                                           Hh                                                                                4rd
+                                                                                                                                                              )fd
+ * ». .-J.                                                      --i
+                                                                   3.1                                                                                         SCd
+-1*                                                                        -1 H                            ^
+                                                                                                                                                               ltd
+ *^r+                                             -\ t-         I       1              H I-                   ^iA                                            Old
+                                                                                                                                                              ted
+       T                                          -^ )-                       -,s,--,  I»I1                   \    1     r                                    Ird
+
+           3i                                     - * * . - l i * " H i . ^V            MX           J. i     T^o        *                                 31 ^Gy
+                                                                                                    --»
+                                                                                           I--
+
+                                                  ^L                       I                    Th                 _v^X
+
+                                                                      Hh
+
+                                                         -I I-
+
+hm T                                           w              V- : i                                                                                  *"3
+
+                                                         l_.       u. · f ^ V * * ^ - ) » i ~ < J / ^ " V v i W - A j . J T m o J w ^ T ^ p T ^N1rVJ
+r\^<c l£>                             Tc»A.iVs^ Of <Zas*S QA -fk«t pg»wl-- olin V e H t t U A K i / K                                    of co*.+Ackr
+
+                                            <\o                   \So                                  no
+
+                                      .. .        .
+
+                              \T                                                 24 0
+
+0 f- pc\wl                                                   1 ~~"V^
+                                                             1         ^---1
+Carrier*                                                     1 ^^-^ ,
+                                                                                                                                           opca-rO^v* erf-
+                                                             1              1
+                                                                                                                                         CrrcuiV; of- Hl-HiO
+                                            qo lof           |6C            iio
+                                                                                                                                         ciVtuiVr *£ Mi- Mio
+<*,        It                                                                                                              3io
+                                                                                                       US                                pv-tfl-tcf r c©nf*thf A
+               1                                                                                                                          OP ***«* l"C t*sMiv%olu«l
+               1"*-- [* prme'iplG > ** ov*rUp iX n«e^<^
+               1
+
+                                  i.
+
+           20                                                                                          250
+                                              qo                                                                                    310
+
+                                            10                                                             3io
+
+           to                                                                                     Z9S                                            veWyX SR.l-S\7-lo
+                                                                                                                                         3Co
+                                      TM -'" T- " --" "" "   " ' l "             "'1
+                                                         ^O                                   270
+                                                                       1*0
+     I/O
+
+     7*
+
+    J"-   to   CO        Go        CO     to                         J"
+
+                   7° 7°                      *-*
+
+                      i
+
+                   X            XX            X                      ^
+
+                   XX              X          XX             <JJ
+
+                         XX        XX              X
+
+                                                              <T
+
+                                                                               (
+
+          X                  XX        X           X         ->4
+
+          XX             X      X                  X
+
+          ...                                                VD      t
+
+          XX X                            X        X
+
+                             XXX X                 X                 s
+                                                   -J
+
+               X                       XXX         X
+                                                   oo
+
+          X        X         X            X        X
+
+               X         X         1X         X    o--I
+
+                                                         ?»       r-
+
+                                                                  o
+
+          XX                 X     X          Xf
+
+                   XX           X      XX                         5
+
+I'M       X XX X XX X X XX                                        o
+
+CO
+
+                                                         >
+                                                         ^
+                                                                  X
+o                                                  I
+                                                                  I
+
+                                                                  7?
+i f x              in        a:       3:
+
+                        9"\      -r-
+
+        X                                    X   X    --1>
+
+                                          XX X        to       I
+
+                                                                   c
+
+                                      XX         X    ^1
+
+                                 XX              X    ~vl          -f
+
+                             XX                  X    <D       f-
+
+            X           X                        X                 r
+
+                                                            H      0
+
+        X          X                             X    N        0   r»
+                                                 -4
+                                                               7   pN
+                                                               v>  .)
+
+               X        X-                       OO   N            ^
+
+                                                 X                 ^
+
+            XX                        .               K            >S
+                                                                   T.
+                                                                   O
+
+               X             X                   X    H            3
+                                                 0                 »o
+
+<0                                                                 X
+
+I
+
+                                                                                                                                                                  \
+
+        t o t o to l o           GO   to     CO                    X
+
+v< JO.  2?     00            5 TO                                  1
+
+        0                    ^1
+
+               X                             X                     t/>
+
+                                                                   75
+
+                   X             X               X
+
+                                                                                                                                                                     ),
+
+                        X             X          X
+
+        X                    X                   X
+
+            X      X                             X
+
+            X                             X      X
+
+                        X                 X
+
+                                      X      X   ~x~
+
+                                                  00
+
+        X      X                                 ~x~
+
+                             XX                  "x~
+i
+
+),
+                     *n ~~7r\iom          -0>^£--l---, I 2.0 vt>H-$  I U X v+ cam       l(e       ^^Hlv\<^  q^m,  H       * " <! » w j
+
+                     Ltd ConXVtfir        XB3 V-                                                                                                     V4-
+
+                                          4 ke         Sopply
+
+                     A-                                                                                                                       IS 50 U_
+
+                          *r                                                                                                                               I
+                                                                                                                                                    V-
+                                                                                                                                           reLau 0
+
+"A                             A B3             1S f A                                            A               \,B1    A
+                                                                                                                     Air
+     AM                               A1        <>Ai*  6 An          4 All         Mi*            6AIW-                   4ak v-»-*v-
+                                                                                                                  6
+      K                            H                                                                                                       W l pe,r5
+
+                                          key-SGtt"ino rotary swjtche.5
+
+                                          ^            Y             m             i                                                       pcaoranltlaecletsd
+
+                                                                                                                                           oil 12000 ji
+
+                                                                                                                                                        e
+
+                                                                                                                          i             «  TM  ~  f  :  R
+                                                                                                                                                        d
+
+                                                                                                                                           +er\Conr*t>$,
+
+(srObiz                                                                                                                                    \n JGltinn^k
+         EC
+                     &lS(SRl)       Bm-(5R3) 8IS-(*R4) ei^SRS") AS(SMo) A3(S*8)                   Al(m> A+(sR<?) fl2(s«7)
+              d ice                                            -W 41se ciVro'ifr of Sf^l -- SRIO
+                                                                                                                  Setting V- SR/-SRS* on
+Conr>e.ch««l »>
+                                                                                                                                         S«-SMo off
+
+                                                                                                                  Settir^ yd - XI-XlO connect
+                                                                                                                                           toS^I-SR\0 c'lruiirj
+                               C G I r ^ O V f w I C rfvt- t w»H»ooh KFF> stn."KV^ gg| cne;
+
+        r\         5"          -JO   is"            T          ·       2£>       25
+
+                       T                                                          i
+
+M1                                                   nan
+
+A1 i_ru                        r u t j -- u . ^ . . r--t- 20
+
+M2      CZI               I1
+
+A2   i                      ^n _ r L r - " t - L j                          UTL 22
+
+M3                                   1=3 CZI                                en a
+
+A3 1 ~l ^T"*                                                                --i-
+
+                                                                                 L, 20
+
+MA      CZI               i    i                    n             czi       nzi
+
+AA                        u.         ,, j -- i _ r 16 4 - _ | ( . . ,,
+
+M5                                                  CZI           CZI       CZI
+
+             -I K                                       -l 1-
+
+A5                                                                     'UU~~U 22
+
+M6                  1=1                                                
+
+A6   1       r~u.ji_n_r                                                 H_n_ 23
+
+M7           n=3                     1 I C Z I E ZJ CZI CZJ
+
+A7 1 _r~u                                -i--
+
+                                              H-.-^ ^...J"1""" 15
+
+M8      I          1                                D CZI a CZI CZI
+
+A 8 1 Jl_... J                       _ T " ~ - U . * --                     H I - 16
+
+M9   I       »                                                   a
+
+A 9 1 _ < +                  J u_ __n_ru i_ 17
+
+M10                :           i--i
+
+A10                                  i n.                                   J 14
+5, 3                                           3                               j
+ L
+               \fi                                                                                                            c
+
+                                  ^
+
+                                   t
+                                                    1 _ 53>
+                                                       ^  °  -t
+                                                    I*
+
+r1                  Vi * + I                                                   n
+
+3
+
+2 S-                                                ^
+
+                    Tt> ^^r>-
+                    ox
+
+                               \  t< 7 ^ $     _
+
+t3
+         -4
+
+J °0                              -JZo
+
+ t                                   t. - o ; -- ;
+
+                    ^ > :>                          v~ . _ ^ > - ,
+                                                                           00
+                               TO
+
+                                     f
+
+                                  t : | c r >
+
+                    5" I                   o                 "n «
+
+                    n ?                i
+
+                                  ft
+                                           P
+                                                   i
+                                                   i
+
+                                               oo
+
+                                        ?i* I
+
+                                %^ r^ -- ^ \
+
+                                ?-v_x
+             o    ~  -      ?3»£ ) -
+
+              1
+
+             t ~" --
+
+             f ** --            n. | 1
+
+                     ·"·  ^ J " ' a » i -
+             1 --TM ^^
+      3"                              :-!?5
+                  _,# "·"*  i·  j>?«1i  ^* 'i
+5 rs         --·  _. *"
+          »  N--                        I -i
+'- o --o -- o -- o                    - o --o --o --o
+
+   o -- -- o    ---- o O              ----o o ----o o              "Co"         Vi
+                                      ------ -- o o o o
+                                      oooo o oo o                               r,
+                                      ooooo o oo
+   -- -- ---- o o o o                                                         c
+
+                                                                   c o 3|
+
+o o oo o o oo                                                      To
+                                                                   is*
+
+M vj M *       M "1 M UJ              M "1 H -f-     N vi M --
+
+CO la» uu L P  > 4> -f> ^             w vo i/>> 0 0  CV oo 0 J CO
+4> ^ v j (A    c>j CO v \ VI
+c i N 4* h i   ^ M CfJ N              -- ------      + A  -f> *>
+
+                                      + * 01 «t      -- -- vt V\       sJ
+
+                                      vi M 4* N      v i M -- K»              3
+                                                                   ~2-
+                                      2.       1\
+                                               ^                    5
+
+                                   I  3        3                      i
+                                               c
+                                                                   7? ?
+                                               5.
+                                               O                   7*
+
+--o--o                                --o--o                       2
+
+----oo                                ----oo                       to
+
+                     OI0. 00| 000
+
+               I0I|                   o o O o 00|I 00I o·I 00
+
+-- <H         f -- V \ -- LO             + <J\ --    -- "I -- N>
+
+N N> M N> M H K> K> uo tAJ oo vA> l o V>J OJ V>»                   N
+
+CO W L*J u> 4> - ^ - ^ 4> N N K> N -f> -r* 4^ 4>                            I
+                                                                             T
+^     -r- ^  V] IM uo v ] ^           **  Ol VI      N» N <t v i   5"
+
+VI -- -f> -- ^       -- IA> --        + vi --  --    v i -- 1° -1
+
+   \
+
+                                                          3-
+                FiAi/sr£-0 "Tlr^K^ of- Qj*t*s Q* 44*e rcceiVd CAt+jkaf-t                                          Arte
+
+                                                                                                             #70  ftecei/G
+                                                                                                                   ftalG*j*
+
+                      30           <J0             iro             lie    270                 330       3*0
+                                                                                                  I
+                      L.           L.              I               L                l_
+
+PT              U1 0                                                                                    360zt opcr-Ai-Gj vAA.^^ck- AMe
+
+FIO                        ··D 7«                                                                            rd.cci^er ^kv-NG^h
+
+Fll                                     ,w 1 1**°                                                            TGtGlWl Clo^t*.*- 2.
+
+FiL                                                      ! * ·» '                                            rtcciV^ eJGKvt^-'i
+
+Fft                                                                      2**  25*0                           rtcclvtt clcr^t^i- 4-
+
+FIV                                                                                      ^°° OiiD            trt.ctivGt tfJ^iAG^hST
+
+Fl^K.lV^n       5 C^CnKc^l CAf^j                                                         3ir            34*
+
+          Fio                                                                            32r *«·             0oar*t*$ Y^K^^i* Anii Cf^O
+           F37
+                           ;<?                                                                                 Of*richer M*«*5*44~ Amc
+                                                                                                             f pA*4 -- «*nVe vclGA/tf */uxj*«.l-)
+
+                      -r-                                          --r~                       --|--
+
+                      10           16              tS-0            2J0              270            3*0  3*0
+          "T3                  -o                  TJ                     T7                    T3
+
+^|73                                                                                K< 1 25
+
+2     * & 7»   <>. s^  x*      70   <*.     *  *0           F <»*=** _· & 2                      O
+                                         2>
+O                      * '*
+
+«oo0                           «o                  t^                     *o
+
+                               -4                                         -0
+
+               u*                  u*          *            V4                  V#
+
+3:                                                                                                   7>
+                                                                                              w
+r n -*- -*- -*~ O
+                                                                                           70
+%r
+                                                                                                                  r>
+I £2 S*
+                                                                          1/3
+
+      \V,                                                             VJ                            n
+
+                                                                      &
+                                                                 ^
+
+                                                            Ui
+
+                                                        ui
+
+                                                     *
+                                               w^
+
+                   Co
+
+                                                                              v -n                  C
+
+                               JOz XX^ JXf _EXr -EX^' _JT=v                                         -4
+
+                   i                                             "Tt                v -n
+
+                    * * r*pBB                               A-
+
+      £0               I -H-                                                              - O CS3
+                                11
+                                                                                           3
+
+      E*. 5)           ft
+              fcytre J 7
+
+                                    ~TfA.*s)6Lfz>v R^i'vihe,,
+
+                          -o  o--/          »ff
+                              o-                 LS
+                          -o
+           F23 ::                                           Contv»l
+
+                          _o
+
+                     Rl
+
+F32. :r                                 Plo On)
+                                    R3
+
+           9 RR3                        S*o ]RR3
+F3+
+                                    4= $ 15-30
+
+F3C i                                        6 Co,N>              Vio
+                                            PS-
+                                                                  rIB*|| c^t«<t
+                              Fi^uve-fkifr
+
+           3  a< -- . r s » > < j
+
+     Fit          F24              1F^r     11 1 F i f f p i 2 -                        F3<?
+
+» " ^ * +          w B . r ^ i r w. r ^ z , j r r r fi ^                         Ti^ S L ^
+
+              -|><|^M
+
+Cio =£;?                                    C«"^*l vpeft.r  ?7
+
+                                                                     P           -C-N)
+
+                                                                     I VAA J
+                                                        '3                                      TTav v i e w ^ « . T 5 l t "
+
+\r\ter pores  ' 1 r--i ; 1 r-                                                                - D^'uc Moto*. UneHer-
+                                                                                                                       WT WIO
+              j m * ; mi --z :i ! mi --3i; ;t
+
+              w i W2. VfJ
+
+VJk««|;
+
+              '»        /~N
+
+              v·
+
+                 4                                                                           fcecdVe                           J3
+
+              £ i L * r * P S O * o l t r
+
+               low e<                                 Spt*4                                  [DQD           @ & @. @:
+                                                                                               0 AR
+              Supply                               rc.3u.UV0v-                                              <S @E <s3: (gR
+                                                                                                            <£fc (SB, (SE @E
+
+                                           am;                                                        R l <£E o o; eg:
+
+                                                                                    B«ue of           R2 <SE ess G3: sa:
+
+                                                                                                                                   w
+                                                                                                                                   tf
+                                                                                                                                   ^
+                                                   3<w                                                R3
+
+                                                   ??                                                                              V
+
+                                                                                                      R4
+
+                                              VUM  »Z*»i 'PmTWM                                        R5"
+                                           SI-55   L-J Cj                                             R.R3
+
+                                                    Printer                                                 1^5 71 IU III IVY
+
+                                                              [dm!
+
+                                                                            U- -.J
+
+                                                                                                            ~  ^  X I I
+
+               Uv>)od(                             Key board
+              Wheel?
+         -J"
+
+         H Fl                      ycr\4 cat** F | -- 8
+
+                    cam- operahcM
+
+                Fz  o>nha>ct\y ^ feceiv* Cam* F *\-20^37                        D.C. -fu-pplitj
+
+                                   print- cams F il ·h-3C> 3T
+
+         CfKry      CAMw.co¥%tTxx|-x  on              j^^                       -+    P6         e^htrnal +-£o/-£ov «r^pflv
+
+                    pawl *ov* *k*f-f- tf/i ^ $ y ^ J ^£a*U                          -o.          +>TAl^Kl|tGd ^CltAV-A.pn fi4*al
+                                                                                    0-t)
+                                                                     /nr7            pi
+
+         /All       J<5uK-poiVtj oh r^Ujj/ke^JcH-h^ bo*                             ft
+                    and. KTF u«* only } u^^r ABCD E
+
+                                                                                    p*       .i
+
+           PC       pin*f Hie )^-p«i*f c^vAhc^W plvj       p - Con.A4LGtV9r\5*      -O           ejchcm*! +-6o/-60y Jupply
+         -O                                                                          PlO         HIM in Tj^ v^^^ly
+                    52H/ICLa^/?2« jwircK                    1 -T
+         (+t)                                                                           ,P*
+                                                            2. /Kl
+         OH                                                                          oPn
+                                                            3 AC
+                                                                                     (-N)
+                                                            + frawe
+Kih^D><J iQ-n- vm yum twmCb^zl) wftu                                                -)~V+
+                                                            r <?,M
+                                                                                    ->. V-
+                                                            4 +T '
+                                                            7 bell
+                                                            ? -t-N
+
+                                                            <\  "trtvuimilr                      inV-GvnAl llOy ruppk
+                                                                                                 UTG<A trtr 6 C«*t-A&hT A*a
+                                                            \o +N
+                                                                                                 vel^y S£l-l0 a**4 Hi-- iO
+                                                           II - N J
+
+rtXGire                                                    i i U rtl<o,
+
+rttovrt         8^° I ^Me CAmiKAph or pAwL^ive jkAft        13 r t t t w e
+                                                        T?y«. 1<|                             fcg-le^g. h^w^j &hr.
+
+                  X F7                                          + sw-w
+
+                                                            'O' r                  F2-6
+
+                                                              I                                 EyhernoJ ClVtuiVy
+                                                        + k.<.ubo-»nr( cutout-/                          +-E.R.
+
+                                                           si-rr                   4> $-- - PT
+
+                                                                                                ^O--T ° Lint a
+                                                                                                          % W4
+
+                                                        "  ^                       -M-
+
+                                                           A Alt                                         EX
+
+                                                                           SRI-IO  Fvo-tH-                      i  -O LCv\c L>
+
+                                                             t                        t> 4-i    nhr(o}r)
+
+                                                        ·f P»"»«\fev relay j                    Clonre.*.t
+
+                                                 PS            Rl-RS
+
+                                            f^Gh^Kp«y-
+
+                                                        rgc<iye/4tcipW»
+
+    Pu                  Pll
+
+    I             F * T ^ receive
+1 F i o  CAM
+                    1 £A*n
+l l g 7 o I a m C J S"?0
+
+w                            ra.wl-£lr>tr£
+If
+         R<J*A/<
+
+    PlO                 PlO
+
+                                            CM/MSA
+                              V              *"*
+                              o           -
+
+                              -N«» _         ~--- vS
+
+                              oK»#                     -F               i n 11 n i im i i"         iMiiii immir
+                                             -w                         1111 ii ii n iilIIi        I II I III II Mil Ml
+                              K»       _     --- f
+                              «J
+                                            ----
+    <*  3"                    Mr »
+    *                         Mj             ~--- o
+    t                         v%                   .o
+                                                                                                ^         1
+                              -M> ,,
+
+                              wK»               <*
+
+                                                4I                                                               to
+                              P           ·
+    %
+                                             . r>
+
+                              K»                                                                iuu nunuui
+
+                              s--               v^                      IHIIIIM lllllll         -lllllll | M II 11
+
+                                                -*                      -II I II I I M I M I I
+
+                              -»          --w
+
+                              *»
+
+                                                  M
+
+                              3                                                                 ?/
+
+                                                                        5 s.
+                                                                        n                                            ">
+
+                                                                        o  T                                                        }
+
+                                                                  o        J                    ^>                         9    31
+
+5                                                                   O                           a CP =F.                   ?*^
+
+                                                                     o                          P                          5
+
+0   7) 7> 73                        s                      5                                    <?-
+
+                         -*>                                                                    *
+
+I
+
+1*
+
+        vO
+        O
+        ft
+        0
+        T
+
+        v*»
+
+        o                     1    v*                                                      70
+        T>
+                                   o      70                                          o
+                                          re
+                                    ft                                            <
+
+        ^J                          *T    v£?                               12
+        c
+                                    s.                                    II
+                                                                                       7>
+        J                          C      7^                                              v]
+
+                                   T      7?                            2                                                       f i -
+                                                                                    o
+        ?                           X vaJ                                            z.
+
+                                    *
+        ·<                         ^
+
+        2?                                                                                                                      *
+         I                                                                                                                      £
+
+        75
+
+                                          -oo-             -*                                                        o-5r       »
+                                             z                  «
+                                                                                                   <-C                          ft
+                                                           -AWV^-1 ^
+                                                                                                             L-I 3
+                                                             5
+
+                                                                                                             7>
+

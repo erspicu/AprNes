@@ -50,8 +50,7 @@ public class EmuScreenControl : Control
 
         public void Render(ImmediateDrawingContext context)
         {
-            if (_ptr == IntPtr.Zero) return;
-
+            GuiBenchmark.NotifyRenderFrame();
             try
             {
                 var leaseFeature = context.TryGetFeature<ISkiaSharpApiLeaseFeature>();
@@ -59,6 +58,21 @@ public class EmuScreenControl : Control
 
                 using var lease = leaseFeature.Lease();
                 var canvas = lease.SkCanvas;
+                var dstRect = new SKRect(0, 0, (float)Bounds.Width, (float)Bounds.Height);
+
+                // Phase 3A: render-thread GPU CRT. Runs SkSL on the GPU-backed
+                // canvas (D3D11 on Windows). Skips the emulator-thread raster
+                // CRT entirely. Active only when Gpu backend + this flag set.
+                if (AprNes.NesCore.AnalogEnabled &&
+                    AprNes.NesCore.CrtEnabled &&
+                    AprNes.NesCore.CrtGpuRenderThreadActive &&
+                    CrtGpuRenderThread.IsReady)
+                {
+                    CrtGpuRenderThread.Render(canvas, lease.GrContext, dstRect);
+                    return;
+                }
+
+                if (_ptr == IntPtr.Zero) return;
 
                 // Zero-copy: InstallPixels makes SKBitmap point directly at
                 // the emulator's unmanaged buffer — O(1), no pixel copy.
@@ -66,12 +80,8 @@ public class EmuScreenControl : Control
                 using var bmp = new SKBitmap();
                 bmp.InstallPixels(info, _ptr, _w * 4);
 
-                // Bilinear: identical to nearest-neighbor at 100% DPI (1:1 mapping),
-                // but avoids Moiré artifacts with scanline filter at non-integer DPI scaling
                 using var paint = new SKPaint { FilterQuality = SKFilterQuality.Low };
-                canvas.DrawBitmap(bmp,
-                    new SKRect(0, 0, (float)Bounds.Width, (float)Bounds.Height),
-                    paint);
+                canvas.DrawBitmap(bmp, dstRect, paint);
             }
             catch (AccessViolationException) { }
         }

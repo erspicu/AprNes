@@ -1,0 +1,134 @@
+// ════════════════════════════════════════════════════════════════════════
+// crt_core_v1.sksl — Phase 3A full-parity CRT (1:1 with CrtScreen.Simd.cs)
+// SkiaSharp 3.119.3-preview (Raster Pipeline / GPU D3D11)
+// ════════════════════════════════════════════════════════════════════════
+// Feature parity vs CPU SIMD reference:
+//   ✓ Barrel curvature (UV warp)
+//   ✓ 3-tap horizontal blur (HBeamSpread)
+//   ✓ RGB convergence (per-channel horizontal shift)
+//   ✓ InterlaceJitter (±0.25 dst-row per-frame beam jitter)
+//   ✓ Gaussian beam weight exp(-dy²/2σ²) — was triangular, now accurate
+//   ✓ Scanline × Bloom coupling: fw = weight*boost + luma*bloom*(1-weight)*boost
+//   ✓ Vignette × Boost fusion (premultiplied into boost per CPU formula)
+//   ✓ Aperture grille / shadow mask
+//   ✓ Gamma V*(1-GC + GC*V)
+//   ✓ Phosphor decay max(current, prev * decay)
+//
+// Per-pixel pipeline order (matches CrtScreen.Simd.Render):
+//   1. curvature UV warp
+//   2. 3-tap hblur sample  (applied per-channel with convergence offset)
+//   3. per-channel convergence
+//   4. compute beam-weight + boost (folded vignette + brightness + bloom)
+//   5. apply fw = constA + luma*constB
+//   6. gamma correction
+//   7. aperture grille / shadow mask
+//   8. phosphor max-blend with previous frame
+
+uniform shader uScreen;
+uniform shader uPrev;
+uniform float2 uSrcSize;          // 1024, 240
+uniform float2 uDstSize;          // Crt_DstW, Crt_DstH
+uniform float  uBeamInv;          // 1 / (2*BeamSigma^2)
+uniform float  uJitter;           // ±0.25 * (srcH/dstH) when InterlaceJitter, else 0
+uniform float  uBrightness;       // BrightnessBoost
+uniform float  uBloomStrength;    // BloomStrength
+uniform float  uGamma;            // GammaCoeff
+uniform float  uMaskStrength;     // ShadowMaskStrength (0 disables)
+uniform float  uMaskType;         // 0=None, 1=ApertureGrille, 2=ShadowMask
+uniform float  uVignetteStrength; // VignetteStrength
+uniform float  uCurvature;        // CurvatureStrength
+uniform float  uConvergence;      // ConvergenceStrength
+uniform float  uHBlurAlpha;       // HBeamSpread * 0.5
+uniform float  uPhosphorDecay;    // PhosphorDecay (0 disables)
+
+// 3-tap horizontal blur (if uHBlurAlpha > 0)
+half3 sampleWithBlur(float2 srcP)
+{
+    half3 c  = uScreen.eval(srcP).rgb;
+    if (uHBlurAlpha <= 0.001) return c;
+    half3 cl = uScreen.eval(float2(srcP.x - 1.0, srcP.y)).rgb;
+    half3 cr = uScreen.eval(float2(srcP.x + 1.0, srcP.y)).rgb;
+    float center = 1.0 - 2.0 * uHBlurAlpha;
+    return cl * half(uHBlurAlpha) + c * half(center) + cr * half(uHBlurAlpha);
+}
+
+half4 main(float2 fragCoord)
+{
+    // ── 1. barrel curvature ──
+    float2 uv = (fragCoord + 0.5) / uDstSize;
+    float2 cc = uv - 0.5;
+    float  fc = 1.0 + uCurvature * dot(cc, cc);
+    float2 warpedUV = cc * fc + 0.5;
+    if (warpedUV.x < 0.0 || warpedUV.x > 1.0 || warpedUV.y < 0.0 || warpedUV.y > 1.0)
+        return half4(0.0, 0.0, 0.0, 1.0);
+
+    float2 srcP = warpedUV * uSrcSize;
+
+    // ── 2+3. per-channel hblur + position-dependent convergence ──
+    // Matches CPU ProcessRowConvergence: offset is 0 at horizontal center,
+    // maximum (±uConvergence in dst-pixel units) at left/right edges —
+    // simulates CRT's pincushion convergence error.
+    // When uConvergence ≈ 0, skip the 3-sample path entirely (saves 2 evals).
+    half3 c;
+    if (abs(uConvergence) < 0.01) {
+        c = sampleWithBlur(srcP);
+    } else {
+        float halfW   = uDstSize.x * 0.5;
+        float relX    = (fragCoord.x - halfW) / halfW;           // -1 left, 0 center, +1 right
+        float convSrc = uConvergence * relX * (uSrcSize.x / uDstSize.x);
+        half3 rgbC = sampleWithBlur(srcP);
+        half3 rgbR = sampleWithBlur(float2(srcP.x + convSrc, srcP.y));
+        half3 rgbB = sampleWithBlur(float2(srcP.x - convSrc, srcP.y));
+        c = half3(rgbR.r, rgbC.g, rgbB.b);
+    }
+
+    // ── 4. Gaussian beam weight with interlace jitter ──
+    float scaleY = uSrcSize.y / uDstSize.y;
+    float srcY   = fragCoord.y * scaleY;
+    float ny     = floor(srcY + 0.5);
+    float dy     = srcY + uJitter - ny;        // ∈ (-0.5+|jitter|, 0.5+|jitter|)
+    float weight = exp(-(dy * dy) * uBeamInv);
+
+    // ── Vignette folded into brightness (CPU per-row `boost`) ──
+    float vy    = uv.y - 0.5;
+    float boost = uBrightness * (1.0 - uVignetteStrength * 4.0 * vy * vy);
+    boost       = max(boost, 0.0);
+
+    // ── 5. scanline × bloom coupling ──
+    //    fw = weight*boost + luma*bloom*(1-weight)*boost
+    //    (bloom stronger in dark scanlines; vignette already folded in boost)
+    float constA = weight * boost;
+    float constB = uBloomStrength * (1.0 - weight) * boost;
+    float luma   = dot(c, half3(0.3, 0.59, 0.11));
+    float fw     = constA + luma * constB;
+    c = clamp(c * half(fw), 0.0, 1.0);
+
+    // ── 6. gamma: V' = V * ((1-GC) + GC*V) ──
+    c = c * ((1.0 - uGamma) + uGamma * c);
+
+    // ── 7. aperture grille / shadow mask ──
+    int maskTypeI = int(uMaskType + 0.5);
+    if (maskTypeI == 1) {
+        int col = int(mod(fragCoord.x, 3.0));
+        half3 maskCol = (col == 0) ? half3(1.0, 0.3, 0.3)
+                      : (col == 1) ? half3(0.3, 1.0, 0.3)
+                      :              half3(0.3, 0.3, 1.0);
+        c *= mix(half3(1.0), maskCol, uMaskStrength);
+    } else if (maskTypeI == 2) {
+        int col = int(mod(fragCoord.x, 3.0));
+        int row = int(mod(fragCoord.y, 2.0));
+        int idx = int(mod(float(col + row), 3.0));
+        half3 maskCol = (idx == 0) ? half3(1.0, 0.3, 0.3)
+                      : (idx == 1) ? half3(0.3, 1.0, 0.3)
+                      :              half3(0.3, 0.3, 1.0);
+        c *= mix(half3(1.0), maskCol, uMaskStrength);
+    }
+
+    // ── 8. phosphor decay ──
+    if (uPhosphorDecay > 0.001) {
+        half3 prev = uPrev.eval(fragCoord).rgb;
+        c = max(c, prev * half(uPhosphorDecay));
+    }
+
+    return half4(c, 1.0);
+}

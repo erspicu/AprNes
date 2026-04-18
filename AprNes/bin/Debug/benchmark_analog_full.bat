@@ -28,7 +28,7 @@ set JIT_SEC=20
 set TEST_SEC=20
 set COOL_SEC=30
 
-set "FLAGS=--region NTSC --ultra-analog --analog-output RF --analog-size 8 --crt --audio-mode 2"
+set "FLAGS=--region NTSC --ultra-analog --analog-output RF --analog-size 8 --crt --audio-dsp --audio-mode 2"
 
 echo ============================================================
 echo   AprNes Analog Full Benchmark
@@ -38,8 +38,8 @@ echo     Region:       NTSC
 echo     Analog:       Ultra (NTSC v2 full decode)
 echo     Output:       RF (composite + CRT RF noise)
 echo     CRT:          Enabled (scanline + bloom + curvature)
-echo     Resolution:   8x (2048x1920)
-echo     Audio:        Mode 2 (Modern DSP)
+echo     Resolution:   8x (2048x1680)
+echo     Audio:        Mode 2 (Modern DSP, --audio-dsp enabled)
 echo   Protocol: JIT(%JIT_SEC%s) + Cool(%COOL_SEC%s) + Run2(%TEST_SEC%s) + Cool(%COOL_SEC%s) + Run3(%TEST_SEC%s)
 echo   Start: %date% %time:~0,8%
 for /f "delims=" %%v in ('"%EXE%" --version 2^>nul') do echo   %%v
@@ -54,6 +54,7 @@ echo.
 :: -- Phase 0: JIT Warmup --
 echo [Phase 0] JIT Warmup (%JIT_SEC%s, result discarded)
 "%EXE%" --rom "%ROM%" --benchmark %JIT_SEC% %FLAGS% > "%TMPFILE%" 2>&1
+findstr /C:"[CRT]" "%TMPFILE%"
 for /f "tokens=7" %%f in ('findstr "BENCHMARK:" "%TMPFILE%"') do set "FPS_JIT=%%f"
 echo   JIT warmup: %FPS_JIT% FPS (discarded - Tier-0 JIT collecting PGO)
 echo.
@@ -94,8 +95,8 @@ echo     Region:       NTSC
 echo     Analog:       Ultra (NTSC v2 full decode)
 echo     Output:       RF (composite + CRT RF noise)
 echo     CRT:          Enabled
-echo     Resolution:   8x (2048x1920)
-echo     Audio:        Mode 2 (Modern DSP)
+echo     Resolution:   8x (2048x1680)
+echo     Audio:        Mode 2 (Modern DSP, --audio-dsp enabled)
 echo     Test ROM:     ny2011.nes
 echo     Duration:     %TEST_SEC%s per run
 echo.

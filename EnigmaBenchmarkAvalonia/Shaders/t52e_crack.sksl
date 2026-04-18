@@ -1,0 +1,212 @@
+// ════════════════════════════════════════════════════════════════════════
+// t52e_crack.sksl — Siemens T52e "Sturgeon" reduced-keyspace brute force
+// ════════════════════════════════════════════════════════════════════════
+// Each output pixel = one (s6, s7, s8) candidate for wheels W7, W8, W9;
+// uS9 uniform fixes W10 per pass; uniforms uS0..uS5 give the "known"
+// starts for W1..W6. 73 passes cover 67·69·71·73 ≈ 24 M candidates.
+//
+// Scorer: count decrypted Baudot bytes equal to SPACE (00100) or E (00001).
+// Together ~32% of German plaintext vs ~6% random. Strong signal; CPU side
+// re-ranks top-K with full IC on the full ciphertext.
+//
+// SkSL restrictions:
+//   - No bitwise ops → XOR done as a + b - 2*a*b for bits in {0,1}.
+//   - Dynamic array indexing IS allowed into local arrays in SkSL, so we
+//     stage B[0..9] into a local array and index via switchMap values.
+//   - Loop bounds constant (CAP=80) — shader short-circuits on ctLen.
+
+uniform shader uPins;       // 73 × 10: row w = wheel w pin pattern
+uniform shader uCipher;     // n × 1
+uniform shader uPermInv;    // 32 × 5 texture of σ⁻¹[row, i] ∈ 0..4
+
+// Switch-map values are inlined as 10 literal `@@SMx@@` placeholders at
+// cracker start (one specialised shader per switch map setting — the
+// map is part of the daily key so it never changes within one crack).
+
+uniform float  uCtLen;
+uniform float  uS9;
+uniform float  uS0, uS1, uS2, uS3, uS4, uS5;   // W1..W6 known starts
+
+const int CAP = 40;
+
+// Read texel as float — explicitly avoid half precision (fp16 has only 10
+// mantissa bits; the `a+b-2ab` XOR trick accumulates values that can drift
+// off {0,1} and then compare-with-zero fails on real GPU drivers).
+int pinRead(int wheel, int pos) {
+    float4 v = float4(uPins.eval(float2(float(pos) + 0.5, float(wheel) + 0.5)));
+    return int(v.r * 255.0 + 0.5);
+}
+
+int cipherAt(int i) {
+    float4 v = float4(uCipher.eval(float2(float(i) + 0.5, 0.5)));
+    return int(v.r * 255.0 + 0.5);
+}
+
+int permInvAt(int row, int i) {
+    float4 v = float4(uPermInv.eval(float2(float(row) + 0.5, float(i) + 0.5)));
+    return int(v.r * 255.0 + 0.5);
+}
+
+int xorb(int a, int b) { return a + b - 2 * a * b; }
+
+half4 main(float2 fragCoord) {
+    int x = int(fragCoord.x);
+    int y = int(fragCoord.y);
+
+    int s7 = x / 67;
+    int s6 = x - s7 * 67;
+    int s8 = y;
+    int s9 = int(uS9 + 0.5);
+
+    if (s7 >= 69 || s8 >= 71) return half4(0.0, 0.0, 0.0, 1.0);
+
+    int p0 = int(uS0 + 0.5), p1 = int(uS1 + 0.5), p2 = int(uS2 + 0.5);
+    int p3 = int(uS3 + 0.5), p4 = int(uS4 + 0.5), p5 = int(uS5 + 0.5);
+    int p6 = s6, p7 = s7, p8 = s8, p9 = s9;
+
+    int ctLen = int(uCtLen + 0.5);
+    int iMax = (ctLen < CAP) ? ctLen : CAP;
+
+    int hitCount = 0;
+
+    for (int i = 0; i < CAP; i++) {
+        if (i >= iMax) break;
+
+        // A-contacts
+        int A0 = pinRead(0, p0);
+        int A1 = pinRead(1, p1);
+        int A2 = pinRead(2, p2);
+        int A3 = pinRead(3, p3);
+        int A4 = pinRead(4, p4);
+        int A5 = pinRead(5, p5);
+        int A6 = pinRead(6, p6);
+        int A7 = pinRead(7, p7);
+        int A8 = pinRead(8, p8);
+        int A9 = pinRead(9, p9);
+
+        // B-contacts: offset ~1/3 revolution
+        int bp0 = p0 + 15; if (bp0 >= 47) bp0 = bp0 - 47;
+        int bp1 = p1 + 17; if (bp1 >= 53) bp1 = bp1 - 53;
+        int bp2 = p2 + 19; if (bp2 >= 59) bp2 = bp2 - 59;
+        int bp3 = p3 + 20; if (bp3 >= 61) bp3 = bp3 - 61;
+        int bp4 = p4 + 21; if (bp4 >= 64) bp4 = bp4 - 64;
+        int bp5 = p5 + 21; if (bp5 >= 65) bp5 = bp5 - 65;
+        int bp6 = p6 + 22; if (bp6 >= 67) bp6 = bp6 - 67;
+        int bp7 = p7 + 23; if (bp7 >= 69) bp7 = bp7 - 69;
+        int bp8 = p8 + 23; if (bp8 >= 71) bp8 = bp8 - 71;
+        int bp9 = p9 + 24; if (bp9 >= 73) bp9 = bp9 - 73;
+
+        int B0 = pinRead(0, bp0);
+        int B1 = pinRead(1, bp1);
+        int B2 = pinRead(2, bp2);
+        int B3 = pinRead(3, bp3);
+        int B4 = pinRead(4, bp4);
+        int B5 = pinRead(5, bp5);
+        int B6 = pinRead(6, bp6);
+        int B7 = pinRead(7, bp7);
+        int B8 = pinRead(8, bp8);
+        int B9 = pinRead(9, bp9);
+
+        // Switch-map values substituted in at shader-source load time.
+        int X0 = B@@SM0@@;
+        int X1 = B@@SM1@@;
+        int X2 = B@@SM2@@;
+        int X3 = B@@SM3@@;
+        int X4 = B@@SM4@@;
+        int X5 = B@@SM5@@;
+        int X6 = B@@SM6@@;
+        int X7 = B@@SM7@@;
+        int X8 = B@@SM8@@;
+        int X9 = B@@SM9@@;
+
+        int H1 = xorb(X0, X1);
+        int H2 = xorb(X2, X3);
+        int H3 = xorb(X4, X5);
+        int H4 = xorb(X6, X7);
+        int H5 = xorb(X8, X9);
+        int H6 = xorb(X0, X5);
+        int H7 = xorb(X1, X6);
+        int H8 = xorb(X2, X7);
+        int H9 = xorb(X3, X8);
+        int H10 = xorb(X4, X9);
+
+        int SR1 = xorb(H1, H8);
+        int SR2 = xorb(H6, H7);
+        int SR3 = xorb(H3, H8);
+        int SR4 = xorb(H2, H10);
+        int SR5 = xorb(H4, H10);
+        int SR6 = xorb(H3, H7);
+        int SR7 = xorb(H2, H5);
+        int SR8 = xorb(H1, H9);
+        int SR9 = xorb(H5, H6);
+        int SR10 = xorb(H4, H9);
+
+        int row = SR1 + SR2 * 2 + SR3 * 4 + SR4 * 8 + SR5 * 16;
+
+        int c = cipherAt(i);
+        int cq = c / 2;   int Cbit0 = c - cq * 2;
+        int cq2 = cq / 2; int Cbit1 = cq - cq2 * 2;
+        int cq3 = cq2 / 2; int Cbit2 = cq2 - cq3 * 2;
+        int cq4 = cq3 / 2; int Cbit3 = cq3 - cq4 * 2;
+        int Cbit4 = cq4 - (cq4 / 2) * 2;
+
+        int inv0 = permInvAt(row, 0);
+        int inv1 = permInvAt(row, 1);
+        int inv2 = permInvAt(row, 2);
+        int inv3 = permInvAt(row, 3);
+        int inv4 = permInvAt(row, 4);
+
+        int t0 = (inv0 == 0) ? Cbit0 : (inv0 == 1) ? Cbit1 : (inv0 == 2) ? Cbit2 : (inv0 == 3) ? Cbit3 : Cbit4;
+        int t1 = (inv1 == 0) ? Cbit0 : (inv1 == 1) ? Cbit1 : (inv1 == 2) ? Cbit2 : (inv1 == 3) ? Cbit3 : Cbit4;
+        int t2 = (inv2 == 0) ? Cbit0 : (inv2 == 1) ? Cbit1 : (inv2 == 2) ? Cbit2 : (inv2 == 3) ? Cbit3 : Cbit4;
+        int t3 = (inv3 == 0) ? Cbit0 : (inv3 == 1) ? Cbit1 : (inv3 == 2) ? Cbit2 : (inv3 == 3) ? Cbit3 : Cbit4;
+        int t4 = (inv4 == 0) ? Cbit0 : (inv4 == 1) ? Cbit1 : (inv4 == 2) ? Cbit2 : (inv4 == 3) ? Cbit3 : Cbit4;
+
+        int pb0 = xorb(t0, SR6);
+        int pb1 = xorb(t1, SR7);
+        int pb2 = xorb(t2, SR8);
+        int pb3 = xorb(t3, SR9);
+        int pb4 = xorb(t4, SR10);
+
+        // Hit if plaintext byte is 00100 (SPACE) or 00001 (E)
+        int isSpace = (1 - pb0) * (1 - pb1) * pb2 * (1 - pb3) * (1 - pb4);
+        int isE     = pb0 * (1 - pb1) * (1 - pb2) * (1 - pb3) * (1 - pb4);
+        hitCount = hitCount + isSpace + isE;
+
+        // Step wheels (M-magnet logic per §3.5)
+        int nA0 = 1 - A0, nA1 = 1 - A1, nA2 = 1 - A2, nA3 = 1 - A3;
+        int nA5 = 1 - A5, nA6 = 1 - A6, nA7 = 1 - A7, nA8 = 1 - A8, nA9 = 1 - A9;
+
+        int M2  = nA9 * nA0;
+        int M3  = nA1 * A0;
+        int M4  = A1 * A2;
+        int M5  = nA3 * nA2;
+        int M6  = A3 * A4;
+        int M7  = A9 * nA5 * nA8;
+        int M8  = A9 * nA5 * A8;
+        int M1  = A9 * A5 * nA7;
+        int M10 = A9 * A5 * A7 * nA6;
+        int M9  = A9 * A5 * A7 * A6;
+
+        if (M1  == 0) { p0 = p0 + 1; if (p0 >= 47) p0 = 0; }
+        if (M2  == 0) { p1 = p1 + 1; if (p1 >= 53) p1 = 0; }
+        if (M3  == 0) { p2 = p2 + 1; if (p2 >= 59) p2 = 0; }
+        if (M4  == 0) { p3 = p3 + 1; if (p3 >= 61) p3 = 0; }
+        if (M5  == 0) { p4 = p4 + 1; if (p4 >= 64) p4 = 0; }
+        if (M6  == 0) { p5 = p5 + 1; if (p5 >= 65) p5 = 0; }
+        if (M7  == 0) { p6 = p6 + 1; if (p6 >= 67) p6 = 0; }
+        if (M8  == 0) { p7 = p7 + 1; if (p7 >= 69) p7 = 0; }
+        if (M9  == 0) { p8 = p8 + 1; if (p8 >= 71) p8 = 0; }
+        if (M10 == 0) { p9 = p9 + 1; if (p9 >= 73) p9 = 0; }
+    }
+
+    int score = hitCount * 1000;
+    int r = score / 65536;
+    int g = (score / 256) - r * 256;
+    int b = score - (score / 256) * 256;
+
+    return half4(half(float(r) / 255.0),
+                 half(float(g) / 255.0),
+                 half(float(b) / 255.0),
+                 half(1.0));
+}

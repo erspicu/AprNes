@@ -113,13 +113,19 @@ public sealed unsafe class EmulatorEngine : IDisposable
         Map(vkUp,     4); Map(vkDown,  5); Map(vkLeft,   6); Map(vkRight, 7);
     }
 
+    /// <summary>
+    /// When true (benchmark mode), never open the audio playback backend
+    /// regardless of AudioEnabled. DSP processing still runs; output is discarded.
+    /// </summary>
+    public bool AudioPlaybackMuted { get; set; }
+
     /// <summary>Apply audio settings: set NesCore flags and open/close audio backend.</summary>
     public void ApplyAudioSettings(bool enabled, int volume)
     {
         NesCore.AudioEnabled = enabled;
         NesCore.Volume       = volume;
         _audio.Close();
-        if (enabled && _running)
+        if (enabled && _running && !AudioPlaybackMuted)
             _audio.Open();
     }
 
@@ -417,7 +423,7 @@ public sealed unsafe class EmulatorEngine : IDisposable
         _thread = new Thread(NesCore.run) { IsBackground = true, Name = "NesCore" };
         _thread.Start();
 
-        if (NesCore.AudioEnabled)
+        if (NesCore.AudioEnabled && !AudioPlaybackMuted)
             _audio.Open();
     }
 

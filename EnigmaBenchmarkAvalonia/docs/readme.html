@@ -1,0 +1,1248 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EnigmaBenchmark — 二戰德國密碼 × 現代算力</title>
+<style>
+  :root {
+    --bg: #0e1116;
+    --surface: #151a22;
+    --surface-2: #1b212b;
+    --text: #d8dee4;
+    --muted: #8a93a0;
+    --amber: #ffd060;
+    --green: #80ff80;
+    --cyan: #80d0ff;
+    --red: #ff8888;
+    --border: #1f2430;
+    --mono: "Consolas", "Cascadia Mono", "JetBrains Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                 "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif;
+    line-height: 1.72;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 56px 32px 120px;
+  }
+  header h1 {
+    font-size: 52px;
+    letter-spacing: -0.02em;
+    margin: 0 0 8px;
+    font-weight: 700;
+    background: linear-gradient(90deg, var(--amber), var(--cyan));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .lead {
+    color: var(--text);
+    font-size: 19px;
+    margin: 0 0 6px;
+  }
+  .meta {
+    color: var(--muted);
+    font-size: 14px;
+    margin: 0 0 56px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+  }
+  h2 {
+    font-size: 28px;
+    margin: 64px 0 18px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    color: var(--amber);
+    font-weight: 600;
+  }
+  h3 {
+    font-size: 20px;
+    margin: 28px 0 10px;
+    color: var(--cyan);
+    font-weight: 600;
+  }
+  h4 {
+    font-size: 16px;
+    margin: 20px 0 8px;
+    color: var(--text);
+  }
+  p { margin: 10px 0 14px; }
+  ul { padding-left: 22px; margin: 10px 0; }
+  li { margin: 4px 0; }
+  code, pre, kbd, samp {
+    font-family: var(--mono);
+    font-size: 13.5px;
+  }
+  code.inline, code:not(pre code) {
+    background: var(--surface);
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: var(--amber);
+    font-size: 13px;
+  }
+  pre {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    margin: 14px 0;
+    line-height: 1.5;
+  }
+  pre code { background: none; color: var(--text); padding: 0; }
+  blockquote {
+    border-left: 3px solid var(--amber);
+    margin: 16px 0;
+    padding: 8px 18px;
+    color: var(--muted);
+    background: rgba(255,208,96,0.04);
+    font-style: italic;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 18px 0 28px;
+    font-size: 14.5px;
+  }
+  th, td {
+    text-align: left;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th {
+    background: var(--surface);
+    font-weight: 600;
+    color: var(--cyan);
+  }
+  td.num, th.num { text-align: right; font-family: var(--mono); }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .status {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 4px;
+    font-size: 11.5px;
+    font-family: var(--mono);
+    vertical-align: middle;
+    margin-left: 10px;
+    letter-spacing: 0.04em;
+  }
+  .status.ready    { background: rgba(128,255,128,0.14); color: var(--green); border: 1px solid rgba(128,255,128,0.32); }
+  .status.planned  { background: rgba(255,208,96,0.10); color: var(--amber); border: 1px solid rgba(255,208,96,0.28); }
+  .status.future   { background: rgba(138,147,160,0.13); color: var(--muted); border: 1px solid rgba(138,147,160,0.28); }
+  .cipher-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px 26px;
+    margin: 24px 0;
+  }
+  .cipher-card h3 { margin-top: 0; }
+  .cipher-card .tag {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.10em;
+    margin-bottom: 4px;
+  }
+  .cipher-card .highlight-stat {
+    display: inline-block;
+    margin: 8px 0 4px;
+    padding: 6px 12px;
+    background: var(--surface-2);
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--amber);
+  }
+  .person-card {
+    background: var(--surface);
+    border-left: 3px solid var(--cyan);
+    border-radius: 4px;
+    padding: 14px 20px;
+    margin: 16px 0;
+  }
+  .person-card h4 {
+    margin: 0 0 4px;
+    color: var(--amber);
+    font-size: 17px;
+  }
+  .person-card .lifespan {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: 6px;
+  }
+  .person-card p:first-of-type { margin-top: 8px; }
+  .person-card p:last-child     { margin-bottom: 2px; }
+  .people-section h3 {
+    margin-top: 44px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  .people-section h3:first-of-type { border-top: none; padding-top: 0; }
+  .backend-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+    margin: 18px 0;
+  }
+  .backend {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+  }
+  .backend h4 { margin: 0 0 6px; color: var(--cyan); }
+  .backend p { font-size: 14px; color: var(--muted); margin: 0; }
+  .kv-table td:first-child { color: var(--muted); width: 34%; font-family: var(--mono); font-size: 13px; }
+  .footnote {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 56px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+  .footnote a { color: var(--cyan); text-decoration: none; }
+  .footnote a:hover { text-decoration: underline; }
+  .big-num {
+    font-family: var(--mono);
+    font-size: 34px;
+    color: var(--green);
+    font-weight: 700;
+    display: inline-block;
+    margin: 4px 12px 4px 0;
+  }
+  .big-num.red { color: var(--red); }
+  .vs {
+    color: var(--muted);
+    font-size: 18px;
+    margin: 0 8px;
+  }
+  .emph { color: var(--amber); }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 52px 0; }
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 22px;
+    margin: 20px 0 36px;
+    font-size: 14px;
+  }
+  .toc ol { margin: 6px 0; padding-left: 22px; }
+  .toc a { color: var(--cyan); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; color: var(--amber); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>EnigmaBenchmark</h1>
+  <p class="lead">二戰德國頂級密碼系統 <span style="color:var(--muted)">×</span> 你書桌上這顆 GPU</p>
+  <p class="meta">
+    當年十萬人、一整座秘密城市、為此誕生的第一台電子電腦；現在，你按一下 Start，不到一秒鐘。
+  </p>
+</header>
+
+<nav class="toc">
+  <strong style="color:var(--amber)">目錄</strong>
+  <ol>
+    <li><a href="#about">這是什麼？</a></li>
+    <li><a href="#ciphers">三場要被秒殺的歷史對決</a></li>
+    <li><a href="#people">破解的人們 — 電影沒拍到的故事</a></li>
+    <li><a href="#backends">四條運算路線</a></li>
+    <li><a href="#numbers">歷史 vs 現在</a></li>
+    <li><a href="#why">為什麼做這個</a></li>
+    <li><a href="#run">怎麼用</a></li>
+    <li><a href="#tech">技術備註</a></li>
+    <li><a href="#credits">致謝 / Credits</a></li>
+  </ol>
+</nav>
+
+<h2 id="about">這是什麼？</h2>
+
+<p>
+  EnigmaBenchmark 用 <strong>四種不同的運算路徑</strong>去暴力破解二戰德軍最著名的幾款密碼機。你會在同一個視窗裡直接看到：
+</p>
+
+<ul>
+  <li>單執行緒 C# — 最樸素的版本</li>
+  <li>全 CPU 多核平行 — <code>Parallel.ForEach</code></li>
+  <li>AVX2 SIMD — <code>Vector256&lt;int&gt;</code> + <code>GatherVector256</code></li>
+  <li>SkSL Shader 在 GPU 上跑 — 跟 <a href="https://github.com/erspicu/AprNes" style="color:var(--cyan)">AprNes</a> 模擬器的 CRT 濾鏡同一條路徑</li>
+</ul>
+
+<p>
+  重點不是「秀 benchmark 數字」，而是把同一件有歷史份量的計算工作放在四個硬體選項上實際跑一遍，讓你看到：
+</p>
+
+<blockquote>
+  同一段 SkSL shader，在 GPU 上 <span class="emph">0.2 秒</span>搞定的事情，
+  單核 C# 要 <span class="emph">11 秒</span>。
+</blockquote>
+
+<p>
+  這是 AprNes CRT 為什麼非走 GPU 不可的具象化。
+</p>
+
+<hr>
+
+<h2 id="ciphers">六場密碼歷史對決</h2>
+
+<div class="cipher-card">
+  <div class="tag">1917 Jan · Auswärtiges Amt Berlin → Mexico City</div>
+  <h3>Zimmermann Telegram / Code 0075 <span class="status ready">已實作</span></h3>
+
+  <p>
+    <strong>1917 年 1 月 16 日</strong>，德國外交秘書 Arthur Zimmermann 發給駐墨西哥大使
+    Heinrich von Eckardt 一封電報。內容：若美國參戰，德國將資助墨西哥對美開戰，
+    歸還<strong>德州、新墨西哥州、亞利桑那州</strong>。這是一戰情報戰的最大單次翻盤。
+  </p>
+
+  <h4>密碼結構</h4>
+  <ul>
+    <li>不是機械密碼，是<strong>codebook</strong>——一本字典式對照表，
+      每個詞對應一組 4–5 位數字</li>
+    <li>德國外交部版本叫 <strong>0075</strong>（本專案模擬的就是這個），
+      Washington→Mexico 段還用了較弱的 <strong>13040</strong></li>
+    <li>電報路徑：Berlin → (Sweden relay / US cable) → Washington 德使館 → Mexico City。
+      每一跳重新加密一次；英國 Room 40 攔截的是 US cable 段</li>
+  </ul>
+
+  <h4>為什麼 codebook 不能被暴力破解</h4>
+  <p>
+    幾千個詞 × 多個 code group variants = keyspace 超出 10⁴⁰⁰ 量級，
+    完全無法窮舉。能破是因為 Room 40 已經<strong>累積數年德國外交電報</strong>，
+    靠重複片段（「AN SEINER EXZELLENZ」、「ZIMMERMANN」簽名）慢慢拼出
+    codebook 的局部。這是情報數量與耐心的勝利，不是計算力的勝利。
+  </p>
+
+  <h4>本專案的實作</h4>
+  <p>
+    簡化為一份約 70 詞的 pseudo-0075 codebook，把 Zimmermann 式電報編為 4 位數
+    code group。cracker 模擬 Room 40 方法：給它幾則「已破解」的前期電報作 crib，
+    單執行緒 linear pass 對齊後反推 codebook 條目，再把 target 訊息盡量解出來。
+    通常在<strong>毫秒級</strong>回報 70–90% 解碼率（decoded ratio）。
+  </p>
+
+  <p class="highlight-stat">
+    Keyspace = 無限（codebook 本身是金鑰） · Cracker path = crib-based dictionary recovery
+  </p>
+
+  <p>
+    這張牌的存在就是為了提醒一個冷酷事實：<strong>演算法再強，只要金鑰載體（codebook、
+    設定表、Kenngruppenbuch）外洩或可累積重建，整套系統崩潰</strong>。Bletchley 時代
+    同樣如此——擄獲的 U-Boat <em>Wetterkurzschlüssel</em> 比 Turing 的 Bombe 值錢得多。
+  </p>
+</div>
+
+<div class="cipher-card">
+  <div class="tag">1918 Mar–Jun · Kaiserliches Heer Western Front</div>
+  <h3>ADFGVX <span class="status ready">已實作</span></h3>
+
+  <p>
+    Fritz Nebel 上校 1918 年 3 月為德軍 Spring Offensive 設計。兩階段密碼，
+    強度理論上很高——直到 <strong>Capt. Georges Painvin</strong>（法軍 Bureau du Chiffre）
+    6 月 2 日破譯第一則，直接改變了戰爭走向。
+  </p>
+
+  <h4>加密流程</h4>
+  <ol>
+    <li><strong>Polybius 代換</strong>：6×6 格塞入 26 字母 + 10 數字，
+      每個明文字元 ↦ 一對 ADFGVX 字母（row, col）。
+      字母選 A D F G V X 是因為它們的摩斯碼<strong>彼此差異最大</strong>，
+      無線電傳輸錯誤率最低</li>
+    <li><strong>Columnar transposition</strong>：把代換結果寫進 keyword 下的列陣，
+      按 keyword 字母字典順序重排欄位，行序讀出</li>
+  </ol>
+
+  <h4>Painvin 的破口</h4>
+  <p>
+    雙階段密碼本應很硬，但德軍 operator 紀律鬆散——<strong>同一天、同一 keyword
+    下重複發送相近訊息</strong>（正式公文常用「An das Hauptquartier…」開頭）。
+    Painvin 用 "<strong>superimposition attack</strong>"：同長度候選對齊後，
+    從格式化前綴統計反推 transposition 的欄序，再回推 Polybius 格內容。
+    三週硬操，體重掉 15 公斤。
+  </p>
+
+  <h4>決定性的那則訊息</h4>
+  <p style="font-family: var(--mono); color: var(--amber); margin-left: 20px; border-left: 2px solid var(--amber); padding-left: 16px;">
+    "Munitionierung beschleunigen Punkt soweit nicht eingesehen auch bei Tag"<br>
+    — 加速運送彈藥，即使白天也繼續
+  </p>
+  <p>
+    這則電報讓法軍精準預判 Montdidier–Compiègne 之間的主攻軸線，調動預備隊堵上缺口。
+    德軍 Spring Offensive 就此停滯。史稱「<strong>Radiogram of Victory</strong>」。
+  </p>
+
+  <h4>本專案的實作</h4>
+  <p>
+    Benchmark 假設 Polybius 格已知（Painvin 當年還得順帶破，難度更高），
+    暴力搜 transposition 的欄序。keyword 長度 8 → 40,320 個排列，
+    <strong>單執行緒幾秒內</strong>解出。用 26-字母 IC 評分選最優。
+  </p>
+
+  <p class="highlight-stat">
+    Keyspace = K! = 8! = 40,320 排列 · 評分 = 標準 26-bucket IC
+  </p>
+
+  <p>
+    現代的眼光看這根本不是硬仗——但 1918 年當時，這是人類首次用<strong>純統計方法</strong>
+    單點破掉整台外場密碼機的工程實例。Painvin 的技術路線（從重複模式反推置換結構）
+    後來 Rejewski、Tutte、Beurling 都走過。
+  </p>
+</div>
+
+<hr>
+
+<h3>三場 WWII 機械 × 電子戰</h3>
+
+<p>
+  這個 benchmark 選了三款德軍最引以為豪、盟軍最頭痛、戰後才解密的密碼系統。每一個都有自己的傳奇與殤。
+</p>
+
+<div class="cipher-card">
+  <div class="tag">1932 – 1945 · Wehrmacht / Heer / Luftwaffe</div>
+  <h3>Enigma M3 <span class="status ready">已實作</span></h3>
+
+  <p>
+    德軍標準三轉輪 Enigma。海陸空三軍、指揮部、外交部、情報單位——整個第三帝國的神經系統都跑在這台鐵盒子上。德國統帥部對 Enigma 的信心近乎宗教：他們到戰敗都不相信 Enigma 被破解。
+  </p>
+
+  <h4>機器組態</h4>
+  <table class="kv-table">
+    <tr><td>轉輪庫（Walzen）</td><td>I / II / III / IV / V（Wehrmacht 五顆）</td></tr>
+    <tr><td>轉輪位置（Walzenlage）</td><td>從 5 顆選 3 顆排列 = <code>5×4×3 = 60</code> 種</td></tr>
+    <tr><td>反射器（Umkehrwalze）</td><td>UKW-B 或 UKW-C</td></tr>
+    <tr><td>環位設定（Ringstellung）</td><td>每個轉輪 A–Z，共 26³</td></tr>
+    <tr><td>起始位置（Grundstellung）</td><td>每個轉輪 A–Z，共 26³</td></tr>
+    <tr><td>插線板（Steckerbrett）</td><td>10 組字母對調</td></tr>
+    <tr><td>機械怪癖</td><td>Double-step anomaly — 中輪到 notch 時，左輪、中輪同時前進</td></tr>
+  </table>
+
+  <h4>Keyspace</h4>
+  <p>
+    完整組合空間是 <code>60 × 26³ × 26³ × 150,738,274,937,250</code>（plugboard）≈ <span class="emph">1.58 × 10²⁰</span>。
+    但插線板部分無法靠 IC 打分區分，實戰中戰後的 Rejewski / Turing 攻擊也是繞過它。
+  </p>
+  <p>
+    Benchmark 假設插線板已知（模擬 crib-based attack 或 Turing Bombe 的效果），只暴力搜 <strong>wheel order × grundstellung</strong>，這就是四個 scope 的定義：
+  </p>
+
+  <table>
+    <tr><th>Scope</th><th>鎖定</th><th class="num">Keyspace</th></tr>
+    <tr><td>Quick</td><td>wheel × 26³</td><td class="num">1,054,560</td></tr>
+    <tr><td>Normal</td><td>+ 右環</td><td class="num">27,418,560</td></tr>
+    <tr><td>Hard</td><td>+ 中環</td><td class="num">712,882,560</td></tr>
+    <tr><td>Extreme</td><td>+ 左環（完整 wheel × pos³ × ring³）</td><td class="num">18,534,946,560</td></tr>
+  </table>
+
+  <h4>歷史</h4>
+  <ul>
+    <li><strong>1932</strong>，波蘭密碼局三位數學家 Marian Rejewski、Jerzy Różycki、Henryk Zygalski 首次破解 Enigma（用傳統 permutation theory），設計了第一台 Bomba</li>
+    <li><strong>1939</strong> 7 月，波蘭人把成果交給英國 Bletchley Park，戰爭才開打兩個月</li>
+    <li><strong>1940</strong> 起，Alan Turing 與 Gordon Welchman 改良出電機式 <strong>Bombe</strong>，美國海軍後來也造了自己的 Bombe</li>
+    <li>整個戰爭期間，Bletchley Park 僱了超過 <strong>10,000 名員工</strong>，其中 75% 是女性</li>
+    <li>這個秘密被英國政府保守了 30 年——到 1974 年 Winterbotham 上校寫了《The Ultra Secret》才公開</li>
+  </ul>
+</div>
+
+<div class="cipher-card">
+  <div class="tag">1942 Feb – 1945 · Kriegsmarine U-Boot (M4 "Shark")</div>
+  <h3>Enigma M4 <span class="status ready">已實作</span></h3>
+
+  <p>
+    <strong>1942 年 2 月 1 日</strong>，德國海軍把 U-Boat 通訊升級到四轉輪 M4。Bletchley Park 瞬間瞎掉，此後 <strong>整整十個月</strong>無法解讀 U-Boat 命令。那十個月叫「Second Happy Time」，德國 U-Boat 狼群在北大西洋撕裂盟軍補給線。
+  </p>
+
+  <p>
+    歷史學者估計，那 10 個月沉了約 <span class="emph">600 艘盟軍商船，載 3.5 百萬噸物資</span>。如果 M4 沒被破，英國可能在 1943 年就斷糧。
+  </p>
+
+  <h4>M4 跟 M3 的差別</h4>
+  <ul>
+    <li>加一個<strong>薄 greek 轉輪</strong>（Beta 或 Gamma）放在最左邊，<strong>不會轉</strong>，但有起始位置</li>
+    <li>反射器改成薄版（UKW-B dünn / UKW-C dünn）</li>
+    <li>Beta + UKW-B dünn 或 Gamma + UKW-C dünn 必須成對</li>
+    <li>Keyspace 比 M3 大 26 × 2 × 2 = 104 倍</li>
+  </ul>
+
+  <h4>怎麼被破的</h4>
+  <p>
+    1942 年 10 月，英國驅逐艦 HMS Petard 在地中海攔截 <strong>U-559</strong>，Able Seaman Colin Grazier 和 Lieutenant Tony Fasson 跳進正在下沉的潛艇搶出了 <em>Wetterkurzschlüssel</em>（氣象短信碼本）。兩人隨潛艇沉沒殉職。
+  </p>
+  <p>
+    Bletchley 靠這本碼本在 1942 年 12 月 13 日重新破開 M4。那一天起，大西洋戰役的天平倒過來了。
+  </p>
+</div>
+
+<div class="cipher-card">
+  <div class="tag">1941 – 1945 · Oberkommando der Wehrmacht（最高統帥部）</div>
+  <h3>Lorenz SZ42 "Tunny" — χ-wheel recovery <span class="status ready">已實作（Colossus 第 1 階段）</span></h3>
+
+  <p>
+    Enigma 是戰術層級。Lorenz 是<strong>戰略</strong>層級——希特勒、OKW、OKH 跟前線集團軍司令之間的直接通訊。一台 Lorenz 的破譯價值超過一百則 Enigma。
+  </p>
+
+  <h4>機器結構（真實 SZ42b）</h4>
+  <p>
+    Lorenz SZ42（Schlüsselzusatz，「密碼附加器」）不是像 Enigma 那種單字替換機，而是<strong>電傳串流密碼</strong>：
+  </p>
+  <ul>
+    <li>明文以 <strong>Baudot 5-bit</strong>（國際電報碼）表示</li>
+    <li>機器生成一串 5-bit 偽隨機 keystream，跟明文 XOR</li>
+    <li>Keystream 由 12 個<strong>pinwheel</strong>聯合產生：
+      <ul>
+        <li>5 個 <strong>χ</strong>（chi）輪：41, 31, 29, 26, 23 個 pin——每字元都前進</li>
+        <li>5 個 <strong>ψ</strong>（psi）輪：43, 47, 51, 53, 59 個 pin——條件前進（by μ）</li>
+        <li>2 個 <strong>μ</strong>（mu）motor 輪：37, 61 個 pin——控制 ψ 是否前進</li>
+      </ul>
+    </li>
+    <li>SZ42b 的 "limitations"：χ₂ 前一字元的 bit 參與 ψ 前進條件——阻擋舊版 motor-only attack</li>
+    <li>加密公式：<code>Z[i] = P[i] ⊕ χ[i] ⊕ ψ[i]</code>；Keystream 週期 ≈ 1.6 × 10¹⁹</li>
+  </ul>
+
+  <p class="highlight-stat">
+    完整 keyspace（含所有 pin pattern）≈ 2<sup>501</sup>
+  </p>
+
+  <p>
+    純暴力是數學上絕對不可能的。Bletchley 不是靠算力破 Lorenz——是靠兩個天才的統計攻擊：
+  </p>
+
+  <ul>
+    <li><strong>Bill Tutte</strong> 從一份 4000 字母的錯誤重發訊息，<strong>只用紙筆</strong>推出 Lorenz 整台機器的邏輯結構，完全沒看過機器本尊。這一手被譽為「二戰最偉大的單一知性成就」之一</li>
+    <li><strong>Tommy Flowers</strong> 在 Post Office Research Station 造了 <strong>Colossus</strong>——1500 個真空管、世界第一台可程式化電子電腦，專為跑 Tutte 的統計攻擊法</li>
+    <li>Colossus 共造了 <strong>10 台</strong>，1944 年起每天破譯 Lorenz 訊息；D-Day 前夕 Eisenhower 親口說「Ultra 情報價值十個陸軍師」</li>
+  </ul>
+
+  <h4>Bletchley 的三階段 pipeline</h4>
+  <p>
+    Lorenz 不是一口氣破掉。Tutte 把攻擊拆成三階段，每階段針對結構的一部分：
+  </p>
+  <ol>
+    <li><strong>Stage 1：χ-輪起始位置回復</strong>（Colossus 做的事）<br>
+      對 41 × 31 × 29 × 26 × 23 = <strong>22,041,682</strong> 個候選，每個生成 χ stream，跟密文計算 Δ-statistic（Z ⊕ χ 的 bit 1 XOR bit 2 分佈偏差），找出最吻合「德文電傳 1+2 dottage」的那組。Colossus Mk II ~1 小時
+    </li>
+    <li><strong>Stage 2：χ 輪 pin pattern 推導</strong><br>
+      Stage 1 拿到 χ 起始位置後，用手工 + 統計方法反推 pin 本身（設計時才選的那組 0/1）
+    </li>
+    <li><strong>Stage 3：ψ 與 μ 輪回復</strong><br>
+      剝除 χ 後，殘餘 = P ⊕ ψ；Testery 的人員純手工做統計加 crib 攻擊，最終還原明文
+    </li>
+  </ol>
+
+  <h4>Benchmark 對應的是哪一段？</h4>
+  <p>
+    <strong>Stage 1：χ-wheel recovery。</strong>這正是 Colossus 存在的唯一理由——Tommy Flowers 設計它就是為了在一小時內跑完這 22 M 個候選。我們的 GPU shader 在幾秒內完成同樣的工作。
+  </p>
+  <p class="highlight-stat">
+    χ keyspace = 41 × 31 × 29 × 26 × 23 ≈ 22,041,682 組合
+  </p>
+
+  <p>
+    為了專心比較硬體，scenario 的加密用簡化式 <code>Z = P ⊕ χ</code>（ψ = 0），ψ 與 μ 的完整 encryption + 解密會改變 signal 結構，把有效暴力搜尋 keyspace 壓縮成 χ₁+χ₂ pair 的 ~900 種——那就失去 GPU 秀肌肉的意義了。Colossus 當年在 Stage 1 看到的 Δ-signal 本質上跟我們 shader 看到的一樣；差別是 ψ/μ 的處理被推到 Stage 2/3 交給人。
+  </p>
+
+  <h4>統計 scorer</h4>
+  <p>
+    shader 每 key 候選對密文前 180 字元做一個簡化 dottage——計數「空格」(Baudot 4) 和 "E" (Baudot 1) 的出現次數。德文電傳這兩個字元合計約 29%，隨機只有 6.25%，信號強度 10σ+。GPU 粗篩後 CPU 再用 32-bucket full-text IC 重排決選，確保正解不會被噪音淹沒。
+  </p>
+</div>
+
+<hr>
+
+<h2 id="people">破解的人們 — 電影沒拍到的故事</h2>
+
+<p>
+  《The Imitation Game》把整段二戰密碼破解的榮耀幾乎都算在 Alan Turing 一個人頭上。
+  真實故事遠比那部電影複雜：<strong>三條獨立的攻擊鏈、四個國家、跨越十多年、
+  數百位數學家工程師女性操作員</strong>，共同撕開了德國「永遠安全」的密碼系統。
+  以下是電影沒拍到、書本沒賣到的那些人。
+</p>
+
+<div class="people-section">
+
+<h3>〇、一戰的先聲（1914–1918）</h3>
+
+<div class="person-card">
+  <h4>Georges Painvin <span class="lifespan">(1886–1980)</span></h4>
+  <p>
+    法軍砲兵上尉，巴黎理工學院礦業工程師出身，業餘研究密碼學。
+    1914 年戰爭爆發被徵召進 <strong>Bureau du Chiffre</strong>，從此進入密碼生涯。
+  </p>
+  <p>
+    1918 年 6 月德軍發起 Spring Offensive，更新 ADFGVX 的 Polybius 格與 keyword，
+    法軍密碼組瞬間瞎掉。Painvin 關在巴黎一間辦公室三週，把兩則同日、同 keyword
+    的深度電文強行重疊比對，一格一格反推出 keyword 欄序與 Polybius 本身。
+    <strong>6 月 2 日破譯的「Radiogram of Victory」</strong>揭露德軍主攻軸線在
+    Montdidier–Compiègne 之間。
+  </p>
+  <p>
+    出關時 Painvin 體重掉 <strong>15 公斤</strong>，頭髮花白，身體徹底垮掉，
+    戰後他自己說：「<em>那是一生中最痛苦的幾天，我幾乎是靠意志力在跟那疊紙筆死磕</em>。」
+    戰後他婉拒留在情報界，回到工業界當鍋爐公司 Compagnie des Compteurs 的總裁，
+    活到 93 歲。法國 1973 年授 Grand Officer of the Legion of Honour，
+    1978 年美國 NSA 也公開承認他的貢獻——那時距離他破 ADFGVX 已經 60 年。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>"Blinker" Hall <span class="lifespan">(Admiral Sir Reginald Hall, 1870–1943)</span></h4>
+  <p>
+    皇家海軍情報局 (NID) 局長，<strong>Room 40</strong> 的推手與政治保護傘。
+    眨眼成癖（Blinker）但政治手腕極精。1917 年 Zimmermann 電報到手，
+    Hall 面臨兩難：直接交給美國會洩漏英國竊聽美國海底電纜的事實。
+    他設計了<strong>墨西哥電報局偷竊版本</strong>的假故事，讓美國以為情報是
+    第三國意外得到，保住了 Room 40 的竊聽源。
+  </p>
+  <p>
+    Hall 的政治運作能力可能比 Room 40 的技術能力更重要。他對時任國務卿
+    Walter Page 的說服文件至今還是情報史課程的教材。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Nigel de Grey & Rev. William Montgomery <span class="lifespan">(1886–1951 / 1871–1930)</span></h4>
+  <p>
+    Room 40 的兩位 Zimmermann 電報解譯者。de Grey 是 Heinemann 出版社編輯出身，
+    Montgomery 是長老會牧師、基督教神學學者——兩人都不是傳統軍情報人員，
+    靠累積德國外交電報逐詞重建 codebook。
+  </p>
+  <p>
+    1917 年 1 月 17 日上午他們手上是部分解出的 Zimmermann 訊息片段——
+    看到「<em>MEXIKO</em>」、「<em>TEXAS</em>」、「<em>ARIZONA</em>」這幾個詞時，
+    de Grey 衝去找 Hall：「<strong>Do you want to bring America into the war?</strong>」
+    史上最重要的外交解碼對話之一。
+  </p>
+  <p>
+    兩人戰時工作 30 年後才得公開。Montgomery 1930 年過世時家屬仍不知他戰時做過什麼；
+    de Grey 戰後繼續在 GCHQ 服務，1951 年退休。
+  </p>
+</div>
+
+<h3>一、波蘭人：故事真正的起點（1932–1939）</h3>
+
+<div class="person-card">
+  <h4>Marian Rejewski <span class="lifespan">(1905–1980)</span></h4>
+  <p>
+    華沙大學數學系畢業，22 歲被吸收進波蘭密碼局 Biuro Szyfrów。
+    <strong>1932 年 12 月</strong>他做到了當時所有歐洲密碼專家都失敗的事——
+    破譯 Enigma。用的不是窮舉，是<strong>置換群論</strong>：他從 Enigma 日鑰
+    指示碼的循環結構（他稱為 "characteristic"）反推出整台機器的內部接線。
+  </p>
+  <p>
+    這是前無古人的數學突破。法國情報員 Gustave Bertrand 透過德國叛徒
+    Hans-Thilo Schmidt 提供的操作手冊只描述 Enigma 的<em>外觀</em>——
+    Rejewski 必須從雜訊般的密文指示碼反推<em>內部</em>每條線的接法。
+    他當時 27 歲。
+  </p>
+  <p>
+    1938 年 Rejewski 與 Henryk Zygalski、Jerzy Różycki 三人搭檔打造了
+    「<strong>Bomba kryptologiczna</strong>」——電機式 Enigma 破譯機，
+    領先英國 Bombe 整整兩年。
+  </p>
+  <p>
+    <strong>1939 年 7 月 25–26 日</strong>，華沙南郊 Pyry 森林秘密會議，
+    波蘭人把所有成果——理論、Bomba 設計圖、仿造 Enigma 實機——交給了
+    英法情報代表。兩個月後德國入侵波蘭。整個 Bletchley Park 的 Enigma 計畫
+    <strong>完全建立在波蘭人的基礎上</strong>。
+  </p>
+  <p>
+    戰爭期間 Rejewski 流亡法國、西班牙、葡萄牙、最後到英國空軍做一般通訊工作。
+    英國<strong>從沒邀請他加入 Bletchley</strong>——怕盟友人員洩密。戰後他
+    回到波蘭，在共產政權下低調當保險公司會計，直到 1967 年才公開談及戰時工作。
+    英國官方直到 1976 年才正式承認波蘭人的貢獻。Rejewski 1980 年在華沙去世，
+    終生未獲得他應得的榮譽。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Jerzy Różycki <span class="lifespan">(1909–1942)</span></h4>
+  <p>
+    Rejewski 的同事，發明「<strong>clock method</strong>」——從 indicator
+    推 Enigma 右輪身份的技巧。1942 年 1 月 9 日他搭乘的客輪 <em>Lamoricière</em>
+    在地中海失蹤，享年 32 歲。戰前破譯三巨頭裡唯一沒活到戰後的。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Henryk Zygalski <span class="lifespan">(1908–1978)</span></h4>
+  <p>
+    發明「<strong>Zygalski sheets</strong>」——打孔穿疊的紙板，疊合後能
+    幾何式消去不可能的 rotor 組合。戰後留在英國當數學老師，從沒被英國政府
+    正式致謝過。
+  </p>
+</div>
+
+<h3>二、Bletchley 的內圈（1939–1945）</h3>
+
+<div class="person-card">
+  <h4>Alan Turing <span class="lifespan">(1912–1954)</span></h4>
+  <p>
+    Hut 8 首席密碼分析師，King's College 研究員。最重要的貢獻是把 Rejewski
+    的 Bomba 邏輯重新架構成英國 <strong>Bombe</strong>——並加上
+    「<strong>crib attack</strong>」（猜明文含有「wetter」「eins」等常見字），
+    破解速度從「週」壓到「小時」。
+  </p>
+  <p>
+    1942 年 M4 Shark 出現後，Turing 與 Joan Clarke、Hugh Alexander 組隊
+    重新攻入 U-Boat 通訊。戰後他設計 ACE（世界最早的儲存程式電腦之一），
+    寫下現代計算理論與人工智慧奠基文獻。<strong>1952 年</strong>因同性戀罪
+    被定罪接受化學閹割，1954 年氰化物自殺，享年 41。
+  </p>
+  <p>
+    2009 年英國首相 Brown 公開道歉，2013 年女王赦免，2019 年他的頭像印上
+    £50 英鎊鈔票。但這一切都來得太晚。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Gordon Welchman <span class="lifespan">(1906–1985)</span></h4>
+  <p>
+    Hut 6 主管，劍橋數學家。Turing 原版 Bombe 只測<em>一個</em> stecker pair
+    的假設；Welchman 加上「<strong>diagonal board</strong>」——26×26 的電路
+    網格，讓 Bombe 能同時測多個 plugboard 矛盾，<strong>整體加速 10× 以上</strong>。
+    沒有 diagonal board，Bombe 不會快到有實戰價值。
+  </p>
+  <p>
+    Welchman 也設計了 Bletchley 的整體流程組織。戰後他到 MIT 工作；
+    1982 年出版 <em>The Hut Six Story</em>，被英美情報界嚴厲批評「洩密」，
+    美國安全許可被撤銷，鬱鬱以終。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Dilly Knox <span class="lifespan">(Alfred Dillwyn Knox, 1884–1943)</span></h4>
+  <p>
+    GC&amp;CS 老一代元老，一戰時破過德國海軍密碼。Bletchley 時期他帶領
+    「<strong>the Cottage</strong>」小組專攻非商用 Enigma 變體：
+    <strong>義大利海軍 Enigma</strong>（1940 年 3 月破）、
+    <strong>Abwehr Enigma</strong>（1941 年 12 月破）。
+  </p>
+  <p>
+    1941 年 3 月 Knox 小組破出的義大利訊息讓英國艦隊在 <strong>Matapan 海角</strong>
+    伏擊並殲滅義大利地中海艦隊——盟軍第一場大型 Ultra 情報勝利。
+  </p>
+  <p>
+    Knox 終身為淋巴瘤所苦，1943 年 2 月病逝。臨終拒絕去醫院——要繼續解碼。
+    他的組員多為女性（Mavis Lever、Margaret Rock），戰時被稱
+    「<em>Dilly's fillies</em>」（Dilly 的小馬），實際上都是劍橋頂尖語言學才女。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Mavis Batey（née Lever） <span class="lifespan">(1921–2013)</span></h4>
+  <p>
+    Knox 的 Cottage 小組成員，19 歲入 Bletchley。1941 年她個人破掉
+    義大利海軍 Enigma 的關鍵訊息——operator 測試鍵盤打了一連串 L，
+    暴露 Enigma<strong>「字母不能加密成自己」</strong>的結構性弱點。
+    這則訊息直接引爆 Matapan 海戰。
+  </p>
+  <p>
+    她後來也破解 Abwehr Enigma 與 D-Day 前西班牙 Abwehr 通訊——這些
+    解讀確認了「德軍相信盟軍會在 Calais 登陸」，是
+    <strong>Operation Fortitude</strong>（諾曼第欺敵）成功的關鍵驗證。
+    戰後成為英國知名園林史學家。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Joan Clarke <span class="lifespan">(1917–1996)</span></h4>
+  <p>
+    Hut 8 數學家，Turing 最親密的工作夥伴。兩人 1941 年短暫訂婚，
+    Turing 坦白同性傾向後解除婚約。Clarke 獨立優化了
+    「<strong>Banburismus</strong>」——深度分析 U-Boat 密信的核心技術，
+    M4 Shark 的破譯主要靠她把原始手續壓到可規模化程度。
+  </p>
+  <p>
+    因為是女性，Clarke 薪資遠低於男同事，職稱被迫叫「linguist」而非
+    「cryptanalyst」（因為當時「女人不做密碼分析」）。戰後她嫁給 GCHQ
+    同事 Jock Murray，一生留在英國情報界。
+  </p>
+</div>
+
+<h3>三、Lorenz / Tunny 的三位天才（1941–1945）</h3>
+
+<div class="person-card">
+  <h4>John Tiltman <span class="lifespan">(1894–1982)</span></h4>
+  <p>
+    Bletchley 的「<strong>首席密碼分析師</strong>」頭銜正式授予人。
+    1941 年 8 月 30 日兩則 Lorenz 訊息因 operator 誤操作共用同一金鑰
+    （depth），Tiltman 從這個 depth 手工逆推出 4000 字符長度的完整金鑰流
+    ——但他不知道機器結構，只有金鑰本身。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Bill Tutte <span class="lifespan">(1917–2002)</span></h4>
+  <p>
+    Tiltman 的 4000 字元金鑰落到年輕數學家 Tutte 手上。接下來
+    <strong>三個月</strong>，Tutte 純用鉛筆、方格紙、與統計直覺
+    反推出 Lorenz SZ40 的完整內部結構——12 個 pinwheel 的接線、步進邏輯、
+    全部 keystream 生成公式。他<strong>從沒看過機器一眼</strong>。
+  </p>
+  <p>
+    這是 20 世紀密碼學最純粹的推理成就之一，被與 Rejewski、Beurling 並列
+    「<strong>憑統計與邏輯手工破解完整密碼機</strong>」的三人。戰後 Tutte
+    到加拿大 Waterloo 大學任教，在圖論（matroid theory）留下奠基性貢獻。
+    2002 年才有英國官方正式承認他的 Lorenz 工作。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Max Newman <span class="lifespan">(1897–1984)</span></h4>
+  <p>
+    劍橋拓撲學家，<strong>Turing 的博士指導老師</strong>。1942 年在 Bletchley
+    建立「<strong>Newmanry</strong>」小組，任務是機械化 Tutte 的統計攻擊。
+    他指導設計 "<strong>Heath Robinson</strong>" 機器——雙紙帶光學同步讀取
+    跑 χ-wheel 差分統計，但紙帶時常燒斷。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Tommy Flowers <span class="lifespan">(1905–1998)</span></h4>
+  <p>
+    <strong>電影從來沒好好拍過這個人</strong>。Flowers 來自 Post Office
+    Research Station, Dollis Hill——一個修電話交換機的工程師，
+    沒有大學學位，不是「Bletchley 那種劍橋菁英」。他看了 Newman 的
+    Heath Robinson 覺得「根本不對，應該全電子」，主動提案。
+  </p>
+  <p>
+    Bletchley 委員會拒絕：「1500 個真空管的機器？光熱身就會燒」。
+    Flowers <strong>自掏腰包、用自己的錢</strong>，帶 GPO 同事在 Dollis Hill
+    加班祕密打造，<strong>1943 年 12 月</strong>造出 <strong>Colossus Mark I</strong>。
+    1944 年 2 月第一次實戰跑 Tutte 攻擊，<strong>幾小時</strong>解完以前需要
+    幾週的 χ-wheel 復原。
+  </p>
+  <p>
+    到 D-Day 前夕共造了 10 台 Colossus。1944 年 6 月 5 日 Eisenhower 發出
+    登陸命令前，他<strong>親眼看了 Colossus 剛解出的 Hitler 命令</strong>——
+    「Panzergruppe West 調往 Normandy」方向，證明德軍仍相信 Calais 才是主攻——
+    才下令 D-Day 照原計畫 6 月 6 日執行。
+  </p>
+  <p>
+    戰後 Churchill 下令<strong>拆毀所有 Colossus</strong>、銷毀圖紙。
+    Flowers 連自己設計的機器都不能談。他戰後繼續在 GPO 做電子交換機，
+    默默無聞幾十年。英國政府直到<strong>2000 年</strong>才正式承認 Colossus
+    是世界第一台可程式化電子電腦——比美國 ENIAC 早兩年——但那時 Flowers
+    已經 95 歲、失智，兩年後過世。
+  </p>
+</div>
+
+<h3>四、瑞典的 Sturgeon：被遺忘的 T52 破譯者</h3>
+
+<div class="person-card">
+  <h4>Arne Beurling <span class="lifespan">(1905–1986)</span></h4>
+  <p>
+    瑞典烏普薩拉大學數學教授，分析學與調和分析領域世界級大師。1940 年 5 月
+    德國佔領挪威、丹麥後，經瑞典中繼的電傳都轉為密碼——瑞典 FRA（國家
+    通信情報局）攔截到一堆看不懂的訊息，那是 Siemens &amp; Halske T52a
+    "Sturgeon"。
+  </p>
+  <p>
+    Beurling 被徵召到 FRA，<strong>關在房間裡兩週，只給他紙、筆、和一疊密文</strong>。
+    兩週後他走出來，手上是 T52 的完整內部結構：10 個 pinwheel 的 XOR 網路、
+    步進邏輯、甚至反推出 key-setting switch 接線。他<strong>從沒看過機器、
+    沒有任何技術文件</strong>——純憑密文統計特性重建整台機器。
+  </p>
+  <p>
+    這是密碼分析史上最瘋狂的成就之一。連 Bletchley 聽說後都半信半疑。
+    Beurling 從沒公開談過方法，他著名金句：
+  </p>
+  <p style="color: var(--amber); font-style: italic; margin-left: 20px; border-left: 2px solid var(--amber); padding-left: 16px;">
+    "A magician doesn't reveal his tricks."
+  </p>
+  <p>
+    瑞典接下來<strong>三年</strong>（1940–1943）讀遍了所有經瑞典轉發的德軍
+    電傳——柏林跟奧斯陸、赫爾辛基、斯德哥爾摩德國大使館間所有通訊。
+    <strong>攔截 50 萬則、解密 35 萬則</strong>——跟 Bletchley 幾年的 Enigma
+    產出相當。1943 年中德國換裝 T52e 並啟用 KTF（明文相關步進）後，
+    瑞典解密量驟降到零。Beurling 晚年到普林斯頓高等研究院，戰時工作
+    要到 1980 年代才逐漸公開。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Michael Crum <span class="lifespan">(1910–1977)</span></h4>
+  <p>
+    Bletchley Park 對 Sturgeon 的主要攻擊者。1942 年夏英軍首次攔截
+    西西里 → 利比亞鏈路（代號 "<strong>Sturgeon</strong>"）與愛琴海 →
+    西西里鏈路（"<strong>Mackerel</strong>"）。operator 紀律鬆散，常常
+    用同一金鑰發多則訊息產生 depths——Crum 小組靠這些 depths 陸續破入 T52d/e。
+  </p>
+  <p>
+    攻擊從未達到 Enigma/Tunny 的規律程度：T52 太複雜，而且<strong>德國空軍
+    有個壞習慣——把 Sturgeon 訊息用較弱的 Enigma 重發</strong>，Bletchley
+    直接從 Enigma 拿明文就好，沒必要硬啃 T52。Crum 戰後加入英國 GCHQ
+    並參與設計 <strong>SAVILLE</strong> 密碼演算法——至今仍是英美機密。
+  </p>
+</div>
+
+<h3>五、幕後的人</h3>
+
+<div class="person-card">
+  <h4>Hans-Thilo Schmidt <span class="lifespan">(1888–1943)</span></h4>
+  <p>
+    德國外交部密碼局員工，代號「<strong>Asche</strong>」。1931–1938 年為了
+    還債、支撐奢華生活，把 Enigma 操作手冊、日鑰表、軍用型號接線資料
+    持續賣給<strong>法國情報局</strong>——Gustave Bertrand 上尉再轉手給
+    波蘭 Rejewski。沒有 Schmidt 提供的「rotor 日鑰格式」，Rejewski 的
+    置換群攻擊無從下手。
+  </p>
+  <p>
+    1943 年 3 月 Schmidt 被 Gestapo 識破被捕，同年在獄中服毒自殺。
+    他的叛變是盟軍情報優勢的真正起點——但動機是錢而非反法西斯理念，
+    歷史對他的評價複雜。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Gustave Bertrand <span class="lifespan">(1896–1976)</span></h4>
+  <p>
+    法國軍情報 SR 二局上尉，整個 1930 年代親手經營 Hans-Thilo Schmidt 這條
+    線人。1938 年他理解到法國自己破不了 Enigma，主動把 Schmidt 提供的文件
+    全部<strong>轉給波蘭</strong>——這個決定是 Enigma 被破的起點。戰後寫
+    <em>Enigma ou la plus grande énigme de la guerre 1939–1945</em>
+    （1973），是最早揭露 Bletchley 波蘭淵源的公開著作，比英國官方解密早 3 年。
+  </p>
+</div>
+
+<div class="person-card">
+  <h4>Bletchley 的女性工作者（~7,500 位）</h4>
+  <p>
+    戰爭最高峰 Bletchley Park 僱用超過 <strong>10,000 人，其中 75% 是女性</strong>
+    ——Wrens（海軍女子部隊）、WAAF（空軍女子部隊）、牛津和劍橋徵召的女大生。
+    她們操作 Bombe 與 Colossus、值夜班、校對密文、做流量分析。
+  </p>
+  <p>
+    Joan Clarke、Mavis Batey、Margaret Rock、<strong>Jane Fawcett</strong>
+    （她破譯的訊息讓英國海軍追上並擊沉 <em>Bismarck</em>）、Ruth Briggs、
+    Pamela Rose……大多數人一輩子無法對配偶、父母、子女提起戰時做過什麼。
+    直到 1990 年代英國 Public Record Office 陸續解密，許多家屬才在老太太
+    過世後從遺物得知媽媽或奶奶破過 Enigma。
+  </p>
+</div>
+
+<h3>六、保密 30 年</h3>
+
+<p>
+  這些人從 1945 年 5 月 8 日起必須徹底閉嘴。
+  <strong>Official Secrets Act</strong> 讓 Bletchley 的一切維持機密
+  <strong>直到 1974 年</strong>——Churchill 個人命令：
+  「<em>Never ever, EVER, speak of this</em>」。戰後英國安全部門甚至
+  秘密監視前 Bletchley 員工是否有洩密傾向。
+</p>
+
+<ul>
+  <li>Turing 化學閹割後自殺，家人不知他戰時救了多少人命</li>
+  <li>Rejewski 1980 年死於華沙，逝世那週英國政府才公開承認他的貢獻</li>
+  <li>Flowers 看著 ENIAC 被稱「世界第一台電腦」而不能反駁</li>
+  <li>Beurling 在美國教書到 1986 年去世，瑞典戰時工作要到戰後 50 年才公開</li>
+  <li>Tutte 在加拿大當一輩子數學教授，學生沒人知道他做過什麼</li>
+  <li>Crum 設計的 SAVILLE 密碼演算法至今仍是機密</li>
+</ul>
+
+<p>
+  <strong>電影拍了 Turing——因為他的結局最戲劇化</strong>。
+  但 Turing 本人會第一個告訴你：<em>Rejewski 才是真正開始這一切的人。
+  Tutte 的 Lorenz 手解比我的 Enigma 攻擊更困難。Beurling 用兩週解完 T52 的
+  事情沒人做到過第二次。Flowers 蓋的 Colossus 是現代電腦的起點。</em>
+</p>
+
+</div>
+
+<hr>
+
+<h2 id="backends">四條運算路線</h2>
+
+<p>
+  同一個暴力搜尋問題，四種實作。<strong>演算法相同</strong>，只有「怎麼把它攤在硬體上」不同：
+</p>
+
+<div class="backend-grid">
+  <div class="backend">
+    <h4>Scalar</h4>
+    <p>單一 C# 執行緒、標準迴圈、沒有優化。這是你想像中「C# 跑起來大概多快」的樣子。</p>
+  </div>
+  <div class="backend">
+    <h4>Parallel</h4>
+    <p><code>Parallel.ForEach</code> 把外層 wheel-order × ring 當工作單元丟給 thread pool。16 核 CPU 大約線性加速到 7–9×。</p>
+  </div>
+  <div class="backend">
+    <h4>SIMD (AVX2)</h4>
+    <p><code>Vector256&lt;int&gt;</code> 一次算 8 個 grundstellung lane，rotor table 用 <code>Avx2.GatherVector256</code> 讀。比 Parallel 快 3–4×。</p>
+  </div>
+  <div class="backend">
+    <h4>SkSL GPU</h4>
+    <p>把 Enigma 寫成 Skia runtime effect shader，一個 pixel = 一把 key 的完整試解。透過 Avalonia <code>ISkiaSharpApiLease</code> 拿 D3D11/OpenGL context。這就是 AprNes CRT 濾鏡用的同一條 shader pipeline。</p>
+  </div>
+</div>
+
+<h3>SkSL 的 GPU 路徑</h3>
+
+<p>
+  Avalonia GUI 下透過 <code>ISkiaSharpApiLease</code> 拿到真實的 <code>GRContext</code>，
+  shader 直接在 GPU（D3D11 / OpenGL）上執行 — 跟寫 CUDA / Metal 的部署成本差了一個量級，
+  但拿到的計算吞吐卻是同一個數量級。
+</p>
+
+<hr>
+
+<h2 id="numbers">歷史 vs 現在</h2>
+
+<h3>Quick scope（~1,054,560 把 key，285-char 密文）</h3>
+
+<table>
+  <tr>
+    <th>實作</th>
+    <th class="num">時間</th>
+    <th class="num">K keys/s</th>
+    <th class="num">相對速度</th>
+  </tr>
+  <tr>
+    <td>Scalar（單執行緒）</td>
+    <td class="num">11.06 s</td>
+    <td class="num">95</td>
+    <td class="num">1.00×</td>
+  </tr>
+  <tr>
+    <td>Parallel（16 核）</td>
+    <td class="num">1.59 s</td>
+    <td class="num">662</td>
+    <td class="num">6.94×</td>
+  </tr>
+  <tr>
+    <td>SIMD + Parallel</td>
+    <td class="num">0.51 s</td>
+    <td class="num">2,059</td>
+    <td class="num">21.59×</td>
+  </tr>
+  <tr>
+    <td><strong>SkSL GPU（OpenGL）</strong></td>
+    <td class="num" style="color:var(--green)"><strong>0.25 s</strong></td>
+    <td class="num" style="color:var(--green)"><strong>~4,200</strong></td>
+    <td class="num" style="color:var(--green)"><strong>44×</strong></td>
+  </tr>
+</table>
+
+<h3>Enigma M4 Quick scope（1,054,560 keys，~270-char 密文）</h3>
+
+<table>
+  <tr>
+    <th>實作</th>
+    <th class="num">時間</th>
+    <th class="num">K keys/s</th>
+    <th class="num">相對速度</th>
+  </tr>
+  <tr>
+    <td>Scalar M4（單執行緒）</td>
+    <td class="num">14.81 s</td>
+    <td class="num">71</td>
+    <td class="num">1.00×</td>
+  </tr>
+  <tr>
+    <td>Scalar M4 Parallel（16 核）</td>
+    <td class="num">1.94 s</td>
+    <td class="num">544</td>
+    <td class="num">7.64×</td>
+  </tr>
+  <tr>
+    <td>SIMD M4 + Parallel</td>
+    <td class="num">0.58 s</td>
+    <td class="num">1,818</td>
+    <td class="num">25.52×</td>
+  </tr>
+  <tr>
+    <td><strong>SkSL M4 GPU（OpenGL）</strong></td>
+    <td class="num" style="color:var(--green)"><strong>0.044 s</strong></td>
+    <td class="num" style="color:var(--green)"><strong>24,005</strong></td>
+    <td class="num" style="color:var(--green)"><strong>337×</strong></td>
+  </tr>
+</table>
+
+<p style="color:var(--muted); font-size:13px;">
+  M4 shader 每字元 work 比 M3 多一道（greek rotor pass），CAP 從 96 降到 80 才塞得下 Skia 的 program-size limit。且 80 字元的 IC 信號在 1M keyspace 下容易被噪音淹沒，所以 GPU 在 shader 內抓 top-256 候選，CPU 端再以全文 IC 決選——GPU 粗篩、CPU 精選。
+</p>
+
+<h3>Lorenz SZ40 chi-only（22,041,682 keys，~620-char Baudot 密文）</h3>
+
+<table>
+  <tr>
+    <th>實作</th>
+    <th class="num">時間</th>
+    <th class="num">K keys/s</th>
+    <th class="num">備註</th>
+  </tr>
+  <tr>
+    <td>Scalar Lorenz（單執行緒）</td>
+    <td class="num">90 s+</td>
+    <td class="num">—</td>
+    <td>90 秒 timeout，單核跑不完完整 22M keyspace</td>
+  </tr>
+  <tr>
+    <td>Scalar Lorenz Parallel（16 核）</td>
+    <td class="num">~20–40 s</td>
+    <td class="num">500K+</td>
+    <td>全核暴力搜</td>
+  </tr>
+  <tr>
+    <td>SIMD Lorenz + Parallel</td>
+    <td class="num">~1–3 s</td>
+    <td class="num">8M+</td>
+    <td>Pre-compute χ2⊕χ3⊕χ4⊕χ5 stream，inner loop 只剩 Vector256 XOR</td>
+  </tr>
+  <tr>
+    <td><strong>SkSL Lorenz GPU（OpenGL）</strong></td>
+    <td class="num" style="color:var(--green)"><strong>~0.5–2 s</strong></td>
+    <td class="num" style="color:var(--green)"><strong>10M+</strong></td>
+    <td>23 個 render pass + CPU top-512 重排</td>
+  </tr>
+</table>
+
+<p style="color:var(--muted); font-size:13px;">
+  Lorenz shader 用「空格 + E 字出現次數」的極簡 scorer（SkSL 不允許 bitwise 運算，per-bit XOR 用 <code>a+b−2ab</code> 代替；32-bucket IC 太胖塞不進 program 限制）。這個 scorer 在 German Baudot 文字上有 10σ+ 的信號，truth 一定落在 top-K，CPU 再用全文 32-bucket IC 決選。這是 Colossus 當年做的事情本質——χ 階段靠統計，ψ 與 μ 之後另解。
+</p>
+
+<p style="color:var(--muted); font-size:13px;">
+  測試平台：Windows 11 / .NET 10 / 16-core CPU / 消費級 GPU。數字會因硬體不同有明顯差異，但相對倍數大致成立。
+</p>
+
+<h3>歷史尺度的對照</h3>
+
+<table>
+  <tr><th>工作</th><th>1940 年代</th><th>現在（本 benchmark）</th></tr>
+  <tr>
+    <td>破一個 Enigma M3 key</td>
+    <td>一台 Turing Bombe 約 <strong>15–20 分鐘</strong>；Bletchley 高峰有 200 台</td>
+    <td class="num" style="color:var(--green)">0.25 秒</td>
+  </tr>
+  <tr>
+    <td>破一則 Enigma M4（Shark）key</td>
+    <td>1942 Feb–Dec：Bletchley <strong>完全瞎掉 10 個月</strong>（U-559 殉職換碼本）；之後 Bombe ~15 分鐘</td>
+    <td class="num" style="color:var(--green)">0.044 秒</td>
+  </tr>
+  <tr>
+    <td>破一則 Lorenz χ-wheel 對位</td>
+    <td>一台 Colossus Mark II 約 <strong>1 小時</strong>；共造 10 台</td>
+    <td class="num" style="color:var(--green)">~1–2 秒</td>
+  </tr>
+  <tr>
+    <td>投入人力</td>
+    <td><strong>~10,000 人</strong>秘密工作 5 年</td>
+    <td class="num" style="color:var(--green)">你按一下</td>
+  </tr>
+  <tr>
+    <td>硬體</td>
+    <td>電機式 Bombe + 真空管 Colossus</td>
+    <td class="num" style="color:var(--green)">一張遊戲顯卡</td>
+  </tr>
+</table>
+
+<hr>
+
+<h2 id="why">為什麼做這個</h2>
+
+<p>
+  表面上，這是 AprNes 模擬器 CRT shader 管線的跨域壓力測試。我們想知道同一條 SkSL / SIMD / Scalar pipeline 放到一個完全不同的工作負載（密碼暴力搜尋）上，會不會有類似的相對性能輪廓。結果：會。
+</p>
+
+<p>
+  但真正的動機比較感性。這幾台密碼機當年是<strong>第三帝國戰爭機器的神經</strong>，是 10,000 個人用青春保守的秘密，是發明現代電腦的直接原因。把它們放到今天一顆 GPU 面前變成一眨眼的事，不只是「硬體進步了」這種陳腔濫調——
+</p>
+
+<blockquote>
+  那是一種時間被壓縮的眩暈感。當年幾萬人、幾年、一座秘密城市、幾台為此而生的機器，合力做一件「僅僅可能」的事。現在你打電動的 GPU 在你喝一口咖啡的時間之內處理掉。你踩在他們肩膀上，不是隱喻——就是字面的。
+</blockquote>
+
+<p>
+  0.25 秒旁邊並列著 1942–1945，那個瞬間就是整個專案存在的理由。
+</p>
+
+<hr>
+
+<h2 id="run">怎麼用</h2>
+
+<h3>從原始碼執行</h3>
+<pre><code>cd EnigmaBenchmarkAvalonia
+dotnet build -c Release
+bin\Release\net10.0\EnigmaBenchmarkAvalonia.exe</code></pre>
+
+<p>視窗開啟後：</p>
+<ol>
+  <li>選擇 Scope（Quick / Normal / Hard / Extreme）</li>
+  <li>按 <strong>Start Benchmark</strong></li>
+  <li>等結果出來。GPU 最先跑完（~0.3 秒），CPU 依 SIMD → Parallel → Scalar 順序後續跟上</li>
+  <li>右上角的狀態標籤會即時顯示目前在跑哪個 cracker</li>
+</ol>
+
+<h3>系統需求</h3>
+<ul>
+  <li>.NET 10 SDK</li>
+  <li>Windows 10/11（Avalonia 目前只在 Windows 上驗證過）</li>
+  <li>支援 AVX2 的 CPU（Intel Haswell 2013 之後、AMD Excavator 2015 之後）</li>
+  <li>任何支援 D3D11 或 OpenGL 的 GPU（整合顯卡也可以）</li>
+</ul>
+
+<hr>
+
+<h2 id="tech">技術備註</h2>
+
+<h3>Enigma M3 實作正確性</h3>
+<ul>
+  <li>五顆轉輪 wiring 取自 NSA / Bletchley Park 解密文件，每顆 26-byte 表都與其他模擬器（如 Cryptool、Enigma Simulator v7）相符</li>
+  <li>Double-step anomaly 已正確實作（中輪 notch 時左輪 + 中輪同時進位）</li>
+  <li>Round-trip 驗證：同一把 key 加密兩次回到明文 — 每次 benchmark 啟動時先跑一遍，通過才開始測</li>
+</ul>
+
+<h3>SkSL runtime effect 的限制</h3>
+<ul>
+  <li><strong>陣列索引必須是 compile-time constant</strong>：26-bucket IC 直方圖展開成 26 個命名 int（h0..h25），每字元做 26 次 branchless compare-and-add</li>
+  <li><strong>迴圈上限必須是 compile-time constant</strong>：密文處理上限寫死 96 字元。完整 285 字元會讓 unroll 後的 program 超過 Skia 的 size limit</li>
+  <li>IC × 100,000 後打包進 RGB24，CPU 端 readback 後重組回整數</li>
+</ul>
+
+<h3>GPU thread 規範</h3>
+<ul>
+  <li><code>GRContext</code> 只能從 Avalonia render thread 拿，用完就還。不能跨執行緒</li>
+  <li>GPU cracker 在 <code>ICustomDrawOperation.Render</code> 裡同步執行（~0.25 秒），期間 UI 暫時凍結</li>
+  <li>完成通知走 <code>TaskCompletionSource</code>；<strong>必須</strong>用 <code>RunContinuationsAsynchronously</code>，否則 await continuation 會在 render thread 執行，任何後續 UI 更新會 cross-thread throw</li>
+</ul>
+
+<hr>
+
+<h2 id="credits">致謝 / Credits</h2>
+
+<ul>
+  <li><strong>Marian Rejewski, Jerzy Różycki, Henryk Zygalski</strong>（波蘭密碼局）— 第一批破開 Enigma</li>
+  <li><strong>Alan Turing, Gordon Welchman, Hugh Alexander, Stuart Milner-Barry, I.J. Good</strong>（Bletchley Park）— Bombe + 統計破譯</li>
+  <li><strong>Bill Tutte</strong> — 徒手推出 Lorenz 整台機器結構</li>
+  <li><strong>Tommy Flowers</strong>（Post Office Research）— 設計並建造 Colossus</li>
+  <li><strong>Lt. Tony Fasson, Able Seaman Colin Grazier</strong>（HMS Petard）— 為 M4 碼本殉職</li>
+  <li>Bletchley Park 的 10,000 名員工，許多人把秘密帶進了墳墓</li>
+</ul>
+
+<p class="footnote">
+  Rotor wiring 資料來源：<a href="https://www.cryptomuseum.com/crypto/enigma/">Crypto Museum</a>、<a href="http://users.telenet.be/d.rijmenants/">Dirk Rijmenants' Cipher Machines</a>。
+  Lorenz 結構參考 Bletchley Park General Report on Tunny（1945，2000 年解密）。
+  歷史事件交叉確認自 David Kahn《The Codebreakers》、Hinsley《British Intelligence in the Second World War》、以及 Bletchley Park 官方檔案。
+  <br><br>
+  本專案為 <a href="https://github.com/erspicu/AprNes">AprNes NES 模擬器</a>的姊妹作，展示其 CRT shader 管線在非圖形工作負載下的表現。
+  <br><br>
+  <em>"We also have sound, incontestable proof of the truth of our observations... I only add that the work I have accomplished was of great importance for the future conduct of the war. If I have helped, I may say I have done my bit."</em> — Marian Rejewski, 1942
+</p>
+
+</div>
+</body>
+</html>
