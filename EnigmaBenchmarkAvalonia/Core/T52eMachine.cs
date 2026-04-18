@@ -277,6 +277,13 @@ public struct T52eMachine
         if (WheelPos[i] >= PinCounts[i]) WheelPos[i] = 0;
     }
 
+    /// <summary>Reset wheel state from a given start position, without allocating.</summary>
+    public void SetStart(int[] startPos)
+    {
+        for (int i = 0; i < 10; i++) WheelPos[i] = startPos[i];
+        Rr3 = 0;
+    }
+
     /// <summary>
     /// Encrypt a full buffer with a fresh start position (doesn't mutate
     /// caller's pos array).

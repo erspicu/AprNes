@@ -55,8 +55,7 @@ public sealed class ScalarCrackerT52e : ICrackerT52e
                         startBuf[6] = s6;
 
                         // Decrypt with candidate key — produces candidate plaintext.
-                        machine.WheelPos = (int[])startBuf.Clone();
-                        machine.Rr3 = 0;
+                        machine.SetStart(startBuf);
                         for (int i = 0; i < n; i++)
                             candidate[i] = machine.Decrypt(ciphertext[i]);
 
@@ -66,7 +65,11 @@ public sealed class ScalarCrackerT52e : ICrackerT52e
                         if (ic > bestIc)
                         {
                             bestIc = ic;
-                            bestStart = (int[])startBuf.Clone();
+                            bestStart[0] = startBuf[0]; bestStart[1] = startBuf[1];
+                            bestStart[2] = startBuf[2]; bestStart[3] = startBuf[3];
+                            bestStart[4] = startBuf[4]; bestStart[5] = startBuf[5];
+                            bestStart[6] = startBuf[6]; bestStart[7] = startBuf[7];
+                            bestStart[8] = startBuf[8]; bestStart[9] = startBuf[9];
                         }
                     }
 

@@ -1,5 +1,7 @@
 namespace EnigmaBenchmark.Core;
 
+using System.Diagnostics;
+
 /// <summary>
 /// Self-test harness for T52eMachine. Invoke with: AprNesAvalonia --t52e-test
 /// Returns exit code 0 on pass, non-zero on fail.
@@ -19,6 +21,7 @@ public static class T52eSelfTest
         failures += Test_Roundtrip_NoKTF();
         failures += Test_Roundtrip_WithKTF();
         failures += Test_DistinctKeysDistinctCipher();
+        failures += Test_EndToEndCrack();
 
         Console.WriteLine();
         Console.WriteLine(failures == 0 ? "[PASS] all T52e self-tests passed."
@@ -152,6 +155,60 @@ public static class T52eSelfTest
             }
         }
         Console.WriteLine("[ ok ] KTF-on encryption is deterministic (roundtrip deferred — spec §6 note)");
+        return 0;
+    }
+
+    private static int Test_EndToEndCrack()
+    {
+        Console.Write("[ .. ] end-to-end crack: ");
+
+        var pins = T52eMachine.GenerateAllPins(seedBase: 1337);
+        int[] switchMap = { 3, 7, 0, 5, 9, 2, 8, 1, 4, 6 };   // arbitrary bijection
+        // True W7..W10 chosen so the outer loop (s9,s8,s7) is reached early;
+        // cracker should find it in a few seconds instead of 20+ minutes.
+        int[] trueStart = { 10, 20, 30, 40, 50, 55, 17, 0, 0, 0 };
+
+        // Long German plaintext, LTRS-only — higher IC makes the search unambiguous.
+        const string plaintext =
+            "ANGRIFF BEGINNT AM SECHZEHNTEN DEZEMBER " +
+            "NEUNZEHNHUNDERTVIERUNDVIERZIG MIT OFFENSIVE " +
+            "DURCH DIE ARDENNEN STOP HEERESGRUPPE B UNTER " +
+            "GENERALFELDMARSCHALL MODEL WIRD DIE SECHSTE " +
+            "PANZERARMEE KOMMANDIEREN ZIEL ANTWERPEN STOP " +
+            "ABSOLUTE GEHEIMHALTUNG IST BEFEHL HEIL HITLER";
+
+        var plain = Baudot.Encode(plaintext);
+
+        var enc = T52eMachine.Create(pins, switchMap, trueStart, ktf: false);
+        var cipher = enc.EncryptFresh(plain, trueStart);
+
+        // Assume W1..W6 recovered by prior analysis; brute-force W7..W10.
+        int[] knownStart = (int[])trueStart.Clone();
+        knownStart[6] = 0; knownStart[7] = 0; knownStart[8] = 0; knownStart[9] = 0;
+
+        var cracker = new Crackers.ScalarCrackerT52e();
+        var sw = Stopwatch.StartNew();
+        var result = cracker.Crack(cipher, pins, switchMap, knownStart,
+                                   Crackers.CrackScope.Quick, timeoutSec: 60);
+        sw.Stop();
+
+        bool match = result.WheelStart[6] == trueStart[6]
+                  && result.WheelStart[7] == trueStart[7]
+                  && result.WheelStart[8] == trueStart[8]
+                  && result.WheelStart[9] == trueStart[9];
+
+        Console.WriteLine($"{result.KeysTried:N0} keys in {sw.Elapsed.TotalSeconds:F1}s, " +
+                          $"best IC {result.BestIc / 100000.0:F4}, " +
+                          $"recovered W7..W10 = [{result.WheelStart[6]},{result.WheelStart[7]}," +
+                          $"{result.WheelStart[8]},{result.WheelStart[9]}] " +
+                          $"(truth [{trueStart[6]},{trueStart[7]},{trueStart[8]},{trueStart[9]}])");
+
+        if (!match)
+        {
+            Console.WriteLine("[FAIL] end-to-end crack did not recover true key");
+            return 1;
+        }
+        Console.WriteLine("[ ok ] end-to-end crack recovered true key");
         return 0;
     }
 
