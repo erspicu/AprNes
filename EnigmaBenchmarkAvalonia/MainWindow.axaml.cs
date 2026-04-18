@@ -162,6 +162,17 @@ public partial class MainWindow : Window
         }
     }
 
+    bool RunGpu      => ChkGpu.IsChecked      ?? true;
+    bool RunSimd     => ChkSimd.IsChecked     ?? true;
+    bool RunParallel => ChkParallel.IsChecked ?? true;
+    bool RunScalar   => ChkScalar.IsChecked   ?? true;
+
+    void WarnIfNoBackends()
+    {
+        if (!RunGpu && !RunSimd && !RunParallel && !RunScalar)
+            AppendColored("  (no backends selected — skipping)\n\n", BrushRed);
+    }
+
     async Task RunBenchmarkLorenz(CrackScope scope)
     {
         var plaintext = DefaultScenario.LorenzPlaintextBytes;
@@ -193,39 +204,36 @@ public partial class MainWindow : Window
 
         var results = new List<(string name, CrackResultLorenz r)>();
 
+        WarnIfNoBackends();
+
         // GPU first
-        SetStatus("Running GPU Lorenz (warmup)…", BrushAmber);
-        AppendColored("  [", BrushMuted);
-        AppendColored("SkSL GPU Lorenz", BrushCyan);
-        AppendColored("] warmup… ", BrushMuted);
-        await Bench.RunGpuLorenzAsync(ciphertext, pins, scope);
-        AppendColored("done\n", BrushGreen);
-
-        SetStatus("Running GPU Lorenz…", BrushAmber);
-        AppendColored("  [", BrushMuted);
-        AppendColored("SkSL GPU Lorenz", BrushCyan);
-        AppendColored("] measured… ", BrushMuted);
-        var gpu = await Bench.RunGpuLorenzAsync(ciphertext, pins, scope);
-        AppendLorenzResult(gpu);
-        results.Add(("SkSL GPU Lorenz (Avalonia)", gpu));
-        AppendLine();
-
-        // CPU backends — generous timeout on scalar since 22M × 700 chars is
-        // a lot for one thread.
-        ICrackerLorenz[] cpu =
+        if (RunGpu)
         {
-            new SimdCrackerLorenz(),
-            new ParallelScalarCrackerLorenz(),
-            new ScalarCrackerLorenz(),
-        };
-        double[] timeouts = { 0, 90, 90 };   // SIMD unlimited; others 90s
-        for (int i = 0; i < cpu.Length; i++)
-        {
-            var c = cpu[i];
-            double to = timeouts[i];
+            SetStatus("Running GPU Lorenz (warmup)…", BrushAmber);
+            AppendColored("  [", BrushMuted);
+            AppendColored("SkSL GPU Lorenz", BrushCyan);
+            AppendColored("] warmup… ", BrushMuted);
+            await Bench.RunGpuLorenzAsync(ciphertext, pins, scope);
+            AppendColored("done\n", BrushGreen);
 
-            // Warmup at a capped scope — actually Lorenz scope isn't variable,
-            // so just do one fast run with a tight timeout to let JIT warm.
+            SetStatus("Running GPU Lorenz…", BrushAmber);
+            AppendColored("  [", BrushMuted);
+            AppendColored("SkSL GPU Lorenz", BrushCyan);
+            AppendColored("] measured… ", BrushMuted);
+            var gpu = await Bench.RunGpuLorenzAsync(ciphertext, pins, scope);
+            AppendLorenzResult(gpu);
+            results.Add(("SkSL GPU Lorenz (Avalonia)", gpu));
+            AppendLine();
+        }
+
+        // CPU backends
+        var cpuList  = new List<(ICrackerLorenz c, double to)>();
+        if (RunSimd)     cpuList.Add((new SimdCrackerLorenz(),           0));
+        if (RunParallel) cpuList.Add((new ParallelScalarCrackerLorenz(), 90));
+        if (RunScalar)   cpuList.Add((new ScalarCrackerLorenz(),         90));
+
+        foreach (var (c, to) in cpuList)
+        {
             SetStatus($"Running {c.Name} (warmup)…", BrushAmber);
             AppendColored("  [", BrushMuted);
             AppendColored(c.Name, BrushCyan);
@@ -242,6 +250,8 @@ public partial class MainWindow : Window
             results.Add((c.Name, r));
             AppendLine();
         }
+
+        if (results.Count == 0) return;
 
         // Summary
         SetStatus("Building summary…", BrushAmber);
@@ -361,39 +371,37 @@ public partial class MainWindow : Window
 
         var results = new List<(string name, CrackResultT52e r)>();
 
+        WarnIfNoBackends();
+
         // GPU first
-        SetStatus("Running GPU T52e (warmup)…", BrushAmber);
-        AppendColored("  [", BrushMuted);
-        AppendColored("SkSL GPU T52e", BrushCyan);
-        AppendColored("] warmup… ", BrushMuted);
-        await Bench.RunGpuT52eAsync(ciphertext, pins, sm, knownStart, scope);
-        AppendColored("done\n", BrushGreen);
-
-        SetStatus("Running GPU T52e…", BrushAmber);
-        AppendColored("  [", BrushMuted);
-        AppendColored("SkSL GPU T52e", BrushCyan);
-        AppendColored("] measured… ", BrushMuted);
-        var gpu = await Bench.RunGpuT52eAsync(ciphertext, pins, sm, knownStart, scope);
-        AppendT52eResult(gpu);
-        results.Add(("SkSL GPU T52e (Avalonia)", gpu));
-        AppendLine();
-
-        ICrackerT52e[] cpu =
+        if (RunGpu)
         {
-            new SimdCrackerT52e(),
-            new ParallelScalarCrackerT52e(),
-            new ScalarCrackerT52e(),
-        };
+            SetStatus("Running GPU T52e (warmup)…", BrushAmber);
+            AppendColored("  [", BrushMuted);
+            AppendColored("SkSL GPU T52e", BrushCyan);
+            AppendColored("] warmup… ", BrushMuted);
+            await Bench.RunGpuT52eAsync(ciphertext, pins, sm, knownStart, scope);
+            AppendColored("done\n", BrushGreen);
+
+            SetStatus("Running GPU T52e…", BrushAmber);
+            AppendColored("  [", BrushMuted);
+            AppendColored("SkSL GPU T52e", BrushCyan);
+            AppendColored("] measured… ", BrushMuted);
+            var gpu = await Bench.RunGpuT52eAsync(ciphertext, pins, sm, knownStart, scope);
+            AppendT52eResult(gpu);
+            results.Add(("SkSL GPU T52e (Avalonia)", gpu));
+            AppendLine();
+        }
+
         // T52e per-key work is ~5× Lorenz's (H/SR XOR network + 32-row perm
         // lookup + 10 wheels stepping). Scalar needs ~9 min for full 24M.
-        // SIMD is unlimited; Parallel completes in ~60s; Scalar gets 900s
-        // (650s typical + safety margin).
-        double[] timeouts = { 0, 180, 900 };
-        for (int i = 0; i < cpu.Length; i++)
-        {
-            var c = cpu[i];
-            double to = timeouts[i];
+        var cpuList  = new List<(ICrackerT52e c, double to)>();
+        if (RunSimd)     cpuList.Add((new SimdCrackerT52e(),           0));
+        if (RunParallel) cpuList.Add((new ParallelScalarCrackerT52e(), 180));
+        if (RunScalar)   cpuList.Add((new ScalarCrackerT52e(),         900));
 
+        foreach (var (c, to) in cpuList)
+        {
             SetStatus($"Running {c.Name} (warmup)…", BrushAmber);
             AppendColored("  [", BrushMuted);
             AppendColored(c.Name, BrushCyan);
@@ -410,6 +418,8 @@ public partial class MainWindow : Window
             results.Add((c.Name, r));
             AppendLine();
         }
+
+        if (results.Count == 0) return;
 
         // Summary
         SetStatus("Building summary…", BrushAmber);
@@ -476,13 +486,21 @@ public partial class MainWindow : Window
 
         var results = new List<(string name, CrackResult r)>();
 
-        // GPU first
-        await RunOneM3("SkSL GPU", scope,
-            () => Bench.RunGpuAsync(ciphertext, fixedParts, CrackScope.Quick),
-            () => Bench.RunGpuAsync(ciphertext, fixedParts, scope),
-            "SkSL GPU (Avalonia)", results);
+        WarnIfNoBackends();
 
-        ICracker[] cpu = { new SimdCracker(), new ParallelScalarCracker(), new ScalarCracker() };
+        // GPU first
+        if (RunGpu)
+        {
+            await RunOneM3("SkSL GPU", scope,
+                () => Bench.RunGpuAsync(ciphertext, fixedParts, CrackScope.Quick),
+                () => Bench.RunGpuAsync(ciphertext, fixedParts, scope),
+                "SkSL GPU (Avalonia)", results);
+        }
+
+        var cpu = new List<ICracker>();
+        if (RunSimd)     cpu.Add(new SimdCracker());
+        if (RunParallel) cpu.Add(new ParallelScalarCracker());
+        if (RunScalar)   cpu.Add(new ScalarCracker());
         foreach (var c in cpu)
         {
             await RunOneM3(c.Name, scope,
@@ -490,6 +508,8 @@ public partial class MainWindow : Window
                 () => Task.Run(() => c.Crack(ciphertext, fixedParts, scope)),
                 c.Name, results);
         }
+
+        if (results.Count == 0) return;
 
         WriteSummary(results);
 
@@ -553,12 +573,20 @@ public partial class MainWindow : Window
 
         var results = new List<(string name, CrackResult r)>();
 
-        await RunOneM4("SkSL GPU M4", scope,
-            () => Bench.RunGpuM4Async(ciphertext, fixedParts, CrackScope.Quick),
-            () => Bench.RunGpuM4Async(ciphertext, fixedParts, scope),
-            "SkSL GPU M4 (Avalonia)", results);
+        WarnIfNoBackends();
 
-        ICrackerM4[] cpu = { new SimdCrackerM4(), new ParallelScalarCrackerM4(), new ScalarCrackerM4() };
+        if (RunGpu)
+        {
+            await RunOneM4("SkSL GPU M4", scope,
+                () => Bench.RunGpuM4Async(ciphertext, fixedParts, CrackScope.Quick),
+                () => Bench.RunGpuM4Async(ciphertext, fixedParts, scope),
+                "SkSL GPU M4 (Avalonia)", results);
+        }
+
+        var cpu = new List<ICrackerM4>();
+        if (RunSimd)     cpu.Add(new SimdCrackerM4());
+        if (RunParallel) cpu.Add(new ParallelScalarCrackerM4());
+        if (RunScalar)   cpu.Add(new ScalarCrackerM4());
         foreach (var c in cpu)
         {
             await RunOneM4(c.Name, scope,
@@ -566,6 +594,8 @@ public partial class MainWindow : Window
                 () => Task.Run(() => c.Crack(ciphertext, fixedParts, scope)),
                 c.Name, results);
         }
+
+        if (results.Count == 0) return;
 
         WriteSummary(results);
 

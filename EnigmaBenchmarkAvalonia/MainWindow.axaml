@@ -28,28 +28,39 @@
         <Border Grid.Row="1" Background="#151A22" BorderBrush="#1F2430"
                 BorderThickness="1" CornerRadius="6"
                 Padding="14,10" Margin="0,0,0,14">
-            <StackPanel Orientation="Horizontal" Spacing="10">
-                <TextBlock VerticalAlignment="Center" Text="Cipher:" Foreground="#8A93A0" />
-                <ComboBox x:Name="CipherBox" SelectedIndex="0" Width="340">
-                    <ComboBoxItem Content="Enigma M3 (Wehrmacht)" />
-                    <ComboBoxItem Content="Enigma M4 (U-Boot Shark)" />
-                    <ComboBoxItem Content="Lorenz SZ42 (Tunny, χ-wheel recovery — Colossus stage 1)" />
-                    <ComboBoxItem Content="Siemens T52e (Sturgeon, 4-wheel reduced brute force)" />
-                </ComboBox>
-                <TextBlock VerticalAlignment="Center" Text="Scope:"
-                           Foreground="#8A93A0" Margin="10,0,0,0" />
-                <ComboBox x:Name="ScopeBox" SelectedIndex="0" Width="110">
-                    <ComboBoxItem Content="Quick" />
-                    <ComboBoxItem Content="Normal" />
-                    <ComboBoxItem Content="Hard" />
-                    <ComboBoxItem Content="Extreme" />
-                </ComboBox>
-                <Button x:Name="StartBtn" Content="Start Benchmark"
-                        Padding="18,6" Margin="10,0,0,0"
-                        Background="#FFD060" Foreground="#101418"
-                        FontWeight="SemiBold" />
-                <TextBlock x:Name="StatusLabel" VerticalAlignment="Center"
-                           Text="Ready" Foreground="#80FF80" Margin="14,0,0,0" />
+            <StackPanel Orientation="Vertical" Spacing="8">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <TextBlock VerticalAlignment="Center" Text="Cipher:" Foreground="#8A93A0" />
+                    <ComboBox x:Name="CipherBox" SelectedIndex="0" Width="340">
+                        <ComboBoxItem Content="Enigma M3 (Wehrmacht)" />
+                        <ComboBoxItem Content="Enigma M4 (U-Boot Shark)" />
+                        <ComboBoxItem Content="Lorenz SZ42 (Tunny, χ-wheel recovery — Colossus stage 1)" />
+                        <ComboBoxItem Content="Siemens T52e (Sturgeon, 4-wheel reduced brute force)" />
+                    </ComboBox>
+                    <TextBlock VerticalAlignment="Center" Text="Scope:"
+                               Foreground="#8A93A0" Margin="10,0,0,0" />
+                    <ComboBox x:Name="ScopeBox" SelectedIndex="0" Width="110">
+                        <ComboBoxItem Content="Quick" />
+                        <ComboBoxItem Content="Normal" />
+                        <ComboBoxItem Content="Hard" />
+                        <ComboBoxItem Content="Extreme" />
+                    </ComboBox>
+                    <Button x:Name="StartBtn" Content="Start Benchmark"
+                            Padding="18,6" Margin="10,0,0,0"
+                            Background="#FFD060" Foreground="#101418"
+                            FontWeight="SemiBold" />
+                    <TextBlock x:Name="StatusLabel" VerticalAlignment="Center"
+                               Text="Ready" Foreground="#80FF80" Margin="14,0,0,0" />
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Spacing="14">
+                    <TextBlock VerticalAlignment="Center" Text="Backends:" Foreground="#8A93A0" />
+                    <CheckBox x:Name="ChkGpu"      Content="SkSL GPU"  IsChecked="True"  Foreground="#D8DEE4" />
+                    <CheckBox x:Name="ChkSimd"     Content="SIMD"      IsChecked="True"  Foreground="#D8DEE4" />
+                    <CheckBox x:Name="ChkParallel" Content="Parallel"  IsChecked="True"  Foreground="#D8DEE4" />
+                    <CheckBox x:Name="ChkScalar"   Content="Scalar"    IsChecked="True"  Foreground="#D8DEE4"
+                              ToolTip.Tip="Scalar on T52e takes ~9 min for the full 24 M keyspace — uncheck to skip" />
+                </StackPanel>
             </StackPanel>
         </Border>
 
