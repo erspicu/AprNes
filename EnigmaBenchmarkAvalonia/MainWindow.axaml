@@ -60,6 +60,14 @@
                     <CheckBox x:Name="ChkParallel" Content="Parallel"  IsChecked="True"  Foreground="#D8DEE4" />
                     <CheckBox x:Name="ChkScalar"   Content="Scalar"    IsChecked="True"  Foreground="#D8DEE4"
                               ToolTip.Tip="Scalar on T52e takes ~9 min for the full 24 M keyspace — uncheck to skip" />
+                    <Button x:Name="CopyLogBtn" Content="Copy Log"
+                            Padding="10,3" Margin="20,0,0,0"
+                            Background="#252A34" Foreground="#D8DEE4"
+                            ToolTip.Tip="Copy all log text to clipboard" />
+                    <Button x:Name="ClearLogBtn" Content="Clear"
+                            Padding="10,3" Margin="4,0,0,0"
+                            Background="#252A34" Foreground="#D8DEE4"
+                            ToolTip.Tip="Clear the log panel" />
                 </StackPanel>
             </StackPanel>
         </Border>

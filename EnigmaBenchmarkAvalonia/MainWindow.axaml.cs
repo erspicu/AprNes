@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
@@ -33,6 +34,8 @@ public partial class MainWindow : Window
         Log.Inlines = new InlineCollection();
         StartBtn.Click += OnStartClick;
         AboutBtn.Click += OnAboutClick;
+        CopyLogBtn.Click += OnCopyLogClick;
+        ClearLogBtn.Click += OnClearLogClick;
         CipherBox.SelectionChanged += (_, _) => PrepareReveal();
         PrintHeader();
         PrepareReveal();
@@ -149,6 +152,38 @@ public partial class MainWindow : Window
         {
             AppendColored($"[!] Could not open readme: {ex.Message}\n", BrushRed);
         }
+    }
+
+    async void OnCopyLogClick(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var sb = new StringBuilder();
+            if (Log.Inlines != null)
+            {
+                foreach (var inline in Log.Inlines)
+                    if (inline is Run r) sb.Append(r.Text);
+            }
+
+            var top = TopLevel.GetTopLevel(this);
+            if (top?.Clipboard == null)
+            {
+                AppendColored("[!] Clipboard unavailable on this platform\n", BrushRed);
+                return;
+            }
+            await top.Clipboard.SetTextAsync(sb.ToString());
+            SetStatus($"Log copied — {sb.Length:N0} chars", BrushGreen);
+        }
+        catch (Exception ex)
+        {
+            AppendColored($"[!] Copy failed: {ex.Message}\n", BrushRed);
+        }
+    }
+
+    void OnClearLogClick(object? sender, RoutedEventArgs e)
+    {
+        Log.Inlines?.Clear();
+        SetStatus("Log cleared", BrushGreen);
     }
 
     async Task RunBenchmark(CrackScope scope)
