@@ -322,6 +322,10 @@ public partial class MainWindow : Window
         AppendColored($"  bestIC={r.BestIc/100000.0:F5}", BrushCyan);
         AppendColored(r.TimedOut ? "  [TIMEOUT]\n" : "\n",
                       r.TimedOut ? BrushRed : BrushText);
+        if (!string.IsNullOrEmpty(r.Diagnostic))
+        {
+            AppendColored("      " + r.Diagnostic + "\n", BrushMuted);
+        }
     }
 
     async Task RunBenchmarkT52e(CrackScope scope)

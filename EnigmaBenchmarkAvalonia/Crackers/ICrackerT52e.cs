@@ -42,4 +42,7 @@ public struct CrackResultT52e
     /// <summary>Best-scoring full 10-element wheel start array (W1..W10, 0-based).</summary>
     public int[] WheelStart;
     public int BestIc;       // × 100_000
+
+    /// <summary>Optional per-backend diagnostic line for the UI log.</summary>
+    public string? Diagnostic;
 }

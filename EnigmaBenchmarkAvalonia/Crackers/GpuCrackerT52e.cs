@@ -175,10 +175,10 @@ public sealed class GpuCrackerT52e : ICrackerT52e
         }
 
         double gpuAvg = gpuNonZero > 0 ? (double)gpuScoreSum / gpuNonZero : 0;
-        Console.WriteLine(
-            $"[T52e GPU] nonzero={gpuNonZero:N0}/{keysTried:N0} " +
-            $"({100.0 * gpuNonZero / Math.Max(keysTried, 1):F1}%)  " +
-            $"max={gpuScoreMax}  avgNonZero={gpuAvg:F0}  topK={topQ.Count}");
+        var diag = $"GPU stats: nonzero={gpuNonZero:N0}/{keysTried:N0} " +
+                   $"({100.0 * gpuNonZero / Math.Max(keysTried, 1):F1}%)  " +
+                   $"max={gpuScoreMax}  avg(nz)={gpuAvg:F0}  topK={topQ.Count}";
+        Console.WriteLine("[T52e GPU] " + diag);
 
         // CPU re-rank on full ciphertext
         var cand = new List<Candidate>(topQ.Count);
@@ -214,6 +214,7 @@ public sealed class GpuCrackerT52e : ICrackerT52e
             ElapsedSeconds = sw.Elapsed.TotalSeconds,
             WheelStart = bestStart,
             BestIc = bestIc,
+            Diagnostic = diag,
         };
     }
 
