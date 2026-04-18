@@ -20,7 +20,7 @@ public sealed class GpuCrackerLorenz : ICrackerLorenz
 
     public string Name => _grContext != null
         ? $"SkSL Lorenz ({_grContext.Backend} GPU, 180-char space+E score)"
-        : "SkSL Lorenz (Skia Raster Pipeline, CPU-side, 180-char space+E score)";
+        : "SkSL GPU Lorenz (180-char space+E score)";
 
     static readonly string ShaderSrc = LoadShader();
 

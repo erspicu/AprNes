@@ -29,7 +29,7 @@ public sealed class GpuCracker : ICracker
 
     public string Name => _grContext != null
         ? $"SkSL ({_grContext.Backend} GPU, 96-char IC)"
-        : "SkSL (Skia Raster Pipeline, CPU-side, 96-char IC)";
+        : "SkSL GPU (96-char IC)";
 
     static readonly string ShaderSrc = LoadShader();
 

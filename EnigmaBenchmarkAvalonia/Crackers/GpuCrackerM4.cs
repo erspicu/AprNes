@@ -17,7 +17,7 @@ public sealed class GpuCrackerM4 : ICrackerM4
 
     public string Name => _grContext != null
         ? $"SkSL M4 ({_grContext.Backend} GPU, 80-char IC)"
-        : "SkSL M4 (Skia Raster Pipeline, CPU-side, 80-char IC)";
+        : "SkSL GPU M4 (80-char IC)";
 
     static readonly string ShaderSrc = LoadShader();
 

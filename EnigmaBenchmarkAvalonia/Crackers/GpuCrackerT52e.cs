@@ -22,7 +22,7 @@ public sealed class GpuCrackerT52e : ICrackerT52e
 
     public string Name => _grContext != null
         ? $"SkSL T52e ({_grContext.Backend} GPU, 80-char space+E score)"
-        : "SkSL T52e (Skia Raster Pipeline, CPU-side)";
+        : "SkSL GPU T52e (80-char space+E score)";
 
     static readonly string ShaderTemplate = LoadShader();
 
