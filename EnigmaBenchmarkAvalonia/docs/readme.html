@@ -587,6 +587,82 @@
   </p>
 </div>
 
+<div class="cipher-card">
+  <div class="tag">1943 – 1945 · Luftwaffe / Kriegsmarine 戰略通訊</div>
+  <h3>Siemens &amp; Halske T52e "Sturgeon" <span class="status ready">已實作（Scalar + Parallel + SIMD + GPU 全 backend）</span></h3>
+
+  <p>
+    T52 家族最後一代、也是**整個家族裡唯一在戰時未被作戰性破解**的型號。德國空軍與海軍的戰略層級電傳——
+    Luftflotte 司令部、U-Boat 艦隊指揮、固定駐軍通訊。比 Enigma 戰術、又比 Lorenz 普及，夾在中間的戰略-戰術混合層級。
+  </p>
+
+  <h4>機器結構</h4>
+  <ul>
+    <li><strong>10 個 pinwheel</strong>，銷數 47、53、59、61、64、65、67、69、71、73（兩兩互質，週期 ≈ 8.94 × 10¹⁷）</li>
+    <li>每輪兩組凸輪接點：<strong>A 接點</strong>驅動步進（誰前進、誰停住）、<strong>B 接點</strong>驅動金鑰流（位置在凸輪上相差 ~1/3 圈）</li>
+    <li>十個<strong>金鑰設定開關</strong>（標 A–K，共 10 位置）— 每日金鑰的一部分，構成 B 通道到內部 X 通道的置換</li>
+    <li>兩層 XOR 繼電器網路：
+      <ul>
+        <li><strong>H 層（10 條）</strong>：每個 H_i = 兩條 X 的 XOR，分別配對相鄰（1-2, 3-4, ...）與相隔 5（1-6, 2-7, ...）</li>
+        <li><strong>SR 層（10 條）</strong>：每條 SR = 兩條 H 的 XOR，展開後相當於 4 條 X 的 XOR</li>
+      </ul>
+    </li>
+    <li>SR1–SR5 驅動一組<strong>32 種置換的換位網路</strong>（Figure 9 的 SR1-5 → 5 位元置換表），SR6–SR10 對明文做 Vernam XOR</li>
+    <li><strong>M 電磁鐵 (M1–M10)</strong>：每個磁鐵的觸發是 A1–A10 的 boolean 邏輯函數；若 M_i 激發，輪 W_i 當輪不步進（被鎖住）</li>
+    <li><strong>KTF 開關（Klartextfunktion）</strong>：啟用時，前一字元明文 bit 3 經 RR3 繼電器饋入 M1、M8、M9、M10 的步進邏輯——讓步進變成<strong>明文相依的非線性混沌</strong></li>
+  </ul>
+
+  <p class="highlight-stat">
+    完整起始位置空間 = 47·53·59·61·64·65·67·69·71·73 ≈ 8.94 × 10¹⁷
+    ·
+    每日金鑰總空間 ≈ 10²⁴（含 pin pattern + switch + 起始位置 + KTF）
+  </p>
+
+  <h4>為什麼 T52e 「戰時未被破」</h4>
+  <p>
+    瑞典的 Arne Beurling 在 1940 年 5 月用紙筆兩週搞定 T52a，接下來三年 FRA 讀遍了所有經瑞典中繼的德軍電傳——攔截 50 萬則、解密 35 萬則。
+    1943 年中德國升級 T52e 加上 KTF 後，瑞典解密量**瞬間歸零**。
+  </p>
+  <p>
+    關鍵變化有二：
+  </p>
+  <ol>
+    <li><strong>H 繼電器層</strong>的加入讓 SR 變成 4-X 的 XOR 組合（T52a/d 直接用 X，有統計偏差），密文統計特性接近均勻分布</li>
+    <li><strong>KTF 開啟</strong>後 M-magnet 步進變成明文相依——depth（重複金鑰加密不同訊息）不再對齊，所有 depth-based 攻擊失效</li>
+  </ol>
+  <p>
+    Bletchley Park 同時期從西西里 → 利比亞鏈路攔到 T52 流量（代號 "Sturgeon"），由 Michael Crum 組攻擊，靠 operator 紀律鬆散產生的 depths 偶有突破，但從未達到 Enigma / Tunny 的規律程度。加上德國空軍有把 Sturgeon 訊息用較弱的 Enigma 重發的壞習慣，Bletchley 直接從 Enigma 拿明文就夠了——T52 的完整戰時 traffic 分析從未完成。
+  </p>
+
+  <h4>Benchmark 對應情境</h4>
+  <p>
+    全鍵空間 10²⁴ 暴力不可行。參考歷史 Bletchley Testery 作法：**假設已知 pin patterns、switch map、以及 10 個輪中的 6 個起始位置**（由 depths、cribs、或另一條側通道回復得到），只暴力搜尋剩下 4 個輪子（W7、W8、W9、W10，銷數 67×69×71×73）。
+  </p>
+  <p class="highlight-stat">
+    縮減搜索空間 = 67 × 69 × 71 × 73 = <strong>23,951,289 ≈ 24 M 候選</strong>
+  </p>
+  <p>
+    這個規模與 Lorenz χ-only 的 22 M 相當，跑起來 Scalar ~9 min、Parallel ~1 min、SIMD 稍快、GPU shader <strong>~1 s</strong>。四個 backend 都通過 24M 全搜索並正確回復金鑰。
+  </p>
+
+  <h4>為什麼 T52e 的 SIMD 比較複雜</h4>
+  <p>
+    T52e 每字元的核心工作有 10 次 pin 讀取 + 10 次 H/SR XOR + 32-entry 置換查表 + 10 次 M-magnet AND/NOT + 10 條輪的條件前進——比 Lorenz chi-only 每字元 5 次 XOR 多了 ~10×。
+    本專案 SIMD 版用 <strong>Vector128 lane-parallel</strong>（一次 4 candidate）：SR 計算用 20 條 Vector128.Xor 取代 scalar SR-LUT（vector XOR 在 SIMD 裡幾乎免費，gather 反而貴）；Fig9 置換表保留 LUT 形式用 5 次軟體 gather；M-magnet 與 Vernam 全部 Vector128 邏輯運算；wheel stepping 用 compare-equal-zero 做遮罩條件前進。x86 走 AVX2、ARM 走 NEON（第 2 條 JIT 選用 Vector128 的好處——一份 code 跑雙平台）。
+  </p>
+
+  <h4>研究文件與實作規格</h4>
+  <p>
+    T52e 正式技術規格在戰後解密一直未完整流出，我們的實作基於 NPL Donald W. Davies 1982 年內部技術備忘錄（examined Munich &amp; Science Museum 兩台倖存機器）。Git 倉庫 <code>docs/research-t52e/</code> 目錄存有完整反向工程記錄、Davies 原始 PDF、以及我們自己整理的 EN / ZH 技術報告：
+  </p>
+  <ul>
+    <li><a href="https://github.com/erspicu/AprNes/blob/master/EnigmaBenchmarkAvalonia/docs/research-t52e/T52e_TechnicalReport_EN.md">T52e Technical Report (English)</a> — 完整機器規格 + 密碼分析史</li>
+    <li><a href="https://github.com/erspicu/AprNes/blob/master/EnigmaBenchmarkAvalonia/docs/research-t52e/T52e_TechnicalReport_ZH.md">T52e 技術報告（中文）</a> — 同上中文版</li>
+    <li><a href="https://github.com/erspicu/AprNes/blob/master/EnigmaBenchmarkAvalonia/docs/research-t52e/T52e_SPEC_VERIFIED.md">T52e_SPEC_VERIFIED.md</a> — 直接用於實作的精簡規格（Figure 9 全 32 列置換表、H/SR XOR 方程式、M-magnet 邏輯等）</li>
+    <li><a href="https://github.com/erspicu/AprNes/blob/master/EnigmaBenchmarkAvalonia/docs/research-t52e/T52e_TechDesc_EN.pdf">T52e_TechDesc_EN.pdf</a> — Davies 1982 原始掃描 PDF</li>
+  </ul>
+</div>
+
 <hr>
 
 <h2 id="people">破解的人們 — 電影沒拍到的故事</h2>

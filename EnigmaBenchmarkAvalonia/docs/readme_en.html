@@ -644,6 +644,122 @@
   </p>
 </div>
 
+<div class="cipher-card">
+  <div class="tag">1943 – 1945 · Luftwaffe / Kriegsmarine strategic comms</div>
+  <h3>Siemens &amp; Halske T52e "Sturgeon" <span class="status ready">Implemented (Scalar + Parallel + SIMD + GPU)</span></h3>
+
+  <p>
+    The final member of the T52 family — and the <strong>only variant that was never operationally
+    broken during the war</strong>. Used by the Luftwaffe and Kriegsmarine for strategic-level
+    teleprinter traffic between air-fleet HQs, U-boat command posts, and fixed garrisons.
+    Sitting between Enigma (tactical) and Lorenz (ubiquitous strategic) — a mid-tier strategic
+    workhorse that's less famous than either but mathematically the most complex of the three.
+  </p>
+
+  <h4>Machine structure</h4>
+  <ul>
+    <li><strong>10 pinwheels</strong> with pin counts 47, 53, 59, 61, 64, 65, 67, 69, 71, 73
+        (all pairwise coprime; full period ≈ 8.94 × 10¹⁷)</li>
+    <li>Two cam contacts per wheel: the <strong>A contact</strong> drives the stepping logic
+        (which wheels advance vs. hold), the <strong>B contact</strong> drives the keystream
+        (displaced about 1/3 of a revolution from A on the same cam)</li>
+    <li>Ten <strong>key-setting switches</strong> labelled A–K (10 positions each) — part of the
+        daily key, forming a permutation from the 10 B channels to 10 internal X channels</li>
+    <li>Two layers of XOR relay networks:
+      <ul>
+        <li><strong>H layer (10 equations)</strong>: each H_i = XOR of two X channels, paired
+            adjacent (1-2, 3-4, …) and offset-by-5 (1-6, 2-7, …)</li>
+        <li><strong>SR layer (10 equations)</strong>: each SR = XOR of two H; expanding,
+            each SR is the XOR of 4 specific X channels</li>
+      </ul>
+    </li>
+    <li>SR1–SR5 drive a <strong>32-setting permutation network</strong> on the 5 plaintext bits
+        (Figure 9 table); SR6–SR10 apply Vernam XOR</li>
+    <li><strong>M interposer magnets (M1–M10)</strong>: each is a boolean function of A1–A10.
+        When M_i fires, wheel W_i is held (does not step that cycle)</li>
+    <li><strong>KTF switch (Klartextfunktion)</strong>: when on, bit 3 of the <em>previous</em>
+        plaintext character is fed through relay RR3 into the stepping logic of M1, M8, M9, M10 —
+        making wheel motion <strong>plaintext-dependent and chaotically non-linear</strong></li>
+  </ul>
+
+  <p class="highlight-stat">
+    Full start-position space = 47·53·59·61·64·65·67·69·71·73 ≈ 8.94 × 10¹⁷
+    ·
+    Daily keyspace ≈ 10²⁴ (pin patterns + switch map + starts + KTF)
+  </p>
+
+  <h4>Why T52e held up</h4>
+  <p>
+    Sweden's Arne Beurling broke T52a in two weeks in May 1940 with nothing but paper and pencil,
+    and for the next three years Swedish FRA read virtually every German teleprinter transmission
+    relayed through Sweden — 500,000 intercepts, 350,000 decrypts. When Germany upgraded to T52e
+    mid-1943 and enabled KTF, Swedish decrypts <strong>dropped to zero overnight</strong>.
+  </p>
+  <p>
+    Two structural changes mattered:
+  </p>
+  <ol>
+    <li>The <strong>H-relay layer</strong> made each SR a 4-way XOR of X channels
+        (T52a/d used X directly, leaving statistical biases). Ciphertext statistics became
+        approximately uniform.</li>
+    <li>With <strong>KTF on</strong>, M-magnet stepping became plaintext-dependent — depths
+        (messages enciphered under the same key) no longer aligned, breaking every depth-based
+        attack in the Swedish toolkit.</li>
+  </ol>
+  <p>
+    Bletchley Park picked up T52 traffic on a Sicily → Libya link (codenamed
+    "Sturgeon") around the same time, worked by Michael Crum's section. Discipline-slip
+    depths gave them occasional entries, never anywhere near the regularity of Enigma or Tunny.
+    The Luftwaffe had a fatal habit of re-transmitting Sturgeon messages on weaker Enigma links,
+    so Bletchley usually read the Enigma copy and left T52 alone — no comprehensive wartime
+    traffic analysis of T52e was ever completed.
+  </p>
+
+  <h4>Benchmark scenario</h4>
+  <p>
+    Full 10²⁴ brute force is infeasible. Following Bletchley's Testery pattern: <strong>assume pin
+    patterns, switch map, and 6 of 10 wheel start positions are known</strong> (via depths, cribs,
+    or side-channel recovery), brute-force the remaining four wheels (W7, W8, W9, W10 — pin counts
+    67 × 69 × 71 × 73).
+  </p>
+  <p class="highlight-stat">
+    Reduced search space = 67 × 69 × 71 × 73 = <strong>23,951,289 ≈ 24 M candidates</strong>
+  </p>
+  <p>
+    Comparable scale to Lorenz chi-only's 22 M. Timings: Scalar ~9 min, Parallel ~1 min,
+    SIMD slightly faster, GPU shader <strong>~1 s</strong>. All four backends pass the full
+    24 M search and recover the true key.
+  </p>
+
+  <h4>Why T52e SIMD is more complex than Lorenz SIMD</h4>
+  <p>
+    Per-character work in T52e: 10 pin reads + 10 H/SR XORs + 32-entry permutation lookup + 10
+    M-magnet AND/NOT + 10 conditional wheel increments — roughly 10× the per-character cost of
+    Lorenz chi-only's 5 XORs. The SIMD backend uses <strong>Vector128 lane-parallel</strong>
+    (4 candidates per SIMD batch): SR computation done via 20 Vector128.Xor ops (replaces the
+    scalar SR-LUT, since vector XOR is nearly free in SIMD while gather is expensive); Fig9
+    permutation kept as a 5×32 LUT with 5 software gathers; M-magnet and Vernam entirely
+    Vector128 logic; wheel stepping via compare-equal-zero masks for conditional increment.
+    Same code runs on x86 (emitted as SSE2/AVX2) and ARM64 (emitted as NEON) thanks to the
+    cross-platform Vector128 API.
+  </p>
+
+  <h4>Research documents and implementation spec</h4>
+  <p>
+    Full T52e specifications were never fully declassified. Our implementation is based on
+    Donald W. Davies' 1982 NPL internal technical memorandum (examined two surviving machines at
+    Munich and the Science Museum London). The Git repo's <code>docs/research-t52e/</code>
+    directory holds the complete reverse-engineering corpus, Davies' original PDF, and our own
+    EN / ZH technical reports:
+  </p>
+  <ul>
+    <li><a href="https://github.com/erspicu/AprNes/blob/master/EnigmaBenchmarkAvalonia/docs/research-t52e/T52e_TechnicalReport_EN.md">T52e Technical Report (English)</a> — full machine spec + cryptanalytic history</li>
+    <li><a href="https://github.com/erspicu/AprNes/blob/master/EnigmaBenchmarkAvalonia/docs/research-t52e/T52e_TechnicalReport_ZH.md">T52e 技術報告（中文）</a> — Traditional Chinese version</li>
+    <li><a href="https://github.com/erspicu/AprNes/blob/master/EnigmaBenchmarkAvalonia/docs/research-t52e/T52e_SPEC_VERIFIED.md">T52e_SPEC_VERIFIED.md</a> — implementation-oriented spec (full 32-row Fig 9 permutation table, H/SR XOR equations, M-magnet logic)</li>
+    <li><a href="https://github.com/erspicu/AprNes/blob/master/EnigmaBenchmarkAvalonia/docs/research-t52e/T52e_TechDesc_EN.pdf">T52e_TechDesc_EN.pdf</a> — Davies' 1982 original scanned PDF</li>
+  </ul>
+</div>
+
 <hr>
 
 <h2 id="people">The codebreakers — the story the movies missed</h2>
