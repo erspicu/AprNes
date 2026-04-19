@@ -155,7 +155,13 @@ public partial class MainWindow : Window
     {
         try
         {
-            var path = Path.Combine(AppContext.BaseDirectory, "docs", "readme.html");
+            // Traditional Chinese hosts get the original zh-Hant readme;
+            // every other locale (Simplified Chinese, English, anything else)
+            // gets the English version.
+            var fileName = L10n.Current == L10n.Lang.TraditionalChinese
+                ? "readme.html"
+                : "readme_en.html";
+            var path = Path.Combine(AppContext.BaseDirectory, "docs", fileName);
             if (!File.Exists(path))
             {
                 AppendColored($"[!] readme.html not found at {path}\n", BrushRed);
