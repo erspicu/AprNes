@@ -13,9 +13,18 @@ using EnigmaBenchmark.Core;
 /// </summary>
 public sealed class SimdCrackerM4 : ICrackerM4
 {
-    public string Name => Avx2.IsSupported
-        ? $"SIMD M4 (Vector256/AVX2, Parallel {Environment.ProcessorCount} cores)"
-        : "SIMD M4 (unavailable → Parallel scalar fallback)";
+    public string Name
+    {
+        get
+        {
+            int n = Environment.ProcessorCount;
+            if (EnigmaBenchmark.Core.SimdCaps.HasAvx2)
+                return $"SIMD M4 (Vector256/AVX2 + gather, Parallel {n} cores)";
+            if (EnigmaBenchmark.Core.SimdCaps.HasNeon)
+                return $"SIMD M4 (Arm64/NEON lacks gather → Parallel {n} cores fallback)";
+            return "SIMD M4 (unavailable → Parallel scalar fallback)";
+        }
+    }
 
     static readonly int[][] FwdInt;
     static readonly int[][] RevInt;

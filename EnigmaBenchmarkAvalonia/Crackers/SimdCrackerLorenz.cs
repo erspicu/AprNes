@@ -2,6 +2,7 @@ namespace EnigmaBenchmark.Crackers;
 
 using System.Diagnostics;
 using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.Arm;
 using System.Runtime.Intrinsics.X86;
 using EnigmaBenchmark.Core;
 
@@ -14,13 +15,20 @@ using EnigmaBenchmark.Core;
 /// </summary>
 public sealed class SimdCrackerLorenz : ICrackerLorenz
 {
-    public string Name => Avx2.IsSupported
-        ? $"SIMD Lorenz (Vector256/AVX2, Parallel {Environment.ProcessorCount} cores)"
-        : "SIMD Lorenz (unavailable → Parallel scalar fallback)";
+    public string Name
+    {
+        get
+        {
+            int n = Environment.ProcessorCount;
+            if (SimdCaps.HasAvx2) return $"SIMD Lorenz (Vector256/AVX2, Parallel {n} cores)";
+            if (SimdCaps.HasNeon) return $"SIMD Lorenz (Vector128/NEON, Parallel {n} cores)";
+            return "SIMD Lorenz (unavailable → Parallel scalar fallback)";
+        }
+    }
 
     public CrackResultLorenz Crack(byte[] ciphertext, byte[][] chiPins, CrackScope scope, double timeoutSec = 0)
     {
-        if (!Avx2.IsSupported)
+        if (!SimdCaps.HasAnyVector)
             return new ParallelScalarCrackerLorenz().Crack(ciphertext, chiPins, scope, timeoutSec);
 
         var sw = Stopwatch.StartNew();
@@ -116,7 +124,12 @@ public sealed class SimdCrackerLorenz : ICrackerLorenz
         };
     }
 
-    /// <summary>out[i] = stripped[i] ⊕ pin0Ext[offset+i] for i in [0, n). 32-byte vector chunks + scalar tail.</summary>
+    /// <summary>
+    /// out[i] = stripped[i] ⊕ pin0Ext[offset+i] for i in [0, n). Dispatches
+    /// to the widest vector unit available: 32-byte AVX2 on x86-64, 16-byte
+    /// NEON on ARM64, scalar on anything else (never reached in practice —
+    /// callers gate on SimdCaps.HasAnyVector).
+    /// </summary>
     static unsafe void XorSimd(byte[] stripped, byte[] pin0Ext, int offset, byte[] output, int n)
     {
         fixed (byte* pS = stripped)
@@ -124,13 +137,29 @@ public sealed class SimdCrackerLorenz : ICrackerLorenz
         fixed (byte* pO = output)
         {
             int i = 0;
-            for (; i <= n - 32; i += 32)
+
+            if (SimdCaps.HasAvx2)
             {
-                var vs = Avx.LoadVector256(pS + i);
-                var vp = Avx.LoadVector256(pP + offset + i);
-                var vr = Avx2.Xor(vs, vp);
-                Avx.Store(pO + i, vr);
+                // 256-bit AVX2 loop — Intel/AMD x86-64
+                for (; i <= n - 32; i += 32)
+                {
+                    var vs = Avx.LoadVector256(pS + i);
+                    var vp = Avx.LoadVector256(pP + offset + i);
+                    Avx.Store(pO + i, Avx2.Xor(vs, vp));
+                }
             }
+            else if (SimdCaps.HasNeon)
+            {
+                // 128-bit NEON loop — Apple Silicon, ARM Linux/Windows
+                for (; i <= n - 16; i += 16)
+                {
+                    var vs = AdvSimd.LoadVector128(pS + i);
+                    var vp = AdvSimd.LoadVector128(pP + offset + i);
+                    AdvSimd.Store(pO + i, AdvSimd.Xor(vs, vp));
+                }
+            }
+
+            // Scalar tail
             for (; i < n; i++)
                 output[i] = (byte)(stripped[i] ^ pin0Ext[offset + i]);
         }

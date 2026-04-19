@@ -20,9 +20,11 @@ using EnigmaBenchmark.Core;
 /// </summary>
 public sealed class SimdCrackerT52e : ICrackerT52e
 {
-    public string Name => Avx2.IsSupported
-        ? $"SIMD T52e (LUT + AVX2, Parallel {Environment.ProcessorCount} cores)"
-        : "SIMD T52e (unavailable → Parallel scalar fallback)";
+    // T52e's speedup over ParallelScalar comes from the SR lookup table,
+    // not from vector intrinsics — the hot loop is pure int arithmetic.
+    // So this runs identically on x86-64 and ARM64; the Name just reports
+    // whatever vector unit the host has for context.
+    public string Name => $"SIMD T52e (SR-LUT, {SimdCaps.HardwareDesc}, Parallel {Environment.ProcessorCount} cores)";
 
     public CrackResultT52e Crack(
         byte[] ciphertext,
@@ -32,9 +34,6 @@ public sealed class SimdCrackerT52e : ICrackerT52e
         CrackScope scope,
         double timeoutSec = 0)
     {
-        if (!Avx2.IsSupported)
-            return new ParallelScalarCrackerT52e().Crack(ciphertext, pins, switchMap, knownStart, scope, timeoutSec);
-
         var sw = Stopwatch.StartNew();
         int n = ciphertext.Length;
 
