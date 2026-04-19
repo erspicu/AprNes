@@ -2,6 +2,7 @@ namespace EnigmaBenchmark.Crackers;
 
 using System.Diagnostics;
 using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.Arm;
 using System.Runtime.Intrinsics.X86;
 using EnigmaBenchmark.Core;
 
@@ -23,10 +24,10 @@ public sealed class SimdCracker : ICracker
         get
         {
             int n = Environment.ProcessorCount;
-            if (EnigmaBenchmark.Core.SimdCaps.HasAvx2)
-                return $"SIMD M3 (Vector256/AVX2 + gather, Parallel {n} cores)";
-            if (EnigmaBenchmark.Core.SimdCaps.HasNeon)
-                return $"SIMD M3 (Arm64/NEON lacks gather → Parallel {n} cores fallback)";
+            if (SimdCaps.HasAvx2)
+                return $"SIMD M3 (Vector256/AVX2 + hw gather, Parallel {n} cores)";
+            if (SimdCaps.HasNeon)
+                return $"SIMD M3 (Vector128/NEON + software gather, Parallel {n} cores)";
             return "SIMD M3 (unavailable → Parallel scalar fallback)";
         }
     }
@@ -56,7 +57,7 @@ public sealed class SimdCracker : ICracker
 
     public CrackResult Crack(byte[] ciphertext, EnigmaM3 fixedParts, CrackScope scope)
     {
-        if (!Avx2.IsSupported)
+        if (!SimdCaps.HasAnyVector)
             return new ParallelScalarCracker().Crack(ciphertext, fixedParts, scope);
 
         var sw = Stopwatch.StartNew();
@@ -86,12 +87,18 @@ public sealed class SimdCracker : ICracker
         var plugboardInt = new int[26];
         for (int i = 0; i < 26; i++) plugboardInt[i] = fixedParts.Plugboard[i];
 
+        bool useAvx2 = SimdCaps.HasAvx2;
+
         Parallel.ForEach(units,
             () => new TLS(ctInt.Length),
             (unit, _, local) =>
             {
-                RunUnit(ctInt, plugboardInt, unit.L, unit.M, unit.R,
-                        unit.rl, unit.rm, unit.rr, local);
+                if (useAvx2)
+                    RunUnit(ctInt, plugboardInt, unit.L, unit.M, unit.R,
+                            unit.rl, unit.rm, unit.rr, local);
+                else
+                    RunUnitNeon(ctInt, plugboardInt, unit.L, unit.M, unit.R,
+                                unit.rl, unit.rm, unit.rr, local);
                 return local;
             },
             (local) =>
@@ -299,6 +306,176 @@ public sealed class SimdCracker : ICracker
     static Vector256<int> Mod26(Vector256<int> v, Vector256<int> v_26)
     {
         var mask = Vector256.GreaterThanOrEqual(v, v_26);
+        return v - (mask & v_26);
+    }
+
+    // ── ARM64 NEON path (Vector128, 4 lanes, software gather) ────────────
+    //
+    // Mirrors RunUnit() but with:
+    //   - Vector128<int>  4 lanes  (vs AVX2's 8)
+    //   - 6 batches of 4 PR values  (vs AVX2's 3 batches of 8)
+    //   - Software gather:  4 scalar rotor-table loads, assembled via
+    //     Vector128.Create.  Rotor tables are 26 × 4 B = 104 B, fully
+    //     in L1 cache — the gather overhead is tolerable.
+    //   - Everything else (broadcast / add / and / compare) uses the
+    //     cross-platform Vector128 API, which the JIT emits as NEON
+    //     on ARM64 and SSE2 on x86 without AVX.
+    //
+    // Benefits over ParallelScalar on ARM:
+    //   - 4-lane vectorised arithmetic for ~80% of per-character work
+    //   - Same Parallel.ForEach outer structure (16-core scaling stays)
+    //   - Expected 2-3× vs ParallelScalar on Apple Silicon / ARM Linux
+    static unsafe void RunUnitNeon(
+        int[] ct, int[] plugboardInt,
+        int WL, int WM, int WR,
+        int RL, int RM, int RR,
+        TLS local)
+    {
+        var FwdWR = FwdInt[WR]; var FwdWM = FwdInt[WM]; var FwdWL = FwdInt[WL];
+        var RevWR = RevInt[WR]; var RevWM = RevInt[WM]; var RevWL = RevInt[WL];
+        int NotchR = RotorData.NotchPos[WR];
+        int NotchM = RotorData.NotchPos[WM];
+
+        var v_Rr_inv = Vector128.Create(26 - RR);
+        var v_Rm_inv = Vector128.Create(26 - RM);
+        var v_Rl_inv = Vector128.Create(26 - RL);
+        var v_Rr     = Vector128.Create(RR);
+        var v_Rm     = Vector128.Create(RM);
+        var v_Rl     = Vector128.Create(RL);
+        var v_26     = Vector128.Create(26);
+        var v_1      = Vector128.Create(1);
+        var v_notchR = Vector128.Create(NotchR);
+        var v_notchM = Vector128.Create(NotchM);
+
+        int ctLen = ct.Length;
+        Span<int> tmp = stackalloc int[4];
+
+        fixed (int* pFwdR = FwdWR)
+        fixed (int* pFwdM = FwdWM)
+        fixed (int* pFwdL = FwdWL)
+        fixed (int* pRevR = RevWR)
+        fixed (int* pRevM = RevWM)
+        fixed (int* pRevL = RevWL)
+        fixed (int* pUkwB = UkwBInt)
+        fixed (int* pPB   = plugboardInt)
+        fixed (int* pCt   = ct)
+        {
+            for (int pl = 0; pl < 26; pl++)
+            for (int pm = 0; pm < 26; pm++)
+            {
+                // 6 batches (0-3, 4-7, ... 20-23) + scalar tail for 24, 25
+                for (int prBase = 0; prBase <= 20; prBase += 4)
+                {
+                    var PR_vec = Vector128.Create(prBase, prBase+1, prBase+2, prBase+3);
+                    var PL_vec = Vector128.Create(pl);
+                    var PM_vec = Vector128.Create(pm);
+
+                    for (int i = 0; i < ctLen; i++)
+                    {
+                        // Rotor stepping (same logic as AVX2 path)
+                        var midMask   = Vector128.Equals(PM_vec, v_notchM);
+                        var rightMask = Vector128.Equals(PR_vec, v_notchR);
+                        var midAdv    = midMask | rightMask;
+                        var leftAdv   = midMask;
+
+                        PL_vec = PL_vec + (leftAdv & v_1);
+                        PM_vec = PM_vec + (midAdv  & v_1);
+                        PR_vec = PR_vec + v_1;
+                        PL_vec = Mod26_128(PL_vec, v_26);
+                        PM_vec = Mod26_128(PM_vec, v_26);
+                        PR_vec = Mod26_128(PR_vec, v_26);
+
+                        var c_vec = Vector128.Create(pCt[i]);
+
+                        c_vec = GatherSw(pPB,   c_vec);
+                        c_vec = ForwardStep128(c_vec, PR_vec, v_Rr_inv, v_Rr, pFwdR, v_26);
+                        c_vec = ForwardStep128(c_vec, PM_vec, v_Rm_inv, v_Rm, pFwdM, v_26);
+                        c_vec = ForwardStep128(c_vec, PL_vec, v_Rl_inv, v_Rl, pFwdL, v_26);
+                        c_vec = GatherSw(pUkwB, c_vec);
+                        c_vec = ForwardStep128(c_vec, PL_vec, v_Rl_inv, v_Rl, pRevL, v_26);
+                        c_vec = ForwardStep128(c_vec, PM_vec, v_Rm_inv, v_Rm, pRevM, v_26);
+                        c_vec = ForwardStep128(c_vec, PR_vec, v_Rr_inv, v_Rr, pRevR, v_26);
+                        c_vec = GatherSw(pPB,   c_vec);
+
+                        c_vec.CopyTo(tmp);
+                        for (int lane = 0; lane < 4; lane++)
+                            local.outBuf[lane][i] = (byte)tmp[lane];
+                    }
+
+                    for (int lane = 0; lane < 4; lane++)
+                    {
+                        int ic = IcScorer.ScoreInt(local.outBuf[lane]);
+                        local.keysTried++;
+                        if (ic > local.bestIc)
+                        {
+                            local.bestIc = ic;
+                            local.bestL = WL; local.bestM = WM; local.bestR = WR;
+                            local.bestPL = pl; local.bestPM = pm; local.bestPR = prBase + lane;
+                            local.bestRR = RR; local.bestRM = RM; local.bestRL = RL;
+                        }
+                    }
+                }
+
+                // Scalar tail for pr=24, 25
+                for (int pr = 24; pr < 26; pr++)
+                {
+                    var m = new EnigmaM3
+                    {
+                        WL = WL, WM = WM, WR = WR,
+                        RL = RL, RM = RM, RR = RR,
+                        PL = pl, PM = pm, PR = pr,
+                        Plugboard = new byte[26],
+                        Reflector = RotorData.UkwB,
+                    };
+                    for (int k = 0; k < 26; k++) m.Plugboard[k] = (byte)plugboardInt[k];
+
+                    for (int i = 0; i < ctLen; i++)
+                        local.outBuf[0][i] = m.EncryptChar((byte)ct[i]);
+
+                    int ic = IcScorer.ScoreInt(local.outBuf[0]);
+                    local.keysTried++;
+                    if (ic > local.bestIc)
+                    {
+                        local.bestIc = ic;
+                        local.bestL = WL; local.bestM = WM; local.bestR = WR;
+                        local.bestPL = pl; local.bestPM = pm; local.bestPR = pr;
+                        local.bestRR = RR; local.bestRM = RM; local.bestRL = RL;
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>Software gather: 4 scalar loads from `table` at indices given by vector lanes.</summary>
+    static unsafe Vector128<int> GatherSw(int* table, Vector128<int> indices)
+    {
+        return Vector128.Create(
+            table[indices.GetElement(0)],
+            table[indices.GetElement(1)],
+            table[indices.GetElement(2)],
+            table[indices.GetElement(3)]);
+    }
+
+    static unsafe Vector128<int> ForwardStep128(
+        Vector128<int> c, Vector128<int> pos,
+        Vector128<int> ringInv, Vector128<int> ring,
+        int* rotorTable, Vector128<int> v_26)
+    {
+        var shift = c + pos + ringInv;
+        shift = Mod26_128(shift, v_26);
+        shift = Mod26_128(shift, v_26);
+
+        var looked = GatherSw(rotorTable, shift);
+
+        var result = looked + ring - pos + v_26;
+        result = Mod26_128(result, v_26);
+        result = Mod26_128(result, v_26);
+        return result;
+    }
+
+    static Vector128<int> Mod26_128(Vector128<int> v, Vector128<int> v_26)
+    {
+        var mask = Vector128.GreaterThanOrEqual(v, v_26);
         return v - (mask & v_26);
     }
 
