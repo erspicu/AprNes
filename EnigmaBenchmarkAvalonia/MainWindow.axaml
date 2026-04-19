@@ -15,7 +15,7 @@
             <StackPanel Grid.Column="0" Orientation="Vertical">
                 <TextBlock Text="EnigmaBenchmark"
                            FontSize="26" FontWeight="Bold" Foreground="#FFD060" />
-                <TextBlock Text="二戰德國頂級密碼 × 你書桌上這顆 GPU"
+                <TextBlock x:Name="TaglineLabel"
                            FontSize="13" Foreground="#8A93A0" Margin="0,2,0,0" />
             </StackPanel>
             <Button Grid.Column="1" x:Name="AboutBtn"

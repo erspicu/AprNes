@@ -32,6 +32,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         Log.Inlines = new InlineCollection();
+        TaglineLabel.Text = L10n.Tagline;
         StartBtn.Click += OnStartClick;
         AboutBtn.Click += OnAboutClick;
         CopyLogBtn.Click += OnCopyLogClick;
@@ -815,7 +816,7 @@ public partial class MainWindow : Window
 
         HistThenLabel.Text = thenLabel;
         HistThenTime.Text  = thenTime;
-        HistNowLabel.Text  = "Your GPU (2025)";
+        HistNowLabel.Text  = L10n.NowLabel(DateTime.Now.Year);
         HistNowTime.Text   = gpuSeconds < 1.0
             ? $"{gpuSeconds * 1000:F0} ms"
             : $"{gpuSeconds:F2} s";
