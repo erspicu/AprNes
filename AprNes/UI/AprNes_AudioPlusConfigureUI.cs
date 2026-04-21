@@ -93,7 +93,7 @@ namespace AprNes.UI
         const int CV_TRK_W = 150;      // trackbar width
         const int CV_VAL_W = 45;       // value label width
         const int CV_EXP_X = 400;      // expansion column X base
-        const int CV_GRP_Y = 581;      // GroupBox top Y (matches Designer)
+        const int CV_GRP_Y = 381;      // GroupBox top Y (matches Designer)
         const int CV_BTN_PAD = 12;     // padding below GroupBox to buttons
 
         // ─────────────────────────────────────────────────────────
@@ -377,15 +377,16 @@ namespace AprNes.UI
                 }
             }
 
-            // Resize GroupBox: height = max(NES info row, expansion rows) + header + padding
+            // Size GroupBox + form for the maximum case (N163 8-ch with info label)
+            // so the window height stays stable when switching chip — no grow/shrink.
+            const int MAX_INFO_H = 32;
+            int maxChRowY0 = CV_Y0 + MAX_INFO_H + 4;
+            int maxExpBottomY = maxChRowY0 + EXP_CH * CV_ROW_H;
             int nesBottomY = CV_Y0 + NES_CH * CV_ROW_H + 20; // +20 for NES info label
-            int expBottomY = chRowY0 + visibleCount * CV_ROW_H;
-            int contentBottom = Math.Max(nesBottomY, expBottomY);
-            int grpH = contentBottom + 15; // bottom padding
+            int grpH = Math.Max(nesBottomY, maxExpBottomY) + 15;
 
             ChannelVol.Size = new Size(ChannelVol.Width, grpH);
 
-            // Resize form and reposition buttons
             int formH = CV_GRP_Y + grpH + CV_BTN_PAD + btnOK.Height + CV_BTN_PAD;
             this.ClientSize = new Size(this.ClientSize.Width, formH);
             btnOK.Location     = new Point(btnOK.Location.X, CV_GRP_Y + grpH + CV_BTN_PAD);
