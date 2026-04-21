@@ -376,6 +376,8 @@ namespace AprNes
             NesCore.AudioEnabled = SoundcheckBox.Checked;
             NesCore.Volume = SoundtrackBar.Value;
             NesCore.AudioMode = AudioMode.SelectedIndex;
+            NesCore.ApuRefreshOutputFn();
+            NesCore.AudioPlus_ApplySettings();
 
             // Accuracy 設定寫入並立即生效
 
