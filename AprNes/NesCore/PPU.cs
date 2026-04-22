@@ -675,6 +675,10 @@ namespace AprNes
 
 
         // OAM corruption: copy first 8 bytes of OAM over the corrupted row (TriCNES CorruptOAM)
+        // Single caller (PpuPhase4_HandleOamCorruption, itself NoInlining cold helper);
+        // AggressiveInlining folds this 10-line body into the cold caller to save one call
+        // indirection without touching the hot PPU path.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static unsafe void ProcessOamCorruption()
         {
             int idx = oamCorruptIndex;
