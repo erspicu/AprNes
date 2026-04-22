@@ -3,6 +3,7 @@ import json
 import argparse
 import http.client
 import sys
+from datetime import datetime
 
 def load_config():
     config_path = r'C:\key\config.json'
@@ -99,7 +100,25 @@ def main():
     model = config.get("model", "gemini-1.5-flash")
     print(f"Querying Gemini ({model})...")
     answer = call_gemini(api_key, model, args.prompt)
-    
+
+    # Log every query + response to message/ with a timestamped filename
+    msg_dir = os.path.join(os.path.dirname(__file__), 'message')
+    os.makedirs(msg_dir, exist_ok=True)
+    stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    log_path = os.path.join(msg_dir, f'{stamp}.txt')
+    with open(log_path, 'w', encoding='utf-8') as f:
+        f.write(f"Timestamp: {datetime.now().isoformat(timespec='seconds')}\n")
+        f.write(f"Model:     {model}\n")
+        f.write("=" * 72 + "\n")
+        f.write("QUESTION\n")
+        f.write("=" * 72 + "\n")
+        f.write(args.prompt.rstrip() + "\n\n")
+        f.write("=" * 72 + "\n")
+        f.write("RESPONSE\n")
+        f.write("=" * 72 + "\n")
+        f.write(answer.rstrip() + "\n")
+    print(f"Logged to: {log_path}")
+
     if args.output:
         with open(args.output, 'w', encoding='utf-8') as f:
             f.write(answer)
