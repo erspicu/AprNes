@@ -8,7 +8,7 @@ namespace AprNes
 {
     /// <summary>
     /// Famicom Disk System (FDS) support — NesCore partial class.
-    /// Independent of IMapper; plugs directly into mem_read_fun/mem_write_fun.
+    /// Independent of IMapper; plugs directly into mem_read_page/mem_write_page.
     /// </summary>
     unsafe public partial class NesCore
     {
@@ -396,7 +396,7 @@ namespace AprNes
                 fds_InsertDisk(0);
 
                 // Read reset vector from BIOS ($FFFC/$FFFD)
-                r_PC = (ushort)(mem_read_fun[0xFFFC](0xFFFC) | (mem_read_fun[0xFFFD](0xFFFD) << 8));
+                r_PC = (ushort)(mem_read_page[7](0xFFFC) | (mem_read_page[7](0xFFFD) << 8));
                 Console.WriteLine("FDS: Reset vector = $" + r_PC.ToString("X4"));
             }
             catch (Exception e)
@@ -487,58 +487,64 @@ namespace AprNes
         }
 
         // ── Memory function pointer setup (FDS-specific) ──────────────────
-        // Strategy: use standard init_function() (which sets up PPU function pointers
-        // correctly via MapperObj) then override CPU-side entries for FDS memory map.
+        // Strategy: init_function() sets up the 8-page default table; we then replace
+        // the pages that FDS remaps. FDS memory layout:
+        //   $4020-$40FF → FDS registers  (inside page 2, handled via fds_Read_Page2)
+        //   $4100-$5FFF → open bus        (inside page 2, handled via fds_Read_Page2)
+        //   $6000-$DFFF → FDS PRG RAM     (pages 3, 4, 5, 6)
+        //   $E000-$FFFF → FDS BIOS ROM    (page 7)
+
+        // FDS-specific page-2 dispatcher: APU/joypad unchanged, FDS regs at $4020-$40FF,
+        // open bus at $4100-$5FFF.
+        static byte fds_Read_Page2(ushort addr)
+        {
+            if (addr < 0x4020) return IO_read(addr);
+            if (addr < 0x4100) return fds_RegRead(addr);
+            return Read_OpenBus(addr);
+        }
+        static void fds_Write_Page2(ushort addr, byte val)
+        {
+            if (addr < 0x4020) { IO_write(addr, val); return; }
+            if (addr < 0x4100) { fds_RegWrite(addr, val); return; }
+            // $4100-$5FFF: FDS ignores writes (ROM-side expansion slot)
+        }
 
         static void fds_InitFunction()
         {
             // init_function() uses MapperObj for PPU read/write — fdsChrMapper provides that.
-            // It also sets CPU-side entries via MapperObj, which we'll override below.
+            // It also sets CPU-side entries via MapperObj, which we now override per page.
             init_function();
 
-            // Override CPU-side memory map for FDS
 #if NET10_0_OR_GREATER
-            for (int address = 0x4020; address < 0x4100; address++)
-            {
-                mem_write_fun[address] = &fds_RegWrite;
-                mem_read_fun[address]  = &fds_RegRead;
-            }
-            for (int address = 0x4100; address < 0x6000; address++)
-            {
-                mem_write_fun[address] = &Write_NoOp;
-                mem_read_fun[address]  = &Read_OpenBus;
-            }
-            for (int address = 0x6000; address < 0xE000; address++)
-            {
-                mem_write_fun[address] = &fds_PrgRamWrite;
-                mem_read_fun[address]  = &fds_PrgRamRead;
-            }
-            for (int address = 0xE000; address < 0x10000; address++)
-            {
-                mem_write_fun[address] = &Write_NoOp; // BIOS is read-only
-                mem_read_fun[address]  = &fds_BiosReadWithCheck;
-            }
+            mem_read_page[2]  = &fds_Read_Page2;
+            mem_write_page[2] = &fds_Write_Page2;
+
+            mem_read_page[3]  = &fds_PrgRamRead;
+            mem_read_page[4]  = &fds_PrgRamRead;
+            mem_read_page[5]  = &fds_PrgRamRead;
+            mem_read_page[6]  = &fds_PrgRamRead;
+            mem_write_page[3] = &fds_PrgRamWrite;
+            mem_write_page[4] = &fds_PrgRamWrite;
+            mem_write_page[5] = &fds_PrgRamWrite;
+            mem_write_page[6] = &fds_PrgRamWrite;
+
+            mem_read_page[7]  = &fds_BiosReadWithCheck;
+            mem_write_page[7] = &Write_NoOp; // BIOS is read-only
 #else
-            for (int address = 0x4020; address < 0x4100; address++)
-            {
-                mem_write_fun[address] = fds_RegWrite;
-                mem_read_fun[address] = fds_RegRead;
-            }
-            for (int address = 0x4100; address < 0x6000; address++)
-            {
-                mem_write_fun[address] = Write_NoOp;
-                mem_read_fun[address] = Read_OpenBus;
-            }
-            for (int address = 0x6000; address < 0xE000; address++)
-            {
-                mem_write_fun[address] = fds_PrgRamWrite;
-                mem_read_fun[address] = fds_PrgRamRead;
-            }
-            for (int address = 0xE000; address < 0x10000; address++)
-            {
-                mem_write_fun[address] = Write_NoOp; // BIOS is read-only
-                mem_read_fun[address] = fds_BiosReadWithCheck;
-            }
+            mem_read_page[2]  = fds_Read_Page2;
+            mem_write_page[2] = fds_Write_Page2;
+
+            mem_read_page[3]  = fds_PrgRamRead;
+            mem_read_page[4]  = fds_PrgRamRead;
+            mem_read_page[5]  = fds_PrgRamRead;
+            mem_read_page[6]  = fds_PrgRamRead;
+            mem_write_page[3] = fds_PrgRamWrite;
+            mem_write_page[4] = fds_PrgRamWrite;
+            mem_write_page[5] = fds_PrgRamWrite;
+            mem_write_page[6] = fds_PrgRamWrite;
+
+            mem_read_page[7]  = fds_BiosReadWithCheck;
+            mem_write_page[7] = Write_NoOp;
 #endif
         }
 

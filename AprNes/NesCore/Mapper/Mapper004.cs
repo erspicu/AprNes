@@ -219,43 +219,10 @@ namespace AprNes
 
         public byte MapperR_CHR(int address)
         {
-
             if (CHR_ROM_count == 0) return ppu_ram[address];
-
-            if (CHR_Bankmode == 0) //0: two 2 KB banks at $0000-$0FFF,four 1 KB banks at $1000-$1FFF; ok
-            {
-                if (address < 0x1000)//2k * 2
-                {
-                    if (address < 0x400) return CHR_ROM[address + ((CHR0_Bankselect2k & 0xfe) << 10)];
-                    else if (address < 0x800) return CHR_ROM[(address - 0x400) + ((CHR0_Bankselect2k | 1) << 10)];
-                    else if (address < 0xc00) return CHR_ROM[(address - 0x800) + ((CHR1_Bankselect2k & 0xfe) << 10)];
-                    else return CHR_ROM[(address - 0xc00) + ((CHR1_Bankselect2k | 1) << 10)];
-                }
-                else //1k *4
-                {
-                    if (address < 0x1400) return CHR_ROM[(address - 0x1000) + (CHR0_Bankselect1k << 10)];
-                    else if (address < 0x1800) return CHR_ROM[(address - 0x1400) + (CHR1_Bankselect1k << 10)];
-                    else if (address < 0x1c00) return CHR_ROM[(address - 0x1800) + (CHR2_Bankselect1k << 10)];
-                    else return CHR_ROM[(address - 0x1c00) + (CHR3_Bankselect1k << 10)];
-                }
-            }
-            else //1: two 2 KB banks at $1000-$1FFF,four 1 KB banks at $0000-$0FFF
-            {
-                if (address < 0x1000) //1k*4
-                {
-                    if (address < 0x400) return CHR_ROM[address + (CHR0_Bankselect1k << 10)];
-                    else if (address < 0x800) return CHR_ROM[(address - 0x400) + (CHR1_Bankselect1k << 10)];
-                    else if (address < 0xc00) return CHR_ROM[(address - 0x800) + (CHR2_Bankselect1k << 10)];
-                    else return CHR_ROM[(address - 0xc00) + (CHR3_Bankselect1k << 10)];
-                }
-                else //2k * 2
-                {
-                    if (address < 0x1400) return CHR_ROM[(address - 0x1000) + ((CHR0_Bankselect2k & 0xfe) << 10)];
-                    else if (address < 0x1800) return CHR_ROM[(address - 0x1400) + ((CHR0_Bankselect2k | 1) << 10)];
-                    else if (address < 0x1c00) return CHR_ROM[(address - 0x1800) + ((CHR1_Bankselect2k & 0xfe) << 10)];
-                    else return CHR_ROM[(address - 0x1c00) + ((CHR1_Bankselect2k | 1) << 10)];
-                }
-            }
+            // Mode 0/1 branching already resolved by UpdateCHRBanks() into chrBankPtrs[0..7];
+            // same dispatch used by the PPU tile-fetch hot path (PPU.cs:893).
+            return NesCore.chrBankPtrs[(address >> 10) & 7][address & 0x3FF];
         }
             public void Cleanup() { }
 }
