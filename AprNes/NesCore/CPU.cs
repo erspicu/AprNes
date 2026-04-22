@@ -71,7 +71,7 @@ namespace AprNes
             cpuBusAddr = addr; cpuIsRead = true;
             byte val;
             if (addr < 0x2000) { val = NES_MEM[addr & 0x7FF]; cpubus = val; }
-            else { val = mem_read_fun[addr](addr); if (addr != 0x4015) cpubus = val; }
+            else { val = mem_read_page[addr >> 13](addr); if (addr != 0x4015) cpubus = val; }
             return val;
         }
 
@@ -94,7 +94,7 @@ namespace AprNes
             { dmcImplicitAbortActive = false; dmcDmaRunning = false; dmcDmaHalt = false; }
             // P3-1: cpubus updated AFTER handler — during handler, cpubus holds last READ value
             // This matches TriCNES dataBus vs In distinction ($2000 glitch depends on this)
-            mem_write_fun[addr](addr, val);
+            mem_write_page[addr >> 13](addr, val);
             cpubus = val;
         }
 

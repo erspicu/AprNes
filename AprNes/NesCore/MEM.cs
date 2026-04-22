@@ -123,7 +123,7 @@ namespace AprNes
             // ── Main read path (TriCNES Fetch) ──
             if (addr >= 0x8000)
             {
-                val = mem_read_fun[addr](addr);
+                val = mem_read_page[addr >> 13](addr);
                 dataPinsNotFloating = true;
             }
             else if (addr < 0x2000)
@@ -133,12 +133,12 @@ namespace AprNes
             }
             else if (addr < 0x4000)
             {
-                val = mem_read_fun[addr](addr); // PPU $2000-$3FFF
+                val = mem_read_page[addr >> 13](addr); // PPU $2000-$3FFF
                 dataPinsNotFloating = true;
             }
             else if (addr >= 0x4020)
             {
-                val = mem_read_fun[addr](addr); // Mapper $4020+
+                val = mem_read_page[addr >> 13](addr); // Mapper $4020+
             }
             else
             {
@@ -238,15 +238,24 @@ namespace AprNes
             dmcSetReadBuffer(val);
         }
 
+        // ── 8-page memory dispatch table ──
+        // NES's 64 KB bus is indexed by (addr >> 13), yielding 8 pages of 8 KB each.
+        // Page 0: $0000-$1FFF  RAM (mirrored every 2 KB)
+        // Page 1: $2000-$3FFF  PPU registers (mirrored every 8 bytes)
+        // Page 2: $4000-$5FFF  APU / joypad / open-bus / mapper expansion (internal dispatch)
+        // Page 3: $6000-$7FFF  Mapper WRAM
+        // Page 4-7: $8000-$FFFF  Mapper PRG
+        //
+        // Replaces the previous 65536-entry table (only 6 unique handlers were being
+        // replicated across 65536 slots). The 8-slot table fits in one cache line.
 #if NET10_0_OR_GREATER
-        // .NET 10: unmanaged native function pointer tables via AllocUnmanaged (64-byte aligned).
-        // Pointer indexing has no bounds check — `mem_read_fun[addr](addr)` compiles to calli.
-        static delegate*<ushort, byte>*       mem_read_fun  = null;
-        static delegate*<ushort, byte, void>* mem_write_fun = null;
+        // .NET 10: unmanaged native function pointer table. `calli`, no bounds check.
+        static delegate*<ushort, byte>*       mem_read_page  = null;
+        static delegate*<ushort, byte, void>* mem_write_page = null;
 #else
-        // .NET Framework 4.8.1: managed delegate arrays
-        static Action<ushort, byte>[] mem_write_fun = null;
-        static Func<ushort, byte>[] mem_read_fun = null;
+        // .NET Framework 4.8.1: managed delegate arrays (bounds check present but cheap).
+        static Action<ushort, byte>[] mem_write_page = null;
+        static Func<ushort, byte>[]   mem_read_page  = null;
 #endif
 
         // ── Static helpers (replace previously-lambda bodies) ──
@@ -266,51 +275,71 @@ namespace AprNes
         static void Wrap_MapperW_RAM(ushort addr, byte val) => MapperObj.MapperW_RAM(addr, val);
         static void Wrap_MapperW_PRG(ushort addr, byte val) => MapperObj.MapperW_PRG(addr, val);
 
+        // ── Page 2 ($4000-$5FFF): mixed region needing internal sub-dispatch ──
+        // $4000-$401F → APU / joypad / frame counter (IO_read/write)
+        // $4020-$40FF → open bus (read) / no-op (write)
+        // $4100-$5FFF → mapper expansion ROM
+        // First branch is predictable (~99% of traffic goes to $4000-$4017).
+        static byte Read_Page2(ushort addr)
+        {
+            if (addr < 0x4020) return IO_read(addr);
+            if (addr < 0x4100) return Read_OpenBus(addr);
+            return Wrap_MapperR_ExpansionROM(addr);
+        }
+        static void Write_Page2(ushort addr, byte val)
+        {
+            if (addr < 0x4020) { IO_write(addr, val); return; }
+            if (addr < 0x4100) return; // $4020-$40FF open bus: write ignored
+            Wrap_MapperW_ExpansionROM(addr, val);
+        }
+
         static void init_function()
         {
 #if NET10_0_OR_GREATER
-            // Allocate once, process-lifetime. 64-byte aligned via AllocUnmanaged on .NET 10.
-            if (mem_write_fun == null)
-                mem_write_fun = (delegate*<ushort, byte, void>*)AllocUnmanaged(0x10000 * sizeof(delegate*<ushort, byte, void>));
-            if (mem_read_fun == null)
-                mem_read_fun  = (delegate*<ushort, byte>*)AllocUnmanaged(0x10000 * sizeof(delegate*<ushort, byte>));
+            // Allocate once. 8 slots × 8 bytes = 64 bytes, one cache line.
+            if (mem_write_page == null)
+                mem_write_page = (delegate*<ushort, byte, void>*)AllocUnmanaged(8 * sizeof(delegate*<ushort, byte, void>));
+            if (mem_read_page == null)
+                mem_read_page  = (delegate*<ushort, byte>*)AllocUnmanaged(8 * sizeof(delegate*<ushort, byte>));
 
-            // Range-based fill: one tight loop per memory region, replaces 65536× if-else chain.
-            for (int i = 0;      i < 0x2000;  i++) mem_write_fun[i] = &Write_NesRam;
-            for (int i = 0x2000; i < 0x4020;  i++) mem_write_fun[i] = &IO_write;
-            for (int i = 0x4020; i < 0x4100;  i++) mem_write_fun[i] = &Write_NoOp;                // $4020-$40FF open bus
-            for (int i = 0x4100; i < 0x6000;  i++) mem_write_fun[i] = &Wrap_MapperW_ExpansionROM;
-            for (int i = 0x6000; i < 0x8000;  i++) mem_write_fun[i] = &Wrap_MapperW_RAM;
-            for (int i = 0x8000; i < 0x10000; i++) mem_write_fun[i] = &Wrap_MapperW_PRG;
+            mem_read_page[0] = &Read_NesRam;
+            mem_read_page[1] = &IO_read;
+            mem_read_page[2] = &Read_Page2;
+            mem_read_page[3] = &Wrap_MapperR_RAM;
+            mem_read_page[4] = &Wrap_MapperR_RPG;
+            mem_read_page[5] = &Wrap_MapperR_RPG;
+            mem_read_page[6] = &Wrap_MapperR_RPG;
+            mem_read_page[7] = &Wrap_MapperR_RPG;
 
-            for (int i = 0;      i < 0x2000;  i++) mem_read_fun[i] = &Read_NesRam;
-            for (int i = 0x2000; i < 0x4020;  i++) mem_read_fun[i] = &IO_read;
-            for (int i = 0x4020; i < 0x4100;  i++) mem_read_fun[i] = &Read_OpenBus;               // $4020-$40FF open bus
-            for (int i = 0x4100; i < 0x6000;  i++) mem_read_fun[i] = &Wrap_MapperR_ExpansionROM;
-            for (int i = 0x6000; i < 0x8000;  i++) mem_read_fun[i] = &Wrap_MapperR_RAM;
-            for (int i = 0x8000; i < 0x10000; i++) mem_read_fun[i] = &Wrap_MapperR_RPG;
+            mem_write_page[0] = &Write_NesRam;
+            mem_write_page[1] = &IO_write;
+            mem_write_page[2] = &Write_Page2;
+            mem_write_page[3] = &Wrap_MapperW_RAM;
+            mem_write_page[4] = &Wrap_MapperW_PRG;
+            mem_write_page[5] = &Wrap_MapperW_PRG;
+            mem_write_page[6] = &Wrap_MapperW_PRG;
+            mem_write_page[7] = &Wrap_MapperW_PRG;
 #else
-            mem_write_fun = new Action<ushort, byte>[0x10000];
-            mem_read_fun  = new Func<ushort, byte>[0x10000];
+            mem_write_page = new Action<ushort, byte>[8];
+            mem_read_page  = new Func<ushort, byte>[8];
 
-            for (int address = 0; address < 0x10000; address++)
-            {
-                if      (address < 0x2000) mem_write_fun[address] = Write_NesRam;
-                else if (address < 0x4020) mem_write_fun[address] = IO_write;
-                else if (address < 0x4100) mem_write_fun[address] = Write_NoOp;
-                else if (address < 0x6000) mem_write_fun[address] = Wrap_MapperW_ExpansionROM;
-                else if (address < 0x8000) mem_write_fun[address] = Wrap_MapperW_RAM;
-                else                       mem_write_fun[address] = Wrap_MapperW_PRG;
-            }
-            for (int address = 0; address < 0x10000; address++)
-            {
-                if      (address < 0x2000) mem_read_fun[address] = Read_NesRam;
-                else if (address < 0x4020) mem_read_fun[address] = IO_read;
-                else if (address < 0x4100) mem_read_fun[address] = Read_OpenBus;
-                else if (address < 0x6000) mem_read_fun[address] = Wrap_MapperR_ExpansionROM;
-                else if (address < 0x8000) mem_read_fun[address] = Wrap_MapperR_RAM;
-                else                       mem_read_fun[address] = Wrap_MapperR_RPG;
-            }
+            mem_read_page[0] = Read_NesRam;
+            mem_read_page[1] = IO_read;
+            mem_read_page[2] = Read_Page2;
+            mem_read_page[3] = Wrap_MapperR_RAM;
+            mem_read_page[4] = Wrap_MapperR_RPG;
+            mem_read_page[5] = Wrap_MapperR_RPG;
+            mem_read_page[6] = Wrap_MapperR_RPG;
+            mem_read_page[7] = Wrap_MapperR_RPG;
+
+            mem_write_page[0] = Write_NesRam;
+            mem_write_page[1] = IO_write;
+            mem_write_page[2] = Write_Page2;
+            mem_write_page[3] = Wrap_MapperW_RAM;
+            mem_write_page[4] = Wrap_MapperW_PRG;
+            mem_write_page[5] = Wrap_MapperW_PRG;
+            mem_write_page[6] = Wrap_MapperW_PRG;
+            mem_write_page[7] = Wrap_MapperW_PRG;
 #endif
         }
     }
