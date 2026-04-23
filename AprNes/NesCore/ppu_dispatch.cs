@@ -49,9 +49,16 @@ namespace AprNes
                 ppuTickPreRenderTable = (delegate* unmanaged<void>*)AllocUnmanaged(sz);
                 ppuTickVBlankTable    = (delegate* unmanaged<void>*)AllocUnmanaged(sz);
             }
+            // Visible line per-cx specialisation:
+            //   slots 0-255  → Ppu_Tick_Visible_PixelZone  (hot pixel generation)
+            //   slots 256-340 → Ppu_Tick_VisibleLine       (scroll/sprite-fetch/prefetch/dummy)
+            for (int i = 0; i < 256; i++)
+                ppuTickVisibleTable[i] = &Ppu_Tick_Visible_PixelZone;
+            for (int i = 256; i < 341; i++)
+                ppuTickVisibleTable[i] = &Ppu_Tick_VisibleLine;
+
             for (int i = 0; i < 341; i++)
             {
-                ppuTickVisibleTable[i]   = &Ppu_Tick_VisibleLine;
                 ppuTickPreRenderTable[i] = &Ppu_Tick_PreRenderLine;
                 ppuTickVBlankTable[i]    = &Ppu_Tick_VBlankLine;
             }
@@ -62,13 +69,269 @@ namespace AprNes
                 ppuTickPreRenderTable = (delegate*<void>*)AllocUnmanaged(sz);
                 ppuTickVBlankTable    = (delegate*<void>*)AllocUnmanaged(sz);
             }
+            for (int i = 0; i < 256; i++)
+                ppuTickVisibleTable[i] = &Ppu_Tick_Visible_PixelZone;
+            for (int i = 256; i < 341; i++)
+                ppuTickVisibleTable[i] = &Ppu_Tick_VisibleLine;
+
             for (int i = 0; i < 341; i++)
             {
-                ppuTickVisibleTable[i]   = &Ppu_Tick_VisibleLine;
                 ppuTickPreRenderTable[i] = &Ppu_Tick_PreRenderLine;
                 ppuTickVBlankTable[i]    = &Ppu_Tick_VBlankLine;
             }
 #endif
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // Ppu_Tick_Visible_PixelZone — visible scanline, entry cx ∈ [0, 255]
+        // (post-inc cx ∈ [1, 256], the pixel generation hot zone).
+        // Specialisations vs Ppu_Tick_VisibleLine:
+        //   - Scroll ops: entry cx never 256/257/280-304 → entire block removed.
+        //   - Scanline wrap: entry cx < 340 → never wraps → scanline stays < 240.
+        //   - Events: scanline < 240 < nmiTriggerLine → check removed.
+        //   - Odd-frame-skip / skippedPreRenderDot341 reset: preRender-only → removed.
+        //   - Tile fetch gate `(cx∈[1,256] ∪ [321,336])` → always true → gate removed.
+        //   - Pixel gate `cx > 0 && cx <= 256` → always true → gate removed.
+        //   - Scanline gate inside pixel block `scanline < 240` → always true → removed.
+        //   - Sprite shift gate `cx <= 256` → always true → removed.
+        //   - Draw gate `cx >= 4 && cx <= 259` → simplified to `cx >= 4`.
+        //   - NTSC capture `cx == 260` → never true → removed.
+        //   - Frame render `scanline==240 && cx==1` → never true here → removed.
+        // ════════════════════════════════════════════════════════════════
+#if NET10_0_OR_GREATER
+        [UnmanagedCallersOnly]
+#endif
+        static void Ppu_Tick_Visible_PixelZone()
+        {
+            int cx = ppu_cycles_x; // entry cx ∈ [0, 255]
+
+            if (ppu2006UpdateDelay != 0 || ppu2005UpdateDelay != 0)
+                PpuPhase2_DeferredUpdates(cx);
+
+            if (--open_bus_decay_timer == 0) { open_bus_decay_timer = 77777; openbus = 0; }
+
+            // (Scroll ops skipped — entry cx ∉ {256, 257} in this zone.)
+
+            // ++cx (no wrap possible; cx becomes 1..256).
+            ppu_cycles_x = ++cx;
+
+            // (Events skipped — scanline < 240 < nmiTriggerLine.)
+
+            ppuVSET_Latch1 = !ppuVSET;
+            if (ppuVSET && !ppuVSET_Latch2) isVblank = true;
+            if (ppu2002ReadPending) { ppu2002ReadPending = false; isVblank = false; }
+
+            isSpriteOverflow_Delayed = isSpriteOverflow;
+
+            MapperObj.PpuClock();
+            ppuA12Prev = (ppuAddressBus & 0x1000) != 0;
+            // NTSC odd-frame skip (entry cx==340 preRender only) — skipped, never fires here.
+            // But skippedPreRenderDot341 reset at (scanline==0, post-inc cx==2) DOES fire in this zone
+            // (entry cx=1, scanline still 0). Keep the check.
+            if (oddSwap && (ShowBackGround || ShowSprites) && scanline == 0 && cx == 2)
+                skippedPreRenderDot341 = false;
+
+            if ((mcCpuClock & 3) != 3)
+            {
+                ShowBG_EvalDelay = ShowBackGround;
+                ShowSpr_EvalDelay = ShowSprites;
+            }
+
+            PPU_DATA_Pipeline_Step(1);
+
+            if (oamCorruptDelay != 0) PpuPhase_HandleDelayedOamCorruption(true);
+
+            PpuPhase4_SpriteEvalAndInit();
+
+            if ((mcCpuClock & 3) == 3)
+            {
+                ShowBG_EvalDelay = ShowBackGround;
+                ShowSpr_EvalDelay = ShowSprites;
+            }
+
+            if (!ShowBackGround && !ShowSprites) ppuAddressBus = vram_addr;
+
+            if (ppu2001UpdateDelay > 0) PpuPhase_Apply2001Mask();
+            if (ppu2001EmphasisDelay > 0) PpuPhase_Apply2001Emphasis();
+
+            prevPrevPrevDotColor = prevPrevDotColor; prevPrevDotColor = prevDotColor; prevDotColor = dotColor;
+            prevPrevPrevDotPalIdx = prevPrevDotPalIdx; prevPrevDotPalIdx = prevDotPalIdx; prevDotPalIdx = dotPalIdx;
+
+            // ── Inlined render block (tile-fetch gate always true, pixel+shift always run) ──
+            // cx ∈ [1, 256] throughout.
+            if (ShowBG_EvalDelay || ShowSpr_EvalDelay)
+            {
+                if (ppu2007_PPU_ALE && ppu2007_PPU_READ)
+                    ppuOctalLatch = (byte)ppuAddressBus;
+
+                int fetchPair = ((cx - 1) >> 1) & 3;
+                if ((cx & 1) != 0)
+                {
+                    if (fetchPair < 2)
+                    {
+                        if (fetchPair == 0)
+                            ppuPAR_NT = (ushort)(0x2000 | (vram_addr & 0x0FFF));
+                        else
+                            ppuPAR_AT = (ushort)(0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07));
+                        ppuPAR_MUX = (fetchPair == 0) ? ppuPAR_NT : ppuPAR_AT;
+                    }
+                    else
+                    {
+                        PPU_CheckPAR();
+                        ppuPAR_CHR = (ushort)((ppuPAR_CHR & ~8) | ((fetchPair & 1) << 3));
+                        ppuPAR_MUX = ppuPAR_CHR;
+                    }
+                    ppuAddressBus = ppuPAR_MUX;
+                }
+                else
+                {
+                    ppuAddressBus = (ushort)((ppuPAR_MUX & 0xFF00) | ppuOctalLatch);
+
+                    if (fetchPair >= 2)
+                    {
+                        ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
+                        if (mapperNeedsA12 && (fetchPair == 2 || !mapperA12IsMmc3))
+                            NotifyMapperA12(ppuAddressBus);
+                    }
+                    else if (fetchPair == 0 && mapperA12IsMmc3)
+                    {
+                        NotifyMapperA12(ppuAddressBus);
+                    }
+
+                    renderTemp = PpuBusRead(ppuAddressBus);
+                    ppuAddressBus = (ushort)((ppuAddressBus & 0xFF00) | renderTemp);
+
+                    if (fetchPair == 0) { commitNTFetch = true; if (extAttrEnabled) extAttrNTOffset = (ushort)(ppuAddressBus & 0x3FF); }
+                    else if (fetchPair == 1) commitATFetch = true;
+                    else if (fetchPair == 2) commitPatLowFetch = true;
+                    else                     commitPatHighFetch = true;
+
+                    if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ppuAddressBus);
+                }
+
+                if (ppu2007_PPU_ALE && !ppu2007_PPU_READ)
+                    ppuOctalLatch = (byte)ppuAddressBus;
+
+                // cx == 321 never in this zone; only cx == 1 possible.
+                if (cx == 1 && chrABAutoSwitch)
+                {
+                    byte** src = Spritesize8x16 ? (chrBGUseASet ? chrBankPtrsA : chrBankPtrsB) : chrBankPtrsA;
+                    *(PtrBlock8*)chrBankPtrs = *(PtrBlock8*)src;
+                }
+            }
+
+            // ── Pixel composition (scanline < 240 guaranteed) ──
+            {
+                bool showBG = ShowBackGround;
+                bool showSpr = ShowSprites;
+
+                byte backdropIdx = (byte)(ppu_ram[0x3f00] & 0x3f);
+                uint compositeColor = palCache[0];
+                byte compositePalIdx = backdropIdx;
+                int bgColor = 0, bgPalette = 0;
+
+                if (showBG && (cx > 8 || ShowBgLeft8))
+                {
+                    int bit = 15 - FineX;
+                    bgColor = (((renderHigh >> bit) & 1) << 1) | ((renderLow >> bit) & 1);
+                    { int ab = 7 - FineX;
+                      bgPalette = (((renderAttrHigh >> ab) & 1) << 1) | ((renderAttrLow >> ab) & 1); }
+                    if (bgColor == 0) bgPalette = 0;
+                }
+
+                if (showSpr && (cx > 8 || ShowSprLeft8) && spriteAnyActive)
+                {
+                    ulong xc = *(ulong*)sprXCounter;
+                    ulong has_bits = ((xc & 0x7F7F7F7F7F7F7F7FUL) + 0x7F7F7F7F7F7F7F7FUL) | xc;
+                    ulong active_mask = skippedPreRenderDot341
+                        ? 0x8080808080808080UL
+                        : (~has_bits & 0x8080808080808080UL);
+                    ulong pixel_mask = (*(ulong*)sprShiftH | *(ulong*)sprShiftL) & 0x8080808080808080UL;
+                    ulong valid = active_mask & pixel_mask;
+
+                    if (valid != 0)
+                    {
+#if NET10_0_OR_GREATER
+                        int i = System.Numerics.BitOperations.TrailingZeroCount(valid) >> 3;
+#else
+                        ulong lowest = valid & (ulong)(-(long)valid);
+                        int i = (int)((0x0001020304050607UL * (lowest >> 7)) >> 56);
+#endif
+
+                        byte h = sprShiftH[i], l = sprShiftL[i];
+                        int attr = sprFetchAttr[i];
+                        int sprColor = ((h >> 7) << 1) | (l >> 7);
+                        int sprPalette = (attr & 3) | 4;
+                        bool sprPriority = (attr & 0x20) == 0;
+
+                        if (i == 0 && canDetectSprite0Hit && sprZeroInSlots && showBG && bgColor != 0)
+                        { if (cx < 256) { pendingSprite0Hit = true; canDetectSprite0Hit = false; } }
+
+                        bool ow = (bgColor == 0) | sprPriority;
+                        bgColor = ow ? sprColor : bgColor;
+                        bgPalette = ow ? sprPalette : bgPalette;
+                    }
+                }
+
+                if (ppuPaletteCorruptionFromVChange | ppuPaletteCorruptionFromDisable)
+                {
+                    ppuPaletteCorruptionFromVChange = false;
+                    ppuPaletteCorruptionFromDisable = false;
+                    CorruptPalettes(bgColor, vram_addr);
+                }
+
+                if (showBG || showSpr)
+                { int pa = (bgPalette << 2) | bgColor; if (bgColor == 0) pa = 0; compositeColor = palCache[pa]; compositePalIdx = (byte)(ppu_ram[0x3f00 + pa] & 0x3f); }
+                else { if ((vram_addr & 0x3F1F) >= 0x3F00) { int pa = vram_addr & 0x1F; if ((pa & 3) == 0) pa &= 0x0F; byte idx = (byte)(ppu_ram[0x3f00 + pa] & 0x3f); compositeColor = NesColors[idx]; compositePalIdx = idx; } }
+
+                dotColor = compositeColor;
+                dotPalIdx = compositePalIdx;
+            }
+
+            // ── Sprite shift (cx <= 256 always true) ──
+            {
+                bool showBG = ShowBackGround;
+                bool showSpr = ShowSprites;
+                bool renderEnabled = showSpr || showBG;
+                bool canDecrement = !skippedPreRenderDot341;
+                ulong v = *(ulong*)sprXCounter;
+                if (!canDecrement || v == 0)
+                {
+                    if (renderEnabled)
+                    {
+                        *(ulong*)sprShiftL = (*(ulong*)sprShiftL << 1) & 0xFEFEFEFEFEFEFEFEUL;
+                        *(ulong*)sprShiftH = (*(ulong*)sprShiftH << 1) & 0xFEFEFEFEFEFEFEFEUL;
+                    }
+                }
+                else
+                {
+                    ulong dec_mask = ((v | ((v & 0x7F7F7F7F7F7F7F7FUL) + 0x7F7F7F7F7F7F7F7FUL))
+                                     & 0x8080808080808080UL) >> 7;
+                    *(ulong*)sprXCounter = v - dec_mask;
+
+                    if (renderEnabled)
+                    {
+                        ulong mask_0 = ~(dec_mask * 255UL);
+                        ulong sl = *(ulong*)sprShiftL;
+                        ulong sh = *(ulong*)sprShiftH;
+                        *(ulong*)sprShiftL = (((sl << 1) & 0xFEFEFEFEFEFEFEFEUL) & mask_0) | (sl & ~mask_0);
+                        *(ulong*)sprShiftH = (((sh << 1) & 0xFEFEFEFEFEFEFEFEUL) & mask_0) | (sh & ~mask_0);
+                    }
+                }
+            }
+
+            PPU_DATA_Pipeline_Step(2);
+
+            // ── Draw to screen (cx ∈ [1, 256]; gate simplifies to cx >= 4) ──
+            if (cx >= 4)
+            {
+                int pos = (scanline << 8) + (cx - 4);
+                if (AnalogEnabled) ntscScanBuf[cx - 4] = prevPrevPrevDotPalIdx;
+                else ScreenBuf1x[pos] = prevPrevPrevDotColor;
+            }
+            // (NTSC capture cx == 260 never fires here; frame render never fires here.)
+
+            ppuRenderingEnabled = ShowBackGround_Instant || ShowSprites_Instant;
         }
 
         // ════════════════════════════════════════════════════════════════
