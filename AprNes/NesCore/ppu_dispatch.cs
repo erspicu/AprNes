@@ -50,12 +50,19 @@ namespace AprNes
                 ppuTickVBlankTable    = (delegate* unmanaged<void>*)AllocUnmanaged(sz);
             }
             // Visible line per-cx specialisation:
-            //   slots 0-255  → Ppu_Tick_Visible_PixelZone  (hot pixel generation)
-            //   slots 256-340 → Ppu_Tick_VisibleLine       (scroll/sprite-fetch/prefetch/dummy)
-            for (int i = 0; i < 256; i++)
-                ppuTickVisibleTable[i] = &Ppu_Tick_Visible_PixelZone;
-            for (int i = 256; i < 341; i++)
-                ppuTickVisibleTable[i] = &Ppu_Tick_VisibleLine;
+            //   slots 0-255    → PixelZone       (hot pixel + tile fetch + sprite shift + draw)
+            //   slots 256, 257 → VisibleLine     (Yinc, CopyHoriV — scroll specials, fall through)
+            //   slots 258-319  → SpriteFetch     (no tile fetch, no pixel, no draw except post-259)
+            //   slots 320-335  → Prefetch        (tile fetch only)
+            //   slots 336-339  → Dummy           (no render work, only universal per-dot)
+            //   slot 340       → VisibleLine     (wrap to next scanline)
+            for (int i = 0;   i < 256; i++) ppuTickVisibleTable[i] = &Ppu_Tick_Visible_PixelZone;
+            ppuTickVisibleTable[256] = &Ppu_Tick_VisibleLine;
+            ppuTickVisibleTable[257] = &Ppu_Tick_VisibleLine;
+            for (int i = 258; i < 320; i++) ppuTickVisibleTable[i] = &Ppu_Tick_Visible_SpriteFetch;
+            for (int i = 320; i < 336; i++) ppuTickVisibleTable[i] = &Ppu_Tick_Visible_Prefetch;
+            for (int i = 336; i < 340; i++) ppuTickVisibleTable[i] = &Ppu_Tick_Visible_Dummy;
+            ppuTickVisibleTable[340] = &Ppu_Tick_VisibleLine;
 
             for (int i = 0; i < 341; i++)
             {
@@ -69,10 +76,13 @@ namespace AprNes
                 ppuTickPreRenderTable = (delegate*<void>*)AllocUnmanaged(sz);
                 ppuTickVBlankTable    = (delegate*<void>*)AllocUnmanaged(sz);
             }
-            for (int i = 0; i < 256; i++)
-                ppuTickVisibleTable[i] = &Ppu_Tick_Visible_PixelZone;
-            for (int i = 256; i < 341; i++)
-                ppuTickVisibleTable[i] = &Ppu_Tick_VisibleLine;
+            for (int i = 0;   i < 256; i++) ppuTickVisibleTable[i] = &Ppu_Tick_Visible_PixelZone;
+            ppuTickVisibleTable[256] = &Ppu_Tick_VisibleLine;
+            ppuTickVisibleTable[257] = &Ppu_Tick_VisibleLine;
+            for (int i = 258; i < 320; i++) ppuTickVisibleTable[i] = &Ppu_Tick_Visible_SpriteFetch;
+            for (int i = 320; i < 336; i++) ppuTickVisibleTable[i] = &Ppu_Tick_Visible_Prefetch;
+            for (int i = 336; i < 340; i++) ppuTickVisibleTable[i] = &Ppu_Tick_Visible_Dummy;
+            ppuTickVisibleTable[340] = &Ppu_Tick_VisibleLine;
 
             for (int i = 0; i < 341; i++)
             {
@@ -330,6 +340,276 @@ namespace AprNes
                 else ScreenBuf1x[pos] = prevPrevPrevDotColor;
             }
             // (NTSC capture cx == 260 never fires here; frame render never fires here.)
+
+            ppuRenderingEnabled = ShowBackGround_Instant || ShowSprites_Instant;
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // Ppu_Tick_Visible_SpriteFetch — visible, entry cx ∈ [258, 319]
+        // (post-inc cx ∈ [259, 320], HBlank sprite fetch region).
+        // Specialisations:
+        //   - No scroll ops (entry never 256/257)
+        //   - No wrap (entry < 340)
+        //   - No events (scanline < nmiTriggerLine)
+        //   - No odd-skip, no skippedPreRenderDot341 reset (cx range misses both)
+        //   - Tile fetch gate → always false → whole tile fetch block removed
+        //   - Pixel / sprite shift gates → always false → removed
+        //   - Draw fires only at post-inc cx==259 (entry 258); keep runtime check
+        //   - NTSC capture fires at post-inc cx==260 (entry 259); keep runtime check
+        //   - Frame render → never → removed
+        // ════════════════════════════════════════════════════════════════
+#if NET10_0_OR_GREATER
+        [UnmanagedCallersOnly]
+#endif
+        static void Ppu_Tick_Visible_SpriteFetch()
+        {
+            int cx = ppu_cycles_x;
+
+            if (ppu2006UpdateDelay != 0 || ppu2005UpdateDelay != 0)
+                PpuPhase2_DeferredUpdates(cx);
+
+            if (--open_bus_decay_timer == 0) { open_bus_decay_timer = 77777; openbus = 0; }
+
+            // (No scroll ops, no wrap, no events.)
+
+            ppu_cycles_x = ++cx;
+
+            ppuVSET_Latch1 = !ppuVSET;
+            if (ppuVSET && !ppuVSET_Latch2) isVblank = true;
+            if (ppu2002ReadPending) { ppu2002ReadPending = false; isVblank = false; }
+
+            isSpriteOverflow_Delayed = isSpriteOverflow;
+
+            MapperObj.PpuClock();
+            ppuA12Prev = (ppuAddressBus & 0x1000) != 0;
+
+            if ((mcCpuClock & 3) != 3)
+            {
+                ShowBG_EvalDelay = ShowBackGround;
+                ShowSpr_EvalDelay = ShowSprites;
+            }
+
+            PPU_DATA_Pipeline_Step(1);
+
+            if (oamCorruptDelay != 0) PpuPhase_HandleDelayedOamCorruption(true);
+
+            PpuPhase4_SpriteEvalAndInit();
+
+            if ((mcCpuClock & 3) == 3)
+            {
+                ShowBG_EvalDelay = ShowBackGround;
+                ShowSpr_EvalDelay = ShowSprites;
+            }
+
+            if (!ShowBackGround && !ShowSprites) ppuAddressBus = vram_addr;
+
+            if (ppu2001UpdateDelay > 0) PpuPhase_Apply2001Mask();
+            if (ppu2001EmphasisDelay > 0) PpuPhase_Apply2001Emphasis();
+
+            prevPrevPrevDotColor = prevPrevDotColor; prevPrevDotColor = prevDotColor; prevDotColor = dotColor;
+            prevPrevPrevDotPalIdx = prevPrevDotPalIdx; prevPrevDotPalIdx = prevDotPalIdx; prevDotPalIdx = dotPalIdx;
+
+            // (Tile fetch / pixel / sprite shift blocks removed — post-inc cx never in ranges.)
+
+            PPU_DATA_Pipeline_Step(2);
+
+            // Draw: only post-inc cx==259 fires (entry 258).
+            if (cx == 259)
+            {
+                int pos = (scanline << 8) + 255;
+                if (AnalogEnabled) ntscScanBuf[255] = prevPrevPrevDotPalIdx;
+                else ScreenBuf1x[pos] = prevPrevPrevDotColor;
+            }
+            if (AnalogEnabled && cx == 260)
+                Ntsc_CaptureScanline(scanline, ntscScanBuf, ppuEmphasis);
+
+            ppuRenderingEnabled = ShowBackGround_Instant || ShowSprites_Instant;
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // Ppu_Tick_Visible_Prefetch — visible, entry cx ∈ [320, 335]
+        // (post-inc cx ∈ [321, 336], next-scanline background prefetch).
+        // Specialisations:
+        //   - No scroll / wrap / events / odd-skip
+        //   - Tile fetch gate → always true → block runs unconditionally
+        //   - Pixel / sprite shift / draw / NTSC capture / frame render → never → removed
+        // ════════════════════════════════════════════════════════════════
+#if NET10_0_OR_GREATER
+        [UnmanagedCallersOnly]
+#endif
+        static void Ppu_Tick_Visible_Prefetch()
+        {
+            int cx = ppu_cycles_x;
+
+            if (ppu2006UpdateDelay != 0 || ppu2005UpdateDelay != 0)
+                PpuPhase2_DeferredUpdates(cx);
+
+            if (--open_bus_decay_timer == 0) { open_bus_decay_timer = 77777; openbus = 0; }
+
+            ppu_cycles_x = ++cx;
+
+            ppuVSET_Latch1 = !ppuVSET;
+            if (ppuVSET && !ppuVSET_Latch2) isVblank = true;
+            if (ppu2002ReadPending) { ppu2002ReadPending = false; isVblank = false; }
+
+            isSpriteOverflow_Delayed = isSpriteOverflow;
+
+            MapperObj.PpuClock();
+            ppuA12Prev = (ppuAddressBus & 0x1000) != 0;
+
+            if ((mcCpuClock & 3) != 3)
+            {
+                ShowBG_EvalDelay = ShowBackGround;
+                ShowSpr_EvalDelay = ShowSprites;
+            }
+
+            PPU_DATA_Pipeline_Step(1);
+
+            if (oamCorruptDelay != 0) PpuPhase_HandleDelayedOamCorruption(true);
+
+            PpuPhase4_SpriteEvalAndInit();
+
+            if ((mcCpuClock & 3) == 3)
+            {
+                ShowBG_EvalDelay = ShowBackGround;
+                ShowSpr_EvalDelay = ShowSprites;
+            }
+
+            if (!ShowBackGround && !ShowSprites) ppuAddressBus = vram_addr;
+
+            if (ppu2001UpdateDelay > 0) PpuPhase_Apply2001Mask();
+            if (ppu2001EmphasisDelay > 0) PpuPhase_Apply2001Emphasis();
+
+            prevPrevPrevDotColor = prevPrevDotColor; prevPrevDotColor = prevDotColor; prevDotColor = dotColor;
+            prevPrevPrevDotPalIdx = prevPrevDotPalIdx; prevPrevDotPalIdx = prevDotPalIdx; prevDotPalIdx = dotPalIdx;
+
+            // Tile fetch — post-inc cx ∈ [321, 336], gate collapses to unconditional.
+            if (ShowBG_EvalDelay || ShowSpr_EvalDelay)
+            {
+                if (ppu2007_PPU_ALE && ppu2007_PPU_READ)
+                    ppuOctalLatch = (byte)ppuAddressBus;
+
+                int fetchPair = ((cx - 1) >> 1) & 3;
+                if ((cx & 1) != 0)
+                {
+                    if (fetchPair < 2)
+                    {
+                        if (fetchPair == 0)
+                            ppuPAR_NT = (ushort)(0x2000 | (vram_addr & 0x0FFF));
+                        else
+                            ppuPAR_AT = (ushort)(0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07));
+                        ppuPAR_MUX = (fetchPair == 0) ? ppuPAR_NT : ppuPAR_AT;
+                    }
+                    else
+                    {
+                        PPU_CheckPAR();
+                        ppuPAR_CHR = (ushort)((ppuPAR_CHR & ~8) | ((fetchPair & 1) << 3));
+                        ppuPAR_MUX = ppuPAR_CHR;
+                    }
+                    ppuAddressBus = ppuPAR_MUX;
+                }
+                else
+                {
+                    ppuAddressBus = (ushort)((ppuPAR_MUX & 0xFF00) | ppuOctalLatch);
+
+                    if (fetchPair >= 2)
+                    {
+                        ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
+                        if (mapperNeedsA12 && (fetchPair == 2 || !mapperA12IsMmc3))
+                            NotifyMapperA12(ppuAddressBus);
+                    }
+                    else if (fetchPair == 0 && mapperA12IsMmc3)
+                    {
+                        NotifyMapperA12(ppuAddressBus);
+                    }
+
+                    renderTemp = PpuBusRead(ppuAddressBus);
+                    ppuAddressBus = (ushort)((ppuAddressBus & 0xFF00) | renderTemp);
+
+                    if (fetchPair == 0) { commitNTFetch = true; if (extAttrEnabled) extAttrNTOffset = (ushort)(ppuAddressBus & 0x3FF); }
+                    else if (fetchPair == 1) commitATFetch = true;
+                    else if (fetchPair == 2) commitPatLowFetch = true;
+                    else                     commitPatHighFetch = true;
+
+                    if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ppuAddressBus);
+                }
+
+                if (ppu2007_PPU_ALE && !ppu2007_PPU_READ)
+                    ppuOctalLatch = (byte)ppuAddressBus;
+
+                // cx == 321 hits at entry 320; cx == 1 never in this zone.
+                if (cx == 321 && chrABAutoSwitch)
+                {
+                    byte** src = Spritesize8x16 ? (chrBGUseASet ? chrBankPtrsA : chrBankPtrsB) : chrBankPtrsA;
+                    *(PtrBlock8*)chrBankPtrs = *(PtrBlock8*)src;
+                }
+            }
+
+            PPU_DATA_Pipeline_Step(2);
+
+            // (No pixel, no sprite shift, no draw, no NTSC capture, no frame render.)
+
+            ppuRenderingEnabled = ShowBackGround_Instant || ShowSprites_Instant;
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // Ppu_Tick_Visible_Dummy — visible, entry cx ∈ [336, 339]
+        // (post-inc cx ∈ [337, 340], end-of-line dummy fetch region).
+        // Specialisations:
+        //   - No scroll / wrap / events / odd-skip
+        //   - Tile fetch / pixel / sprite shift / draw / NTSC / frame render → all never → removed
+        //   - Leanest possible visible handler — only universal per-dot state updates.
+        // ════════════════════════════════════════════════════════════════
+#if NET10_0_OR_GREATER
+        [UnmanagedCallersOnly]
+#endif
+        static void Ppu_Tick_Visible_Dummy()
+        {
+            int cx = ppu_cycles_x;
+
+            if (ppu2006UpdateDelay != 0 || ppu2005UpdateDelay != 0)
+                PpuPhase2_DeferredUpdates(cx);
+
+            if (--open_bus_decay_timer == 0) { open_bus_decay_timer = 77777; openbus = 0; }
+
+            ppu_cycles_x = ++cx;
+
+            ppuVSET_Latch1 = !ppuVSET;
+            if (ppuVSET && !ppuVSET_Latch2) isVblank = true;
+            if (ppu2002ReadPending) { ppu2002ReadPending = false; isVblank = false; }
+
+            isSpriteOverflow_Delayed = isSpriteOverflow;
+
+            MapperObj.PpuClock();
+            ppuA12Prev = (ppuAddressBus & 0x1000) != 0;
+
+            if ((mcCpuClock & 3) != 3)
+            {
+                ShowBG_EvalDelay = ShowBackGround;
+                ShowSpr_EvalDelay = ShowSprites;
+            }
+
+            PPU_DATA_Pipeline_Step(1);
+
+            if (oamCorruptDelay != 0) PpuPhase_HandleDelayedOamCorruption(true);
+
+            PpuPhase4_SpriteEvalAndInit();
+
+            if ((mcCpuClock & 3) == 3)
+            {
+                ShowBG_EvalDelay = ShowBackGround;
+                ShowSpr_EvalDelay = ShowSprites;
+            }
+
+            if (!ShowBackGround && !ShowSprites) ppuAddressBus = vram_addr;
+
+            if (ppu2001UpdateDelay > 0) PpuPhase_Apply2001Mask();
+            if (ppu2001EmphasisDelay > 0) PpuPhase_Apply2001Emphasis();
+
+            prevPrevPrevDotColor = prevPrevDotColor; prevPrevDotColor = prevDotColor; prevDotColor = dotColor;
+            prevPrevPrevDotPalIdx = prevPrevDotPalIdx; prevPrevDotPalIdx = prevDotPalIdx; prevDotPalIdx = dotPalIdx;
+
+            PPU_DATA_Pipeline_Step(2);
 
             ppuRenderingEnabled = ShowBackGround_Instant || ShowSprites_Instant;
         }
