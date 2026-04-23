@@ -23,10 +23,31 @@ namespace AprNes
         // TriCNES: CopyV flag — set when $2006 delayed copy fires, used for scroll conflict detection
 
         // ════════════════════════════════════════════════════════════════
-        // _EmulatePPU — full PPU step (called at mcPpuClock == 0)
+        // _EmulatePPU — thin dispatcher over 341-slot function-pointer tables.
+        // Three tables (visible / preRender / vblank) each hold a handler
+        // specialised to its scanline state. See ppu_dispatch.cs for handlers
+        // and InitPpuDispatchTable() setup.
         // TriCNES: Emulator.cs line 1256
         // ════════════════════════════════════════════════════════════════
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_step_new()
+        {
+            int cx = ppu_cycles_x;
+            int sl = scanline;
+#if NET10_0_OR_GREATER
+            delegate* unmanaged<void>* table;
+#else
+            delegate*<void>* table;
+#endif
+            if (sl < 240)                     table = ppuTickVisibleTable;
+            else if (sl == preRenderLine)     table = ppuTickPreRenderTable;
+            else                              table = ppuTickVBlankTable;
+            table[cx]();
+        }
+
+        // Keep legacy monolithic ppu_step_new body dead-code-eliminated but
+        // visible in git history for reference. It is never called.
+        static void ppu_step_legacy_unused()
         {
             int cx = ppu_cycles_x; // local alias, PRE-increment value
 

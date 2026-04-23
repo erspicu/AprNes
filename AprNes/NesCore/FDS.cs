@@ -381,6 +381,7 @@ namespace AprNes
                 // Memory function pointer setup (FDS-specific)
                 fds_InitFunction();
                 InitOpHandlers();
+                InitPpuDispatchTable();
 
                 // APU & audio
                 initAPU();
