@@ -8,8 +8,16 @@ namespace AprNes
         static byte r_A = 0, r_X = 0, r_Y = 0, r_SP = 0xFD, flagN = 0, flagV = 0, flagD = 0, flagI = 1, flagZ = 0, flagC = 0;
         static ushort r_PC = 0;
         static byte opcode;
-        // 256-entry native function pointer table — unmanaged memory, no bounds check
+        // 256-entry native function pointer table — unmanaged memory, no bounds check.
+        // On .NET 10 we upgrade to `delegate* unmanaged<void>*` + [UnmanagedCallersOnly]
+        // on every Op_XX so calli skips the GC safe-point poll (~1-3 cycles/dispatch);
+        // .NET Framework 4.8.1 lacks the attribute, so it keeps the plain managed
+        // function pointer form — which still emits calli, just with the poll.
+#if NET10_0_OR_GREATER
+        static unsafe delegate* unmanaged<void>* opFnPtrs;
+#else
         static unsafe delegate*<void>* opFnPtrs;
+#endif
 
         static public bool exit = false;
         static bool IRQLine = false;           // Latched from irqLineCurrent at CPUClock==5 (TriCNES: IRQLine)
@@ -627,9 +635,15 @@ namespace AprNes
 
         // === Named static op methods (for delegate* function pointer table) ===
 
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_Default() { CpuRead(addressBus); CompleteOperation(); }
 
         // === BRK / NMI / IRQ / RESET ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_00() {
             if (operationCycle == 1) {
                 if (!doBRK) { CpuRead(addressBus); }
@@ -672,277 +686,493 @@ namespace AprNes
         }
 
         // === ORA ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_09() { GetImmediate(); Op_ORA(dl); CompleteOperation(); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_05() {
             if (operationCycle == 1) GetAddressZeroPage();
             else { Op_ORA(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_15() {
             if (operationCycle < 3) GetAddressZPOffX();
             else { Op_ORA(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_0D() {
             if (operationCycle < 3) GetAddressAbsolute();
             else { Op_ORA(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_1D() {
             if (operationCycle < 4) GetAddressAbsOffX(true);
             else { Op_ORA(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_19() {
             if (operationCycle < 4) GetAddressAbsOffY(true);
             else { Op_ORA(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_01() {
             if (operationCycle < 5) GetAddressIndOffX();
             else { Op_ORA(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_11() {
             if (operationCycle < 5) GetAddressIndOffY(true);
             else { Op_ORA(CpuRead(addressBus)); CompleteOperation(); }
         }
 
         // === AND ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_29() { GetImmediate(); Op_AND(dl); CompleteOperation(); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_25() {
             if (operationCycle == 1) GetAddressZeroPage();
             else { Op_AND(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_35() {
             if (operationCycle < 3) GetAddressZPOffX();
             else { Op_AND(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_2D() {
             if (operationCycle < 3) GetAddressAbsolute();
             else { Op_AND(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_3D() {
             if (operationCycle < 4) GetAddressAbsOffX(true);
             else { Op_AND(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_39() {
             if (operationCycle < 4) GetAddressAbsOffY(true);
             else { Op_AND(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_21() {
             if (operationCycle < 5) GetAddressIndOffX();
             else { Op_AND(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_31() {
             if (operationCycle < 5) GetAddressIndOffY(true);
             else { Op_AND(CpuRead(addressBus)); CompleteOperation(); }
         }
 
         // === EOR ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_49() { GetImmediate(); Op_EOR(dl); CompleteOperation(); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_45() {
             if (operationCycle == 1) GetAddressZeroPage();
             else { Op_EOR(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_55() {
             if (operationCycle < 3) GetAddressZPOffX();
             else { Op_EOR(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_4D() {
             if (operationCycle < 3) GetAddressAbsolute();
             else { Op_EOR(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_5D() {
             if (operationCycle < 4) GetAddressAbsOffX(true);
             else { Op_EOR(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_59() {
             if (operationCycle < 4) GetAddressAbsOffY(true);
             else { Op_EOR(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_41() {
             if (operationCycle < 5) GetAddressIndOffX();
             else { Op_EOR(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_51() {
             if (operationCycle < 5) GetAddressIndOffY(true);
             else { Op_EOR(CpuRead(addressBus)); CompleteOperation(); }
         }
 
         // === ADC ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_69() { GetImmediate(); Op_ADC(dl); CompleteOperation(); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_65() {
             if (operationCycle == 1) GetAddressZeroPage();
             else { Op_ADC(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_75() {
             if (operationCycle < 3) GetAddressZPOffX();
             else { Op_ADC(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_6D() {
             if (operationCycle < 3) GetAddressAbsolute();
             else { Op_ADC(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_7D() {
             if (operationCycle < 4) GetAddressAbsOffX(true);
             else { Op_ADC(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_79() {
             if (operationCycle < 4) GetAddressAbsOffY(true);
             else { Op_ADC(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_61() {
             if (operationCycle < 5) GetAddressIndOffX();
             else { Op_ADC(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_71() {
             if (operationCycle < 5) GetAddressIndOffY(true);
             else { Op_ADC(CpuRead(addressBus)); CompleteOperation(); }
         }
 
         // === SBC ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_E9_SBC_Imm() { GetImmediate(); Op_SBC(dl); CompleteOperation(); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_E5() {
             if (operationCycle == 1) GetAddressZeroPage();
             else { Op_SBC(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_F5() {
             if (operationCycle < 3) GetAddressZPOffX();
             else { Op_SBC(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_ED() {
             if (operationCycle < 3) GetAddressAbsolute();
             else { Op_SBC(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_FD() {
             if (operationCycle < 4) GetAddressAbsOffX(true);
             else { Op_SBC(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_F9() {
             if (operationCycle < 4) GetAddressAbsOffY(true);
             else { Op_SBC(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_E1() {
             if (operationCycle < 5) GetAddressIndOffX();
             else { Op_SBC(CpuRead(addressBus)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_F1() {
             if (operationCycle < 5) GetAddressIndOffY(true);
             else { Op_SBC(CpuRead(addressBus)); CompleteOperation(); }
         }
 
         // === CMP ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_C9() { GetImmediate(); Op_CMP(dl, r_A); CompleteOperation(); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_C5() {
             if (operationCycle == 1) GetAddressZeroPage();
             else { Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_D5() {
             if (operationCycle < 3) GetAddressZPOffX();
             else { Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_CD() {
             if (operationCycle < 3) GetAddressAbsolute();
             else { Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_DD() {
             if (operationCycle < 4) GetAddressAbsOffX(true);
             else { Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_D9() {
             if (operationCycle < 4) GetAddressAbsOffY(true);
             else { Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_C1() {
             if (operationCycle < 5) GetAddressIndOffX();
             else { Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_D1() {
             if (operationCycle < 5) GetAddressIndOffY(true);
             else { Op_CMP(CpuRead(addressBus), r_A); CompleteOperation(); }
         }
 
         // === CPX ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_E0() { GetImmediate(); Op_CMP(dl, r_X); CompleteOperation(); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_E4() {
             if (operationCycle == 1) GetAddressZeroPage();
             else { Op_CMP(CpuRead(addressBus), r_X); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_EC() {
             if (operationCycle < 3) GetAddressAbsolute();
             else { Op_CMP(CpuRead(addressBus), r_X); CompleteOperation(); }
         }
 
         // === CPY ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_C0() { GetImmediate(); Op_CMP(dl, r_Y); CompleteOperation(); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_C4() {
             if (operationCycle == 1) GetAddressZeroPage();
             else { Op_CMP(CpuRead(addressBus), r_Y); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_CC() {
             if (operationCycle < 3) GetAddressAbsolute();
             else { Op_CMP(CpuRead(addressBus), r_Y); CompleteOperation(); }
         }
 
         // === LDA ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_A9() { GetImmediate(); r_A = dl; SetNZ(r_A); CompleteOperation(); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_A5() {
             if (operationCycle == 1) GetAddressZeroPage();
             else { r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_B5() {
             if (operationCycle < 3) GetAddressZPOffX();
             else { r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_AD() {
             if (operationCycle < 3) GetAddressAbsolute();
             else { r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_BD() {
             if (operationCycle < 4) GetAddressAbsOffX(true);
             else { r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_B9() {
             if (operationCycle < 4) GetAddressAbsOffY(true);
             else { r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_A1() {
             if (operationCycle < 5) GetAddressIndOffX();
             else { r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_B1() {
             if (operationCycle < 5) GetAddressIndOffY(true);
             else { r_A = CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); }
         }
 
         // === LDX ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_A2() { GetImmediate(); r_X = dl; SetNZ(r_X); CompleteOperation(); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_A6() {
             if (operationCycle == 1) GetAddressZeroPage();
             else { r_X = CpuRead(addressBus); SetNZ(r_X); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_B6() {
             if (operationCycle < 3) GetAddressZPOffY();
             else { r_X = CpuRead(addressBus); SetNZ(r_X); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_AE() {
             if (operationCycle < 3) GetAddressAbsolute();
             else { r_X = CpuRead(addressBus); SetNZ(r_X); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_BE() {
             if (operationCycle < 4) GetAddressAbsOffY(true);
             else { r_X = CpuRead(addressBus); SetNZ(r_X); CompleteOperation(); }
         }
 
         // === LDY ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_A0() { GetImmediate(); r_Y = dl; SetNZ(r_Y); CompleteOperation(); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_A4() {
             if (operationCycle == 1) GetAddressZeroPage();
             else { r_Y = CpuRead(addressBus); SetNZ(r_Y); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_B4() {
             if (operationCycle < 3) GetAddressZPOffX();
             else { r_Y = CpuRead(addressBus); SetNZ(r_Y); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_AC() {
             if (operationCycle < 3) GetAddressAbsolute();
             else { r_Y = CpuRead(addressBus); SetNZ(r_Y); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_BC() {
             if (operationCycle < 4) GetAddressAbsOffX(true);
             else { r_Y = CpuRead(addressBus); SetNZ(r_Y); CompleteOperation(); }
@@ -950,35 +1180,56 @@ namespace AprNes
 
         // === STA ===
         // TriCNES: store instructions set cpuIsRead=false on the last addressing cycle (before write)
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_85() {
             if (operationCycle == 1) { GetAddressZeroPage(); cpuIsRead = false; }
             else { CpuWrite(addressBus, r_A); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_95() {
             if (operationCycle < 2) GetAddressZPOffX();
             else if (operationCycle == 2) { GetAddressZPOffX(); cpuIsRead = false; }
             else { CpuWrite(addressBus, r_A); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_8D() {
             if (operationCycle < 2) GetAddressAbsolute();
             else if (operationCycle == 2) { GetAddressAbsolute(); cpuIsRead = false; }
             else { CpuWrite(addressBus, r_A); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_9D() {
             if (operationCycle < 3) GetAddressAbsOffX(false);
             else if (operationCycle == 3) { GetAddressAbsOffX(false); cpuIsRead = false; }
             else { CpuWrite(addressBus, r_A); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_99() {
             if (operationCycle < 3) GetAddressAbsOffY(false);
             else if (operationCycle == 3) { GetAddressAbsOffY(false); cpuIsRead = false; }
             else { CpuWrite(addressBus, r_A); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_81() {
             if (operationCycle < 4) GetAddressIndOffX();
             else if (operationCycle == 4) { GetAddressIndOffX(); cpuIsRead = false; }
             else { CpuWrite(addressBus, r_A); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_91() {
             if (operationCycle < 4) GetAddressIndOffY(false);
             else if (operationCycle == 4) { GetAddressIndOffY(false); cpuIsRead = false; }
@@ -986,15 +1237,24 @@ namespace AprNes
         }
 
         // === STX ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_86() {
             if (operationCycle == 1) { GetAddressZeroPage(); cpuIsRead = false; }
             else { CpuWrite(addressBus, r_X); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_96() {
             if (operationCycle < 2) GetAddressZPOffY();
             else if (operationCycle == 2) { GetAddressZPOffY(); cpuIsRead = false; }
             else { CpuWrite(addressBus, r_X); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_8E() {
             if (operationCycle < 2) GetAddressAbsolute();
             else if (operationCycle == 2) { GetAddressAbsolute(); cpuIsRead = false; }
@@ -1002,15 +1262,24 @@ namespace AprNes
         }
 
         // === STY ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_84() {
             if (operationCycle == 1) { GetAddressZeroPage(); cpuIsRead = false; }
             else { CpuWrite(addressBus, r_Y); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_94() {
             if (operationCycle < 2) GetAddressZPOffX();
             else if (operationCycle == 2) { GetAddressZPOffX(); cpuIsRead = false; }
             else { CpuWrite(addressBus, r_Y); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_8C() {
             if (operationCycle < 2) GetAddressAbsolute();
             else if (operationCycle == 2) { GetAddressAbsolute(); cpuIsRead = false; }
@@ -1018,6 +1287,9 @@ namespace AprNes
         }
 
         // === BIT ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_24() {
             if (operationCycle == 1) { GetAddressZeroPage(); }
             else { dl = CpuReadRMW(addressBus);
@@ -1026,6 +1298,9 @@ namespace AprNes
                 flagV = (byte)((dl & 0x40) >> 6);
                 CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_2C() {
             if (operationCycle < 3) { GetAddressAbsolute(); }
             else { dl = CpuReadRMW(addressBus);
@@ -1036,29 +1311,44 @@ namespace AprNes
         }
 
         // === ASL ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_0A() {
             CpuRead(addressBus);
             flagC = (byte)((r_A & 0x80) >> 7); r_A <<= 1; SetNZ(r_A);
             CompleteOperation();
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_06() {
             if (operationCycle < 2) GetAddressZeroPage();
             else if (operationCycle == 2) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 3) { CpuWrite(addressBus, dl); }
             else { Op_ASL_mem(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_16() {
             if (operationCycle < 3) GetAddressZPOffX();
             else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_ASL_mem(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_0E() {
             if (operationCycle < 3) GetAddressAbsolute();
             else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_ASL_mem(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_1E() {
             if (operationCycle < 5) GetAddressAbsOffX(false);
             else if (operationCycle == 5) { CpuWrite(addressBus, dl); }
@@ -1066,29 +1356,44 @@ namespace AprNes
         }
 
         // === LSR ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_4A() {
             CpuRead(addressBus);
             flagC = (byte)(r_A & 1); r_A >>= 1; SetNZ(r_A);
             CompleteOperation();
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_46() {
             if (operationCycle < 2) GetAddressZeroPage();
             else if (operationCycle == 2) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 3) { CpuWrite(addressBus, dl); }
             else { Op_LSR_mem(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_56() {
             if (operationCycle < 3) GetAddressZPOffX();
             else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_LSR_mem(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_4E() {
             if (operationCycle < 3) GetAddressAbsolute();
             else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_LSR_mem(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_5E() {
             if (operationCycle < 5) GetAddressAbsOffX(false);
             else if (operationCycle == 5) { CpuWrite(addressBus, dl); }
@@ -1096,29 +1401,44 @@ namespace AprNes
         }
 
         // === ROL ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_2A() {
             CpuRead(addressBus);
             { byte oc = flagC; flagC = (byte)((r_A & 0x80) >> 7); r_A = (byte)((r_A << 1) | oc); SetNZ(r_A); }
             CompleteOperation();
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_26() {
             if (operationCycle < 2) GetAddressZeroPage();
             else if (operationCycle == 2) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 3) { CpuWrite(addressBus, dl); }
             else { Op_ROL_mem(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_36() {
             if (operationCycle < 3) GetAddressZPOffX();
             else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_ROL_mem(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_2E() {
             if (operationCycle < 3) GetAddressAbsolute();
             else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_ROL_mem(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_3E() {
             if (operationCycle < 5) GetAddressAbsOffX(false);
             else if (operationCycle == 5) { CpuWrite(addressBus, dl); }
@@ -1126,29 +1446,44 @@ namespace AprNes
         }
 
         // === ROR ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_6A() {
             CpuRead(addressBus);
             { byte oc = flagC; flagC = (byte)(r_A & 1); r_A = (byte)((r_A >> 1) | (oc << 7)); SetNZ(r_A); }
             CompleteOperation();
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_66() {
             if (operationCycle < 2) GetAddressZeroPage();
             else if (operationCycle == 2) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 3) { CpuWrite(addressBus, dl); }
             else { Op_ROR_mem(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_76() {
             if (operationCycle < 3) GetAddressZPOffX();
             else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_ROR_mem(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_6E() {
             if (operationCycle < 3) GetAddressAbsolute();
             else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_ROR_mem(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_7E() {
             if (operationCycle < 5) GetAddressAbsOffX(false);
             else if (operationCycle == 5) { CpuWrite(addressBus, dl); }
@@ -1156,24 +1491,36 @@ namespace AprNes
         }
 
         // === INC ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_E6() {
             if (operationCycle < 2) GetAddressZeroPage();
             else if (operationCycle == 2) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 3) { CpuWrite(addressBus, dl); }
             else { Op_INC_mem(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_F6() {
             if (operationCycle < 3) GetAddressZPOffX();
             else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_INC_mem(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_EE() {
             if (operationCycle < 3) GetAddressAbsolute();
             else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_INC_mem(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_FE() {
             if (operationCycle < 5) GetAddressAbsOffX(false);
             else if (operationCycle == 5) { CpuWrite(addressBus, dl); }
@@ -1181,24 +1528,36 @@ namespace AprNes
         }
 
         // === DEC ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_C6() {
             if (operationCycle < 2) GetAddressZeroPage();
             else if (operationCycle == 2) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 3) { CpuWrite(addressBus, dl); }
             else { Op_DEC_mem(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_D6() {
             if (operationCycle < 3) GetAddressZPOffX();
             else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_DEC_mem(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_CE() {
             if (operationCycle < 3) GetAddressAbsolute();
             else if (operationCycle == 3) { dl = CpuRead(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_DEC_mem(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_DE() {
             if (operationCycle < 5) GetAddressAbsOffX(false);
             else if (operationCycle == 5) { CpuWrite(addressBus, dl); }
@@ -1206,43 +1565,106 @@ namespace AprNes
         }
 
         // === INX / INY / DEX / DEY ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_E8() { CpuRead(addressBus); r_X++; SetNZ(r_X); CompleteOperation(); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_C8() { CpuRead(addressBus); r_Y++; SetNZ(r_Y); CompleteOperation(); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_CA() { CpuRead(addressBus); r_X--; SetNZ(r_X); CompleteOperation(); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_88() { CpuRead(addressBus); r_Y--; SetNZ(r_Y); CompleteOperation(); }
 
         // === Transfer ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_AA() { r_X = r_A; CpuRead(addressBus); SetNZ(r_X); CompleteOperation(); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_8A() { r_A = r_X; CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_A8() { r_Y = r_A; CpuRead(addressBus); SetNZ(r_Y); CompleteOperation(); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_98() { r_A = r_Y; CpuRead(addressBus); SetNZ(r_A); CompleteOperation(); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_BA() { r_X = r_SP; CpuRead(addressBus); SetNZ(r_X); CompleteOperation(); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_9A() { r_SP = r_X; CpuRead(addressBus); CompleteOperation(); }
 
         // === Flag instructions ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_18() { CpuRead(addressBus); PollInterrupts(); flagC = 0; CompleteOperation_NoPoll(); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_38() { CpuRead(addressBus); PollInterrupts(); flagC = 1; CompleteOperation_NoPoll(); }
         // TriCNES: PollInterrupts BEFORE flag change for all flag-set/clear instructions
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_58() { CpuRead(addressBus); PollInterrupts(); flagI = 0; CompleteOperation_NoPoll(); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_78() { CpuRead(addressBus); PollInterrupts(); flagI = 1; CompleteOperation_NoPoll(); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_D8() { CpuRead(addressBus); PollInterrupts(); flagD = 0; CompleteOperation_NoPoll(); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_F8() { CpuRead(addressBus); PollInterrupts(); flagD = 1; CompleteOperation_NoPoll(); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_B8() { CpuRead(addressBus); PollInterrupts(); flagV = 0; CompleteOperation_NoPoll(); }
 
         // === Stack instructions ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_48() {
             if (operationCycle < 2) CpuRead(addressBus);
             else { StackPush(r_A); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_08() {
             if (operationCycle < 2) CpuRead(addressBus);
             else { StackPush((byte)(GetFlag() | 0x30)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_68() {
             if (operationCycle < 2) CpuRead(addressBus);
             else if (operationCycle == 2) { CpuRead((ushort)(0x100 | r_SP)); r_SP++; }
             else { r_A = CpuRead((ushort)(0x100 | r_SP)); SetNZ(r_A); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_28() { // PLP
             if (operationCycle < 2) CpuRead(addressBus);
             else if (operationCycle == 2) { CpuRead((ushort)(0x100 | r_SP)); r_SP++; }
@@ -1250,20 +1672,50 @@ namespace AprNes
         }
 
         // === Branches ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_10() { DoBranch(flagN == 0); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_30() { DoBranch(flagN != 0); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_50() { DoBranch(flagV == 0); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_70() { DoBranch(flagV != 0); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_90() { DoBranch(flagC == 0); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_B0() { DoBranch(flagC != 0); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_D0() { DoBranch(flagZ == 0); }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_F0() { DoBranch(flagZ != 0); }
 
         // === JMP ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_4C() {
             if (operationCycle == 1) GetAddressAbsolute();
             else { GetAddressAbsolute(); r_PC = addressBus; CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_6C() {
             if (operationCycle < 3) { GetAddressAbsolute(); }
             else if (operationCycle == 3) { specialBus = CpuRead(addressBus); }
@@ -1275,6 +1727,9 @@ namespace AprNes
         }
 
         // === JSR ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_20() {
             if (operationCycle == 1) {
                 addressBus = r_PC; dl = CpuRead(addressBus); r_PC++;
@@ -1296,6 +1751,9 @@ namespace AprNes
         }
 
         // === RTS ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_60() {
             if (operationCycle == 1) { GetImmediate(); }
             else if (operationCycle == 2) {
@@ -1312,6 +1770,9 @@ namespace AprNes
         }
 
         // === RTI ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_40() {
             if (operationCycle == 1) { GetImmediate(); }
             else if (operationCycle == 2) {
@@ -1331,70 +1792,109 @@ namespace AprNes
         }
 
         // === NOP (implied) ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_NOP() { CpuRead(addressBus); CompleteOperation(); }
 
         // === DOP Immediate ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_DOP_Imm() { GetImmediate(); CompleteOperation(); }
 
         // === DOP ZeroPage ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_DOP_ZP() {
             if (operationCycle == 1) GetAddressZeroPage();
             else { CpuRead(addressBus); CompleteOperation(); }
         }
 
         // === DOP ZeroPage,X ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_DOP_ZPX() {
             if (operationCycle < 3) GetAddressZPOffX();
             else { CpuRead(addressBus); CompleteOperation(); }
         }
 
         // === TOP Absolute ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_0C() {
             if (operationCycle < 3) GetAddressAbsolute();
             else { CpuRead(addressBus); CompleteOperation(); }
         }
 
         // === TOP Absolute,X ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_TOP_AbsX() {
             if (operationCycle < 4) GetAddressAbsOffX(true);
             else { CpuRead(addressBus); CompleteOperation(); }
         }
 
         // === SLO ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_07() {
             if (operationCycle < 2) GetAddressZeroPage();
             else if (operationCycle == 2) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 3) { CpuWrite(addressBus, dl); }
             else { Op_SLO(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_17() {
             if (operationCycle < 3) GetAddressZPOffX();
             else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_SLO(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_0F() {
             if (operationCycle < 3) GetAddressAbsolute();
             else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_SLO(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_1F() {
             if (operationCycle < 5) GetAddressAbsOffX(false);
             else if (operationCycle == 5) { CpuWrite(addressBus, dl); }
             else { Op_SLO(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_1B() {
             if (operationCycle < 5) GetAddressAbsOffY(false);
             else if (operationCycle == 5) { CpuWrite(addressBus, dl); }
             else { Op_SLO(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_03() {
             if (operationCycle < 5) GetAddressIndOffX();
             else if (operationCycle == 5) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 6) { CpuWrite(addressBus, dl); }
             else { Op_SLO(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_13() {
             if (operationCycle < 5) GetAddressIndOffY(false);
             else if (operationCycle == 5) { dl = CpuReadRMW(addressBus); }
@@ -1403,40 +1903,61 @@ namespace AprNes
         }
 
         // === RLA ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_27() {
             if (operationCycle < 2) GetAddressZeroPage();
             else if (operationCycle == 2) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 3) { CpuWrite(addressBus, dl); }
             else { Op_RLA(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_37() {
             if (operationCycle < 3) GetAddressZPOffX();
             else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_RLA(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_2F() {
             if (operationCycle < 3) GetAddressAbsolute();
             else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_RLA(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_3F() {
             if (operationCycle < 5) GetAddressAbsOffX(false);
             else if (operationCycle == 5) { CpuWrite(addressBus, dl); }
             else { Op_RLA(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_3B() {
             if (operationCycle < 5) GetAddressAbsOffY(false);
             else if (operationCycle == 5) { CpuWrite(addressBus, dl); }
             else { Op_RLA(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_23() {
             if (operationCycle < 5) GetAddressIndOffX();
             else if (operationCycle == 5) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 6) { CpuWrite(addressBus, dl); }
             else { Op_RLA(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_33() {
             if (operationCycle < 5) GetAddressIndOffY(false);
             else if (operationCycle == 5) { dl = CpuReadRMW(addressBus); }
@@ -1445,40 +1966,61 @@ namespace AprNes
         }
 
         // === SRE ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_47() {
             if (operationCycle < 2) GetAddressZeroPage();
             else if (operationCycle == 2) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 3) { CpuWrite(addressBus, dl); }
             else { Op_SRE(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_57() {
             if (operationCycle < 3) GetAddressZPOffX();
             else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_SRE(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_4F() {
             if (operationCycle < 3) GetAddressAbsolute();
             else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_SRE(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_5F() {
             if (operationCycle < 5) GetAddressAbsOffX(false);
             else if (operationCycle == 5) { CpuWrite(addressBus, dl); }
             else { Op_SRE(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_5B() {
             if (operationCycle < 5) GetAddressAbsOffY(false);
             else if (operationCycle == 5) { CpuWrite(addressBus, dl); }
             else { Op_SRE(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_43() {
             if (operationCycle < 5) GetAddressIndOffX();
             else if (operationCycle == 5) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 6) { CpuWrite(addressBus, dl); }
             else { Op_SRE(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_53() {
             if (operationCycle < 5) GetAddressIndOffY(false);
             else if (operationCycle == 5) { dl = CpuReadRMW(addressBus); }
@@ -1487,40 +2029,61 @@ namespace AprNes
         }
 
         // === RRA ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_67() {
             if (operationCycle < 2) GetAddressZeroPage();
             else if (operationCycle == 2) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 3) { CpuWrite(addressBus, dl); }
             else { Op_RRA(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_77() {
             if (operationCycle < 3) GetAddressZPOffX();
             else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_RRA(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_6F() {
             if (operationCycle < 3) GetAddressAbsolute();
             else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_RRA(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_7F() {
             if (operationCycle < 5) GetAddressAbsOffX(false);
             else if (operationCycle == 5) { CpuWrite(addressBus, dl); }
             else { Op_RRA(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_7B() {
             if (operationCycle < 5) GetAddressAbsOffY(false);
             else if (operationCycle == 5) { CpuWrite(addressBus, dl); }
             else { Op_RRA(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_63() {
             if (operationCycle < 5) GetAddressIndOffX();
             else if (operationCycle == 5) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 6) { CpuWrite(addressBus, dl); }
             else { Op_RRA(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_73() {
             if (operationCycle < 5) GetAddressIndOffY(false);
             else if (operationCycle == 5) { dl = CpuReadRMW(addressBus); }
@@ -1529,20 +2092,32 @@ namespace AprNes
         }
 
         // === SAX ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_87() {
             if (operationCycle == 1) { GetAddressZeroPage(); cpuIsRead = false; }
             else { CpuWrite(addressBus, (byte)(r_A & r_X)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_97() {
             if (operationCycle < 2) GetAddressZPOffY();
             else if (operationCycle == 2) { GetAddressZPOffY(); cpuIsRead = false; }
             else { CpuWrite(addressBus, (byte)(r_A & r_X)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_8F() {
             if (operationCycle < 2) GetAddressAbsolute();
             else if (operationCycle == 2) { GetAddressAbsolute(); cpuIsRead = false; }
             else { CpuWrite(addressBus, (byte)(r_A & r_X)); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_83() {
             if (operationCycle < 4) GetAddressIndOffX();
             else if (operationCycle == 4) { GetAddressIndOffX(); cpuIsRead = false; }
@@ -1550,66 +2125,105 @@ namespace AprNes
         }
 
         // === LAX ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_A7() {
             if (operationCycle == 1) GetAddressZeroPage();
             else { r_A = CpuRead(addressBus); r_X = r_A; SetNZ(r_X); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_B7() {
             if (operationCycle < 3) GetAddressZPOffY();
             else { r_A = CpuRead(addressBus); r_X = r_A; SetNZ(r_X); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_AF() {
             if (operationCycle < 3) GetAddressAbsolute();
             else { r_A = CpuRead(addressBus); r_X = r_A; SetNZ(r_X); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_BF() {
             if (operationCycle < 4) GetAddressAbsOffY(true);
             else { r_A = CpuRead(addressBus); r_X = r_A; SetNZ(r_X); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_A3() {
             if (operationCycle < 5) GetAddressIndOffX();
             else { r_A = CpuRead(addressBus); r_X = r_A; SetNZ(r_X); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_B3() {
             if (operationCycle < 5) GetAddressIndOffY(true);
             else { r_A = CpuRead(addressBus); r_X = r_A; SetNZ(r_X); CompleteOperation(); }
         }
 
         // === DCP ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_C7() {
             if (operationCycle < 2) GetAddressZeroPage();
             else if (operationCycle == 2) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 3) { CpuWrite(addressBus, dl); }
             else { Op_DCP(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_D7() {
             if (operationCycle < 3) GetAddressZPOffX();
             else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_DCP(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_CF() {
             if (operationCycle < 3) GetAddressAbsolute();
             else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_DCP(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_DF() {
             if (operationCycle < 5) GetAddressAbsOffX(false);
             else if (operationCycle == 5) { CpuWrite(addressBus, dl); }
             else { Op_DCP(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_DB() {
             if (operationCycle < 5) GetAddressAbsOffY(false);
             else if (operationCycle == 5) { CpuWrite(addressBus, dl); }
             else { Op_DCP(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_C3() {
             if (operationCycle < 5) GetAddressIndOffX();
             else if (operationCycle == 5) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 6) { CpuWrite(addressBus, dl); }
             else { Op_DCP(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_D3() {
             if (operationCycle < 5) GetAddressIndOffY(false);
             else if (operationCycle == 5) { dl = CpuReadRMW(addressBus); }
@@ -1618,40 +2232,61 @@ namespace AprNes
         }
 
         // === ISC ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_E7() {
             if (operationCycle < 2) GetAddressZeroPage();
             else if (operationCycle == 2) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 3) { CpuWrite(addressBus, dl); }
             else { Op_ISC(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_F7() {
             if (operationCycle < 3) GetAddressZPOffX();
             else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_ISC(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_EF() {
             if (operationCycle < 3) GetAddressAbsolute();
             else if (operationCycle == 3) { dl = CpuReadRMW(addressBus); }
             else if (operationCycle == 4) { CpuWrite(addressBus, dl); }
             else { Op_ISC(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_FF() {
             if (operationCycle < 5) GetAddressAbsOffX(false);
             else if (operationCycle == 5) { CpuWrite(addressBus, dl); }
             else { Op_ISC(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_FB() {
             if (operationCycle < 5) GetAddressAbsOffY(false);
             else if (operationCycle == 5) { CpuWrite(addressBus, dl); }
             else { Op_ISC(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_E3() {
             if (operationCycle < 5) GetAddressIndOffX();
             else if (operationCycle == 5) { dl = CpuRead(addressBus); }
             else if (operationCycle == 6) { CpuWrite(addressBus, dl); }
             else { Op_ISC(addressBus); CompleteOperation(); }
         }
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_F3() {
             if (operationCycle < 5) GetAddressIndOffY(false);
             else if (operationCycle == 5) { dl = CpuRead(addressBus); }
@@ -1660,6 +2295,9 @@ namespace AprNes
         }
 
         // === ANC ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_ANC() {
             GetImmediate();
             r_A = (byte)(r_A & dl); flagC = (byte)((r_A & 0x80) >> 7); SetNZ(r_A);
@@ -1667,6 +2305,9 @@ namespace AprNes
         }
 
         // === ALR ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_4B() {
             GetImmediate();
             r_A = (byte)(r_A & dl); flagC = (byte)(r_A & 1); r_A >>= 1; SetNZ(r_A);
@@ -1674,6 +2315,9 @@ namespace AprNes
         }
 
         // === ARR ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_6B() {
             GetImmediate();
             r_A = (byte)(r_A & dl);
@@ -1685,6 +2329,9 @@ namespace AprNes
         }
 
         // === SBX ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_CB() {
             GetImmediate();
             { int tmp = (r_A & r_X) - dl; flagC = (tmp >= 0) ? (byte)1 : (byte)0; r_X = (byte)tmp; SetNZ(r_X); }
@@ -1692,6 +2339,9 @@ namespace AprNes
         }
 
         // === ANE ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_8B() {
             GetImmediate();
             r_A = (byte)((r_A | 0xFF) & r_X & dl);
@@ -1699,6 +2349,9 @@ namespace AprNes
         }
 
         // === LXA ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_AB() {
             GetImmediate();
             r_A = (byte)((r_A | 0xFF) & dl); r_X = r_A; SetNZ(r_X);
@@ -1706,6 +2359,9 @@ namespace AprNes
         }
 
         // === LAE ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_BB() {
             if (operationCycle < 4) { GetAddressAbsOffY(true); }
             else { dl = CpuRead(addressBus); r_A = (byte)(dl & r_SP); r_X = r_A; r_SP = r_A; SetNZ(r_A);
@@ -1713,6 +2369,9 @@ namespace AprNes
         }
 
         // === SHA (Ind),Y ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_93() {
             if (operationCycle < 4) { GetAddressIndOffY(false); }
             else if (operationCycle == 4) { GetAddressIndOffY(false); cpuIsRead = false; }
@@ -1726,6 +2385,9 @@ namespace AprNes
         }
 
         // === SHA Abs,Y ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_9F() {
             if (operationCycle < 3) { GetAddressAbsOffY(false); }
             else if (operationCycle == 3) { GetAddressAbsOffY(false); cpuIsRead = false; }
@@ -1739,6 +2401,9 @@ namespace AprNes
         }
 
         // === SHY Abs,X ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_9C() {
             if (operationCycle < 3) { GetAddressAbsOffX(false); }
             else if (operationCycle == 3) { GetAddressAbsOffX(false); cpuIsRead = false; }
@@ -1752,6 +2417,9 @@ namespace AprNes
         }
 
         // === SHX Abs,Y ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_9E() {
             if (operationCycle < 3) { GetAddressAbsOffY(false); }
             else if (operationCycle == 3) { GetAddressAbsOffY(false); cpuIsRead = false; }
@@ -1765,6 +2433,9 @@ namespace AprNes
         }
 
         // === SHS Abs,Y ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_9B() {
             if (operationCycle < 3) { GetAddressAbsOffY(false); }
             else if (operationCycle == 3) { GetAddressAbsOffY(false); cpuIsRead = false; }
@@ -1779,18 +2450,31 @@ namespace AprNes
         }
 
         // === HLT (JAM) ===
+        #if NET10_0_OR_GREATER
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        #endif
         static void Op_HLT() { DoHLT(); }
 
         static unsafe void InitOpHandlers()
         {
             // Allocate once; process-lifetime (matches other AllocUnmanaged buffers).
-            int tableSize = 256 * sizeof(delegate*<void>);
+            // Same 8-byte-per-slot layout on both runtimes; pointer type differs.
+            int tableSize = 256 * sizeof(IntPtr);
+#if NET10_0_OR_GREATER
+            if (opFnPtrs == null)
+                opFnPtrs = (delegate* unmanaged<void>*)AllocUnmanaged(tableSize);
+#else
             if (opFnPtrs == null)
                 opFnPtrs = (delegate*<void>*)AllocUnmanaged(tableSize);
+#endif
 
             // stackalloc with initializer preserves the 16×16 opcode matrix layout
             // with zero GC allocation. Buffer.MemoryCopy blasts it into the native table.
+#if NET10_0_OR_GREATER
+            delegate* unmanaged<void>* t = stackalloc delegate* unmanaged<void>[256]
+#else
             delegate*<void>* t = stackalloc delegate*<void>[256]
+#endif
             {
                 &Op_00                , &Op_01                , &Op_HLT               , &Op_03                , &Op_DOP_ZP            , &Op_05                , &Op_06                , &Op_07                ,  // 0x00-0x07
                 &Op_08                , &Op_09                , &Op_0A                , &Op_ANC               , &Op_0C                , &Op_0D                , &Op_0E                , &Op_0F                ,  // 0x08-0x0f
