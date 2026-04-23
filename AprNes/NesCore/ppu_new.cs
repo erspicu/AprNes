@@ -23,32 +23,44 @@ namespace AprNes
         // TriCNES: CopyV flag — set when $2006 delayed copy fires, used for scroll conflict detection
 
         // ════════════════════════════════════════════════════════════════
-        // _EmulatePPU — thin dispatcher over 341-slot function-pointer tables.
-        // Three tables (visible / preRender / vblank) each hold a handler
-        // specialised to its scanline state. See ppu_dispatch.cs for handlers
-        // and InitPpuDispatchTable() setup.
+        // _EmulatePPU — PPU step entry point.
+        //
+        // Two implementations behind conditional compilation:
+        //   .NET 10 (NET10_0_OR_GREATER) → ppu_step_legacy (single-method monolith)
+        //     .NET 10 JIT / TieredPGO can optimise the monolith better than the
+        //     function-pointer table indirection (measured: new dispatch regressed
+        //     ~150 fps → 140-145 fps on .NET 10 Release).
+        //   .NET Framework 4.8.1 (NetFx)  → 341-slot function-pointer dispatch
+        //     NetFx JIT benefits from the per-slot const-folding + smaller handler
+        //     bodies (measured: ~122 fps → 136 fps on NetFx Debug).
+        //
+        // Both paths implement the same TriCNES _EmulatePPU semantics; they only
+        // differ in how the dispatch is structured.
         // TriCNES: Emulator.cs line 1256
         // ════════════════════════════════════════════════════════════════
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ppu_step_new()
         {
+#if NET10_0_OR_GREATER
+            ppu_step_legacy();
+#else
             int cx = ppu_cycles_x;
             int sl = scanline;
-#if NET10_0_OR_GREATER
-            delegate* unmanaged<void>* table;
-#else
             delegate*<void>* table;
-#endif
             // Hot-first ordering: Visible (77-92%) → VBlank (8-23%) → PreRender (0.3-0.4%).
             if      (sl <  240)            table = ppuTickVisibleTable;
             else if (sl <  preRenderLine)  table = ppuTickVBlankTable;   // sl ∈ [240, preRenderLine-1]
             else                           table = ppuTickPreRenderTable; // sl == preRenderLine
             table[cx]();
+#endif
         }
 
-        // Keep legacy monolithic ppu_step_new body dead-code-eliminated but
-        // visible in git history for reference. It is never called.
-        static void ppu_step_legacy_unused()
+#if NET10_0_OR_GREATER
+        // Legacy monolithic PPU step — the pre-refactor implementation.
+        // Called on .NET 10 where JIT / TieredPGO handles the single large
+        // method better than the dispatch-table indirection.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void ppu_step_legacy()
         {
             int cx = ppu_cycles_x; // local alias, PRE-increment value
 
@@ -407,6 +419,7 @@ namespace AprNes
             // ── End of dot: update ppuRenderingEnabled ──
             ppuRenderingEnabled = ShowBackGround_Instant || ShowSprites_Instant;
         }
+#endif // NET10_0_OR_GREATER — ppu_step_legacy
 
         // ════════════════════════════════════════════════════════════════
         // Phase 2: Deferred register updates — extracted from ppu_step_new
