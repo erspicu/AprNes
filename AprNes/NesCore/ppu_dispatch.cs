@@ -651,8 +651,8 @@ namespace AprNes
 
             // Phase 3 events fire only when scanline >= nmiTriggerLine.
             // After a potential wrap from SL 239 to SL 240, scanline may now be 240.
-            // nmiTriggerLine is 241 (NTSC) / 241 (PAL) so SL 240 doesn't fire events.
-            // But we still keep the runtime check for correctness if wrap lands past that.
+            // nmiTriggerLine is 241 (NTSC/PAL) / 291 (Dendy); SL 240 never fires events
+            // for any region. Runtime check kept for correctness if wrap lands past that.
             if (scanline >= nmiTriggerLine)
                 PpuPhase3_Events(cx);
 

@@ -39,9 +39,10 @@ namespace AprNes
 #else
             delegate*<void>* table;
 #endif
-            if (sl < 240)                     table = ppuTickVisibleTable;
-            else if (sl == preRenderLine)     table = ppuTickPreRenderTable;
-            else                              table = ppuTickVBlankTable;
+            // Hot-first ordering: Visible (77-92%) → VBlank (8-23%) → PreRender (0.3-0.4%).
+            if      (sl <  240)            table = ppuTickVisibleTable;
+            else if (sl <  preRenderLine)  table = ppuTickVBlankTable;   // sl ∈ [240, preRenderLine-1]
+            else                           table = ppuTickPreRenderTable; // sl == preRenderLine
             table[cx]();
         }
 
