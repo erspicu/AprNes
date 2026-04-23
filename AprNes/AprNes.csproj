@@ -212,6 +212,7 @@
     <Compile Include="NesCore\NTSC_CRT\CrtScreen.cs" />
     <Compile Include="NesCore\PPU.cs" />
     <Compile Include="NesCore\ppu_new.cs" />
+    <Compile Include="NesCore\ppu_dispatch.cs" />
     <Compile Include="NesCore\TestRunnerCore.cs" />
     <Compile Include="..\unittest\NesTestFramework\IEmulatorCore.cs" Link="NesTestFramework\IEmulatorCore.cs" />
     <Compile Include="..\unittest\NesTestFramework\BlarggTestRunner.cs" Link="NesTestFramework\BlarggTestRunner.cs" />

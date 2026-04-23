@@ -578,6 +578,7 @@ prerender_sprite0_x = 0;
                 //init function array
                 init_function();
                 InitOpHandlers();
+                InitPpuDispatchTable();
 
                 //init APU & audio output (must be before reset vector read)
                 initAPU();
