@@ -319,7 +319,6 @@ namespace AprNes
                     AnalogBufSize   = Crt_DstW * Crt_DstH;
                     AnalogScreenBuf = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * AnalogBufSize);
                 }
-                Buffer_BG_array  = (int* )NesCore.AllocUnmanaged(sizeof(int)  * 61440);
                 NesColors        = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * 64);
                 spr_ram          = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 256);
                 secondaryOAM     = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 32);

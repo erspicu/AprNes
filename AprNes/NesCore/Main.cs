@@ -234,7 +234,6 @@ namespace AprNes
             if (PRG_ROM      != null) { NesCore.FreeUnmanaged((IntPtr)PRG_ROM);      PRG_ROM      = null; }
             if (CHR_ROM      != null) { NesCore.FreeUnmanaged((IntPtr)CHR_ROM);      CHR_ROM      = null; }
             if (ScreenBuf1x  != null) { NesCore.FreeUnmanaged((IntPtr)ScreenBuf1x);  ScreenBuf1x  = null; }
-            if (Buffer_BG_array != null) { NesCore.FreeUnmanaged((IntPtr)Buffer_BG_array); Buffer_BG_array = null; }
             if (NesColors    != null) { NesCore.FreeUnmanaged((IntPtr)NesColors);    NesColors    = null; }
             if (spr_ram      != null) { NesCore.FreeUnmanaged((IntPtr)spr_ram);      spr_ram      = null; }
             if (secondaryOAM != null) { NesCore.FreeUnmanaged((IntPtr)secondaryOAM); secondaryOAM = null; }
@@ -301,7 +300,7 @@ namespace AprNes
             dmaOamInternalBus = 0; dmaOamAddr = 0;
 
             // PPU control registers ($2000/$2001/$2002)
-            BaseNameTableAddr = 0; VramaddrIncrement = 1;
+            VramaddrIncrement = 1;
             SpPatternTableAddr = 0; BgPatternTableAddr = 0;
             Spritesize8x16 = false; NMIable = false;
             ShowBackGround = false; ShowSprites = false;
@@ -487,12 +486,7 @@ prerender_sprite0_x = 0;
                     AnalogScreenBuf     = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * AnalogBufSize);
                     AnalogScreenBufBack = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * AnalogBufSize);
                 }
-                Buffer_BG_array  = (int* )NesCore.AllocUnmanaged(sizeof(int)  * 61440);
                 NesColors        = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * 64);
-                sprLineBuf       = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * 256);
-                sprLinePri       = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 256);
-                sprLineSet       = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 256);
-                sprLinePalIdx    = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 256);
                 spr_ram          = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 256);
                 secondaryOAM     = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 32);
                 corruptOamRow    = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 32);

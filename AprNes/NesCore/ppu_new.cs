@@ -182,73 +182,135 @@ namespace AprNes
         }
 
         // ════════════════════════════════════════════════════════════════
-        // Phase 4: Sprite evaluation + scanline init — extracted from ppu_step_new
-        // to reduce method body size and allow JIT to optimize the hot Phase 5 path.
-        // Runs only on active scanlines (0-239 + pre-render).
+        // Phase 4 entry for pre-render and slot-340 wrap.
+        // Visible handlers now call their specialised helpers directly; this method keeps
+        // only the pre-render path plus the evalDot==0 dummy-fetch case after wrap.
         // ════════════════════════════════════════════════════════════════
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void PpuPhase4_SpriteEvalAndInit()
         {
-            // Cold path: OAM corruption flag handling — only fires when $2001 rendering toggle
-            //   creates a pending corruption event. 99%+ of calls skip entirely.
-            if (oamCorruptPending || oamCorruptDisabledFlag)
-                PpuPhase4_HandleOamCorruption();
+            PpuPhase4_HandleOamCorruptionIfNeeded();
 
-            // Per-dot sprite evaluation
-            bool evalScanline = (scanline >= 0 && scanline < 240) || scanline == preRenderLine;
-            bool ro = scanline == preRenderLine;
             int evalDot = ppu_cycles_x; // post-increment PPU_Dot
 
-            // Dots 0-64: clear secondary OAM (Tier 4 gate)
-            if (evalScanline && evalDot >= 0 && evalDot <= 64 && (ShowBG_EvalDelay || ShowSpr_EvalDelay))
+            if (evalDot == 0)
             {
-                if (evalDot == 1) { evalOam2Addr = 0; evalOam2Full = false; evalTick = 0; evalOamOverflowed = false; }
-                if ((evalDot & 1) != 0) { oamCopyBuffer = ro ? secondaryOAM[evalOam2Addr] : (byte)0xFF; }
-                else if (evalDot > 0) { if (!ro) secondaryOAM[evalOam2Addr] = oamCopyBuffer; evalOam2Addr++; evalOam2Addr &= 0x1F; }
+                PpuPhase4_DummyNTFetch(0);
+                return;
             }
 
-            // Dot 65: init (outside rendering gate)
-            if (evalScanline && evalDot == 65) { evalOam2Addr = 0; nineObjectsOnLine = false; }
-
-            // Dots 65-256: evaluation (Tier 1 Instant gate)
-            if (evalScanline && evalDot >= 65 && evalDot <= 256 && (ShowBackGround_Instant || ShowSprites_Instant))
+            if (scanline == preRenderLine)
             {
-                if (evalDot == 65) { sprite0_eval_addr = spr_ram_add; SpriteEvalInit(); SpriteEvalTick(); }
-                else { SpriteEvalTick(); if (evalDot == 256) SpriteEvalEnd(); }
-            }
-            else if (ro && evalDot == 65 && ppuRenderingEnabled) { sprite0_eval_addr = spr_ram_add; }
-
-            // Dots 257-320: sprite fetch (extracted — 64/341 = 19% of calls).
-            // IL-size win vs call-overhead tradeoff: helper is ~600 IL bytes, at 3M calls/sec
-            // the ~4-cycle call overhead ≈ 0.3% CPU, more than offset by hot function shrink.
-            if (evalDot >= 257 && evalDot <= 320) PpuPhase4_SpriteFetch(evalDot);
-
-            // Dot 321 equivalent
-            if (evalDot == 322 && scanline < 240 && (ShowBackGround_Instant || ShowSprites_Instant))
-                oamCopyBuffer = secondaryOAM[0];
-
-            // Dot 257: copy sprite slot count
-            if (scanline >= 0 && scanline < 240 && evalDot == 257) { sprSlotCount = evalSpriteCount; sprZeroInSlots = evalSprite0Visible; }
-            else if (scanline == preRenderLine && evalDot == 257) { sprSlotCount = evalSpriteCount; sprZeroInSlots = evalSprite0Visible; }
-            if (scanline == preRenderLine && evalDot == 257 && ppuRenderingEnabled) PrecomputePreRenderSprites();
-
-            // Cold path: dot 339 only (1/341 = 0.3% of calls)
-            if (evalDot == 339) PpuPhase4_Dot339();
-
-            // Cold path: dummy NT fetch — only dots 0, 337-340 (5/341 = 1.5% of calls)
-            if (evalDot >= 337 || evalDot == 0) PpuPhase4_DummyNTFetch(evalDot);
-
-            // Per-cycle sprite overflow + scanline init
-            if (scanline >= 0 && scanline < 240)
-            {
-                // Cold path: dot 1 scanline init (240 visible × 1 dot = 0.27% of calls)
-                if (evalDot == 1) PpuPhase4_VisibleScanlineDot1Init();
-                if (spriteOverflowCycle >= 0 && evalDot == spriteOverflowCycle) isSpriteOverflow = true;
+                PpuPhase4_PreRenderDot(evalDot);
             }
         }
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void PpuPhase4_VisiblePixelZone(int evalDot)
+        {
+            bool renderDelayed = ShowBG_EvalDelay || ShowSpr_EvalDelay;
+            if (renderDelayed && evalDot <= 64)
+            {
+                if (evalDot == 1) { evalOam2Addr = 0; evalOam2Full = false; evalTick = 0; evalOamOverflowed = false; }
+                if ((evalDot & 1) != 0) oamCopyBuffer = 0xFF;
+                else if (evalDot > 0)
+                {
+                    secondaryOAM[evalOam2Addr] = oamCopyBuffer;
+                    evalOam2Addr++;
+                    evalOam2Addr &= 0x1F;
+                }
+            }
+
+            if (evalDot == 65)
+            {
+                evalOam2Addr = 0;
+                nineObjectsOnLine = false;
+            }
+
+            if (ShowBackGround_Instant || ShowSprites_Instant)
+            {
+                if (evalDot == 65)
+                {
+                    sprite0_eval_addr = spr_ram_add;
+                    SpriteEvalInit();
+                    SpriteEvalTick();
+                }
+                else if (evalDot > 65)
+                {
+                    SpriteEvalTick();
+                    if (evalDot == 256) SpriteEvalEnd();
+                }
+            }
+
+            if (evalDot == 1) PpuPhase4_VisibleScanlineDot1Init();
+            if (spriteOverflowCycle >= 0 && evalDot == spriteOverflowCycle) isSpriteOverflow = true;
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void PpuPhase4_PreRenderDot(int evalDot)
+        {
+            bool renderDelayed = ShowBG_EvalDelay || ShowSpr_EvalDelay;
+            if (renderDelayed && evalDot <= 64)
+            {
+                if (evalDot == 1) { evalOam2Addr = 0; evalOam2Full = false; evalTick = 0; evalOamOverflowed = false; }
+                if ((evalDot & 1) != 0) oamCopyBuffer = secondaryOAM[evalOam2Addr];
+                else if (evalDot > 0)
+                {
+                    evalOam2Addr++;
+                    evalOam2Addr &= 0x1F;
+                }
+            }
+
+            if (evalDot == 65)
+            {
+                evalOam2Addr = 0;
+                nineObjectsOnLine = false;
+            }
+
+            if (evalDot >= 65 && evalDot <= 256)
+            {
+                if (ShowBackGround_Instant || ShowSprites_Instant)
+                {
+                    if (evalDot == 65)
+                    {
+                        sprite0_eval_addr = spr_ram_add;
+                        SpriteEvalInit();
+                        SpriteEvalTick();
+                    }
+                    else
+                    {
+                        SpriteEvalTick();
+                        if (evalDot == 256) SpriteEvalEnd();
+                    }
+                }
+                else if (evalDot == 65 && ppuRenderingEnabled)
+                {
+                    sprite0_eval_addr = spr_ram_add;
+                }
+            }
+
+            if (evalDot >= 257 && evalDot <= 320) PpuPhase4_SpriteFetch(evalDot);
+
+            if (evalDot == 257)
+            {
+                sprSlotCount = evalSpriteCount;
+                sprZeroInSlots = evalSprite0Visible;
+                if (ppuRenderingEnabled) PrecomputePreRenderSprites();
+            }
+
+            if (evalDot == 339) PpuPhase4_Dot339();
+            if (evalDot >= 337) PpuPhase4_DummyNTFetch(evalDot);
+        }
+
         // ── PpuPhase4 cold helpers (NoInlining: keep them out of the hot path's IL budget) ──
-        // Called from PpuPhase4_SpriteEvalAndInit via Pattern A guards (condition at call site).
+        // Called either from the pre-render Phase4 entry or directly from visible dispatch handlers.
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void PpuPhase4_HandleOamCorruptionIfNeeded()
+        {
+            if (oamCorruptPending || oamCorruptDisabledFlag)
+                PpuPhase4_HandleOamCorruption();
+        }
 
         // OAM corruption handling — only invoked when oamCorruptPending or oamCorruptDisabledFlag is set.
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -270,14 +332,12 @@ namespace AprNes
             }
         }
 
-        // Visible scanline dot 1 init: clear BG buffer + fill backdrop + precompute overflow.
+        // Visible scanline dot 1 init: fill backdrop + precompute overflow.
         // Called once per visible scanline (240/89K dots = 0.27%).
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void PpuPhase4_VisibleScanlineDot1Init()
         {
             int scanOff = scanline << 8;
-            // Clear 256 uints (1024 bytes) — Unsafe.InitBlockUnaligned → rep stosb / AVX memset
-            System.Runtime.CompilerServices.Unsafe.InitBlockUnaligned(Buffer_BG_array + scanOff, 0, 1024);
             if (AnalogEnabled)
             {
                 // Fill 256 bytes with backdrop palette index

@@ -124,7 +124,7 @@ namespace AprNes
         }
 
         //ppu ctrl 0x2000
-        static int BaseNameTableAddr = 0, VramaddrIncrement = 1, SpPatternTableAddr = 0, BgPatternTableAddr = 0;
+        static int VramaddrIncrement = 1, SpPatternTableAddr = 0, BgPatternTableAddr = 0;
         static public bool Spritesize8x16 = false;
         static bool NMIable = false;
 
@@ -241,7 +241,6 @@ namespace AprNes
         // P4-2: Palette corruption flags
         static public uint* ScreenBuf1x;
         static uint* NesColors; //, targetSize;
-        static int* Buffer_BG_array;
         static byte spr_ram_add = 0;
 
         static bool oddSwap = false;
@@ -949,11 +948,6 @@ namespace AprNes
         static bool pendingSprite0Hit = false; // half-dot sprite 0 hit latch (TriCNES: PPUStatus_PendingSpriteZeroHit)
         static bool ppu2002ReadPending = false; // TriCNES: PPU_Read2002 (deferred VBL clear)
 
-        // Per-dot sprite compositing buffers (filled at cx==257, consumed per-dot in half-step)
-        static uint* sprLineBuf;     // 256 entries: winning sprite color (NesColors[])
-        static byte* sprLinePri;     // 256 entries: priority (0=front, 1=behind BG)
-        static byte* sprLineSet;     // 256 entries: 1=sprite pixel present, 0=empty
-        static byte* sprLinePalIdx;  // 256 entries: raw palette index (for NTSC analog)
         //ref http://wiki.nesdev.com/w/index.php/PPU_scrolling
         static byte ppu_r_2002()
         {
@@ -1029,7 +1023,6 @@ namespace AprNes
             SpPatternTableAddr = (value & 0x08) != 0 ? 0x1000 : 0;
             BgPatternTableAddr = (value & 0x10) != 0 ? 0x1000 : 0;
             vram_addr_internal = (ushort)((vram_addr_internal & 0x73ff) | ((value & 3) << 10));
-            BaseNameTableAddr = 0x2000 | ((value & 3) << 10);
         }
 
         static void ppu_w_2001(byte value)
