@@ -376,16 +376,18 @@ namespace AprNes
             }
 
             // ── Sprite shift (cx <= 256 always true) ──
+            // NESdev (PPU sprite evaluation): when both BG and sprites are
+            // disabled, "rendering will be halted immediately" — the entire
+            // sprite-output pipeline freezes, including the X-position counter.
+            // Hoist the rendering-enable check to the outer scope so counter
+            // decrement and shifter update freeze together.
+            if (ShowSprites || ShowBackGround)
             {
-                bool renderEnabled = ShowSprites || ShowBackGround;
                 ulong v = *(ulong*)sprXCounter;
                 if (skippedPreRenderDot341 || v == 0)
                 {
-                    if (renderEnabled)
-                    {
-                        *(ulong*)sprShiftL = (*(ulong*)sprShiftL << 1) & 0xFEFEFEFEFEFEFEFEUL;
-                        *(ulong*)sprShiftH = (*(ulong*)sprShiftH << 1) & 0xFEFEFEFEFEFEFEFEUL;
-                    }
+                    *(ulong*)sprShiftL = (*(ulong*)sprShiftL << 1) & 0xFEFEFEFEFEFEFEFEUL;
+                    *(ulong*)sprShiftH = (*(ulong*)sprShiftH << 1) & 0xFEFEFEFEFEFEFEFEUL;
                 }
                 else
                 {
@@ -393,17 +395,14 @@ namespace AprNes
                                      & 0x8080808080808080UL) >> 7;
                     *(ulong*)sprXCounter = v - dec_mask;
 
-                    if (renderEnabled)
-                    {
-                        ulong mask_0 = ~(dec_mask * 255UL);
-                        // Pre-combine (& 0xFE) with mask_0 → saves 1 AND per shift register.
-                        ulong shift_mask = mask_0 & 0xFEFEFEFEFEFEFEFEUL;
-                        ulong keep_mask = ~mask_0;
-                        ulong sl = *(ulong*)sprShiftL;
-                        ulong sh = *(ulong*)sprShiftH;
-                        *(ulong*)sprShiftL = ((sl << 1) & shift_mask) | (sl & keep_mask);
-                        *(ulong*)sprShiftH = ((sh << 1) & shift_mask) | (sh & keep_mask);
-                    }
+                    ulong mask_0 = ~(dec_mask * 255UL);
+                    // Pre-combine (& 0xFE) with mask_0 → saves 1 AND per shift register.
+                    ulong shift_mask = mask_0 & 0xFEFEFEFEFEFEFEFEUL;
+                    ulong keep_mask = ~mask_0;
+                    ulong sl = *(ulong*)sprShiftL;
+                    ulong sh = *(ulong*)sprShiftH;
+                    *(ulong*)sprShiftL = ((sl << 1) & shift_mask) | (sl & keep_mask);
+                    *(ulong*)sprShiftH = ((sh << 1) & shift_mask) | (sh & keep_mask);
                 }
             }
 
