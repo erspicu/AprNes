@@ -175,8 +175,6 @@ public sealed unsafe class EmulatorEngine : IDisposable
         int newW, newH;
         if (analogEnabled)
         {
-            newW = 256 * analogSize;
-            newH = 210 * analogSize;
             _pipelineActive = false;
 
             // Reset pipeline to 1× no-filter so the subsequent Init aliases _output
@@ -187,7 +185,11 @@ public sealed unsafe class EmulatorEngine : IDisposable
 
             // Analog NesCore buffer management (mirrors AprNes WinForms ApplyRenderSettings)
             NesCore.SyncAnalogConfig();
-            int neededPx = NesCore.Crt_DstW * NesCore.Crt_DstH;
+            // Single source of truth: Crt_DstW/H are the canonical output dims after
+            // SyncAnalogConfig (handles fullscreen overrides too). Don't recompute.
+            newW = NesCore.Crt_DstW;
+            newH = NesCore.Crt_DstH;
+            int neededPx = newW * newH;
             if (NesCore.AnalogScreenBuf == null || NesCore.AnalogBufSize != neededPx)
             {
                 if (NesCore.AnalogScreenBuf != null)
