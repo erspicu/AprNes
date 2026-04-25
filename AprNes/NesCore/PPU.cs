@@ -919,19 +919,26 @@ namespace AprNes
 
         static public bool screen_lock = false;
         static public volatile bool emuWaiting = false;
+        // Set true by NesCore.run() while the emu thread is executing; false when
+        // the thread is not alive (no ROM loaded, or after exit). TryPauseEmu uses
+        // this to avoid spinning forever when no emu thread exists yet.
+        static public volatile bool emuThreadAlive = false;
 
         // Shared quiesce helper used by both NetFx and Avalonia front-ends to safely
         // park the emu thread (and the render thread, if running) before mutating
         // NesCore state from the UI thread. Returns true when a pause was performed
-        // (caller must call ResumeEmu afterwards); false if no pause was needed
-        // because the emu thread is already parked or shutting down.
+        // (caller must call ResumeEmu afterwards); false if no emu thread exists
+        // or it's shutting down (caller should NOT call ResumeEmu in that case).
+        // Note: we don't early-return on `emuWaiting` alone — it briefly flips true
+        // every frame on the renderThreadRunning code path, so checking it without
+        // also checking _event state would race.
         public static bool TryPauseEmu()
         {
-            if (exit || emuWaiting) return false;
+            if (exit || !emuThreadAlive) return false;
             _event.Reset();
-            while (!emuWaiting && !exit) System.Threading.Thread.Sleep(1);
+            while (!emuWaiting && !exit && emuThreadAlive) System.Threading.Thread.Sleep(1);
             if (renderThreadRunning && !exit) renderDone.Wait();
-            return !exit;
+            return !exit && emuThreadAlive;
         }
 
         public static void ResumeEmu() => _event.Set();

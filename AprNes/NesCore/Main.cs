@@ -644,24 +644,32 @@ prerender_sprite0_x = 0;
                 return;
             }
 
-            if (isFDS)
+            emuThreadAlive = true;
+            try
             {
-                Run_FDS();
+                if (isFDS)
+                {
+                    Run_FDS();
+                }
+                else if (Region == RegionType.NTSC)
+                {
+                    Run_NTSC();
+                }
+                else if (Region == RegionType.Dendy)
+                {
+                    Run_Dendy();
+                }
+                else if (Region == RegionType.PAL)
+                {
+                    Run_PAL();
+                }
+                // All RegionType enum values (NTSC/PAL/Dendy) are covered above,
+                // plus isFDS. No fallback path needed.
             }
-            else if (Region == RegionType.NTSC)
+            finally
             {
-                Run_NTSC();
+                emuThreadAlive = false;
             }
-            else if (Region == RegionType.Dendy)
-            {
-                Run_Dendy();
-            }
-            else if (Region == RegionType.PAL)
-            {
-                Run_PAL();
-            }
-            // All RegionType enum values (NTSC/PAL/Dendy) are covered above,
-            // plus isFDS. No fallback path needed.
         }
 
         // NTSC fast path. MasterClockTickInlineNTSC is AggressiveInlined
