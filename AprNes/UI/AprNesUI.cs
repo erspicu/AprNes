@@ -1656,19 +1656,13 @@ public string GetRomInfo()
         }
 
         // Phase C: pause emu + wait for render thread to finish any in-flight iteration,
-        // WITHOUT stopping the render thread. Use this for mode toggles, screenshot
-        // capture, ApplyRenderSettings — anywhere that previously did Stop+Start pairs.
-        // Caller is responsible for calling _event.Set() afterwards to resume emu.
+        // WITHOUT stopping the render thread. Thin wrapper around NesCore.TryPauseEmu;
+        // the UI-level `running` flag is the only NetFx-specific guard. Caller is
+        // responsible for calling _event.Set() afterwards to resume emu.
         public void PauseEmuAndRender()
         {
             if (!running) return;
-            NesCore._event.Reset();
-            // Wait for emu to enter its WaitOne (sync digital, sync analog fallback,
-            // OR the Phase C async path which now also checks _event each frame).
-            while (!NesCore.emuWaiting) System.Threading.Thread.Sleep(1);
-            if (NesCore.renderThreadRunning)
-                NesCore.renderDone.Wait();
-            // Don't reset renderDone — emu's next-frame renderDone.Wait will pass through.
+            NesCore.TryPauseEmu();
         }
 
         unsafe void RenderThreadLoop()

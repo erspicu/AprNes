@@ -158,17 +158,14 @@ public sealed unsafe class EmulatorEngine : IDisposable
                                      ResizeFilter s2Filter, int s2Scale,
                                      bool scanline, bool analogEnabled, int analogSize)
     {
-        // Safety: if running, detach video output and wait for emu thread to fully stop
-        // (mirrors AprNes WinForms: _event.Reset → while(!emuWaiting) Sleep)
+        // Safety: if running, detach video output and park emu thread via the
+        // shared NesCore.TryPauseEmu helper (mirrors NetFx PauseEmuAndRender).
         bool wasAttached = false;
         if (_running)
         {
             NesCore.VideoOutput -= OnVideoOutput;
             wasAttached = true;
-            NesCore._event.Reset();
-            // Spin until emu thread confirms it's blocked on _event.WaitOne()
-            while (!NesCore.emuWaiting)
-                Thread.Sleep(1);
+            NesCore.TryPauseEmu();
         }
 
         // Repick PixelZone handler (Digital vs Analog) for current AnalogEnabled.
@@ -271,7 +268,7 @@ public sealed unsafe class EmulatorEngine : IDisposable
         if (wasAttached)
         {
             NesCore.VideoOutput += OnVideoOutput;
-            NesCore._event.Set();
+            NesCore.ResumeEmu();
         }
     }
 

@@ -919,6 +919,23 @@ namespace AprNes
 
         static public bool screen_lock = false;
         static public volatile bool emuWaiting = false;
+
+        // Shared quiesce helper used by both NetFx and Avalonia front-ends to safely
+        // park the emu thread (and the render thread, if running) before mutating
+        // NesCore state from the UI thread. Returns true when a pause was performed
+        // (caller must call ResumeEmu afterwards); false if no pause was needed
+        // because the emu thread is already parked or shutting down.
+        public static bool TryPauseEmu()
+        {
+            if (exit || emuWaiting) return false;
+            _event.Reset();
+            while (!emuWaiting && !exit) System.Threading.Thread.Sleep(1);
+            if (renderThreadRunning && !exit) renderDone.Wait();
+            return !exit;
+        }
+
+        public static void ResumeEmu() => _event.Set();
+
         static void RenderScreen()
         {
             // Phase C-3: unified path — render thread (when running) handles both

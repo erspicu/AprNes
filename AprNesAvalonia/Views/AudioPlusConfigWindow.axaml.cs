@@ -432,13 +432,7 @@ public partial class AudioPlusConfigWindow : Window
     private void BtnOK_Click(object? sender, RoutedEventArgs e)
     {
         // Pause emu thread before modifying NesCore audio pipeline fields
-        bool needSync = !NesCore.emuWaiting && !NesCore.exit;
-        if (needSync)
-        {
-            NesCore._event.Reset();
-            while (!NesCore.emuWaiting && !NesCore.exit)
-                System.Threading.Thread.Sleep(1);
-        }
+        bool paused = NesCore.TryPauseEmu();
 
         SaveToNesCore();
         SaveAudioPlusIni();
@@ -447,8 +441,7 @@ public partial class AudioPlusConfigWindow : Window
         NesCore.mmix_UpdateChannelGains();
         NesCore.AudioPlus_ApplySettings();
 
-        if (needSync)
-            NesCore._event.Set();
+        if (paused) NesCore.ResumeEmu();
 
         Close();
     }
