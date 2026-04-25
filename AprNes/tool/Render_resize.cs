@@ -14,10 +14,6 @@ namespace AprNes
     // Replaces Render_xbrz_1x~9x and Render_scanline_2x/4x/6x
     unsafe public class Render_resize : InterfaceGraphic
     {
-        uint* _input;
-        // Phase A4: palette → RGB conversion buffer (256×240 uint).
-        // Source for filter pipeline; replaces direct ScreenBuf1x consumption.
-        uint* _rgbInput;
         uint* _stage1Buf;   // intermediate buffer after stage1 (null if not needed)
         uint* _output;      // final output buffer
         // Phase C-3 fix: _output may alias NesCore.digitalFrameRgb (1× no-filter
@@ -56,25 +52,21 @@ namespace AprNes
         {
             if (_stage1Buf != null) { AprNes.NesCore.FreeUnmanaged((IntPtr)_stage1Buf); _stage1Buf = null; }
             // Phase C-3 fix: only free _output when we own it (not when aliasing
-            // NesCore.digitalFrameRgb / _input / _rgbInput).
+            // NesCore.digitalFrameRgb).
             if (_output != null && _ownsOutput) { AprNes.NesCore.FreeUnmanaged((IntPtr)_output); }
             _output = null;
             _ownsOutput = false;
-            if (_rgbInput != null) { AprNes.NesCore.FreeUnmanaged((IntPtr)_rgbInput); _rgbInput = null; }
         }
 
         public Bitmap GetOutput()
         {
-            uint* buf = _output != null ? _output : _input;
-            return new Bitmap(_finalW, _finalH, _finalW * 4, PixelFormat.Format32bppRgb, (IntPtr)buf);
+            return new Bitmap(_finalW, _finalH, _finalW * 4, PixelFormat.Format32bppRgb, (IntPtr)_output);
         }
 
         public void init(uint* input, Graphics _device)
         {
-            _input = input;
-
-            // Phase C-3: _rgbInput retired — emu pre-converts to NesCore.digitalFrameRgb.
-            // Keep field at null; freeMem treats null safely.
+            // input parameter retained for InterfaceGraphic contract; pipeline
+            // sources from NesCore.digitalFrameRgb (Phase A4b/C-3) and ignores it.
 
             bool needStage1Buf = (_s1Filter != ResizeFilter.None) && (_s2Filter != ResizeFilter.None);
             bool needOutputBuf = (_s1Filter != ResizeFilter.None) || (_s2Filter != ResizeFilter.None);
@@ -111,7 +103,7 @@ namespace AprNes
         // Headless init: allocate buffers without GDI device (for benchmark mode)
         public void initHeadless(uint* input)
         {
-            _input = input;
+            // input parameter ignored (see init() comment).
 
             bool needStage1Buf = (_s1Filter != ResizeFilter.None) && (_s2Filter != ResizeFilter.None);
             bool needOutputBuf = (_s1Filter != ResizeFilter.None) || (_s2Filter != ResizeFilter.None);

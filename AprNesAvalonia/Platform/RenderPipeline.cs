@@ -14,9 +14,6 @@ namespace AprNesAvalonia.Platform;
 /// </summary>
 public unsafe class RenderPipeline : IDisposable
 {
-    private uint* _input;       // Phase A4b: kept for back-compat, no longer used as data source
-    // Phase A4b: palette→RGB conversion target (256×240). Replaces direct ScreenBuf1x consumption.
-    private uint* _rgbInput;
     private uint* _stage1Buf;
     private uint* _output;
     // Phase C-3 fix: ownership tracking (parallel to Render_resize). _output may alias
@@ -30,7 +27,7 @@ public unsafe class RenderPipeline : IDisposable
 
     public int OutputW { get; private set; } = 256;
     public int OutputH { get; private set; } = 240;
-    public uint* OutputPtr => _output != null ? _output : _input;
+    public uint* OutputPtr => _output;
     public bool HasFilters => _s1Filter != ResizeFilter.None || _s2Filter != ResizeFilter.None || _scanline;
     public bool IsInitialized => _initialized;
 
@@ -57,9 +54,8 @@ public unsafe class RenderPipeline : IDisposable
     public void Init(uint* input)
     {
         FreeMem();
-        _input = input;
-
-        // Phase C-3: _rgbInput retired — emu pre-converts to NesCore.digitalFrameRgb.
+        // input parameter retained for call-site compat; pipeline sources from
+        // NesCore.digitalFrameRgb (Phase A4b/C-3) and ignores it.
 
         bool needStage1Buf = _s1Filter != ResizeFilter.None && _s2Filter != ResizeFilter.None;
         bool needOutputBuf = _s1Filter != ResizeFilter.None || _s2Filter != ResizeFilter.None;
@@ -168,7 +164,6 @@ public unsafe class RenderPipeline : IDisposable
         if (_output != null && _ownsOutput) { AprNes.NesCore.FreeUnmanaged((IntPtr)_output); }
         _output = null;
         _ownsOutput = false;
-        if (_rgbInput != null) { AprNes.NesCore.FreeUnmanaged((IntPtr)_rgbInput); _rgbInput = null; }
         _initialized = false;
     }
 
