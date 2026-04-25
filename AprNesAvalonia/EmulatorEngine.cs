@@ -43,7 +43,10 @@ public sealed unsafe class EmulatorEngine : IDisposable
     // ── Render pipeline (two-stage filter engine) ────────────────────────
     private readonly RenderPipeline _pipeline = new();
     private bool _pipelineActive;       // true if filters are configured
-    private bool _analogMode;           // true = read from AnalogScreenBuf
+    // Source of truth for analog vs digital is NesCore.AnalogEnabled. Caller is
+    // expected to set it BEFORE calling ApplyRenderSettings (see MainWindow.ApplyIniSettings).
+    // OnVideoOutput reads this property to pick the buffer source.
+    private static bool AnalogMode => NesCore.AnalogEnabled;
     private int _outputW = 256, _outputH = 240;
 
     /// <summary>Front buffer pointer — safe to read from Render Thread while Emu Thread writes to back buffer.</summary>
@@ -168,8 +171,6 @@ public sealed unsafe class EmulatorEngine : IDisposable
                 Thread.Sleep(1);
         }
 
-        _analogMode = analogEnabled;
-
         // Repick PixelZone handler (Digital vs Analog) for current AnalogEnabled.
         // NesCore.AnalogEnabled is set by caller before this method is invoked.
         NesCore.ConfigurePpuVisibleDispatch();
@@ -180,6 +181,12 @@ public sealed unsafe class EmulatorEngine : IDisposable
             newW = 256 * analogSize;
             newH = 210 * analogSize;
             _pipelineActive = false;
+
+            // Reset pipeline to 1× no-filter so the subsequent Init aliases _output
+            // to digitalFrameRgb (zero allocation). Without this, a stale filter
+            // config from the previous digital mode would re-allocate a per-pipeline
+            // _output buffer that is never read in analog mode.
+            _pipeline.Configure(ResizeFilter.None, 1, ResizeFilter.None, 1, false);
 
             // Analog NesCore buffer management (mirrors AprNes WinForms ApplyRenderSettings)
             NesCore.SyncAnalogConfig();
@@ -504,7 +511,7 @@ public sealed unsafe class EmulatorEngine : IDisposable
 
             void* dst = (void*)_backBuffer;
 
-            if (_analogMode && NesCore.AnalogScreenBuf != null)
+            if (AnalogMode && NesCore.AnalogScreenBuf != null)
             {
                 Buffer.MemoryCopy(NesCore.AnalogScreenBuf, dst, copyBytes, copyBytes);
             }
@@ -523,7 +530,7 @@ public sealed unsafe class EmulatorEngine : IDisposable
             // Push frame to VideoRecorder (mirrors AprNes WinForms VideoOutputDeal)
             if (VideoRecorder.IsRecording)
             {
-                uint* capturePtr = _analogMode && NesCore.AnalogScreenBuf != null
+                uint* capturePtr = AnalogMode && NesCore.AnalogScreenBuf != null
                     ? NesCore.AnalogScreenBuf
                     : _pipeline.OutputPtr; // Phase A4b: always pipeline output for digital
                 if (capturePtr != null)
