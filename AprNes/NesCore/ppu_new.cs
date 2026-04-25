@@ -194,6 +194,12 @@ namespace AprNes
             // for THIS frame, regardless of when emu's frame_count++ happens next.
             if (AnalogEnabled) Crt_SetFrameCount(frame_count);
 
+            // Phase C-3: digital path — emu pre-converts palette indices → RGB into
+            // digitalFrameRgb. Render thread reads digitalFrameRgb race-free; emu's
+            // next frame writes ntsc_rowPalettes (separate buffer) without touching
+            // the converted RGB buffer.
+            if (!AnalogEnabled) Convert_PalIdxFrameToRGB(digitalFrameRgb);
+
             RenderScreen();
             frame_count++;
             // Phase B: Ntsc_SetFrameCount stays here (ntsc_frameCount is consumed inside

@@ -56,8 +56,7 @@ public unsafe class RenderPipeline : IDisposable
         FreeMem();
         _input = input;
 
-        // Phase A4b: always allocate the 256×240 palette→RGB conversion buffer.
-        _rgbInput = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * 256 * 240);
+        // Phase C-3: _rgbInput retired — emu pre-converts to NesCore.digitalFrameRgb.
 
         bool needStage1Buf = _s1Filter != ResizeFilter.None && _s2Filter != ResizeFilter.None;
         bool needOutputBuf = _s1Filter != ResizeFilter.None || _s2Filter != ResizeFilter.None;
@@ -68,7 +67,7 @@ public unsafe class RenderPipeline : IDisposable
         if (needOutputBuf)
             _output = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * OutputW * OutputH);
         else
-            _output = _rgbInput; // 1×: GDI / blit reads converted RGB directly
+            _output = AprNes.NesCore.digitalFrameRgb; // 1×: read emu's pre-converted RGB
 
         if (_s1Filter == ResizeFilter.XBRz)
             HS_XBRz.initTable(256, 240);
@@ -83,11 +82,9 @@ public unsafe class RenderPipeline : IDisposable
     {
         if (!_initialized) return;
 
-        // Phase A4b: convert ntsc_rowPalettes (per-frame palette indices) → RGB once,
-        // then run the filter pipeline on the converted buffer.
-        AprNes.NesCore.Convert_PalIdxFrameToRGB(_rgbInput);
-
-        uint* src = _rgbInput;
+        // Phase C-3: emu pre-converts ntsc_rowPalettes → digitalFrameRgb at frame end.
+        // Read the pre-converted RGB directly (race-free vs next frame's palette writes).
+        uint* src = AprNes.NesCore.digitalFrameRgb;
         uint* dst;
 
         // Determine stage1 destination

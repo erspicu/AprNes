@@ -241,6 +241,10 @@ namespace AprNes
         // (Phase A5: ScreenBuf1x retired — emu writes palette indices to
         // ntsc_rowPalettes; render-side does NesColors[] lookup at scale time.)
         static public uint* NesColors;
+        // Phase C-3: emu pre-converts ntsc_rowPalettes → RGB into this buffer at
+        // frame end, BEFORE signaling the render thread. Render thread reads it
+        // race-free; next frame's PixelZone writes don't touch it.
+        static public uint* digitalFrameRgb;
         static byte spr_ram_add = 0;
 
         static bool oddSwap = false;
@@ -917,38 +921,25 @@ namespace AprNes
         static public volatile bool emuWaiting = false;
         static void RenderScreen()
         {
-            if (!AnalogEnabled)
+            // Phase C-3: unified path — render thread (when running) handles both
+            // analog and digital. Sync fallback only for headless / Avalonia
+            // (which never starts the render thread).
+            if (renderThreadRunning)
             {
-                // === 數位模式同步 path / headless (最常見路徑) ===
-                screen_lock = true;
-                VideoOutput?.Invoke(null, null);
-                screen_lock = false;
-                emuWaiting = true;
-                _event.WaitOne();
-                emuWaiting = false;
-            }
-            else if (!renderThreadRunning)
-            {
-                // === Analog 同步 fallback (UI 停止渲染執行緒時 / headless 模式) ===
-                screen_lock = true;
-                if (UltraAnalog && CrtEnabled) Crt_Render();
-                VideoOutput?.Invoke(null, null);
-                screen_lock = false;
+                // Async: emu just signals; render thread does the work
+                // (digital reads digitalFrameRgb, analog runs Crt_Render → swap → blit).
+                renderReady.Set();
                 emuWaiting = true;
                 _event.WaitOne();
                 emuWaiting = false;
             }
             else
             {
-                // === Phase B/C Async path (analog + render thread) ===
-                // renderDone.Wait() happens at top of PpuPhase_FrameRender
-                // (before Ntsc_FlushPendingRows) to protect linearBuffer from race.
-                // Crt_Render and SwapAnalogBuffers moved into RenderThreadLoop —
-                // emu thread just signals that linearBuffer is ready.
-                renderReady.Set();
-                // Phase C: emuWaiting/_event.WaitOne also checked in async path so
-                // ApplyRenderSettings/screenshot/etc can pause emu via _event.Reset
-                // without needing to stop the render thread.
+                // Sync fallback (headless TestRunner, Avalonia compositor model).
+                screen_lock = true;
+                if (AnalogEnabled && UltraAnalog && CrtEnabled) Crt_Render();
+                VideoOutput?.Invoke(null, null);
+                screen_lock = false;
                 emuWaiting = true;
                 _event.WaitOne();
                 emuWaiting = false;

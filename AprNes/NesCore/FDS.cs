@@ -326,6 +326,8 @@ namespace AprNes
                 palCache         = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * 32);
                 // Phase A2: per-frame palette index buffer (analog + digital).
                 ntsc_rowPalettes = (byte*)NesCore.AllocUnmanaged(240 * 256);
+                // Phase C-3: pre-converted RGB buffer for digital path.
+                digitalFrameRgb = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * 256 * 240);
                 InitFlipTable();
                 // expansionChannels: needed by mapper Reset() before initAPU()
                 expansionChannels = (int*)NesCore.AllocUnmanaged(sizeof(int) * 8);

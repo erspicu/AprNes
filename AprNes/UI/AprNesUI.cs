@@ -1679,22 +1679,32 @@ public string GetRomInfo()
                 if (!NesCore.renderThreadRunning) break;
                 NesCore.renderReady.Reset();
 
-                // Phase B: CRT post-processing now runs on render thread (was emu thread).
-                // emu thread already filled linearBuffer in Ntsc_FlushPendingRows and
-                // snapshot crt_frameCount via Crt_SetFrameCount before signaling.
-                if (NesCore.UltraAnalog && NesCore.CrtEnabled)
-                    NesCore.Crt_Render();
+                // Phase C-3: mode-aware dispatch. emu has already populated the
+                // appropriate buffer (linearBuffer for analog, digitalFrameRgb for digital)
+                // and snapshot crt_frameCount before signaling.
+                bool analog = NesCore.AnalogEnabled;
+                if (analog)
+                {
+                    if (NesCore.UltraAnalog && NesCore.CrtEnabled)
+                        NesCore.Crt_Render();
+                    NesCore.SwapAnalogBuffers();
+                    WINAPIGDI.NativeGDI.UpdateDataPtr(NesCore.AnalogScreenBufBack);
+                    WINAPIGDI.NativeGDI.DrawImageHighSpeedtoDevice();
+                }
+                else
+                {
+                    // Digital: RenderObj.Render reads digitalFrameRgb (already converted by
+                    // emu thread), runs filter pipeline, then GDI blit.
+                    if (RenderObj != null) RenderObj.Render();
+                }
 
-                // Phase B: buffer swap now happens here (was emu thread). Crt_Render writes
-                // to AnalogScreenBuf; swap moves the just-rendered frame into AnalogScreenBufBack
-                // which GDI reads in DrawImageHighSpeedtoDevice below.
-                NesCore.SwapAnalogBuffers();
-
-                WINAPIGDI.NativeGDI.UpdateDataPtr(NesCore.AnalogScreenBufBack);
-                WINAPIGDI.NativeGDI.DrawImageHighSpeedtoDevice();
-
-                if (VideoRecorder.IsRecording && NesCore.AnalogScreenBufBack != null)
-                    VideoRecorder.PushFrame(NesCore.AnalogScreenBufBack);
+                if (VideoRecorder.IsRecording)
+                {
+                    uint* capturePtr = analog
+                        ? NesCore.AnalogScreenBufBack
+                        : NesCore.RenderOutputPtr;
+                    if (capturePtr != null) VideoRecorder.PushFrame(capturePtr);
+                }
 
                 if (LimitFPS)
                 {

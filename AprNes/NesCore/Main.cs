@@ -239,6 +239,7 @@ namespace AprNes
             if (corruptOamRow!= null) { NesCore.FreeUnmanaged((IntPtr)corruptOamRow);corruptOamRow= null; }
             if (ppu_ram      != null) { NesCore.FreeUnmanaged((IntPtr)ppu_ram);      ppu_ram      = null; }
             if (ntsc_rowPalettes != null) { NesCore.FreeUnmanaged((IntPtr)ntsc_rowPalettes); ntsc_rowPalettes = null; }
+            if (digitalFrameRgb != null) { NesCore.FreeUnmanaged((IntPtr)digitalFrameRgb); digitalFrameRgb = null; }
             if (FlipTable    != null) { NesCore.FreeUnmanaged((IntPtr)FlipTable);    FlipTable    = null; }
             if (sprShiftL    != null) { NesCore.FreeUnmanaged((IntPtr)sprShiftL);    sprShiftL    = null; }
             if (sprShiftH    != null) { NesCore.FreeUnmanaged((IntPtr)sprShiftH);    sprShiftH    = null; }
@@ -492,6 +493,10 @@ prerender_sprite0_x = 0;
                 // Phase A2: per-frame palette index buffer, used by both analog and digital paths.
                 // 240 scanlines × 256 pixels = 60 KB.
                 ntsc_rowPalettes = (byte*)NesCore.AllocUnmanaged(240 * 256);
+                // Phase C-3: pre-converted RGB buffer for digital path (256×240 uint = 256 KB).
+                // emu populates at frame end via Convert_PalIdxFrameToRGB; render thread reads —
+                // race-free vs next frame's PixelZone palette index writes.
+                digitalFrameRgb = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * 256 * 240);
                 InitFlipTable();
                 sprShiftL        = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 8);
                 sprShiftH        = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 8);

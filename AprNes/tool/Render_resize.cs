@@ -66,8 +66,8 @@ namespace AprNes
         {
             _input = input;
 
-            // Phase A4: always allocate the 256×240 palette→RGB conversion buffer.
-            _rgbInput = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * 256 * 240);
+            // Phase C-3: _rgbInput retired — emu pre-converts to NesCore.digitalFrameRgb.
+            // Keep field at null; freeMem treats null safely.
 
             bool needStage1Buf = (_s1Filter != ResizeFilter.None) && (_s2Filter != ResizeFilter.None);
             bool needOutputBuf = (_s1Filter != ResizeFilter.None) || (_s2Filter != ResizeFilter.None);
@@ -78,7 +78,7 @@ namespace AprNes
             if (needOutputBuf)
                 _output = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * _finalW * _finalH);
             else
-                _output = _rgbInput; // 1×: GDI reads the converted RGB buffer directly
+                _output = AprNes.NesCore.digitalFrameRgb; // 1×: GDI reads emu's pre-converted RGB
 
             NativeGDI.initHighSpeed(_device, _finalW, _finalH, _output, 0, 0);
 
@@ -100,9 +100,6 @@ namespace AprNes
         {
             _input = input;
 
-            // Phase A4: same conversion buffer as init() path.
-            _rgbInput = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * 256 * 240);
-
             bool needStage1Buf = (_s1Filter != ResizeFilter.None) && (_s2Filter != ResizeFilter.None);
             bool needOutputBuf = (_s1Filter != ResizeFilter.None) || (_s2Filter != ResizeFilter.None);
 
@@ -112,7 +109,7 @@ namespace AprNes
             if (needOutputBuf)
                 _output = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * _finalW * _finalH);
             else
-                _output = _rgbInput;
+                _output = AprNes.NesCore.digitalFrameRgb; // Phase C-3: read emu's pre-converted RGB
 
             if (_s1Filter == ResizeFilter.XBRz)
                 HS_XBRz.initTable(256, 240);
@@ -134,11 +131,11 @@ namespace AprNes
         // Run filter pipeline only (no GDI draw) — used by headless benchmark
         public void RenderFilter()
         {
-            // Phase A4: convert palette indices (ntsc_rowPalettes) → RGB once,
-            // then run filter pipeline on the converted buffer.
-            AprNes.NesCore.Convert_PalIdxFrameToRGB(_rgbInput);
-
-            uint* src = _rgbInput;
+            // Phase C-3: emu thread already converted ntsc_rowPalettes → digitalFrameRgb
+            // before signaling. Read directly without doing Convert here (race-free).
+            // Headless / sync fallback: emu still does Convert in PpuPhase_FrameRender
+            // before calling VideoOutput.Invoke synchronously, so this is safe in both modes.
+            uint* src = AprNes.NesCore.digitalFrameRgb;
             uint* dst;
 
             // Determine stage1 destination
