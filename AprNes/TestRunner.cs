@@ -111,7 +111,7 @@ namespace AprNes
                 var s2Filter = ParseResizeFilter(stage2);
                 int s2Scale  = ParseResizeScale(stage2);
                 filterRenderer.Configure(s1Filter, s1Scale, s2Filter, s2Scale, scanline);
-                filterRenderer.initHeadless(NesCore.ScreenBuf1x);
+                filterRenderer.initHeadless(null); // Phase A5: pipeline reads ntsc_rowPalettes internally
             };
 
             TestRunnerCore.BenchmarkFilterStepFn = () =>
@@ -163,22 +163,27 @@ namespace AprNes
             }
 
             {
+                // Phase A5: emu output is now palette indices (ntsc_rowPalettes); convert
+                // to RGB on the fly for the screenshot.
                 Bitmap bmp = new Bitmap(256, 240, PixelFormat.Format32bppArgb);
                 BitmapData data = bmp.LockBits(
                     new Rectangle(0, 0, 256, 240),
                     ImageLockMode.WriteOnly,
                     PixelFormat.Format32bppArgb);
 
-                uint* src = NesCore.ScreenBuf1x;
+                byte* palSrc = NesCore.ntsc_rowPalettes;
+                uint* colors = NesCore.NesColors;
                 byte* dst = (byte*)data.Scan0;
                 int stride = data.Stride;
 
-                for (int y = 0; y < 240; y++)
+                if (palSrc != null && colors != null)
                 {
-                    uint* dstRow = (uint*)(dst + y * stride);
-                    for (int x = 0; x < 256; x++)
+                    for (int y = 0; y < 240; y++)
                     {
-                        dstRow[x] = src[y * 256 + x];
+                        uint* dstRow = (uint*)(dst + y * stride);
+                        byte* srcRow = palSrc + y * 256;
+                        for (int x = 0; x < 256; x++)
+                            dstRow[x] = colors[srcRow[x]];
                     }
                 }
 

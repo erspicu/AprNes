@@ -238,8 +238,9 @@ namespace AprNes
         static bool oamCorruptDisabledFlag = false;     // TriCNES: PPU_OAMCorruptionRenderingDisabledOutOfVBlank
 
         // P4-2: Palette corruption flags
-        static public uint* ScreenBuf1x;
-        static uint* NesColors; //, targetSize;
+        // (Phase A5: ScreenBuf1x retired — emu writes palette indices to
+        // ntsc_rowPalettes; render-side does NesColors[] lookup at scale time.)
+        static public uint* NesColors;
         static byte spr_ram_add = 0;
 
         static bool oddSwap = false;
@@ -274,10 +275,9 @@ namespace AprNes
         static bool sprZeroInSlots = false;            // Sprite 0 is in slot 0
 
         // ── 3-dot pixel output pipeline (TriCNES P2-2) ──
-        // TriCNES: PrevPrevPrevDotColor → PrevPrevDotColor → PrevDotColor → DotColor
-        // DrawToScreen uses PrevPrevPrevDotColor (3 dot delay).
-        // Pipeline stores composite (BG+sprite) color and palette index.
-        static uint dotColor = 0, prevDotColor = 0, prevPrevDotColor = 0, prevPrevPrevDotColor = 0;
+        // TriCNES: PrevPrevPrev → PrevPrev → Prev → Dot (3 dot delay before draw).
+        // Phase A5: only the palette-index pipeline survives; dotColor (RGB) was
+        // dropped together with ScreenBuf1x — render-side does NesColors[] lookup.
         static byte dotPalIdx = 0, prevDotPalIdx = 0, prevPrevDotPalIdx = 0, prevPrevPrevDotPalIdx = 0;
 
         // ── P4-4: Odd frame skip side effects ──

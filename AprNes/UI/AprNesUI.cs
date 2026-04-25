@@ -199,7 +199,7 @@ namespace AprNes
                 if (RenderObj != null)
                 {
                     RenderObj.freeMem();
-                    RenderObj.init(NesCore.ScreenBuf1x, grfx);
+                    RenderObj.init(null, grfx); // Phase A5: pipeline reads ntsc_rowPalettes internally
                 }
             }
 
@@ -1484,7 +1484,7 @@ public string GetRomInfo()
 
             if (RenderObj != null) RenderObj.freeMem();
             RenderObj = NesCore.AnalogEnabled ? (InterfaceGraphic)new Render_Analog() : CreateRenderResize();
-            RenderObj.init(NesCore.ScreenBuf1x, grfx);
+            RenderObj.init(null, grfx); // Phase A5: pipeline reads ntsc_rowPalettes internally
 
             NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
             NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
@@ -1748,7 +1748,7 @@ public string GetRomInfo()
             while (!NesCore.emuWaiting) Thread.Sleep(1);
             if (RenderObj != null) RenderObj.freeMem();
             RenderObj = NesCore.AnalogEnabled ? (InterfaceGraphic)new Render_Analog() : CreateRenderResize();
-            RenderObj.init(NesCore.ScreenBuf1x, grfx);
+            RenderObj.init(null, grfx); // Phase A5: pipeline reads ntsc_rowPalettes internally
             NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
 
             NesCore.SoftReset();   // 設 flag（模擬線程暫停中，無 race condition）
@@ -1832,7 +1832,7 @@ public string GetRomInfo()
 
             if (RenderObj != null) RenderObj.freeMem();
             RenderObj = NesCore.AnalogEnabled ? (InterfaceGraphic)new Render_Analog() : CreateRenderResize();
-            RenderObj.init(NesCore.ScreenBuf1x, grfx);
+            RenderObj.init(null, grfx); // Phase A5: pipeline reads ntsc_rowPalettes internally
             NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
 
             // Analog mode: 重啟 async 渲染執行緒
@@ -1888,7 +1888,7 @@ public string GetRomInfo()
 
             if (RenderObj != null) RenderObj.freeMem();
             RenderObj = NesCore.AnalogEnabled ? (InterfaceGraphic)new Render_Analog() : CreateRenderResize();
-            RenderObj.init(NesCore.ScreenBuf1x, grfx);
+            RenderObj.init(null, grfx); // Phase A5: pipeline reads ntsc_rowPalettes internally
 
             NesCore.VideoOutput -= new EventHandler(VideoOutputDeal);
             NesCore.VideoOutput += new EventHandler(VideoOutputDeal);
@@ -2311,7 +2311,7 @@ public string GetRomInfo()
             grfx = panel1.CreateGraphics();
             if (RenderObj != null) RenderObj.freeMem();
             RenderObj = new Render_Analog();
-            RenderObj.init(NesCore.ScreenBuf1x, grfx);
+            RenderObj.init(null, grfx); // Phase A5: pipeline reads ntsc_rowPalettes internally
 
             label3.Location = new Point(0, 0);
             panel1.Visible = true;

@@ -233,7 +233,6 @@ namespace AprNes
             if (MapperObj != null) { MapperObj.Cleanup(); MapperObj = null; }
             if (PRG_ROM      != null) { NesCore.FreeUnmanaged((IntPtr)PRG_ROM);      PRG_ROM      = null; }
             if (CHR_ROM      != null) { NesCore.FreeUnmanaged((IntPtr)CHR_ROM);      CHR_ROM      = null; }
-            if (ScreenBuf1x  != null) { NesCore.FreeUnmanaged((IntPtr)ScreenBuf1x);  ScreenBuf1x  = null; }
             if (NesColors    != null) { NesCore.FreeUnmanaged((IntPtr)NesColors);    NesColors    = null; }
             if (spr_ram      != null) { NesCore.FreeUnmanaged((IntPtr)spr_ram);      spr_ram      = null; }
             if (secondaryOAM != null) { NesCore.FreeUnmanaged((IntPtr)secondaryOAM); secondaryOAM = null; }
@@ -333,8 +332,7 @@ namespace AprNes
             for (int i = 0; i < 8; i++)
             { sprShiftL[i] = 0; sprShiftH[i] = 0; sprXCounter[i] = 0; sprFetchAttr[i] = 0; }
             sprSlotCount = 0; sprZeroInSlots = false;
-            // 3-dot pixel pipeline
-            dotColor = prevDotColor = prevPrevDotColor = prevPrevPrevDotColor = 0;
+            // 3-dot pixel pipeline (Phase A5: palette indices only)
             dotPalIdx = prevDotPalIdx = prevPrevDotPalIdx = prevPrevPrevDotPalIdx = 0;
             skippedPreRenderDot341 = false;
             // P4-1: OAM corruption
@@ -478,7 +476,6 @@ prerender_sprite0_x = 0;
                 }
 
                 //init allocate
-                ScreenBuf1x      = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * 61440);
                 if (AnalogEnabled)
                 {
                     SyncAnalogConfig();  // 確保 Crt_DstW/DstH 使用正確的 AnalogSize
@@ -550,7 +547,6 @@ prerender_sprite0_x = 0;
                     *Vertical = dbEntry.MirrorOverride;
                 MapperObj.UpdateCHRBanks();
 
-                for (int i = 0; i < 61440; i++) ScreenBuf1x[i] = 0;
                 for (int i = 0; i < 16384; i++) ppu_ram[i] = 0;
                 for (int i = 0; i < 256; i++) spr_ram[i] = 0;
                 for (int i = 0; i < 32; i++) { secondaryOAM[i] = 0; corruptOamRow[i] = 0; }

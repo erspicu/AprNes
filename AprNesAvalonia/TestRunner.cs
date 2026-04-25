@@ -28,9 +28,10 @@ namespace AprNes
 
             // Pick source buffer + dimensions:
             //   Analog mode → AnalogScreenBuf at Crt_DstW × Crt_DstH (varies with AnalogSize)
-            //   Normal mode → ScreenBuf1x at 256 × 240
+            //   Normal mode → ntsc_rowPalettes (palette indices) converted on the fly via NesColors
             int w, h;
             uint* src;
+            uint* tempRgb = null;
             if (NesCore.AnalogEnabled && NesCore.AnalogScreenBuf != null)
             {
                 w = NesCore.Crt_DstW;
@@ -41,13 +42,23 @@ namespace AprNes
             {
                 w = 256;
                 h = 240;
-                src = NesCore.ScreenBuf1x;
+                if (NesCore.ntsc_rowPalettes == null || NesCore.NesColors == null)
+                {
+                    System.Console.Error.WriteLine(
+                        "[Screenshot] palette buffer / NesColors not initialised; skipped");
+                    return;
+                }
+                // Phase A5: convert palette indices → RGB into a one-shot scratch buffer.
+                tempRgb = (uint*)System.Runtime.InteropServices.Marshal.AllocHGlobal(sizeof(uint) * w * h);
+                NesCore.Convert_PalIdxFrameToRGB(tempRgb);
+                src = tempRgb;
             }
 
             if (src == null || w <= 0 || h <= 0)
             {
                 System.Console.Error.WriteLine(
                     "[Screenshot] source buffer null or invalid dimensions; skipped");
+                if (tempRgb != null) System.Runtime.InteropServices.Marshal.FreeHGlobal((nint)tempRgb);
                 return;
             }
 
@@ -68,6 +79,7 @@ namespace AprNes
             finally
             {
                 bmp.Dispose();
+                if (tempRgb != null) System.Runtime.InteropServices.Marshal.FreeHGlobal((nint)tempRgb);
             }
         }
     }

@@ -339,18 +339,9 @@ namespace AprNes
         static void PpuPhase4_VisibleScanlineDot1Init()
         {
             int scanOff = scanline << 8;
-            // Phase A3: always prefill ntsc_rowPalettes with backdrop palette index
-            // (both modes consume it). Digital additionally fills ScreenBuf1x with
-            // the corresponding backdrop colour.
+            // Phase A5: only ntsc_rowPalettes prefill needed; ScreenBuf1x retired.
             byte bgIdx = (byte)(ppu_ram[0x3f00] & 0x3f);
             System.Runtime.CompilerServices.Unsafe.InitBlockUnaligned(ntsc_rowPalettes + scanOff, bgIdx, 256);
-            if (!AnalogEnabled)
-            {
-                // Fill 256 uints with backdrop color — 4-byte pattern, JIT-unroll ulong loop
-                uint bgColor = palCache[0]; ulong fill = bgColor | ((ulong)bgColor << 32);
-                ulong* sp = (ulong*)(ScreenBuf1x + scanOff);
-                for (int i = 0; i < 128; i++) sp[i] = fill;
-            }
             PrecomputeOverflow();
         }
 

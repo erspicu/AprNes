@@ -371,7 +371,7 @@ namespace AprNes
         // CRITICAL: phase0 must be captured per-scanline on the PPU thread (scanPhase6 /
         // scanPhaseBase are serial state — reading them from parallel workers would race
         // and produce non-deterministic subcarrier phase, corrupting colour output).
-        static byte* ntsc_rowPalettes;    // kSrcH × 256 bytes
+        public static byte* ntsc_rowPalettes;    // kSrcH × 256 bytes (Phase A5: public — emu's per-frame palette buffer)
         static byte* ntsc_rowEmphasis;    // kSrcH bytes
         static int* ntsc_rowPhase0;       // kSrcH ints — captured subcarrier phase per scanline
 

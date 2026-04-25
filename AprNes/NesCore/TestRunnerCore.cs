@@ -483,14 +483,15 @@ namespace AprNes
                 }
 
                 // --- Screen stability detection ---
+                // Phase A5: use ntsc_rowPalettes (palette indices) instead of ScreenBuf1x.
                 if (waitResult && !testStarted && frameCount > 120)
                 {
                     uint hash = 1;
                     bool hasContent = false;
-                    uint firstPx = NesCore.ScreenBuf1x[0];
+                    byte firstPx = NesCore.ntsc_rowPalettes[0];
                     for (int i = 0; i < 256 * 240; i += 37)
                     {
-                        uint px = NesCore.ScreenBuf1x[i];
+                        byte px = NesCore.ntsc_rowPalettes[i];
                         hash = hash * 31 + px;
                         if (px != firstPx) hasContent = true;
                     }

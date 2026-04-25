@@ -312,7 +312,6 @@ namespace AprNes
                 for (int i = 0; i < 32768; i++) fdsPrgRam[i] = 0;
 
                 // Shared hardware allocations (same as init())
-                ScreenBuf1x      = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * 61440);
                 if (AnalogEnabled)
                 {
                     SyncAnalogConfig();
@@ -358,7 +357,6 @@ namespace AprNes
                 mmc5Ref = null;
 
                 // Clear all buffers
-                for (int i = 0; i < 61440; i++) ScreenBuf1x[i] = 0;
                 for (int i = 0; i < 16384; i++) ppu_ram[i] = 0;
                 for (int i = 0; i < 256; i++) spr_ram[i] = 0;
                 for (int i = 0; i < 32; i++) { secondaryOAM[i] = 0; corruptOamRow[i] = 0; }
