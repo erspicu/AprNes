@@ -940,19 +940,11 @@ namespace AprNes
             }
             else
             {
-                // === Async double buffer path (類比模式) ===
-                screen_lock = true;
-                if (UltraAnalog && CrtEnabled) Crt_Render();
-                screen_lock = false;
-
-                // 等上一幀 GDI 完成（如果還在跑）
-                analogRenderDone.Wait();
-                analogRenderDone.Reset();
-
-                // Swap front/back buffer — GDI 讀 back buffer（上一幀），模擬寫 front buffer（下一幀）
-                SwapAnalogBuffers();
-
-                // 通知渲染執行緒開始 blit back buffer
+                // === Phase B Async path (類比模式 + analog render thread) ===
+                // analogRenderDone.Wait() now happens at top of PpuPhase_FrameRender
+                // (before Ntsc_FlushPendingRows) to protect linearBuffer from race.
+                // Crt_Render and SwapAnalogBuffers moved into AnalogRenderThreadLoop —
+                // emu thread just signals that linearBuffer is ready.
                 analogRenderReady.Set();
             }
         }

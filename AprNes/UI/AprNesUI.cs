@@ -1666,6 +1666,17 @@ public string GetRomInfo()
                 if (!NesCore.analogRenderThreadRunning) break;
                 NesCore.analogRenderReady.Reset();
 
+                // Phase B: CRT post-processing now runs on render thread (was emu thread).
+                // emu thread already filled linearBuffer in Ntsc_FlushPendingRows and
+                // snapshot crt_frameCount via Crt_SetFrameCount before signaling.
+                if (NesCore.UltraAnalog && NesCore.CrtEnabled)
+                    NesCore.Crt_Render();
+
+                // Phase B: buffer swap now happens here (was emu thread). Crt_Render writes
+                // to AnalogScreenBuf; swap moves the just-rendered frame into AnalogScreenBufBack
+                // which GDI reads in DrawImageHighSpeedtoDevice below.
+                NesCore.SwapAnalogBuffers();
+
                 WINAPIGDI.NativeGDI.UpdateDataPtr(NesCore.AnalogScreenBufBack);
                 WINAPIGDI.NativeGDI.DrawImageHighSpeedtoDevice();
 

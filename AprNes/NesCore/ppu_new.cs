@@ -175,11 +175,31 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void PpuPhase_FrameRender()
         {
-            // Parallel-demod all 240 captured scanlines before Crt_Render reads linearBuffer.
+            // Phase B: when analog render thread is running, wait for the previous
+            // frame's CRT/blit to complete BEFORE we touch linearBuffer. Crt_Render
+            // (now on render thread) reads linearBuffer; we must not overwrite it
+            // via Ntsc_FlushPendingRows until that read is done.
+            if (AnalogEnabled && analogRenderThreadRunning)
+            {
+                analogRenderDone.Wait();
+                analogRenderDone.Reset();
+            }
+
+            // Parallel-demod all 240 captured scanlines (writes linearBuffer).
             if (AnalogEnabled) Ntsc_FlushPendingRows();
+
+            // Phase B: snapshot frame_count INTO CrtScreen BEFORE signaling render thread.
+            // This guarantees the render thread's Crt_Render reads the correct per-frame
+            // state (interlace jitter direction, frame age in phosphor blending, etc.)
+            // for THIS frame, regardless of when emu's frame_count++ happens next.
+            if (AnalogEnabled) Crt_SetFrameCount(frame_count);
+
             RenderScreen();
             frame_count++;
-            if (AnalogEnabled) { Ntsc_SetFrameCount(frame_count); Crt_SetFrameCount(frame_count); }
+            // Phase B: Ntsc_SetFrameCount stays here (ntsc_frameCount is consumed inside
+            // FlushPendingRows on emu thread). Crt_SetFrameCount moved up — no longer
+            // duplicated here.
+            if (AnalogEnabled) Ntsc_SetFrameCount(frame_count);
         }
 
         // ════════════════════════════════════════════════════════════════
