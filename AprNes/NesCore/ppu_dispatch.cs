@@ -147,7 +147,7 @@ namespace AprNes
                 ShowSpr_EvalDelay = ShowSprites;
             }
 
-            PPU_DATA_Pipeline_Step(1);
+            PPU_DATA_Pipeline_Step1();
 
             if (oamCorruptDelay != 0) PpuPhase_HandleDelayedOamCorruption(true);
 
@@ -331,7 +331,7 @@ namespace AprNes
                 }
             }
 
-            PPU_DATA_Pipeline_Step(2);
+            Ppu2007_BusRead();
 
             // ── Draw to screen (cx ∈ [1, 256]; gate simplifies to cx >= 4) ──
             if (cx >= 4)
@@ -381,7 +381,7 @@ namespace AprNes
 
             // (Tile fetch / pixel / sprite shift blocks removed — post-inc cx never in ranges.)
 
-            PPU_DATA_Pipeline_Step(2);
+            Ppu2007_BusRead();
 
             // Draw: only post-inc cx==259 fires (entry 258).
             if (cx == 259)
@@ -425,7 +425,7 @@ namespace AprNes
 
             PpuBgTileFetchRange(cx);
 
-            PPU_DATA_Pipeline_Step(2);
+            Ppu2007_BusRead();
 
             // (No pixel, no sprite shift, no draw, no NTSC capture, no frame render.)
 
@@ -459,7 +459,7 @@ namespace AprNes
             PpuPhase4_DummyNTFetch(cx);
             PpuDotAuxAfterPhase4();
 
-            PPU_DATA_Pipeline_Step(2);
+            Ppu2007_BusRead();
 
             ppuRenderingEnabled = ShowBackGround_Instant || ShowSprites_Instant;
         }
@@ -506,7 +506,7 @@ namespace AprNes
             }
             PpuDotAuxAfterPhase4();
 
-            PPU_DATA_Pipeline_Step(2);
+            Ppu2007_BusRead();
 
             // Only post-inc cx 257/258 produce the final delayed pixels.
             if (scanline < 240 && (cx == 257 || cx == 258))
@@ -570,7 +570,7 @@ namespace AprNes
             // Pre-render still needs BG tile fetch + sprite shift, but no pixel composition.
             Ppu_PreRender_RenderBlock(cx);
 
-            PPU_DATA_Pipeline_Step(2);
+            Ppu2007_BusRead();
 
             ppuRenderingEnabled = ShowBackGround_Instant || ShowSprites_Instant;
         }
@@ -619,7 +619,7 @@ namespace AprNes
                 ShowSpr_EvalDelay = ShowSprites;
             }
 
-            PPU_DATA_Pipeline_Step(1);
+            PPU_DATA_Pipeline_Step1();
 
             if (oamCorruptDelay != 0) PpuPhase_HandleDelayedOamCorruption(activeScanlineCorruption);
         }
@@ -678,7 +678,7 @@ namespace AprNes
 
             // No active-scanline render block.
 
-            PPU_DATA_Pipeline_Step(2);
+            Ppu2007_BusRead();
 
             // No DrawToScreen (visible gate false).
 
