@@ -940,12 +940,18 @@ namespace AprNes
             }
             else
             {
-                // === Phase B Async path (類比模式 + analog render thread) ===
-                // renderDone.Wait() now happens at top of PpuPhase_FrameRender
+                // === Phase B/C Async path (analog + render thread) ===
+                // renderDone.Wait() happens at top of PpuPhase_FrameRender
                 // (before Ntsc_FlushPendingRows) to protect linearBuffer from race.
                 // Crt_Render and SwapAnalogBuffers moved into RenderThreadLoop —
                 // emu thread just signals that linearBuffer is ready.
                 renderReady.Set();
+                // Phase C: emuWaiting/_event.WaitOne also checked in async path so
+                // ApplyRenderSettings/screenshot/etc can pause emu via _event.Reset
+                // without needing to stop the render thread.
+                emuWaiting = true;
+                _event.WaitOne();
+                emuWaiting = false;
             }
         }
 
