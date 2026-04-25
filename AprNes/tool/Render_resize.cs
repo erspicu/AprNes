@@ -20,6 +20,10 @@ namespace AprNes
         uint* _rgbInput;
         uint* _stage1Buf;   // intermediate buffer after stage1 (null if not needed)
         uint* _output;      // final output buffer
+        // Phase C-3 fix: _output may alias NesCore.digitalFrameRgb (1× no-filter
+        // case) which we don't own. _ownsOutput=true only when we allocated _output
+        // ourselves; freeMem only frees when owned.
+        bool _ownsOutput;
         int _s1Scale, _s2Scale;
         int _finalW, _finalH;
         int _stage1W, _stage1H;
@@ -51,8 +55,11 @@ namespace AprNes
         public void freeMem()
         {
             if (_stage1Buf != null) { AprNes.NesCore.FreeUnmanaged((IntPtr)_stage1Buf); _stage1Buf = null; }
-            // _output may alias _rgbInput in 1×-no-filter path — null-check both before freeing _output.
-            if (_output != null && _output != _input && _output != _rgbInput) { AprNes.NesCore.FreeUnmanaged((IntPtr)_output); _output = null; }
+            // Phase C-3 fix: only free _output when we own it (not when aliasing
+            // NesCore.digitalFrameRgb / _input / _rgbInput).
+            if (_output != null && _ownsOutput) { AprNes.NesCore.FreeUnmanaged((IntPtr)_output); }
+            _output = null;
+            _ownsOutput = false;
             if (_rgbInput != null) { AprNes.NesCore.FreeUnmanaged((IntPtr)_rgbInput); _rgbInput = null; }
         }
 
@@ -76,9 +83,15 @@ namespace AprNes
                 _stage1Buf = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * _stage1W * _stage1H);
 
             if (needOutputBuf)
+            {
                 _output = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * _finalW * _finalH);
+                _ownsOutput = true;
+            }
             else
+            {
                 _output = AprNes.NesCore.digitalFrameRgb; // 1×: GDI reads emu's pre-converted RGB
+                _ownsOutput = false;
+            }
 
             NativeGDI.initHighSpeed(_device, _finalW, _finalH, _output, 0, 0);
 
@@ -107,9 +120,15 @@ namespace AprNes
                 _stage1Buf = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * _stage1W * _stage1H);
 
             if (needOutputBuf)
+            {
                 _output = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * _finalW * _finalH);
+                _ownsOutput = true;
+            }
             else
+            {
                 _output = AprNes.NesCore.digitalFrameRgb; // Phase C-3: read emu's pre-converted RGB
+                _ownsOutput = false;
+            }
 
             if (_s1Filter == ResizeFilter.XBRz)
                 HS_XBRz.initTable(256, 240);
