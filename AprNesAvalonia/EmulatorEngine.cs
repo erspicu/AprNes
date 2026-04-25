@@ -49,6 +49,16 @@ public sealed unsafe class EmulatorEngine : IDisposable
     private static bool AnalogMode => NesCore.AnalogEnabled;
     private int _outputW = 256, _outputH = 240;
 
+    // ── Helper render thread (issue 5.1 / Phase 5.1) ──────────────────────
+    // Mirrors NetFx's RenderThreadLoop. Moves _pipeline.Process / Crt_Render /
+    // Buffer.MemoryCopy off the emu thread, driven by NesCore.renderReady signals
+    // from PpuPhase_FrameRender. While this thread is alive we set
+    // NesCore.renderThreadRunning=true so emu's RenderScreen takes the async branch.
+    private Thread? _renderThread;
+    // Set true while OutputOneFrame is executing on the render thread. PauseEmuAndRender
+    // drains this to ensure ApplyRenderSettings doesn't mutate shared state mid-iteration.
+    private volatile bool _renderInIteration;
+
     /// <summary>Front buffer pointer — safe to read from Render Thread while Emu Thread writes to back buffer.</summary>
     public IntPtr CurrentFrontBuffer => _frontBuffer;
 
@@ -158,14 +168,17 @@ public sealed unsafe class EmulatorEngine : IDisposable
                                      ResizeFilter s2Filter, int s2Scale,
                                      bool scanline, bool analogEnabled, int analogSize)
     {
-        // Safety: if running, detach video output and park emu thread via the
-        // shared NesCore.TryPauseEmu helper (mirrors NetFx PauseEmuAndRender).
+        // Safety: if running, detach video output and park emu thread + render
+        // thread via PauseEmuAndRender (mirrors NetFx PauseEmuAndRender). The
+        // detach is harmless when renderThreadRunning=true (emu doesn't fire
+        // VideoOutput in that branch) but we keep it for the renderThreadRunning
+        // toggle/reattach flow on Stop/Start.
         bool wasAttached = false;
         if (_running)
         {
             NesCore.VideoOutput -= OnVideoOutput;
             wasAttached = true;
-            NesCore.TryPauseEmu();
+            PauseEmuAndRender();
         }
 
         // Repick PixelZone handler (Digital vs Analog) for current AnalogEnabled.
@@ -428,6 +441,16 @@ public sealed unsafe class EmulatorEngine : IDisposable
         _fpsStopWatch.Reset();
         NesCore.exit = false;
         NesCore._event.Set();
+
+        // Phase 5.1: spawn helper render thread BEFORE emu thread so it's ready
+        // when emu signals renderReady. Set renderThreadRunning=true so emu's
+        // RenderScreen takes the async branch (skips OnVideoOutput sync fallback).
+        NesCore.renderReady.Reset();
+        NesCore.renderDone.Set();   // emu's Phase B renderDone.Wait passes through on first frame
+        NesCore.renderThreadRunning = true;
+        _renderThread = new Thread(RenderThreadLoop) { IsBackground = true, Name = "AvaRender" };
+        _renderThread.Start();
+
         _thread = new Thread(NesCore.run) { IsBackground = true, Name = "NesCore" };
         _thread.Start();
 
@@ -441,8 +464,17 @@ public sealed unsafe class EmulatorEngine : IDisposable
         _audio.Close();
         if (!_running) return;
         _running = false;
+
+        // Phase 5.1: stop the render thread first. After this, emu's RenderScreen
+        // falls back to the sync VideoOutput?.Invoke path, which is harmless for
+        // the brief window between here and exit=true.
+        NesCore.renderThreadRunning = false;
+        NesCore.renderReady.Set();   // wake render thread out of Wait so it can observe the flag
+        _renderThread?.Join(500);
+        _renderThread = null;
+
         NesCore.exit = true;
-        NesCore._event.Set();   // unblock if paused
+        NesCore._event.Set();   // unblock emu if paused
         _thread?.Join(2000);
         _thread = null;
     }
@@ -500,7 +532,11 @@ public sealed unsafe class EmulatorEngine : IDisposable
     }
 
     // ── Private ────────────────────────────────────────────────────────────
-    private void OnVideoOutput(object? sender, EventArgs e)
+    // Phase 5.1: shared body for one frame's output work. Called from either:
+    //   - OnVideoOutput (sync fallback when renderThreadRunning=false), OR
+    //   - RenderThreadLoop (helper thread when renderThreadRunning=true).
+    // Includes filter / CRT / blit / swap / VideoRecorder / FPS limit / dispatch.
+    private void OutputOneFrame()
     {
         int copyBytes = _outputW * _outputH * 4;
 
@@ -512,6 +548,11 @@ public sealed unsafe class EmulatorEngine : IDisposable
 
             if (AnalogMode && NesCore.AnalogScreenBuf != null)
             {
+                // Phase 5.1: CPU CRT runs here (off emu thread) when render thread
+                // is active. GPU CRT path leaves Crt_Render as no-op via
+                // CrtScreen.Gpu.Render's CrtGpuRenderThreadActive check.
+                if (NesCore.UltraAnalog && NesCore.CrtEnabled)
+                    NesCore.Crt_Render();
                 Buffer.MemoryCopy(NesCore.AnalogScreenBuf, dst, copyBytes, copyBytes);
             }
             else
@@ -555,6 +596,48 @@ public sealed unsafe class EmulatorEngine : IDisposable
         // Signal UI thread via Avalonia dispatcher
         if (Interlocked.Exchange(ref _pendingFrame, 1) == 0)
             Avalonia.Threading.Dispatcher.UIThread.Post(FireFrameReady, Avalonia.Threading.DispatcherPriority.Render);
+    }
+
+    // Sync fallback (renderThreadRunning=false). Fires on emu thread via NesCore's
+    // RenderScreen → VideoOutput?.Invoke. Stays attached even when render thread is
+    // running — emu just won't fire VideoOutput in that branch, so this is a no-op.
+    private void OnVideoOutput(object? sender, EventArgs e) => OutputOneFrame();
+
+    // Phase 5.1: helper render thread. Driven by NesCore.renderReady signals from
+    // emu thread's RenderScreen. While this loop is alive,
+    // NesCore.renderThreadRunning=true and emu skips the sync VideoOutput fallback.
+    private void RenderThreadLoop()
+    {
+        while (NesCore.renderThreadRunning)
+        {
+            NesCore.renderReady.Wait();
+            if (!NesCore.renderThreadRunning) break;
+            NesCore.renderReady.Reset();
+
+            _renderInIteration = true;
+            OutputOneFrame();
+            _renderInIteration = false;
+
+            // Signal emu thread that this frame's render work is done. emu's
+            // analog Phase B path (PpuPhase_FrameRender) waits on this before
+            // overwriting linearBuffer for the next frame.
+            NesCore.renderDone.Set();
+        }
+    }
+
+    // Phase 5.1: pause emu thread AND quiesce the helper render thread. Mirrors
+    // NetFx's PauseEmuAndRender — used by ApplyRenderSettings (and any other path
+    // that mutates shared NesCore/_pipeline state) to ensure no concurrent reader.
+    // Returns true if emu was actually paused (caller must call ResumeEmu).
+    public bool PauseEmuAndRender()
+    {
+        if (!NesCore.TryPauseEmu()) return false;
+        // Drain: wait until render thread is between iterations AND no pending
+        // renderReady signal. After this, emu is parked (won't signal more) and
+        // render thread is at renderReady.Wait — truly idle.
+        while (_renderInIteration || NesCore.renderReady.Wait(0))
+            Thread.Sleep(1);
+        return true;
     }
 
     private void FireFrameReady()
