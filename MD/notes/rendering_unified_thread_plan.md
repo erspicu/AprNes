@@ -1,7 +1,35 @@
 # Rendering Refactor — Unified render thread + CRT/filter relocation (Option 2+3)
 
 Branch: `feature/rendering-refactor`
-Date: 2026-04-25
+Originally written: 2026-04-25
+Last updated: 2026-04-25
+
+## Implementation status
+
+| Phase | Status | Commits |
+|---|---|---|
+| A1 — Analog writes directly to `ntsc_rowPalettes` | ✅ Merged | `8be4815` |
+| A2 — `ntsc_rowPalettes` always-allocated | ✅ Merged | `c37359f` |
+| A3 — Digital writes palIdx to `ntsc_rowPalettes` (dual-write transitional) | ✅ Merged | `90ea96b` |
+| A4a — `Render_resize` reads `ntsc_rowPalettes` via palette→RGB conversion | ✅ Merged | `37d1411` |
+| A4b — Avalonia `RenderPipeline` reads `ntsc_rowPalettes` | ✅ Merged | `a7c0627` |
+| A5 — Drop `ScreenBuf1x` + dotColor pipeline + dual write | ✅ Merged | `36b7acb` |
+| B — Move `Crt_Render` + `SwapAnalogBuffers` to render thread | ✅ Merged | `e2f4b26` |
+| C-1 — Rename `analog*` render thread symbols → `render*` | ✅ Merged | `1eb6ff6` |
+| C-2 — Render thread always-running across mode toggles | ✅ Merged | `d18c889` |
+| C-3 — Digital path through render thread (NetFx) | ✅ Merged | `d0e06a1` |
+| C-3 fix — `_ownsOutput` flag (don't free aliased buffers) | ✅ Merged | `1b1235e` |
+| D — Cleanup + Avalonia parity + documentation | 🚧 In progress | — |
+
+**Validated**: 184/184 blargg + 138/138 AccuracyCoin v2 (no regression).
+
+The implemented model differs from this plan in one important way: there is
+**no `palBuf` / `palBuf_back` double buffer**. `ntsc_rowPalettes` is the
+single 60 KB palette-index frame buffer; the digital path pre-converts
+to a separate `digitalFrameRgb` (256×240 uint, always allocated) on the
+emu thread *before* signaling the render thread, which makes the swap
+unnecessary. See `rendering_dispatch_analog_vs_digital.md` for the
+post-refactor architecture.
 
 ## Why option 1 was unstable (lessons learned)
 
@@ -204,3 +232,44 @@ This plan eliminates both by:
 - If it regresses, we learn early without large rollback
 
 Want to commit this plan as the branch's first commit and start Phase A?
+
+---
+
+## Post-implementation deviations from the plan
+
+The shipped result diverges from the original plan in a few places worth
+recording for anyone tracing the commit history.
+
+1. **No `palBuf` / `palBuf_back` swap.** The digital path pre-converts on
+   the emu thread (`Convert_PalIdxFrameToRGB`) before the render-thread
+   signal. The render thread reads `digitalFrameRgb` exclusively; emu
+   never writes that buffer between signal and `_event` resume. Phase A's
+   "double-buffered palette" idea collapsed to a single
+   `ntsc_rowPalettes` (palette buffer) + a single `digitalFrameRgb` (RGB
+   buffer), both always allocated.
+
+2. **`Render_resize._output` aliases `digitalFrameRgb` in 1× no-filter
+   case.** This avoids a per-frame copy, but introduced a use-after-free
+   when toggling digital → analog (the alias was being freed in
+   `freeMem`). Resolved by adding a parallel `_ownsOutput` bool that
+   `freeMem` consults — the Phase C-3 fix commit (`1b1235e`). Same
+   pattern applied to `AprNesAvalonia/Platform/RenderPipeline.cs`.
+
+3. **`PauseEmuAndRender` helper instead of `analogRenderDone.Wait`
+   alone.** Mode-toggle quiescence needs both threads parked: emu at
+   `_event.WaitOne()` (signaled by `emuWaiting=true`) AND render at the
+   tail of its loop iteration (signaled by `renderDone.Wait()`). The
+   helper centralises this in `AprNesUI.cs`.
+
+4. **Headless / Avalonia sync fallback path.** `RenderScreen` branches
+   on `renderThreadRunning`. When false, it runs CRT + `VideoOutput`
+   inline on the emu thread and then waits on `_event` — the same exit
+   condition as the threaded path. This kept Avalonia working unchanged
+   through the refactor.
+
+5. **Phase D scope reduced.** `Render_resize` is *not* deleted —
+   Avalonia still uses an equivalent (`RenderPipeline`) and NetFx still
+   uses it directly. Phase D's actual deliverables are: documentation
+   updates (this file + `rendering_dispatch_analog_vs_digital.md`) and
+   minor dead-code cleanup (residual `_input` / `_rgbInput` fields in
+   `Render_resize` and `RenderPipeline`).
