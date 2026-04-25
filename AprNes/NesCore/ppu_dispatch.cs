@@ -396,10 +396,13 @@ namespace AprNes
                     if (renderEnabled)
                     {
                         ulong mask_0 = ~(dec_mask * 255UL);
+                        // Pre-combine (& 0xFE) with mask_0 → saves 1 AND per shift register.
+                        ulong shift_mask = mask_0 & 0xFEFEFEFEFEFEFEFEUL;
+                        ulong keep_mask = ~mask_0;
                         ulong sl = *(ulong*)sprShiftL;
                         ulong sh = *(ulong*)sprShiftH;
-                        *(ulong*)sprShiftL = (((sl << 1) & 0xFEFEFEFEFEFEFEFEUL) & mask_0) | (sl & ~mask_0);
-                        *(ulong*)sprShiftH = (((sh << 1) & 0xFEFEFEFEFEFEFEFEUL) & mask_0) | (sh & ~mask_0);
+                        *(ulong*)sprShiftL = ((sl << 1) & shift_mask) | (sl & keep_mask);
+                        *(ulong*)sprShiftH = ((sh << 1) & shift_mask) | (sh & keep_mask);
                     }
                 }
             }
