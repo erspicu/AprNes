@@ -179,10 +179,10 @@ namespace AprNes
             // frame's CRT/blit to complete BEFORE we touch linearBuffer. Crt_Render
             // (now on render thread) reads linearBuffer; we must not overwrite it
             // via Ntsc_FlushPendingRows until that read is done.
-            if (AnalogEnabled && analogRenderThreadRunning)
+            if (AnalogEnabled && renderThreadRunning)
             {
-                analogRenderDone.Wait();
-                analogRenderDone.Reset();
+                renderDone.Wait();
+                renderDone.Reset();
             }
 
             // Parallel-demod all 240 captured scanlines (writes linearBuffer).

@@ -190,9 +190,9 @@ namespace AprNes
         // AnalogScreenBufBack = back buffer (GDI 讀取上一幀)
         static public uint* AnalogScreenBufBack = null;
         // 渲染執行緒同步事件
-        static public ManualResetEventSlim analogRenderReady = new ManualResetEventSlim(false);
-        static public ManualResetEventSlim analogRenderDone  = new ManualResetEventSlim(true); // 初始已完成
-        static public volatile bool analogRenderThreadRunning = false;
+        static public ManualResetEventSlim renderReady = new ManualResetEventSlim(false);
+        static public ManualResetEventSlim renderDone  = new ManualResetEventSlim(true); // 初始已完成
+        static public volatile bool renderThreadRunning = false;
 
         /// <summary>
         /// 交換 front/back buffer 指標，並更新 CRT/NTSC 的 buffer 指標。

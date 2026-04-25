@@ -927,7 +927,7 @@ namespace AprNes
                 _event.WaitOne();
                 emuWaiting = false;
             }
-            else if (!analogRenderThreadRunning)
+            else if (!renderThreadRunning)
             {
                 // === Analog 同步 fallback (UI 停止渲染執行緒時 / headless 模式) ===
                 screen_lock = true;
@@ -941,11 +941,11 @@ namespace AprNes
             else
             {
                 // === Phase B Async path (類比模式 + analog render thread) ===
-                // analogRenderDone.Wait() now happens at top of PpuPhase_FrameRender
+                // renderDone.Wait() now happens at top of PpuPhase_FrameRender
                 // (before Ntsc_FlushPendingRows) to protect linearBuffer from race.
-                // Crt_Render and SwapAnalogBuffers moved into AnalogRenderThreadLoop —
+                // Crt_Render and SwapAnalogBuffers moved into RenderThreadLoop —
                 // emu thread just signals that linearBuffer is ready.
-                analogRenderReady.Set();
+                renderReady.Set();
             }
         }
 
