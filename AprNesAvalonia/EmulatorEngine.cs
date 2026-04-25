@@ -247,17 +247,15 @@ public sealed unsafe class EmulatorEngine : IDisposable
             _frontBuffer = _bufferB;
         }
 
-        // Init pipeline buffers
-        if (_pipelineActive && NesCore.ScreenBuf1x != null)
-            _pipeline.Init(NesCore.ScreenBuf1x);
-        else
-            _pipeline.FreeMem();
+        // Phase A4b: pipeline is always initialised — it does palette→RGB conversion
+        // even when no filters are active (1× no-filter path). Digital mode never
+        // bypasses the pipeline now.
+        _pipeline.Init(null);
 
         // Update render output info for VideoRecorder (mirrors WinForms RenderObj.init)
         NesCore.RenderOutputW = newW;
         NesCore.RenderOutputH = newH;
-        NesCore.RenderOutputPtr = _pipelineActive && _pipeline.IsInitialized
-            ? _pipeline.OutputPtr : NesCore.ScreenBuf1x;
+        NesCore.RenderOutputPtr = _pipeline.OutputPtr;
 
         if (resChanged)
             ResolutionChanged?.Invoke(newW, newH);
@@ -415,9 +413,9 @@ public sealed unsafe class EmulatorEngine : IDisposable
     {
         if (!_romLoaded || _running) return;
 
-        // Re-init pipeline with current ScreenBuf1x (may have changed after ROM load/reset)
-        if (_pipelineActive)
-            _pipeline.Init(NesCore.ScreenBuf1x);
+        // Phase A4b: pipeline always re-init'd. Input pointer no longer matters — pipeline
+        // reads ntsc_rowPalettes via NesCore.Convert_PalIdxFrameToRGB.
+        _pipeline.Init(null);
 
         _running = true;
         _fpsDeadline = 0;
@@ -510,25 +508,13 @@ public sealed unsafe class EmulatorEngine : IDisposable
             {
                 Buffer.MemoryCopy(NesCore.AnalogScreenBuf, dst, copyBytes, copyBytes);
             }
-            else if (_pipelineActive)
-            {
-                if (!_pipeline.IsInitialized && NesCore.ScreenBuf1x != null)
-                    _pipeline.Init(NesCore.ScreenBuf1x);
-
-                if (_pipeline.IsInitialized)
-                {
-                    _pipeline.Process();
-                    Buffer.MemoryCopy(_pipeline.OutputPtr, dst, copyBytes, copyBytes);
-                }
-                else
-                {
-                    int baseBytes = 256 * 240 * 4;
-                    Buffer.MemoryCopy(NesCore.ScreenBuf1x, dst, baseBytes, baseBytes);
-                }
-            }
             else
             {
-                Buffer.MemoryCopy(NesCore.ScreenBuf1x, dst, copyBytes, copyBytes);
+                // Phase A4b: digital path always goes through pipeline.
+                // Pipeline does palette→RGB conversion + (optional) filter scaling.
+                if (!_pipeline.IsInitialized) _pipeline.Init(null);
+                _pipeline.Process();
+                Buffer.MemoryCopy(_pipeline.OutputPtr, dst, copyBytes, copyBytes);
             }
 
             // Lock-free atomic swap: front ↔ back
@@ -539,9 +525,7 @@ public sealed unsafe class EmulatorEngine : IDisposable
             {
                 uint* capturePtr = _analogMode && NesCore.AnalogScreenBuf != null
                     ? NesCore.AnalogScreenBuf
-                    : _pipelineActive && _pipeline.IsInitialized
-                        ? _pipeline.OutputPtr
-                        : NesCore.ScreenBuf1x;
+                    : _pipeline.OutputPtr; // Phase A4b: always pipeline output for digital
                 if (capturePtr != null)
                     VideoRecorder.PushFrame(capturePtr);
             }

@@ -14,7 +14,9 @@ namespace AprNesAvalonia.Platform;
 /// </summary>
 public unsafe class RenderPipeline : IDisposable
 {
-    private uint* _input;
+    private uint* _input;       // Phase A4b: kept for back-compat, no longer used as data source
+    // Phase A4b: palette→RGB conversion target (256×240). Replaces direct ScreenBuf1x consumption.
+    private uint* _rgbInput;
     private uint* _stage1Buf;
     private uint* _output;
     private int _s1Scale, _s2Scale;
@@ -54,6 +56,9 @@ public unsafe class RenderPipeline : IDisposable
         FreeMem();
         _input = input;
 
+        // Phase A4b: always allocate the 256×240 palette→RGB conversion buffer.
+        _rgbInput = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * 256 * 240);
+
         bool needStage1Buf = _s1Filter != ResizeFilter.None && _s2Filter != ResizeFilter.None;
         bool needOutputBuf = _s1Filter != ResizeFilter.None || _s2Filter != ResizeFilter.None;
 
@@ -63,7 +68,7 @@ public unsafe class RenderPipeline : IDisposable
         if (needOutputBuf)
             _output = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * OutputW * OutputH);
         else
-            _output = _input;
+            _output = _rgbInput; // 1×: GDI / blit reads converted RGB directly
 
         if (_s1Filter == ResizeFilter.XBRz)
             HS_XBRz.initTable(256, 240);
@@ -78,7 +83,11 @@ public unsafe class RenderPipeline : IDisposable
     {
         if (!_initialized) return;
 
-        uint* src = _input;
+        // Phase A4b: convert ntsc_rowPalettes (per-frame palette indices) → RGB once,
+        // then run the filter pipeline on the converted buffer.
+        AprNes.NesCore.Convert_PalIdxFrameToRGB(_rgbInput);
+
+        uint* src = _rgbInput;
         uint* dst;
 
         // Determine stage1 destination
@@ -148,7 +157,9 @@ public unsafe class RenderPipeline : IDisposable
     public void FreeMem()
     {
         if (_stage1Buf != null) { AprNes.NesCore.FreeUnmanaged((IntPtr)_stage1Buf); _stage1Buf = null; }
-        if (_output != null && _output != _input) { AprNes.NesCore.FreeUnmanaged((IntPtr)_output); _output = null; }
+        // Phase A4b: _output may alias _rgbInput in 1× no-filter path; null-check both before freeing _output.
+        if (_output != null && _output != _input && _output != _rgbInput) { AprNes.NesCore.FreeUnmanaged((IntPtr)_output); _output = null; }
+        if (_rgbInput != null) { AprNes.NesCore.FreeUnmanaged((IntPtr)_rgbInput); _rgbInput = null; }
         _initialized = false;
     }
 
