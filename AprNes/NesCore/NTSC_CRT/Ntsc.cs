@@ -388,10 +388,11 @@ namespace AprNes
         // cx==260 of each scanline. Advancing scanPhase6 / scanPhaseBase here (single-threaded)
         // keeps the per-scanline phase sequence deterministic — subsequent parallel decode
         // reads the captured phase0 per row, never touching the serial counters.
-        public static void Ntsc_CaptureScanline(int sl, byte* palBuf, byte emphasisBits)
+        // Phase A1: PixelZone now writes palette indices directly into ntsc_rowPalettes.
+        // This function only captures emphasis + per-scanline phase0 for parallel decode.
+        public static void Ntsc_CaptureScanline(int sl, byte emphasisBits)
         {
             if (sl < 0 || sl >= kSrcH) return;
-            Buffer.MemoryCopy(palBuf, ntsc_rowPalettes + sl * 256, 256, 256);
             ntsc_rowEmphasis[sl] = emphasisBits;
             // Capture + advance per the path that'll decode this row.
             // Ultra-analog → _Physical uses scanPhaseBase; else _Fast uses scanPhase6.

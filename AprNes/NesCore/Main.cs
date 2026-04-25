@@ -248,7 +248,6 @@ namespace AprNes
             if (chrBankPtrs  != null) { NesCore.FreeUnmanaged((IntPtr)chrBankPtrs);  chrBankPtrs  = null; }
             if (chrBankPtrsA != null) { NesCore.FreeUnmanaged((IntPtr)chrBankPtrsA); chrBankPtrsA = null; }
             if (chrBankPtrsB != null) { NesCore.FreeUnmanaged((IntPtr)chrBankPtrsB); chrBankPtrsB = null; }
-            if (ntscScanBuf  != null) { NesCore.FreeUnmanaged((IntPtr)ntscScanBuf);  ntscScanBuf  = null; }
             if (NES_MEM      != null) { NesCore.FreeUnmanaged((IntPtr)NES_MEM);      NES_MEM      = null; }
             if (Vertical           != null) { NesCore.FreeUnmanaged((IntPtr)Vertical);           Vertical           = null; }
             if (AnalogScreenBuf     != null) { NesCore.FreeUnmanaged((IntPtr)AnalogScreenBuf);     AnalogScreenBuf     = null; AnalogBufSize = 0; }
@@ -497,7 +496,6 @@ prerender_sprite0_x = 0;
                 sprShiftH        = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 8);
                 sprXCounter      = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 8);
                 sprFetchAttr     = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 8);
-                ntscScanBuf      = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 256);
                 // Allocate expansionChannels early — Mapper024/019/069/085 etc.
                 // touch NesCore.expansionChannels[0..7] in their Reset(), which
                 // runs BEFORE initAPU() is called below.

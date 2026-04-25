@@ -341,9 +341,11 @@ namespace AprNes
             int scanOff = scanline << 8;
             if (AnalogEnabled)
             {
-                // Fill 256 bytes with backdrop palette index
+                // Fill 256 bytes with backdrop palette index in ntsc_rowPalettes
+                // (Phase A1: pixels not written by PixelZone keep backdrop colour;
+                // direct write to per-frame buffer instead of per-scanline scratch).
                 byte bgIdx = (byte)(ppu_ram[0x3f00] & 0x3f);
-                System.Runtime.CompilerServices.Unsafe.InitBlockUnaligned(ntscScanBuf, bgIdx, 256);
+                System.Runtime.CompilerServices.Unsafe.InitBlockUnaligned(ntsc_rowPalettes + scanOff, bgIdx, 256);
             }
             else
             {

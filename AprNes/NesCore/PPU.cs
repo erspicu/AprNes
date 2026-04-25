@@ -140,9 +140,8 @@ namespace AprNes
         static bool ppuGreyscale = false; // $2001 bit 0 — greyscale mode (palette read returns & 0x30)
         static byte ppuEmphasis = 0; // $2001[7:5] emphasis bits (for NTSC signal amplitude)
 
-        // NTSC 類比模式：每條掃描線的原始調色盤索引緩衝區（256 bytes，0x00-0x3F）
-        // 由 RenderBGTile 和 RenderSpritesLine 在 AnalogEnabled=true 時填入
-        static byte* ntscScanBuf;
+        // (Phase A1: removed ntscScanBuf scratch — analog now writes directly to
+        // ntsc_rowPalettes per-frame buffer in NTSC_CRT/Ntsc.cs.)
 
         // MMC5 extended attribute mode (per-tile palette + CHR bank from ExRAM)
         static ushort extAttrNTOffset;  // nametable offset saved at phase 1

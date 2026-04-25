@@ -410,17 +410,15 @@ namespace AprNes
             Ppu2007_BusRead();
 
             // ── Draw (mode-specialised) ──
+            // Phase A1: analog writes directly to ntsc_rowPalettes (per-frame buffer)
+            // instead of ntscScanBuf scratch + Ntsc_CaptureScanline copy step.
             if (cx >= 4)
             {
+                int pos = (scanline << 8) + (cx - 4);
                 if (!isAnalog)
-                {
-                    int pos = (scanline << 8) + (cx - 4);
                     ScreenBuf1x[pos] = prevPrevPrevDotColor;
-                }
                 else
-                {
-                    ntscScanBuf[cx - 4] = prevPrevPrevDotPalIdx;
-                }
+                    ntsc_rowPalettes[pos] = prevPrevPrevDotPalIdx;
             }
 
             ppuRenderingEnabled = ShowBackGround_Instant || ShowSprites_Instant;
@@ -468,11 +466,13 @@ namespace AprNes
             if (cx == 259)
             {
                 int pos = (scanline << 8) + 255;
-                if (AnalogEnabled) ntscScanBuf[255] = prevPrevPrevDotPalIdx;
+                if (AnalogEnabled) ntsc_rowPalettes[pos] = prevPrevPrevDotPalIdx;
                 else ScreenBuf1x[pos] = prevPrevPrevDotColor;
             }
+            // Phase A1: analog scanline data is already in ntsc_rowPalettes;
+            // Ntsc_CaptureScanline now only sets emphasis + advances per-row phase counters.
             if (AnalogEnabled && cx == 260)
-                Ntsc_CaptureScanline(scanline, ntscScanBuf, ppuEmphasis);
+                Ntsc_CaptureScanline(scanline, ppuEmphasis);
 
             ppuRenderingEnabled = ShowBackGround_Instant || ShowSprites_Instant;
         }
@@ -593,7 +593,7 @@ namespace AprNes
             if (scanline < 240 && (cx == 257 || cx == 258))
             {
                 int pos = (scanline << 8) + (cx - 4);
-                if (AnalogEnabled) ntscScanBuf[cx - 4] = prevPrevPrevDotPalIdx;
+                if (AnalogEnabled) ntsc_rowPalettes[pos] = prevPrevPrevDotPalIdx;
                 else ScreenBuf1x[pos] = prevPrevPrevDotColor;
             }
 
