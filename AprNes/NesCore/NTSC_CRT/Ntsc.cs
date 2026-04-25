@@ -15,6 +15,17 @@ namespace AprNes
     {
         public static int UpscaleMode = 1;
 
+        // ── Analog-size compile-time specialization ──
+        // Generic struct constraint: each TScale instantiation produces a distinct JIT-
+        // specialized method body where N is a compile-time constant. Power-of-2 N
+        // becomes a shift; non-power-of-2 (e.g. 6) becomes constant-divide via magic
+        // multiplication. Either is far cheaper than runtime `x / N` in the hot loop.
+        private interface IAnalogScale { int N { get; } }
+        private struct Scale2 : IAnalogScale { public int N { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => 2; } }
+        private struct Scale4 : IAnalogScale { public int N { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => 4; } }
+        private struct Scale6 : IAnalogScale { public int N { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => 6; } }
+        private struct Scale8 : IAnalogScale { public int N { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => 8; } }
+
         // ── 解耦參數 ────────────────────────
         static int ntsc_analogOutput;
         static bool ntsc_ultraAnalog;
@@ -478,20 +489,39 @@ namespace AprNes
             }
             uint ns = (addNoise || herring) ? (uint)(ntsc_frameCount * 1664525u + (uint)sl * 1013904223u + 1442695041u) : 0u;
 
-            // ★ Code Splitting: 分支外提
-            if (!addNoise && !herring) RunDecodeLoop(dstW, N, row0, dotY, dotI, dotQ, phase0, ref iFilt, ref qFilt, ref yFilt, ref yVel, ringDamp, false, false, 0, 0, 0, 0, 0, 0, 0);
-            else if (addNoise && !herring) RunDecodeLoop(dstW, N, row0, dotY, dotI, dotQ, phase0, ref iFilt, ref qFilt, ref yFilt, ref yVel, ringDamp, true, false, ns, nScale, nOff, 0, 0, 0, 0);
-            else if (!addNoise && herring) RunDecodeLoop(dstW, N, row0, dotY, dotI, dotQ, phase0, ref iFilt, ref qFilt, ref yFilt, ref yVel, ringDamp, false, true, 0, 0, 0, hR, hI, hC, hS);
-            else RunDecodeLoop(dstW, N, row0, dotY, dotI, dotQ, phase0, ref iFilt, ref qFilt, ref yFilt, ref yVel, ringDamp, true, true, ns, nScale, nOff, hR, hI, hC, hS);
+            // ★ Code Splitting: 分支外提 + scale 特化（N 變 compile-time const）
+            switch (N)
+            {
+                case 2: DispatchDecodeLoop<Scale2>(dstW, row0, dotY, dotI, dotQ, phase0, ref iFilt, ref qFilt, ref yFilt, ref yVel, ringDamp, addNoise, herring, ns, nScale, nOff, hR, hI, hC, hS); break;
+                case 4: DispatchDecodeLoop<Scale4>(dstW, row0, dotY, dotI, dotQ, phase0, ref iFilt, ref qFilt, ref yFilt, ref yVel, ringDamp, addNoise, herring, ns, nScale, nOff, hR, hI, hC, hS); break;
+                case 6: DispatchDecodeLoop<Scale6>(dstW, row0, dotY, dotI, dotQ, phase0, ref iFilt, ref qFilt, ref yFilt, ref yVel, ringDamp, addNoise, herring, ns, nScale, nOff, hR, hI, hC, hS); break;
+                case 8: DispatchDecodeLoop<Scale8>(dstW, row0, dotY, dotI, dotQ, phase0, ref iFilt, ref qFilt, ref yFilt, ref yVel, ringDamp, addNoise, herring, ns, nScale, nOff, hR, hI, hC, hS); break;
+                default: RunDecodeLoopGeneric(dstW, N, row0, dotY, dotI, dotQ, phase0, ref iFilt, ref qFilt, ref yFilt, ref yVel, ringDamp, addNoise, herring, ns, nScale, nOff, hR, hI, hC, hS); break;
+            }
 
             VerticalFillRows(sl, dstW, row0, rowStart, rowEnd);
         }
 
+        // Inner 4-way noise/herring dispatch (each branch hands JIT compile-time bool flags).
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void RunDecodeLoop(int dstW, int N, uint* row0, float* dotY, float* dotI, float* dotQ, int phStart,
+        private static void DispatchDecodeLoop<TScale>(int dstW, uint* row0, float* dotY, float* dotI, float* dotQ, int phStart,
             ref float iFilt, ref float qFilt, ref float yFilt, ref float yVel, float ringDamp,
             bool addNoise, bool herring, uint ns, float nScale, float nOff, float hR, float hI, float hC, float hS)
+            where TScale : struct, IAnalogScale
         {
+            if (!addNoise && !herring) RunDecodeLoop<TScale>(dstW, row0, dotY, dotI, dotQ, phStart, ref iFilt, ref qFilt, ref yFilt, ref yVel, ringDamp, false, false, 0, 0, 0, 0, 0, 0, 0);
+            else if (addNoise && !herring) RunDecodeLoop<TScale>(dstW, row0, dotY, dotI, dotQ, phStart, ref iFilt, ref qFilt, ref yFilt, ref yVel, ringDamp, true, false, ns, nScale, nOff, 0, 0, 0, 0);
+            else if (!addNoise && herring) RunDecodeLoop<TScale>(dstW, row0, dotY, dotI, dotQ, phStart, ref iFilt, ref qFilt, ref yFilt, ref yVel, ringDamp, false, true, 0, 0, 0, hR, hI, hC, hS);
+            else RunDecodeLoop<TScale>(dstW, row0, dotY, dotI, dotQ, phStart, ref iFilt, ref qFilt, ref yFilt, ref yVel, ringDamp, true, true, ns, nScale, nOff, hR, hI, hC, hS);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void RunDecodeLoop<TScale>(int dstW, uint* row0, float* dotY, float* dotI, float* dotQ, int phStart,
+            ref float iFilt, ref float qFilt, ref float yFilt, ref float yVel, float ringDamp,
+            bool addNoise, bool herring, uint ns, float nScale, float nOff, float hR, float hI, float hC, float hS)
+            where TScale : struct, IAnalogScale
+        {
+            int N = default(TScale).N; // compile-time const after JIT specialization
             int ph = phStart; float iF = iFilt, qF = qFilt, yF = yFilt, yV = yVel; float hRl = hR, hIl = hI;
             for (int x = 0; x < dstW; x++)
             {
@@ -511,6 +541,29 @@ namespace AprNes
             iFilt = iF; qFilt = qF; yFilt = yF; yVel = yV;
         }
 
+        // Runtime-N fallback for unusual analog sizes (kept for forward compatibility).
+        private static void RunDecodeLoopGeneric(int dstW, int N, uint* row0, float* dotY, float* dotI, float* dotQ, int phStart,
+            ref float iFilt, ref float qFilt, ref float yFilt, ref float yVel, float ringDamp,
+            bool addNoise, bool herring, uint ns, float nScale, float nOff, float hR, float hI, float hC, float hS)
+        {
+            int ph = phStart; float iF = iFilt, qF = qFilt, yF = yFilt, yV = yVel; float hRl = hR, hIl = hI;
+            for (int x = 0; x < dstW; x++)
+            {
+                int d = x / N; float c = cosTab6[ph], s = sinTab6[ph];
+                float chroma = dotI[d] * c - dotQ[d] * s;
+                iF += ChromaBlur * (chroma * c - iF); qF += ChromaBlur * (-chroma * s - qF);
+                yV = yV * ringDamp + (dotY[d] - yF) * SlewRate; yF += yV; float y = yF;
+
+                if (herring) { y += hIl; float t = hRl * hC - hIl * hS; hIl = hRl * hS + hIl * hC; hRl = t; }
+                if (addNoise) { ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5; y += (ns & 0xFF) * nScale - nOff; }
+
+                row0[x] = YiqToRgb(y, iF, qF);
+
+                ph += 1 + (((4 - ph) >> 31) & -6);
+            }
+            iFilt = iF; qFilt = qF; yFilt = yF; yVel = yV;
+        }
+
         static void DecodeAV_SVideo(int sl, float* dotY, float* dotI, float* dotQ)
         {
             float iFilt = HbiSimulation ? 0f : dotI[0]; float qFilt = HbiSimulation ? 0f : dotQ[0]; float yFilt = HbiSimulation ? 0f : dotY[0];
@@ -518,13 +571,45 @@ namespace AprNes
             int rowStart = sl * Crt_DstH / Crt_SrcH; int rowEnd = Math.Min((sl + 1) * Crt_DstH / Crt_SrcH, Crt_DstH);
             uint* row0 = ntsc_analogScreenBuf + (long)rowStart * dstW;
 
+            // Scale specialization (compile-time const N → shift or magic-multiply div)
+            switch (N)
+            {
+                case 2: RunSVideoLoop<Scale2>(dstW, row0, dotY, dotI, dotQ, ref iFilt, ref qFilt, ref yFilt); break;
+                case 4: RunSVideoLoop<Scale4>(dstW, row0, dotY, dotI, dotQ, ref iFilt, ref qFilt, ref yFilt); break;
+                case 6: RunSVideoLoop<Scale6>(dstW, row0, dotY, dotI, dotQ, ref iFilt, ref qFilt, ref yFilt); break;
+                case 8: RunSVideoLoop<Scale8>(dstW, row0, dotY, dotI, dotQ, ref iFilt, ref qFilt, ref yFilt); break;
+                default: RunSVideoLoopGeneric(dstW, N, row0, dotY, dotI, dotQ, ref iFilt, ref qFilt, ref yFilt); break;
+            }
+            VerticalFillRows(sl, dstW, row0, rowStart, rowEnd);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void RunSVideoLoop<TScale>(int dstW, uint* row0, float* dotY, float* dotI, float* dotQ,
+            ref float iFilt, ref float qFilt, ref float yFilt)
+            where TScale : struct, IAnalogScale
+        {
+            int N = default(TScale).N; // compile-time const after JIT specialization
+            float iF = iFilt, qF = qFilt, yF = yFilt;
             for (int outX = 0; outX < dstW; outX++)
             {
                 int d = outX / N;
-                iFilt += ChromaBlur * (dotI[d] - iFilt); qFilt += ChromaBlur * (dotQ[d] - qFilt); yFilt += SlewRate * (dotY[d] - yFilt);
-                row0[outX] = YiqToRgb(yFilt, iFilt, qFilt);
+                iF += ChromaBlur * (dotI[d] - iF); qF += ChromaBlur * (dotQ[d] - qF); yF += SlewRate * (dotY[d] - yF);
+                row0[outX] = YiqToRgb(yF, iF, qF);
             }
-            VerticalFillRows(sl, dstW, row0, rowStart, rowEnd);
+            iFilt = iF; qFilt = qF; yFilt = yF;
+        }
+
+        private static void RunSVideoLoopGeneric(int dstW, int N, uint* row0, float* dotY, float* dotI, float* dotQ,
+            ref float iFilt, ref float qFilt, ref float yFilt)
+        {
+            float iF = iFilt, qF = qFilt, yF = yFilt;
+            for (int outX = 0; outX < dstW; outX++)
+            {
+                int d = outX / N;
+                iF += ChromaBlur * (dotI[d] - iF); qF += ChromaBlur * (dotQ[d] - qF); yF += SlewRate * (dotY[d] - yF);
+                row0[outX] = YiqToRgb(yF, iF, qF);
+            }
+            iFilt = iF; qFilt = qF; yFilt = yF;
         }
 
         static void DecodeScanline_Physical(int sl, byte* palBuf, byte emphasisBits, float* waveBuf, float* cBuf)

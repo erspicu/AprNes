@@ -44,6 +44,17 @@ namespace AprNes
         static uint* _prevFrame;
         static bool _prevFrameValid;
 
+        // Per-thread row scratch for ApplyHorizontalBlur (replaces per-row stackalloc).
+        // Allocated once per worker thread, lives until process exit (matches Ntsc.cs pattern).
+        [ThreadStatic] static float* tls_crtBlurRow;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void EnsureCrtBlurScratch()
+        {
+            if (tls_crtBlurRow != null) return;
+            tls_crtBlurRow = (float*)NesCore.AllocUnmanaged(Crt_SrcW * sizeof(float));
+        }
+
         internal static void Init()
         {
             System.Console.WriteLine("[CRT] backend = Scalar (CrtScreen.cs, Vector<T> auto-vectorized)");
@@ -197,10 +208,12 @@ namespace AprNes
                 int row = i % Crt_SrcH;
                 float* p = lb + plane * kPlane + row * Crt_SrcW;
 
-                // Snapshot row to a stackalloc buffer — breaks the in-place
+                // Snapshot row to a per-thread scratch buffer — breaks the in-place
                 // Read-After-Write hazard that blocked SIMD in the scalar version.
-                // Crt_SrcW = 1024 → 4KB stackalloc, free on modern CPUs.
-                float* src = stackalloc float[Crt_SrcW];
+                // ThreadStatic unmanaged allocation, lives for process lifetime
+                // (replaces per-call 4 KB stackalloc — saves ~720 stackallocs/frame).
+                EnsureCrtBlurScratch();
+                float* src = tls_crtBlurRow;
                 Buffer.MemoryCopy(p, src, Crt_SrcW * sizeof(float), Crt_SrcW * sizeof(float));
 
                 // Left edge: original used prev=p[0] on first iter → src[0]*(α+c) + src[1]*α
