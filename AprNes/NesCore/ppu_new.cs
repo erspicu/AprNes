@@ -456,6 +456,10 @@ namespace AprNes
             }
             // SWAR: check 8+8 bytes in one 64-bit OR
             spriteAnyActive = ((*(ulong*)sprShiftH) | (*(ulong*)sprShiftL)) != 0;
+
+            // #5: re-pick PixelZone handler if sprite activity changed for next scanline.
+            // No-op fast-path when state unchanged (~99% of scanlines).
+            UpdatePpuVisibleDispatchForNextScanline();
         }
 
         // Garbage/Dummy NT fetch (TriCNES: PPU_Render_ShiftRegistersAndBitPlanes_DummyNT)

@@ -80,41 +80,104 @@ namespace AprNes
             ConfigurePpuVisibleDispatch();
         }
 
-        // Re-populates ppuTickVisibleTable[0..255] for the current AnalogEnabled state.
-        // Safe to call any time the emu thread is paused (e.g. inside ApplyRenderSettings).
+        // Tracks last-applied dispatch state so PpuPhase4_Dot339 can short-circuit
+        // when the next scanline's sprite activity matches the current handler.
+        static bool _dispatchSpritesActive = true;
+
+        // Re-populates ppuTickVisibleTable[0..255] for the current
+        // (AnalogEnabled, spriteAnyActive) combination. Safe to call any time
+        // the emu thread is paused (ApplyRenderSettings) or from the per-scanline
+        // dispatch update hook in PpuPhase4_Dot339.
         public static void ConfigurePpuVisibleDispatch()
         {
             if (ppuTickVisibleTable == null) return; // Init not yet called
+            bool analog = AnalogEnabled;
+            bool sprActive = spriteAnyActive;
+            _dispatchSpritesActive = sprActive;
 #if NET10_0_OR_GREATER
-            delegate* unmanaged<void> handler = AnalogEnabled
-                ? (delegate* unmanaged<void>)&Ppu_Tick_Visible_PixelZone_Analog
-                : (delegate* unmanaged<void>)&Ppu_Tick_Visible_PixelZone_Digital;
+            delegate* unmanaged<void> handler;
+            if (analog)
+                handler = sprActive
+                    ? (delegate* unmanaged<void>)&Ppu_Tick_Visible_PixelZone_Analog_Spr
+                    : (delegate* unmanaged<void>)&Ppu_Tick_Visible_PixelZone_Analog_NoSpr;
+            else
+                handler = sprActive
+                    ? (delegate* unmanaged<void>)&Ppu_Tick_Visible_PixelZone_Digital_Spr
+                    : (delegate* unmanaged<void>)&Ppu_Tick_Visible_PixelZone_Digital_NoSpr;
 #else
-            delegate*<void> handler = AnalogEnabled
-                ? (delegate*<void>)&Ppu_Tick_Visible_PixelZone_Analog
-                : (delegate*<void>)&Ppu_Tick_Visible_PixelZone_Digital;
+            delegate*<void> handler;
+            if (analog)
+                handler = sprActive
+                    ? (delegate*<void>)&Ppu_Tick_Visible_PixelZone_Analog_Spr
+                    : (delegate*<void>)&Ppu_Tick_Visible_PixelZone_Analog_NoSpr;
+            else
+                handler = sprActive
+                    ? (delegate*<void>)&Ppu_Tick_Visible_PixelZone_Digital_Spr
+                    : (delegate*<void>)&Ppu_Tick_Visible_PixelZone_Digital_NoSpr;
 #endif
             for (int i = 0; i < 256; i++) ppuTickVisibleTable[i] = handler;
         }
 
+        // Hot-path hook from PpuPhase4_Dot339: only re-populates table when
+        // sprite-active state for the upcoming scanline differs from current.
+        // ~99% of consecutive scanlines have the same state, so this short-
+        // circuits the 256-pointer write almost every call.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void UpdatePpuVisibleDispatchForNextScanline()
+        {
+            if (spriteAnyActive == _dispatchSpritesActive) return;
+            ConfigurePpuVisibleDispatch();
+        }
+
         // ════════════════════════════════════════════════════════════════
-        // Ppu_Tick_Visible_PixelZone_Digital / _Analog — visible scanline,
-        // entry cx ∈ [0, 255] (post-inc cx ∈ [1, 256]).
+        // PixelZone hot handler — 4-way specialised by (Analog, Sprites):
+        //   Digital_Spr  / Digital_NoSpr  — output mode × sprite activity
+        //   Analog_Spr   / Analog_NoSpr
         //
-        // Two specialisations selected at config time via AnalogEnabled:
-        //   Digital: drops dotPalIdx pipeline; pixel composition only computes
-        //            compositeColor; draw writes ScreenBuf1x unconditionally.
-        //   Analog:  drops dotColor pipeline; pixel composition only computes
-        //            compositePalIdx; draw writes ntscScanBuf unconditionally.
+        // Output mode (Digital vs Analog) is set at config time via AnalogEnabled.
+        // Sprite mode (Spr vs NoSpr) is updated per-scanline in PpuPhase4_Dot339:
+        //   when spriteAnyActive == false at scanline boundary, route to NoSpr
+        //   variant for the next scanline (skips the entire sprite mux block).
         //
-        // Sprite-0 hit, palette corruption, and bgColor logic remain identical
-        // (sprite-0 hit needs bgColor regardless of output mode).
+        // Source uses a generic struct constraint pattern (IPixelZoneMode) so
+        // the 4 variants share one body; JIT specialises per TMode and folds
+        // const branches at compile time. UnmanagedCallersOnly entry wrappers
+        // are non-generic (required for function-pointer dispatch).
         // ════════════════════════════════════════════════════════════════
+
+        private interface IPixelZoneMode
+        {
+            bool IsAnalog { get; }
+            bool HasSprites { get; }
+        }
+        private struct PixelMode_Digital_Spr   : IPixelZoneMode { public bool IsAnalog { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => false; } public bool HasSprites { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => true;  } }
+        private struct PixelMode_Digital_NoSpr : IPixelZoneMode { public bool IsAnalog { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => false; } public bool HasSprites { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => false; } }
+        private struct PixelMode_Analog_Spr    : IPixelZoneMode { public bool IsAnalog { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => true;  } public bool HasSprites { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => true;  } }
+        private struct PixelMode_Analog_NoSpr  : IPixelZoneMode { public bool IsAnalog { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => true;  } public bool HasSprites { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => false; } }
+
 #if NET10_0_OR_GREATER
         [UnmanagedCallersOnly]
 #endif
-        static void Ppu_Tick_Visible_PixelZone_Digital()
+        static void Ppu_Tick_Visible_PixelZone_Digital_Spr()   => PixelZoneImpl<PixelMode_Digital_Spr>();
+#if NET10_0_OR_GREATER
+        [UnmanagedCallersOnly]
+#endif
+        static void Ppu_Tick_Visible_PixelZone_Digital_NoSpr() => PixelZoneImpl<PixelMode_Digital_NoSpr>();
+#if NET10_0_OR_GREATER
+        [UnmanagedCallersOnly]
+#endif
+        static void Ppu_Tick_Visible_PixelZone_Analog_Spr()    => PixelZoneImpl<PixelMode_Analog_Spr>();
+#if NET10_0_OR_GREATER
+        [UnmanagedCallersOnly]
+#endif
+        static void Ppu_Tick_Visible_PixelZone_Analog_NoSpr()  => PixelZoneImpl<PixelMode_Analog_NoSpr>();
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void PixelZoneImpl<TMode>() where TMode : struct, IPixelZoneMode
         {
+            bool isAnalog = default(TMode).IsAnalog;     // compile-time const
+            bool hasSprites = default(TMode).HasSprites; // compile-time const
+
             int cx = ppu_cycles_x; // entry cx ∈ [0, 255]
 
             if (ppu2006UpdateDelay != 0 || ppu2005UpdateDelay != 0)
@@ -167,8 +230,11 @@ namespace AprNes
             if (ppu2001UpdateDelay > 0) PpuPhase_Apply2001Mask();
             if (ppu2001EmphasisDelay > 0) PpuPhase_Apply2001Emphasis();
 
-            // ── Digital pipeline shift (color only) ──
-            prevPrevPrevDotColor = prevPrevDotColor; prevPrevDotColor = prevDotColor; prevDotColor = dotColor;
+            // ── Pipeline shift (mode-specialised: only the active output's chain) ──
+            if (!isAnalog)
+            { prevPrevPrevDotColor = prevPrevDotColor; prevPrevDotColor = prevDotColor; prevDotColor = dotColor; }
+            else
+            { prevPrevPrevDotPalIdx = prevPrevDotPalIdx; prevPrevDotPalIdx = prevDotPalIdx; prevDotPalIdx = dotPalIdx; }
 
             // ── Inlined render block (tile-fetch gate always true, pixel+shift always run) ──
             // cx ∈ [1, 256] throughout.
@@ -233,12 +299,11 @@ namespace AprNes
                 }
             }
 
-            // ── Pixel composition (digital: compositeColor only) ──
+            // ── Pixel composition (mode-specialised) ──
             {
                 bool showBG = ShowBackGround;
                 bool showSpr = ShowSprites;
 
-                uint compositeColor = palCache[0];
                 int bgColor = 0, bgPalette = 0;
 
                 if (showBG && (cx > 8 || ShowBgLeft8))
@@ -250,7 +315,8 @@ namespace AprNes
                     if (bgColor == 0) bgPalette = 0;
                 }
 
-                if (showSpr && (cx > 8 || ShowSprLeft8) && spriteAnyActive)
+                // Sprite mux: completely elided in NoSpr variants (hasSprites=false → JIT prunes block).
+                if (hasSprites && showSpr && (cx > 8 || ShowSprLeft8) && spriteAnyActive)
                 {
                     ulong xc = *(ulong*)sprXCounter;
                     ulong has_bits = ((xc & 0x7F7F7F7F7F7F7F7FUL) + 0x7F7F7F7F7F7F7F7FUL) | xc;
@@ -291,11 +357,22 @@ namespace AprNes
                     CorruptPalettes(bgColor, vram_addr);
                 }
 
-                if (showBG || showSpr)
-                { int pa = (bgPalette << 2) | bgColor; if (bgColor == 0) pa = 0; compositeColor = palCache[pa]; }
-                else { if ((vram_addr & 0x3F1F) >= 0x3F00) { int pa = vram_addr & 0x1F; if ((pa & 3) == 0) pa &= 0x0F; compositeColor = NesColors[ppu_ram[0x3f00 + pa] & 0x3f]; } }
-
-                dotColor = compositeColor;
+                if (!isAnalog)
+                {
+                    uint compositeColor = palCache[0];
+                    if (showBG || showSpr)
+                    { int pa = (bgPalette << 2) | bgColor; if (bgColor == 0) pa = 0; compositeColor = palCache[pa]; }
+                    else { if ((vram_addr & 0x3F1F) >= 0x3F00) { int pa = vram_addr & 0x1F; if ((pa & 3) == 0) pa &= 0x0F; compositeColor = NesColors[ppu_ram[0x3f00 + pa] & 0x3f]; } }
+                    dotColor = compositeColor;
+                }
+                else
+                {
+                    byte compositePalIdx = (byte)(ppu_ram[0x3f00] & 0x3f);
+                    if (showBG || showSpr)
+                    { int pa = (bgPalette << 2) | bgColor; if (bgColor == 0) pa = 0; compositePalIdx = (byte)(ppu_ram[0x3f00 + pa] & 0x3f); }
+                    else { if ((vram_addr & 0x3F1F) >= 0x3F00) { int pa = vram_addr & 0x1F; if ((pa & 3) == 0) pa &= 0x0F; compositePalIdx = (byte)(ppu_ram[0x3f00 + pa] & 0x3f); } }
+                    dotPalIdx = compositePalIdx;
+                }
             }
 
             // ── Sprite shift (cx <= 256 always true) ──
@@ -332,234 +409,18 @@ namespace AprNes
 
             Ppu2007_BusRead();
 
-            // ── Digital draw ──
+            // ── Draw (mode-specialised) ──
             if (cx >= 4)
             {
-                int pos = (scanline << 8) + (cx - 4);
-                ScreenBuf1x[pos] = prevPrevPrevDotColor;
-            }
-
-            ppuRenderingEnabled = ShowBackGround_Instant || ShowSprites_Instant;
-        }
-
-        // ── Analog twin: same as Digital except palIdx pipeline + ntscScanBuf write ──
-#if NET10_0_OR_GREATER
-        [UnmanagedCallersOnly]
-#endif
-        static void Ppu_Tick_Visible_PixelZone_Analog()
-        {
-            int cx = ppu_cycles_x;
-
-            if (ppu2006UpdateDelay != 0 || ppu2005UpdateDelay != 0)
-                PpuPhase2_DeferredUpdates(cx);
-
-            if (--open_bus_decay_timer == 0) { open_bus_decay_timer = 77777; openbus = 0; }
-
-            ppu_cycles_x = ++cx;
-
-            ppuVSET_Latch1 = !ppuVSET;
-            if (ppuVSET && !ppuVSET_Latch2) isVblank = true;
-            if (ppu2002ReadPending) { ppu2002ReadPending = false; isVblank = false; }
-
-            isSpriteOverflow_Delayed = isSpriteOverflow;
-
-            MapperObj.PpuClock();
-            ppuA12Prev = (ppuAddressBus & 0x1000) != 0;
-            if (oddSwap && (ShowBackGround || ShowSprites) && scanline == 0 && cx == 2)
-                skippedPreRenderDot341 = false;
-
-            if ((mcCpuClock & 3) != 3)
-            {
-                ShowBG_EvalDelay = ShowBackGround;
-                ShowSpr_EvalDelay = ShowSprites;
-            }
-
-            PPU_DATA_Pipeline_Step1();
-
-            if (oamCorruptDelay != 0) PpuPhase_HandleDelayedOamCorruption(true);
-
-            PpuPhase4_HandleOamCorruptionIfNeeded();
-            PpuPhase4_VisiblePixelZone(cx);
-
-            if ((mcCpuClock & 3) == 3)
-            {
-                ShowBG_EvalDelay = ShowBackGround;
-                ShowSpr_EvalDelay = ShowSprites;
-            }
-
-            if (!ShowBackGround && !ShowSprites) ppuAddressBus = vram_addr;
-
-            if (ppu2001UpdateDelay > 0) PpuPhase_Apply2001Mask();
-            if (ppu2001EmphasisDelay > 0) PpuPhase_Apply2001Emphasis();
-
-            // ── Analog pipeline shift (palIdx only) ──
-            prevPrevPrevDotPalIdx = prevPrevDotPalIdx; prevPrevDotPalIdx = prevDotPalIdx; prevDotPalIdx = dotPalIdx;
-
-            // Tile fetch (identical to digital handler)
-            if (ShowBG_EvalDelay || ShowSpr_EvalDelay)
-            {
-                if (ppu2007_PPU_ALE && ppu2007_PPU_READ)
-                    ppuOctalLatch = (byte)ppuAddressBus;
-
-                int fetchPair = ((cx - 1) >> 1) & 3;
-                if ((cx & 1) != 0)
+                if (!isAnalog)
                 {
-                    if (fetchPair < 2)
-                    {
-                        if (fetchPair == 0)
-                            ppuPAR_NT = (ushort)(0x2000 | (vram_addr & 0x0FFF));
-                        else
-                            ppuPAR_AT = (ushort)(0x23C0 | (vram_addr & 0x0C00) | ((vram_addr >> 4) & 0x38) | ((vram_addr >> 2) & 0x07));
-                        ppuPAR_MUX = (fetchPair == 0) ? ppuPAR_NT : ppuPAR_AT;
-                    }
-                    else
-                    {
-                        PPU_CheckPAR();
-                        ppuPAR_CHR = (ushort)((ppuPAR_CHR & ~8) | ((fetchPair & 1) << 3));
-                        ppuPAR_MUX = ppuPAR_CHR;
-                    }
-                    ppuAddressBus = ppuPAR_MUX;
+                    int pos = (scanline << 8) + (cx - 4);
+                    ScreenBuf1x[pos] = prevPrevPrevDotColor;
                 }
                 else
                 {
-                    ppuAddressBus = (ushort)((ppuPAR_MUX & 0xFF00) | ppuOctalLatch);
-
-                    if (fetchPair >= 2)
-                    {
-                        ppuChrFetchA12 = (ppuAddressBus >> 12) & 1;
-                        if (mapperNeedsA12 && (fetchPair == 2 || !mapperA12IsMmc3))
-                            NotifyMapperA12(ppuAddressBus);
-                    }
-                    else if (fetchPair == 0 && mapperA12IsMmc3)
-                    {
-                        NotifyMapperA12(ppuAddressBus);
-                    }
-
-                    renderTemp = PpuBusRead(ppuAddressBus);
-                    ppuAddressBus = (ushort)((ppuAddressBus & 0xFF00) | renderTemp);
-
-                    if (fetchPair == 0) { commitNTFetch = true; if (extAttrEnabled) extAttrNTOffset = (ushort)(ppuAddressBus & 0x3FF); }
-                    else if (fetchPair == 1) commitATFetch = true;
-                    else if (fetchPair == 2) commitPatLowFetch = true;
-                    else                     commitPatHighFetch = true;
-
-                    if (mmc5Ref != null) mmc5Ref.NotifyVramRead(ppuAddressBus);
+                    ntscScanBuf[cx - 4] = prevPrevPrevDotPalIdx;
                 }
-
-                if (ppu2007_PPU_ALE && !ppu2007_PPU_READ)
-                    ppuOctalLatch = (byte)ppuAddressBus;
-
-                if (cx == 1 && chrABAutoSwitch)
-                {
-                    byte** src = Spritesize8x16 ? (chrBGUseASet ? chrBankPtrsA : chrBankPtrsB) : chrBankPtrsA;
-                    *(PtrBlock8*)chrBankPtrs = *(PtrBlock8*)src;
-                }
-            }
-
-            // ── Pixel composition (analog: compositePalIdx only) ──
-            {
-                bool showBG = ShowBackGround;
-                bool showSpr = ShowSprites;
-
-                byte backdropIdx = (byte)(ppu_ram[0x3f00] & 0x3f);
-                byte compositePalIdx = backdropIdx;
-                int bgColor = 0, bgPalette = 0;
-
-                if (showBG && (cx > 8 || ShowBgLeft8))
-                {
-                    int bit = 15 - FineX;
-                    bgColor = (((renderHigh >> bit) & 1) << 1) | ((renderLow >> bit) & 1);
-                    { int ab = 7 - FineX;
-                      bgPalette = (((renderAttrHigh >> ab) & 1) << 1) | ((renderAttrLow >> ab) & 1); }
-                    if (bgColor == 0) bgPalette = 0;
-                }
-
-                if (showSpr && (cx > 8 || ShowSprLeft8) && spriteAnyActive)
-                {
-                    ulong xc = *(ulong*)sprXCounter;
-                    ulong has_bits = ((xc & 0x7F7F7F7F7F7F7F7FUL) + 0x7F7F7F7F7F7F7F7FUL) | xc;
-                    ulong active_mask = skippedPreRenderDot341
-                        ? 0x8080808080808080UL
-                        : (~has_bits & 0x8080808080808080UL);
-                    ulong pixel_mask = (*(ulong*)sprShiftH | *(ulong*)sprShiftL) & 0x8080808080808080UL;
-                    ulong valid = active_mask & pixel_mask;
-
-                    if (valid != 0)
-                    {
-#if NET10_0_OR_GREATER
-                        int i = System.Numerics.BitOperations.TrailingZeroCount(valid) >> 3;
-#else
-                        ulong lowest = valid & (ulong)(-(long)valid);
-                        int i = (int)((0x0001020304050607UL * (lowest >> 7)) >> 56);
-#endif
-
-                        byte h = sprShiftH[i], l = sprShiftL[i];
-                        int attr = sprFetchAttr[i];
-                        int sprColor = ((h >> 7) << 1) | (l >> 7);
-                        int sprPalette = (attr & 3) | 4;
-                        bool sprPriority = (attr & 0x20) == 0;
-
-                        if (i == 0 && canDetectSprite0Hit && sprZeroInSlots && showBG && bgColor != 0)
-                        { if (cx < 256) { pendingSprite0Hit = true; canDetectSprite0Hit = false; } }
-
-                        bool ow = (bgColor == 0) | sprPriority;
-                        bgColor = ow ? sprColor : bgColor;
-                        bgPalette = ow ? sprPalette : bgPalette;
-                    }
-                }
-
-                if (ppuPaletteCorruptionFromVChange | ppuPaletteCorruptionFromDisable)
-                {
-                    ppuPaletteCorruptionFromVChange = false;
-                    ppuPaletteCorruptionFromDisable = false;
-                    CorruptPalettes(bgColor, vram_addr);
-                }
-
-                if (showBG || showSpr)
-                { int pa = (bgPalette << 2) | bgColor; if (bgColor == 0) pa = 0; compositePalIdx = (byte)(ppu_ram[0x3f00 + pa] & 0x3f); }
-                else { if ((vram_addr & 0x3F1F) >= 0x3F00) { int pa = vram_addr & 0x1F; if ((pa & 3) == 0) pa &= 0x0F; compositePalIdx = (byte)(ppu_ram[0x3f00 + pa] & 0x3f); } }
-
-                dotPalIdx = compositePalIdx;
-            }
-
-            // ── Sprite shift (identical to digital handler) ──
-            {
-                bool showBG = ShowBackGround;
-                bool showSpr = ShowSprites;
-                bool renderEnabled = showSpr || showBG;
-                bool canDecrement = !skippedPreRenderDot341;
-                ulong v = *(ulong*)sprXCounter;
-                if (!canDecrement || v == 0)
-                {
-                    if (renderEnabled)
-                    {
-                        *(ulong*)sprShiftL = (*(ulong*)sprShiftL << 1) & 0xFEFEFEFEFEFEFEFEUL;
-                        *(ulong*)sprShiftH = (*(ulong*)sprShiftH << 1) & 0xFEFEFEFEFEFEFEFEUL;
-                    }
-                }
-                else
-                {
-                    ulong dec_mask = ((v | ((v & 0x7F7F7F7F7F7F7F7FUL) + 0x7F7F7F7F7F7F7F7FUL))
-                                     & 0x8080808080808080UL) >> 7;
-                    *(ulong*)sprXCounter = v - dec_mask;
-
-                    if (renderEnabled)
-                    {
-                        ulong mask_0 = ~(dec_mask * 255UL);
-                        ulong sl = *(ulong*)sprShiftL;
-                        ulong sh = *(ulong*)sprShiftH;
-                        *(ulong*)sprShiftL = (((sl << 1) & 0xFEFEFEFEFEFEFEFEUL) & mask_0) | (sl & ~mask_0);
-                        *(ulong*)sprShiftH = (((sh << 1) & 0xFEFEFEFEFEFEFEFEUL) & mask_0) | (sh & ~mask_0);
-                    }
-                }
-            }
-
-            Ppu2007_BusRead();
-
-            // ── Analog draw ──
-            if (cx >= 4)
-            {
-                ntscScanBuf[cx - 4] = prevPrevPrevDotPalIdx;
             }
 
             ppuRenderingEnabled = ShowBackGround_Instant || ShowSprites_Instant;
