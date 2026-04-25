@@ -402,6 +402,20 @@ namespace AprNes
             cache[28] = cache[12];
         }
 
+        // Phase A4: per-frame palette → RGB conversion. Reads ntsc_rowPalettes
+        // (60 KB byte buffer, NES color indices 0..63) and writes 256×240 uint
+        // RGB pixels via NesColors[] lookup. Called by Render_resize each frame
+        // when emu output is the palette buffer rather than ScreenBuf1x.
+        public static unsafe void Convert_PalIdxFrameToRGB(uint* dst)
+        {
+            if (ntsc_rowPalettes == null || NesColors == null || dst == null) return;
+            byte* src = ntsc_rowPalettes;
+            uint* colors = NesColors;
+            int total = 256 * 240;
+            for (int i = 0; i < total; i++)
+                dst[i] = colors[src[i]];
+        }
+
         // Legacy Ppu2007SmTick / Increment2007 removed — replaced by SR latch 3-phase model
         // in ppu_new.cs (PPU_DATA_StateMachine, PPU_DATA_StateMachine2, PPU_DATA_StateMachine_Half)
 

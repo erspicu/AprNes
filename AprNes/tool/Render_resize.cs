@@ -15,6 +15,9 @@ namespace AprNes
     unsafe public class Render_resize : InterfaceGraphic
     {
         uint* _input;
+        // Phase A4: palette → RGB conversion buffer (256×240 uint).
+        // Source for filter pipeline; replaces direct ScreenBuf1x consumption.
+        uint* _rgbInput;
         uint* _stage1Buf;   // intermediate buffer after stage1 (null if not needed)
         uint* _output;      // final output buffer
         int _s1Scale, _s2Scale;
@@ -48,7 +51,9 @@ namespace AprNes
         public void freeMem()
         {
             if (_stage1Buf != null) { AprNes.NesCore.FreeUnmanaged((IntPtr)_stage1Buf); _stage1Buf = null; }
-            if (_output != null && _output != _input) { AprNes.NesCore.FreeUnmanaged((IntPtr)_output); _output = null; }
+            // _output may alias _rgbInput in 1×-no-filter path — null-check both before freeing _output.
+            if (_output != null && _output != _input && _output != _rgbInput) { AprNes.NesCore.FreeUnmanaged((IntPtr)_output); _output = null; }
+            if (_rgbInput != null) { AprNes.NesCore.FreeUnmanaged((IntPtr)_rgbInput); _rgbInput = null; }
         }
 
         public Bitmap GetOutput()
@@ -61,6 +66,9 @@ namespace AprNes
         {
             _input = input;
 
+            // Phase A4: always allocate the 256×240 palette→RGB conversion buffer.
+            _rgbInput = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * 256 * 240);
+
             bool needStage1Buf = (_s1Filter != ResizeFilter.None) && (_s2Filter != ResizeFilter.None);
             bool needOutputBuf = (_s1Filter != ResizeFilter.None) || (_s2Filter != ResizeFilter.None);
 
@@ -70,7 +78,7 @@ namespace AprNes
             if (needOutputBuf)
                 _output = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * _finalW * _finalH);
             else
-                _output = _input; // 1x: direct output from NES
+                _output = _rgbInput; // 1×: GDI reads the converted RGB buffer directly
 
             NativeGDI.initHighSpeed(_device, _finalW, _finalH, _output, 0, 0);
 
@@ -92,6 +100,9 @@ namespace AprNes
         {
             _input = input;
 
+            // Phase A4: same conversion buffer as init() path.
+            _rgbInput = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * 256 * 240);
+
             bool needStage1Buf = (_s1Filter != ResizeFilter.None) && (_s2Filter != ResizeFilter.None);
             bool needOutputBuf = (_s1Filter != ResizeFilter.None) || (_s2Filter != ResizeFilter.None);
 
@@ -101,7 +112,7 @@ namespace AprNes
             if (needOutputBuf)
                 _output = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * _finalW * _finalH);
             else
-                _output = _input;
+                _output = _rgbInput;
 
             if (_s1Filter == ResizeFilter.XBRz)
                 HS_XBRz.initTable(256, 240);
@@ -123,7 +134,11 @@ namespace AprNes
         // Run filter pipeline only (no GDI draw) — used by headless benchmark
         public void RenderFilter()
         {
-            uint* src = _input;
+            // Phase A4: convert palette indices (ntsc_rowPalettes) → RGB once,
+            // then run filter pipeline on the converted buffer.
+            AprNes.NesCore.Convert_PalIdxFrameToRGB(_rgbInput);
+
+            uint* src = _rgbInput;
             uint* dst;
 
             // Determine stage1 destination
