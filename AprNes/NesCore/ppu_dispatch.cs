@@ -377,12 +377,9 @@ namespace AprNes
 
             // ── Sprite shift (cx <= 256 always true) ──
             {
-                bool showBG = ShowBackGround;
-                bool showSpr = ShowSprites;
-                bool renderEnabled = showSpr || showBG;
-                bool canDecrement = !skippedPreRenderDot341;
+                bool renderEnabled = ShowSprites || ShowBackGround;
                 ulong v = *(ulong*)sprXCounter;
-                if (!canDecrement || v == 0)
+                if (skippedPreRenderDot341 || v == 0)
                 {
                     if (renderEnabled)
                     {
