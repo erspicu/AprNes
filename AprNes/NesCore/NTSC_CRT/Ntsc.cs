@@ -147,7 +147,8 @@ namespace AprNes
                 loLevels[0] = -0.12f; loLevels[1] = 0.00f; loLevels[2] = 0.31f; loLevels[3] = 0.72f;
                 // Row-capture buffers for deferred parallel demodulation.
                 // Scratch buffers (wave/cBuf/dotY/I/Q) are now per-thread via [ThreadStatic].
-                ntsc_rowPalettes = (byte*)NesCore.AllocUnmanaged(kSrcH * 256);
+                // Phase A2: ntsc_rowPalettes is now allocated unconditionally in Main.init/initFDS
+                // (used by both analog and digital paths). Only NTSC-specific row metadata stays here.
                 ntsc_rowEmphasis = (byte*)NesCore.AllocUnmanaged(kSrcH);
                 ntsc_rowPhase0   = (int*)NesCore.AllocUnmanaged(kSrcH * sizeof(int));
                 hiLevels = (float*)NesCore.AllocUnmanaged(4 * sizeof(float));

@@ -325,6 +325,8 @@ namespace AprNes
                 corruptOamRow    = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 32);
                 ppu_ram          = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 0x4000);
                 palCache         = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * 32);
+                // Phase A2: per-frame palette index buffer (analog + digital).
+                ntsc_rowPalettes = (byte*)NesCore.AllocUnmanaged(240 * 256);
                 InitFlipTable();
                 // expansionChannels: needed by mapper Reset() before initAPU()
                 expansionChannels = (int*)NesCore.AllocUnmanaged(sizeof(int) * 8);

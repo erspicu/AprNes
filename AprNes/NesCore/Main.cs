@@ -239,6 +239,7 @@ namespace AprNes
             if (secondaryOAM != null) { NesCore.FreeUnmanaged((IntPtr)secondaryOAM); secondaryOAM = null; }
             if (corruptOamRow!= null) { NesCore.FreeUnmanaged((IntPtr)corruptOamRow);corruptOamRow= null; }
             if (ppu_ram      != null) { NesCore.FreeUnmanaged((IntPtr)ppu_ram);      ppu_ram      = null; }
+            if (ntsc_rowPalettes != null) { NesCore.FreeUnmanaged((IntPtr)ntsc_rowPalettes); ntsc_rowPalettes = null; }
             if (FlipTable    != null) { NesCore.FreeUnmanaged((IntPtr)FlipTable);    FlipTable    = null; }
             if (sprShiftL    != null) { NesCore.FreeUnmanaged((IntPtr)sprShiftL);    sprShiftL    = null; }
             if (sprShiftH    != null) { NesCore.FreeUnmanaged((IntPtr)sprShiftH);    sprShiftH    = null; }
@@ -491,6 +492,9 @@ prerender_sprite0_x = 0;
                 corruptOamRow    = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 32);
                 ppu_ram          = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 0x4000);
                 palCache         = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * 32);
+                // Phase A2: per-frame palette index buffer, used by both analog and digital paths.
+                // 240 scanlines × 256 pixels = 60 KB.
+                ntsc_rowPalettes = (byte*)NesCore.AllocUnmanaged(240 * 256);
                 InitFlipTable();
                 sprShiftL        = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 8);
                 sprShiftH        = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 8);
