@@ -339,15 +339,12 @@ namespace AprNes
         static void PpuPhase4_VisibleScanlineDot1Init()
         {
             int scanOff = scanline << 8;
-            if (AnalogEnabled)
-            {
-                // Fill 256 bytes with backdrop palette index in ntsc_rowPalettes
-                // (Phase A1: pixels not written by PixelZone keep backdrop colour;
-                // direct write to per-frame buffer instead of per-scanline scratch).
-                byte bgIdx = (byte)(ppu_ram[0x3f00] & 0x3f);
-                System.Runtime.CompilerServices.Unsafe.InitBlockUnaligned(ntsc_rowPalettes + scanOff, bgIdx, 256);
-            }
-            else
+            // Phase A3: always prefill ntsc_rowPalettes with backdrop palette index
+            // (both modes consume it). Digital additionally fills ScreenBuf1x with
+            // the corresponding backdrop colour.
+            byte bgIdx = (byte)(ppu_ram[0x3f00] & 0x3f);
+            System.Runtime.CompilerServices.Unsafe.InitBlockUnaligned(ntsc_rowPalettes + scanOff, bgIdx, 256);
+            if (!AnalogEnabled)
             {
                 // Fill 256 uints with backdrop color — 4-byte pattern, JIT-unroll ulong loop
                 uint bgColor = palCache[0]; ulong fill = bgColor | ((ulong)bgColor << 32);
