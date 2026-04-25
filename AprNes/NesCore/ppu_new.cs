@@ -555,6 +555,24 @@ namespace AprNes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void PPU_DATA_Pipeline_Step3()
         {
+            // Idle fast-path (#2): when both latches are at the settled idle pattern (0x0A)
+            // and no CPU $2007 activity is pending, every operation in this method is a
+            // no-op on observable state. Skip the entire body.
+            //
+            // Settled invariants (derived from Step1/Step3 bit-update equations):
+            //   readLatch  == 0x0A → PD_RB / ReadALE both false
+            //   writeLatch == 0x0A → DB_PAR / WriteALE both false (so TStep_Latch false)
+            //   readLatch / writeLatch updates produce 0x0A again (fixed point)
+            //   PPU_ALE was already false (written by Step1 when no rendering ALE source)
+            // CPU-side conditions: Read_SR / Write_SR / PD_RB / DB_PAR all false
+            // means no transition from idle is in flight; safe to skip.
+            if (readLatch == 0x0A && writeLatch == 0x0A
+                && !ppu2007_Read_SR && !ppu2007_Write_SR
+                && !ppu2007_PD_RB && !ppu2007_DB_PAR)
+            {
+                return;
+            }
+
             ppu2007_TStep = ppu2007_TStep_Latch || ppu2007_PD_RB;
             if (ppu2007_TStep)
             {
