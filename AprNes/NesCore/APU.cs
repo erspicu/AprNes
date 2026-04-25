@@ -435,6 +435,7 @@ namespace AprNes
         //   PUT cycle: DMC Load DMA countdown
         //   Both:      DMC $4015 delay, Triangle timer, Frame counter, Quarter/Half frame
         // =====================================================================
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void apu_step()
         {
             apucycle++;
