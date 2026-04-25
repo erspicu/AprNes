@@ -1827,6 +1827,9 @@ public string GetRomInfo()
                 NesCore.Crt_Init();
             }
 
+            // Repick visible PixelZone handler (Digital vs Analog) for current AnalogEnabled.
+            NesCore.ConfigurePpuVisibleDispatch();
+
             if (RenderObj != null) RenderObj.freeMem();
             RenderObj = NesCore.AnalogEnabled ? (InterfaceGraphic)new Render_Analog() : CreateRenderResize();
             RenderObj.init(NesCore.ScreenBuf1x, grfx);

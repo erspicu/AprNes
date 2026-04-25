@@ -170,6 +170,10 @@ public sealed unsafe class EmulatorEngine : IDisposable
 
         _analogMode = analogEnabled;
 
+        // Repick PixelZone handler (Digital vs Analog) for current AnalogEnabled.
+        // NesCore.AnalogEnabled is set by caller before this method is invoked.
+        NesCore.ConfigurePpuVisibleDispatch();
+
         int newW, newH;
         if (analogEnabled)
         {
