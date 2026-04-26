@@ -135,17 +135,14 @@ namespace AprNes
             _inputBitmap.NotifyPixelsChanged();
 
             // ── Stage 2: build SKShader from input bitmap + previous-frame surface ──
-            // Mitchell-Netravali cubic sampling avoids the visible "analog block"
-            // artifacts at chroma/luma boundaries that nearest-neighbor (Skia
-            // default) would produce when upscaling 1024-wide source to display dim.
-            using var inputImage  = SKImage.FromBitmap(_inputBitmap);
-            using var inputShader = inputImage.ToShader(
-                SKShaderTileMode.Clamp, SKShaderTileMode.Clamp,
-                new SKSamplingOptions(SKCubicResampler.Mitchell));
+            // Texture sampling at default (nearest); cubic interpolation lives
+            // in the SkSL helper sampleHCatmullRom (crt_core_v1.sksl).
+            using var inputShader = SKShader.CreateBitmap(
+                _inputBitmap,
+                SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
             using var prevImage  = _prevSurface!.Snapshot();
             using var prevShader = prevImage.ToShader(
-                SKShaderTileMode.Clamp, SKShaderTileMode.Clamp,
-                new SKSamplingOptions(SKCubicResampler.Mitchell));
+                SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
 
             // ── Stage 3: set uniforms + children ──
             var uniforms = new SKRuntimeEffectUniforms(_effect);

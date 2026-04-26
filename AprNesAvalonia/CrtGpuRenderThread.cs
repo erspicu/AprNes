@@ -24,7 +24,10 @@ internal static unsafe class CrtGpuRenderThread
 {
     static SKRuntimeEffect? _effect;
 
-    // Input: 1024×240 Bgra8888 quantization of linearBuffer
+    // Input: 1024×240 Bgra8888 quantization of linearBuffer.
+    // Cubic sampling for boundary smoothing happens entirely in SkSL
+    // (sampleHCatmullRom in crt_core_v1.sksl) — texture sampling here is left
+    // as nearest so the shader's 4-tap helper sees raw pixels, not pre-blurred.
     static SKBitmap? _inputBitmap;
     const int SrcW = 1024;
     const int SrcH = 240;
@@ -125,22 +128,15 @@ internal static unsafe class CrtGpuRenderThread
         _inputBitmap.NotifyPixelsChanged();
 
         // ── Stage 2: child shaders ──
-        // Use Mitchell-Netravali cubic sampling on the source bitmap. SkiaSharp's
-        // default (nearest-neighbor) caused visible "analog block" artifacts at
-        // chroma/luma boundaries when the 1024-wide source was upscaled to the
-        // display dim — real CRTs never had crisp pixel edges. Mitchell gives
-        // smooth interpolation without overshoot ringing, mimicking the analog
-        // beam's natural smearing across boundaries.
-        using var inputImage  = SKImage.FromBitmap(_inputBitmap);
-        using var inputShader = inputImage.ToShader(
-            SKShaderTileMode.Clamp, SKShaderTileMode.Clamp,
-            new SKSamplingOptions(SKCubicResampler.Mitchell));
-        // Phosphor prev: same Mitchell cubic so phosphor afterglow doesn't
-        // re-introduce blockiness from the previous frame.
+        // Texture sampling left at default (nearest) — crt_core_v1.sksl's
+        // sampleHCatmullRom helper does its own 4-tap cubic interpolation
+        // over raw pixels. Stacking SkiaSharp Mitchell on top would over-blur.
+        using var inputShader = SKShader.CreateBitmap(
+            _inputBitmap,
+            SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
         using var prevImage  = _prevSurface!.Snapshot();
         using var prevShader = prevImage.ToShader(
-            SKShaderTileMode.Clamp, SKShaderTileMode.Clamp,
-            new SKSamplingOptions(SKCubicResampler.Mitchell));
+            SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
 
         // ── Stage 3: uniforms (full CPU parity — see crt_core_v1.sksl header) ──
         var uniforms = new SKRuntimeEffectUniforms(_effect!);
