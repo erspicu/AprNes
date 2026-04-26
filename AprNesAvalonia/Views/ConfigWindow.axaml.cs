@@ -55,7 +55,15 @@ public partial class ConfigWindow : Window
 
         // Wire up interactive events
         LangCombo.SelectionChanged += LangCombo_SelectionChanged;
-        ChkAnalog.Click += (_, _) => UpdateAnalogEnableState();
+        ChkAnalog.Click += (_, _) =>
+        {
+            // When user turns Analog Mode ON, default Ultra Analog to checked.
+            // (Ultra is the canonical "best quality" analog setting; most users
+            // want it on. If they prefer Fast non-Ultra, they uncheck it here.)
+            if (ChkAnalog.IsChecked == true)
+                ChkUltraAnalog.IsChecked = true;
+            UpdateAnalogEnableState();
+        };
         ChkUltraAnalog.Click += (_, _) => UpdateAnalogEnableState();
         CmbFilter1.SelectionChanged += CmbFilter_Changed;
         CmbFilter2.SelectionChanged += CmbFilter_Changed;
