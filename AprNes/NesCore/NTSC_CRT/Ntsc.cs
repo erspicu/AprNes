@@ -53,7 +53,7 @@ namespace AprNes
         // ── 共用唯讀查表與參數 (Thread-Safe) ─────────────────
         static float* loLevels; static float* hiLevels;
         static float* iPhase; static float* qPhase;
-        static float* cosTab6; static float* sinTab6;
+        static float* cosTabPhase; static float* sinTabPhase;
         static float* hannY; static float* hannI; static float* hannQ;
         static float* combinedI; static float* combinedQ;
         public static byte* gammaLUT;
@@ -65,7 +65,63 @@ namespace AprNes
         public static float RfAudioLevel = 0.0f;
         public static float RfBuzzPhase = 0.0f;
 
-        public const int kOutW = 1024;
+        // ── Sampling-rate-dependent constants (HD_NTSC switch) ────────────
+        // HD_NTSC (defined only in Avalonia csproj) doubles the NTSC sampling
+        // rate to 2048 samples/scanline (12× Fsc oversampling) for higher chroma
+        // demod precision. NetFx keeps 1024 (6× Fsc) for compatibility / perf.
+        // See MD/Avalonia/ntsc_2048_sampling_plan.md for the full design.
+#if HD_NTSC
+        public const int kOutW          = 2048;
+        public const int kSampDot       = 8;
+        public const int kSampDotLog2   = 3;      // log2(kSampDot) — used to convert sample index → dot index ((p+k) >> kSampDotLog2)
+        public const int kPhaseEntries  = 12;     // cos/sin table size = master clock phases per Fsc cycle (master=12×Fsc when sampling at 2× master rate)
+        public const float kSampleRateScale = 0.5f;  // halves IIR coefficients (ChromaBlur/SlewRate/RingStrength) to keep same physical cutoff at 2× rate
+#else
+        public const int kOutW          = 1024;
+        public const int kSampDot       = 4;
+        public const int kSampDotLog2   = 2;
+        public const int kPhaseEntries  = 6;
+        public const float kSampleRateScale = 1.0f;
+#endif
+        // emphAtten layout = [8 emph][kEmphStride phases]; second half duplicates
+        // first half so inner loops can read phases 0..2N-1 without explicit
+        // % kPhaseEntries (branchless wrap for ±1 lookahead).
+        public const int kEmphStride    = kPhaseEntries * 2;
+        // Master clock phases per Fsc cycle is always 6 (NES hardware: master = 6 × Fsc).
+        // At HD_NTSC, kPhaseEntries=12 = 2 sub-samples per master phase. This ratio is
+        // used to scale emphasis-attenuation phase ranges (master-phase indexed in NES spec).
+        public const int kSubPerMaster  = kPhaseEntries / 6;
+
+        // ── Phase increments per loop iteration unit (HD_NTSC scaled) ─────
+        // Each step value gives identical numerical behaviour to the previous
+        // hardcoded literal in non-HD builds.
+        // Per-line carry = (1364 master cycles × kSubPerMaster) mod kPhaseEntries
+        //   non-HD (kPhaseEntries=6, kSubPerMaster=1): 1364 mod 6 = 2
+        //   HD     (kPhaseEntries=12, kSubPerMaster=2): 2728 mod 12 = 4
+        const int kPhaseStepLine    = 2 * kSubPerMaster;
+        // Per-dot = kSampDot phases (kSampDot samples per dot, +1 phase each).
+        const int kPhaseStepDot     = kSampDot;
+        // Per-sample inside DemodulateRow inner loop = always +1 phase.
+        const int kPhaseStepSample  = 1;
+        // Per-output-pixel chroma demod stride in RunDecodeLoop. In 1024-rate this
+        // is +1 (one master tick of phase per output pixel at default analog 4×).
+        // At HD_NTSC, +2 to keep same physical angular velocity per output pixel.
+        const int kPhaseStepOutPx   = 1 * kSubPerMaster;
+        // Branchless-wrap support: bit-shift threshold = kPhaseEntries - step - 1
+        // and AND-mask = -kPhaseEntries (negative wrap delta).
+        const int kPhaseWrap        = -kPhaseEntries;
+        const int kThreshLine       = kPhaseEntries - kPhaseStepLine    - 1;
+        const int kThreshDot        = kPhaseEntries - kPhaseStepDot     - 1;
+        const int kThreshSample     = kPhaseEntries - kPhaseStepSample  - 1;
+        const int kThreshOutPx      = kPhaseEntries - kPhaseStepOutPx   - 1;
+        // Initial-offset constants (used in DemodulateRow_Core to seed tModI/tModQ
+        // at specific phase angles for I/Q demod). Original values 3 and 5 represent
+        // 180° and 300° offsets in the 6-entry frame; HD doubles them.
+        const int kPhaseInitI = 3 * kSubPerMaster;   // 180° offset
+        const int kPhaseInitQ = 5 * kSubPerMaster;   // 300° offset (= kPhaseEntries - 1 by coincidence in 6-frame)
+        // Wrap threshold for the (phase0 + N) initial offset wrap = kPhaseEntries - 1.
+        const int kPhaseInitMax = kPhaseEntries - 1;
+
         public const int kSrcH = 240;
         public const int kPlane = kOutW * kSrcH;
         public static float* linearBuffer;
@@ -90,13 +146,18 @@ namespace AprNes
             { NoiseIntensity = SV_NoiseIntensity; SlewRate = SV_SlewRate; ChromaBlur = SV_ChromaBlur; }
             else
             { NoiseIntensity = AV_NoiseIntensity; SlewRate = AV_SlewRate; ChromaBlur = AV_ChromaBlur; }
+            // HD_NTSC: halve IIR coefficients (per-sample, frequency-domain) so the
+            // 3dB cutoff stays at the same physical Hz when sampling rate doubles.
+            // NoiseIntensity is per-sample amplitude (not a filter pole) — leave it.
+            SlewRate   *= kSampleRateScale;
+            ChromaBlur *= kSampleRateScale;
         }
 
         static int scanPhase6 = 0;
         static int scanPhaseBase = 0;
 
         const int kDots = 256;
-        const int kSampDot = 4;
+        // kSampDot is HD_NTSC-conditional (declared above with kOutW/kPhaseEntries)
         const int kWaveLen = kDots * kSampDot;
         const int kLeadPad = 30;
         const int kBufLen = kLeadPad * 2 + kWaveLen;
@@ -116,10 +177,19 @@ namespace AprNes
         static readonly Vector<int> v65536iN = new Vector<int>(65536);
         static readonly Vector<int> vAlphaiN = new Vector<int>(unchecked((int)0xFF000000));
 
+        // Filter window sizes — scaled by kSampDot ratio at HD_NTSC so the
+        // physical bandwidth (in Fsc cycles) matches the 1024-rate baseline.
+#if HD_NTSC
+        const int kWinY = 12; const int kWinY_half = kWinY / 2;
+        const int kWinI = 36; const int kWinI_half = kWinI / 2;
+        const int kWinQ = 108; const int kWinQ_half = kWinQ / 2;
+        static int winQ = 108, winQ_half = 54; // runtime: 108 asymmetric / 36 symmetric
+#else
         const int kWinY = 6; const int kWinY_half = kWinY / 2;
         const int kWinI = 18; const int kWinI_half = kWinI / 2;
         const int kWinQ = 54; const int kWinQ_half = kWinQ / 2;
         static int winQ = 54, winQ_half = 27; // runtime: 54 (asymmetric 1953) or 18 (symmetric 1960s)
+#endif
 
         public static float ColorTempR = 1.0f;
         public static float ColorTempG = 1.0f;
@@ -156,34 +226,41 @@ namespace AprNes
                 iPhase = (float*)NesCore.AllocUnmanaged(16 * sizeof(float));
                 qPhase = (float*)NesCore.AllocUnmanaged(16 * sizeof(float));
                 linearBuffer = (float*)NesCore.AllocUnmanaged(kOutW * kSrcH * 3 * sizeof(float));
-                cosTab6 = (float*)NesCore.AllocUnmanaged(6 * sizeof(float));
-                sinTab6 = (float*)NesCore.AllocUnmanaged(6 * sizeof(float));
+                cosTabPhase = (float*)NesCore.AllocUnmanaged(kPhaseEntries * sizeof(float));
+                sinTabPhase = (float*)NesCore.AllocUnmanaged(kPhaseEntries * sizeof(float));
                 hannY = (float*)NesCore.AllocUnmanaged(kWinY * sizeof(float));
                 hannI = (float*)NesCore.AllocUnmanaged(kWinI * sizeof(float));
                 hannQ = (float*)NesCore.AllocUnmanaged(kWinQ * sizeof(float));
-                combinedI = (float*)NesCore.AllocUnmanaged(6 * kWinI * sizeof(float));
-                combinedQ = (float*)NesCore.AllocUnmanaged(6 * kWinQ * sizeof(float));
+                combinedI = (float*)NesCore.AllocUnmanaged(kPhaseEntries * kWinI * sizeof(float));
+                combinedQ = (float*)NesCore.AllocUnmanaged(kPhaseEntries * kWinQ * sizeof(float));
                 gammaLUT = (byte*)NesCore.AllocUnmanaged(4096);
                 attenTab = (float*)NesCore.AllocUnmanaged(4 * sizeof(float));
                 yBase = (float*)NesCore.AllocUnmanaged(64 * sizeof(float));
                 iBase = (float*)NesCore.AllocUnmanaged(64 * sizeof(float));
                 qBase = (float*)NesCore.AllocUnmanaged(64 * sizeof(float));
-                waveTable = (float*)NesCore.AllocUnmanaged(64 * 6 * 4 * sizeof(float));
-                cTable = (float*)NesCore.AllocUnmanaged(64 * 6 * 4 * sizeof(float));
-                emphAtten = (float*)NesCore.AllocUnmanaged(8 * 12 * sizeof(float));
+                waveTable = (float*)NesCore.AllocUnmanaged(64 * kPhaseEntries * kSampDot * sizeof(float));
+                cTable = (float*)NesCore.AllocUnmanaged(64 * kPhaseEntries * kSampDot * sizeof(float));
+                // emphAtten layout: [8 emph][kPhaseEntries × 2 phases] — 2× width
+                // for branchless mod-free indexing (inner loops read phases 0..2N-1
+                // without explicit % kPhaseEntries).
+                emphAtten = (float*)NesCore.AllocUnmanaged(8 * (kPhaseEntries * 2) * sizeof(float));
                 yBaseE = (float*)NesCore.AllocUnmanaged(64 * 8 * sizeof(float));
                 iBaseE = (float*)NesCore.AllocUnmanaged(64 * 8 * sizeof(float));
                 qBaseE = (float*)NesCore.AllocUnmanaged(64 * 8 * sizeof(float));
 
+                // iPhase/qPhase: 16 NES color codes mapped to NTSC chroma phase.
+                // The /6.0 here is "12 colors per cycle ÷ 2" = 30° per code, which
+                // is set by NES hardware behavior, NOT by sampling rate. Keep 6.0.
                 for (int c = 0; c < 16; c++) { double a = c * Math.PI / 6.0; iPhase[c] = -(float)Math.Cos(a); qPhase[c] = (float)Math.Sin(a); }
-                for (int k = 0; k < 6; k++) { double a = k * 2.0 * Math.PI / 6.0; cosTab6[k] = (float)Math.Cos(a); sinTab6[k] = (float)Math.Sin(a); }
+                // cos/sin phase table: kPhaseEntries entries spanning one full Fsc cycle.
+                for (int k = 0; k < kPhaseEntries; k++) { double a = k * 2.0 * Math.PI / kPhaseEntries; cosTabPhase[k] = (float)Math.Cos(a); sinTabPhase[k] = (float)Math.Sin(a); }
 
                 ComputeHann(hannY, kWinY); ComputeHann(hannI, kWinI); ComputeHann(hannQ, kWinQ);
 
-                for (int ph = 0; ph < 6; ph++)
+                for (int ph = 0; ph < kPhaseEntries; ph++)
                 {
-                    for (int n = 0; n < kWinI; n++) combinedI[ph * kWinI + n] = hannI[n] * cosTab6[(ph + n) % 6];
-                    for (int n = 0; n < kWinQ; n++) combinedQ[ph * kWinQ + n] = hannQ[n] * sinTab6[(ph + n) % 6];
+                    for (int n = 0; n < kWinI; n++) combinedI[ph * kWinI + n] = hannI[n] * cosTabPhase[(ph + n) % kPhaseEntries];
+                    for (int n = 0; n < kWinQ; n++) combinedQ[ph * kWinQ + n] = hannQ[n] * sinTabPhase[(ph + n) % kPhaseEntries];
                 }
                 attenTab[0] = 1.0f; for (int n = 1; n <= 3; n++) attenTab[n] = (float)Math.Pow(0.746, n);
                 for (int p = 0; p < 64; p++)
@@ -195,37 +272,56 @@ namespace AprNes
                     if (color >= 1 && color <= 12) { iBase[p] = iPhase[color] * sat; qBase[p] = qPhase[color] * sat; }
                     else { iBase[p] = 0f; qBase[p] = 0f; }
                 }
+                // waveTable / cTable: per-palette × per-phase × per-subsample
+                // pre-computed waveform. Layout: (p * kPhaseEntries + ph) * kSampDot
                 for (int p = 0; p < 64; p++)
                 {
-                    for (int ph = 0; ph < 6; ph++)
+                    for (int ph = 0; ph < kPhaseEntries; ph++)
                     {
-                        float* wdst = waveTable + (p * 6 + ph) * 4; float* cdst = cTable + (p * 6 + ph) * 4;
-                        for (int s = 0; s < 4; s++)
+                        float* wdst = waveTable + (p * kPhaseEntries + ph) * kSampDot;
+                        float* cdst = cTable    + (p * kPhaseEntries + ph) * kSampDot;
+                        for (int s = 0; s < kSampDot; s++)
                         {
-                            int tm = (ph + s) % 6; cdst[s] = cosTab6[tm] * iBase[p] - sinTab6[tm] * qBase[p]; wdst[s] = yBase[p] + cdst[s];
+                            int tm = (ph + s) % kPhaseEntries;
+                            cdst[s] = cosTabPhase[tm] * iBase[p] - sinTabPhase[tm] * qBase[p];
+                            wdst[s] = yBase[p] + cdst[s];
                         }
                     }
                 }
+                // emphAtten: NES emphasis (R/G/B bits) attenuates 3 master clock
+                // phases of the Fsc cycle each. At HD_NTSC, master phase boundaries
+                // scale by kSubPerMaster so 1 master tick = kSubPerMaster sub-samples.
                 for (int e = 0; e < 8; e++)
                 {
-                    for (int p = 0; p < 6; p++)
+                    for (int p = 0; p < kPhaseEntries; p++)
                     {
-                        int cnt = 0; if ((e & 1) != 0 && p >= 1 && p <= 3) cnt++; if ((e & 2) != 0 && p >= 3 && p <= 5) cnt++; if ((e & 4) != 0 && (p >= 5 || p <= 1)) cnt++;
-                        emphAtten[e * 12 + p] = (float)Math.Pow(0.746, cnt);
+                        int cnt = 0;
+                        // R bit: master phases 1-3 (inclusive) → sub-samples [1..4)*kSubPerMaster
+                        if ((e & 1) != 0 && p >= 1 * kSubPerMaster && p < 4 * kSubPerMaster) cnt++;
+                        // G bit: master phases 3-5 (inclusive) → sub-samples [3..6)*kSubPerMaster
+                        if ((e & 2) != 0 && p >= 3 * kSubPerMaster && p < 6 * kSubPerMaster) cnt++;
+                        // B bit: master phases 5,0,1 (wrap) → sub-samples [5..6)*kSubPerMaster ∪ [0..2)*kSubPerMaster
+                        if ((e & 4) != 0 && (p >= 5 * kSubPerMaster || p < 2 * kSubPerMaster)) cnt++;
+                        emphAtten[e * kEmphStride + p] = (float)Math.Pow(0.746, cnt);
                     }
-                    for (int p = 0; p < 6; p++) emphAtten[e * 12 + 6 + p] = emphAtten[e * 12 + p];
+                    // Duplicate first half into second half for branchless wrap access
+                    for (int p = 0; p < kPhaseEntries; p++)
+                        emphAtten[e * kEmphStride + kPhaseEntries + p] = emphAtten[e * kEmphStride + p];
                 }
                 for (int p = 0; p < 64; p++)
                 {
                     for (int e = 0; e < 8; e++)
                     {
                         float sumY = 0f, sumI = 0f, sumQ = 0f;
-                        for (int ph = 0; ph < 6; ph++)
+                        for (int ph = 0; ph < kPhaseEntries; ph++)
                         {
-                            float V = yBase[p] + iBase[p] * cosTab6[ph] - qBase[p] * sinTab6[ph];
-                            V *= emphAtten[e * 12 + ph]; sumY += V; sumI += V * cosTab6[ph]; sumQ -= V * sinTab6[ph];
+                            float V = yBase[p] + iBase[p] * cosTabPhase[ph] - qBase[p] * sinTabPhase[ph];
+                            V *= emphAtten[e * kEmphStride + ph]; sumY += V; sumI += V * cosTabPhase[ph]; sumQ -= V * sinTabPhase[ph];
                         }
-                        yBaseE[p * 8 + e] = sumY / 6f; iBaseE[p * 8 + e] = sumI / 3f; qBaseE[p * 8 + e] = sumQ / 3f;
+                        // Average over kPhaseEntries (luma) and kPhaseEntries/2 (chroma — half-cycle integration).
+                        yBaseE[p * 8 + e] = sumY / (float)kPhaseEntries;
+                        iBaseE[p * 8 + e] = sumI / (float)(kPhaseEntries / 2);
+                        qBaseE[p * 8 + e] = sumQ / (float)(kPhaseEntries / 2);
                     }
                 }
             }
@@ -282,9 +378,9 @@ namespace AprNes
             winQ_half = newQ / 2;
             if (hannQ == null) return; // not yet initialized
             ComputeHann(hannQ, winQ);
-            for (int ph = 0; ph < 6; ph++)
+            for (int ph = 0; ph < kPhaseEntries; ph++)
                 for (int n = 0; n < winQ; n++)
-                    combinedQ[ph * kWinQ + n] = hannQ[n] * sinTab6[(ph + n) % 6];
+                    combinedQ[ph * kWinQ + n] = hannQ[n] * sinTabPhase[(ph + n) % kPhaseEntries];
         }
 
         static void ComputeHann(float* w, int N)
@@ -400,12 +496,12 @@ namespace AprNes
             if (ntsc_ultraAnalog)
             {
                 ntsc_rowPhase0[sl] = scanPhaseBase;
-                scanPhaseBase += 2 + (((3 - scanPhaseBase) >> 31) & -6);
+                scanPhaseBase += kPhaseStepLine + (((kThreshLine - scanPhaseBase) >> 31) & kPhaseWrap);
             }
             else
             {
                 ntsc_rowPhase0[sl] = scanPhase6;
-                scanPhase6 += 2 + (((3 - scanPhase6) >> 31) & -6);
+                scanPhase6 += kPhaseStepLine + (((kThreshLine - scanPhase6) >> 31) & kPhaseWrap);
             }
         }
 
@@ -441,7 +537,7 @@ namespace AprNes
             int phase0 = scanPhase6;
 
             // ★ 符號位元擴展黑魔法
-            scanPhase6 += 2 + (((3 - scanPhase6) >> 31) & -6);
+            scanPhase6 += kPhaseStepLine + (((kThreshLine - scanPhase6) >> 31) & kPhaseWrap);
 
             DecodeScanline_Fast_Worker(sl, palBuf, emphasisBits, phase0, dotY, dotI, dotQ);
         }
@@ -467,14 +563,14 @@ namespace AprNes
         static void DecodeAV_Composite(int sl, int phase0, float* dotY, float* dotI, float* dotQ)
         {
             bool isRF = (AnalogOutputMode)ntsc_analogOutput == AnalogOutputMode.RF;
-            bool addNoise = NoiseIntensity > 0f; float ringDamp = RingStrength * 0.5f;
+            bool addNoise = NoiseIntensity > 0f; float ringDamp = RingStrength * 0.5f * kSampleRateScale;
             float nScale = NoiseIntensity * (2f / 255.0f); float nOff = NoiseIntensity;
             int dstW = Crt_DstW; int N = ntsc_analogSize;
             int rowStart = sl * Crt_DstH / Crt_SrcH;
             int rowEnd = Math.Min((sl + 1) * Crt_DstH / Crt_SrcH, Crt_DstH);
             uint* row0 = ntsc_analogScreenBuf + (long)rowStart * dstW;
 
-            float c0 = cosTab6[phase0], s0 = sinTab6[phase0]; float chr0 = dotI[0] * c0 - dotQ[0] * s0;
+            float c0 = cosTabPhase[phase0], s0 = sinTabPhase[phase0]; float chr0 = dotI[0] * c0 - dotQ[0] * s0;
             float iFilt = HbiSimulation ? 0f : chr0 * c0; float qFilt = HbiSimulation ? 0f : -chr0 * s0;
             float yFilt = HbiSimulation ? 0f : dotY[0]; float yVel = 0f;
 
@@ -527,7 +623,7 @@ namespace AprNes
             int ph = phStart; float iF = iFilt, qF = qFilt, yF = yFilt, yV = yVel; float hRl = hR, hIl = hI;
             for (int x = 0; x < dstW; x++)
             {
-                int d = x / N; float c = cosTab6[ph], s = sinTab6[ph];
+                int d = x / N; float c = cosTabPhase[ph], s = sinTabPhase[ph];
                 float chroma = dotI[d] * c - dotQ[d] * s;
                 iF += ChromaBlur * (chroma * c - iF); qF += ChromaBlur * (-chroma * s - qF);
                 yV = yV * ringDamp + (dotY[d] - yF) * SlewRate; yF += yV; float y = yF;
@@ -538,7 +634,7 @@ namespace AprNes
                 row0[x] = YiqToRgb(y, iF, qF);
 
                 // ★ 符號位元擴展黑魔法
-                ph += 1 + (((4 - ph) >> 31) & -6);
+                ph += kPhaseStepOutPx + (((kThreshOutPx - ph) >> 31) & kPhaseWrap);
             }
             iFilt = iF; qFilt = qF; yFilt = yF; yVel = yV;
         }
@@ -551,7 +647,7 @@ namespace AprNes
             int ph = phStart; float iF = iFilt, qF = qFilt, yF = yFilt, yV = yVel; float hRl = hR, hIl = hI;
             for (int x = 0; x < dstW; x++)
             {
-                int d = x / N; float c = cosTab6[ph], s = sinTab6[ph];
+                int d = x / N; float c = cosTabPhase[ph], s = sinTabPhase[ph];
                 float chroma = dotI[d] * c - dotQ[d] * s;
                 iF += ChromaBlur * (chroma * c - iF); qF += ChromaBlur * (-chroma * s - qF);
                 yV = yV * ringDamp + (dotY[d] - yF) * SlewRate; yF += yV; float y = yF;
@@ -561,7 +657,7 @@ namespace AprNes
 
                 row0[x] = YiqToRgb(y, iF, qF);
 
-                ph += 1 + (((4 - ph) >> 31) & -6);
+                ph += kPhaseStepOutPx + (((kThreshOutPx - ph) >> 31) & kPhaseWrap);
             }
             iFilt = iF; qFilt = qF; yFilt = yF; yVel = yV;
         }
@@ -619,7 +715,7 @@ namespace AprNes
             int phase0 = scanPhaseBase;
 
             // ★ 符號位元擴展黑魔法
-            scanPhaseBase += 2 + (((3 - scanPhaseBase) >> 31) & -6);
+            scanPhaseBase += kPhaseStepLine + (((kThreshLine - scanPhaseBase) >> 31) & kPhaseWrap);
 
             DecodeScanline_Physical_Worker(sl, palBuf, emphasisBits, phase0, waveBuf, cBuf);
         }
@@ -631,7 +727,10 @@ namespace AprNes
             {
                 uint jns = (uint)(ntsc_frameCount * 2654435761u + (uint)sl * 340573321u);
                 jns ^= jns << 13; jns ^= jns >> 17; jns ^= jns << 5;
-                if ((jns & 31) == 0) { phase0 += ((jns & 64) != 0 ? 1 : 5); phase0 += ((5 - phase0) >> 31) & -6; }
+                // ColorBurstJitter: rare (1/32) ±1 master-tick phase nudge mod 6 master ticks.
+                // In HD_NTSC each master tick = kSubPerMaster sub-samples, and the wrap
+                // domain becomes kPhaseEntries (= 12) instead of 6.
+                if ((jns & 31) == 0) { phase0 += ((jns & 64) != 0 ? kSubPerMaster : 5 * kSubPerMaster); phase0 += ((kPhaseInitMax - phase0) >> 31) & kPhaseWrap; }
             }
             if ((AnalogOutputMode)ntsc_analogOutput == AnalogOutputMode.SVideo)
             {
@@ -653,7 +752,7 @@ namespace AprNes
 
         static void GenerateWaveform(byte* palBuf, byte emphasisBits, bool isRF, int sl, int phase0, float* waveBuf)
         {
-            int emph = emphasisBits & 7; float* ea = emphAtten + emph * 12;
+            int emph = emphasisBits & 7; float* ea = emphAtten + emph * kEmphStride;
             bool addNoise = NoiseIntensity > 0f;
             float firstY = yBaseE[(palBuf[0] & 63) * 8 + emph]; float lastY = yBaseE[(palBuf[255] & 63) * 8 + emph];
 
@@ -688,36 +787,58 @@ namespace AprNes
         private static void RunWaveformLoop(byte* palBuf, float* ea, float* waveBuf, int phase0,
             float leftPad, float lastY, bool addNoise, bool herring, uint ns, float nScale, float nOff, float hR, float hI, float hC, float hS)
         {
-            float vPrev = leftPad; float ringDamp = RingStrength * 0.5f; float vVel = 0f; int tMod = phase0;
+            float vPrev = leftPad; float ringDamp = RingStrength * 0.5f * kSampleRateScale; float vVel = 0f; int tMod = phase0;
             float hRl = hR, hIl = hI;
 
-            // 4-step lookahead: precompute rotation matrices for steps 1-4
+            // kSampDot-step lookahead: precompute rotation matrices for steps 1..kSampDot
             float c1 = hC, s1 = hS;
             float c2 = c1 * hC - s1 * hS, s2 = s1 * hC + c1 * hS;
             float c3 = c2 * hC - s2 * hS, s3 = s2 * hC + c2 * hS;
             float c4 = c3 * hC - s3 * hS, s4 = s3 * hC + c3 * hS;
+#if HD_NTSC
+            float c5 = c4 * hC - s4 * hS, s5 = s4 * hC + c4 * hS;
+            float c6 = c5 * hC - s5 * hS, s6 = s5 * hC + c5 * hS;
+            float c7 = c6 * hC - s6 * hS, s7 = s6 * hC + c6 * hS;
+            float c8 = c7 * hC - s7 * hS, s8 = s7 * hC + c7 * hS;
+#endif
 
             for (int d = 0; d < kDots; d++)
             {
-                float* src = waveTable + ((palBuf[d] & 63) * 6 + tMod) * 4;
+                float* src = waveTable + ((palBuf[d] & 63) * kPhaseEntries + tMod) * kSampDot;
                 float* ePtr = ea + tMod;
-                int baseIdx = kLeadPad + d * 4;
+                int baseIdx = kLeadPad + d * kSampDot;
 
-                // Herringbone: parallel 4-sample computation (breaks data dependency)
+                // Herringbone: parallel kSampDot-sample computation (breaks data dependency)
                 float h0 = 0, h1 = 0, h2 = 0, h3 = 0;
+#if HD_NTSC
+                float h4 = 0, h5 = 0, h6 = 0, h7 = 0;
+#endif
                 if (herring)
                 {
                     h0 = hIl;
                     h1 = hRl * s1 + hIl * c1;
                     h2 = hRl * s2 + hIl * c2;
                     h3 = hRl * s3 + hIl * c3;
+#if HD_NTSC
+                    h4 = hRl * s4 + hIl * c4;
+                    h5 = hRl * s5 + hIl * c5;
+                    h6 = hRl * s6 + hIl * c6;
+                    h7 = hRl * s7 + hIl * c7;
+                    float tR = hRl * c8 - hIl * s8;
+                    hIl = hRl * s8 + hIl * c8;
+                    hRl = tR;
+#else
                     float tR = hRl * c4 - hIl * s4;
                     hIl = hRl * s4 + hIl * c4;
                     hRl = tR;
+#endif
                 }
 
-                // Noise: single xorshift, split 32-bit into 4 bytes
+                // Noise: xorshift produces 4 noise bytes; HD needs 2 xorshifts for 8.
                 float n0 = 0, n1 = 0, n2 = 0, n3 = 0;
+#if HD_NTSC
+                float n4 = 0, n5 = 0, n6 = 0, n7 = 0;
+#endif
                 if (addNoise)
                 {
                     ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5;
@@ -725,23 +846,42 @@ namespace AprNes
                     n1 = ((ns >> 8) & 0xFF) * nScale - nOff;
                     n2 = ((ns >> 16) & 0xFF) * nScale - nOff;
                     n3 = ((ns >> 24) & 0xFF) * nScale - nOff;
+#if HD_NTSC
+                    ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5;
+                    n4 = (ns & 0xFF) * nScale - nOff;
+                    n5 = ((ns >> 8) & 0xFF) * nScale - nOff;
+                    n6 = ((ns >> 16) & 0xFF) * nScale - nOff;
+                    n7 = ((ns >> 24) & 0xFF) * nScale - nOff;
+#endif
                 }
 
-                // Pre-compute all four sample inputs up front — independent of the
-                // vVel/vPrev filter chain, so RyuJIT + CPU OoO engine can schedule
-                // them in parallel with the sequential filter that follows.
+                // Pre-compute kSampDot sample inputs up front — independent of the
+                // vVel/vPrev filter chain (sequential below), so RyuJIT + CPU OoO
+                // engine can schedule them in parallel with the LTI filter.
                 float x0 = src[0] * ePtr[0] + h0 + n0;
                 float x1 = src[1] * ePtr[1] + h1 + n1;
                 float x2 = src[2] * ePtr[2] + h2 + n2;
                 float x3 = src[3] * ePtr[3] + h3 + n3;
+#if HD_NTSC
+                float x4 = src[4] * ePtr[4] + h4 + n4;
+                float x5 = src[5] * ePtr[5] + h5 + n5;
+                float x6 = src[6] * ePtr[6] + h6 + n6;
+                float x7 = src[7] * ePtr[7] + h7 + n7;
+#endif
 
                 // LTI filter: vVel/vPrev chain is sequential — can't be vectorised.
                 waveBuf[baseIdx]     = (vPrev += (vVel = vVel * ringDamp + (x0 - vPrev) * SlewRate));
                 waveBuf[baseIdx + 1] = (vPrev += (vVel = vVel * ringDamp + (x1 - vPrev) * SlewRate));
                 waveBuf[baseIdx + 2] = (vPrev += (vVel = vVel * ringDamp + (x2 - vPrev) * SlewRate));
                 waveBuf[baseIdx + 3] = (vPrev += (vVel = vVel * ringDamp + (x3 - vPrev) * SlewRate));
+#if HD_NTSC
+                waveBuf[baseIdx + 4] = (vPrev += (vVel = vVel * ringDamp + (x4 - vPrev) * SlewRate));
+                waveBuf[baseIdx + 5] = (vPrev += (vVel = vVel * ringDamp + (x5 - vPrev) * SlewRate));
+                waveBuf[baseIdx + 6] = (vPrev += (vVel = vVel * ringDamp + (x6 - vPrev) * SlewRate));
+                waveBuf[baseIdx + 7] = (vPrev += (vVel = vVel * ringDamp + (x7 - vPrev) * SlewRate));
+#endif
 
-                tMod += 4 + (((1 - tMod) >> 31) & -6);
+                tMod += kPhaseStepDot + (((kThreshDot - tMod) >> 31) & kPhaseWrap);
             }
 
             for (int i = kLeadPad + kWaveLen; i < kBufLen; i++)
@@ -753,7 +893,7 @@ namespace AprNes
         // 移除不該加的 AggressiveInlining 標籤，讓外層維持清爽！
         static void GenerateWaveform_SVideo(byte* palBuf, byte emphasisBits, int sl, int phase0, float* waveBuf, float* cBuf)
         {
-            int emph = emphasisBits & 7; float* ea = emphAtten + emph * 12;
+            int emph = emphasisBits & 7; float* ea = emphAtten + emph * kEmphStride;
             bool addNoise = NoiseIntensity > 0f; float firstY = yBaseE[(palBuf[0] & 63) * 8 + emph]; float lastY = yBaseE[(palBuf[255] & 63) * 8 + emph];
             uint ns = addNoise ? (uint)(ntsc_frameCount * 1664525u + (uint)sl * 1013904223u + 1442695041u) : 0u;
             float nScale = 2f * NoiseIntensity / 255.0f, nOff = NoiseIntensity;
@@ -769,11 +909,11 @@ namespace AprNes
         private static void RunWaveformLoop_SVideo(byte* palBuf, float* ea, float* waveBuf, float* cBuf, int phase0,
             int emph, float leftPad, float lastY, bool addNoise, uint ns, float nScale, float nOff)
         {
-            float vPrev = leftPad, rd = RingStrength * 0.5f, vv = 0f; int tMod = phase0;
+            float vPrev = leftPad, rd = RingStrength * 0.5f * kSampleRateScale, vv = 0f; int tMod = phase0;
             for (int d = 0; d < kDots; d++)
             {
-                float Ytgt = yBaseE[(palBuf[d] & 63) * 8 + emph]; float* csrc = cTable + ((palBuf[d] & 63) * 6 + tMod) * 4;
-                int baseIdx = kLeadPad + d * 4;
+                float Ytgt = yBaseE[(palBuf[d] & 63) * 8 + emph]; float* csrc = cTable + ((palBuf[d] & 63) * kPhaseEntries + tMod) * kSampDot;
+                int baseIdx = kLeadPad + d * kSampDot;
 
                 // ★ SVideo 暴力攤平: 完全展開 s=0~3
 
@@ -800,9 +940,34 @@ namespace AprNes
                 if (addNoise) { ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5; y3 += (ns & 0xFF) * nScale - nOff; }
                 vv = vv * rd + (y3 - vPrev) * SlewRate; vPrev += vv;
                 waveBuf[baseIdx + 3] = vPrev; cBuf[baseIdx + 3] = csrc[3] * ea[tMod + 3];
+#if HD_NTSC
+                // --- s = 4 ---
+                float y4 = Ytgt;
+                if (addNoise) { ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5; y4 += (ns & 0xFF) * nScale - nOff; }
+                vv = vv * rd + (y4 - vPrev) * SlewRate; vPrev += vv;
+                waveBuf[baseIdx + 4] = vPrev; cBuf[baseIdx + 4] = csrc[4] * ea[tMod + 4];
+
+                // --- s = 5 ---
+                float y5 = Ytgt;
+                if (addNoise) { ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5; y5 += (ns & 0xFF) * nScale - nOff; }
+                vv = vv * rd + (y5 - vPrev) * SlewRate; vPrev += vv;
+                waveBuf[baseIdx + 5] = vPrev; cBuf[baseIdx + 5] = csrc[5] * ea[tMod + 5];
+
+                // --- s = 6 ---
+                float y6 = Ytgt;
+                if (addNoise) { ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5; y6 += (ns & 0xFF) * nScale - nOff; }
+                vv = vv * rd + (y6 - vPrev) * SlewRate; vPrev += vv;
+                waveBuf[baseIdx + 6] = vPrev; cBuf[baseIdx + 6] = csrc[6] * ea[tMod + 6];
+
+                // --- s = 7 ---
+                float y7 = Ytgt;
+                if (addNoise) { ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5; y7 += (ns & 0xFF) * nScale - nOff; }
+                vv = vv * rd + (y7 - vPrev) * SlewRate; vPrev += vv;
+                waveBuf[baseIdx + 7] = vPrev; cBuf[baseIdx + 7] = csrc[7] * ea[tMod + 7];
+#endif
 
                 // ★ 符號位元擴展黑魔法
-                tMod += 4 + (((1 - tMod) >> 31) & -6);
+                tMod += kPhaseStepDot + (((kThreshDot - tMod) >> 31) & kPhaseWrap);
             }
             for (int i = kLeadPad + kWaveLen; i < kBufLen; i++) { vv = vv * rd + (lastY - vPrev) * SlewRate; vPrev += vv; waveBuf[i] = vPrev; cBuf[i] = 0f; }
         }
@@ -825,9 +990,10 @@ namespace AprNes
             float* qDotBuf = stackalloc float[256];
             {
                 int wQ = winQ, wQ_half = winQ_half;
-                float* wvQ = chromaBuf + kLeadPad - wQ_half + 2;
-                int tModQ = phase0 + 5;
-                tModQ += ((5 - tModQ) >> 31) & -6;
+                // +kSampDot/2 = half-dot offset for chroma window centering on the dot midpoint.
+                float* wvQ = chromaBuf + kLeadPad - wQ_half + (kSampDot / 2);
+                int tModQ = phase0 + kPhaseInitQ;
+                tModQ += ((kPhaseInitMax - tModQ) >> 31) & kPhaseWrap;
                 for (int d = 0; d < 256; d++)
                 {
                     float* cwQ = combinedQ + tModQ * kWinQ; int n = 0;
@@ -843,13 +1009,13 @@ namespace AprNes
                     qDotBuf[d] = -2f * sumQ; wvQ += kSampDot;
 
                     // ★ 符號位元擴展黑魔法
-                    tModQ += 4 + (((1 - tModQ) >> 31) & -6);
+                    tModQ += kPhaseStepDot + (((kThreshDot - tModQ) >> 31) & kPhaseWrap);
                 }
             }
 
             float* wvY = waveBuf + kLeadPad - kWinY_half; float* wvI = chromaBuf + kLeadPad - kWinI_half;
-            int tModI = phase0 + 3;
-            tModI += ((5 - tModI) >> 31) & -6;
+            int tModI = phase0 + kPhaseInitI;
+            tModI += ((kPhaseInitMax - tModI) >> 31) & kPhaseWrap;
             float* yChunk = stackalloc float[VS]; float* iChunk = stackalloc float[VS]; float* qChunk = stackalloc float[VS];
 
             uint* tmpOutBuf = null;
@@ -867,7 +1033,11 @@ namespace AprNes
                 {
                     for (int k = 0; k < VS; k++)
                     {
-                        yChunk[k] = hannY[0] * wvY[0] + hannY[1] * wvY[1] + hannY[2] * wvY[2] + hannY[3] * wvY[3] + hannY[4] * wvY[4] + hannY[5] * wvY[5];
+                        float yAcc = hannY[0] * wvY[0] + hannY[1] * wvY[1] + hannY[2] * wvY[2] + hannY[3] * wvY[3] + hannY[4] * wvY[4] + hannY[5] * wvY[5];
+#if HD_NTSC
+                        yAcc += hannY[6] * wvY[6] + hannY[7] * wvY[7] + hannY[8] * wvY[8] + hannY[9] * wvY[9] + hannY[10] * wvY[10] + hannY[11] * wvY[11];
+#endif
+                        yChunk[k] = yAcc;
                         float* cwI = combinedI + tModI * kWinI; int n = 0; var acc = new Vector<float>(0f);
 #if NET10_0_OR_GREATER
                         for (; n <= kWinI - VS; n += VS) acc = Vector.MultiplyAddEstimate(*(Vector<float>*)(cwI + n), *(Vector<float>*)(wvI + n), acc);
@@ -875,10 +1045,12 @@ namespace AprNes
                         for (; n <= kWinI - VS; n += VS) acc += *(Vector<float>*)(cwI + n) * *(Vector<float>*)(wvI + n);
 #endif
                         float sumI = Vector.Dot(acc, new Vector<float>(1f)); for (; n < kWinI; n++) sumI += cwI[n] * wvI[n];
-                        iChunk[k] = 2f * sumI; qChunk[k] = qDotBuf[(p + k) >> 2]; wvY++; wvI++;
+                        // (p+k) >> kSampDotLog2 = sample index → dot index. Critical:
+                        // bare `>> 2` here would index past qDotBuf[256] when kSampDot=8.
+                        iChunk[k] = 2f * sumI; qChunk[k] = qDotBuf[(p + k) >> kSampDotLog2]; wvY++; wvI++;
 
                         // ★ 符號位元擴展黑魔法
-                        tModI += 1 + (((4 - tModI) >> 31) & -6);
+                        tModI += kPhaseStepSample + (((kThreshSample - tModI) >> 31) & kPhaseWrap);
                     }
                     var Y = *(Vector<float>*)yChunk; var I = *(Vector<float>*)iChunk; var Q = *(Vector<float>*)qChunk;
 #if NET10_0_OR_GREATER
@@ -899,7 +1071,11 @@ namespace AprNes
                 {
                     for (int k = 0; k < VS; k++)
                     {
-                        yChunk[k] = hannY[0] * wvY[0] + hannY[1] * wvY[1] + hannY[2] * wvY[2] + hannY[3] * wvY[3] + hannY[4] * wvY[4] + hannY[5] * wvY[5];
+                        float yAcc = hannY[0] * wvY[0] + hannY[1] * wvY[1] + hannY[2] * wvY[2] + hannY[3] * wvY[3] + hannY[4] * wvY[4] + hannY[5] * wvY[5];
+#if HD_NTSC
+                        yAcc += hannY[6] * wvY[6] + hannY[7] * wvY[7] + hannY[8] * wvY[8] + hannY[9] * wvY[9] + hannY[10] * wvY[10] + hannY[11] * wvY[11];
+#endif
+                        yChunk[k] = yAcc;
                         float* cwI = combinedI + tModI * kWinI; int n = 0; var acc = new Vector<float>(0f);
 #if NET10_0_OR_GREATER
                         for (; n <= kWinI - VS; n += VS) acc = Vector.MultiplyAddEstimate(*(Vector<float>*)(cwI + n), *(Vector<float>*)(wvI + n), acc);
@@ -907,10 +1083,12 @@ namespace AprNes
                         for (; n <= kWinI - VS; n += VS) acc += *(Vector<float>*)(cwI + n) * *(Vector<float>*)(wvI + n);
 #endif
                         float sumI = Vector.Dot(acc, new Vector<float>(1f)); for (; n < kWinI; n++) sumI += cwI[n] * wvI[n];
-                        iChunk[k] = 2f * sumI; qChunk[k] = qDotBuf[(p + k) >> 2]; wvY++; wvI++;
+                        // (p+k) >> kSampDotLog2 = sample index → dot index. Critical:
+                        // bare `>> 2` here would index past qDotBuf[256] when kSampDot=8.
+                        iChunk[k] = 2f * sumI; qChunk[k] = qDotBuf[(p + k) >> kSampDotLog2]; wvY++; wvI++;
 
                         // ★ 符號位元擴展黑魔法
-                        tModI += 1 + (((4 - tModI) >> 31) & -6);
+                        tModI += kPhaseStepSample + (((kThreshSample - tModI) >> 31) & kPhaseWrap);
                     }
                     var Y = *(Vector<float>*)yChunk; var I = *(Vector<float>*)iChunk; var Q = *(Vector<float>*)qChunk;
 #if NET10_0_OR_GREATER

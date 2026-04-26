@@ -12,7 +12,9 @@
     <TieredCompilation>true</TieredCompilation>
     <TieredPGO>true</TieredPGO>
     <!-- CRT runtime dispatch: all three backends compiled (Scalar + SIMD + GPU) -->
-    <DefineConstants>$(DefineConstants);CRT_SIMD_AVAILABLE;CRT_GPU_AVAILABLE</DefineConstants>
+    <!-- HD_NTSC: NTSC pipeline at 2048 samples/scanline (12× Fsc oversampling).
+         NetFx omits this symbol → keeps 1024-sample path with current performance. -->
+    <DefineConstants>$(DefineConstants);CRT_SIMD_AVAILABLE;CRT_GPU_AVAILABLE;HD_NTSC</DefineConstants>
     <!-- ConfigWindow uses parameterized constructor only; XAML runtime loader not used -->
     <NoWarn>$(NoWarn);AVLN3001</NoWarn>
     <!-- Build timestamp embedded into assembly metadata (immune to copy/rename) -->
