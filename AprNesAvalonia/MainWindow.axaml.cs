@@ -741,33 +741,45 @@ public partial class MainWindow : Window
         if (NesCore.AnalogEnabled)
         {
             var screen = Screens.ScreenFromVisual(this);
-            // Screen.Bounds is in PHYSICAL pixels but GameCanvas.Width is in DIPs.
-            // Divide by Scaling so the letterbox dims match what Avalonia uses for
-            // layout. Without this, ≥125% Windows display scaling overflows the
-            // screen and crops the picture.
+            // Allocate the CRT buffer at PHYSICAL pixel resolution so the
+            // SkSL shader produces sharp 1:1 pixels on the screen. The
+            // GameCanvas display size is then set in DIPs (= physical /
+            // scaling) so Avalonia's compositor maps source pixels to screen
+            // pixels at exactly 1:1. Avoids the ≥125% DPI quality loss that
+            // happened when we sized the buffer in DIPs and let the
+            // compositor upscale.
             double scaling = screen?.Scaling ?? 1.0;
             if (scaling <= 0.0) scaling = 1.0;
-            int sw = (int)((screen?.Bounds.Width  ?? 1920) / scaling);
-            int sh = (int)((screen?.Bounds.Height ?? 1080) / scaling);
-            double screenAR = (double)sw / sh;
+            int swPhys = screen?.Bounds.Width  ?? 1920;
+            int shPhys = screen?.Bounds.Height ?? 1080;
+            double screenAR = (double)swPhys / shPhys;
 
-            int displayW, displayH;
+            int displayW, displayH;   // physical pixels
             if (screenAR > AnalogContentAR)
             {
-                displayH = sh;
-                displayW = (int)(sh * AnalogContentAR);
+                displayH = shPhys;
+                displayW = (int)(shPhys * AnalogContentAR);
             }
             else
             {
-                displayW = sw;
-                displayH = (int)(sw / AnalogContentAR);
+                displayW = swPhys;
+                displayH = (int)(swPhys / AnalogContentAR);
             }
 
-            // Reroute Crt_DstW/H to letterbox dims, then re-run the render
-            // pipeline so EmulatorEngine reallocates AnalogScreenBuf at the
-            // new size + fires ResolutionChanged → updates GameCanvas dims.
+            // Reroute Crt_DstW/H to letterbox PHYSICAL dims, then re-run the
+            // render pipeline so EmulatorEngine reallocates AnalogScreenBuf at
+            // physical resolution + fires ResolutionChanged → updates
+            // FrameWidth/Height (= source bitmap dims, also physical).
             NesCore.Crt_SetFullscreenSize(displayW, displayH);
             ApplyRenderPipeline();
+
+            // Override GameCanvas layout dims to DIP units so Avalonia sizes
+            // the control to fit the screen correctly. (OnResolutionChanged
+            // wrote physical pixel dims to Width/Height, which would overflow
+            // the DIP-sized window on hi-DPI screens.) Source bitmap stays
+            // physical → compositor draws src→dst at 1:1 physical pixels.
+            GameCanvas.Width  = displayW / scaling;
+            GameCanvas.Height = displayH / scaling;
         }
         // Digital FS: GameCanvas keeps its native render dims (matches NetFx —
         // panel1 is NOT stretched, just centered with black around).
