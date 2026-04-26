@@ -27,11 +27,16 @@ python downloader.py [網址]
 python downloader.py https://www.nesdev.org/wiki/DMA
 ```
 
-## 4. 指定輸出檔名
-你可以使用 `-o` 或 `--output` 參數來自訂存檔名稱：
+## 4. 預設輸出位置
+未指定 `-o` 時，下載結果會放到本目錄下的 `temp/` 子資料夾（gitignore 中已忽略，不會被 commit）。
+- 預設檔名取自 URL 末段
+- 若無副檔名會自動補 `.html`
+
+## 5. 指定輸出檔名
+你可以使用 `-o` 或 `--output` 參數來自訂存檔路徑（可絕對或相對）：
 
 ```bash
-python downloader.py [網址] -o [自定義檔名.html]
+python downloader.py [網址] -o [自定義路徑.html]
 ```
 
 ## 5. 技術原理

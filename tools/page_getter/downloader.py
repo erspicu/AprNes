@@ -4,15 +4,22 @@ import os
 import time
 from playwright.sync_api import sync_playwright
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_OUTPUT_DIR = os.path.join(SCRIPT_DIR, 'temp')
+
 def download_page(url, output_file=None):
     try:
         if not output_file:
-            output_file = url.rstrip('/').split('/')[-1]
-            if not output_file:
-                output_file = 'index.html'
-            if not output_file.lower().endswith(('.html', '.htm', '.txt', '.php', '.jsp')):
-                output_file += '.html'
-        
+            # Default: derive filename from URL and drop it under temp/
+            # so cache HTML doesn't pollute the page_getter root.
+            name = url.rstrip('/').split('/')[-1]
+            if not name:
+                name = 'index.html'
+            if not name.lower().endswith(('.html', '.htm', '.txt', '.php', '.jsp')):
+                name += '.html'
+            os.makedirs(DEFAULT_OUTPUT_DIR, exist_ok=True)
+            output_file = os.path.join(DEFAULT_OUTPUT_DIR, name)
+
         print(f"Downloading {url} to {output_file} (using Playwright)...")
         
         with sync_playwright() as p:
