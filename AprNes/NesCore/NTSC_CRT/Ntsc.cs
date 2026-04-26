@@ -89,6 +89,37 @@ namespace AprNes
         // At HD_NTSC, kPhaseEntries=12 = 2 sub-samples per master phase. This ratio is
         // used to scale emphasis-attenuation phase ranges (master-phase indexed in NES spec).
         public const int kSubPerMaster  = kPhaseEntries / 6;
+
+        // ── Phase increments per loop iteration unit (HD_NTSC scaled) ─────
+        // Each step value gives identical numerical behaviour to the previous
+        // hardcoded literal in non-HD builds.
+        // Per-line carry = (1364 master cycles × kSubPerMaster) mod kPhaseEntries
+        //   non-HD (kPhaseEntries=6, kSubPerMaster=1): 1364 mod 6 = 2
+        //   HD     (kPhaseEntries=12, kSubPerMaster=2): 2728 mod 12 = 4
+        const int kPhaseStepLine    = 2 * kSubPerMaster;
+        // Per-dot = kSampDot phases (kSampDot samples per dot, +1 phase each).
+        const int kPhaseStepDot     = kSampDot;
+        // Per-sample inside DemodulateRow inner loop = always +1 phase.
+        const int kPhaseStepSample  = 1;
+        // Per-output-pixel chroma demod stride in RunDecodeLoop. In 1024-rate this
+        // is +1 (one master tick of phase per output pixel at default analog 4×).
+        // At HD_NTSC, +2 to keep same physical angular velocity per output pixel.
+        const int kPhaseStepOutPx   = 1 * kSubPerMaster;
+        // Branchless-wrap support: bit-shift threshold = kPhaseEntries - step - 1
+        // and AND-mask = -kPhaseEntries (negative wrap delta).
+        const int kPhaseWrap        = -kPhaseEntries;
+        const int kThreshLine       = kPhaseEntries - kPhaseStepLine    - 1;
+        const int kThreshDot        = kPhaseEntries - kPhaseStepDot     - 1;
+        const int kThreshSample     = kPhaseEntries - kPhaseStepSample  - 1;
+        const int kThreshOutPx      = kPhaseEntries - kPhaseStepOutPx   - 1;
+        // Initial-offset constants (used in DemodulateRow_Core to seed tModI/tModQ
+        // at specific phase angles for I/Q demod). Original values 3 and 5 represent
+        // 180° and 300° offsets in the 6-entry frame; HD doubles them.
+        const int kPhaseInitI = 3 * kSubPerMaster;   // 180° offset
+        const int kPhaseInitQ = 5 * kSubPerMaster;   // 300° offset (= kPhaseEntries - 1 by coincidence in 6-frame)
+        // Wrap threshold for the (phase0 + N) initial offset wrap = kPhaseEntries - 1.
+        const int kPhaseInitMax = kPhaseEntries - 1;
+
         public const int kSrcH = 240;
         public const int kPlane = kOutW * kSrcH;
         public static float* linearBuffer;
@@ -113,6 +144,11 @@ namespace AprNes
             { NoiseIntensity = SV_NoiseIntensity; SlewRate = SV_SlewRate; ChromaBlur = SV_ChromaBlur; }
             else
             { NoiseIntensity = AV_NoiseIntensity; SlewRate = AV_SlewRate; ChromaBlur = AV_ChromaBlur; }
+            // HD_NTSC: halve IIR coefficients (per-sample, frequency-domain) so the
+            // 3dB cutoff stays at the same physical Hz when sampling rate doubles.
+            // NoiseIntensity is per-sample amplitude (not a filter pole) — leave it.
+            SlewRate   *= kSampleRateScale;
+            ChromaBlur *= kSampleRateScale;
         }
 
         static int scanPhase6 = 0;
@@ -458,12 +494,12 @@ namespace AprNes
             if (ntsc_ultraAnalog)
             {
                 ntsc_rowPhase0[sl] = scanPhaseBase;
-                scanPhaseBase += 2 + (((3 - scanPhaseBase) >> 31) & -6);
+                scanPhaseBase += kPhaseStepLine + (((kThreshLine - scanPhaseBase) >> 31) & kPhaseWrap);
             }
             else
             {
                 ntsc_rowPhase0[sl] = scanPhase6;
-                scanPhase6 += 2 + (((3 - scanPhase6) >> 31) & -6);
+                scanPhase6 += kPhaseStepLine + (((kThreshLine - scanPhase6) >> 31) & kPhaseWrap);
             }
         }
 
@@ -499,7 +535,7 @@ namespace AprNes
             int phase0 = scanPhase6;
 
             // ★ 符號位元擴展黑魔法
-            scanPhase6 += 2 + (((3 - scanPhase6) >> 31) & -6);
+            scanPhase6 += kPhaseStepLine + (((kThreshLine - scanPhase6) >> 31) & kPhaseWrap);
 
             DecodeScanline_Fast_Worker(sl, palBuf, emphasisBits, phase0, dotY, dotI, dotQ);
         }
@@ -525,7 +561,7 @@ namespace AprNes
         static void DecodeAV_Composite(int sl, int phase0, float* dotY, float* dotI, float* dotQ)
         {
             bool isRF = (AnalogOutputMode)ntsc_analogOutput == AnalogOutputMode.RF;
-            bool addNoise = NoiseIntensity > 0f; float ringDamp = RingStrength * 0.5f;
+            bool addNoise = NoiseIntensity > 0f; float ringDamp = RingStrength * 0.5f * kSampleRateScale;
             float nScale = NoiseIntensity * (2f / 255.0f); float nOff = NoiseIntensity;
             int dstW = Crt_DstW; int N = ntsc_analogSize;
             int rowStart = sl * Crt_DstH / Crt_SrcH;
@@ -596,7 +632,7 @@ namespace AprNes
                 row0[x] = YiqToRgb(y, iF, qF);
 
                 // ★ 符號位元擴展黑魔法
-                ph += 1 + (((4 - ph) >> 31) & -6);
+                ph += kPhaseStepOutPx + (((kThreshOutPx - ph) >> 31) & kPhaseWrap);
             }
             iFilt = iF; qFilt = qF; yFilt = yF; yVel = yV;
         }
@@ -619,7 +655,7 @@ namespace AprNes
 
                 row0[x] = YiqToRgb(y, iF, qF);
 
-                ph += 1 + (((4 - ph) >> 31) & -6);
+                ph += kPhaseStepOutPx + (((kThreshOutPx - ph) >> 31) & kPhaseWrap);
             }
             iFilt = iF; qFilt = qF; yFilt = yF; yVel = yV;
         }
@@ -677,7 +713,7 @@ namespace AprNes
             int phase0 = scanPhaseBase;
 
             // ★ 符號位元擴展黑魔法
-            scanPhaseBase += 2 + (((3 - scanPhaseBase) >> 31) & -6);
+            scanPhaseBase += kPhaseStepLine + (((kThreshLine - scanPhaseBase) >> 31) & kPhaseWrap);
 
             DecodeScanline_Physical_Worker(sl, palBuf, emphasisBits, phase0, waveBuf, cBuf);
         }
@@ -746,7 +782,7 @@ namespace AprNes
         private static void RunWaveformLoop(byte* palBuf, float* ea, float* waveBuf, int phase0,
             float leftPad, float lastY, bool addNoise, bool herring, uint ns, float nScale, float nOff, float hR, float hI, float hC, float hS)
         {
-            float vPrev = leftPad; float ringDamp = RingStrength * 0.5f; float vVel = 0f; int tMod = phase0;
+            float vPrev = leftPad; float ringDamp = RingStrength * 0.5f * kSampleRateScale; float vVel = 0f; int tMod = phase0;
             float hRl = hR, hIl = hI;
 
             // 4-step lookahead: precompute rotation matrices for steps 1-4
@@ -757,9 +793,9 @@ namespace AprNes
 
             for (int d = 0; d < kDots; d++)
             {
-                float* src = waveTable + ((palBuf[d] & 63) * 6 + tMod) * 4;
+                float* src = waveTable + ((palBuf[d] & 63) * kPhaseEntries + tMod) * kSampDot;
                 float* ePtr = ea + tMod;
-                int baseIdx = kLeadPad + d * 4;
+                int baseIdx = kLeadPad + d * kSampDot;
 
                 // Herringbone: parallel 4-sample computation (breaks data dependency)
                 float h0 = 0, h1 = 0, h2 = 0, h3 = 0;
@@ -799,7 +835,7 @@ namespace AprNes
                 waveBuf[baseIdx + 2] = (vPrev += (vVel = vVel * ringDamp + (x2 - vPrev) * SlewRate));
                 waveBuf[baseIdx + 3] = (vPrev += (vVel = vVel * ringDamp + (x3 - vPrev) * SlewRate));
 
-                tMod += 4 + (((1 - tMod) >> 31) & -6);
+                tMod += kPhaseStepDot + (((kThreshDot - tMod) >> 31) & kPhaseWrap);
             }
 
             for (int i = kLeadPad + kWaveLen; i < kBufLen; i++)
@@ -827,11 +863,11 @@ namespace AprNes
         private static void RunWaveformLoop_SVideo(byte* palBuf, float* ea, float* waveBuf, float* cBuf, int phase0,
             int emph, float leftPad, float lastY, bool addNoise, uint ns, float nScale, float nOff)
         {
-            float vPrev = leftPad, rd = RingStrength * 0.5f, vv = 0f; int tMod = phase0;
+            float vPrev = leftPad, rd = RingStrength * 0.5f * kSampleRateScale, vv = 0f; int tMod = phase0;
             for (int d = 0; d < kDots; d++)
             {
-                float Ytgt = yBaseE[(palBuf[d] & 63) * 8 + emph]; float* csrc = cTable + ((palBuf[d] & 63) * 6 + tMod) * 4;
-                int baseIdx = kLeadPad + d * 4;
+                float Ytgt = yBaseE[(palBuf[d] & 63) * 8 + emph]; float* csrc = cTable + ((palBuf[d] & 63) * kPhaseEntries + tMod) * kSampDot;
+                int baseIdx = kLeadPad + d * kSampDot;
 
                 // ★ SVideo 暴力攤平: 完全展開 s=0~3
 
@@ -860,7 +896,7 @@ namespace AprNes
                 waveBuf[baseIdx + 3] = vPrev; cBuf[baseIdx + 3] = csrc[3] * ea[tMod + 3];
 
                 // ★ 符號位元擴展黑魔法
-                tMod += 4 + (((1 - tMod) >> 31) & -6);
+                tMod += kPhaseStepDot + (((kThreshDot - tMod) >> 31) & kPhaseWrap);
             }
             for (int i = kLeadPad + kWaveLen; i < kBufLen; i++) { vv = vv * rd + (lastY - vPrev) * SlewRate; vPrev += vv; waveBuf[i] = vPrev; cBuf[i] = 0f; }
         }
@@ -883,9 +919,10 @@ namespace AprNes
             float* qDotBuf = stackalloc float[256];
             {
                 int wQ = winQ, wQ_half = winQ_half;
-                float* wvQ = chromaBuf + kLeadPad - wQ_half + 2;
-                int tModQ = phase0 + 5;
-                tModQ += ((5 - tModQ) >> 31) & -6;
+                // +kSampDot/2 = half-dot offset for chroma window centering on the dot midpoint.
+                float* wvQ = chromaBuf + kLeadPad - wQ_half + (kSampDot / 2);
+                int tModQ = phase0 + kPhaseInitQ;
+                tModQ += ((kPhaseInitMax - tModQ) >> 31) & kPhaseWrap;
                 for (int d = 0; d < 256; d++)
                 {
                     float* cwQ = combinedQ + tModQ * kWinQ; int n = 0;
@@ -901,13 +938,13 @@ namespace AprNes
                     qDotBuf[d] = -2f * sumQ; wvQ += kSampDot;
 
                     // ★ 符號位元擴展黑魔法
-                    tModQ += 4 + (((1 - tModQ) >> 31) & -6);
+                    tModQ += kPhaseStepDot + (((kThreshDot - tModQ) >> 31) & kPhaseWrap);
                 }
             }
 
             float* wvY = waveBuf + kLeadPad - kWinY_half; float* wvI = chromaBuf + kLeadPad - kWinI_half;
-            int tModI = phase0 + 3;
-            tModI += ((5 - tModI) >> 31) & -6;
+            int tModI = phase0 + kPhaseInitI;
+            tModI += ((kPhaseInitMax - tModI) >> 31) & kPhaseWrap;
             float* yChunk = stackalloc float[VS]; float* iChunk = stackalloc float[VS]; float* qChunk = stackalloc float[VS];
 
             uint* tmpOutBuf = null;
@@ -936,7 +973,7 @@ namespace AprNes
                         iChunk[k] = 2f * sumI; qChunk[k] = qDotBuf[(p + k) >> 2]; wvY++; wvI++;
 
                         // ★ 符號位元擴展黑魔法
-                        tModI += 1 + (((4 - tModI) >> 31) & -6);
+                        tModI += kPhaseStepSample + (((kThreshSample - tModI) >> 31) & kPhaseWrap);
                     }
                     var Y = *(Vector<float>*)yChunk; var I = *(Vector<float>*)iChunk; var Q = *(Vector<float>*)qChunk;
 #if NET10_0_OR_GREATER
@@ -968,7 +1005,7 @@ namespace AprNes
                         iChunk[k] = 2f * sumI; qChunk[k] = qDotBuf[(p + k) >> 2]; wvY++; wvI++;
 
                         // ★ 符號位元擴展黑魔法
-                        tModI += 1 + (((4 - tModI) >> 31) & -6);
+                        tModI += kPhaseStepSample + (((kThreshSample - tModI) >> 31) & kPhaseWrap);
                     }
                     var Y = *(Vector<float>*)yChunk; var I = *(Vector<float>*)iChunk; var Q = *(Vector<float>*)qChunk;
 #if NET10_0_OR_GREATER
