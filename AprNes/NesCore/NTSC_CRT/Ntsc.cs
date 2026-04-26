@@ -73,11 +73,13 @@ namespace AprNes
 #if HD_NTSC
         public const int kOutW          = 2048;
         public const int kSampDot       = 8;
+        public const int kSampDotLog2   = 3;      // log2(kSampDot) — used to convert sample index → dot index ((p+k) >> kSampDotLog2)
         public const int kPhaseEntries  = 12;     // cos/sin table size = master clock phases per Fsc cycle (master=12×Fsc when sampling at 2× master rate)
         public const float kSampleRateScale = 0.5f;  // halves IIR coefficients (ChromaBlur/SlewRate/RingStrength) to keep same physical cutoff at 2× rate
 #else
         public const int kOutW          = 1024;
         public const int kSampDot       = 4;
+        public const int kSampDotLog2   = 2;
         public const int kPhaseEntries  = 6;
         public const float kSampleRateScale = 1.0f;
 #endif
@@ -725,7 +727,10 @@ namespace AprNes
             {
                 uint jns = (uint)(ntsc_frameCount * 2654435761u + (uint)sl * 340573321u);
                 jns ^= jns << 13; jns ^= jns >> 17; jns ^= jns << 5;
-                if ((jns & 31) == 0) { phase0 += ((jns & 64) != 0 ? 1 : 5); phase0 += ((5 - phase0) >> 31) & -6; }
+                // ColorBurstJitter: rare (1/32) ±1 master-tick phase nudge mod 6 master ticks.
+                // In HD_NTSC each master tick = kSubPerMaster sub-samples, and the wrap
+                // domain becomes kPhaseEntries (= 12) instead of 6.
+                if ((jns & 31) == 0) { phase0 += ((jns & 64) != 0 ? kSubPerMaster : 5 * kSubPerMaster); phase0 += ((kPhaseInitMax - phase0) >> 31) & kPhaseWrap; }
             }
             if ((AnalogOutputMode)ntsc_analogOutput == AnalogOutputMode.SVideo)
             {
@@ -1028,7 +1033,11 @@ namespace AprNes
                 {
                     for (int k = 0; k < VS; k++)
                     {
-                        yChunk[k] = hannY[0] * wvY[0] + hannY[1] * wvY[1] + hannY[2] * wvY[2] + hannY[3] * wvY[3] + hannY[4] * wvY[4] + hannY[5] * wvY[5];
+                        float yAcc = hannY[0] * wvY[0] + hannY[1] * wvY[1] + hannY[2] * wvY[2] + hannY[3] * wvY[3] + hannY[4] * wvY[4] + hannY[5] * wvY[5];
+#if HD_NTSC
+                        yAcc += hannY[6] * wvY[6] + hannY[7] * wvY[7] + hannY[8] * wvY[8] + hannY[9] * wvY[9] + hannY[10] * wvY[10] + hannY[11] * wvY[11];
+#endif
+                        yChunk[k] = yAcc;
                         float* cwI = combinedI + tModI * kWinI; int n = 0; var acc = new Vector<float>(0f);
 #if NET10_0_OR_GREATER
                         for (; n <= kWinI - VS; n += VS) acc = Vector.MultiplyAddEstimate(*(Vector<float>*)(cwI + n), *(Vector<float>*)(wvI + n), acc);
@@ -1036,7 +1045,9 @@ namespace AprNes
                         for (; n <= kWinI - VS; n += VS) acc += *(Vector<float>*)(cwI + n) * *(Vector<float>*)(wvI + n);
 #endif
                         float sumI = Vector.Dot(acc, new Vector<float>(1f)); for (; n < kWinI; n++) sumI += cwI[n] * wvI[n];
-                        iChunk[k] = 2f * sumI; qChunk[k] = qDotBuf[(p + k) >> 2]; wvY++; wvI++;
+                        // (p+k) >> kSampDotLog2 = sample index → dot index. Critical:
+                        // bare `>> 2` here would index past qDotBuf[256] when kSampDot=8.
+                        iChunk[k] = 2f * sumI; qChunk[k] = qDotBuf[(p + k) >> kSampDotLog2]; wvY++; wvI++;
 
                         // ★ 符號位元擴展黑魔法
                         tModI += kPhaseStepSample + (((kThreshSample - tModI) >> 31) & kPhaseWrap);
@@ -1060,7 +1071,11 @@ namespace AprNes
                 {
                     for (int k = 0; k < VS; k++)
                     {
-                        yChunk[k] = hannY[0] * wvY[0] + hannY[1] * wvY[1] + hannY[2] * wvY[2] + hannY[3] * wvY[3] + hannY[4] * wvY[4] + hannY[5] * wvY[5];
+                        float yAcc = hannY[0] * wvY[0] + hannY[1] * wvY[1] + hannY[2] * wvY[2] + hannY[3] * wvY[3] + hannY[4] * wvY[4] + hannY[5] * wvY[5];
+#if HD_NTSC
+                        yAcc += hannY[6] * wvY[6] + hannY[7] * wvY[7] + hannY[8] * wvY[8] + hannY[9] * wvY[9] + hannY[10] * wvY[10] + hannY[11] * wvY[11];
+#endif
+                        yChunk[k] = yAcc;
                         float* cwI = combinedI + tModI * kWinI; int n = 0; var acc = new Vector<float>(0f);
 #if NET10_0_OR_GREATER
                         for (; n <= kWinI - VS; n += VS) acc = Vector.MultiplyAddEstimate(*(Vector<float>*)(cwI + n), *(Vector<float>*)(wvI + n), acc);
@@ -1068,7 +1083,9 @@ namespace AprNes
                         for (; n <= kWinI - VS; n += VS) acc += *(Vector<float>*)(cwI + n) * *(Vector<float>*)(wvI + n);
 #endif
                         float sumI = Vector.Dot(acc, new Vector<float>(1f)); for (; n < kWinI; n++) sumI += cwI[n] * wvI[n];
-                        iChunk[k] = 2f * sumI; qChunk[k] = qDotBuf[(p + k) >> 2]; wvY++; wvI++;
+                        // (p+k) >> kSampDotLog2 = sample index → dot index. Critical:
+                        // bare `>> 2` here would index past qDotBuf[256] when kSampDot=8.
+                        iChunk[k] = 2f * sumI; qChunk[k] = qDotBuf[(p + k) >> kSampDotLog2]; wvY++; wvI++;
 
                         // ★ 符號位元擴展黑魔法
                         tModI += kPhaseStepSample + (((kThreshSample - tModI) >> 31) & kPhaseWrap);
