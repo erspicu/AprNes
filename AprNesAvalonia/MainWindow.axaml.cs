@@ -6,6 +6,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
@@ -80,6 +81,17 @@ public partial class MainWindow : Window
             var ph = TryGetPlatformHandle();
             IntPtr hwnd = ph?.Handle ?? IntPtr.Zero;
             _emu.InitGamepad(hwnd, _ini);
+
+            // FS-3: restore fullscreen state from ini. Defer to Loaded priority
+            // so Avalonia has finished its first layout pass — otherwise
+            // ScreenFromVisual may not return the current monitor yet.
+            if (_ini.GetBool("ScreenFull", false))
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (!_isFullscreen) ToggleFullscreen();
+                }, DispatcherPriority.Loaded);
+            }
         };
 
         InitRecentROMs();
@@ -685,24 +697,110 @@ public partial class MainWindow : Window
 
     // ═══ Fullscreen ═════════════════════════════════════════════════════════
 
+    // 8:7 PAR content aspect ratio for analog letterbox: (256 × 8/7) / 210 ≈ 1.3933
+    // Matches NetFx AnalogContentAR (AprNesUI.cs:2241-2242).
+    private const double AnalogContentAR = (256.0 * 8.0 / 7.0) / 210.0;
+
     private void ToggleFullscreen()
     {
+        // FS-3: stop recording across FS transitions (matches NetFx — chrome
+        // and buffer dims change, so video frame size would be wrong).
+        StopRecordingIfActive(true);
+
         _isFullscreen = !_isFullscreen;
         if (_isFullscreen)
         {
+            // FS-1: hide chrome (menu + status bar). GameBorder Background is
+            // already Black so any letterbox area is the right colour.
+            MainMenu.IsVisible  = false;
+            StatusBar.IsVisible = false;
+
+            // SizeToContent must be Manual before WindowState=FullScreen, otherwise
+            // Avalonia tries to size the window to GameCanvas content and fights us.
+            SizeToContent = SizeToContent.Manual;
             WindowState = WindowState.FullScreen;
-            // EmuScreenControl handles scaling via Skia DrawBitmap
-            GameCanvas.Width  = double.NaN;
-            GameCanvas.Height = double.NaN;
+
+            // FS-2: analog mode → 8:7 PAR letterbox + CRT buffer realloc.
+            // Multi-monitor aware via Screens.ScreenFromVisual (NetFx uses
+            // PrimaryScreen unconditionally — Avalonia upgrade).
+            if (NesCore.AnalogEnabled)
+            {
+                var screen = Screens.ScreenFromVisual(this);
+                int sw = screen?.Bounds.Width  ?? 1920;
+                int sh = screen?.Bounds.Height ?? 1080;
+                double screenAR = (double)sw / sh;
+
+                int displayW, displayH;
+                if (screenAR > AnalogContentAR)
+                {
+                    displayH = sh;
+                    displayW = (int)(sh * AnalogContentAR);
+                }
+                else
+                {
+                    displayW = sw;
+                    displayH = (int)(sw / AnalogContentAR);
+                }
+
+                // Reroute Crt_DstW/H to letterbox dims, then re-run the render
+                // pipeline so EmulatorEngine reallocates AnalogScreenBuf at the
+                // new size + fires ResolutionChanged → updates GameCanvas dims.
+                NesCore.Crt_SetFullscreenSize(displayW, displayH);
+                ApplyRenderPipeline();
+            }
+            // Digital FS: GameCanvas keeps its native render dims (matches NetFx —
+            // panel1 is NOT stretched, just centered with black around).
+
+            // Centre the game pane inside the fullscreen GameBorder.
+            GameCanvas.HorizontalAlignment = HorizontalAlignment.Center;
+            GameCanvas.VerticalAlignment   = VerticalAlignment.Center;
             GameBorder.Margin = new Thickness(0);
         }
         else
         {
+            // FS-2: restore default Crt_DstW/H + reallocate buffers back to the
+            // configured AnalogSize.
+            if (NesCore.AnalogEnabled)
+            {
+                NesCore.Crt_ClearFullscreenSize();
+                ApplyRenderPipeline();
+            }
+
+            // Restore default alignment (Stretch is harmless because
+            // SizeToContent=WidthAndHeight makes GameBorder match GameCanvas).
+            GameCanvas.HorizontalAlignment = HorizontalAlignment.Stretch;
+            GameCanvas.VerticalAlignment   = VerticalAlignment.Stretch;
+
+            MainMenu.IsVisible  = true;
+            StatusBar.IsVisible = true;
+
             WindowState = WindowState.Normal;
-            GameCanvas.Width  = _emu.OutputW;
-            GameCanvas.Height = _emu.OutputH;
             GameBorder.Margin = new Thickness(0);
+            SizeToContent = SizeToContent.WidthAndHeight;
         }
+
+        // FS-4: disable risky items in the right-click menu while in FS
+        // (matches NetFx contextMenuStrip1.Opening handler). Configuration
+        // and UltraAnalog both trigger CRT/buffer reallocation paths that
+        // are awkward to coordinate with FS state — easier to lock them out.
+        CtxConfig.IsEnabled       = !_isFullscreen;
+        CtxUltraAnalog.IsEnabled  = !_isFullscreen;
+
+        // FS-3: persist current state to ini (matches NetFx ScreenFull key).
+        _ini.Set("ScreenFull", _isFullscreen ? "true" : "false");
+        _ini.Save();
+    }
+
+    // FS-3: NetFx-equivalent FullScreenModeTransition. When AnalogMode flips
+    // while in fullscreen, the FS layout / CRT buffer dims need to be torn
+    // down for the OLD mode and rebuilt for the NEW mode in a single safe
+    // sequence: exit → apply new settings → re-enter.
+    private void FullScreenModeTransition()
+    {
+        if (!_isFullscreen) return;
+        ToggleFullscreen();      // exit using current (pre-toggle) AnalogEnabled state
+        ApplyIniSettings();      // new AnalogMode + size + filters take effect
+        ToggleFullscreen();      // re-enter using new AnalogEnabled state
     }
 
     // ═══ Screenshot ═════════════════════════════════════════════════════════
@@ -1020,12 +1118,25 @@ public partial class MainWindow : Window
     {
         StopRecordingIfActive(true);
 
+        bool prevAnalog = NesCore.AnalogEnabled;
+
         var dlg = new ConfigWindow(_ini, _emu.Gamepad);
         await dlg.ShowDialog(this);
 
-        // ApplyRenderSettings (called inside ApplyIniSettings) handles
-        // emu thread sync internally: detach → wait emuWaiting → rebuild → reattach
-        ApplyIniSettings();
+        bool nowAnalog = _ini.GetBool("AnalogMode", false);
+
+        if (_isFullscreen && prevAnalog != nowAnalog)
+        {
+            // FS-3: AnalogMode flipped while in FS — needs a coordinated
+            // exit/reapply/re-enter cycle (mirrors NetFx FullScreenModeTransition).
+            FullScreenModeTransition();
+        }
+        else
+        {
+            // ApplyRenderSettings (called inside ApplyIniSettings) handles
+            // emu thread sync internally: detach → wait emuWaiting → rebuild → reattach
+            ApplyIniSettings();
+        }
         UpdateRecordMenuVisibility();
     }
 

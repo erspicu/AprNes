@@ -10,7 +10,7 @@
 
     <DockPanel>
         <!-- ═══ Menu Bar ═══ -->
-        <Menu DockPanel.Dock="Top">
+        <Menu x:Name="MainMenu" DockPanel.Dock="Top">
 
             <!-- File -->
             <MenuItem x:Name="MenuFile" Header="_File">
@@ -85,7 +85,7 @@
         </Menu>
 
         <!-- ═══ Status Bar ═══ -->
-        <Border DockPanel.Dock="Bottom"
+        <Border x:Name="StatusBar" DockPanel.Dock="Bottom"
                 Background="#E8E8E8"
                 BorderBrush="#CCC" BorderThickness="0,1,0,0"
                 Padding="6,3">
