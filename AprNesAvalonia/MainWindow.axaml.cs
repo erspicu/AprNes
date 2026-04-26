@@ -55,9 +55,12 @@ public partial class MainWindow : Window
         _fpsTimer.Tick += (_, _) => StatusFps.Text = _emu.TakeFrameCount().ToString();
         _fpsTimer.Start();
 
-        // Keyboard input
-        KeyDown += OnKeyDown;
-        KeyUp   += OnKeyUp;
+        // Keyboard input — subscribe in TUNNEL phase (root → leaf) so MainWindow
+        // sees the key BEFORE the Menu, which would otherwise consume Up/Down/Left/Right
+        // for its focus navigation and stop them from reaching the game.
+        // handledEventsToo guards against any other ancestor that might pre-mark.
+        AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel, handledEventsToo: true);
+        AddHandler(KeyUpEvent,   OnKeyUp,   RoutingStrategies.Tunnel, handledEventsToo: true);
 
         // Drag & drop
         AddHandler(DragDrop.DropEvent, OnDrop);
@@ -628,10 +631,23 @@ public partial class MainWindow : Window
             e.Handled = true;
             return;
         }
+
         _emu.KeyDown(e.Key);
+
+        // While the emu is running, consume bare keys so Menu focus navigation
+        // (arrow keys, Tab, Enter…) doesn't steal them. Modifier-bearing keys
+        // (Ctrl+O for Open ROM, Alt+F to open File menu) skip this — they keep
+        // their normal accelerator routing.
+        if (_emu.IsRunning && e.KeyModifiers == KeyModifiers.None)
+            e.Handled = true;
     }
 
-    private void OnKeyUp(object? sender, KeyEventArgs e) => _emu.KeyUp(e.Key);
+    private void OnKeyUp(object? sender, KeyEventArgs e)
+    {
+        _emu.KeyUp(e.Key);
+        if (_emu.IsRunning && e.KeyModifiers == KeyModifiers.None)
+            e.Handled = true;
+    }
 
     // ═══ Drag & Drop ════════════════════════════════════════════════════════
 
