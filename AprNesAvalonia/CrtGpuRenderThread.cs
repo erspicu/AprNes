@@ -125,14 +125,22 @@ internal static unsafe class CrtGpuRenderThread
         _inputBitmap.NotifyPixelsChanged();
 
         // ── Stage 2: child shaders ──
-        using var inputShader = SKShader.CreateBitmap(
-            _inputBitmap,
-            SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
-        // Phosphor prev: when _prevSurface is GPU-backed, Snapshot is a GPU
-        // image → shader sampling stays on GPU (no raster fallback).
+        // Use Mitchell-Netravali cubic sampling on the source bitmap. SkiaSharp's
+        // default (nearest-neighbor) caused visible "analog block" artifacts at
+        // chroma/luma boundaries when the 1024-wide source was upscaled to the
+        // display dim — real CRTs never had crisp pixel edges. Mitchell gives
+        // smooth interpolation without overshoot ringing, mimicking the analog
+        // beam's natural smearing across boundaries.
+        using var inputImage  = SKImage.FromBitmap(_inputBitmap);
+        using var inputShader = inputImage.ToShader(
+            SKShaderTileMode.Clamp, SKShaderTileMode.Clamp,
+            new SKSamplingOptions(SKCubicResampler.Mitchell));
+        // Phosphor prev: same Mitchell cubic so phosphor afterglow doesn't
+        // re-introduce blockiness from the previous frame.
         using var prevImage  = _prevSurface!.Snapshot();
         using var prevShader = prevImage.ToShader(
-            SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
+            SKShaderTileMode.Clamp, SKShaderTileMode.Clamp,
+            new SKSamplingOptions(SKCubicResampler.Mitchell));
 
         // ── Stage 3: uniforms (full CPU parity — see crt_core_v1.sksl header) ──
         var uniforms = new SKRuntimeEffectUniforms(_effect!);
