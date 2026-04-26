@@ -785,11 +785,17 @@ namespace AprNes
             float vPrev = leftPad; float ringDamp = RingStrength * 0.5f * kSampleRateScale; float vVel = 0f; int tMod = phase0;
             float hRl = hR, hIl = hI;
 
-            // 4-step lookahead: precompute rotation matrices for steps 1-4
+            // kSampDot-step lookahead: precompute rotation matrices for steps 1..kSampDot
             float c1 = hC, s1 = hS;
             float c2 = c1 * hC - s1 * hS, s2 = s1 * hC + c1 * hS;
             float c3 = c2 * hC - s2 * hS, s3 = s2 * hC + c2 * hS;
             float c4 = c3 * hC - s3 * hS, s4 = s3 * hC + c3 * hS;
+#if HD_NTSC
+            float c5 = c4 * hC - s4 * hS, s5 = s4 * hC + c4 * hS;
+            float c6 = c5 * hC - s5 * hS, s6 = s5 * hC + c5 * hS;
+            float c7 = c6 * hC - s6 * hS, s7 = s6 * hC + c6 * hS;
+            float c8 = c7 * hC - s7 * hS, s8 = s7 * hC + c7 * hS;
+#endif
 
             for (int d = 0; d < kDots; d++)
             {
@@ -797,21 +803,37 @@ namespace AprNes
                 float* ePtr = ea + tMod;
                 int baseIdx = kLeadPad + d * kSampDot;
 
-                // Herringbone: parallel 4-sample computation (breaks data dependency)
+                // Herringbone: parallel kSampDot-sample computation (breaks data dependency)
                 float h0 = 0, h1 = 0, h2 = 0, h3 = 0;
+#if HD_NTSC
+                float h4 = 0, h5 = 0, h6 = 0, h7 = 0;
+#endif
                 if (herring)
                 {
                     h0 = hIl;
                     h1 = hRl * s1 + hIl * c1;
                     h2 = hRl * s2 + hIl * c2;
                     h3 = hRl * s3 + hIl * c3;
+#if HD_NTSC
+                    h4 = hRl * s4 + hIl * c4;
+                    h5 = hRl * s5 + hIl * c5;
+                    h6 = hRl * s6 + hIl * c6;
+                    h7 = hRl * s7 + hIl * c7;
+                    float tR = hRl * c8 - hIl * s8;
+                    hIl = hRl * s8 + hIl * c8;
+                    hRl = tR;
+#else
                     float tR = hRl * c4 - hIl * s4;
                     hIl = hRl * s4 + hIl * c4;
                     hRl = tR;
+#endif
                 }
 
-                // Noise: single xorshift, split 32-bit into 4 bytes
+                // Noise: xorshift produces 4 noise bytes; HD needs 2 xorshifts for 8.
                 float n0 = 0, n1 = 0, n2 = 0, n3 = 0;
+#if HD_NTSC
+                float n4 = 0, n5 = 0, n6 = 0, n7 = 0;
+#endif
                 if (addNoise)
                 {
                     ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5;
@@ -819,21 +841,40 @@ namespace AprNes
                     n1 = ((ns >> 8) & 0xFF) * nScale - nOff;
                     n2 = ((ns >> 16) & 0xFF) * nScale - nOff;
                     n3 = ((ns >> 24) & 0xFF) * nScale - nOff;
+#if HD_NTSC
+                    ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5;
+                    n4 = (ns & 0xFF) * nScale - nOff;
+                    n5 = ((ns >> 8) & 0xFF) * nScale - nOff;
+                    n6 = ((ns >> 16) & 0xFF) * nScale - nOff;
+                    n7 = ((ns >> 24) & 0xFF) * nScale - nOff;
+#endif
                 }
 
-                // Pre-compute all four sample inputs up front — independent of the
-                // vVel/vPrev filter chain, so RyuJIT + CPU OoO engine can schedule
-                // them in parallel with the sequential filter that follows.
+                // Pre-compute kSampDot sample inputs up front — independent of the
+                // vVel/vPrev filter chain (sequential below), so RyuJIT + CPU OoO
+                // engine can schedule them in parallel with the LTI filter.
                 float x0 = src[0] * ePtr[0] + h0 + n0;
                 float x1 = src[1] * ePtr[1] + h1 + n1;
                 float x2 = src[2] * ePtr[2] + h2 + n2;
                 float x3 = src[3] * ePtr[3] + h3 + n3;
+#if HD_NTSC
+                float x4 = src[4] * ePtr[4] + h4 + n4;
+                float x5 = src[5] * ePtr[5] + h5 + n5;
+                float x6 = src[6] * ePtr[6] + h6 + n6;
+                float x7 = src[7] * ePtr[7] + h7 + n7;
+#endif
 
                 // LTI filter: vVel/vPrev chain is sequential — can't be vectorised.
                 waveBuf[baseIdx]     = (vPrev += (vVel = vVel * ringDamp + (x0 - vPrev) * SlewRate));
                 waveBuf[baseIdx + 1] = (vPrev += (vVel = vVel * ringDamp + (x1 - vPrev) * SlewRate));
                 waveBuf[baseIdx + 2] = (vPrev += (vVel = vVel * ringDamp + (x2 - vPrev) * SlewRate));
                 waveBuf[baseIdx + 3] = (vPrev += (vVel = vVel * ringDamp + (x3 - vPrev) * SlewRate));
+#if HD_NTSC
+                waveBuf[baseIdx + 4] = (vPrev += (vVel = vVel * ringDamp + (x4 - vPrev) * SlewRate));
+                waveBuf[baseIdx + 5] = (vPrev += (vVel = vVel * ringDamp + (x5 - vPrev) * SlewRate));
+                waveBuf[baseIdx + 6] = (vPrev += (vVel = vVel * ringDamp + (x6 - vPrev) * SlewRate));
+                waveBuf[baseIdx + 7] = (vPrev += (vVel = vVel * ringDamp + (x7 - vPrev) * SlewRate));
+#endif
 
                 tMod += kPhaseStepDot + (((kThreshDot - tMod) >> 31) & kPhaseWrap);
             }
@@ -894,6 +935,31 @@ namespace AprNes
                 if (addNoise) { ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5; y3 += (ns & 0xFF) * nScale - nOff; }
                 vv = vv * rd + (y3 - vPrev) * SlewRate; vPrev += vv;
                 waveBuf[baseIdx + 3] = vPrev; cBuf[baseIdx + 3] = csrc[3] * ea[tMod + 3];
+#if HD_NTSC
+                // --- s = 4 ---
+                float y4 = Ytgt;
+                if (addNoise) { ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5; y4 += (ns & 0xFF) * nScale - nOff; }
+                vv = vv * rd + (y4 - vPrev) * SlewRate; vPrev += vv;
+                waveBuf[baseIdx + 4] = vPrev; cBuf[baseIdx + 4] = csrc[4] * ea[tMod + 4];
+
+                // --- s = 5 ---
+                float y5 = Ytgt;
+                if (addNoise) { ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5; y5 += (ns & 0xFF) * nScale - nOff; }
+                vv = vv * rd + (y5 - vPrev) * SlewRate; vPrev += vv;
+                waveBuf[baseIdx + 5] = vPrev; cBuf[baseIdx + 5] = csrc[5] * ea[tMod + 5];
+
+                // --- s = 6 ---
+                float y6 = Ytgt;
+                if (addNoise) { ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5; y6 += (ns & 0xFF) * nScale - nOff; }
+                vv = vv * rd + (y6 - vPrev) * SlewRate; vPrev += vv;
+                waveBuf[baseIdx + 6] = vPrev; cBuf[baseIdx + 6] = csrc[6] * ea[tMod + 6];
+
+                // --- s = 7 ---
+                float y7 = Ytgt;
+                if (addNoise) { ns ^= ns << 13; ns ^= ns >> 17; ns ^= ns << 5; y7 += (ns & 0xFF) * nScale - nOff; }
+                vv = vv * rd + (y7 - vPrev) * SlewRate; vPrev += vv;
+                waveBuf[baseIdx + 7] = vPrev; cBuf[baseIdx + 7] = csrc[7] * ea[tMod + 7];
+#endif
 
                 // ★ 符號位元擴展黑魔法
                 tMod += kPhaseStepDot + (((kThreshDot - tMod) >> 31) & kPhaseWrap);
