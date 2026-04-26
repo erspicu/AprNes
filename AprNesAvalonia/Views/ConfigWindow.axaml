@@ -170,6 +170,7 @@
                                 <ComboBoxItem Content="4x" IsSelected="True"/>
                                 <ComboBoxItem Content="6x"/>
                                 <ComboBoxItem Content="8x"/>
+                                <ComboBoxItem Content="10x"/>
                             </ComboBox>
                             <TextBlock Grid.Row="3" Grid.Column="0" x:Name="LblInput" Text="Input" VerticalAlignment="Center"/>
                             <ComboBox  Grid.Row="3" Grid.Column="1" x:Name="CmbAnalogInput" Width="140">

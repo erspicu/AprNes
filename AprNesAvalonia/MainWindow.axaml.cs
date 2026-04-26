@@ -183,7 +183,9 @@ public partial class MainWindow : Window
         AprNes.NesCore.UltraAnalog = _ultraAnalogEnabled;
         AprNes.NesCore.CrtEnabled = _ini.GetBool("crt", true);
 
-        int[] validSizes = { 2, 4, 6, 8 };
+        // 10× (2560×2100) fits 4K @ 100% DPI windowed; CRT pipeline handles
+        // the extra pixels cheaply on the GPU backend (Avalonia default).
+        int[] validSizes = { 2, 4, 6, 8, 10 };
         int aSize = _ini.GetInt("AnalogSize", 4);
         AprNes.NesCore.AnalogSize = Array.IndexOf(validSizes, aSize) >= 0 ? aSize : 4;
 
@@ -849,7 +851,9 @@ public partial class MainWindow : Window
     {
         if (!_emu.IsRunning || _capturing) return;
         _capturing = true;
-        _emu.Pause();
+        // Use PauseEmuAndRender so both emu and the helper render thread are
+        // quiesced — otherwise the buffers we read could be mid-write.
+        bool paused = _emu.PauseEmuAndRender();
 
         string message;
         try
@@ -861,24 +865,91 @@ public partial class MainWindow : Window
             string stamp    = DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss");
             string filePath = Path.Combine(dir, $"Screen-{stamp}.png");
 
-            var ptr = _emu.CurrentFrontBuffer;
-            if (ptr != IntPtr.Zero)
+            // In Ultra+CRT+GPU mode the helper render thread bypasses the CPU
+            // CRT path entirely — Crt_Render is no-op and AnalogScreenBuf stays
+            // empty. Force a one-shot CPU CRT render by clearing
+            // CrtGpuRenderThreadActive across the call: CrtScreenGpu.Render
+            // then runs the full SkSL pipeline on a raster surface and reads
+            // back into crt_analogScreenBuf (= AnalogScreenBuf). Restore the
+            // flag immediately so normal rendering keeps using the GPU canvas
+            // path.
+            // Three capture sources depending on what mode the compositor is using:
+            //
+            // 1. Ultra+CRT+GPU: emu only writes NesCore.linearBuffer. The visible
+            //    image is produced by the SkSL shader inside CrtGpuRenderThread,
+            //    which the compositor calls during paint. AnalogScreenBuf is
+            //    NEVER written in this mode (Crt_Render is no-op, ReadPixels
+            //    paths are bypassed). To capture the same image the user sees,
+            //    re-run the EXACT same shader pipeline on a raster SKSurface and
+            //    save its snapshot.
+            //
+            // 2. Analog (any other variant): AnalogScreenBuf is the canonical
+            //    framebuffer — filled directly by DecodeScanline_Fast (non-Ultra),
+            //    by the CPU CRT (Scalar/SIMD backend), or stays zero if Ultra+
+            //    no-CRT (which writes via DecodeScanline_Physical_Worker direct
+            //    to ntsc_analogScreenBuf — same alias).
+            //
+            // 3. Digital: _emu.CurrentFrontBuffer (= _bufferA/B) holds the
+            //    pipeline's RGB output.
+
+            bool useGpuShaderCapture = NesCore.AnalogEnabled
+                                    && NesCore.UltraAnalog
+                                    && NesCore.CrtEnabled
+                                    && NesCore.CrtGpuRenderThreadActive
+                                    && CrtGpuRenderThread.IsReady;
+
+            if (useGpuShaderCapture)
             {
-                int w = _emu.OutputW, h = _emu.OutputH;
-                using var bmp = new Avalonia.Media.Imaging.Bitmap(
-                    PixelFormats.Bgra8888, AlphaFormat.Unpremul,
-                    ptr,
-                    new PixelSize(w, h),
-                    new Vector(96, 96),
-                    w * 4);
+                int w = NesCore.Crt_DstW, h = NesCore.Crt_DstH;
+                var info = new SkiaSharp.SKImageInfo(w, h,
+                    SkiaSharp.SKColorType.Bgra8888, SkiaSharp.SKAlphaType.Opaque);
+                using var surface = SkiaSharp.SKSurface.Create(info);
+                surface.Canvas.Clear(SkiaSharp.SKColors.Black);
+                // grContext=null → CrtGpuRenderThread.EnsureSurfaces falls back
+                // to raster SKSurface, runs the shader on CPU (still SkSL), and
+                // composes into our provided canvas. Output matches what the
+                // GPU compositor draws (same shader, same uniforms, same input).
+                CrtGpuRenderThread.Render(surface.Canvas, null,
+                    new SkiaSharp.SKRect(0, 0, w, h));
+                using var snap = surface.Snapshot();
+                using var data = snap.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
                 using var fs = File.Create(filePath);
-                bmp.Save(fs);
+                data.SaveTo(fs);
+            }
+            else
+            {
+                IntPtr ptr;
+                int w, h;
+                if (NesCore.AnalogEnabled)
+                {
+                    unsafe { ptr = (IntPtr)NesCore.AnalogScreenBuf; }
+                    w = NesCore.Crt_DstW;
+                    h = NesCore.Crt_DstH;
+                }
+                else
+                {
+                    ptr = _emu.CurrentFrontBuffer;
+                    w = _emu.OutputW;
+                    h = _emu.OutputH;
+                }
+
+                if (ptr != IntPtr.Zero)
+                {
+                    using var bmp = new Avalonia.Media.Imaging.Bitmap(
+                        PixelFormats.Bgra8888, AlphaFormat.Unpremul,
+                        ptr,
+                        new PixelSize(w, h),
+                        new Vector(96, 96),
+                        w * 4);
+                    using var fs = File.Create(filePath);
+                    bmp.Save(fs);
+                }
             }
             message = filePath + " " + L("dlg_screenshot_saved", "save!");
         }
         catch (Exception ex) { message = L("dlg_screenshot_failed", "Screenshot failed:") + " " + ex.Message; }
 
-        _emu.Resume();
+        if (paused) NesCore.ResumeEmu();
         _capturing = false;
         await ShowMessageBox(message);
     }
