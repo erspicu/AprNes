@@ -22,7 +22,9 @@ namespace AprNes
 
         static DateTime GetBuildTimestamp()
         {
-            string filePath = System.Reflection.Assembly.GetCallingAssembly().Location;
+            // Need the full exe path to read PE header. Assembly.Location is empty
+            // in single-file publish; Process.MainModule works in all configurations.
+            string filePath = System.Diagnostics.Process.GetCurrentProcess().MainModule!.FileName;
             byte[] b = new byte[2048];
             using (var s = new System.IO.FileStream(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read))
                 s.Read(b, 0, 2048);

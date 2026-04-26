@@ -53,8 +53,9 @@ namespace AprNes
             {
                 if (_logPath == null)
                 {
-                    string dir = Path.Combine(Path.GetDirectoryName(
-                        System.Reflection.Assembly.GetExecutingAssembly().Location), "Captures", "Video");
+                    // AppContext.BaseDirectory works in single-file publish too
+                    // (Assembly.Location returns "" when assemblies are bundled).
+                    string dir = Path.Combine(AppContext.BaseDirectory, "Captures", "Video");
                     if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
                     _logPath = Path.Combine(dir, "VideoRecorder.log");
                 }
