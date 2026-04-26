@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AprNes — FFmpeg Setup Guide</title>
+<style>
+  :root { --bg: #1a1a2e; --card: #16213e; --accent: #0f3460; --highlight: #e94560; --text: #eee; --dim: #aaa; --code-bg: #0d1117; --border: #333; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; }
+  .container { max-width: 820px; margin: 0 auto; padding: 40px 24px; }
+  h1 { text-align: center; font-size: 1.8em; margin-bottom: 8px; }
+  .subtitle { text-align: center; color: var(--dim); margin-bottom: 32px; font-size: 0.95em; }
+  .lang-switch { text-align: center; margin-bottom: 36px; }
+  .lang-switch button { background: var(--accent); color: var(--text); border: 1px solid var(--border); padding: 8px 24px; margin: 0 4px; border-radius: 6px; cursor: pointer; font-size: 0.95em; transition: 0.2s; }
+  .lang-switch button:hover, .lang-switch button.active { background: var(--highlight); border-color: var(--highlight); }
+  .section { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 28px 28px 20px; margin-bottom: 24px; }
+  .section h2 { color: var(--highlight); font-size: 1.2em; margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
+  .step-num { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: var(--highlight); color: #fff; border-radius: 50%; font-weight: bold; font-size: 0.9em; flex-shrink: 0; }
+  p, li { margin-bottom: 10px; }
+  ul { padding-left: 22px; }
+  a { color: #53a8ff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { background: var(--code-bg); padding: 2px 8px; border-radius: 4px; font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 0.9em; color: #7ee787; }
+  .path-box { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 14px 18px; margin: 12px 0; font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 0.88em; line-height: 1.9; overflow-x: auto; color: #c9d1d9; }
+  .path-box .comment { color: #8b949e; }
+  .path-box .hl { color: #7ee787; font-weight: bold; }
+  .note { background: #1c2333; border-left: 4px solid #f0ad4e; border-radius: 0 6px 6px 0; padding: 14px 18px; margin: 16px 0; font-size: 0.92em; }
+  .note-title { color: #f0ad4e; font-weight: bold; margin-bottom: 4px; }
+  .file-list { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; margin: 10px 0; }
+  .file-list code { display: block; padding: 4px 10px; margin: 2px 0; }
+  .footer { text-align: center; color: var(--dim); font-size: 0.85em; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border); }
+  .hidden { display: none; }
+  @media (max-width: 600px) { .file-list { grid-template-columns: 1fr; } .container { padding: 20px 12px; } .section { padding: 18px 16px 14px; } }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>AprNes — FFmpeg Setup Guide</h1>
+<p class="subtitle">Enable video & audio recording / FFmpeg 錄影錄音設定教學</p>
+
+<div class="lang-switch">
+  <button id="btn-en" class="active" onclick="switchLang('en')">English</button>
+  <button id="btn-zh" onclick="switchLang('zh')">繁體中文</button>
+</div>
+
+<!-- ========== ENGLISH ========== -->
+<div id="lang-en">
+
+<div class="section">
+  <h2><span class="step-num">1</span> Download FFmpeg</h2>
+  <p>Visit the official FFmpeg download page:</p>
+  <p style="font-size:1.05em; margin: 12px 0;">
+    <a href="https://www.ffmpeg.org/download.html" target="_blank">https://www.ffmpeg.org/download.html</a>
+  </p>
+  <p>Under <strong>Windows</strong>, click <strong>"Windows builds from gyan.dev"</strong> or <strong>"BtbN GitHub Releases"</strong>.</p>
+  <p>Download the <strong>shared</strong> build (recommended):</p>
+  <ul>
+    <li>Look for: <code>ffmpeg-master-latest-win64-gpl-shared.zip</code> (or similar)</li>
+    <li>The <strong>shared</strong> version is smaller — it separates DLLs from executables</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h2><span class="step-num">2</span> Extract the archive</h2>
+  <p>Unzip the downloaded <code>.zip</code> file. You will see a folder structure like:</p>
+  <div class="path-box">
+    <span class="comment">ffmpeg-master-latest-win64-gpl-shared/</span><br>
+    &nbsp;&nbsp;├── LICENSE.txt<br>
+    &nbsp;&nbsp;├── <span class="hl">bin/</span><br>
+    &nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── ffmpeg.exe<br>
+    &nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── ffprobe.exe<br>
+    &nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── ffplay.exe<br>
+    &nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── avcodec-62.dll<br>
+    &nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── avformat-62.dll<br>
+    &nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── avutil-60.dll<br>
+    &nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── ... <span class="comment">(other .dll files)</span><br>
+    &nbsp;&nbsp;├── doc/<br>
+    &nbsp;&nbsp;└── include/
+  </div>
+  <p>The files we need are all inside the <code>bin/</code> folder.</p>
+</div>
+
+<div class="section">
+  <h2><span class="step-num">3</span> Copy to AprNes</h2>
+  <p>Copy <strong>all files</strong> from the <code>bin/</code> folder into:</p>
+  <div class="path-box">
+    <span class="comment">&lt;AprNes.exe location&gt;</span>\<span class="hl">tools\ffmpeg\</span>
+  </div>
+  <p>For example, if <code>AprNes.exe</code> is at <code>C:\Games\AprNes\</code>, the target is:</p>
+  <div class="path-box">
+    C:\Games\AprNes\<span class="hl">tools\ffmpeg\</span>ffmpeg.exe<br>
+    C:\Games\AprNes\<span class="hl">tools\ffmpeg\</span>avcodec-62.dll<br>
+    C:\Games\AprNes\<span class="hl">tools\ffmpeg\</span>avformat-62.dll<br>
+    <span class="comment">... (all .exe and .dll files from bin/)</span>
+  </div>
+  <p>Complete file list to copy:</p>
+  <div class="file-list">
+    <code>ffmpeg.exe</code>
+    <code>ffprobe.exe</code>
+    <code>ffplay.exe</code>
+    <code>avcodec-62.dll</code>
+    <code>avdevice-62.dll</code>
+    <code>avfilter-11.dll</code>
+    <code>avformat-62.dll</code>
+    <code>avutil-60.dll</code>
+    <code>swresample-6.dll</code>
+    <code>swscale-9.dll</code>
+  </div>
+  <div class="note">
+    <div class="note-title">Note</div>
+    <p>Create the <code>tools\ffmpeg\</code> folder if it doesn't exist. The DLL version numbers (e.g. <code>-62</code>, <code>-60</code>) may vary depending on the FFmpeg version you download — that's fine, just copy everything from <code>bin/</code>.</p>
+  </div>
+</div>
+
+<div class="section">
+  <h2><span class="step-num">4</span> Done!</h2>
+  <p>Restart AprNes. The recording feature is now available. AprNes will automatically detect <code>ffmpeg.exe</code> in the <code>tools\ffmpeg\</code> folder and enable video &amp; audio recording.</p>
+  <div class="note">
+    <div class="note-title">Verification</div>
+    <p>Final folder structure should look like:</p>
+  </div>
+  <div class="path-box">
+    AprNes.exe<br>
+    configure\<br>
+    tools\<br>
+    &nbsp;&nbsp;└── <span class="hl">ffmpeg\</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── ffmpeg.exe<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── ffprobe.exe<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── ffplay.exe<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── avcodec-62.dll<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── avformat-62.dll<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── avutil-60.dll<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── <span class="comment">... (other DLLs)</span>
+  </div>
+</div>
+
+</div><!-- /lang-en -->
+
+<!-- ========== 繁體中文 ========== -->
+<div id="lang-zh" class="hidden">
+
+<div class="section">
+  <h2><span class="step-num">1</span> 下載 FFmpeg</h2>
+  <p>前往 FFmpeg 官方下載頁面：</p>
+  <p style="font-size:1.05em; margin: 12px 0;">
+    <a href="https://www.ffmpeg.org/download.html" target="_blank">https://www.ffmpeg.org/download.html</a>
+  </p>
+  <p>在 <strong>Windows</strong> 區塊中，點擊 <strong>"Windows builds from gyan.dev"</strong> 或 <strong>"BtbN GitHub Releases"</strong>。</p>
+  <p>下載 <strong>shared</strong> 版本（推薦）：</p>
+  <ul>
+    <li>檔名類似：<code>ffmpeg-master-latest-win64-gpl-shared.zip</code></li>
+    <li><strong>shared</strong> 版本較小，將 DLL 與執行檔分開封裝</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h2><span class="step-num">2</span> 解壓縮</h2>
+  <p>將下載的 <code>.zip</code> 檔案解壓縮，會看到以下資料夾結構：</p>
+  <div class="path-box">
+    <span class="comment">ffmpeg-master-latest-win64-gpl-shared/</span><br>
+    &nbsp;&nbsp;├── LICENSE.txt<br>
+    &nbsp;&nbsp;├── <span class="hl">bin/</span><br>
+    &nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── ffmpeg.exe<br>
+    &nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── ffprobe.exe<br>
+    &nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── ffplay.exe<br>
+    &nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── avcodec-62.dll<br>
+    &nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── avformat-62.dll<br>
+    &nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── avutil-60.dll<br>
+    &nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── ... <span class="comment">(其他 .dll 檔案)</span><br>
+    &nbsp;&nbsp;├── doc/<br>
+    &nbsp;&nbsp;└── include/
+  </div>
+  <p>我們需要的檔案全部在 <code>bin/</code> 資料夾內。</p>
+</div>
+
+<div class="section">
+  <h2><span class="step-num">3</span> 複製到 AprNes</h2>
+  <p>將 <code>bin/</code> 資料夾中的<strong>所有檔案</strong>複製到：</p>
+  <div class="path-box">
+    <span class="comment">&lt;AprNes.exe 所在位置&gt;</span>\<span class="hl">tools\ffmpeg\</span>
+  </div>
+  <p>例如，如果 <code>AprNes.exe</code> 位於 <code>C:\Games\AprNes\</code>，目標路徑為：</p>
+  <div class="path-box">
+    C:\Games\AprNes\<span class="hl">tools\ffmpeg\</span>ffmpeg.exe<br>
+    C:\Games\AprNes\<span class="hl">tools\ffmpeg\</span>avcodec-62.dll<br>
+    C:\Games\AprNes\<span class="hl">tools\ffmpeg\</span>avformat-62.dll<br>
+    <span class="comment">... (bin/ 內的所有 .exe 和 .dll 檔案)</span>
+  </div>
+  <p>需要複製的完整檔案清單：</p>
+  <div class="file-list">
+    <code>ffmpeg.exe</code>
+    <code>ffprobe.exe</code>
+    <code>ffplay.exe</code>
+    <code>avcodec-62.dll</code>
+    <code>avdevice-62.dll</code>
+    <code>avfilter-11.dll</code>
+    <code>avformat-62.dll</code>
+    <code>avutil-60.dll</code>
+    <code>swresample-6.dll</code>
+    <code>swscale-9.dll</code>
+  </div>
+  <div class="note">
+    <div class="note-title">注意</div>
+    <p>如果 <code>tools\ffmpeg\</code> 資料夾不存在，請手動建立。DLL 的版本號碼（例如 <code>-62</code>、<code>-60</code>）會隨 FFmpeg 版本不同而變化，這是正常的，只要把 <code>bin/</code> 裡的所有檔案都複製過去即可。</p>
+  </div>
+</div>
+
+<div class="section">
+  <h2><span class="step-num">4</span> 完成！</h2>
+  <p>重新啟動 AprNes，錄影功能即可使用。AprNes 會自動偵測 <code>tools\ffmpeg\</code> 資料夾中的 <code>ffmpeg.exe</code>，並啟用影音錄製功能。</p>
+  <div class="note">
+    <div class="note-title">確認安裝</div>
+    <p>最終資料夾結構應如下所示：</p>
+  </div>
+  <div class="path-box">
+    AprNes.exe<br>
+    configure\<br>
+    tools\<br>
+    &nbsp;&nbsp;└── <span class="hl">ffmpeg\</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── ffmpeg.exe<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── ffprobe.exe<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── ffplay.exe<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── avcodec-62.dll<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── avformat-62.dll<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── avutil-60.dll<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── <span class="comment">... (其他 DLL)</span>
+  </div>
+</div>
+
+</div><!-- /lang-zh -->
+
+<div class="footer">AprNes Emulator &mdash; FFmpeg Setup Guide</div>
+
+</div><!-- /container -->
+
+<script>
+function switchLang(lang) {
+  document.getElementById('lang-en').classList.toggle('hidden', lang !== 'en');
+  document.getElementById('lang-zh').classList.toggle('hidden', lang !== 'zh');
+  document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+  document.getElementById('btn-zh').classList.toggle('active', lang === 'zh');
+}
+</script>
+</body>
+</html>

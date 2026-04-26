@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AprNes — FDS Setup Guide</title>
+<style>
+  :root { --bg: #1a1a2e; --card: #16213e; --accent: #0f3460; --highlight: #e94560; --text: #eee; --dim: #aaa; --code-bg: #0d1117; --border: #333; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; }
+  .container { max-width: 820px; margin: 0 auto; padding: 40px 24px; }
+  h1 { text-align: center; font-size: 1.8em; margin-bottom: 8px; }
+  .subtitle { text-align: center; color: var(--dim); margin-bottom: 32px; font-size: 0.95em; }
+  .lang-switch { text-align: center; margin-bottom: 36px; }
+  .lang-switch button { background: var(--accent); color: var(--text); border: 1px solid var(--border); padding: 8px 24px; margin: 0 4px; border-radius: 6px; cursor: pointer; font-size: 0.95em; transition: 0.2s; }
+  .lang-switch button:hover, .lang-switch button.active { background: var(--highlight); border-color: var(--highlight); }
+  .section { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 28px 28px 20px; margin-bottom: 24px; }
+  .section h2 { color: var(--highlight); font-size: 1.2em; margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
+  .step-num { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: var(--highlight); color: #fff; border-radius: 50%; font-weight: bold; font-size: 0.9em; flex-shrink: 0; }
+  p, li { margin-bottom: 10px; }
+  ul { padding-left: 22px; }
+  a { color: #53a8ff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { background: var(--code-bg); padding: 2px 8px; border-radius: 4px; font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 0.9em; color: #7ee787; }
+  .path-box { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 14px 18px; margin: 12px 0; font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 0.88em; line-height: 1.9; overflow-x: auto; color: #c9d1d9; }
+  .path-box .comment { color: #8b949e; }
+  .path-box .hl { color: #7ee787; font-weight: bold; }
+  .note { background: #1c2333; border-left: 4px solid #f0ad4e; border-radius: 0 6px 6px 0; padding: 14px 18px; margin: 16px 0; font-size: 0.92em; }
+  .note-title { color: #f0ad4e; font-weight: bold; margin-bottom: 4px; }
+  .note-info { background: #1c2333; border-left: 4px solid #53a8ff; border-radius: 0 6px 6px 0; padding: 14px 18px; margin: 16px 0; font-size: 0.92em; }
+  .note-info .note-title { color: #53a8ff; }
+  .footer { text-align: center; color: var(--dim); font-size: 0.85em; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border); }
+  .hidden { display: none; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td { padding: 8px 12px; border: 1px solid var(--border); text-align: left; font-size: 0.9em; }
+  th { background: var(--accent); color: var(--text); }
+  td { background: var(--code-bg); }
+  @media (max-width: 600px) { .container { padding: 20px 12px; } .section { padding: 18px 16px 14px; } }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>AprNes — FDS Setup Guide</h1>
+<p class="subtitle">Play Famicom Disk System games / 遊玩 Famicom Disk System 磁碟機遊戲</p>
+
+<div class="lang-switch">
+  <button id="btn-en" class="active" onclick="switchLang('en')">English</button>
+  <button id="btn-zh" onclick="switchLang('zh')">繁體中文</button>
+</div>
+
+<!-- ========== ENGLISH ========== -->
+<div id="lang-en">
+
+<div class="section">
+  <h2><span class="step-num">1</span> What is FDS?</h2>
+  <p>The <strong>Famicom Disk System (FDS)</strong> was an add-on for the Japanese Famicom (NES) that used rewritable floppy disks instead of cartridges. Many classic titles were released exclusively on FDS, including early versions of <em>The Legend of Zelda</em>, <em>Metroid</em>, <em>Kid Icarus</em>, and <em>Castlevania</em>.</p>
+  <p>FDS games require a <strong>BIOS ROM</strong> to boot — this BIOS was built into the original hardware. AprNes needs a copy of this BIOS file to emulate FDS games.</p>
+</div>
+
+<div class="section">
+  <h2><span class="step-num">2</span> Obtain the FDS BIOS</h2>
+  <p>You need the official Nintendo FDS BIOS file, commonly known as <code>disksys.rom</code>.</p>
+  <table>
+    <tr><th>Property</th><th>Value</th></tr>
+    <tr><td>File name</td><td><code>DISKSYS.ROM</code></td></tr>
+    <tr><td>File size</td><td>8,192 bytes (8 KB)</td></tr>
+    <tr><td>SHA-256</td><td style="word-break:break-all;"><code>99c18490ed9002d9c6d999b9d8d15be5c051bdfa7cc7e73318053c9a994b0178</code></td></tr>
+  </table>
+  <div class="note">
+    <div class="note-title">Legal notice</div>
+    <p>The FDS BIOS is copyrighted by Nintendo. You should only use a BIOS dump from hardware you own. AprNes does not include this file.</p>
+  </div>
+</div>
+
+<div class="section">
+  <h2><span class="step-num">3</span> Place the BIOS file</h2>
+  <p>Create a folder named <code>FDSBIOS</code> in the same directory as <code>AprNes.exe</code>, and place the BIOS file inside:</p>
+  <div class="path-box">
+    <span class="comment">&lt;AprNes.exe location&gt;</span>\<span class="hl">FDSBIOS</span>\<span class="hl">DISKSYS.ROM</span>
+  </div>
+  <p>For example:</p>
+  <div class="path-box">
+    C:\Games\AprNes\AprNes.exe<br>
+    C:\Games\AprNes\<span class="hl">FDSBIOS</span>\<span class="hl">DISKSYS.ROM</span>
+  </div>
+  <div class="note">
+    <div class="note-title">Important</div>
+    <p>The file must be named exactly <code>DISKSYS.ROM</code> (case-insensitive on Windows). The folder must be named exactly <code>FDSBIOS</code>.</p>
+  </div>
+</div>
+
+<div class="section">
+  <h2><span class="step-num">4</span> Load an FDS game</h2>
+  <p>Open AprNes and load an FDS ROM file (typically <code>.fds</code> extension) the same way you would load a regular NES ROM. AprNes automatically detects FDS format and loads the BIOS.</p>
+  <p>Supported FDS file formats:</p>
+  <ul>
+    <li><strong>With header</strong> — Files starting with <code>FDS\x1A</code> (the standard <code>.fds</code> format)</li>
+    <li><strong>Headerless (raw)</strong> — Raw disk images where file size is a multiple of 65,500 bytes</li>
+  </ul>
+  <div class="note-info">
+    <div class="note-title">Disk swapping</div>
+    <p>For multi-disk games, AprNes handles disk side switching automatically. When the game prompts you to flip or swap the disk, the emulator detects the request via the BIOS and inserts the correct disk side.</p>
+  </div>
+</div>
+
+<div class="section">
+  <h2><span class="step-num">5</span> Verification</h2>
+  <p>Your final folder structure should look like this:</p>
+  <div class="path-box">
+    AprNes.exe<br>
+    configure\<br>
+    <span class="hl">FDSBIOS</span>\<br>
+    &nbsp;&nbsp;└── <span class="hl">DISKSYS.ROM</span> <span class="comment">(8,192 bytes)</span><br>
+    tools\<br>
+    <span class="comment">... (other files)</span>
+  </div>
+  <p>If the BIOS file is missing or invalid, AprNes will display an error message when you try to load an FDS game, indicating what went wrong (file not found, wrong size, etc.).</p>
+</div>
+
+</div><!-- /lang-en -->
+
+<!-- ========== 繁體中文 ========== -->
+<div id="lang-zh" class="hidden">
+
+<div class="section">
+  <h2><span class="step-num">1</span> 什麼是 FDS？</h2>
+  <p><strong>Famicom Disk System（FDS）</strong>是日本 Famicom（紅白機）的磁碟機擴充周邊，使用可讀寫的軟碟取代卡匣。許多經典遊戲最初都是以 FDS 格式獨佔發行，包括早期版本的<em>薩爾達傳說</em>、<em>銀河戰士</em>、<em>光神話</em>和<em>惡魔城</em>等。</p>
+  <p>FDS 遊戲需要一份<strong>BIOS ROM</strong>才能啟動——這個 BIOS 內建於原始硬體中。AprNes 需要這份 BIOS 檔案才能模擬 FDS 遊戲。</p>
+</div>
+
+<div class="section">
+  <h2><span class="step-num">2</span> 取得 FDS BIOS</h2>
+  <p>您需要任天堂官方的 FDS BIOS 檔案，通常稱為 <code>disksys.rom</code>。</p>
+  <table>
+    <tr><th>屬性</th><th>值</th></tr>
+    <tr><td>檔案名稱</td><td><code>DISKSYS.ROM</code></td></tr>
+    <tr><td>檔案大小</td><td>8,192 bytes（8 KB）</td></tr>
+    <tr><td>SHA-256</td><td style="word-break:break-all;"><code>99c18490ed9002d9c6d999b9d8d15be5c051bdfa7cc7e73318053c9a994b0178</code></td></tr>
+  </table>
+  <div class="note">
+    <div class="note-title">法律聲明</div>
+    <p>FDS BIOS 的著作權屬於任天堂。請僅使用從您擁有的硬體中備份的 BIOS。AprNes 不包含此檔案。</p>
+  </div>
+</div>
+
+<div class="section">
+  <h2><span class="step-num">3</span> 放置 BIOS 檔案</h2>
+  <p>在 <code>AprNes.exe</code> 所在的目錄中建立一個名為 <code>FDSBIOS</code> 的資料夾，並將 BIOS 檔案放入其中：</p>
+  <div class="path-box">
+    <span class="comment">&lt;AprNes.exe 所在位置&gt;</span>\<span class="hl">FDSBIOS</span>\<span class="hl">DISKSYS.ROM</span>
+  </div>
+  <p>例如：</p>
+  <div class="path-box">
+    C:\Games\AprNes\AprNes.exe<br>
+    C:\Games\AprNes\<span class="hl">FDSBIOS</span>\<span class="hl">DISKSYS.ROM</span>
+  </div>
+  <div class="note">
+    <div class="note-title">注意</div>
+    <p>檔案名稱必須是 <code>DISKSYS.ROM</code>（Windows 下不區分大小寫）。資料夾名稱必須是 <code>FDSBIOS</code>。</p>
+  </div>
+</div>
+
+<div class="section">
+  <h2><span class="step-num">4</span> 載入 FDS 遊戲</h2>
+  <p>開啟 AprNes，以載入一般 NES ROM 的方式載入 FDS ROM 檔案（副檔名通常為 <code>.fds</code>）。AprNes 會自動偵測 FDS 格式並載入 BIOS。</p>
+  <p>支援的 FDS 檔案格式：</p>
+  <ul>
+    <li><strong>含標頭</strong> — 以 <code>FDS\x1A</code> 開頭的檔案（標準 <code>.fds</code> 格式）</li>
+    <li><strong>無標頭（原始格式）</strong> — 檔案大小為 65,500 bytes 的整數倍的原始磁碟映像</li>
+  </ul>
+  <div class="note-info">
+    <div class="note-title">自動換碟</div>
+    <p>多磁碟遊戲的換碟操作由 AprNes 自動處理。當遊戲提示翻面或換碟時，模擬器會透過 BIOS 偵測請求，自動插入正確的磁碟面。</p>
+  </div>
+</div>
+
+<div class="section">
+  <h2><span class="step-num">5</span> 確認安裝</h2>
+  <p>最終資料夾結構應如下所示：</p>
+  <div class="path-box">
+    AprNes.exe<br>
+    configure\<br>
+    <span class="hl">FDSBIOS</span>\<br>
+    &nbsp;&nbsp;└── <span class="hl">DISKSYS.ROM</span> <span class="comment">(8,192 bytes)</span><br>
+    tools\<br>
+    <span class="comment">... (其他檔案)</span>
+  </div>
+  <p>如果 BIOS 檔案遺失或無效，AprNes 會在您嘗試載入 FDS 遊戲時顯示錯誤訊息，說明問題所在（找不到檔案、大小不正確等）。</p>
+</div>
+
+</div><!-- /lang-zh -->
+
+<div class="footer">AprNes Emulator &mdash; FDS Setup Guide</div>
+
+</div><!-- /container -->
+
+<script>
+function switchLang(lang) {
+  document.getElementById('lang-en').classList.toggle('hidden', lang !== 'en');
+  document.getElementById('lang-zh').classList.toggle('hidden', lang !== 'zh');
+  document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+  document.getElementById('btn-zh').classList.toggle('active', lang === 'zh');
+}
+</script>
+</body>
+</html>

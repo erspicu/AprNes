@@ -78,4 +78,29 @@
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
   </ItemGroup>
+
+  <!-- Publish-only content (release packaging). Copied to publish dir,
+       NOT to bin/Debug or bin/Release on a normal build. Adding more files
+       under PublishContent/ will auto-include them on next publish. -->
+  <ItemGroup>
+    <None Include="PublishContent\**\*.*" Exclude="PublishContent\**\.gitkeep">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <Link>%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </None>
+  </ItemGroup>
+
+  <!-- After publish: ensure empty placeholder dirs exist (FDSBIOS for user
+       to drop DISKSYS.ROM into, tools/ffmpeg/ for ffmpeg.exe), and strip
+       artifacts the end user doesn't need (~85 MB savings). -->
+  <Target Name="AprNesPublishPostProcess" AfterTargets="Publish">
+    <MakeDir Directories="$(PublishDir)FDSBIOS;$(PublishDir)tools\ffmpeg" />
+    <ItemGroup>
+      <_AprNesPublishStrip Include="$(PublishDir)libSkiaSharp.pdb" />
+      <_AprNesPublishStrip Include="$(PublishDir)AprNesAvalonia.pdb" />
+      <_AprNesPublishStrip Include="$(PublishDir)createdump.exe" />
+      <_AprNesPublishStrip Include="$(PublishDir)Microsoft.DiaSymReader.Native.amd64.dll" />
+    </ItemGroup>
+    <Delete Files="@(_AprNesPublishStrip)" />
+  </Target>
 </Project>

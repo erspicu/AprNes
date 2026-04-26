@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AprNes — Release Notes</title>
+<style>
+  :root { --bg: #1a1a2e; --card: #16213e; --accent: #0f3460; --highlight: #e94560; --text: #eee; --dim: #aaa; --code-bg: #0d1117; --border: #333; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; }
+  .container { max-width: 860px; margin: 0 auto; padding: 40px 24px; }
+  h1 { text-align: center; font-size: 1.8em; margin-bottom: 8px; }
+  .subtitle { text-align: center; color: var(--dim); margin-bottom: 32px; font-size: 0.95em; }
+  .lang-switch { text-align: center; margin-bottom: 36px; }
+  .lang-switch button { background: var(--accent); color: var(--text); border: 1px solid var(--border); padding: 8px 24px; margin: 0 4px; border-radius: 6px; cursor: pointer; font-size: 0.95em; transition: 0.2s; }
+  .lang-switch button:hover, .lang-switch button.active { background: var(--highlight); border-color: var(--highlight); }
+  .date-header { color: var(--highlight); font-size: 1.3em; font-weight: bold; margin: 36px 0 18px; padding-bottom: 8px; border-bottom: 2px solid var(--highlight); }
+  .date-header:first-of-type { margin-top: 0; }
+  .section { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 22px 24px 16px; margin-bottom: 16px; }
+  .section h3 { color: #53a8ff; font-size: 1.05em; margin-bottom: 10px; }
+  p, li { margin-bottom: 8px; }
+  ul { padding-left: 22px; }
+  code { background: var(--code-bg); padding: 2px 8px; border-radius: 4px; font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 0.9em; color: #7ee787; }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.78em; font-weight: bold; margin-right: 6px; vertical-align: middle; }
+  .tag-new { background: #1a6334; color: #7ee787; }
+  .tag-fix { background: #6e3a00; color: #f0ad4e; }
+  .tag-perf { background: #2a1a5e; color: #b391ff; }
+  .tag-ui { background: #0f3460; color: #53a8ff; }
+  .baseline { background: var(--card); border: 1px solid var(--highlight); border-radius: 10px; padding: 18px 24px; margin: 24px 0; text-align: center; }
+  .baseline strong { color: var(--highlight); font-size: 1.1em; }
+  .footer { text-align: center; color: var(--dim); font-size: 0.85em; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border); }
+  .hidden { display: none; }
+  @media (max-width: 600px) { .container { padding: 20px 12px; } .section { padding: 16px 14px 12px; } }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>AprNes — Release Notes</h1>
+<p class="subtitle">Software update history / 軟體更新紀錄</p>
+
+<div class="lang-switch">
+  <button id="btn-en" class="active" onclick="switchLang('en')">English</button>
+  <button id="btn-zh" onclick="switchLang('zh')">繁體中文</button>
+</div>
+
+<!-- ========== ENGLISH ========== -->
+<div id="lang-en">
+
+<div class="baseline">
+  <strong>Test Baseline: 174/174 blargg PASS &bull; 136/136 AccuracyCoin PASS (PERFECT)</strong>
+</div>
+
+<!-- ── 2026-03-29 ── -->
+<div class="date-header">2026-03-29</div>
+
+<div class="section">
+  <h3><span class="tag tag-new">NEW</span> PAL Region Support</h3>
+  <ul>
+    <li>Full PAL (2C07) timing: 312 scanlines, 50 Hz, 3.2:1 PPU/CPU ratio</li>
+    <li>PAL-specific APU tables (noise, DMC, frame counter)</li>
+    <li>PAL palette generated from DAC voltage levels (YUV decoding)</li>
+    <li>Color emphasis R/G swap, odd-frame dot skip disabled</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3><span class="tag tag-new">NEW</span> Dendy Region Support (Russian Famiclone)</h3>
+  <ul>
+    <li>CPU clock divider 15, NMI delayed to scanline 291</li>
+    <li>312 scanlines at 50 Hz, NTSC palette and APU tables</li>
+    <li>Frame counter IRQ disabled (UMC hardware behavior)</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3><span class="tag tag-perf">PERF</span> Async Double Buffer (Analog Mode)</h3>
+  <ul>
+    <li>Ping-pong double buffer with a dedicated GDI render thread</li>
+    <li>Decouples <code>SetDIBitsToDevice</code> from the emulation thread</li>
+    <li>Analog mode at 6x/8x resolution now runs at stable 60 FPS</li>
+    <li>Fixed 3 deadlock scenarios during resolution switching</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3><span class="tag tag-ui">UI</span> Menu Bar Redesign &amp; Region Selector</h3>
+  <ul>
+    <li>Main interface switched from panel buttons to a MenuStrip</li>
+    <li>Region sub-menu: NTSC / PAL / Dendy (instant switch, ROM reload required)</li>
+    <li>Per-channel volume sliders in settings window</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3><span class="tag tag-new">NEW</span> Audio Recording &amp; Channel Volume Control</h3>
+  <ul>
+    <li>Independent volume control for each APU channel (Pulse 1/2, Triangle, Noise, DMC)</li>
+    <li>Audio recording with auto-stop and quality settings</li>
+  </ul>
+</div>
+
+<!-- ── 2026-03-26 ~ 28 ── -->
+<div class="date-header">2026-03-26 ~ 2026-03-28</div>
+
+<div class="section">
+  <h3><span class="tag tag-new">NEW</span> AudioPlus DSP Engine</h3>
+  <ul>
+    <li>Three audio modes: Raw (Mode 0), Classic (Mode 1), Modern Digital (Mode 2)</li>
+    <li>Mode 2 DSP chain: DC Blocker &rarr; FIR LPF &rarr; Stereo Widener &rarr; Comb Reverb &rarr; Biquad HPF &rarr; Soft Limiter</li>
+    <li>Per-channel processing for expansion audio (VRC6, VRC7, 5B, N163, FDS)</li>
+    <li>Performance: +20~28% throughput via FIR unroll, transposed biquad, flat architecture</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3><span class="tag tag-new">NEW</span> Famicom Disk System (FDS) Support</h3>
+  <ul>
+    <li>BIOS validation with SHA-256 verification</li>
+    <li>Disk I/O state machine: motor control, head delay, per-byte transfer, CRC-16</li>
+    <li>Dual IRQ sources: timer IRQ + disk transfer IRQ</li>
+    <li>FDS wavetable audio with FM modulation</li>
+    <li>Automatic disk side swapping via BIOS routine detection</li>
+    <li>Verified: 10+ titles (Donkey Kong, Super Mario Bros., Dracula II, etc.)</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3><span class="tag tag-fix">FIX</span> Mapper Fixes &amp; Additions (12 mappers)</h3>
+  <ul>
+    <li><strong>VRC7 (085)</strong>: Full OPLL FM synthesis audio engine + CHR-RAM banking</li>
+    <li><strong>Namco 163 (019)</strong>: CIRAM nametable mapping and write protection fix</li>
+    <li><strong>VRC4d (025)</strong>: A0/A1 address line swap correction</li>
+    <li><strong>Others</strong>: Irem H-3001, Taito X1-005/X1-017, GxROM, Mapper 070/071/089/152/206 — mirroring &amp; banking fixes</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3><span class="tag tag-perf">PERF</span> NTSC / CRT Post-Processing Optimization</h3>
+  <ul>
+    <li>Symmetric I/Q demodulation mode, Q FIR dual-accumulator SIMD</li>
+    <li>Bilinear batch SIMD, curvature modulo elimination</li>
+    <li>PhosphorDecay default adjusted (0.6 &rarr; 0.15)</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3><span class="tag tag-ui">UI</span> Scaling Filters &amp; Input System</h3>
+  <ul>
+    <li>Two-stage resize pipeline, xBRZ / ScaleX / LibScanline rewrite</li>
+    <li>Player 2 gamepad support with stable device GUID identification</li>
+  </ul>
+</div>
+
+<!-- ── 2026-03-25 ── -->
+<div class="date-header">2026-03-25</div>
+
+<div class="section">
+  <h3><span class="tag tag-fix">FIX</span> MMC5 Complete Rewrite (Mapper 005)</h3>
+  <ul>
+    <li>VRAM Read Notification model (Mesen2-style): PPU notifies MMC5 on every VRAM fetch</li>
+    <li>3-consecutive-NT-read scanline detection replaces old A12 IRQ</li>
+    <li>Automatic CHR A/B set switching based on tile position tracking</li>
+    <li>Fixes: Castlevania III title screen cursor glitch, mmc5test split screen rendering</li>
+  </ul>
+</div>
+
+<!-- ── 2026-03-23 ── -->
+<div class="date-header">2026-03-23</div>
+
+<div class="section">
+  <h3><span class="tag tag-perf">PERF</span> CRT Post-Processing Architecture Rewrite</h3>
+  <ul>
+    <li>Per-row fused pipeline: Shadow Mask + Phosphor Persistence + Beam Convergence in a single pass</li>
+    <li>SWAR shadow mask color correction (eliminated R/B cross-product contamination)</li>
+    <li>Branchless Math.Max for phosphor persistence (CMOV instead of branches)</li>
+    <li>Performance: 6x +3.1%, 8x +10.7% improvement</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3><span class="tag tag-fix">FIX</span> PPU Accuracy Improvements</h3>
+  <ul>
+    <li>Read-time CIRAM mirroring (matches real hardware; fixes Mega Man 5 elevator glitch)</li>
+    <li>$2006 delayed t&rarr;v copy with 3-dot countdown timer (fixes Mega Man 5 vertical jitter)</li>
+  </ul>
+</div>
+
+</div><!-- /lang-en -->
+
+<!-- ========== 繁體中文 ========== -->
+<div id="lang-zh" class="hidden">
+
+<div class="baseline">
+  <strong>測試基線：174/174 blargg 通過 &bull; 136/136 AccuracyCoin 通過（滿分）</strong>
+</div>
+
+<!-- ── 2026-03-29 ── -->
+<div class="date-header">2026-03-29</div>
+
+<div class="section">
+  <h3><span class="tag tag-new">新功能</span> PAL 區域支援</h3>
+  <ul>
+    <li>完整 PAL (2C07) 時序：312 掃描線、50 Hz、3.2:1 PPU/CPU 比</li>
+    <li>PAL 專用 APU 表格（noise、DMC、frame counter）</li>
+    <li>從 DAC 電壓動態生成 PAL 調色盤（YUV 解碼）</li>
+    <li>Color Emphasis 紅綠交換、奇數幀 dot skip 禁用</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3><span class="tag tag-new">新功能</span> Dendy 區域支援（俄羅斯 Famiclone）</h3>
+  <ul>
+    <li>CPU 除頻 ÷15，NMI 延遲至 scanline 291</li>
+    <li>312 掃描線、50 Hz，使用 NTSC 調色盤與 APU 表格</li>
+    <li>Frame counter IRQ 禁用（UMC 硬體行為）</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3><span class="tag tag-perf">效能</span> Async Double Buffer（類比模式非同步渲染）</h3>
+  <ul>
+    <li>Ping-pong 雙重緩衝搭配獨立 GDI 渲染執行緒</li>
+    <li>將 <code>SetDIBitsToDevice</code> 從模擬執行緒解耦</li>
+    <li>類比模式 6x/8x 解析度穩定達到 60 FPS</li>
+    <li>修復切換解析度時的 3 個死鎖問題</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3><span class="tag tag-ui">介面</span> 選單列重新設計與區域選擇器</h3>
+  <ul>
+    <li>主介面從面板按鈕改為 MenuStrip 選單列</li>
+    <li>Region 子選單：NTSC / PAL / Dendy（即時切換，需重載 ROM）</li>
+    <li>設定視窗新增各聲道音量滑桿</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3><span class="tag tag-new">新功能</span> 音訊錄製與聲道獨立音量</h3>
+  <ul>
+    <li>每個 APU 聲道獨立音量控制（Pulse 1/2、Triangle、Noise、DMC）</li>
+    <li>音訊錄製功能，支援自動停止與品質設定</li>
+  </ul>
+</div>
+
+<!-- ── 2026-03-26 ~ 28 ── -->
+<div class="date-header">2026-03-26 ~ 2026-03-28</div>
+
+<div class="section">
+  <h3><span class="tag tag-new">新功能</span> AudioPlus DSP 音效引擎</h3>
+  <ul>
+    <li>三種音效模式：Raw（Mode 0）、Classic（Mode 1）、Modern Digital（Mode 2）</li>
+    <li>Mode 2 DSP 鏈：DC Blocker &rarr; FIR LPF &rarr; Stereo Widener &rarr; Comb Reverb &rarr; Biquad HPF &rarr; Soft Limiter</li>
+    <li>擴展音效逐聲道處理（VRC6、VRC7、5B、N163、FDS）</li>
+    <li>效能提升 +20~28%（FIR unroll、transposed biquad、扁平化架構）</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3><span class="tag tag-new">新功能</span> Famicom Disk System (FDS) 磁碟機支援</h3>
+  <ul>
+    <li>BIOS 驗證（SHA-256 校驗）</li>
+    <li>磁碟 I/O 狀態機：馬達控制、磁頭延遲、逐位元組傳輸、CRC-16</li>
+    <li>雙 IRQ 來源：Timer IRQ + 磁碟傳輸 IRQ</li>
+    <li>FDS wavetable 音效 + FM 調變</li>
+    <li>自動換碟（BIOS 例程偵測）</li>
+    <li>已驗證：10+ 遊戲（大金剛、超級瑪利歐、德乃伯拉 II 等）</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3><span class="tag tag-fix">修復</span> Mapper 大批修復與新增（12 個）</h3>
+  <ul>
+    <li><strong>VRC7 (085)</strong>：完整 OPLL FM 合成音效引擎 + CHR-RAM banking</li>
+    <li><strong>Namco 163 (019)</strong>：CIRAM nametable 映射與寫入保護修正</li>
+    <li><strong>VRC4d (025)</strong>：A0/A1 地址線對調修正</li>
+    <li><strong>其他</strong>：Irem H-3001、Taito X1-005/X1-017、GxROM、Mapper 070/071/089/152/206 — 鏡像與 banking 修正</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3><span class="tag tag-perf">效能</span> NTSC / CRT 後處理優化</h3>
+  <ul>
+    <li>對稱 I/Q 解調模式、Q FIR 雙累加器 SIMD</li>
+    <li>雙線性插值批次 SIMD、曲面變形取模運算消除</li>
+    <li>PhosphorDecay 預設值調整（0.6 &rarr; 0.15）</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3><span class="tag tag-ui">介面</span> 畫面縮放濾鏡與輸入系統</h3>
+  <ul>
+    <li>兩階段縮放管線、xBRZ / ScaleX / LibScanline 重寫</li>
+    <li>新增 Player 2 手把支援，改用裝置 GUID 穩定識別</li>
+  </ul>
+</div>
+
+<!-- ── 2026-03-25 ── -->
+<div class="date-header">2026-03-25</div>
+
+<div class="section">
+  <h3><span class="tag tag-fix">修復</span> MMC5 完整重寫（Mapper 005）</h3>
+  <ul>
+    <li>VRAM Read Notification 模型（Mesen2 風格）：PPU 每次 VRAM fetch 通知 MMC5</li>
+    <li>3 次連續 NT 讀取掃描線偵測，取代舊版 A12 IRQ</li>
+    <li>依 tile 位置自動切換 CHR A/B set</li>
+    <li>修復：惡魔城傳說標題畫面游標亂碼、mmc5test split screen 渲染</li>
+  </ul>
+</div>
+
+<!-- ── 2026-03-23 ── -->
+<div class="date-header">2026-03-23</div>
+
+<div class="section">
+  <h3><span class="tag tag-perf">效能</span> CRT 後處理架構重寫</h3>
+  <ul>
+    <li>Per-row 融合管線：Shadow Mask + Phosphor Persistence + Beam Convergence 單 pass 處理</li>
+    <li>SWAR Shadow Mask 色彩修正（消除 R/B 交叉乘積污染）</li>
+    <li>Branchless Math.Max 磷光持續（CMOV 取代分支）</li>
+    <li>效能：6x +3.1%、8x +10.7% 提升</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3><span class="tag tag-fix">修復</span> PPU 精確度提升</h3>
+  <ul>
+    <li>Read-time CIRAM 鏡像（與真實硬體一致；修復洛克人 5 電梯重複平台）</li>
+    <li>$2006 延遲 t&rarr;v 複製（3 dot countdown timer；修復洛克人 5 垂直震動）</li>
+  </ul>
+</div>
+
+</div><!-- /lang-zh -->
+
+<div class="footer">AprNes Emulator &mdash; Release Notes &mdash; 2026-03-23 ~ 2026-03-29</div>
+
+</div><!-- /container -->
+
+<script>
+function switchLang(lang) {
+  document.getElementById('lang-en').classList.toggle('hidden', lang !== 'en');
+  document.getElementById('lang-zh').classList.toggle('hidden', lang !== 'zh');
+  document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+  document.getElementById('btn-zh').classList.toggle('active', lang === 'zh');
+}
+</script>
+</body>
+</html>

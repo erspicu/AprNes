@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AprNes — About &amp; License</title>
+<style>
+  :root { --bg: #1a1a2e; --card: #16213e; --accent: #0f3460; --highlight: #e94560; --text: #eee; --dim: #aaa; --code-bg: #0d1117; --border: #333; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+  .container { max-width: 820px; margin: 0 auto; padding: 40px 24px; }
+  h1 { text-align: center; font-size: 1.8em; margin-bottom: 8px; }
+  .subtitle { text-align: center; color: var(--dim); margin-bottom: 32px; font-size: 0.95em; }
+  .lang-switch { text-align: center; margin-bottom: 36px; }
+  .lang-switch button { background: var(--accent); color: var(--text); border: 1px solid var(--border); padding: 8px 24px; margin: 0 4px; border-radius: 6px; cursor: pointer; font-size: 0.95em; transition: 0.2s; }
+  .lang-switch button:hover, .lang-switch button.active { background: var(--highlight); border-color: var(--highlight); }
+  .section { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 28px 28px 20px; margin-bottom: 24px; }
+  .section h2 { color: var(--highlight); font-size: 1.25em; margin-bottom: 14px; }
+  p { margin-bottom: 14px; }
+  a { color: #53a8ff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { background: var(--code-bg); padding: 2px 8px; border-radius: 4px; font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 0.9em; color: #7ee787; }
+  .license-box { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 20px 24px; margin: 16px 0; font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 0.85em; line-height: 1.7; white-space: pre-wrap; color: #c9d1d9; text-align: center; }
+  .quote { background: #1c2333; border-left: 4px solid var(--highlight); border-radius: 0 6px 6px 0; padding: 18px 22px; margin: 18px 0; font-size: 0.95em; font-style: italic; color: #ddd; }
+  .links { text-align: center; margin: 20px 0; }
+  .links a { display: inline-block; background: var(--accent); padding: 8px 20px; margin: 4px; border-radius: 6px; color: var(--text); transition: 0.2s; }
+  .links a:hover { background: var(--highlight); text-decoration: none; }
+  .footer { text-align: center; color: var(--dim); font-size: 0.85em; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border); }
+  .hidden { display: none; }
+  @media (max-width: 600px) { .container { padding: 20px 12px; } .section { padding: 18px 16px 14px; } }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>AprNes</h1>
+<p class="subtitle">A cycle-accurate NES emulator / Cycle-accurate NES 模擬器</p>
+
+<div class="lang-switch">
+  <button id="btn-en" class="active" onclick="switchLang('en')">English</button>
+  <button id="btn-zh" onclick="switchLang('zh')">繁體中文</button>
+</div>
+
+<!-- ========== ENGLISH ========== -->
+<div id="lang-en">
+
+<div class="section">
+  <h2>About This Project</h2>
+  <p>AprNes is a cycle-accurate NES (Nintendo Entertainment System) emulator written in C#. It achieves <strong>perfect scores</strong> on both the blargg (174/174) and AccuracyCoin (136/136) test suites.</p>
+  <p>This project was developed with AI assistance (GitHub Copilot / Claude), with a focus on leveraging modern computing power to explore and implement concepts the author wanted to try.</p>
+  <div class="links">
+    <a href="https://github.com/erspicu/AprNes" target="_blank">GitHub</a>
+    <a href="https://www.baxermux.org/myemu/AprNes/" target="_blank">Website</a>
+  </div>
+</div>
+
+<div class="section">
+  <h2>License &mdash; WTFPL</h2>
+  <p>This project is released under the <a href="http://www.wtfpl.net/" target="_blank"><strong>WTFPL</strong></a> (Do What The Fuck You Want To Public License).</p>
+  <div class="license-box">DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE
+Version 2, December 2004
+
+Everyone is permitted to copy and distribute verbatim or modified
+copies of this license document, and changing it is allowed as long
+as the name is changed.
+
+TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION
+
+ 0. You just DO WHAT THE FUCK YOU WANT TO.</div>
+  <p>In plain terms: you can do <strong>absolutely anything</strong> with this code &mdash; copy it, modify it, sell it, relicense it, use it in commercial products, use it without attribution &mdash; no strings attached, no conditions, no exceptions.</p>
+</div>
+
+<div class="section">
+  <h2>Why This License?</h2>
+  <div class="quote">I believe that AI-assisted development builds upon the collective knowledge shared by developers across the internet. It is only fair to give back in the same spirit.</div>
+  <p>This project was built with the help of AI tools. The AI's capabilities come from training on code, documentation, and knowledge that countless developers have openly shared online. The author of this project considers it a natural responsibility to contribute back to that shared pool of knowledge without restriction.</p>
+  <p>Placing any copyright claim on work that was made possible by the open contributions of others would feel contradictory. The WTFPL reflects this philosophy in the most direct way possible: <strong>the author retains no copyright over any part of this project.</strong></p>
+  <p>If any piece of this code helps you &mdash; whether you are learning, building, researching, or just tinkering &mdash; then it has served its purpose.</p>
+</div>
+
+</div><!-- /lang-en -->
+
+<!-- ========== 繁體中文 ========== -->
+<div id="lang-zh" class="hidden">
+
+<div class="section">
+  <h2>關於本專案</h2>
+  <p>AprNes 是一個使用 C# 開發的 cycle-accurate NES（任天堂娛樂系統）模擬器。在 blargg（174/174）與 AccuracyCoin（136/136）兩大測試套件上均達到<strong>滿分</strong>。</p>
+  <p>本專案由 AI 輔助開發（GitHub Copilot / Claude），偏向於利用現代電腦效能來探索並實現作者想嘗試的概念。</p>
+  <div class="links">
+    <a href="https://github.com/erspicu/AprNes" target="_blank">GitHub</a>
+    <a href="https://www.baxermux.org/myemu/AprNes/" target="_blank">官方網站</a>
+  </div>
+</div>
+
+<div class="section">
+  <h2>授權條款 &mdash; WTFPL</h2>
+  <p>本專案採用 <a href="http://www.wtfpl.net/" target="_blank"><strong>WTFPL</strong></a>（Do What The Fuck You Want To Public License）授權。</p>
+  <div class="license-box">DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE
+Version 2, December 2004
+
+Everyone is permitted to copy and distribute verbatim or modified
+copies of this license document, and changing it is allowed as long
+as the name is changed.
+
+TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION
+
+ 0. You just DO WHAT THE FUCK YOU WANT TO.</div>
+  <p>簡單來說：您可以對這份程式碼做<strong>任何事</strong>——複製、修改、販售、重新授權、用於商業產品、不標註出處——完全沒有任何附帶條件，沒有例外。</p>
+</div>
+
+<div class="section">
+  <h2>為什麼選擇這個授權？</h2>
+  <div class="quote">我認為 AI 輔助開發建立在網路上每位開發者共享的知識之上，將成果回饋分享是理所當然的。</div>
+  <p>本專案是在 AI 工具的協助下完成的。AI 的能力來自於對無數開發者公開分享的程式碼、文件與知識的訓練。作者認為，將成果無條件地回饋給這個共享的知識庫，是一種自然而然的責任。</p>
+  <p>對一個因他人的開放貢獻而成為可能的作品主張著作權，會讓人感到矛盾。WTFPL 以最直接的方式體現了這個理念：<strong>作者不保留本專案的任何著作權。</strong></p>
+  <p>如果這份程式碼的任何部分對您有所幫助——無論您是在學習、開發、研究，還是純粹出於興趣——那它就已經達成了它的目的。</p>
+</div>
+
+</div><!-- /lang-zh -->
+
+<div class="footer">AprNes Emulator &mdash; About &amp; License</div>
+
+</div><!-- /container -->
+
+<script>
+function switchLang(lang) {
+  document.getElementById('lang-en').classList.toggle('hidden', lang !== 'en');
+  document.getElementById('lang-zh').classList.toggle('hidden', lang !== 'zh');
+  document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+  document.getElementById('btn-zh').classList.toggle('active', lang === 'zh');
+}
+</script>
+</body>
+</html>
