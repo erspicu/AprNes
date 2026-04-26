@@ -67,7 +67,9 @@ namespace AprNes
         internal static int crt_frameCount;
 
         // ── Display dimensions ────────────────────────────────────────
-        public const int Crt_SrcW = 1024;
+        // Crt_SrcW tracks linearBuffer width (kOutW), so HD_NTSC double-rate
+        // (2048 samples/scanline) propagates to all CRT backends automatically.
+        public const int Crt_SrcW = kOutW;
         public const int Crt_SrcH = 240;
         static int? _fullscreenW = null, _fullscreenH = null;
         public static int Crt_DstW => _fullscreenW ?? 256 * crt_analogSize;

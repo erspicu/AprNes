@@ -32,10 +32,11 @@ namespace AprNes
         // Shader (compiled once, reused every frame)
         static SKRuntimeEffect? _effect;
 
-        // Input: 1024×240 Bgra8888 quantization of linearBuffer RGB planes
+        // Input: kOutW×240 Bgra8888 quantization of linearBuffer RGB planes
+        // (1024 non-HD, 2048 HD — tracks linearBuffer stride automatically)
         static SKBitmap? _inputBitmap;
         static byte* _inputScratch;           // unmanaged staging for InstallPixels
-        const int SrcW = 1024;
+        const int SrcW = kOutW;
         const int SrcH = 240;
 
         // Output + phosphor ping-pong (Step 3): _prevSurface holds frame N-1,
@@ -162,7 +163,11 @@ namespace AprNes
             uniforms["uVignetteStrength"] = VignetteStrength;
             uniforms["uCurvature"] = CurvatureStrength;
             uniforms["uConvergence"] = ConvergenceStrength;
-            uniforms["uHBlurAlpha"] = HBeamSpread * 0.5f;
+            // HBlurAlpha is the side-tap weight of a 3-tap source-pixel-space blur.
+            // At HD_NTSC the source is 2× denser, so the kernel covers half the
+            // angular dot range — boost the side-tap weight by 1/kSampleRateScale
+            // to compensate (clamped at 0.45f to keep center weight non-negative).
+            uniforms["uHBlurAlpha"] = Math.Min(HBeamSpread * 0.5f / kSampleRateScale, 0.45f);
             uniforms["uPhosphorDecay"] = PhosphorDecay;
 
             var children = new SKRuntimeEffectChildren(_effect);
