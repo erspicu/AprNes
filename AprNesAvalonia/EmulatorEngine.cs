@@ -269,7 +269,7 @@ public sealed unsafe class EmulatorEngine : IDisposable
         // Phase A4b: pipeline is always initialised — it does palette→RGB conversion
         // even when no filters are active (1× no-filter path). Digital mode never
         // bypasses the pipeline now.
-        _pipeline.Init(null);
+        _pipeline.Init();
 
         // Update render output info for VideoRecorder (mirrors WinForms RenderObj.init)
         NesCore.RenderOutputW = newW;
@@ -434,7 +434,7 @@ public sealed unsafe class EmulatorEngine : IDisposable
 
         // Phase A4b: pipeline always re-init'd. Input pointer no longer matters — pipeline
         // reads ntsc_rowPalettes via NesCore.Convert_PalIdxFrameToRGB.
-        _pipeline.Init(null);
+        _pipeline.Init();
 
         _running = true;
         _fpsDeadline = 0;
@@ -559,7 +559,7 @@ public sealed unsafe class EmulatorEngine : IDisposable
             {
                 // Phase A4b: digital path always goes through pipeline.
                 // Pipeline does palette→RGB conversion + (optional) filter scaling.
-                if (!_pipeline.IsInitialized) _pipeline.Init(null);
+                if (!_pipeline.IsInitialized) _pipeline.Init();
                 _pipeline.Process();
                 Buffer.MemoryCopy(_pipeline.OutputPtr, dst, copyBytes, copyBytes);
             }

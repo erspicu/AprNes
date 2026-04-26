@@ -57,6 +57,11 @@
     <Compile Include="../AprNes/tool/libXBRz.cs" Link="Tool/libXBRz.cs" />
     <Compile Include="../AprNes/tool/Scalex.cs" Link="Tool/Scalex.cs" />
     <Compile Include="../AprNes/tool/LibScanline.cs" Link="Tool/LibScanline.cs" />
+
+    <!-- Phase 5.6: shared two-stage resize pipeline (composes the three filters above).
+         Single source of truth — was duplicated as AprNesAvalonia/Platform/RenderPipeline.cs
+         and AprNes/tool/Render_resize.cs (NetFx version still wraps this with GDI bits). -->
+    <Compile Include="../AprNes/tool/RenderPipeline.cs" Link="Tool/RenderPipeline.cs" />
   </ItemGroup>
 
   <ItemGroup>
