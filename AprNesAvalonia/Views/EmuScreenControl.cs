@@ -63,7 +63,17 @@ public class EmuScreenControl : Control
                 // Phase 3A: render-thread GPU CRT. Runs SkSL on the GPU-backed
                 // canvas (D3D11 on Windows). Skips the emulator-thread raster
                 // CRT entirely. Active only when Gpu backend + this flag set.
+                //
+                // UltraAnalog gate: GPU CRT shader reads NesCore.linearBuffer,
+                // which is only populated by emu's DecodeScanline_Physical
+                // (Ultra path). Non-Ultra emu uses DecodeScanline_Fast which
+                // writes ntsc_analogScreenBuf directly and never touches
+                // linearBuffer — so the GPU shader would render an empty/stale
+                // float buffer → black screen. Fall back to the FrontBufferPtr
+                // memcpy path (which will display ntsc_analogScreenBuf via
+                // OutputOneFrame's analog branch).
                 if (AprNes.NesCore.AnalogEnabled &&
+                    AprNes.NesCore.UltraAnalog &&
                     AprNes.NesCore.CrtEnabled &&
                     AprNes.NesCore.CrtGpuRenderThreadActive &&
                     CrtGpuRenderThread.IsReady)
