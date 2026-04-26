@@ -190,9 +190,9 @@ namespace AprNes
         // AnalogScreenBufBack = back buffer (GDI 讀取上一幀)
         static public uint* AnalogScreenBufBack = null;
         // 渲染執行緒同步事件
-        static public ManualResetEventSlim analogRenderReady = new ManualResetEventSlim(false);
-        static public ManualResetEventSlim analogRenderDone  = new ManualResetEventSlim(true); // 初始已完成
-        static public volatile bool analogRenderThreadRunning = false;
+        static public ManualResetEventSlim renderReady = new ManualResetEventSlim(false);
+        static public ManualResetEventSlim renderDone  = new ManualResetEventSlim(true); // 初始已完成
+        static public volatile bool renderThreadRunning = false;
 
         /// <summary>
         /// 交換 front/back buffer 指標，並更新 CRT/NTSC 的 buffer 指標。
@@ -233,12 +233,13 @@ namespace AprNes
             if (MapperObj != null) { MapperObj.Cleanup(); MapperObj = null; }
             if (PRG_ROM      != null) { NesCore.FreeUnmanaged((IntPtr)PRG_ROM);      PRG_ROM      = null; }
             if (CHR_ROM      != null) { NesCore.FreeUnmanaged((IntPtr)CHR_ROM);      CHR_ROM      = null; }
-            if (ScreenBuf1x  != null) { NesCore.FreeUnmanaged((IntPtr)ScreenBuf1x);  ScreenBuf1x  = null; }
             if (NesColors    != null) { NesCore.FreeUnmanaged((IntPtr)NesColors);    NesColors    = null; }
             if (spr_ram      != null) { NesCore.FreeUnmanaged((IntPtr)spr_ram);      spr_ram      = null; }
             if (secondaryOAM != null) { NesCore.FreeUnmanaged((IntPtr)secondaryOAM); secondaryOAM = null; }
             if (corruptOamRow!= null) { NesCore.FreeUnmanaged((IntPtr)corruptOamRow);corruptOamRow= null; }
             if (ppu_ram      != null) { NesCore.FreeUnmanaged((IntPtr)ppu_ram);      ppu_ram      = null; }
+            if (ntsc_rowPalettes != null) { NesCore.FreeUnmanaged((IntPtr)ntsc_rowPalettes); ntsc_rowPalettes = null; }
+            if (digitalFrameRgb != null) { NesCore.FreeUnmanaged((IntPtr)digitalFrameRgb); digitalFrameRgb = null; }
             if (FlipTable    != null) { NesCore.FreeUnmanaged((IntPtr)FlipTable);    FlipTable    = null; }
             if (sprShiftL    != null) { NesCore.FreeUnmanaged((IntPtr)sprShiftL);    sprShiftL    = null; }
             if (sprShiftH    != null) { NesCore.FreeUnmanaged((IntPtr)sprShiftH);    sprShiftH    = null; }
@@ -248,7 +249,6 @@ namespace AprNes
             if (chrBankPtrs  != null) { NesCore.FreeUnmanaged((IntPtr)chrBankPtrs);  chrBankPtrs  = null; }
             if (chrBankPtrsA != null) { NesCore.FreeUnmanaged((IntPtr)chrBankPtrsA); chrBankPtrsA = null; }
             if (chrBankPtrsB != null) { NesCore.FreeUnmanaged((IntPtr)chrBankPtrsB); chrBankPtrsB = null; }
-            if (ntscScanBuf  != null) { NesCore.FreeUnmanaged((IntPtr)ntscScanBuf);  ntscScanBuf  = null; }
             if (NES_MEM      != null) { NesCore.FreeUnmanaged((IntPtr)NES_MEM);      NES_MEM      = null; }
             if (Vertical           != null) { NesCore.FreeUnmanaged((IntPtr)Vertical);           Vertical           = null; }
             if (AnalogScreenBuf     != null) { NesCore.FreeUnmanaged((IntPtr)AnalogScreenBuf);     AnalogScreenBuf     = null; AnalogBufSize = 0; }
@@ -333,8 +333,7 @@ namespace AprNes
             for (int i = 0; i < 8; i++)
             { sprShiftL[i] = 0; sprShiftH[i] = 0; sprXCounter[i] = 0; sprFetchAttr[i] = 0; }
             sprSlotCount = 0; sprZeroInSlots = false;
-            // 3-dot pixel pipeline
-            dotColor = prevDotColor = prevPrevDotColor = prevPrevPrevDotColor = 0;
+            // 3-dot pixel pipeline (Phase A5: palette indices only)
             dotPalIdx = prevDotPalIdx = prevPrevDotPalIdx = prevPrevPrevDotPalIdx = 0;
             skippedPreRenderDot341 = false;
             // P4-1: OAM corruption
@@ -478,7 +477,6 @@ prerender_sprite0_x = 0;
                 }
 
                 //init allocate
-                ScreenBuf1x      = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * 61440);
                 if (AnalogEnabled)
                 {
                     SyncAnalogConfig();  // 確保 Crt_DstW/DstH 使用正確的 AnalogSize
@@ -492,12 +490,18 @@ prerender_sprite0_x = 0;
                 corruptOamRow    = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 32);
                 ppu_ram          = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 0x4000);
                 palCache         = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * 32);
+                // Phase A2: per-frame palette index buffer, used by both analog and digital paths.
+                // 240 scanlines × 256 pixels = 60 KB.
+                ntsc_rowPalettes = (byte*)NesCore.AllocUnmanaged(240 * 256);
+                // Phase C-3: pre-converted RGB buffer for digital path (256×240 uint = 256 KB).
+                // emu populates at frame end via Convert_PalIdxFrameToRGB; render thread reads —
+                // race-free vs next frame's PixelZone palette index writes.
+                digitalFrameRgb = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * 256 * 240);
                 InitFlipTable();
                 sprShiftL        = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 8);
                 sprShiftH        = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 8);
                 sprXCounter      = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 8);
                 sprFetchAttr     = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 8);
-                ntscScanBuf      = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 256);
                 // Allocate expansionChannels early — Mapper024/019/069/085 etc.
                 // touch NesCore.expansionChannels[0..7] in their Reset(), which
                 // runs BEFORE initAPU() is called below.
@@ -548,7 +552,6 @@ prerender_sprite0_x = 0;
                     *Vertical = dbEntry.MirrorOverride;
                 MapperObj.UpdateCHRBanks();
 
-                for (int i = 0; i < 61440; i++) ScreenBuf1x[i] = 0;
                 for (int i = 0; i < 16384; i++) ppu_ram[i] = 0;
                 for (int i = 0; i < 256; i++) spr_ram[i] = 0;
                 for (int i = 0; i < 32; i++) { secondaryOAM[i] = 0; corruptOamRow[i] = 0; }
@@ -641,24 +644,32 @@ prerender_sprite0_x = 0;
                 return;
             }
 
-            if (isFDS)
+            emuThreadAlive = true;
+            try
             {
-                Run_FDS();
+                if (isFDS)
+                {
+                    Run_FDS();
+                }
+                else if (Region == RegionType.NTSC)
+                {
+                    Run_NTSC();
+                }
+                else if (Region == RegionType.Dendy)
+                {
+                    Run_Dendy();
+                }
+                else if (Region == RegionType.PAL)
+                {
+                    Run_PAL();
+                }
+                // All RegionType enum values (NTSC/PAL/Dendy) are covered above,
+                // plus isFDS. No fallback path needed.
             }
-            else if (Region == RegionType.NTSC)
+            finally
             {
-                Run_NTSC();
+                emuThreadAlive = false;
             }
-            else if (Region == RegionType.Dendy)
-            {
-                Run_Dendy();
-            }
-            else if (Region == RegionType.PAL)
-            {
-                Run_PAL();
-            }
-            // All RegionType enum values (NTSC/PAL/Dendy) are covered above,
-            // plus isFDS. No fallback path needed.
         }
 
         // NTSC fast path. MasterClockTickInlineNTSC is AggressiveInlined

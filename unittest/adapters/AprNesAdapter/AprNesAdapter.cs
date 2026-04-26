@@ -94,9 +94,12 @@ namespace AprNesAdapter
 
         public void GetScreenPixels(uint[] buffer)
         {
-            uint* screen = AprNes.NesCore.ScreenBuf1x;
+            // Phase A5: emu output is palette indices in ntsc_rowPalettes; convert via NesColors.
+            byte* pal = AprNes.NesCore.ntsc_rowPalettes;
+            uint* colors = AprNes.NesCore.NesColors;
+            if (pal == null || colors == null) return;
             for (int i = 0; i < 256 * 240; i++)
-                buffer[i] = screen[i];
+                buffer[i] = colors[pal[i]];
         }
 
         public void SetP1Buttons(bool a, bool b, bool select, bool start,

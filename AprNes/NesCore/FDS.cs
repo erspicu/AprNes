@@ -312,7 +312,6 @@ namespace AprNes
                 for (int i = 0; i < 32768; i++) fdsPrgRam[i] = 0;
 
                 // Shared hardware allocations (same as init())
-                ScreenBuf1x      = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * 61440);
                 if (AnalogEnabled)
                 {
                     SyncAnalogConfig();
@@ -325,6 +324,10 @@ namespace AprNes
                 corruptOamRow    = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 32);
                 ppu_ram          = (byte*)NesCore.AllocUnmanaged(sizeof(byte) * 0x4000);
                 palCache         = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * 32);
+                // Phase A2: per-frame palette index buffer (analog + digital).
+                ntsc_rowPalettes = (byte*)NesCore.AllocUnmanaged(240 * 256);
+                // Phase C-3: pre-converted RGB buffer for digital path.
+                digitalFrameRgb = (uint*)NesCore.AllocUnmanaged(sizeof(uint) * 256 * 240);
                 InitFlipTable();
                 // expansionChannels: needed by mapper Reset() before initAPU()
                 expansionChannels = (int*)NesCore.AllocUnmanaged(sizeof(int) * 8);
@@ -356,7 +359,6 @@ namespace AprNes
                 mmc5Ref = null;
 
                 // Clear all buffers
-                for (int i = 0; i < 61440; i++) ScreenBuf1x[i] = 0;
                 for (int i = 0; i < 16384; i++) ppu_ram[i] = 0;
                 for (int i = 0; i < 256; i++) spr_ram[i] = 0;
                 for (int i = 0; i < 32; i++) { secondaryOAM[i] = 0; corruptOamRow[i] = 0; }

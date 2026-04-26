@@ -318,19 +318,11 @@ namespace AprNes
             // 設定變更前先停止錄影（避免 raw 格式不一致）
             AprNesUI.GetInstance().StopRecordingOnSettingsChange();
 
-            // ── 先停止 async 渲染執行緒，再暫停模擬執行緒 ────────────────
-            // async 模式下模擬端不走 sync path、不設 emuWaiting，
-            // 必須先停渲染執行緒（內含 _event.Reset），讓模擬端回到 sync fallback
-            AprNesUI.GetInstance().StopAnalogRenderThread();
-
-            // 防止 CrtScreen.Render() 在欄位已改、緩衝區未重建時存取越界記憶體
+            // Phase C: 暫停 emu + 等渲染執行緒完成當前 iteration（不停 thread）
+            // async 模式下 emu 也會在 RenderScreen 末尾檢查 _event，所以 PauseEmuAndRender 兩種模式都通
             bool isRunning = AprNesUI.GetInstance().IsRunning;
             if (isRunning)
-            {
-                NesCore._event.Reset();
-                // 等待模擬執行緒完成當前整幀並阻塞於 _event.WaitOne()
-                while (!NesCore.emuWaiting) System.Threading.Thread.Sleep(1);
-            }
+                AprNesUI.GetInstance().PauseEmuAndRender();
 
             // ── Resize stage settings ──────────────────────────────────────
             AprNesUI.GetInstance().AppConfigure["ResizeStage1"] = filterItemsS1[sizelevel1.SelectedIndex][1];

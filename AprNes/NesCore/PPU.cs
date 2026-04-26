@@ -140,9 +140,8 @@ namespace AprNes
         static bool ppuGreyscale = false; // $2001 bit 0 — greyscale mode (palette read returns & 0x30)
         static byte ppuEmphasis = 0; // $2001[7:5] emphasis bits (for NTSC signal amplitude)
 
-        // NTSC 類比模式：每條掃描線的原始調色盤索引緩衝區（256 bytes，0x00-0x3F）
-        // 由 RenderBGTile 和 RenderSpritesLine 在 AnalogEnabled=true 時填入
-        static byte* ntscScanBuf;
+        // (Phase A1: removed ntscScanBuf scratch — analog now writes directly to
+        // ntsc_rowPalettes per-frame buffer in NTSC_CRT/Ntsc.cs.)
 
         // MMC5 extended attribute mode (per-tile palette + CHR bank from ExRAM)
         static ushort extAttrNTOffset;  // nametable offset saved at phase 1
@@ -239,8 +238,13 @@ namespace AprNes
         static bool oamCorruptDisabledFlag = false;     // TriCNES: PPU_OAMCorruptionRenderingDisabledOutOfVBlank
 
         // P4-2: Palette corruption flags
-        static public uint* ScreenBuf1x;
-        static uint* NesColors; //, targetSize;
+        // (Phase A5: ScreenBuf1x retired — emu writes palette indices to
+        // ntsc_rowPalettes; render-side does NesColors[] lookup at scale time.)
+        static public uint* NesColors;
+        // Phase C-3: emu pre-converts ntsc_rowPalettes → RGB into this buffer at
+        // frame end, BEFORE signaling the render thread. Render thread reads it
+        // race-free; next frame's PixelZone writes don't touch it.
+        static public uint* digitalFrameRgb;
         static byte spr_ram_add = 0;
 
         static bool oddSwap = false;
@@ -275,10 +279,9 @@ namespace AprNes
         static bool sprZeroInSlots = false;            // Sprite 0 is in slot 0
 
         // ── 3-dot pixel output pipeline (TriCNES P2-2) ──
-        // TriCNES: PrevPrevPrevDotColor → PrevPrevDotColor → PrevDotColor → DotColor
-        // DrawToScreen uses PrevPrevPrevDotColor (3 dot delay).
-        // Pipeline stores composite (BG+sprite) color and palette index.
-        static uint dotColor = 0, prevDotColor = 0, prevPrevDotColor = 0, prevPrevPrevDotColor = 0;
+        // TriCNES: PrevPrevPrev → PrevPrev → Prev → Dot (3 dot delay before draw).
+        // Phase A5: only the palette-index pipeline survives; dotColor (RGB) was
+        // dropped together with ScreenBuf1x — render-side does NesColors[] lookup.
         static byte dotPalIdx = 0, prevDotPalIdx = 0, prevPrevDotPalIdx = 0, prevPrevPrevDotPalIdx = 0;
 
         // ── P4-4: Odd frame skip side effects ──
@@ -401,6 +404,20 @@ namespace AprNes
             cache[20] = cache[4];
             cache[24] = cache[8];
             cache[28] = cache[12];
+        }
+
+        // Phase A4: per-frame palette → RGB conversion. Reads ntsc_rowPalettes
+        // (60 KB byte buffer, NES color indices 0..63) and writes 256×240 uint
+        // RGB pixels via NesColors[] lookup. Called by Render_resize each frame
+        // when emu output is the palette buffer rather than ScreenBuf1x.
+        public static unsafe void Convert_PalIdxFrameToRGB(uint* dst)
+        {
+            if (ntsc_rowPalettes == null || NesColors == null || dst == null) return;
+            byte* src = ntsc_rowPalettes;
+            uint* colors = NesColors;
+            int total = 256 * 240;
+            for (int i = 0; i < total; i++)
+                dst[i] = colors[src[i]];
         }
 
         // Legacy Ppu2007SmTick / Increment2007 removed — replaced by SR latch 3-phase model
@@ -902,45 +919,54 @@ namespace AprNes
 
         static public bool screen_lock = false;
         static public volatile bool emuWaiting = false;
+        // Set true by NesCore.run() while the emu thread is executing; false when
+        // the thread is not alive (no ROM loaded, or after exit). TryPauseEmu uses
+        // this to avoid spinning forever when no emu thread exists yet.
+        static public volatile bool emuThreadAlive = false;
+
+        // Shared quiesce helper used by both NetFx and Avalonia front-ends to safely
+        // park the emu thread (and the render thread, if running) before mutating
+        // NesCore state from the UI thread. Returns true when a pause was performed
+        // (caller must call ResumeEmu afterwards); false if no emu thread exists
+        // or it's shutting down (caller should NOT call ResumeEmu in that case).
+        // Note: we don't early-return on `emuWaiting` alone — it briefly flips true
+        // every frame on the renderThreadRunning code path, so checking it without
+        // also checking _event state would race.
+        public static bool TryPauseEmu()
+        {
+            if (exit || !emuThreadAlive) return false;
+            _event.Reset();
+            while (!emuWaiting && !exit && emuThreadAlive) System.Threading.Thread.Sleep(1);
+            if (renderThreadRunning && !exit) renderDone.Wait();
+            return !exit && emuThreadAlive;
+        }
+
+        public static void ResumeEmu() => _event.Set();
+
         static void RenderScreen()
         {
-            if (!AnalogEnabled)
+            // Phase C-3: unified path — render thread (when running) handles both
+            // analog and digital. Sync fallback only for headless / Avalonia
+            // (which never starts the render thread).
+            if (renderThreadRunning)
             {
-                // === 數位模式同步 path / headless (最常見路徑) ===
-                screen_lock = true;
-                VideoOutput?.Invoke(null, null);
-                screen_lock = false;
-                emuWaiting = true;
-                _event.WaitOne();
-                emuWaiting = false;
-            }
-            else if (!analogRenderThreadRunning)
-            {
-                // === Analog 同步 fallback (UI 停止渲染執行緒時 / headless 模式) ===
-                screen_lock = true;
-                if (UltraAnalog && CrtEnabled) Crt_Render();
-                VideoOutput?.Invoke(null, null);
-                screen_lock = false;
+                // Async: emu just signals; render thread does the work
+                // (digital reads digitalFrameRgb, analog runs Crt_Render → swap → blit).
+                renderReady.Set();
                 emuWaiting = true;
                 _event.WaitOne();
                 emuWaiting = false;
             }
             else
             {
-                // === Async double buffer path (類比模式) ===
+                // Sync fallback (headless TestRunner, Avalonia compositor model).
                 screen_lock = true;
-                if (UltraAnalog && CrtEnabled) Crt_Render();
+                if (AnalogEnabled && UltraAnalog && CrtEnabled) Crt_Render();
+                VideoOutput?.Invoke(null, null);
                 screen_lock = false;
-
-                // 等上一幀 GDI 完成（如果還在跑）
-                analogRenderDone.Wait();
-                analogRenderDone.Reset();
-
-                // Swap front/back buffer — GDI 讀 back buffer（上一幀），模擬寫 front buffer（下一幀）
-                SwapAnalogBuffers();
-
-                // 通知渲染執行緒開始 blit back buffer
-                analogRenderReady.Set();
+                emuWaiting = true;
+                _event.WaitOne();
+                emuWaiting = false;
             }
         }
 

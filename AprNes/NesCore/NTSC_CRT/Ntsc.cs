@@ -147,7 +147,8 @@ namespace AprNes
                 loLevels[0] = -0.12f; loLevels[1] = 0.00f; loLevels[2] = 0.31f; loLevels[3] = 0.72f;
                 // Row-capture buffers for deferred parallel demodulation.
                 // Scratch buffers (wave/cBuf/dotY/I/Q) are now per-thread via [ThreadStatic].
-                ntsc_rowPalettes = (byte*)NesCore.AllocUnmanaged(kSrcH * 256);
+                // Phase A2: ntsc_rowPalettes is now allocated unconditionally in Main.init/initFDS
+                // (used by both analog and digital paths). Only NTSC-specific row metadata stays here.
                 ntsc_rowEmphasis = (byte*)NesCore.AllocUnmanaged(kSrcH);
                 ntsc_rowPhase0   = (int*)NesCore.AllocUnmanaged(kSrcH * sizeof(int));
                 hiLevels = (float*)NesCore.AllocUnmanaged(4 * sizeof(float));
@@ -370,7 +371,7 @@ namespace AprNes
         // CRITICAL: phase0 must be captured per-scanline on the PPU thread (scanPhase6 /
         // scanPhaseBase are serial state — reading them from parallel workers would race
         // and produce non-deterministic subcarrier phase, corrupting colour output).
-        static byte* ntsc_rowPalettes;    // kSrcH × 256 bytes
+        public static byte* ntsc_rowPalettes;    // kSrcH × 256 bytes (Phase A5: public — emu's per-frame palette buffer)
         static byte* ntsc_rowEmphasis;    // kSrcH bytes
         static int* ntsc_rowPhase0;       // kSrcH ints — captured subcarrier phase per scanline
 
@@ -388,10 +389,11 @@ namespace AprNes
         // cx==260 of each scanline. Advancing scanPhase6 / scanPhaseBase here (single-threaded)
         // keeps the per-scanline phase sequence deterministic — subsequent parallel decode
         // reads the captured phase0 per row, never touching the serial counters.
-        public static void Ntsc_CaptureScanline(int sl, byte* palBuf, byte emphasisBits)
+        // Phase A1: PixelZone now writes palette indices directly into ntsc_rowPalettes.
+        // This function only captures emphasis + per-scanline phase0 for parallel decode.
+        public static void Ntsc_CaptureScanline(int sl, byte emphasisBits)
         {
             if (sl < 0 || sl >= kSrcH) return;
-            Buffer.MemoryCopy(palBuf, ntsc_rowPalettes + sl * 256, 256, 256);
             ntsc_rowEmphasis[sl] = emphasisBits;
             // Capture + advance per the path that'll decode this row.
             // Ultra-analog → _Physical uses scanPhaseBase; else _Fast uses scanPhase6.

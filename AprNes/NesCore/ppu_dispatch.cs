@@ -230,11 +230,10 @@ namespace AprNes
             if (ppu2001UpdateDelay > 0) PpuPhase_Apply2001Mask();
             if (ppu2001EmphasisDelay > 0) PpuPhase_Apply2001Emphasis();
 
-            // ── Pipeline shift (mode-specialised: only the active output's chain) ──
-            if (!isAnalog)
-            { prevPrevPrevDotColor = prevPrevDotColor; prevPrevDotColor = prevDotColor; prevDotColor = dotColor; }
-            else
-            { prevPrevPrevDotPalIdx = prevPrevDotPalIdx; prevPrevDotPalIdx = prevDotPalIdx; prevDotPalIdx = dotPalIdx; }
+            // ── Pipeline shift (palette index only, both modes) ──
+            // Phase A5: dotColor pipeline retired with ScreenBuf1x. Both digital and analog
+            // now consume only the palette-index pipeline; render-side does NesColors[] lookup.
+            prevPrevPrevDotPalIdx = prevPrevDotPalIdx; prevPrevDotPalIdx = prevDotPalIdx; prevDotPalIdx = dotPalIdx;
 
             // ── Inlined render block (tile-fetch gate always true, pixel+shift always run) ──
             // cx ∈ [1, 256] throughout.
@@ -357,22 +356,13 @@ namespace AprNes
                     CorruptPalettes(bgColor, vram_addr);
                 }
 
-                if (!isAnalog)
-                {
-                    uint compositeColor = palCache[0];
-                    if (showBG || showSpr)
-                    { int pa = (bgPalette << 2) | bgColor; if (bgColor == 0) pa = 0; compositeColor = palCache[pa]; }
-                    else { if ((vram_addr & 0x3F1F) >= 0x3F00) { int pa = vram_addr & 0x1F; if ((pa & 3) == 0) pa &= 0x0F; compositeColor = NesColors[ppu_ram[0x3f00 + pa] & 0x3f]; } }
-                    dotColor = compositeColor;
-                }
-                else
-                {
-                    byte compositePalIdx = (byte)(ppu_ram[0x3f00] & 0x3f);
-                    if (showBG || showSpr)
-                    { int pa = (bgPalette << 2) | bgColor; if (bgColor == 0) pa = 0; compositePalIdx = (byte)(ppu_ram[0x3f00 + pa] & 0x3f); }
-                    else { if ((vram_addr & 0x3F1F) >= 0x3F00) { int pa = vram_addr & 0x1F; if ((pa & 3) == 0) pa &= 0x0F; compositePalIdx = (byte)(ppu_ram[0x3f00 + pa] & 0x3f); } }
-                    dotPalIdx = compositePalIdx;
-                }
+                // Phase A5: both modes compute only compositePalIdx; render-side
+                // converts palette indices to RGB via Convert_PalIdxFrameToRGB.
+                byte compositePalIdx = (byte)(ppu_ram[0x3f00] & 0x3f);
+                if (showBG || showSpr)
+                { int pa = (bgPalette << 2) | bgColor; if (bgColor == 0) pa = 0; compositePalIdx = (byte)(ppu_ram[0x3f00 + pa] & 0x3f); }
+                else { if ((vram_addr & 0x3F1F) >= 0x3F00) { int pa = vram_addr & 0x1F; if ((pa & 3) == 0) pa &= 0x0F; compositePalIdx = (byte)(ppu_ram[0x3f00 + pa] & 0x3f); } }
+                dotPalIdx = compositePalIdx;
             }
 
             // ── Sprite shift (cx <= 256 always true) ──
@@ -409,18 +399,11 @@ namespace AprNes
 
             Ppu2007_BusRead();
 
-            // ── Draw (mode-specialised) ──
+            // ── Draw (Phase A5: palette indices only) ──
             if (cx >= 4)
             {
-                if (!isAnalog)
-                {
-                    int pos = (scanline << 8) + (cx - 4);
-                    ScreenBuf1x[pos] = prevPrevPrevDotColor;
-                }
-                else
-                {
-                    ntscScanBuf[cx - 4] = prevPrevPrevDotPalIdx;
-                }
+                int pos = (scanline << 8) + (cx - 4);
+                ntsc_rowPalettes[pos] = prevPrevPrevDotPalIdx;
             }
 
             ppuRenderingEnabled = ShowBackGround_Instant || ShowSprites_Instant;
@@ -465,14 +448,16 @@ namespace AprNes
             Ppu2007_BusRead();
 
             // Draw: only post-inc cx==259 fires (entry 258).
+            // Phase A5: palette indices only — render-side does palette→RGB.
             if (cx == 259)
             {
                 int pos = (scanline << 8) + 255;
-                if (AnalogEnabled) ntscScanBuf[255] = prevPrevPrevDotPalIdx;
-                else ScreenBuf1x[pos] = prevPrevPrevDotColor;
+                ntsc_rowPalettes[pos] = prevPrevPrevDotPalIdx;
             }
+            // Phase A1: analog scanline data is already in ntsc_rowPalettes;
+            // Ntsc_CaptureScanline now only sets emphasis + advances per-row phase counters.
             if (AnalogEnabled && cx == 260)
-                Ntsc_CaptureScanline(scanline, ntscScanBuf, ppuEmphasis);
+                Ntsc_CaptureScanline(scanline, ppuEmphasis);
 
             ppuRenderingEnabled = ShowBackGround_Instant || ShowSprites_Instant;
         }
@@ -590,11 +575,11 @@ namespace AprNes
             Ppu2007_BusRead();
 
             // Only post-inc cx 257/258 produce the final delayed pixels.
+            // Phase A5: palette indices only.
             if (scanline < 240 && (cx == 257 || cx == 258))
             {
                 int pos = (scanline << 8) + (cx - 4);
-                if (AnalogEnabled) ntscScanBuf[cx - 4] = prevPrevPrevDotPalIdx;
-                else ScreenBuf1x[pos] = prevPrevPrevDotColor;
+                ntsc_rowPalettes[pos] = prevPrevPrevDotPalIdx;
             }
 
             ppuRenderingEnabled = ShowBackGround_Instant || ShowSprites_Instant;
@@ -719,7 +704,7 @@ namespace AprNes
             if (ppu2001UpdateDelay > 0) PpuPhase_Apply2001Mask();
             if (ppu2001EmphasisDelay > 0) PpuPhase_Apply2001Emphasis();
 
-            prevPrevPrevDotColor = prevPrevDotColor; prevPrevDotColor = prevDotColor; prevDotColor = dotColor;
+            // Phase A5: dotColor pipeline retired with ScreenBuf1x.
             prevPrevPrevDotPalIdx = prevPrevDotPalIdx; prevPrevDotPalIdx = prevDotPalIdx; prevDotPalIdx = dotPalIdx;
         }
 
