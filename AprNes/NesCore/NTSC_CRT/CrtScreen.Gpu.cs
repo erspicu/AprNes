@@ -135,6 +135,8 @@ namespace AprNes
             _inputBitmap.NotifyPixelsChanged();
 
             // ── Stage 2: build SKShader from input bitmap + previous-frame surface ──
+            // Texture sampling at default (nearest); cubic interpolation lives
+            // in the SkSL helper sampleHCatmullRom (crt_core_v1.sksl).
             using var inputShader = SKShader.CreateBitmap(
                 _inputBitmap,
                 SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);

@@ -6,6 +6,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
@@ -80,6 +81,17 @@ public partial class MainWindow : Window
             var ph = TryGetPlatformHandle();
             IntPtr hwnd = ph?.Handle ?? IntPtr.Zero;
             _emu.InitGamepad(hwnd, _ini);
+
+            // FS-3: restore fullscreen state from ini. Defer to Loaded priority
+            // so Avalonia has finished its first layout pass — otherwise
+            // ScreenFromVisual may not return the current monitor yet.
+            if (_ini.GetBool("ScreenFull", false))
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (!_isFullscreen) ToggleFullscreen();
+                }, DispatcherPriority.Loaded);
+            }
         };
 
         InitRecentROMs();
@@ -171,7 +183,9 @@ public partial class MainWindow : Window
         AprNes.NesCore.UltraAnalog = _ultraAnalogEnabled;
         AprNes.NesCore.CrtEnabled = _ini.GetBool("crt", true);
 
-        int[] validSizes = { 2, 4, 6, 8 };
+        // 10× (2560×2100) fits 4K @ 100% DPI windowed; CRT pipeline handles
+        // the extra pixels cheaply on the GPU backend (Avalonia default).
+        int[] validSizes = { 2, 4, 6, 8, 10 };
         int aSize = _ini.GetInt("AnalogSize", 4);
         AprNes.NesCore.AnalogSize = Array.IndexOf(validSizes, aSize) >= 0 ? aSize : 4;
 
@@ -577,10 +591,18 @@ public partial class MainWindow : Window
 
     private void OnResolutionChanged(int w, int h)
     {
-        GameCanvas.Width  = w;
-        GameCanvas.Height = h;
-        GameCanvas.FrameWidth  = w;
-        GameCanvas.FrameHeight = h;
+        // Mode-switch crash root cause: setting GameCanvas.Width here triggers
+        // Avalonia's automatic visual invalidation → compositor re-renders with
+        // (NEW dims, OLD FrontBufferPtr) → SKBitmap.InstallPixels reads OOB on
+        // smaller OLD buffer → crash. Fix: nuke FrontBufferPtr first, update
+        // dims, then re-publish the new buffer pointer.
+        GameCanvas.FrontBufferPtr = IntPtr.Zero;
+        GameCanvas.FrameWidth     = w;
+        GameCanvas.FrameHeight    = h;
+        GameCanvas.Width          = w;
+        GameCanvas.Height         = h;
+        GameCanvas.FrontBufferPtr = _emu.CurrentFrontBuffer;
+        GameCanvas.InvalidateVisual();
     }
 
     // Raised when EmulatorEngine loads an FDS ROM with non-NTSC region and
@@ -685,24 +707,152 @@ public partial class MainWindow : Window
 
     // ═══ Fullscreen ═════════════════════════════════════════════════════════
 
+    // 8:7 PAR content aspect ratio for analog letterbox: (256 × 8/7) / 210 ≈ 1.3933
+    // Matches NetFx AnalogContentAR (AprNesUI.cs:2241-2242).
+    private const double AnalogContentAR = (256.0 * 8.0 / 7.0) / 210.0;
+
     private void ToggleFullscreen()
     {
-        _isFullscreen = !_isFullscreen;
-        if (_isFullscreen)
+        if (_isFullscreen) ExitFullscreen(reapplyPipeline: true);
+        else               EnterFullscreen();
+    }
+
+    private void EnterFullscreen()
+    {
+        // FS-3: stop recording across FS transitions (matches NetFx — chrome
+        // and buffer dims change, so video frame size would be wrong).
+        StopRecordingIfActive(true);
+
+        _isFullscreen = true;
+
+        // FS-1: hide chrome (menu + status bar). GameBorder Background is
+        // already Black so any letterbox area is the right colour.
+        MainMenu.IsVisible  = false;
+        StatusBar.IsVisible = false;
+
+        // SizeToContent must be Manual before WindowState=FullScreen, otherwise
+        // Avalonia tries to size the window to GameCanvas content and fights us.
+        SizeToContent = SizeToContent.Manual;
+        WindowState = WindowState.FullScreen;
+
+        // FS-2: analog mode → 8:7 PAR letterbox + CRT buffer realloc.
+        // Multi-monitor aware via Screens.ScreenFromVisual (NetFx uses
+        // PrimaryScreen unconditionally — Avalonia upgrade).
+        if (NesCore.AnalogEnabled)
         {
-            WindowState = WindowState.FullScreen;
-            // EmuScreenControl handles scaling via Skia DrawBitmap
-            GameCanvas.Width  = double.NaN;
-            GameCanvas.Height = double.NaN;
-            GameBorder.Margin = new Thickness(0);
+            var screen = Screens.ScreenFromVisual(this);
+            // Allocate the CRT buffer at PHYSICAL pixel resolution so the
+            // SkSL shader produces sharp 1:1 pixels on the screen. The
+            // GameCanvas display size is then set in DIPs (= physical /
+            // scaling) so Avalonia's compositor maps source pixels to screen
+            // pixels at exactly 1:1. Avoids the ≥125% DPI quality loss that
+            // happened when we sized the buffer in DIPs and let the
+            // compositor upscale.
+            double scaling = screen?.Scaling ?? 1.0;
+            if (scaling <= 0.0) scaling = 1.0;
+            int swPhys = screen?.Bounds.Width  ?? 1920;
+            int shPhys = screen?.Bounds.Height ?? 1080;
+            double screenAR = (double)swPhys / shPhys;
+
+            int displayW, displayH;   // physical pixels
+            if (screenAR > AnalogContentAR)
+            {
+                displayH = shPhys;
+                displayW = (int)(shPhys * AnalogContentAR);
+            }
+            else
+            {
+                displayW = swPhys;
+                displayH = (int)(swPhys / AnalogContentAR);
+            }
+
+            // Reroute Crt_DstW/H to letterbox PHYSICAL dims, then re-run the
+            // render pipeline so EmulatorEngine reallocates AnalogScreenBuf at
+            // physical resolution + fires ResolutionChanged → updates
+            // FrameWidth/Height (= source bitmap dims, also physical).
+            NesCore.Crt_SetFullscreenSize(displayW, displayH);
+            ApplyRenderPipeline();
+
+            // Override GameCanvas layout dims to DIP units so Avalonia sizes
+            // the control to fit the screen correctly. (OnResolutionChanged
+            // wrote physical pixel dims to Width/Height, which would overflow
+            // the DIP-sized window on hi-DPI screens.) Source bitmap stays
+            // physical → compositor draws src→dst at 1:1 physical pixels.
+            GameCanvas.Width  = displayW / scaling;
+            GameCanvas.Height = displayH / scaling;
         }
-        else
+        // Digital FS: GameCanvas keeps its native render dims (matches NetFx —
+        // panel1 is NOT stretched, just centered with black around).
+
+        // Centre the game pane inside the fullscreen GameBorder.
+        GameCanvas.HorizontalAlignment = HorizontalAlignment.Center;
+        GameCanvas.VerticalAlignment   = VerticalAlignment.Center;
+        GameBorder.Margin = new Thickness(0);
+
+        UpdateContextMenuFullscreenState();
+        SaveFullscreenStateToIni();
+    }
+
+    // reapplyPipeline=false is used by FullScreenModeTransition: the subsequent
+    // ApplyIniSettings will reapply with the new mode's settings, and we don't
+    // want to double-call ApplyRenderPipeline with an inconsistent
+    // NesCore.AnalogEnabled vs ini AnalogMode.
+    private void ExitFullscreen(bool reapplyPipeline)
+    {
+        StopRecordingIfActive(true);
+
+        _isFullscreen = false;
+
+        // FS-2: restore default Crt_DstW/H + reallocate buffers back to the
+        // configured AnalogSize. Caller may suppress the ApplyRenderPipeline
+        // call during a mode transition (we'd run it with stale flags).
+        if (NesCore.AnalogEnabled)
         {
-            WindowState = WindowState.Normal;
-            GameCanvas.Width  = _emu.OutputW;
-            GameCanvas.Height = _emu.OutputH;
-            GameBorder.Margin = new Thickness(0);
+            NesCore.Crt_ClearFullscreenSize();
+            if (reapplyPipeline) ApplyRenderPipeline();
         }
+
+        // Restore default alignment (Stretch is harmless because
+        // SizeToContent=WidthAndHeight makes GameBorder match GameCanvas).
+        GameCanvas.HorizontalAlignment = HorizontalAlignment.Stretch;
+        GameCanvas.VerticalAlignment   = VerticalAlignment.Stretch;
+
+        MainMenu.IsVisible  = true;
+        StatusBar.IsVisible = true;
+
+        WindowState = WindowState.Normal;
+        GameBorder.Margin = new Thickness(0);
+        SizeToContent = SizeToContent.WidthAndHeight;
+
+        UpdateContextMenuFullscreenState();
+        SaveFullscreenStateToIni();
+    }
+
+    private void UpdateContextMenuFullscreenState()
+    {
+        // FS-4: disable risky items in the right-click menu while in FS.
+        CtxConfig.IsEnabled      = !_isFullscreen;
+        CtxUltraAnalog.IsEnabled = !_isFullscreen;
+    }
+
+    private void SaveFullscreenStateToIni()
+    {
+        // FS-3: persist current state to ini (matches NetFx ScreenFull key).
+        _ini.Set("ScreenFull", _isFullscreen ? "true" : "false");
+        _ini.Save();
+    }
+
+    // FS-3: NetFx-equivalent FullScreenModeTransition. When AnalogMode flips
+    // while in fullscreen, exit FS without re-applying the pipeline (it would
+    // see an inconsistent state — ini AnalogMode = NEW but
+    // NesCore.AnalogEnabled = OLD). ApplyIniSettings then syncs everything
+    // with the new mode, and we re-enter using the now-current flags.
+    private void FullScreenModeTransition()
+    {
+        if (!_isFullscreen) return;
+        ExitFullscreen(reapplyPipeline: false);
+        ApplyIniSettings();   // sets NesCore.AnalogEnabled = new + reallocates buffers
+        EnterFullscreen();     // analog letterbox / digital native, based on new flag
     }
 
     // ═══ Screenshot ═════════════════════════════════════════════════════════
@@ -713,7 +863,9 @@ public partial class MainWindow : Window
     {
         if (!_emu.IsRunning || _capturing) return;
         _capturing = true;
-        _emu.Pause();
+        // Use PauseEmuAndRender so both emu and the helper render thread are
+        // quiesced — otherwise the buffers we read could be mid-write.
+        bool paused = _emu.PauseEmuAndRender();
 
         string message;
         try
@@ -725,24 +877,91 @@ public partial class MainWindow : Window
             string stamp    = DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss");
             string filePath = Path.Combine(dir, $"Screen-{stamp}.png");
 
-            var ptr = _emu.CurrentFrontBuffer;
-            if (ptr != IntPtr.Zero)
+            // In Ultra+CRT+GPU mode the helper render thread bypasses the CPU
+            // CRT path entirely — Crt_Render is no-op and AnalogScreenBuf stays
+            // empty. Force a one-shot CPU CRT render by clearing
+            // CrtGpuRenderThreadActive across the call: CrtScreenGpu.Render
+            // then runs the full SkSL pipeline on a raster surface and reads
+            // back into crt_analogScreenBuf (= AnalogScreenBuf). Restore the
+            // flag immediately so normal rendering keeps using the GPU canvas
+            // path.
+            // Three capture sources depending on what mode the compositor is using:
+            //
+            // 1. Ultra+CRT+GPU: emu only writes NesCore.linearBuffer. The visible
+            //    image is produced by the SkSL shader inside CrtGpuRenderThread,
+            //    which the compositor calls during paint. AnalogScreenBuf is
+            //    NEVER written in this mode (Crt_Render is no-op, ReadPixels
+            //    paths are bypassed). To capture the same image the user sees,
+            //    re-run the EXACT same shader pipeline on a raster SKSurface and
+            //    save its snapshot.
+            //
+            // 2. Analog (any other variant): AnalogScreenBuf is the canonical
+            //    framebuffer — filled directly by DecodeScanline_Fast (non-Ultra),
+            //    by the CPU CRT (Scalar/SIMD backend), or stays zero if Ultra+
+            //    no-CRT (which writes via DecodeScanline_Physical_Worker direct
+            //    to ntsc_analogScreenBuf — same alias).
+            //
+            // 3. Digital: _emu.CurrentFrontBuffer (= _bufferA/B) holds the
+            //    pipeline's RGB output.
+
+            bool useGpuShaderCapture = NesCore.AnalogEnabled
+                                    && NesCore.UltraAnalog
+                                    && NesCore.CrtEnabled
+                                    && NesCore.CrtGpuRenderThreadActive
+                                    && CrtGpuRenderThread.IsReady;
+
+            if (useGpuShaderCapture)
             {
-                int w = _emu.OutputW, h = _emu.OutputH;
-                using var bmp = new Avalonia.Media.Imaging.Bitmap(
-                    PixelFormats.Bgra8888, AlphaFormat.Unpremul,
-                    ptr,
-                    new PixelSize(w, h),
-                    new Vector(96, 96),
-                    w * 4);
+                int w = NesCore.Crt_DstW, h = NesCore.Crt_DstH;
+                var info = new SkiaSharp.SKImageInfo(w, h,
+                    SkiaSharp.SKColorType.Bgra8888, SkiaSharp.SKAlphaType.Opaque);
+                using var surface = SkiaSharp.SKSurface.Create(info);
+                surface.Canvas.Clear(SkiaSharp.SKColors.Black);
+                // grContext=null → CrtGpuRenderThread.EnsureSurfaces falls back
+                // to raster SKSurface, runs the shader on CPU (still SkSL), and
+                // composes into our provided canvas. Output matches what the
+                // GPU compositor draws (same shader, same uniforms, same input).
+                CrtGpuRenderThread.Render(surface.Canvas, null,
+                    new SkiaSharp.SKRect(0, 0, w, h));
+                using var snap = surface.Snapshot();
+                using var data = snap.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
                 using var fs = File.Create(filePath);
-                bmp.Save(fs);
+                data.SaveTo(fs);
+            }
+            else
+            {
+                IntPtr ptr;
+                int w, h;
+                if (NesCore.AnalogEnabled)
+                {
+                    unsafe { ptr = (IntPtr)NesCore.AnalogScreenBuf; }
+                    w = NesCore.Crt_DstW;
+                    h = NesCore.Crt_DstH;
+                }
+                else
+                {
+                    ptr = _emu.CurrentFrontBuffer;
+                    w = _emu.OutputW;
+                    h = _emu.OutputH;
+                }
+
+                if (ptr != IntPtr.Zero)
+                {
+                    using var bmp = new Avalonia.Media.Imaging.Bitmap(
+                        PixelFormats.Bgra8888, AlphaFormat.Unpremul,
+                        ptr,
+                        new PixelSize(w, h),
+                        new Vector(96, 96),
+                        w * 4);
+                    using var fs = File.Create(filePath);
+                    bmp.Save(fs);
+                }
             }
             message = filePath + " " + L("dlg_screenshot_saved", "save!");
         }
         catch (Exception ex) { message = L("dlg_screenshot_failed", "Screenshot failed:") + " " + ex.Message; }
 
-        _emu.Resume();
+        if (paused) NesCore.ResumeEmu();
         _capturing = false;
         await ShowMessageBox(message);
     }
@@ -1020,12 +1239,25 @@ public partial class MainWindow : Window
     {
         StopRecordingIfActive(true);
 
+        bool prevAnalog = NesCore.AnalogEnabled;
+
         var dlg = new ConfigWindow(_ini, _emu.Gamepad);
         await dlg.ShowDialog(this);
 
-        // ApplyRenderSettings (called inside ApplyIniSettings) handles
-        // emu thread sync internally: detach → wait emuWaiting → rebuild → reattach
-        ApplyIniSettings();
+        bool nowAnalog = _ini.GetBool("AnalogMode", false);
+
+        if (_isFullscreen && prevAnalog != nowAnalog)
+        {
+            // FS-3: AnalogMode flipped while in FS — needs a coordinated
+            // exit/reapply/re-enter cycle (mirrors NetFx FullScreenModeTransition).
+            FullScreenModeTransition();
+        }
+        else
+        {
+            // ApplyRenderSettings (called inside ApplyIniSettings) handles
+            // emu thread sync internally: detach → wait emuWaiting → rebuild → reattach
+            ApplyIniSettings();
+        }
         UpdateRecordMenuVisibility();
     }
 

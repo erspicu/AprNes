@@ -1,0 +1,146 @@
+// ════════════════════════════════════════════════════════════════════════
+// crt_core_20260426193627_mitchell.sksl — v1 + horizontal Mitchell cubic
+// ════════════════════════════════════════════════════════════════════════
+// Diff vs crt_core_v1.sksl (baseline):
+//   • Adds sampleHMitchell helper — 4-tap Mitchell-Netravali cubic
+//     interpolation along the X axis (B=1/3, C=1/3).
+//   • sampleWithBlur internally reads source via sampleHMitchell instead
+//     of raw uScreen.eval, so chroma/luma boundaries are interpolated with
+//     a softer cubic kernel — gentler than Catmull-Rom (B=0, C=0.5),
+//     smooths boundaries without ringing or harsh detail emphasis.
+//
+// Texture sampling on uScreen / uPrev is set to nearest in C# so this
+// helper's 4-tap weights operate on raw source pixels.
+// ════════════════════════════════════════════════════════════════════════
+
+uniform shader uScreen;
+uniform shader uPrev;
+uniform float2 uSrcSize;
+uniform float2 uDstSize;
+uniform float  uBeamInv;
+uniform float  uJitter;
+uniform float  uBrightness;
+uniform float  uBloomStrength;
+uniform float  uGamma;
+uniform float  uMaskStrength;
+uniform float  uMaskType;
+uniform float  uVignetteStrength;
+uniform float  uCurvature;
+uniform float  uConvergence;
+uniform float  uHBlurAlpha;
+uniform float  uPhosphorDecay;
+
+// 4-tap Mitchell-Netravali cubic interpolation along X axis (B=1/3, C=1/3).
+// Mitchell weights (verified to sum to 1 at all fx ∈ [0,1)):
+//   w0 = (-7/3 * fx^3 + 5 * fx^2 - 3 * fx + 1/3) / 6
+//   w1 = ( 7 * fx^3 - 12 * fx^2 + 16/3) / 6
+//   w2 = (-7 * fx^3 + 9 * fx^2 + 3 * fx + 1/3) / 6
+//   w3 = ( 7/3 * fx^3 - 2 * fx^2) / 6
+// Smoother than Catmull-Rom — passes a gentler low-pass over the source,
+// closer to the analog beam's natural smearing across boundaries.
+half3 sampleHMitchell(float2 srcP)
+{
+    float fx = fract(srcP.x);
+    float ix = floor(srcP.x);
+
+    float fx2 = fx * fx;
+    float fx3 = fx2 * fx;
+
+    float w0 = ((-7.0/3.0) * fx3 + 5.0 * fx2 - 3.0 * fx + 1.0/3.0) / 6.0;
+    float w1 = ( 7.0       * fx3 - 12.0 * fx2 + 16.0/3.0)          / 6.0;
+    float w2 = (-7.0       * fx3 + 9.0  * fx2 + 3.0 * fx + 1.0/3.0) / 6.0;
+    float w3 = ( 7.0/3.0   * fx3 - 2.0  * fx2)                     / 6.0;
+
+    half3 c0 = uScreen.eval(float2(ix - 1.0, srcP.y)).rgb;
+    half3 c1 = uScreen.eval(float2(ix,       srcP.y)).rgb;
+    half3 c2 = uScreen.eval(float2(ix + 1.0, srcP.y)).rgb;
+    half3 c3 = uScreen.eval(float2(ix + 2.0, srcP.y)).rgb;
+
+    half3 col = c0 * half(w0) + c1 * half(w1) + c2 * half(w2) + c3 * half(w3);
+    return clamp(col, half3(0.0), half3(1.0));
+}
+
+// 3-tap horizontal blur (if uHBlurAlpha > 0); each tap uses the cubic helper.
+half3 sampleWithBlur(float2 srcP)
+{
+    half3 c  = sampleHMitchell(srcP);
+    if (uHBlurAlpha <= 0.001) return c;
+    half3 cl = sampleHMitchell(float2(srcP.x - 1.0, srcP.y));
+    half3 cr = sampleHMitchell(float2(srcP.x + 1.0, srcP.y));
+    float center = 1.0 - 2.0 * uHBlurAlpha;
+    return cl * half(uHBlurAlpha) + c * half(center) + cr * half(uHBlurAlpha);
+}
+
+half4 main(float2 fragCoord)
+{
+    // ── 1. barrel curvature ──
+    float2 uv = (fragCoord + 0.5) / uDstSize;
+    float2 cc = uv - 0.5;
+    float  fc = 1.0 + uCurvature * dot(cc, cc);
+    float2 warpedUV = cc * fc + 0.5;
+    if (warpedUV.x < 0.0 || warpedUV.x > 1.0 || warpedUV.y < 0.0 || warpedUV.y > 1.0)
+        return half4(0.0, 0.0, 0.0, 1.0);
+
+    float2 srcP = warpedUV * uSrcSize;
+
+    // ── 2+3. per-channel hblur + position-dependent convergence ──
+    half3 c;
+    if (abs(uConvergence) < 0.01) {
+        c = sampleWithBlur(srcP);
+    } else {
+        float halfW   = uDstSize.x * 0.5;
+        float relX    = (fragCoord.x - halfW) / halfW;
+        float convSrc = uConvergence * relX * (uSrcSize.x / uDstSize.x);
+        half3 rgbC = sampleWithBlur(srcP);
+        half3 rgbR = sampleWithBlur(float2(srcP.x + convSrc, srcP.y));
+        half3 rgbB = sampleWithBlur(float2(srcP.x - convSrc, srcP.y));
+        c = half3(rgbR.r, rgbC.g, rgbB.b);
+    }
+
+    // ── 4. Gaussian beam weight with interlace jitter ──
+    float scaleY = uSrcSize.y / uDstSize.y;
+    float srcY   = fragCoord.y * scaleY;
+    float ny     = floor(srcY + 0.5);
+    float dy     = srcY + uJitter - ny;
+    float weight = exp(-(dy * dy) * uBeamInv);
+
+    float vy    = uv.y - 0.5;
+    float boost = uBrightness * (1.0 - uVignetteStrength * 4.0 * vy * vy);
+    boost       = max(boost, 0.0);
+
+    // ── 5. scanline × bloom coupling ──
+    float constA = weight * boost;
+    float constB = uBloomStrength * (1.0 - weight) * boost;
+    float luma   = dot(c, half3(0.3, 0.59, 0.11));
+    float fw     = constA + luma * constB;
+    c = clamp(c * half(fw), 0.0, 1.0);
+
+    // ── 6. gamma: V' = V * ((1-GC) + GC*V) ──
+    c = c * ((1.0 - uGamma) + uGamma * c);
+
+    // ── 7. aperture grille / shadow mask ──
+    int maskTypeI = int(uMaskType + 0.5);
+    if (maskTypeI == 1) {
+        int col = int(mod(fragCoord.x, 3.0));
+        half3 maskCol = (col == 0) ? half3(1.0, 0.3, 0.3)
+                      : (col == 1) ? half3(0.3, 1.0, 0.3)
+                      :              half3(0.3, 0.3, 1.0);
+        c *= mix(half3(1.0), maskCol, uMaskStrength);
+    } else if (maskTypeI == 2) {
+        int col = int(mod(fragCoord.x, 3.0));
+        int row = int(mod(fragCoord.y, 2.0));
+        int idx = int(mod(float(col + row), 3.0));
+        half3 maskCol = (idx == 0) ? half3(1.0, 0.3, 0.3)
+                      : (idx == 1) ? half3(0.3, 1.0, 0.3)
+                      :              half3(0.3, 0.3, 1.0);
+        c *= mix(half3(1.0), maskCol, uMaskStrength);
+    }
+
+    // ── 8. phosphor decay ──
+    if (uPhosphorDecay > 0.001) {
+        half3 prev = uPrev.eval(fragCoord).rgb;
+        c = max(c, prev * half(uPhosphorDecay));
+    }
+
+    return half4(c, 1.0);
+}

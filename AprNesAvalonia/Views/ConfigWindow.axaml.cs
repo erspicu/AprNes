@@ -55,7 +55,15 @@ public partial class ConfigWindow : Window
 
         // Wire up interactive events
         LangCombo.SelectionChanged += LangCombo_SelectionChanged;
-        ChkAnalog.Click += (_, _) => UpdateAnalogEnableState();
+        ChkAnalog.Click += (_, _) =>
+        {
+            // When user turns Analog Mode ON, default Ultra Analog to checked.
+            // (Ultra is the canonical "best quality" analog setting; most users
+            // want it on. If they prefer Fast non-Ultra, they uncheck it here.)
+            if (ChkAnalog.IsChecked == true)
+                ChkUltraAnalog.IsChecked = true;
+            UpdateAnalogEnableState();
+        };
         ChkUltraAnalog.Click += (_, _) => UpdateAnalogEnableState();
         CmbFilter1.SelectionChanged += CmbFilter_Changed;
         CmbFilter2.SelectionChanged += CmbFilter_Changed;
@@ -182,7 +190,7 @@ public partial class ConfigWindow : Window
         ChkAnalog.IsChecked       = _ini.GetBool("AnalogMode", false);
         ChkUltraAnalog.IsChecked  = _ini.GetBool("UltraAnalog", false);
         CmbAnalogSize.SelectedIndex = _ini.Get("AnalogSize", "4") switch
-            { "2" => 0, "6" => 2, "8" => 3, _ => 1 };
+            { "2" => 0, "6" => 2, "8" => 3, "10" => 4, _ => 1 };
         CmbAnalogInput.SelectedIndex = _ini.Get("AnalogOutput", "AV") switch
             { "RF" => 0, "SVideo" => 1, _ => 2 };
         ChkCRT.IsChecked = _ini.GetBool("crt", false);
@@ -259,7 +267,7 @@ public partial class ConfigWindow : Window
         _ini.Set("Scanline",     ChkScanline.IsChecked == true ? "1" : "0");
         _ini.Set("AnalogMode",   ChkAnalog.IsChecked == true ? "1" : "0");
         _ini.Set("UltraAnalog",  ChkUltraAnalog.IsChecked == true ? "1" : "0");
-        string analogSize = CmbAnalogSize.SelectedIndex switch { 0 => "2", 2 => "6", 3 => "8", _ => "4" };
+        string analogSize = CmbAnalogSize.SelectedIndex switch { 0 => "2", 2 => "6", 3 => "8", 4 => "10", _ => "4" };
         _ini.Set("AnalogSize", analogSize);
         string analogInput = CmbAnalogInput.SelectedIndex switch { 0 => "RF", 1 => "SVideo", _ => "AV" };
         _ini.Set("AnalogOutput", analogInput);
@@ -394,7 +402,7 @@ public partial class ConfigWindow : Window
         UpdateResolutionLabel();
     }
 
-    private static readonly int[] _analogSizeValues = { 2, 4, 6, 8 };
+    private static readonly int[] _analogSizeValues = { 2, 4, 6, 8, 10 };
 
     private void UpdateResolutionLabel()
     {

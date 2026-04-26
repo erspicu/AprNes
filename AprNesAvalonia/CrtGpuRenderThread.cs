@@ -24,7 +24,10 @@ internal static unsafe class CrtGpuRenderThread
 {
     static SKRuntimeEffect? _effect;
 
-    // Input: 1024×240 Bgra8888 quantization of linearBuffer
+    // Input: 1024×240 Bgra8888 quantization of linearBuffer.
+    // Cubic sampling for boundary smoothing happens entirely in SkSL
+    // (sampleHCatmullRom in crt_core_v1.sksl) — texture sampling here is left
+    // as nearest so the shader's 4-tap helper sees raw pixels, not pre-blurred.
     static SKBitmap? _inputBitmap;
     const int SrcW = 1024;
     const int SrcH = 240;
@@ -125,11 +128,12 @@ internal static unsafe class CrtGpuRenderThread
         _inputBitmap.NotifyPixelsChanged();
 
         // ── Stage 2: child shaders ──
+        // Texture sampling left at default (nearest) — crt_core_v1.sksl's
+        // sampleHCatmullRom helper does its own 4-tap cubic interpolation
+        // over raw pixels. Stacking SkiaSharp Mitchell on top would over-blur.
         using var inputShader = SKShader.CreateBitmap(
             _inputBitmap,
             SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
-        // Phosphor prev: when _prevSurface is GPU-backed, Snapshot is a GPU
-        // image → shader sampling stays on GPU (no raster fallback).
         using var prevImage  = _prevSurface!.Snapshot();
         using var prevShader = prevImage.ToShader(
             SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);

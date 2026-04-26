@@ -59,6 +59,14 @@ public sealed unsafe class EmulatorEngine : IDisposable
     // drains this to ensure ApplyRenderSettings doesn't mutate shared state mid-iteration.
     private volatile bool _renderInIteration;
 
+    // Defer-free queue for _bufferA/_bufferB. Avalonia's compositor render thread
+    // reads FrontBufferPtr without taking _resizeLock — if ApplyRenderSettings freed
+    // the old buffers immediately, a mid-draw composite would use-after-free. We
+    // hold one generation of stale buffers and free them on the NEXT realloc (or on
+    // Dispose), by which point any in-flight draw has finished.
+    private IntPtr _pendingFreeA = IntPtr.Zero;
+    private IntPtr _pendingFreeB = IntPtr.Zero;
+
     /// <summary>Front buffer pointer — safe to read from Render Thread while Emu Thread writes to back buffer.</summary>
     public IntPtr CurrentFrontBuffer => _frontBuffer;
 
@@ -251,8 +259,13 @@ public sealed unsafe class EmulatorEngine : IDisposable
 
             if (_bufferSize != needed)
             {
-                if (_bufferA != IntPtr.Zero) AprNes.NesCore.FreeUnmanaged(_bufferA);
-                if (_bufferB != IntPtr.Zero) AprNes.NesCore.FreeUnmanaged(_bufferB);
+                // Defer-free: drain the previous generation (now safe — at least
+                // one realloc cycle has passed since they were retired), then push
+                // current buffers onto the pending queue instead of freeing now.
+                if (_pendingFreeA != IntPtr.Zero) AprNes.NesCore.FreeUnmanaged(_pendingFreeA);
+                if (_pendingFreeB != IntPtr.Zero) AprNes.NesCore.FreeUnmanaged(_pendingFreeB);
+                _pendingFreeA = _bufferA;
+                _pendingFreeB = _bufferB;
 
                 _bufferA = AprNes.NesCore.AllocUnmanaged(needed);
                 _bufferB = AprNes.NesCore.AllocUnmanaged(needed);
@@ -295,6 +308,31 @@ public sealed unsafe class EmulatorEngine : IDisposable
             if (_running)
                 _gamepad.Poll();
         }
+    }
+
+    // Re-allocate the analog frame buffers after NesCore.init / initFDS frees them
+    // (Main.cs:254 + FDS init both Free AnalogScreenBuf during full-state cleanup).
+    // Without this, OutputOneFrame's `AnalogMode && AnalogScreenBuf != null` check
+    // would fall through to the digital path, which reads digitalFrameRgb that emu
+    // never populates in analog mode → black screen on every ROM open.
+    private void EnsureAnalogBuffersAfterCoreInit()
+    {
+        if (!NesCore.AnalogEnabled) return;
+        NesCore.SyncAnalogConfig();
+        int needed = NesCore.Crt_DstW * NesCore.Crt_DstH;
+        if (NesCore.AnalogScreenBuf == null || NesCore.AnalogBufSize != needed)
+        {
+            if (NesCore.AnalogScreenBuf != null)
+                { AprNes.NesCore.FreeUnmanaged((IntPtr)NesCore.AnalogScreenBuf); NesCore.AnalogScreenBuf = null; }
+            if (NesCore.AnalogScreenBufBack != null)
+                { AprNes.NesCore.FreeUnmanaged((IntPtr)NesCore.AnalogScreenBufBack); NesCore.AnalogScreenBufBack = null; }
+            NesCore.AnalogBufSize       = needed;
+            NesCore.AnalogScreenBuf     = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * needed);
+            NesCore.AnalogScreenBufBack = (uint*)AprNes.NesCore.AllocUnmanaged(sizeof(uint) * needed);
+        }
+        NesCore.SyncAnalogConfig();
+        NesCore.Ntsc_Init();
+        NesCore.Crt_Init();
     }
 
     /// <summary>Load and initialise a ROM (supports .nes, .fds, .zip). Returns true on success.</summary>
@@ -362,6 +400,7 @@ public sealed unsafe class EmulatorEngine : IDisposable
         if (!initOk) return false;
         _romLoaded = true;
         LoadSRam();
+        EnsureAnalogBuffersAfterCoreInit();
 
         NesCore.VideoOutput -= OnVideoOutput;
         NesCore.VideoOutput += OnVideoOutput;
@@ -397,6 +436,7 @@ public sealed unsafe class EmulatorEngine : IDisposable
 
         if (!initOk) return false;
         LoadSRam();
+        EnsureAnalogBuffersAfterCoreInit();
 
         NesCore.VideoOutput -= OnVideoOutput;
         NesCore.VideoOutput += OnVideoOutput;
@@ -661,7 +701,11 @@ public sealed unsafe class EmulatorEngine : IDisposable
         {
             if (_bufferA != IntPtr.Zero) AprNes.NesCore.FreeUnmanaged(_bufferA);
             if (_bufferB != IntPtr.Zero) AprNes.NesCore.FreeUnmanaged(_bufferB);
+            // Drain pending defer-free queue.
+            if (_pendingFreeA != IntPtr.Zero) AprNes.NesCore.FreeUnmanaged(_pendingFreeA);
+            if (_pendingFreeB != IntPtr.Zero) AprNes.NesCore.FreeUnmanaged(_pendingFreeB);
             _bufferA = _bufferB = _backBuffer = _frontBuffer = IntPtr.Zero;
+            _pendingFreeA = _pendingFreeB = IntPtr.Zero;
             _bufferSize = 0;
         }
     }
