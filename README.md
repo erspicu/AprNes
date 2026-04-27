@@ -1,12 +1,30 @@
 # AprNes - C# NES Emulator
 
-> 🇺🇸 English | [🇹🇼 繁體中文](#aprnes---c-nes-模擬器) | Last updated: 2026-04-12
+> 🇺🇸 English | [🇹🇼 繁體中文](#aprnes---c-nes-模擬器) | Last updated: 2026-04-27
 
 A cycle-accurate NES (Nintendo Entertainment System) emulator written in C#, developed in collaboration with AI (GitHub Copilot / Claude). The project achieves **perfect scores** on both the blargg and AccuracyCoin test suites.
 
+## 🚀 Latest Release — `aprnesava` 2026-04-27
+
+> **[Download AprNesAvalonia 2026-04-27 (single-file Windows x64)](https://github.com/erspicu/AprNes/releases/tag/aprnesava-20260427)**
+
+The new mainline edition based on **.NET 10 + Avalonia** is out. Highlights:
+
+- ⚡ **GPU CRT pipeline** — SkSL shader runs on D3D11; CRT post-processing never returns to the CPU. **2.5× presented FPS** vs. CPU backends at 10× scale.
+- 🎯 **HD-NTSC 12× Fsc oversampling** — 2048 samples/scanline (NetFx is 1024). Far more accurate chroma demodulation, herringbone, color fringing, and chroma blur reproduction.
+- 📦 **Single-file deployment** — emulator + .NET 10 runtime + Avalonia + SkiaSharp + native libs all bundled into one ~60 MB `AprNesAvalonia.exe`. End users install nothing.
+- 🚀 **.NET 10 dividends** — TieredPGO on, `Vector<T>` 256-bit AVX2, `MultiplyAddEstimate` FMA chain. ~30-50% higher emu FPS than NetFx with the same NesCore source.
+- ✅ **Same accuracy** — 184/184 blargg + 138/138 AccuracyCoin v2 perfect score, untouched.
+
+📖 **[Full feature comparison: aprnesava vs. AprNes NetFx (English)](MD/Avalonia/aprnesava_vs_netfx_features_en.md)** ｜ **[繁體中文](MD/Avalonia/aprnesava_vs_netfx_features_zh.md)**
+
+> The legacy NetFx (.NET Framework 4.8.1 / WinForms) edition remains available for direct download on the [project website](https://www.baxermux.org/myemu/AprNes/), but is now in maintenance freeze. New features land on `aprnesava` only.
+
 ## Project Status
 
-AprNes will continue with additional mapper support before concluding its development on .NET Framework 4.8.1. Future development will move to a separate project built on **.NET 10 + Avalonia**.
+`AprNes` (NetFx edition) reached its target milestone on 2026-04-27 and entered maintenance freeze. Active development has moved to **`aprnesava`** (`AprNesAvalonia/`) — a .NET 10 + Avalonia mainline that shares the exact same NesCore source. Both editions pass the same test suites (184/184 blargg + 138/138 AccuracyCoin); aprnesava additionally adds GPU CRT, HD_NTSC, and the .NET 10 SIMD path.
+
+The next development focus for aprnesava is **macOS (ARM64)** and **Linux (x86_64 / ARM64)** support — the platform abstraction layer (`AprNesAvalonia/Platform/`) is in place, with audio and gamepad backends behind interfaces.
 
 This project was developed with AI assistance, with a focus on leveraging modern computing power to explore and implement concepts I wanted to try.
 
@@ -14,7 +32,23 @@ This project was developed with AI assistance, with a focus on leveraging modern
 
 Although AprNes passed all 136 AccuracyCoin tests and the full blargg test suite, real-world testing revealed subtle PPU rendering inaccuracies in certain test ROMs (e.g., `scanline-a1` and `colorwin_ntsc.nes`). Investigation traced the root cause to insufficient precision in the PPU timing model. Attempts to patch the existing architecture proved impractical, leading to the decision to port TriCNES's complete timing architecture — including its per-master-clock execution model and fine-grained PPU state machine — as an equivalent reimplementation.
 
-The TriCNES timing model is significantly more complex than a traditional NES emulator, with a comprehensive finite state machine covering every sub-cycle of PPU, CPU, APU, and DMA interaction. This thoroughness comes at a computational cost: on .NET Framework 4.8.1, the analog rendering pipeline (Ultra NTSC + CRT simulation) at 6x/8x resolution can dip below 60 FPS, despite extensive JIT-level optimization. Resolving this performance gap ultimately requires migrating to .NET 10, where TieredPGO and On-Stack Replacement can offset the overhead of this high-precision timing model.
+The TriCNES timing model is significantly more complex than a traditional NES emulator, with a comprehensive finite state machine covering every sub-cycle of PPU, CPU, APU, and DMA interaction. This thoroughness comes at a computational cost: on .NET Framework 4.8.1, the analog rendering pipeline (Ultra NTSC + CRT simulation) at 6x/8x resolution can dip below 60 FPS, despite extensive JIT-level optimization. Resolving this performance gap ultimately requires migrating to .NET 10, where TieredPGO and On-Stack Replacement can offset the overhead of this high-precision timing model — exactly what aprnesava provides.
+
+### Optimisation Writeups
+
+Two long-form pieces from the recent rounds of hot-loop work — tutorial-style with concrete commits referenced:
+
+- **[AprNes Non-JIT Optimisation Techniques](MD/jit/AprNes_Optimization_Techniques_EN.md)** — 11 sections of hand-coded technique catalogued with real before/after commits: bitwise tricks, branchless code, lookup tables, magic numbers, SWAR, true SIMD, integer-for-float, loop unrolling and ILP, function-pointer dispatch, cache-line aware data layout, redundancy elimination.
+- **[C# JIT and I-Cache Optimisation Tutorial](MD/jit/JIT_ICache_Tutorial_EN.md)** — from the game loop down through CPU cache hierarchy, hot/cold path splitting, the inlining-vs-I-cache tradeoff, multi-core pipelining, thread affinity, and the actual PMU/ETW analysis workflow used in this project.
+
+### NES Emulator Background Tutorials
+
+Long-form pieces written along the way that may be useful for anyone writing their own NES emulator:
+
+- **[NES Emulator Timing Models — A Comparative Guide](MD/techbook/nes_emulator_timing_models_guide_en.md)** — taxonomy of timing accuracy levels (frame / scanline / cycle / dot / sub-cycle).
+- **[Catch-Up Concept in Emulator Design](MD/techbook/emulator_catch_up_concept_en.md)** — what catch-up is, when to use it vs. global ticks, and trade-offs.
+- **[AprNes Catch-Up and Structural Optimisation](MD/techbook/aprnes_catch_up_and_structural_optimization_en.md)** — applied write-up of how AprNes reaches dot-level CPU/PPU sync via the `Mem_r → tick() → 3× ppu_step` pattern.
+- **[The Per-Scanline NES Emulator Challenge](MD/techbook/per_scanline_nes_emulator_challenge_en.md)** — what it actually takes to pass blargg / AccuracyCoin starting from a per-scanline design.
 
 ## License
 
@@ -77,16 +111,32 @@ Key references used during development:
     *   `libXBRz.cs` / `LibScanline.cs` / `Scalex.cs` — Screen scaling filters.
 *   **`AprNes/TestRunner.cs`** — Headless automated test runner ($6000 protocol, screen stability detection, CRC comparison).
 
-### Cross-Platform Variant (AprNesAvalonia/)
+### Mainline Edition — `aprnesava` (AprNesAvalonia/)
 
-*   **`AprNesAvalonia/`** — Cross-platform build targeting .NET 10 + Avalonia 11 UI framework with TieredPGO.
-    *   Shares the same `NesCore/` source as the WinForms edition (no code duplication).
-    *   Targets Windows, Linux, macOS, and ARM (e.g. Raspberry Pi, Apple Silicon).
-    *   `NesCoreNET/` — .NET 10 fork of NesCore with SIMD optimizations (platform-agnostic `Vector128<T>`).
-    *   `MainWindow.axaml.cs` — Avalonia main window with WriteableBitmap rendering.
-    *   `Views/ConfigWindow.axaml.cs` — Key binding and settings window.
+*   **`AprNesAvalonia/`** — Mainline edition (.NET 10 + Avalonia 11.3 + SkiaSharp 3.119, with TieredPGO + ReadyToRun).
+    *   Shares the exact same `NesCore/` source as the NetFx edition via `<Compile Include="../AprNes/NesCore/**/*.cs">` — no code duplication; emulation correctness is identical.
+    *   Build symbols: `CRT_SIMD_AVAILABLE` + `CRT_GPU_AVAILABLE` + `HD_NTSC` (NetFx defines none of these — those code paths are .NET 10 / Avalonia only).
+    *   `MainWindow.axaml.cs` — Main window (Menu + ContextMenu + StatusBar + GameCanvas).
+    *   `Views/EmuScreenControl.cs` — Zero-copy render control (`SKBitmap.InstallPixels` + `ICustomDrawOperation` on Avalonia's render thread).
+    *   `Views/ConfigWindow.axaml.cs` / `AnalogConfigWindow.axaml.cs` / `AudioPlusConfigWindow.axaml.cs` — Multi-tabbed settings windows.
+    *   `CrtGpuRenderThread.cs` — Phase 3A render-thread GPU CRT path (leases GPU `SKCanvas` via `ISkiaSharpApiLeaseFeature`, runs the SkSL shader on D3D11 directly, never reads back to CPU).
+    *   `Shaders/crt_core_*.sksl` — Versioned SkSL shaders (Catmull-Rom / Mitchell cubic samplers). `ShaderLoader.LoadLatest()` auto-picks the newest timestamped version; `--crt-shader <filename>` overrides.
+    *   `Platform/` — Cross-platform abstraction: `IAudioBackend` (Win32WaveOutBackend default), `IGamepadBackend` (Win32 DirectInput8 + XInput / Null fallback), `PlatformFactory`. macOS / Linux backends are the next implementation milestone.
+    *   `PublishContent/` — Release-only assets (ReadMe / configure / tools / benchmark scripts) — auto-included by `dotnet publish`, excluded from regular builds.
     *   `TestRunner.cs` — Headless test runner (Avalonia Bitmap, no System.Drawing dependency).
-    *   Build: `build_avalonia.bat` → `AprNesAvalonia/bin/Debug/net10.0/AprNesAvalonia.exe`
+    *   **Develop**: `build_avalonia.bat` → `AprNesAvalonia/bin/Debug/net10.0/AprNesAvalonia.exe`
+    *   **Single-file release**:
+        ```bash
+        dotnet publish AprNesAvalonia/AprNesAvalonia.csproj -c Release -r win-x64 \
+          --self-contained true \
+          -p:PublishSingleFile=true \
+          -p:IncludeNativeLibrariesForSelfExtract=true \
+          -p:EnableCompressionInSingleFile=true \
+          -p:PublishReadyToRun=true \
+          -p:DebugType=embedded \
+          -o publish/AprNesAvalonia-win-x64
+        ```
+        → 16 files / 7 dirs / ~60 MB at `publish/AprNesAvalonia-win-x64/AprNesAvalonia.exe`
 
 ### WebAssembly Variant (AprNesWasm/)
 
@@ -263,13 +313,31 @@ python run_tests.py -j 10
 
 # AprNes - C# NES 模擬器
 
-> [🇺🇸 English](#aprnes---c-nes-emulator) | 🇹🇼 繁體中文 | 最後編修：2026-04-12
+> [🇺🇸 English](#aprnes---c-nes-emulator) | 🇹🇼 繁體中文 | 最後編修：2026-04-27
 
 使用 C# 開發的 NES（任天堂娛樂系統）cycle-accurate 模擬器，與 AI（GitHub Copilot / Claude）協作開發完成。在 blargg 與 AccuracyCoin 兩大測試套件上均達到**滿分**。
 
+## 🚀 最新發行 — `aprnesava` 2026-04-27
+
+> **[下載 AprNesAvalonia 2026-04-27（單檔 Windows x64 自帶 runtime）](https://github.com/erspicu/AprNes/releases/tag/aprnesava-20260427)**
+
+全新主線版本，基於 **.NET 10 + Avalonia**：
+
+- ⚡ **GPU CRT pipeline** — SkSL shader 在 D3D11 上跑，CRT 後處理全程不回 CPU。10× scale 下 **presented FPS 比 CPU 後端快 2.5×**。
+- 🎯 **HD-NTSC 12× Fsc 過採樣** — 每 scanline 2048 sample（NetFx 是 1024）。Chroma 解調精度顯著提升，RF 模式下 herringbone、color fringing、chroma blur 還原更接近真實 NTSC 訊號。
+- 📦 **Single-file 打包** — emulator + .NET 10 runtime + Avalonia + SkiaSharp + 全部 native lib 封裝在 ~60 MB 單一 `AprNesAvalonia.exe`。end user 不用裝任何東西。
+- 🚀 **.NET 10 紅利** — TieredPGO 全開、`Vector<T>` 256-bit AVX2、`MultiplyAddEstimate` FMA chain。同份 NesCore，emu FPS 比 NetFx 高 30-50%。
+- ✅ **精度完全一致** — 184/184 blargg + 138/138 AccuracyCoin v2 雙滿分，沒被打破。
+
+📖 **[完整版本對比：aprnesava vs. AprNes NetFx（中文）](MD/Avalonia/aprnesava_vs_netfx_features_zh.md)** ｜ **[English](MD/Avalonia/aprnesava_vs_netfx_features_en.md)**
+
+> 舊版 NetFx (.NET Framework 4.8.1 / WinForms) 仍可從[官網](https://www.baxermux.org/myemu/AprNes/)下載，但已停止主動維護。所有新功能只會在 `aprnesava` 上推出。
+
 ## 專案狀態
 
-AprNes 將在完成更多 Mapper 支援後，結束在 .NET Framework 4.8.1 平台上的開發。後續開發將轉移至以 **.NET 10 + Avalonia** 為基礎的獨立新專案。
+`AprNes`（NetFx 版）於 2026-04-27 達成里程碑目標進入維護凍結。主線開發轉移到 **`aprnesava`**（`AprNesAvalonia/`）—— 基於 .NET 10 + Avalonia、與 NetFx 共用同一份 NesCore 原始碼。兩版都通過相同測試套件（184/184 blargg + 138/138 AccuracyCoin），但 aprnesava 額外加入 GPU CRT、HD_NTSC、.NET 10 SIMD 路徑。
+
+aprnesava 接下來的開發重點是 **macOS (ARM64)** 與 **Linux (x86_64 / ARM64)** 支援 —— 平台抽象層（`AprNesAvalonia/Platform/`）已切好，音訊跟手把後端在 interface 後面，加非 Windows 平台不再是大手術。
 
 本專案由 AI 輔助開發，偏向於利用現代電腦效能來實現一些我想嘗試的概念。
 
@@ -277,7 +345,23 @@ AprNes 將在完成更多 Mapper 支援後，結束在 .NET Framework 4.8.1 平�
 
 儘管 AprNes 已通過全部 136 項 AccuracyCoin 測試與 blargg 完整測試集，在實際遊玩過程中仍發現部分 PPU 渲染畫面不夠正確（如 `scanline-a1` 與 `colorwin_ntsc.nes`）。追查後確認根因是 PPU timing 模型精度不足。由於在現有架構下難以修補相關問題，最終決定將 TriCNES 的完整 timing 架構——包含 per-master-clock 執行模型與精細的 PPU 有限狀態機——進行等價移植（reimplementation）。
 
-TriCNES 的 timing 模型複雜度遠高於一般 NES 模擬器，其有限狀態機完整涵蓋了 PPU、CPU、APU、DMA 之間每個子週期的交互。這種精確性帶來了相當大的運算開銷：在 .NET Framework 4.8.1 上，即使經過大量 JIT 層級的效能優化，開啟類比渲染管線（Ultra NTSC + CRT 模擬）於 6x/8x 解析度時仍可能低於 60 FPS。要根本解決此效能瓶頸，最終需遷移至 .NET 10，借助 TieredPGO 與 On-Stack Replacement 來抵消高精度 timing 模型帶來的運算成本。
+TriCNES 的 timing 模型複雜度遠高於一般 NES 模擬器，其有限狀態機完整涵蓋了 PPU、CPU、APU、DMA 之間每個子週期的交互。這種精確性帶來了相當大的運算開銷：在 .NET Framework 4.8.1 上，即使經過大量 JIT 層級的效能優化，開啟類比渲染管線（Ultra NTSC + CRT 模擬）於 6x/8x 解析度時仍可能低於 60 FPS。要根本解決此效能瓶頸，最終需遷移至 .NET 10，借助 TieredPGO 與 On-Stack Replacement 來抵消高精度 timing 模型帶來的運算成本 —— 這正是 aprnesava 提供的方案。
+
+### 效能優化心得
+
+最近一輪熱迴圈優化的兩篇長文，教學風格、每段都引用實際 commit：
+
+- **[AprNes 非 JIT 級優化技法（English）](MD/jit/AprNes_Optimization_Techniques_EN.md)** ｜ **[繁體中文](MD/jit/AprNes_Optimization_Techniques.md)** — 11 段手寫優化技法目錄：bit trick (`x & (N-1)` 取代 `% N`)、branchless、lookup tables、magic number、SWAR、真正 SIMD、integer-for-float (Bresenham / fixed-point)、loop unrolling 與 ILP、function-pointer dispatch、cache-line aware 資料佈局、redundancy elimination。
+- **[C# JIT 與 I-Cache 優化教學（English）](MD/jit/JIT_ICache_Tutorial_EN.md)** ｜ **[繁體中文](MD/jit/JIT_ICache_Tutorial.md)** — 從 game loop 出發，走過 CPU cache hierarchy、hot/cold path 切割、inlining vs I-cache 拉鋸、multi-core pipelining、C# thread affinity，到本專案實際使用的 PMU/ETW 分析流程。
+
+### NES 模擬器背景教學
+
+開發過程中順手寫的長文，可能對自己寫 NES 模擬器的人有用：
+
+- **[NES 模擬器 Timing 模型對照指南（English）](MD/techbook/nes_emulator_timing_models_guide_en.md)** ｜ **[繁體中文](MD/techbook/nes_emulator_timing_models_guide_zh.md)** — Timing 精度等級分類學（frame / scanline / cycle / dot / sub-cycle）。
+- **[Catch-Up 概念（English）](MD/techbook/emulator_catch_up_concept_en.md)** ｜ **[繁體中文](MD/techbook/emulator_catch_up_concept_zh.md)** — catch-up 是什麼、什麼時候用 vs. 全域 tick、各方向 trade-off。
+- **[AprNes Catch-Up 與結構優化（English）](MD/techbook/aprnes_catch_up_and_structural_optimization_en.md)** ｜ **[繁體中文](MD/techbook/aprnes_catch_up_and_structural_optimization_zh.md)** — 應用版，講 AprNes 怎麼透過 `Mem_r → tick() → 3× ppu_step` 達成 dot-level CPU/PPU 同步。
+- **[Per-Scanline NES 模擬器挑戰（English）](MD/techbook/per_scanline_nes_emulator_challenge_en.md)** ｜ **[繁體中文](MD/techbook/per_scanline_nes_emulator_challenge_zh.md)** — 從 per-scanline 設計起步要過 blargg / AccuracyCoin 實際得做哪些事。
 
 ## 授權
 
@@ -338,16 +422,32 @@ AprNes 是一個以追求 cycle-accurate 精度為目標的 NES 硬體模擬研�
     *   `libXBRz.cs` / `LibScanline.cs` / `Scalex.cs` — 畫面放大濾鏡。
 *   **`AprNes/TestRunner.cs`** — 自動化測試執行器（headless 模式，支援 $6000 協定、畫面穩定偵測、CRC 比對）。
 
-### 跨平台版本 (AprNesAvalonia/)
+### 主線版本 — `aprnesava` (AprNesAvalonia/)
 
-*   **`AprNesAvalonia/`** — 跨平台版本，採用 .NET 10 + Avalonia 11 UI 框架，啟用 TieredPGO 最佳化。
-    *   與 WinForms 版共用相同的 `NesCore/` 原始碼（無程式碼複製）。
-    *   支援 Windows、Linux、macOS 及 ARM（如樹莓派、Apple Silicon）。
-    *   `NesCoreNET/` — .NET 10 版 NesCore，含 SIMD 最佳化（平台無關的 `Vector128<T>`）。
-    *   `MainWindow.axaml.cs` — Avalonia 主視窗，使用 WriteableBitmap 渲染。
-    *   `Views/ConfigWindow.axaml.cs` — 按鍵設定與偏好設定視窗。
+*   **`AprNesAvalonia/`** — 主線版本（.NET 10 + Avalonia 11.3 + SkiaSharp 3.119，啟用 TieredPGO + ReadyToRun）。
+    *   透過 `<Compile Include="../AprNes/NesCore/**/*.cs">` 共用 NetFx 版相同的 `NesCore/` 原始碼 —— 無程式碼複製，模擬精度完全一致。
+    *   Build symbol: `CRT_SIMD_AVAILABLE` + `CRT_GPU_AVAILABLE` + `HD_NTSC`（NetFx 不定義其中任何一個 —— 這些路徑只在 .NET 10 / Avalonia 編譯）。
+    *   `MainWindow.axaml.cs` — 主視窗（Menu + ContextMenu + StatusBar + GameCanvas）。
+    *   `Views/EmuScreenControl.cs` — 零拷貝渲染控件（在 Avalonia render thread 上用 `SKBitmap.InstallPixels` + `ICustomDrawOperation`）。
+    *   `Views/ConfigWindow.axaml.cs` / `AnalogConfigWindow.axaml.cs` / `AudioPlusConfigWindow.axaml.cs` — 多分頁設定視窗。
+    *   `CrtGpuRenderThread.cs` — Phase 3A render-thread GPU CRT 路徑（透過 `ISkiaSharpApiLeaseFeature` 取得 GPU 後端的 `SKCanvas`，SkSL shader 直接在 D3D11 上執行，全程不回 CPU）。
+    *   `Shaders/crt_core_*.sksl` — 版本化 SkSL shaders（Catmull-Rom / Mitchell 立方採樣）。`ShaderLoader.LoadLatest()` 自動挑時間戳最新的版本；可用 `--crt-shader <檔名>` 切換。
+    *   `Platform/` — 跨平台抽象層：`IAudioBackend`（預設 Win32WaveOutBackend）、`IGamepadBackend`（Win32 DirectInput8 + XInput / Null fallback）、`PlatformFactory`。macOS / Linux 後端是接下來的開發目標。
+    *   `PublishContent/` — Release-only 資源（ReadMe / configure / tools / benchmark 指令稿） —— `dotnet publish` 自動帶入，平常 build 不會複製。
     *   `TestRunner.cs` — Headless 測試執行器（使用 Avalonia Bitmap，不依賴 System.Drawing）。
-    *   建置：`build_avalonia.bat` → `AprNesAvalonia/bin/Debug/net10.0/AprNesAvalonia.exe`
+    *   **開發版**：`build_avalonia.bat` → `AprNesAvalonia/bin/Debug/net10.0/AprNesAvalonia.exe`
+    *   **Single-file 發行版**：
+        ```bash
+        dotnet publish AprNesAvalonia/AprNesAvalonia.csproj -c Release -r win-x64 \
+          --self-contained true \
+          -p:PublishSingleFile=true \
+          -p:IncludeNativeLibrariesForSelfExtract=true \
+          -p:EnableCompressionInSingleFile=true \
+          -p:PublishReadyToRun=true \
+          -p:DebugType=embedded \
+          -o publish/AprNesAvalonia-win-x64
+        ```
+        → 16 個檔案 / 7 個目錄 / 約 60 MB，主程式在 `publish/AprNesAvalonia-win-x64/AprNesAvalonia.exe`
 
 ### WebAssembly 版本 (AprNesWasm/)
 
