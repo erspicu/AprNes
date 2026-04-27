@@ -1,0 +1,48 @@
+<section id="ava-release" style="padding:4rem 0">
+  <div class="container">
+    <div style="background:linear-gradient(135deg,rgba(0,170,170,.10),rgba(255,210,80,.06));border:1px solid var(--nes-teal);border-radius:14px;padding:2rem;">
+      <div class="text-center mb-3">
+        <span class="nbadge nbadge-teal" style="font-size:.78rem;letter-spacing:.5px" data-i18n="ava_badge">NEW · 2026.04.27</span>
+      </div>
+      <h3 style="color:var(--nes-yellow);text-align:center;margin-bottom:.6rem" data-i18n="ava_title">🚀 aprnesava 新版發布 — .NET 10 / Avalonia</h3>
+      <p style="text-align:center;color:var(--nes-muted);font-size:.92rem;line-height:1.7;max-width:760px;margin:0 auto 1.4rem" data-i18n="ava_lead">
+        全新主線版本，基於 .NET 10 + Avalonia + SkiaSharp，全面 GPU 加速 CRT pipeline，並導入 HD_NTSC 12× Fsc 過採樣。NES 模擬精度與 NetFx 版完全一致（blargg 184/184 + AccuracyCoin 138/138 雙滿分），但效能與畫面後處理品質全面領先。
+      </p>
+
+      <div class="row g-3 mb-4" style="max-width:900px;margin:0 auto">
+        <div class="col-md-4">
+          <div style="background:rgba(0,0,0,.25);border:1px solid var(--nes-border);border-radius:10px;padding:1rem;height:100%">
+            <div style="font-size:1.4rem;margin-bottom:.4rem">⚡</div>
+            <div style="color:var(--nes-yellow);font-weight:600;font-size:.95rem;margin-bottom:.4rem" data-i18n="ava_r1_t">GPU 加速 CRT</div>
+            <div style="color:var(--nes-muted);font-size:.84rem;line-height:1.6" data-i18n="ava_r1_d">SkSL shader 跑在 D3D11 上，全程不回 CPU。10× scale 實測比 CPU 後端快 2.5×（58.67 vs 23.45 FPS）。</div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div style="background:rgba(0,0,0,.25);border:1px solid var(--nes-border);border-radius:10px;padding:1rem;height:100%">
+            <div style="font-size:1.4rem;margin-bottom:.4rem">🎯</div>
+            <div style="color:var(--nes-yellow);font-weight:600;font-size:.95rem;margin-bottom:.4rem" data-i18n="ava_r2_t">HD_NTSC 12× Fsc</div>
+            <div style="color:var(--nes-muted);font-size:.84rem;line-height:1.6" data-i18n="ava_r2_d">2048 sample/scanline（NetFx 是 1024）。RF 模式 herringbone、color fringing、chroma blur 還原更接近真實 NTSC 訊號。</div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div style="background:rgba(0,0,0,.25);border:1px solid var(--nes-border);border-radius:10px;padding:1rem;height:100%">
+            <div style="font-size:1.4rem;margin-bottom:.4rem">📦</div>
+            <div style="color:var(--nes-yellow);font-weight:600;font-size:.95rem;margin-bottom:.4rem" data-i18n="ava_r3_t">Single-file 打包</div>
+            <div style="color:var(--nes-muted);font-size:.84rem;line-height:1.6" data-i18n="ava_r3_d">整個 emulator + .NET 10 runtime + Avalonia + SkiaSharp 全封裝成單一 .exe，不需安裝 .NET runtime。</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="text-center mb-3">
+        <a href="https://github.com/erspicu/AprNes/releases/tag/aprnesava-20260427" target="_blank" class="btn px-4 py-2" style="background:var(--nes-teal);color:#fff;font-weight:600;text-decoration:none;border-radius:8px">
+          🚀 <span data-i18n="ava_dl_btn">前往 GitHub 下載 aprnesava 2026.04.27</span>
+        </a>
+      </div>
+
+      <div style="background:rgba(0,0,0,.3);border-left:3px solid var(--nes-yellow);border-radius:6px;padding:.9rem 1.1rem;font-size:.85rem;color:var(--nes-muted);line-height:1.7;max-width:820px;margin:1.2rem auto 0">
+        <span style="color:var(--nes-yellow);font-weight:600" data-i18n="ava_note_label">📌 給 NetFx 版用戶的話：</span>
+        <span data-i18n="ava_note_body">下方仍提供 04/27 NetFx 版本的直接下載，但此後 NetFx 分支基本停止維護，所有新功能只會在 aprnesava 上推出。建議改用新版 — 設定檔自動沿用，操作介面完全相容，獲得更高效能與更精確的 NTSC 模擬。詳細對比可參閱 </span><a href="https://github.com/erspicu/AprNes/blob/master/MD/Avalonia/aprnesava_vs_netfx_features_zh.md" target="_blank" data-i18n="ava_note_link">完整版本對比文件</a><span data-i18n="ava_note_body2">。</span>
+      </div>
+    </div>
+  </div>
+</section>

@@ -5,14 +5,28 @@
       <p class="sec-sub" data-i18n="dl_sub">需要 .NET Framework 4.8.1 或以上執行環境</p>
     </div>
 
+    <div style="background:rgba(255,210,80,.06);border:1px solid rgba(255,210,80,.4);border-radius:10px;padding:.9rem 1.1rem;font-size:.85rem;color:var(--nes-muted);line-height:1.7;max-width:700px;margin:0 auto 1rem">
+      <span style="color:var(--nes-yellow);font-weight:600" data-i18n="dl_netfx_notice_t">⚠️ 提醒：</span>
+      <span data-i18n="dl_netfx_notice_b">下方為 NetFx (.NET Framework 4.8.1) 版本歷史下載，目前已停止主動維護。建議改用上方 </span>
+      <a href="#ava-release" data-i18n="dl_netfx_notice_link">aprnesava .NET 10 新版</a><span data-i18n="dl_netfx_notice_b2"> — 效能更高、HD_NTSC 12× 過採樣、GPU 加速 CRT。</span>
+    </div>
+
     <div class="d-flex flex-column gap-2" style="max-width:700px;margin:0 auto">
 
       <div class="dl-row" style="border-color:var(--nes-teal)">
         <div>
-          <div class="ver text-teal" data-i18n="dln_ver">2026.04.19 — 最新版</div>
-          <div class="note" data-i18n="dln_note">2026.04.12 版本的完整優化版。Mapper 由 65 個擴充至 79 個，blargg 184/184 + AccuracyCoin 138/138 雙滿分通過。這是本專案最終發布版，後續維護基本停止。</div>
+          <div class="ver text-teal" data-i18n="dl0427_ver">2026.04.27 — NetFx 最終維護版</div>
+          <div class="note" data-i18n="dl0427_note">.NET Framework 4.8.1 分支的最後一次維護打包。包含 04/19 之後所有共用 NesCore 修正（IL3000 single-file 相容性 fix 等）。NES 模擬精度與 aprnesava 完全一致，但缺少 GPU CRT、HD_NTSC、.NET 10 加速等新版獨有特性。</div>
         </div>
-        <a href="file/AprNes-20260419.7z" class="btn-dl" data-i18n="dl_btn">下載 .7z</a>
+        <a href="file/AprNes-20260427.7z" class="btn-dl" data-i18n="dl_btn">下載 .7z</a>
+      </div>
+
+      <div class="dl-row">
+        <div>
+          <div class="ver" data-i18n="dln_ver">2026.04.19</div>
+          <div class="note" data-i18n="dln_note">2026.04.12 版本的完整優化版。Mapper 由 65 個擴充至 79 個，blargg 184/184 + AccuracyCoin 138/138 雙滿分通過。</div>
+        </div>
+        <a href="file/AprNes-20260419.7z" class="btn-dl old" data-i18n="dl_btn2">下載</a>
       </div>
 
       <div class="dl-row">
