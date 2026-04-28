@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AprNes — 技術文章 / Techbook</title>
+  <link rel="stylesheet" href="libs/bootstrap.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* ── Techbook-specific styles ───────────────────────────────────── */
+    .tb-cat-title {
+      color: var(--nes-yellow);
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: .25rem;
+      display: flex;
+      align-items: center;
+      gap: .55rem;
+    }
+    .tb-cat-sub {
+      color: var(--nes-muted);
+      font-size: .88rem;
+      margin-bottom: 1.4rem;
+      padding-left: 1.95rem;
+    }
+    .tb-card {
+      background: var(--nes-card);
+      border: 1px solid var(--nes-border);
+      border-radius: 12px;
+      padding: 1.4rem 1.6rem;
+      height: 100%;
+      transition: transform .18s, box-shadow .18s, border-color .18s;
+      display: flex;
+      flex-direction: column;
+    }
+    .tb-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(0, 128, 128, .18);
+      border-color: rgba(56, 189, 248, .4);
+    }
+    .tb-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .35rem;
+      margin-bottom: .7rem;
+    }
+    .tb-tag {
+      font-size: .68rem;
+      font-weight: 600;
+      letter-spacing: .03em;
+      padding: .18rem .55rem;
+      border-radius: 999px;
+      text-transform: uppercase;
+    }
+    .tb-tag.perf  { background: rgba(251, 191, 36, .12); color: #fbbf24; border: 1px solid rgba(251, 191, 36, .3); }
+    .tb-tag.arch  { background: rgba(56, 189, 248, .12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, .3); }
+    .tb-tag.zh    { background: rgba(34, 197, 94, .12); color: #22c55e; border: 1px solid rgba(34, 197, 94, .3); }
+    .tb-tag.tut   { background: rgba(0, 128, 128, .18); color: #2dd4bf; border: 1px solid rgba(0, 128, 128, .35); }
+    .tb-tag.deep  { background: rgba(244, 114, 182, .12); color: #f472b6; border: 1px solid rgba(244, 114, 182, .3); }
+    .tb-card h4 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--nes-text);
+      margin-bottom: .65rem;
+      line-height: 1.4;
+    }
+    .tb-card .tb-summary {
+      font-size: .87rem;
+      color: var(--nes-muted);
+      line-height: 1.7;
+      flex-grow: 1;
+      margin-bottom: 1rem;
+    }
+    .tb-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: .78rem;
+      color: var(--nes-muted);
+      margin-top: auto;
+      padding-top: .7rem;
+      border-top: 1px solid var(--nes-border);
+    }
+    .tb-meta a {
+      color: var(--nes-accent);
+      text-decoration: none;
+      font-weight: 600;
+      transition: color .2s;
+    }
+    .tb-meta a:hover { color: var(--nes-yellow); }
+    .tb-arrow { transition: transform .18s; display: inline-block; }
+    .tb-meta a:hover .tb-arrow { transform: translateX(3px); }
+  </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar navbar-expand-lg fixed-top">
+  <div class="container">
+    <a class="navbar-brand" href="index.html">🎮 AprNes</a>
+    <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav ms-auto align-items-center gap-2">
+        <li class="nav-item"><a class="nav-link" href="index.html">← 回首頁</a></li>
+        <li class="nav-item"><a class="nav-link" href="index.html#download">下載</a></li>
+        <li class="nav-item"><a class="nav-link" href="index.html#reports">測試報告</a></li>
+        <li class="nav-item"><a class="nav-link active" href="techbook.html">技術文章</a></li>
+        <li class="nav-item">
+          <a class="nav-link" href="https://github.com/erspicu/AprNes" target="_blank">GitHub</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero" style="padding-top:8rem;padding-bottom:3rem">
+  <div class="container">
+    <div class="badge-row">
+      <span class="nbadge nbadge-yellow">📚 Techbook</span>
+      <span class="nbadge nbadge-teal">教學 / 心得</span>
+      <span class="nbadge nbadge-blue">中文</span>
+    </div>
+    <h1><span class="text-yellow">技術文章</span></h1>
+    <p class="sub">
+      AprNes 開發過程中累積的研究筆記與心得整理。從 NES 硬體模擬的設計理論，
+      到 C# / .NET 的微架構效能優化技巧，分類收錄於此。文章持續增加中。
+    </p>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════════════════════
+     CATEGORY 1: Performance Engineering
+     ═══════════════════════════════════════════════════════════════ -->
+<section style="padding:3.5rem 0 2.5rem">
+  <div class="container">
+    <div class="tb-cat-title">⚡ <span>效能優化</span></div>
+    <div class="tb-cat-sub">
+      C# / .NET 模擬器的熱迴圈優化方法，從手寫技法到 JIT 與 CPU 微架構層面的設計考量。
+    </div>
+
+    <div class="row g-4">
+      <!-- Article: Non-JIT Optimization Techniques -->
+      <div class="col-md-6">
+        <div class="tb-card">
+          <div class="tb-tags">
+            <span class="tb-tag perf">效能</span>
+            <span class="tb-tag tut">技法目錄</span>
+            <span class="tb-tag deep">進階</span>
+            <span class="tb-tag zh">中文</span>
+          </div>
+          <h4>AprNes 非 JIT 層優化技巧整理</h4>
+          <p class="tb-summary">
+            整理 AprNes 主線從 2026-03-15 起所有效能改動，聚焦在<strong>語言／Runtime 層級以下</strong>的優化技巧。涵蓋 11 大類：位元運算（用 <code>&amp;</code> 取代 <code>%</code>）、Branchless 程式碼、查表法（LUT）、Magic Number、SWAR、真正 SIMD、整數取代浮點（Bresenham / Fixed-Point）、迴圈展開與 ILP、函式指標靜態分派、資料佈局與 Cache-line aware 設計、冗餘計算消除。每一節都附真實 commit 的 before / after 範例，方便對照學習。
+          </p>
+          <div class="tb-meta">
+            <span>11 個技法 ｜ 含 commit 對照</span>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/jit/AprNes_Optimization_Techniques.md" target="_blank">
+              閱讀全文 <span class="tb-arrow">→</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Article: JIT and I-Cache Tutorial -->
+      <div class="col-md-6">
+        <div class="tb-card">
+          <div class="tb-tags">
+            <span class="tb-tag perf">效能</span>
+            <span class="tb-tag tut">教學</span>
+            <span class="tb-tag deep">進階</span>
+            <span class="tb-tag zh">中文</span>
+          </div>
+          <h4>C# JIT 與 I-Cache 優化教學</h4>
+          <p class="tb-summary">
+            從 Game Loop 出發，一路談到 CPU 快取階層、冷熱路徑拆分、多核流水線、執行緒親和性，並結合 AprNes 實戰的 PMU / ETW 分析流程。涵蓋 Inlining 與 I-Cache 的權衡、量化工具與階梯式策略、熱路徑溢出時的處理、跨核心溝通成本、C# 怎麼確保執行緒真正落在不同 core 上，最後延伸到高併發 web service。目標讀者是想從 JIT 行為與 CPU 微架構層級理解效能的開發者。
+          </p>
+          <div class="tb-meta">
+            <span>11 章 ｜ 含 PMU 實戰</span>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/jit/JIT_ICache_Tutorial.md" target="_blank">
+              閱讀全文 <span class="tb-arrow">→</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════════════════════
+     CATEGORY 2: Emulator Design Theory
+     ═══════════════════════════════════════════════════════════════ -->
+<section style="padding:3.5rem 0 4.5rem">
+  <div class="container">
+    <div class="tb-cat-title">🧩 <span>模擬器設計理論</span></div>
+    <div class="tb-cat-sub">
+      NES 硬體精確模擬的設計問題：要把時間模擬到多細？該不該用 Catch-Up？Per-Scanline 真的比較簡單嗎？
+    </div>
+
+    <div class="row g-4">
+      <!-- Article: Timing Models Guide -->
+      <div class="col-md-6 col-lg-4">
+        <div class="tb-card">
+          <div class="tb-tags">
+            <span class="tb-tag arch">架構</span>
+            <span class="tb-tag tut">教學</span>
+            <span class="tb-tag zh">中文</span>
+          </div>
+          <h4>NES 模擬器 Timing 模型教學</h4>
+          <p class="tb-summary">
+            模擬器到底要把「時間」模擬到多細？這個問題看似效能議題，實則同時是架構、正確性、工程成本與維護性的問題。文章把常見的 timing 模型分類成從 frame-based、scanline、cycle、dot 一路到 sub-cycle / master clock，比較每一級買到什麼、付出什麼成本、能通過哪些測試 ROM。是設計新模擬器或評估既有模擬器精度的入門指南。
+          </p>
+          <div class="tb-meta">
+            <span>分類學 + trade-off 比較</span>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_emulator_timing_models_guide_zh.md" target="_blank">
+              閱讀全文 <span class="tb-arrow">→</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Article: Catch-Up vs Structural Optimization -->
+      <div class="col-md-6 col-lg-4">
+        <div class="tb-card">
+          <div class="tb-tags">
+            <span class="tb-tag arch">架構</span>
+            <span class="tb-tag deep">進階</span>
+            <span class="tb-tag zh">中文</span>
+          </div>
+          <h4>AprNes 為什麼少用 Catch-Up，改走結構性優化</h4>
+          <p class="tb-summary">
+            Catch-Up 在許多模擬器裡是省成本的主流做法 —— 讓某個元件先跑，等需要互動時再把其他元件補跑到正確時間點。但在追求 cycle-accurate 的設計裡，catch-up 帶來的副作用（延遲決策、補丁式邏輯、精度退化）反而成為包袱。文章解釋 AprNes 為什麼選擇 <code>Mem_r → tick() → 3× ppu_step</code> 的全域 tick 模型，以及這個結構讓哪些熱迴圈優化成為可能。
+          </p>
+          <div class="tb-meta">
+            <span>結構性 vs 補償性</span>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/aprnes_catch_up_and_structural_optimization_zh.md" target="_blank">
+              閱讀全文 <span class="tb-arrow">→</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Article: Per-Scanline Challenge -->
+      <div class="col-md-6 col-lg-4">
+        <div class="tb-card">
+          <div class="tb-tags">
+            <span class="tb-tag arch">架構</span>
+            <span class="tb-tag deep">進階</span>
+            <span class="tb-tag zh">中文</span>
+          </div>
+          <h4>為什麼「高品質 Per-Scanline NES Emulator」其實很難</h4>
+          <p class="tb-summary">
+            很多人以為 per-scanline 模擬器只是比較粗、比較不準、也比較容易做。實際上要讓 per-scanline 模擬器跑大多數遊戲不出錯，需要疊加大量的 hack 跟特例補償：MMC3 IRQ 時序、$2007 寫入時的 PPU 內部狀態、sprite 0 hit 的 cycle 精確位置、DMA 偷取週期……。文章梳理這些看不見的成本，解釋為什麼乾脆走 cycle-accurate 反而是更乾淨的設計選擇。
+          </p>
+          <div class="tb-meta">
+            <span>hidden cost 分析</span>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/per_scanline_nes_emulator_challenge_zh.md" target="_blank">
+              閱讀全文 <span class="tb-arrow">→</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- COMING SOON / 投稿 -->
+<section style="padding:3rem 0">
+  <div class="container">
+    <div style="background:linear-gradient(135deg,rgba(0,128,128,.08),rgba(56,189,248,.04));border:1px dashed var(--nes-border);border-radius:12px;padding:2rem;text-align:center">
+      <div style="font-size:2rem;margin-bottom:.6rem">✍️</div>
+      <h4 style="color:var(--nes-yellow);margin-bottom:.7rem">後續會持續補充</h4>
+      <p style="color:var(--nes-muted);font-size:.9rem;line-height:1.7;max-width:640px;margin:0 auto">
+        新的教學文章與技術心得會陸續加進來，包含 NTSC 訊號模擬、CRT shader 設計、SIMD 編程實踐、跨平台移植經驗等主題。也歡迎社群參與討論或在 GitHub 上提 issue 建議題目。
+      </p>
+      <a href="https://github.com/erspicu/AprNes" target="_blank" class="btn btn-outline-light px-4 mt-3" style="font-size:.85rem">
+        前往 GitHub
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="row align-items-center">
+      <div class="col-md-6 mb-2 mb-md-0">
+        <strong class="text-yellow">AprNes</strong>
+        <span style="margin:0 .5rem;opacity:.3">|</span>
+        <span>by erspicu_brox</span>
+        <span style="margin:0 .5rem;opacity:.3">|</span>
+        <a href="https://github.com/erspicu/AprNes" target="_blank">GitHub</a>
+      </div>
+      <div class="col-md-6 text-md-end">
+        <a href="index.html">← 回首頁</a>
+        <span style="margin:0 .5rem;opacity:.3">|</span>
+        <a href="report/index.html" target="_blank">測試報告</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="libs/bootstrap.bundle.min.js"></script>
+<script>
+  // Smooth scroll for in-page anchors (none on this page yet, future-proofing)
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+      const tgt = document.querySelector(a.getAttribute('href'));
+      if (tgt) { e.preventDefault(); tgt.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    });
+  });
+</script>
+</body>
+</html>

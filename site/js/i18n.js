@@ -2,7 +2,7 @@
 const LANG = {
   zh: {
     nav_feat:'特色', nav_map:'Mapper', nav_analog:'類比模擬', nav_dsp:'音效 DSP', nav_rep:'測試報告', nav_gal:'截圖', nav_hist:'歷史',
-    nav_road:'Roadmap', nav_ack:'致謝', nav_dl:'下載',
+    nav_road:'Roadmap', nav_ack:'致謝', nav_dl:'下載', nav_tb:'技術文章',
     map_title:'Mapper 相容性', map_sub:'79 個已實作 Mapper，68 個人工校驗完整支援',
     map_stat_ok:'✅ 完整支援', map_stat_partial:'⚠️ 部分支援', map_stat_unconfirmed:'❓ 待確認', map_stat_total:'🔧 已實作總計',
     map_ok_label:'✅ 完整支援（人工校驗通過）', map_partial_label:'⚠️ 部分支援（部分遊戲有問題）',
@@ -151,7 +151,7 @@ const LANG = {
   },
   en: {
     nav_feat:'Features', nav_map:'Mappers', nav_analog:'Analog', nav_dsp:'Audio DSP', nav_rep:'Reports', nav_gal:'Gallery', nav_hist:'History',
-    nav_road:'Roadmap', nav_ack:'Credits', nav_dl:'Download',
+    nav_road:'Roadmap', nav_ack:'Credits', nav_dl:'Download', nav_tb:'Techbook',
     map_title:'Mapper Compatibility', map_sub:'79 mappers implemented, 68 fully verified by manual testing',
     map_stat_ok:'✅ Fully Supported', map_stat_partial:'⚠️ Partial Support', map_stat_unconfirmed:'❓ Unconfirmed', map_stat_total:'🔧 Total Implemented',
     map_ok_label:'✅ Fully Supported (Manually Verified)', map_partial_label:'⚠️ Partial Support (some games have issues)',
