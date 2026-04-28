@@ -134,6 +134,47 @@
 <hr class="divider">
 
 <!-- ═══════════════════════════════════════════════════════════════
+     CATEGORY 0: Overview / 綜合導論 (lead article — recommended start)
+     ═══════════════════════════════════════════════════════════════ -->
+<section style="padding:3.5rem 0 2.5rem">
+  <div class="container">
+    <div class="tb-cat-title">📖 <span>綜合導論</span></div>
+    <div class="tb-cat-sub">
+      模擬器主要技術名詞、邊界與選用建議的問答式總覽。新讀者建議從這裡開始。
+    </div>
+
+    <div class="row g-4">
+      <div class="col-12">
+        <div class="tb-card" style="border-left:3px solid var(--nes-yellow)">
+          <div class="tb-tags">
+            <span class="tb-tag perf">效能</span>
+            <span class="tb-tag arch">架構</span>
+            <span class="tb-tag tut">入門必讀</span>
+            <span class="tb-tag deep">深度</span>
+            <span class="tb-tag zh">中文</span>
+            <span class="tb-tag zh" style="background:rgba(56,189,248,.12);color:#38bdf8;border-color:rgba(56,189,248,.3)">English</span>
+          </div>
+          <h4>模擬器技術問答集 — 從 JIT、DBT、KVM 到電晶體級模擬</h4>
+          <p class="tb-summary">
+            以問答形式涵蓋現代模擬器的主要實作技術：JIT、DBT、KVM、LLVM 後端、靜態重編譯（Static Recompilation）、HLE GPU 橋接、AI 紋理超解析、Rollback 網路同步、MSU-1 音源置換、FPGA 模擬、Visual6502 電晶體級模擬與 Lean 形式化驗證等。第一章特別<strong>釐清「.NET / .NET Framework / Java 等語言層 JIT」與「模擬器 JIT / Dynarec」這兩個經常被混淆的概念</strong>，避免入門者走錯方向。後面七章逐項展開各技術的適用情境、邊界、實作挑戰，並對 4 種核心技術（JIT / DBT / KVM / Static Recomp）給出練習目標推薦。
+          </p>
+          <div class="tb-meta">
+            <span>40 題 ｜ 8 大章節 ｜ 中英對照</span>
+            <span>
+              <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/emulator_techniques_qa_zh.md" target="_blank">中文版 <span class="tb-arrow">→</span></a>
+              <span style="opacity:.4;margin:0 .35rem">｜</span>
+              <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/emulator_techniques_qa_en.md" target="_blank">English <span class="tb-arrow">→</span></a>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════════════════════
      CATEGORY 1: Performance Engineering
      ═══════════════════════════════════════════════════════════════ -->
 <section style="padding:3.5rem 0 2.5rem">
