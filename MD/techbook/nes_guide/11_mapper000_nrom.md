@@ -8,12 +8,32 @@ Mapper000，也就是 NROM，是最簡單的 NES 卡匣格式。它沒有 bank s
 
 ## NES 硬體觀念
 
+**生活比喻**：NROM 是最簡單的卡匣 —— **一本印好的書，沒有任何機關**。主廚直接讀就好，沒有換頁、沒有暗格、沒有密碼。
+
 NROM 常見兩種：
 
-- NROM-128：16KB PRG ROM。
-- NROM-256：32KB PRG ROM。
+- **NROM-128**：16KB PRG ROM (對應 16 KB 的 ROM 晶片，例如《Donkey Kong》《Super Mario Bros.》)
+- **NROM-256**：32KB PRG ROM (對應 32 KB 的 ROM 晶片，例如《Excitebike》)
 
 CPU cartridge window 是 `$8000-$FFFF`，大小 32KB。
+
+```
+NROM-128 (16 KB)：
+   $8000 ┌─────────────────┐
+         │  PRG ROM        │  ← 第一個 16 KB 的內容
+   $BFFF ├─────────────────┤
+   $C000 │  PRG ROM (鏡像) │  ← 同一份內容再貼一次
+   $FFFF └─────────────────┘     讓 reset/IRQ vector 在 $FFFC-$FFFF 找得到
+
+NROM-256 (32 KB)：
+   $8000 ┌─────────────────┐
+         │  PRG ROM 前半   │
+   $BFFF ├─────────────────┤
+   $C000 │  PRG ROM 後半   │
+   $FFFF └─────────────────┘
+```
+
+**為什麼學 mapper 從 NROM 開始？** 因為 NROM 沒有任何 mapper 邏輯（也沒 register、沒 bank switching、沒 IRQ）。先把 IMapper 介面打通，遊戲能跑，再去處理有狀態的 mapper。
 
 NROM-256：
 

@@ -4,6 +4,27 @@
 
 前面章節已經介紹硬體與 AprNes 實作。這章整理一條務實的開發路線，讓初學者知道先做什麼、後做什麼，避免一開始就被 cycle-accurate PPU、DMA edge case、MMC3 IRQ 壓垮。
 
+## 開發前的心理建設
+
+寫模擬器是**長期專案**，不是週末玩具。給自己合理的期望：
+
+| 階段 | 約略時間 | 你能跑什麼 |
+|---|---|---|
+| ROM loader + CPU stub | 1-3 天 | nestest CPU 測試 (沒畫面) |
+| 第一張畫面 | 1 週 | 看到 *Donkey Kong* 開機畫面 (但 sprite 跟 BG 可能錯位) |
+| 完整 NROM 遊戲 | 2-3 週 | *Super Mario Bros.* 能玩 |
+| MMC1 + MMC3 | 1 個月 | 大部分 1985-1990 主流遊戲 |
+| Cycle accurate (過 blargg) | 2-3 個月 | 通過所有 184 個 blargg 測試 |
+| AccuracyCoin 滿分 | 3-6 個月 | 138/138 滿分 |
+
+**鐵律**：
+1. **先讓 CPU 測試 ROM 通過**（nestest），畫面再差都先放著
+2. **先求能跑遊戲，再求精度** — 不要一開始追求 cycle accurate
+3. **每個階段都要有測試 ROM 驗收** — 不要靠「看遊戲有沒有跑」當作正確性判斷
+4. **有 reference emulator 可比對** — 卡住時開 Mesen2 / fceux 用 debugger 對照
+
+---
+
 ## 階段 1：ROM Loader 與 Mapper000
 
 目標：
@@ -18,6 +39,15 @@
 - 能讀 reset vector。
 - CPU 可以從 `$8000-$FFFF` 取 opcode。
 - PPU 可以讀 CHR pattern data。
+
+**測試方式**：印出 reset vector：
+
+```csharp
+ushort resetVec = (ushort)(prg[0x7FFC - 0x8000] | (prg[0x7FFD - 0x8000] << 8));
+Console.WriteLine($"Reset = ${resetVec:X4}");   // 應該指向 $8000-$FFFF 範圍
+```
+
+ROM 用 NROM 的 *Donkey Kong* 或 *Super Mario Bros.*，reset vector 通常在 `$C000` 附近。
 
 ## 階段 2：CPU Memory Map
 
@@ -52,6 +82,17 @@
 - 先跑 nestest 類 CPU 測試。
 
 後續再改 per-cycle。
+
+**關鍵測試 ROM**：
+- **nestest.nes**（必過）— 載入 `$C000` 跑 automated mode，預期執行結束 `$0002`-`$0003` 顯示錯誤碼 (`$00 $00` = PASS)
+- **blargg `instr_test-v5/all_instrs.nes`** — 測 official + 常見 illegal opcode
+- **blargg `cpu_timing_test6/cpu_timing_test.nes`** — 測 cycle counting 跟 page-cross penalty
+
+進階階段（如果要追求 cycle-accurate）再加：
+- **cpu_dummy_reads** / **cpu_dummy_writes_oam** / **cpu_dummy_writes_ppumem**
+- **cpu_interrupts_v2** — 測 NMI hijacking 等 edge case
+
+詳細 opcode 規則見 [A2 6502 完整 256 Opcode 實作參考](A2_6502_opcode_reference.md)。
 
 ## 階段 4：PPU 最小畫面
 

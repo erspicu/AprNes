@@ -8,6 +8,8 @@ CNROM 是 CHR bank switching 的最小例子。它的 PRG ROM 基本固定，但
 
 ## NES 硬體觀念
 
+**生活比喻**：CNROM 跟 UNROM 剛好相反 —— **食譜本身固定不換，但圖片冊可以一頁一頁換**。主廚（CPU）一直看同一本食譜；上菜小弟（PPU）每換一個關卡就翻到不同的圖片冊。
+
 PRG 與 CHR 是兩個不同世界：
 
 - CPU 執行 PRG ROM。
@@ -15,12 +17,31 @@ PRG 與 CHR 是兩個不同世界：
 
 CNROM 通常：
 
+```
+CPU 看到的：              PPU 看到的：
+$8000 ┌──────────┐        $0000 ┌────────────────┐
+      │          │              │  可切換 8 KB    │
+      │  固定    │              │  CHR ROM bank   │  ← 寫 CPU 的 $8000-$FFFF
+      │  PRG ROM │              │                 │     會改變這裡
+      │          │        $1FFF └────────────────┘
+$FFFF └──────────┘
+```
+
 ```text
 CPU $8000-$FFFF     fixed PRG ROM
 PPU $0000-$1FFF     switchable 8KB CHR ROM bank
 ```
 
-CPU 不能直接執行 CHR，也不能直接把 CHR 當 CPU memory。CPU 是透過寫 mapper register，要求卡匣硬體改變 PPU CHR address 對應的 ROM bank。
+CPU 不能直接執行 CHR，也不能直接把 CHR 當 CPU memory。**CPU 要寫 `$8000-$FFFF` 任何位址**（注意不是寫到那個位址，是給 mapper 一個訊號），mapper 收到後改變 PPU CHR bus 看到的 ROM bank。
+
+```assembly
+; 切到 CHR bank 2 (第 3 個 8 KB bank)
+LDA  #$02
+STA  $8000        ; 寫到任何 $8000-$FFFF 都會被 CNROM 解讀為「換 CHR bank」
+                   ; mapper 取 value & 0x03 (CNROM 最多 4 個 bank)
+```
+
+**為什麼有 CNROM？** 因為某些遊戲（例如《Solomon's Key》、《Gradius》）的程式邏輯小（< 32 KB），但需要的圖形多（多種 boss、特效）。這時用 CNROM 比 UNROM 划算：PRG 維持 32 KB 不換頁，但 CHR 可以放 32 KB 或 64 KB，每關用不同 8 KB。**代表作品**：《Solomon's Key》、《Gradius》、《Q*bert》、《Spelunker》。
 
 ## 初學者簡化模型
 

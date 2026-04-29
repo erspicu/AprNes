@@ -8,6 +8,8 @@ UNROM 是學習 PRG bank switching 的好例子。它沒有 MMC1 的 serial regi
 
 ## NES 硬體觀念
 
+**生活比喻**：UNROM 像**書桌只能放兩本書 —— 一本上半部、一本下半部**。下半部那本永遠不換（因為食譜目錄在最後一頁），上半部那本可以隨時換成書架上其他冊。
+
 CPU 可直接看到的 PRG ROM window 是 32KB：
 
 ```text
@@ -16,9 +18,14 @@ $8000-$FFFF
 
 但遊戲可能有超過 32KB 的 PRG ROM。UNROM 的做法：
 
-```text
-$8000-$BFFF  switchable 16KB PRG bank
-$C000-$FFFF  fixed last 16KB PRG bank
+```
+$8000 ┌─────────────────────────┐
+      │  可切換 16 KB PRG bank   │  ← 寫 $8000-$FFFF 改變
+      │  (最多 8 個或 16 個 bank)│     遊戲程式邏輯主體放這裡
+$BFFF ├─────────────────────────┤
+$C000 │  固定 16 KB PRG bank     │  ← 永遠是最後一個 bank
+      │  (最後一個 bank)         │     vector + 共用副程式放這裡
+$FFFF └─────────────────────────┘     例如 reset/NMI/IRQ handler
 ```
 
 固定最後 bank 很重要，因為 interrupt vectors 在：
@@ -31,7 +38,9 @@ $FFFE-$FFFF  IRQ/BRK vector
 
 如果最後 bank 可以被任意切走，CPU reset 或 interrupt 可能找不到正確入口。
 
-UNROM 通常使用 CHR RAM。圖形資料由 CPU 程式在執行時寫入 PPU pattern table。
+**為什麼這個設計很普及？** 因為「**遊戲共用程式 (NMI handler、輸入處理、共用副程式) 放固定 bank，關卡資料 / 不同畫面放可切換 bank**」是寫 NES 遊戲最自然的架構。代表作品：《Mega Man》（每一關各占一個 bank）、《Castlevania》、《Contra》、《DuckTales》。
+
+UNROM 通常使用 **CHR RAM**（不是 CHR ROM）。為什麼？因為 UNROM 卡匣硬體沒提供 CHR bank switching，但遊戲又想動態變圖形（例如不同關卡用不同 sprite）。解法：**在卡匣裝 8 KB SRAM 給 PPU 用**，CPU 透過 PPU `$2007` 把當前要用的圖案寫進去。圖形資料由 CPU 程式在執行時寫入 PPU pattern table。
 
 ## 初學者簡化模型
 

@@ -15,12 +15,29 @@ NTSC NES 有共同的高頻 master clock。不同晶片從這個基準分頻：
 - PPU dot rate 約 CPU cycle 的 3 倍。
 - APU 與 CPU cycle 同步，但有 GET/PUT phase 差異。
 
+**生活比喻**：想像廚房裡掛了一個高頻節拍器（master clock），每秒滴答 21,477,272 次。
+- **CPU** 是 12 拍滴答動一下（每秒 1,789,773 次 = 1.79 MHz）
+- **PPU** 是 4 拍滴答動一下（每秒 5,369,318 次 = 5.37 MHz）
+- **APU** 跟 CPU 同步，但內部分成 GET（奇數 cycle）跟 PUT（偶數 cycle）兩種事件
+
+```
+master clock 拍   1   2   3   4   5   6   7   8   9   10  11  12  13  14  15...
+CPU              [─────────────────── 1 cycle ──────────────────][...
+PPU              [─ 1 dot ─][─ 1 dot ─][─ 1 dot ─][─ 1 dot ─][─...
+                    ▲          ▲          ▲          ▲
+                  PPU 動       PPU 動    PPU 動     PPU 動
+```
+
+PPU 每跑 3 dot，CPU 才跑 1 cycle。所以 PPU **不是 CPU 的子函式**，而是另一個獨立、跑得比 CPU 快 3 倍的處理器。
+
 簡化理解：
 
 ```text
-CPU:  C . . C . . C . .
-PPU:  P P P P P P P P P
+CPU:  C . . C . . C . .       (每 12 master clock 動一次)
+PPU:  P P P P P P P P P       (每 4 master clock 動一次)
 ```
+
+**為什麼這個比例（CPU:PPU = 1:3）這麼方便？** 因為 NES 的螢幕是 256 像素寬，每條 scanline 共 341 dot，CPU 每條 scanline 跑剛好 113.667 cycles。這個比例讓**遊戲程式設計師可以用「CPU 跑了幾條指令」估算「PPU 跑到了第幾個 dot」**，是 NES 上「scanline IRQ」「split scroll」之類的時序技巧成立的基礎。
 
 但 AprNes 的模型更細，會在指定 master clock phase 執行：
 

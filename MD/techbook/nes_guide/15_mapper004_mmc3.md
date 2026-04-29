@@ -8,13 +8,20 @@ MMC3 是 NES 上非常重要的 mapper。它支援細緻的 PRG/CHR bank switchi
 
 ## NES 硬體觀念
 
+**生活比喻**：MMC3 是任天堂自家的「**全能 mapper**」，幾乎是 NES 後半生命週期的標準裝備。它一次提供：
+- **PRG 切換更細**：UNROM 一次切 16 KB，MMC3 一次切 8 KB（4 個槽位獨立切）。
+- **CHR 切換更彈性**：CNROM 一次切 8 KB，MMC3 可以切兩個 2 KB + 四個 1 KB 共 8 個槽位。
+- **內建 IRQ 計時器**：可以在「PPU 掃到第 X 條 scanline」自動通知 CPU。
+
+最後一個是革命性 —— **scanline IRQ** 讓遊戲不用「狂查 sprite 0 hit」就能在精確的 raster line 觸發事件，達成複雜的 split scrolling、status bar、特效。**代表作品**：《Super Mario Bros. 3》、《Mega Man 3-6》、《Kirby's Adventure》、《Crystalis》。
+
 MMC3 功能：
 
 - 8KB PRG bank switching。
 - 1KB / 2KB CHR bank switching。
 - mirroring control。
 - IRQ latch / reload / enable。
-- 觀察 PPU A12 rising edge 產生 scanline counter clock。
+- **觀察 PPU A12 rising edge** 產生 scanline counter clock。
 
 ### PRG bank mode
 
@@ -40,14 +47,35 @@ CHR mode 決定 2KB bank 在低半部還是高半部。
 
 ### IRQ
 
-MMC3 scanline IRQ 不是單純每條 scanline 加 1。硬體是觀察 PPU address line A12：
+MMC3 scanline IRQ 不是單純每條 scanline 加 1。**硬體實際上是觀察 PPU 位址 bus 的 A12 線**：
 
-- PPU 讀 `$0000-$0FFF` 時 A12 = 0。
-- PPU 讀 `$1000-$1FFF` 時 A12 = 1。
-- 背景或 sprite pattern fetch 造成 A12 rising edge。
-- MMC3 用這些 edge clock IRQ counter。
+- PPU 讀 `$0000-$0FFF` 時 A12 = 0（pattern table 0）
+- PPU 讀 `$1000-$1FFF` 時 A12 = 1（pattern table 1）
+- 背景 / sprite pattern fetch 在不同時機讀不同 pattern table，造成 A12 訊號上升下降
+- 每次 A12 從 0 → 1（rising edge）時 mapper 內部 counter 減 1
+- counter 減到 0 觸發 IRQ
 
-為了避免短暫 pulse 被誤判，需要 A12 low 持續一段時間後的 rising edge 才算。
+**生活比喻**：MMC3 不戴錶，是看「**廚房瓦斯爐什麼時候轉到大火**」來計時。背景跟 sprite 用不同 pattern table 的時候，A12 線會在掃描線中段「轉大火」一次。MMC3 卡這個訊號計算過了多少 scanline。
+
+```text
+標準 NES PPU 一條 scanline 的 pattern fetch：
+  dot 1-256    背景 fetch (用 BG pattern table)
+  dot 257-320  sprite fetch (用 sprite pattern table)
+  dot 321-336  下一條 scanline 的背景前 2 個 tile
+
+如果 BG 用 $0000 (A12=0), sprite 用 $1000 (A12=1)：
+  scanline 進行中：A12 在 dot 256→257 切換時上升 ★ ← MMC3 看到這個 edge
+  之後再切回 0
+  下條 scanline 又一個 edge ★
+
+每條可見 scanline 大約產生 1 次 A12 rising edge → MMC3 counter -1
+```
+
+**為什麼這個設計這麼複雜？** 因為任天堂想讓 MMC3 能精確計算 scanline，但又不想多拉訊號線到 mapper。**反正 PPU 本來就會在每條 scanline 對 pattern table 做特定模式的存取，A12 邊緣訊號就剛好是「免費的 scanline 時鐘」**。
+
+副作用：**遊戲必須讓 BG 跟 sprite 用不同的 pattern table**（例如 BG 用 `$0000`、sprite 用 `$1000`），否則 A12 永遠不變化，scanline IRQ 不會運作。`$2000` register 的 bit 3、bit 4 控制這兩個選擇。
+
+為了避免短暫 pulse 被誤判，需要 A12 low 持續一段時間後的 rising edge 才算。實作模擬器時通常用一個 counter 計算 A12 維持 low 多少 PPU cycle，超過閾值（一般是 8 cycle 左右）才認可下次 rising edge。MMC3 還有不同 revision（Sharp 版 vs IRQ A vs IRQ B），各家行為微妙不同。
 
 ## 初學者簡化模型
 

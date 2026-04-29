@@ -11,15 +11,36 @@ CPU 有 16-bit address bus，所以能發出 `$0000-$FFFF` 共 64KB 的地址。
 CPU 位址空間：
 
 ```text
-$0000-$1FFF  2KB internal RAM, mirrored every $0800
-$2000-$3FFF  PPU registers, mirrored every 8 bytes
-$4000-$401F  APU / controller / DMA registers
-$4020-$5FFF  cartridge expansion area
-$6000-$7FFF  cartridge PRG RAM / SRAM
-$8000-$FFFF  cartridge PRG ROM / mapper banks
+$0000-$07FF  2KB RAM (主機內建)         ┐
+$0800-$0FFF  RAM mirror                  ├ 同一塊 2KB 重複 4 次
+$1000-$17FF  RAM mirror                  │
+$1800-$1FFF  RAM mirror                  ┘
+$2000-$2007  PPU registers (8 個)        ┐
+$2008-$3FFF  PPU register mirror         ┘ 那 8 個重複 1024 次
+$4000-$4017  APU / controller / DMA registers
+$4018-$401F  CPU 測試模式 (NES 用不到)
+$4020-$5FFF  卡匣擴充區 (大部分 mapper 不用)
+$6000-$7FFF  卡匣 PRG RAM / SRAM (有電池的話 = 存檔)
+$8000-$FFFF  卡匣 PRG ROM / mapper banks
 ```
 
 這張表是寫 NES emulator 的中心。
+
+**生活比喻**：把 64 KB 想成一棟 65536 房間的大樓平面圖：
+- **0–8191 號**：主機自己的小儲藏室（2 KB RAM 重複貼了四次門牌）。為什麼重複？省晶片！1980 年代 address decoder 只接 11 條線，剩下的線忽略，「`$0042` 跟 `$0842` 通到同一間」就是這個結果。
+- **8192–16383 號**：8 個 PPU 控制台，但門牌號被多印了 1023 次。
+- **16384–16407 號**：APU、手把、DMA 觸發器。
+- **16415–24575 號**：卡匣的擴充區，大部分卡匣這裡是「空房間」（讀會回 open bus）。
+- **24576–32767 號**：卡匣的 PRG RAM（有電池的卡匣的存檔位置）。
+- **32768–65535 號**：卡匣的 PRG ROM。**主廚 90% 的時間都在這個區域看食譜**，所以這裡的讀取速度直接決定遊戲跑多快。
+
+**為什麼模擬器不能把 64 KB 當一個 byte 陣列？** 因為**寫入相同位址，行為可能完全不同**：
+- 寫 `$0042` → 真的存進 RAM，下次讀回來
+- 寫 `$2000` → 觸發 PPU 控制設定，不會有 byte 留下來
+- 寫 `$4014` → 觸發 OAM DMA，CPU stall 513 cycles
+- 寫 `$8000` → 對 NROM 是無效操作，對 MMC1 是「累積一個 bit 到 mapper register」
+
+模擬器的 `Mem_w(addr, val)` 函式必須先看 addr 落在哪個區段，分派給對應的 handler，這就是 **bus dispatch**。
 
 CPU 讀某個地址可能是：
 

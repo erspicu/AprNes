@@ -13,11 +13,29 @@ NES 卡匣通常包含兩種主要資料：
 - PRG ROM：CPU 執行的程式碼與資料。
 - CHR ROM 或 CHR RAM：PPU 讀取的 tile pattern。
 
+**生活比喻**：把 NES 卡匣想像成一本菜單夾，裡面有兩種頁：
+- **PRG**（食譜）：主廚（CPU）按步驟執行的指令。
+- **CHR**（圖片）：菜的照片，給上菜小弟（PPU）參考用。
+
+主廚從來不看圖片，上菜小弟也從來不看食譜。**兩個人用兩條不同的輸送帶（CPU bus 跟 PPU bus）拿自己的東西**，所以可以同時進行。NES 之所以在 1983 年能跑 60 fps 的動作遊戲，這個「**兩條 bus 並行**」是關鍵硬體設計。
+
 iNES 檔案常見排列：
 
 ```text
-16-byte header | optional trainer | PRG ROM | CHR ROM
++----------------+
+| 16-byte header |  ← 告訴 emulator 這片卡匣的「形狀」
++----------------+
+| trainer (512B) |  ← 罕用，舊 dump 工具留下的，header bit 2 = 1 才有
++----------------+
+| PRG ROM        |  ← 大小 = header byte 4 × 16 KB
+| (program)      |
++----------------+
+| CHR ROM        |  ← 大小 = header byte 5 × 8 KB
+| (graphics)     |     若 byte 5 = 0 表示卡匣使用 CHR RAM (8 KB)
++----------------+
 ```
+
+**iNES (Marc Brouwerd 1996 年定義) vs NES 2.0**：iNES 是最常見的 ROM 格式，NES 2.0 是延伸版能表達更多 mapper / submapper / 區域資訊。模擬器至少要支援 iNES 才能載入大部分 ROM 集；NES 2.0 是進階目標。
 
 Header 重要欄位：
 
@@ -87,7 +105,20 @@ $8000-$BFFF  PRG bank 0
 $C000-$FFFF  mirror of PRG bank 0
 ```
 
-AprNes 在載入時把 16KB 複製到第二個 16KB，讓 mapper 讀取時可以用簡單 offset。
+**為什麼需要鏡像？** 因為 CPU 的 reset/NMI/IRQ vector 全在 `$FFFA`–`$FFFF`，如果 16 KB ROM 只放在 `$8000-$BFFF`，CPU 開機時會跳到 `$C000` 之後一片空白，根本啟動不了。鏡像讓 16 KB 的內容 **同時出現在兩個地方**，遊戲開機程式就能在 `$C000+` 找到 reset vector。
+
+**生活比喻**：餐廳菜單只有一面（16 頁），但桌上的菜單夾是雙面 32 頁。為了讓客人不管翻哪一面都看到內容，老闆把同一份菜單**印兩面相同的**塞進夾子。
+
+AprNes 在載入時把 16KB 複製到第二個 16KB，讓 mapper 讀取時可以用簡單 offset：
+
+```csharp
+if (PRG_ROM_count == 1) {
+    // 16 KB ROM → 複製到後 16 KB
+    Buffer.MemoryCopy(PRG_ROM, PRG_ROM + 0x4000, 0x4000, 0x4000);
+}
+```
+
+這樣 mapper 內的 `MapperR_RPG` 就可以直接 `return PRG_ROM[addr - 0x8000]`，不用每次判斷有沒有鏡像。
 
 ### Mapper number
 

@@ -14,24 +14,61 @@ CPU core 是 emulator 最容易開始、也最容易低估的部分。表面上�
 
 NES CPU 是 Ricoh 2A03，核心接近 MOS 6502，但不支援正常 BCD decimal mode。
 
+**生活比喻**：把 6502 想成一個只有兩隻手的主廚：
+- **左手 (A 累加器)**：所有運算的工作手，加減/邏輯結果都進這裡。
+- **右手 1 (X 索引)** / **右手 2 (Y 索引)**：拿來當「第幾個位置」的計數器，例如「`STA $1000,X` 表示寫到 `$1000+X` 那格」。
+- **書籤 (PC program counter)**：食譜目前讀到第幾頁。
+- **疊盤指標 (SP stack pointer)**：暫時放東西的盤子堆放在哪一層。
+- **儀表板 (P 狀態旗標)**：7 個獨立小燈號，表示「上次運算結果是 0 嗎？」「進位了嗎？」「現在能不能接電話 (IRQ)」。
+
+跟現代 CPU 比起來 6502 真的很簡陋 —— **沒有乘除法指令、沒有浮點、沒有 cache**。所有運算都是 8-bit + 8-bit。但它指令集小（official 56 條指令）、行為規律，是學 CPU 模擬最好的起點。
+
 主要 register：
 
 ```text
-A   accumulator
-X   index X
-Y   index Y
-SP  stack pointer, stack page = $0100-$01FF
-PC  program counter
-P   status flags: N V - B D I Z C
+A   accumulator       8-bit  ── 主要運算暫存器
+X   index X           8-bit  ── 索引/計數
+Y   index Y           8-bit  ── 索引/計數
+SP  stack pointer     8-bit  ── stack 在 $0100-$01FF (256 byte)，
+                                 SP 是 low byte，real addr = $100|SP
+PC  program counter   16-bit ── 指向下一條要執行的指令
+P   status flags      8-bit  ── 7 個獨立 flag
 ```
 
-狀態旗標：
+狀態旗標 P (從高位到低位 `N V - B D I Z C`)：
 
-- N：negative。
-- V：overflow。
-- D：decimal，2A03 不使用 decimal arithmetic。
-- I：IRQ disable。
-- Z：zero。
+| Bit | 名稱 | 中文 | 何時設定 | 何時清除 |
+|---|---|---|---|---|
+| 7 | **N** | Negative | 結果 bit 7 = 1 | 結果 bit 7 = 0 |
+| 6 | **V** | Overflow | 簽名運算溢位 (例: 127 + 1) | `CLV` 或正常運算 |
+| 5 | **-** | (unused) | 永遠 1 (在 P 中)；push 時也是 1 | — |
+| 4 | **B** | Break | `BRK`/`PHP` push 時 = 1；IRQ/NMI push 時 = 0 | (沒實體 bit；只在 push 出去的副本) |
+| 3 | **D** | Decimal | `SED` | `CLD` |
+| 2 | **I** | Interrupt Disable | `SEI` 或進入中斷 handler | `CLI` |
+| 1 | **Z** | Zero | 結果 = 0 | 結果 ≠ 0 |
+| 0 | **C** | Carry | 加法進位 / 減法不借位 / shift 從 bit 7 出來 | 反之 |
+
+**NES 跟標準 6502 的差別**：D（decimal）旗標可以讀寫，**但 ADC/SBC 完全不走 BCD 路徑**。Ricoh 2A03 把 BCD 邏輯閘移除了。模擬器寫 ADC/SBC 時不需要做 BCD 模式判斷。
+
+**指令分類** (大致)：
+
+```
+Load/Store     LDA LDX LDY STA STX STY      ── 進出 register
+Transfer       TAX TAY TXA TYA TSX TXS      ── register 之間搬
+Stack          PHA PHP PLA PLP              ── push/pull
+Arithmetic     ADC SBC                      ── 加減 (含 carry)
+Logical        AND ORA EOR                  ── 位元邏輯
+Bit op         BIT                          ── 測試 bit
+Compare        CMP CPX CPY                  ── 比較 (設旗標)
+Inc/Dec        INC DEC INX DEX INY DEY      ── ±1
+Shift/Rotate   ASL LSR ROL ROR              ── 移位
+Branch         BCC BCS BEQ BNE BMI BPL...   ── 條件分支 (8 種)
+Jump           JMP JSR RTS RTI              ── 無條件跳/呼叫/返回
+Status         CLC SEC CLI SEI CLV CLD SED  ── 改 P 旗標
+System         BRK NOP                      ── 中斷/不做事
+```
+
+完整 256 個 opcode（含 illegal）的詳細規則見 [A2 6502 完整 256 Opcode 實作參考](A2_6502_opcode_reference.md)。
 - C：carry。
 
 CPU 指令不是一個函式瞬間做完。6502 每條指令由多個 bus cycle 組成，過程中可能讀 opcode、讀 operand、做 dummy read、寫回 memory。

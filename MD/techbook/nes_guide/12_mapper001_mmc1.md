@@ -8,22 +8,57 @@ MMC1 是初學 mapper 時很重要的一步。它不像簡單 mapper 一次寫�
 
 ## NES 硬體觀念
 
+**生活比喻**：MMC1 是個**密碼鎖**，不能直接寫入完整數字。要打開它，每次只能轉一個刻度（1 bit）—— 連續轉 5 次才會「咔答」一聲設定一個 register。如果中途轉錯（寫了 bit 7 = 1），整個鎖會 reset，要從頭再來。
+
+**為什麼設計這麼麻煩？** 因為 MMC1 內部只有 8 條輸入腳位（CPU 的 8 條 data line），但要表達 5+5+5+5 = 20 bit 的設定，**晶片設計者選擇用「序列載入」省晶片面積** —— 用 5 次寫入慢慢餵 5 bit。代價是遊戲程式要寫 5 次才能改 bank。
+
 MMC1 有 4 個主要 register：
 
 ```text
-$8000-$9FFF  Control
-$A000-$BFFF  CHR bank 0
-$C000-$DFFF  CHR bank 1
-$E000-$FFFF  PRG bank
+$8000-$9FFF  Control       (mirror / PRG mode / CHR mode，5 bit)
+$A000-$BFFF  CHR bank 0    (5 bit 選 4 KB CHR bank)
+$C000-$DFFF  CHR bank 1    (5 bit 選 4 KB CHR bank，CHR mode 1 才用到)
+$E000-$FFFF  PRG bank      (5 bit 選 16 KB PRG bank)
 ```
 
 CPU 寫入 `$8000-$FFFF` 時，MMC1 不是直接使用整個 byte，而是：
+
+```
+寫 $9234, value = 0x80   ─→  bit 7 = 1，reset：清空 shift register、PRG mode = 3
+寫 $9234, value = 0x01   ─→  shift = 0b00001，count = 1
+寫 $9234, value = 0x00   ─→  shift = 0b00001 (右移後左補 0)，count = 2
+寫 $9234, value = 0x00   ─→  shift = 0b00001 (右移)，count = 3
+寫 $9234, value = 0x00   ─→  shift = 0b00001 (右移)，count = 4
+寫 $9234, value = 0x01   ─→  shift = 0b10001，count = 5  ← 達到 5 次
+                              寫到 Control register (因為位址在 $8000-$9FFF)
+                              清空 shift register、count
+```
+
+注意位址只決定**最後一次寫入要送到哪個 register**，前 4 次寫到任何 `$8000-$FFFF` 都行。
 
 - 若 bit 7 為 1：reset shift register。
 - 否則取 bit 0，依序放入 5-bit shift register。
 - 累積 5 次後，依 address range 寫入對應 register。
 
 這表示 CPU 對 mapper 的寫入是一種硬體序列通訊。
+
+**遊戲怎麼寫？**
+
+```assembly
+; 把 0x0E 寫到 control register (mirror=2, PRG mode=3, CHR mode=1)
+LDA  #$80         ; reset MMC1
+STA  $8000
+LDA  #$0E         ; 想寫的值 (0b01110)
+LSR  A            ; bit 0 → carry
+PHA
+LDA  #$00
+ROL  A            ; carry → bit 0
+STA  $8000        ; 寫第 1 bit
+PLA
+... (重複 5 次) ...
+```
+
+實務上遊戲會包裝成 `mmc1_write_reg` 副程式重複用。
 
 ## Control Register
 
