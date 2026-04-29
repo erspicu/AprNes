@@ -6,6 +6,10 @@
 
 本章先建立全局地圖。後面每章會把其中一塊硬體拆開，並對照 AprNes 的 `NesCore` 實作。
 
+> **給對硬體名詞還不熟悉的讀者**：如果讀到 register、bus、interrupt、memory-mapped I/O 這些名詞會卡住，建議先看 [A1 計算機組織小複習](A1_computer_organization_primer.md) —— 那篇全程用「廚房 / 主廚 / 工作檯」這類生活比喻把這些抽象概念講清楚，再回來讀本系列會輕鬆很多。
+>
+> 之後想查 6502 指令的具體規則，看 [A2 6502 完整 256 Opcode 實作參考](A2_6502_opcode_reference.md)。
+
 ## NES 硬體觀念
 
 NES 可以粗略分成幾個主要元件：

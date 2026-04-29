@@ -6,6 +6,10 @@ CPU core 是 emulator 最容易開始、也最容易低估的部分。表面上�
 
 本章以 AprNes 的 `CPU.cs` 為準，介紹 6502 core 的基本結構。
 
+> **如果你對「register 跟 RAM 差在哪」「stack 怎麼運作」「I 跟 N 旗標是什麼」這類觀念還不熟**，先看 [A1 計算機組織小複習](A1_computer_organization_primer.md) —— 那篇用廚房比喻把這些術語接地氣了。
+>
+> **遇到實作 opcode 時不確定某個 hex 該做什麼**，翻 [A2 6502 完整 256 Opcode 實作參考](A2_6502_opcode_reference.md) —— 含全部官方 + 非官方 opcode 的 cycle、bytes、flags、RMW 規則跟 page-cross penalty。
+
 ## NES 硬體觀念
 
 NES CPU 是 Ricoh 2A03，核心接近 MOS 6502，但不支援正常 BCD decimal mode。
