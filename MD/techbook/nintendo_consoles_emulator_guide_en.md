@@ -1,6 +1,6 @@
 # Nintendo Console Emulator Development Guide
 
-> From the Famicom in 1983 to the Switch in 2017, Nintendo released 12 mainstream home and handheld consoles over 34 years. This guide walks through them in **release-date order**, covering each console's hardware architecture and design philosophy, plus what someone writing an emulator for that machine would actually face. Each console comes with notable open-source emulator references for further study.
+> From the 1983 Famicom to the 2017 Switch (still on sale today), Nintendo has released 12 mainstream home and handheld consoles across more than 40 years. This guide walks through them in **release-date order**, covering each console's hardware architecture and design philosophy, plus what someone writing an emulator for that machine would actually face. Each console comes with notable open-source emulator references for further study.
 
 ---
 
