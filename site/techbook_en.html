@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AprNes — Techbook</title>
+  <link rel="stylesheet" href="libs/bootstrap.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* ── Techbook-specific styles ───────────────────────────────────── */
+    .tb-cat-title {
+      color: var(--nes-yellow);
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: .25rem;
+      display: flex;
+      align-items: center;
+      gap: .55rem;
+    }
+    .tb-cat-sub {
+      color: var(--nes-muted);
+      font-size: .88rem;
+      margin-bottom: 1.4rem;
+      padding-left: 1.95rem;
+    }
+    .tb-card {
+      background: var(--nes-card);
+      border: 1px solid var(--nes-border);
+      border-radius: 12px;
+      padding: 1.4rem 1.6rem;
+      height: 100%;
+      transition: transform .18s, box-shadow .18s, border-color .18s;
+      display: flex;
+      flex-direction: column;
+    }
+    .tb-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(0, 128, 128, .18);
+      border-color: rgba(56, 189, 248, .4);
+    }
+    .tb-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .35rem;
+      margin-bottom: .7rem;
+    }
+    .tb-tag {
+      font-size: .68rem;
+      font-weight: 600;
+      letter-spacing: .03em;
+      padding: .18rem .55rem;
+      border-radius: 999px;
+      text-transform: uppercase;
+    }
+    .tb-tag.perf  { background: rgba(251, 191, 36, .12); color: #fbbf24; border: 1px solid rgba(251, 191, 36, .3); }
+    .tb-tag.arch  { background: rgba(56, 189, 248, .12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, .3); }
+    .tb-tag.zh    { background: rgba(34, 197, 94, .12); color: #22c55e; border: 1px solid rgba(34, 197, 94, .3); }
+    .tb-tag.tut   { background: rgba(0, 128, 128, .18); color: #2dd4bf; border: 1px solid rgba(0, 128, 128, .35); }
+    .tb-tag.deep  { background: rgba(244, 114, 182, .12); color: #f472b6; border: 1px solid rgba(244, 114, 182, .3); }
+    .tb-card h4 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--nes-text);
+      margin-bottom: .65rem;
+      line-height: 1.4;
+    }
+    .tb-card .tb-summary {
+      font-size: .87rem;
+      color: var(--nes-muted);
+      line-height: 1.7;
+      flex-grow: 1;
+      margin-bottom: 1rem;
+    }
+    .tb-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: .78rem;
+      color: var(--nes-muted);
+      margin-top: auto;
+      padding-top: .7rem;
+      border-top: 1px solid var(--nes-border);
+    }
+    .tb-meta a {
+      color: var(--nes-accent);
+      text-decoration: none;
+      font-weight: 600;
+      transition: color .2s;
+    }
+    .tb-meta a:hover { color: var(--nes-yellow); }
+    .tb-arrow { transition: transform .18s; display: inline-block; }
+    .tb-meta a:hover .tb-arrow { transform: translateX(3px); }
+
+    /* Chapter list (for series tutorials) */
+    .chapter-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: .15rem .9rem;
+      margin: .8rem 0 1rem;
+      padding: .9rem 1rem;
+      background: rgba(0, 0, 0, .22);
+      border: 1px solid rgba(255, 255, 255, .04);
+      border-radius: 8px;
+    }
+    .chapter-list a {
+      font-size: .82rem;
+      color: var(--nes-muted);
+      text-decoration: none;
+      padding: .25rem .35rem;
+      border-radius: 4px;
+      transition: color .15s, background .15s;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .chapter-list a:hover {
+      color: var(--nes-yellow);
+      background: rgba(255, 255, 255, .04);
+    }
+    .chapter-list .ch-num {
+      color: var(--nes-teal);
+      font-weight: 700;
+      margin-right: .4rem;
+      font-family: 'Cascadia Code', Consolas, monospace;
+      font-size: .76rem;
+    }
+    .chapter-list .ch-app .ch-num { color: var(--nes-yellow); }
+    .chapter-list .ch-section-head {
+      grid-column: 1 / -1;
+      font-size: .72rem;
+      color: var(--nes-yellow);
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      padding: .5rem .35rem .15rem;
+      border-bottom: 1px dashed rgba(255, 255, 255, .08);
+      margin-bottom: .15rem;
+    }
+    .chapter-list .ch-section-head:first-child { padding-top: 0; }
+
+    /* Language switcher */
+    .lang-switch {
+      border: 1px solid var(--nes-border);
+      border-radius: 999px;
+      padding: .25rem .85rem !important;
+      font-size: .8rem !important;
+      font-weight: 600;
+      color: var(--nes-muted) !important;
+      transition: all .2s;
+    }
+    .lang-switch:hover {
+      border-color: var(--nes-accent);
+      color: var(--nes-accent) !important;
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar navbar-expand-lg fixed-top">
+  <div class="container">
+    <a class="navbar-brand" href="index.html">🎮 AprNes</a>
+    <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav ms-auto align-items-center gap-2">
+        <li class="nav-item"><a class="nav-link" href="index.html">← Home</a></li>
+        <li class="nav-item"><a class="nav-link" href="index.html#download">Download</a></li>
+        <li class="nav-item"><a class="nav-link" href="index.html#reports">Test Reports</a></li>
+        <li class="nav-item"><a class="nav-link active" href="techbook_en.html">Techbook</a></li>
+        <li class="nav-item"><a class="nav-link lang-switch" href="techbook.html" title="中文版">中</a></li>
+        <li class="nav-item">
+          <a class="nav-link" href="https://github.com/erspicu/AprNes" target="_blank">GitHub</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero" style="padding-top:8rem;padding-bottom:3rem">
+  <div class="container">
+    <div class="badge-row">
+      <span class="nbadge nbadge-yellow">📚 Techbook</span>
+      <span class="nbadge nbadge-teal">Tutorials / Notes</span>
+      <span class="nbadge nbadge-blue">English</span>
+    </div>
+    <h1><span class="text-yellow">Techbook</span></h1>
+    <p class="sub">
+      Research notes and writeups accumulated during AprNes development. From NES hardware
+      simulation theory to C# / .NET microarchitecture-level performance optimisation,
+      organised by category. Articles will keep being added.
+    </p>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════════════════════
+     CATEGORY 0: Overview (lead articles — recommended start)
+     ═══════════════════════════════════════════════════════════════ -->
+<section style="padding:3.5rem 0 2.5rem">
+  <div class="container">
+    <div class="tb-cat-title">📖 <span>Overview</span></div>
+    <div class="tb-cat-sub">
+      A Q&A-style overview of major emulator implementation techniques and a
+      development guide spanning Nintendo consoles' 34 years of evolution.
+      A good starting point for newcomers.
+    </div>
+
+    <div class="row g-4">
+      <!-- Article: Emulator Techniques Q&A -->
+      <div class="col-12">
+        <div class="tb-card" style="border-left:3px solid var(--nes-yellow)">
+          <div class="tb-tags">
+            <span class="tb-tag perf">Performance</span>
+            <span class="tb-tag arch">Architecture</span>
+            <span class="tb-tag tut">Must-Read</span>
+            <span class="tb-tag deep">In-Depth</span>
+            <span class="tb-tag zh" style="background:rgba(56,189,248,.12);color:#38bdf8;border-color:rgba(56,189,248,.3)">English</span>
+            <span class="tb-tag zh">中文</span>
+          </div>
+          <h4>Emulator Techniques Q&A — From JIT, DBT, KVM to Transistor-Level Simulation</h4>
+          <p class="tb-summary">
+            A Q&A-style coverage of the main implementation techniques behind modern
+            emulators: JIT, DBT, KVM, LLVM backend, Static Recompilation, HLE GPU
+            bridging, AI texture upscaling, rollback netcode, MSU-1 audio replacement,
+            FPGA simulation, Visual6502 transistor-level simulation, and Lean formal
+            verification. The opening section explicitly <strong>separates "language JIT"
+            (.NET / .NET Framework / Java) from "emulator JIT / Dynarec"</strong> —
+            two concepts most newcomers conflate. The remaining seven sections walk
+            through each technique's applicability, limits, and implementation
+            challenges, plus suggested practice targets for the four core techniques
+            (JIT / DBT / KVM / Static Recomp).
+          </p>
+          <div class="tb-meta">
+            <span>40 Q&A · 8 sections · zh + en</span>
+            <span>
+              <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/emulator_techniques_qa_en.md" target="_blank">English <span class="tb-arrow">→</span></a>
+              <span style="opacity:.4;margin:0 .35rem">｜</span>
+              <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/emulator_techniques_qa_zh.md" target="_blank">中文 <span class="tb-arrow">→</span></a>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Article: Nintendo Console Emulator Development Guide -->
+      <div class="col-12">
+        <div class="tb-card" style="border-left:3px solid var(--nes-yellow)">
+          <div class="tb-tags">
+            <span class="tb-tag arch">Architecture</span>
+            <span class="tb-tag tut">Console Tour</span>
+            <span class="tb-tag deep">In-Depth</span>
+            <span class="tb-tag zh" style="background:rgba(56,189,248,.12);color:#38bdf8;border-color:rgba(56,189,248,.3)">English</span>
+            <span class="tb-tag zh">中文</span>
+          </div>
+          <h4>Nintendo Console Emulator Development Guide — From the 1983 Famicom to the 2017 Switch</h4>
+          <p class="tb-summary">
+            Walks through Nintendo's 12 mainstream home consoles and handhelds in
+            <strong>release-date order</strong> (NES → Game Boy → SNES → N64 → GBC →
+            GBA → GameCube → NDS → Wii → 3DS → Wii U → Switch). Each console covers
+            four aspects: hardware architecture and design philosophy, release date,
+            core implementation challenges (CPU sync, PPU/GPU pipeline, encryption,
+            HLE/LLE trade-off, etc.), and notable open-source emulator references.
+            Closes with a difficulty ranking and a suggested learning path — for
+            developers wanting to write their own emulator or evaluate which console
+            to take on.
+          </p>
+          <div class="tb-meta">
+            <span>12 consoles · 34-year evolution · zh + en</span>
+            <span>
+              <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nintendo_consoles_emulator_guide_en.md" target="_blank">English <span class="tb-arrow">→</span></a>
+              <span style="opacity:.4;margin:0 .35rem">｜</span>
+              <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nintendo_consoles_emulator_guide_zh.md" target="_blank">中文 <span class="tb-arrow">→</span></a>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════════════════════
+     CATEGORY 0.5: NES Emulator Tutorial Series
+     ═══════════════════════════════════════════════════════════════ -->
+<section style="padding:3.5rem 0 2.5rem">
+  <div class="container">
+    <div class="tb-cat-title">📚 <span>NES Emulator Tutorial Series</span></div>
+    <div class="tb-cat-sub">
+      An NES-emulator-from-scratch tutorial series: 17 chapters + 2 appendices, each
+      cross-referenced to the AprNes / NesCore source.
+    </div>
+
+    <div class="row g-4">
+      <div class="col-12">
+        <div class="tb-card" style="border-left:3px solid var(--nes-teal)">
+          <div class="tb-tags">
+            <span class="tb-tag arch">Architecture</span>
+            <span class="tb-tag tut">Series</span>
+            <span class="tb-tag deep">In-Depth</span>
+            <span class="tb-tag zh" style="background:rgba(56,189,248,.12);color:#38bdf8;border-color:rgba(56,189,248,.3)">English</span>
+            <span class="tb-tag zh">中文</span>
+          </div>
+          <h4>NES / AprNes Emulator Tutorial Series</h4>
+          <p class="tb-summary">
+            A linear tutorial designed for "programmers who can code but aren't
+            comfortable with hardware." Starts from NES hardware concepts and walks
+            through every subsystem against the AprNes / NesCore implementation:
+            ROM loading, CPU bus, the 6502 core, master-clock synchronisation, PPU
+            memory pipeline, APU, DMA, controllers, and Mappers 0-4. Throughout, it
+            grounds abstract concepts with everyday analogies (kitchen / chef /
+            counter / conveyor). Each chapter follows a consistent shape: hardware
+            concepts → beginner-friendly model → AprNes implementation mapping →
+            common mistakes → recap. The two appendices (A1 computer organization
+            primer and A2 complete 256-opcode reference) work as standalone references.
+          </p>
+
+          <div class="chapter-list">
+            <div class="ch-section-head">Foundations · CPU Bus</div>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/en/01_intro_and_hardware_overview.md" target="_blank"><span class="ch-num">01</span>Introduction and NES Hardware Overview</a>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/en/02_hardware_concepts_for_emulator.md" target="_blank"><span class="ch-num">02</span>Hardware Concepts You Need First</a>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/en/03_ines_rom_loader.md" target="_blank"><span class="ch-num">03</span>iNES ROM Loading and Header Parsing</a>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/en/04_cpu_bus_and_memory_map.md" target="_blank"><span class="ch-num">04</span>CPU Bus and Memory Map</a>
+
+            <div class="ch-section-head">CPU · Timing</div>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/en/05_6502_cpu_core.md" target="_blank"><span class="ch-num">05</span>6502 CPU Core</a>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/en/06_master_clock_timing.md" target="_blank"><span class="ch-num">06</span>Master Clock and System Sync</a>
+
+            <div class="ch-section-head">PPU · APU · I/O</div>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/en/07_ppu_memory_and_registers.md" target="_blank"><span class="ch-num">07</span>PPU Memory and Registers</a>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/en/08_ppu_rendering_pipeline.md" target="_blank"><span class="ch-num">08</span>PPU Rendering Pipeline</a>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/en/09_apu_audio_mode_0.md" target="_blank"><span class="ch-num">09</span>APU and AudioMode 0</a>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/en/10_dma_and_controller_io.md" target="_blank"><span class="ch-num">10</span>DMA and Controller I/O</a>
+
+            <div class="ch-section-head">Mapper Series (Easy → Hard)</div>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/en/11_mapper000_nrom.md" target="_blank"><span class="ch-num">11</span>Mapper000 / NROM</a>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/en/13_mapper002_unrom.md" target="_blank"><span class="ch-num">13</span>Mapper002 / UNROM</a>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/en/14_mapper003_cnrom.md" target="_blank"><span class="ch-num">14</span>Mapper003 / CNROM</a>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/en/12_mapper001_mmc1.md" target="_blank"><span class="ch-num">12</span>Mapper001 / MMC1</a>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/en/15_mapper004_mmc3.md" target="_blank"><span class="ch-num">15</span>Mapper004 / MMC3</a>
+
+            <div class="ch-section-head">Putting It Together</div>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/en/16_building_an_emulator_step_by_step.md" target="_blank"><span class="ch-num">16</span>Building an NES Emulator Step by Step</a>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/en/17_aprnes_code_reading_map.md" target="_blank"><span class="ch-num">17</span>AprNes / NesCore Code Reading Map</a>
+
+            <div class="ch-section-head">Appendices</div>
+            <a class="ch-app" href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/en/A1_computer_organization_primer.md" target="_blank"><span class="ch-num">A1</span>Computer Organization Primer</a>
+            <a class="ch-app" href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/en/A2_6502_opcode_reference.md" target="_blank"><span class="ch-num">A2</span>6502 Complete 256-Opcode Reference</a>
+          </div>
+
+          <div class="tb-meta">
+            <span>17 chapters + 2 appendices · zh + en · with kitchen analogies</span>
+            <span>
+              <a href="https://github.com/erspicu/AprNes/tree/master/MD/techbook/nes_guide/en" target="_blank">📂 English Index <span class="tb-arrow">→</span></a>
+              <span style="opacity:.4;margin:0 .35rem">｜</span>
+              <a href="https://github.com/erspicu/AprNes/tree/master/MD/techbook/nes_guide/zh" target="_blank">📂 中文 <span class="tb-arrow">→</span></a>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════════════════════
+     CATEGORY 1: Performance Engineering
+     ═══════════════════════════════════════════════════════════════ -->
+<section style="padding:3.5rem 0 2.5rem">
+  <div class="container">
+    <div class="tb-cat-title">⚡ <span>Performance Engineering</span></div>
+    <div class="tb-cat-sub">
+      Hot-loop optimisation methods for C# / .NET emulators — from hand-coded
+      techniques to JIT and CPU microarchitecture-level design considerations.
+    </div>
+
+    <div class="row g-4">
+      <!-- Article: Non-JIT Optimization Techniques -->
+      <div class="col-md-6">
+        <div class="tb-card">
+          <div class="tb-tags">
+            <span class="tb-tag perf">Performance</span>
+            <span class="tb-tag tut">Catalogue</span>
+            <span class="tb-tag deep">Advanced</span>
+            <span class="tb-tag zh" style="background:rgba(56,189,248,.12);color:#38bdf8;border-color:rgba(56,189,248,.3)">English</span>
+          </div>
+          <h4>AprNes Non-JIT Optimisation Techniques</h4>
+          <p class="tb-summary">
+            Catalogues every performance change on AprNes master since 2026-03-15,
+            focused on <strong>below the language/runtime level</strong>. Covers 11
+            categories: bitwise tricks (<code>&amp;</code> instead of <code>%</code>),
+            branchless code, lookup tables (LUT), magic numbers, SWAR, true SIMD,
+            integer-for-float (Bresenham / fixed-point), loop unrolling and ILP,
+            function-pointer static dispatch, cache-line-aware data layout, and
+            redundancy elimination. Each section references real before/after
+            commits.
+          </p>
+          <div class="tb-meta">
+            <span>11 techniques · with commit references</span>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/jit/AprNes_Optimization_Techniques_EN.md" target="_blank">
+              Read <span class="tb-arrow">→</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Article: JIT and I-Cache Tutorial -->
+      <div class="col-md-6">
+        <div class="tb-card">
+          <div class="tb-tags">
+            <span class="tb-tag perf">Performance</span>
+            <span class="tb-tag tut">Tutorial</span>
+            <span class="tb-tag deep">Advanced</span>
+            <span class="tb-tag zh" style="background:rgba(56,189,248,.12);color:#38bdf8;border-color:rgba(56,189,248,.3)">English</span>
+          </div>
+          <h4>C# JIT and I-Cache Optimisation Tutorial</h4>
+          <p class="tb-summary">
+            Starting from the game loop, walks through CPU cache hierarchy, hot/cold
+            path splitting, multi-core pipelining, and thread affinity, with the
+            actual PMU / ETW analysis workflow used in AprNes. Covers the inlining-
+            vs-I-cache trade-off, quantitative tools and laddered strategy, what to
+            do when the hot path overflows, inter-core communication cost, how to
+            ensure C# threads actually land on different cores, and finishes by
+            extending these ideas to high-concurrency web services. Targets
+            developers who want to understand performance from the JIT-behaviour
+            and CPU-microarchitecture level.
+          </p>
+          <div class="tb-meta">
+            <span>11 chapters · with PMU walkthrough</span>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/jit/JIT_ICache_Tutorial_EN.md" target="_blank">
+              Read <span class="tb-arrow">→</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════════════════════
+     CATEGORY 2: Emulator Design Theory
+     ═══════════════════════════════════════════════════════════════ -->
+<section style="padding:3.5rem 0 4.5rem">
+  <div class="container">
+    <div class="tb-cat-title">🧩 <span>Emulator Design Theory</span></div>
+    <div class="tb-cat-sub">
+      Design questions for accurate NES hardware simulation: how finely should we
+      simulate time? Should we use catch-up? Is per-scanline really easier?
+    </div>
+
+    <div class="row g-4">
+      <!-- Article: Timing Models Guide -->
+      <div class="col-md-6 col-lg-4">
+        <div class="tb-card">
+          <div class="tb-tags">
+            <span class="tb-tag arch">Architecture</span>
+            <span class="tb-tag tut">Tutorial</span>
+            <span class="tb-tag zh" style="background:rgba(56,189,248,.12);color:#38bdf8;border-color:rgba(56,189,248,.3)">English</span>
+          </div>
+          <h4>NES Emulator Timing Models — A Comparative Guide</h4>
+          <p class="tb-summary">
+            How finely should an emulator simulate "time"? It looks like a performance
+            question, but it's also an architecture, correctness, engineering-cost,
+            and maintainability question. The article classifies common timing models
+            from frame-based, scanline, cycle, dot, all the way to sub-cycle / master
+            clock — comparing what each tier buys, what it costs, and which test ROMs
+            it can pass. A starting reference for designing a new emulator or
+            assessing an existing one's accuracy.
+          </p>
+          <div class="tb-meta">
+            <span>Taxonomy + trade-off comparison</span>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_emulator_timing_models_guide_en.md" target="_blank">
+              Read <span class="tb-arrow">→</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Article: Catch-Up vs Structural Optimization -->
+      <div class="col-md-6 col-lg-4">
+        <div class="tb-card">
+          <div class="tb-tags">
+            <span class="tb-tag arch">Architecture</span>
+            <span class="tb-tag deep">Advanced</span>
+            <span class="tb-tag zh" style="background:rgba(56,189,248,.12);color:#38bdf8;border-color:rgba(56,189,248,.3)">English</span>
+          </div>
+          <h4>Why AprNes Avoids Catch-Up and Goes Structural</h4>
+          <p class="tb-summary">
+            Catch-up is the dominant cost-saving approach in many emulators — let one
+            component run ahead and let other components catch up later when needed.
+            But in cycle-accurate designs, the side effects of catch-up (delayed
+            decisions, patchwork logic, accuracy degradation) become a liability.
+            The article explains why AprNes chose the
+            <code>Mem_r → tick() → 3× ppu_step</code> global tick model and what
+            hot-loop optimisations that structure enables.
+          </p>
+          <div class="tb-meta">
+            <span>Structural vs compensatory</span>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/aprnes_catch_up_and_structural_optimization_en.md" target="_blank">
+              Read <span class="tb-arrow">→</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Article: Per-Scanline Challenge -->
+      <div class="col-md-6 col-lg-4">
+        <div class="tb-card">
+          <div class="tb-tags">
+            <span class="tb-tag arch">Architecture</span>
+            <span class="tb-tag deep">Advanced</span>
+            <span class="tb-tag zh" style="background:rgba(56,189,248,.12);color:#38bdf8;border-color:rgba(56,189,248,.3)">English</span>
+          </div>
+          <h4>The Per-Scanline NES Emulator Challenge</h4>
+          <p class="tb-summary">
+            Many people think a per-scanline emulator is just coarser, less precise,
+            and easier to write. In practice, getting a per-scanline emulator to run
+            most games without breaking requires layering many hacks and special
+            cases: MMC3 IRQ timing, PPU internal state when <code>$2007</code> is
+            written, the precise cycle of sprite-0-hit, DMA cycle stealing, and so
+            on. The article enumerates these hidden costs and explains why going
+            cycle-accurate is actually the cleaner design.
+          </p>
+          <div class="tb-meta">
+            <span>Hidden-cost analysis</span>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/per_scanline_nes_emulator_challenge_en.md" target="_blank">
+              Read <span class="tb-arrow">→</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- COMING SOON -->
+<section style="padding:3rem 0">
+  <div class="container">
+    <div style="background:linear-gradient(135deg,rgba(0,128,128,.08),rgba(56,189,248,.04));border:1px dashed var(--nes-border);border-radius:12px;padding:2rem;text-align:center">
+      <div style="font-size:2rem;margin-bottom:.6rem">✍️</div>
+      <h4 style="color:var(--nes-yellow);margin-bottom:.7rem">More to Come</h4>
+      <p style="color:var(--nes-muted);font-size:.9rem;line-height:1.7;max-width:640px;margin:0 auto">
+        New tutorials and writeups will keep coming, including NTSC signal simulation,
+        CRT shader design, SIMD programming practices, cross-platform porting
+        experience, and more. Discussions and topic suggestions on GitHub issues are
+        also welcome.
+      </p>
+      <a href="https://github.com/erspicu/AprNes" target="_blank" class="btn btn-outline-light px-4 mt-3" style="font-size:.85rem">
+        Visit GitHub
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="row align-items-center">
+      <div class="col-md-6 mb-2 mb-md-0">
+        <strong class="text-yellow">AprNes</strong>
+        <span style="margin:0 .5rem;opacity:.3">|</span>
+        <span>by erspicu_brox</span>
+        <span style="margin:0 .5rem;opacity:.3">|</span>
+        <a href="https://github.com/erspicu/AprNes" target="_blank">GitHub</a>
+      </div>
+      <div class="col-md-6 text-md-end">
+        <a href="index.html">← Home</a>
+        <span style="margin:0 .5rem;opacity:.3">|</span>
+        <a href="report/index.html" target="_blank">Test Reports</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="libs/bootstrap.bundle.min.js"></script>
+<script>
+  // Smooth scroll for in-page anchors (none on this page yet, future-proofing)
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+      const tgt = document.querySelector(a.getAttribute('href'));
+      if (tgt) { e.preventDefault(); tgt.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    });
+  });
+</script>
+</body>
+</html>

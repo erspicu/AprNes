@@ -90,6 +90,68 @@
     .tb-meta a:hover { color: var(--nes-yellow); }
     .tb-arrow { transition: transform .18s; display: inline-block; }
     .tb-meta a:hover .tb-arrow { transform: translateX(3px); }
+
+    /* Chapter list (for series tutorials) */
+    .chapter-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: .15rem .9rem;
+      margin: .8rem 0 1rem;
+      padding: .9rem 1rem;
+      background: rgba(0, 0, 0, .22);
+      border: 1px solid rgba(255, 255, 255, .04);
+      border-radius: 8px;
+    }
+    .chapter-list a {
+      font-size: .82rem;
+      color: var(--nes-muted);
+      text-decoration: none;
+      padding: .25rem .35rem;
+      border-radius: 4px;
+      transition: color .15s, background .15s;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .chapter-list a:hover {
+      color: var(--nes-yellow);
+      background: rgba(255, 255, 255, .04);
+    }
+    .chapter-list .ch-num {
+      color: var(--nes-teal);
+      font-weight: 700;
+      margin-right: .4rem;
+      font-family: 'Cascadia Code', Consolas, monospace;
+      font-size: .76rem;
+    }
+    .chapter-list .ch-app .ch-num { color: var(--nes-yellow); }
+    .chapter-list .ch-section-head {
+      grid-column: 1 / -1;
+      font-size: .72rem;
+      color: var(--nes-yellow);
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      padding: .5rem .35rem .15rem;
+      border-bottom: 1px dashed rgba(255, 255, 255, .08);
+      margin-bottom: .15rem;
+    }
+    .chapter-list .ch-section-head:first-child { padding-top: 0; }
+
+    /* Language switcher */
+    .lang-switch {
+      border: 1px solid var(--nes-border);
+      border-radius: 999px;
+      padding: .25rem .85rem !important;
+      font-size: .8rem !important;
+      font-weight: 600;
+      color: var(--nes-muted) !important;
+      transition: all .2s;
+    }
+    .lang-switch:hover {
+      border-color: var(--nes-accent);
+      color: var(--nes-accent) !important;
+    }
   </style>
 </head>
 <body>
@@ -107,6 +169,7 @@
         <li class="nav-item"><a class="nav-link" href="index.html#download">下載</a></li>
         <li class="nav-item"><a class="nav-link" href="index.html#reports">測試報告</a></li>
         <li class="nav-item"><a class="nav-link active" href="techbook.html">技術文章</a></li>
+        <li class="nav-item"><a class="nav-link lang-switch" href="techbook_en.html" title="English version">EN</a></li>
         <li class="nav-item">
           <a class="nav-link" href="https://github.com/erspicu/AprNes" target="_blank">GitHub</a>
         </li>
@@ -190,6 +253,80 @@
               <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nintendo_consoles_emulator_guide_zh.md" target="_blank">中文版 <span class="tb-arrow">→</span></a>
               <span style="opacity:.4;margin:0 .35rem">｜</span>
               <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nintendo_consoles_emulator_guide_en.md" target="_blank">English <span class="tb-arrow">→</span></a>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════════════════════
+     CATEGORY 0.5: NES Emulator Tutorial Series
+     ═══════════════════════════════════════════════════════════════ -->
+<section style="padding:3.5rem 0 2.5rem">
+  <div class="container">
+    <div class="tb-cat-title">📚 <span>NES 模擬器系列教學</span></div>
+    <div class="tb-cat-sub">
+      從零開始的 NES 模擬器實作教學系列，17 章 + 2 附錄，與 AprNes 程式碼章節對照。
+    </div>
+
+    <div class="row g-4">
+      <div class="col-12">
+        <div class="tb-card" style="border-left:3px solid var(--nes-teal)">
+          <div class="tb-tags">
+            <span class="tb-tag arch">架構</span>
+            <span class="tb-tag tut">系列教學</span>
+            <span class="tb-tag deep">深度</span>
+            <span class="tb-tag zh">中文</span>
+            <span class="tb-tag zh" style="background:rgba(56,189,248,.12);color:#38bdf8;border-color:rgba(56,189,248,.3)">English</span>
+          </div>
+          <h4>NES / AprNes 模擬器教學系列</h4>
+          <p class="tb-summary">
+            為「會寫程式但不熟硬體」的初學者設計的逐章教學。從 NES 主機硬體觀念出發，逐步走到 AprNes / NesCore 的實作對照，涵蓋 ROM 載入、CPU bus、6502 核心、master clock 同步、PPU memory pipeline、APU、DMA、Controller、Mapper 0-4 等所有子系統，並用「廚房 / 主廚 / 工作檯」這類生活比喻把抽象概念接地氣。每章結構統一：硬體觀念 → 初學者簡化模型 → AprNes 實作對照 → 常見錯誤 → 重點整理。最後 A1 計算機組織複習與 A2 完整 256 opcode 實作參考可獨立查閱。
+          </p>
+
+          <div class="chapter-list">
+            <div class="ch-section-head">入門 · CPU Bus</div>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/zh/01_intro_and_hardware_overview.md" target="_blank"><span class="ch-num">01</span>導讀與 NES 硬體總覽</a>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/zh/02_hardware_concepts_for_emulator.md" target="_blank"><span class="ch-num">02</span>寫模擬器前必懂的硬體觀念</a>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/zh/03_ines_rom_loader.md" target="_blank"><span class="ch-num">03</span>iNES ROM 載入與 Header 解析</a>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/zh/04_cpu_bus_and_memory_map.md" target="_blank"><span class="ch-num">04</span>CPU Bus 與記憶體地圖</a>
+
+            <div class="ch-section-head">CPU · 時序</div>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/zh/05_6502_cpu_core.md" target="_blank"><span class="ch-num">05</span>6502 CPU Core</a>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/zh/06_master_clock_timing.md" target="_blank"><span class="ch-num">06</span>Master Clock 與整機同步</a>
+
+            <div class="ch-section-head">PPU · APU · I/O</div>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/zh/07_ppu_memory_and_registers.md" target="_blank"><span class="ch-num">07</span>PPU Memory 與 Register</a>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/zh/08_ppu_rendering_pipeline.md" target="_blank"><span class="ch-num">08</span>PPU Rendering Pipeline</a>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/zh/09_apu_audio_mode_0.md" target="_blank"><span class="ch-num">09</span>APU 與 AudioMode 0</a>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/zh/10_dma_and_controller_io.md" target="_blank"><span class="ch-num">10</span>DMA 與 Controller I/O</a>
+
+            <div class="ch-section-head">Mapper 系列（由簡到難）</div>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/zh/11_mapper000_nrom.md" target="_blank"><span class="ch-num">11</span>Mapper000 / NROM</a>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/zh/13_mapper002_unrom.md" target="_blank"><span class="ch-num">13</span>Mapper002 / UNROM</a>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/zh/14_mapper003_cnrom.md" target="_blank"><span class="ch-num">14</span>Mapper003 / CNROM</a>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/zh/12_mapper001_mmc1.md" target="_blank"><span class="ch-num">12</span>Mapper001 / MMC1</a>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/zh/15_mapper004_mmc3.md" target="_blank"><span class="ch-num">15</span>Mapper004 / MMC3</a>
+
+            <div class="ch-section-head">整合 · AprNes 對照</div>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/zh/16_building_an_emulator_step_by_step.md" target="_blank"><span class="ch-num">16</span>從零寫 NES 模擬器的實作路線</a>
+            <a href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/zh/17_aprnes_code_reading_map.md" target="_blank"><span class="ch-num">17</span>AprNes / NesCore 程式碼閱讀地圖</a>
+
+            <div class="ch-section-head">附錄</div>
+            <a class="ch-app" href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/zh/A1_computer_organization_primer.md" target="_blank"><span class="ch-num">A1</span>計算機組織小複習（給寫程式但不熟硬體的人）</a>
+            <a class="ch-app" href="https://github.com/erspicu/AprNes/blob/master/MD/techbook/nes_guide/zh/A2_6502_opcode_reference.md" target="_blank"><span class="ch-num">A2</span>6502 完整 256 Opcode 實作參考</a>
+          </div>
+
+          <div class="tb-meta">
+            <span>17 章 + 2 附錄 ｜ 中英對照 ｜ 含廚房比喻</span>
+            <span>
+              <a href="https://github.com/erspicu/AprNes/tree/master/MD/techbook/nes_guide/zh" target="_blank">📂 中文目錄 <span class="tb-arrow">→</span></a>
+              <span style="opacity:.4;margin:0 .35rem">｜</span>
+              <a href="https://github.com/erspicu/AprNes/tree/master/MD/techbook/nes_guide/en" target="_blank">📂 English <span class="tb-arrow">→</span></a>
             </span>
           </div>
         </div>
