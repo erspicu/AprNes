@@ -24,6 +24,15 @@
     <NoWarn>$(NoWarn);AVLN3001</NoWarn>
     <!-- Build timestamp embedded into assembly metadata (immune to copy/rename) -->
     <SourceRevisionId>build$([System.DateTime]::Now.ToString("yyyyMMdd-HHmmss"))</SourceRevisionId>
+    <!-- Single-file publish keeps native libs *alongside* the apphost
+         (not extracted into ~/.net/<app>/<hash>/). HexaGen.Runtime's
+         LibraryLoader uses raw NativeLibrary.Load("libSDL3.so") via
+         dlopen, which doesn't honour .NET's NATIVE_DLL_SEARCH_DIRECTORIES;
+         only the apphost's DT_RUNPATH ($ORIGIN) finds the lib. With this
+         flag false, libSDL3 / libminiaudio / libSkiaSharp / libHarfBuzzSharp
+         publish as separate files next to the binary and dlopen resolves
+         them on first use. -->
+    <IncludeNativeLibrariesForSelfExtract>false</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 
   <!-- NesCore: 直接引用 AprNes 全部源碼，不再使用本地 NesCoreNET 副本 -->
