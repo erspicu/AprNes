@@ -126,19 +126,23 @@ const LANG = {
     bmc_title:'支持這個專案',
     bmc_desc:'AprNes 是個人業餘開源專案，如果你覺得這個模擬器有趣、研究內容有幫助，歡迎請我喝杯咖啡！',
     footer_by:'by erspicu_brox', footer_legacy:'🕹️ 舊版網站（2017 年版）', footer_rep:'測試報告',
-    // ── aprnesava release banner ──
-    ava_badge:'NEW · 2026.04.27',
-    ava_title:'🚀 aprnesava 新版發布 — .NET 10 / Avalonia',
-    ava_lead:'全新主線版本，基於 .NET 10 + Avalonia + SkiaSharp，全面 GPU 加速 CRT pipeline，並導入 HD_NTSC 12× Fsc 過採樣。NES 模擬精度與 NetFx 版完全一致（blargg 184/184 + AccuracyCoin 138/138 雙滿分），但效能與畫面後處理品質全面領先。',
-    ava_r1_t:'GPU 加速 CRT',
-    ava_r1_d:'SkSL shader 跑在 D3D11 上，全程不回 CPU。10× scale 實測比 CPU 後端快 2.5×（58.67 vs 23.45 FPS）。',
-    ava_r2_t:'HD_NTSC 12× Fsc',
-    ava_r2_d:'2048 sample/scanline（NetFx 是 1024）。RF 模式 herringbone、color fringing、chroma blur 還原更接近真實 NTSC 訊號。',
-    ava_r3_t:'Single-file 打包',
-    ava_r3_d:'整個 emulator + .NET 10 runtime + Avalonia + SkiaSharp 全封裝成單一 .exe，不需安裝 .NET runtime。',
-    ava_dl_btn:'前往 GitHub 下載 aprnesava 2026.04.27',
+    // ── aprnesava release banner (2026.04.30 cross-platform preview) ──
+    ava_badge:'NEW · 2026.04.30 · 跨平台',
+    ava_title:'🚀 aprnesava 跨平台 preview — Windows / Linux / macOS',
+    ava_lead:'首次提供 Linux x86_64 / Linux ARM64 / macOS ARM64 三個平台的 self-contained 執行檔，與既有 Windows x64 並列。Windows 沿用 Win32 WaveOut + DirectInput8/XInput；Linux/macOS 走 Hexa.NET.MiniAudio（音訊）+ Hexa.NET.SDL3（手把）NuGet 套件，prebuilt native binary 已內建在壓縮檔中。模擬精度仍是 blargg 184/184 + AccuracyCoin 138/138 雙滿分。',
+    ava_r1_t:'跨平台四種 RID',
+    ava_r1_d:'win-x64 / linux-x64 / linux-arm64 / osx-arm64 四份 archive 各自 self-contained，目標機器免裝任何相依（含 .NET runtime）。',
+    ava_r2_t:'GPU 加速 CRT',
+    ava_r2_d:'SkSL shader 跑在 D3D11/Metal/OpenGL，全程不回 CPU。10× scale 實測比 CPU 後端快 2.5×（58.67 vs 23.45 FPS）。',
+    ava_r3_t:'HD_NTSC 12× Fsc',
+    ava_r3_d:'2048 sample/scanline（NetFx 是 1024）。RF 模式 herringbone、color fringing、chroma blur 還原更接近真實 NTSC 訊號。',
+    ava_dl_btn:'前往 GitHub 下載 2026.04.30 跨平台版',
+    ava_tb_btn:'延伸閱讀：技術文章',
+    ava_tb_href:'techbook.html',
+    ava_warn_label:'⚠️ 成熟度說明：',
+    ava_warn_body:'目前只有 win-x64 是經過完整測試的成熟版本（沿用 NetFx 版的 Win32 backend）；Linux x64 / Linux ARM64 / macOS ARM64 三個版本只跑過 cross-publish 編譯驗證，尚無真機回饋，可能還有未發現的問題。此外，主線開發接下來可能會暫停一段時間，已知問題不一定會立即修復。歡迎在真機上測試並回報 Issue。',
     ava_note_label:'📌 給 NetFx 版用戶的話：',
-    ava_note_body:'下方仍提供 04/27 NetFx 版本的直接下載，但此後 NetFx 分支基本停止維護，所有新功能只會在 aprnesava 上推出。建議改用新版 — 設定檔自動沿用，操作介面完全相容，獲得更高效能與更精確的 NTSC 模擬。詳細對比可參閱 ',
+    ava_note_body:'下方仍提供 04/27 NetFx 版本的直接下載，但 NetFx 分支已停止維護，所有新功能只會在 aprnesava 上推出。建議改用新版 — 設定檔自動沿用，操作介面完全相容。詳細對比可參閱 ',
     ava_note_link:'完整版本對比文件',
     ava_note_body2:'。',
     // ── NetFx download notice + 04/27 entry ──
@@ -275,19 +279,23 @@ const LANG = {
     bmc_title:'Support This Project',
     bmc_desc:"AprNes is a personal open-source hobby project. If you find the emulator interesting or the research helpful, feel free to buy me a coffee!",
     footer_by:'by erspicu_brox', footer_legacy:'🕹️ Legacy Site (2017 version)', footer_rep:'Test Reports',
-    // ── aprnesava release banner ──
-    ava_badge:'NEW · 2026.04.27',
-    ava_title:'🚀 aprnesava New Release — .NET 10 / Avalonia',
-    ava_lead:'A brand-new mainline edition built on .NET 10 + Avalonia + SkiaSharp, with a fully GPU-accelerated CRT pipeline and HD_NTSC 12× Fsc oversampling. Emulation accuracy is identical to the NetFx edition (blargg 184/184 + AccuracyCoin 138/138 perfect score), but performance and post-processing quality are significantly ahead.',
-    ava_r1_t:'GPU-Accelerated CRT',
-    ava_r1_d:'SkSL shader runs on D3D11 — pixel data never returns to the CPU. Measured at 10× scale: 2.5× faster than CPU backends (58.67 vs. 23.45 FPS).',
-    ava_r2_t:'HD_NTSC 12× Fsc',
-    ava_r2_d:'2048 samples/scanline (NetFx is 1024). RF-mode herringbone, color fringing, and chroma blur reproduce real NTSC signal characteristics much more closely.',
-    ava_r3_t:'Single-File Deployment',
-    ava_r3_d:'Emulator + .NET 10 runtime + Avalonia + SkiaSharp bundled into a single .exe. No .NET runtime install required.',
-    ava_dl_btn:'Get aprnesava 2026.04.27 on GitHub',
+    // ── aprnesava release banner (2026.04.30 cross-platform preview) ──
+    ava_badge:'NEW · 2026.04.30 · Cross-platform',
+    ava_title:'🚀 aprnesava Cross-Platform Preview — Windows / Linux / macOS',
+    ava_lead:'First public preview offering Linux x86_64 / Linux ARM64 / macOS ARM64 self-contained binaries alongside the existing Windows x64 build. Windows keeps the hand-written Win32 WaveOut + DirectInput8/XInput backends; Linux/macOS route through Hexa.NET.MiniAudio (audio) + Hexa.NET.SDL3 (gamepad) NuGet packages, with prebuilt native libraries bundled in each archive. Emulation accuracy is unchanged: blargg 184/184 + AccuracyCoin 138/138 perfect score across all platforms.',
+    ava_r1_t:'Four Cross-Platform RIDs',
+    ava_r1_d:'win-x64 / linux-x64 / linux-arm64 / osx-arm64 archives are each fully self-contained — no dependencies (including .NET runtime) need to be installed on the target machine.',
+    ava_r2_t:'GPU-Accelerated CRT',
+    ava_r2_d:'SkSL shader runs on D3D11 / Metal / OpenGL — pixel data never returns to the CPU. Measured at 10× scale: 2.5× faster than CPU backends (58.67 vs. 23.45 FPS).',
+    ava_r3_t:'HD_NTSC 12× Fsc',
+    ava_r3_d:'2048 samples/scanline (NetFx is 1024). RF-mode herringbone, color fringing, and chroma blur reproduce real NTSC signal characteristics much more closely.',
+    ava_dl_btn:'Get the 2026.04.30 cross-platform release on GitHub',
+    ava_tb_btn:'Further reading: Tech articles',
+    ava_tb_href:'techbook_en.html',
+    ava_warn_label:'⚠️ Maturity status:',
+    ava_warn_body:'Only the win-x64 archive is mature and well-tested (it reuses the long-standing NetFx Win32 backends). The Linux x64 / Linux ARM64 / macOS ARM64 archives have only been validated via cross-publish compilation; no real-hardware testing feedback yet, so unsurfaced issues may remain. Active development may also pause for a while as the author moves on to other things — known issues won\'t necessarily be fixed promptly. Real-hardware testers and bug reports via Issues are welcome.',
     ava_note_label:'📌 A note for NetFx users:',
-    ava_note_body:'The 04/27 NetFx build is still available below for direct download, but the NetFx branch enters maintenance freeze from this release on — all new features will land on aprnesava only. We recommend switching: configuration carries over automatically, the UI is fully compatible, and you gain better performance and more accurate NTSC simulation. Detailed comparison: ',
+    ava_note_body:'The 04/27 NetFx build is still available below for direct download, but the NetFx branch is in maintenance freeze — all new features will land on aprnesava only. We recommend switching: configuration carries over automatically and the UI is fully compatible. Detailed comparison: ',
     ava_note_link:'full feature comparison document',
     ava_note_body2:'.',
     // ── NetFx download notice + 04/27 entry ──
@@ -307,6 +315,10 @@ function applyI18n() {
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const k = el.getAttribute('data-i18n');
     if (d[k] !== undefined) el.textContent = d[k];
+  });
+  document.querySelectorAll('[data-i18n-href]').forEach(el => {
+    const k = el.getAttribute('data-i18n-href');
+    if (d[k] !== undefined) el.setAttribute('href', d[k]);
   });
   document.documentElement.lang = curLang === 'zh' ? 'zh-TW' : 'en';
   document.getElementById('lang-btn').textContent = curLang === 'zh' ? 'EN' : '中文';
