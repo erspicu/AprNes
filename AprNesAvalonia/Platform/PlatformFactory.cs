@@ -22,9 +22,8 @@ public static class PlatformFactory
         if (OperatingSystem.IsWindows())
             return new Win32GamepadBackend();
 
-        // TODO: Linux → SDL2GamepadBackend or EvdevBackend
-        // TODO: macOS → SDL2GamepadBackend
-
-        return new NullGamepadBackend();
+        // Linux / macOS: Hexa.NET.SDL3 with SDL_INIT_GAMEPAD only — no
+        // SDL window, coexists cleanly with Avalonia's windowing.
+        return new Sdl3GamepadBackend();
     }
 }
