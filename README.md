@@ -1,20 +1,26 @@
 # AprNes - C# NES Emulator
 
-> 🇺🇸 English | [🇹🇼 繁體中文](#aprnes---c-nes-模擬器) | Last updated: 2026-04-27
+> 🇺🇸 English | [🇹🇼 繁體中文](#aprnes---c-nes-模擬器) | Last updated: 2026-05-01
 
 A cycle-accurate NES (Nintendo Entertainment System) emulator written in C#, developed in collaboration with AI (GitHub Copilot / Claude). The project achieves **perfect scores** on both the blargg and AccuracyCoin test suites.
 
-## 🚀 Latest Release — `aprnesava` 2026-04-27
+## 🚀 Latest Release — `aprnesava` 2026-04-30 cross-platform preview
 
-> **[Download AprNesAvalonia 2026-04-27 (single-file Windows x64)](https://github.com/erspicu/AprNes/releases/tag/aprnesava-20260427)**
+> **[Download AprNesAvalonia 2026-04-30 (Windows x64 / Linux x64 / Linux ARM64 / macOS ARM64)](https://github.com/erspicu/AprNes/releases/tag/aprnesava-20260430-crossplatform)**
 
-The new mainline edition based on **.NET 10 + Avalonia** is out. Highlights:
+First public preview offering **Linux x86_64 / Linux ARM64 / macOS ARM64** binaries alongside the existing Windows x64 build. Cross-platform routing: Windows keeps the hand-written Win32 WaveOut + DirectInput8/XInput backends; other OSes go through [Hexa.NET.MiniAudio](https://github.com/HexaEngine/Hexa.NET.MiniAudio) (audio) + [Hexa.NET.SDL3](https://github.com/HexaEngine/Hexa.NET.SDL3) (gamepad), with prebuilt native libraries bundled in each archive.
+
+> ⚠️ **Maturity status** — Only the **`win-x64`** archive is mature and well-tested. The Linux/macOS archives have only been validated via cross-publish compilation; **no real-hardware testing feedback yet**. Real Pi 5 / Linux desktop / Apple Silicon users are welcome to try and file Issues.
+>
+> 📌 **Development pause** — Active development on aprnesava may pause for a while as the author moves on to other things; known cross-platform issues won't necessarily be fixed promptly.
+
+The previous 2026-04-27 Windows-only release, which introduced GPU CRT + HD-NTSC + .NET 10 SIMD, is also still available [here](https://github.com/erspicu/AprNes/releases/tag/aprnesava-20260427). Highlights from that line:
 
 - ⚡ **GPU CRT pipeline** — SkSL shader runs on D3D11; CRT post-processing never returns to the CPU. **2.5× presented FPS** vs. CPU backends at 10× scale.
 - 🎯 **HD-NTSC 12× Fsc oversampling** — 2048 samples/scanline (NetFx is 1024). Far more accurate chroma demodulation, herringbone, color fringing, and chroma blur reproduction.
-- 📦 **Single-file deployment** — emulator + .NET 10 runtime + Avalonia + SkiaSharp + native libs all bundled into one ~60 MB `AprNesAvalonia.exe`. End users install nothing.
+- 📦 **Self-contained deployment** — emulator + .NET 10 runtime + Avalonia + SkiaSharp + native libs all bundled. End users install nothing.
 - 🚀 **.NET 10 dividends** — TieredPGO on, `Vector<T>` 256-bit AVX2, `MultiplyAddEstimate` FMA chain. ~30-50% higher emu FPS than NetFx with the same NesCore source.
-- ✅ **Same accuracy** — 184/184 blargg + 138/138 AccuracyCoin v2 perfect score, untouched.
+- ✅ **Same accuracy** — 184/184 blargg + 138/138 AccuracyCoin v2 perfect score on every platform, untouched.
 
 📖 **[Full feature comparison: aprnesava vs. AprNes NetFx (English)](MD/Avalonia/aprnesava_vs_netfx_features_en.md)** ｜ **[繁體中文](MD/Avalonia/aprnesava_vs_netfx_features_zh.md)**
 
@@ -24,7 +30,7 @@ The new mainline edition based on **.NET 10 + Avalonia** is out. Highlights:
 
 `AprNes` (NetFx edition) reached its target milestone on 2026-04-27 and entered maintenance freeze. Active development has moved to **`aprnesava`** (`AprNesAvalonia/`) — a .NET 10 + Avalonia mainline that shares the exact same NesCore source. Both editions pass the same test suites (184/184 blargg + 138/138 AccuracyCoin); aprnesava additionally adds GPU CRT, HD_NTSC, and the .NET 10 SIMD path.
 
-The next development focus for aprnesava is **macOS (ARM64)** and **Linux (x86_64 / ARM64)** support — the platform abstraction layer (`AprNesAvalonia/Platform/`) is in place, with audio and gamepad backends behind interfaces.
+Cross-platform support landed on 2026-04-30 — Linux x64 / Linux ARM64 / macOS ARM64 binaries are now published alongside Windows x64. Implementation: `Platform/MiniAudioBackend.cs` (Hexa.NET.MiniAudio, SPSC ring + `[UnmanagedCallersOnly]` data callback) for audio, `Platform/Sdl3GamepadBackend.cs` (Hexa.NET.SDL3 in headless `SDL_INIT_GAMEPAD` mode) for gamepad. Windows keeps its existing hand-written backends. **Note**: only the Windows build has real-world testing; the Linux/macOS preview lacks user feedback and active development may pause for a while.
 
 This project was developed with AI assistance, with a focus on leveraging modern computing power to explore and implement concepts I wanted to try.
 
@@ -121,22 +127,20 @@ Key references used during development:
     *   `Views/ConfigWindow.axaml.cs` / `AnalogConfigWindow.axaml.cs` / `AudioPlusConfigWindow.axaml.cs` — Multi-tabbed settings windows.
     *   `CrtGpuRenderThread.cs` — Phase 3A render-thread GPU CRT path (leases GPU `SKCanvas` via `ISkiaSharpApiLeaseFeature`, runs the SkSL shader on D3D11 directly, never reads back to CPU).
     *   `Shaders/crt_core_*.sksl` — Versioned SkSL shaders (Catmull-Rom / Mitchell cubic samplers). `ShaderLoader.LoadLatest()` auto-picks the newest timestamped version; `--crt-shader <filename>` overrides.
-    *   `Platform/` — Cross-platform abstraction: `IAudioBackend` (Win32WaveOutBackend default), `IGamepadBackend` (Win32 DirectInput8 + XInput / Null fallback), `PlatformFactory`. macOS / Linux backends are the next implementation milestone.
+    *   `Platform/` — Cross-platform abstraction: `IAudioBackend` (Windows: Win32WaveOutBackend; Linux/macOS: MiniAudioBackend), `IGamepadBackend` (Windows: Win32GamepadBackend = DirectInput8 + XInput; Linux/macOS: Sdl3GamepadBackend), `PlatformFactory`.
     *   `PublishContent/` — Release-only assets (ReadMe / configure / tools / benchmark scripts) — auto-included by `dotnet publish`, excluded from regular builds.
     *   `TestRunner.cs` — Headless test runner (Avalonia Bitmap, no System.Drawing dependency).
     *   **Develop**: `build_avalonia.bat` → `AprNesAvalonia/bin/Debug/net10.0/AprNesAvalonia.exe`
-    *   **Single-file release**:
+    *   **Single-file release** (any of `win-x64` / `linux-x64` / `linux-arm64` / `osx-arm64`):
         ```bash
-        dotnet publish AprNesAvalonia/AprNesAvalonia.csproj -c Release -r win-x64 \
+        dotnet publish AprNesAvalonia/AprNesAvalonia.csproj -c Release -r <RID> \
           --self-contained true \
           -p:PublishSingleFile=true \
-          -p:IncludeNativeLibrariesForSelfExtract=true \
           -p:EnableCompressionInSingleFile=true \
-          -p:PublishReadyToRun=true \
           -p:DebugType=embedded \
-          -o publish/AprNesAvalonia-win-x64
+          -o publish/AprNesAvalonia-<RID>
         ```
-        → 16 files / 7 dirs / ~60 MB at `publish/AprNesAvalonia-win-x64/AprNesAvalonia.exe`
+        → ~50 MB apphost binary plus the side native libs (`libSDL3.so/.dylib`, `libminiaudio.so/.dylib`, `libSkiaSharp.so/.dylib`, `libHarfBuzzSharp.so/.dylib`) sitting beside it. Native libs are deliberately **not** bundled into the single file (csproj has `<IncludeNativeLibrariesForSelfExtract>false</IncludeNativeLibrariesForSelfExtract>`) because Hexa.NET's `LibraryLoader` uses raw `NativeLibrary.Load("libname")` via `dlopen`, which only finds libs in the apphost's `$ORIGIN` — not in `~/.net/<app>/<hash>/` where extracted libs would land.
 
 ### WebAssembly Variant (AprNesWasm/)
 
@@ -313,21 +317,27 @@ python run_tests.py -j 10
 
 # AprNes - C# NES 模擬器
 
-> [🇺🇸 English](#aprnes---c-nes-emulator) | 🇹🇼 繁體中文 | 最後編修：2026-04-27
+> [🇺🇸 English](#aprnes---c-nes-emulator) | 🇹🇼 繁體中文 | 最後編修：2026-05-01
 
 使用 C# 開發的 NES（任天堂娛樂系統）cycle-accurate 模擬器，與 AI（GitHub Copilot / Claude）協作開發完成。在 blargg 與 AccuracyCoin 兩大測試套件上均達到**滿分**。
 
-## 🚀 最新發行 — `aprnesava` 2026-04-27
+## 🚀 最新發行 — `aprnesava` 2026-04-30 跨平台 preview
 
-> **[下載 AprNesAvalonia 2026-04-27（單檔 Windows x64 自帶 runtime）](https://github.com/erspicu/AprNes/releases/tag/aprnesava-20260427)**
+> **[下載 AprNesAvalonia 2026-04-30（Windows x64 / Linux x64 / Linux ARM64 / macOS ARM64）](https://github.com/erspicu/AprNes/releases/tag/aprnesava-20260430-crossplatform)**
 
-全新主線版本，基於 **.NET 10 + Avalonia**：
+首次提供 **Linux x86_64 / Linux ARM64 / macOS ARM64** 的執行檔，與既有 Windows x64 並列。跨平台路由策略：Windows 沿用手寫的 Win32 WaveOut + DirectInput8/XInput backend；其他作業系統走 [Hexa.NET.MiniAudio](https://github.com/HexaEngine/Hexa.NET.MiniAudio)（音訊）+ [Hexa.NET.SDL3](https://github.com/HexaEngine/Hexa.NET.SDL3)（手把），prebuilt native binaries 都已經內建在各自的壓縮檔裡。
+
+> ⚠️ **成熟度說明** — 目前**只有 `win-x64` 是經過完整測試的成熟版本**。Linux / macOS 三個版本只跑過 cross-publish 編譯驗證，**尚無真機回饋**。歡迎在 Pi 5 / Linux 桌面 / Apple Silicon 真機上幫忙測試並回報 Issue。
+>
+> 📌 **開發暫停** — aprnesava 主線開發可能會暫停一段時間（作者要去做別的事），已知跨平台問題不一定會立即修復。
+
+之前的 2026-04-27 Windows 版（GPU CRT + HD-NTSC + .NET 10 SIMD 首次落地）也仍可下載：[連結](https://github.com/erspicu/AprNes/releases/tag/aprnesava-20260427)。重點功能：
 
 - ⚡ **GPU CRT pipeline** — SkSL shader 在 D3D11 上跑，CRT 後處理全程不回 CPU。10× scale 下 **presented FPS 比 CPU 後端快 2.5×**。
 - 🎯 **HD-NTSC 12× Fsc 過採樣** — 每 scanline 2048 sample（NetFx 是 1024）。Chroma 解調精度顯著提升，RF 模式下 herringbone、color fringing、chroma blur 還原更接近真實 NTSC 訊號。
-- 📦 **Single-file 打包** — emulator + .NET 10 runtime + Avalonia + SkiaSharp + 全部 native lib 封裝在 ~60 MB 單一 `AprNesAvalonia.exe`。end user 不用裝任何東西。
+- 📦 **Self-contained 打包** — emulator + .NET 10 runtime + Avalonia + SkiaSharp + 全部 native lib 封裝完成。end user 不用裝任何東西。
 - 🚀 **.NET 10 紅利** — TieredPGO 全開、`Vector<T>` 256-bit AVX2、`MultiplyAddEstimate` FMA chain。同份 NesCore，emu FPS 比 NetFx 高 30-50%。
-- ✅ **精度完全一致** — 184/184 blargg + 138/138 AccuracyCoin v2 雙滿分，沒被打破。
+- ✅ **精度完全一致** — 184/184 blargg + 138/138 AccuracyCoin v2 雙滿分，每個平台都不變。
 
 📖 **[完整版本對比：aprnesava vs. AprNes NetFx（中文）](MD/Avalonia/aprnesava_vs_netfx_features_zh.md)** ｜ **[English](MD/Avalonia/aprnesava_vs_netfx_features_en.md)**
 
@@ -337,7 +347,7 @@ python run_tests.py -j 10
 
 `AprNes`（NetFx 版）於 2026-04-27 達成里程碑目標進入維護凍結。主線開發轉移到 **`aprnesava`**（`AprNesAvalonia/`）—— 基於 .NET 10 + Avalonia、與 NetFx 共用同一份 NesCore 原始碼。兩版都通過相同測試套件（184/184 blargg + 138/138 AccuracyCoin），但 aprnesava 額外加入 GPU CRT、HD_NTSC、.NET 10 SIMD 路徑。
 
-aprnesava 接下來的開發重點是 **macOS (ARM64)** 與 **Linux (x86_64 / ARM64)** 支援 —— 平台抽象層（`AprNesAvalonia/Platform/`）已切好，音訊跟手把後端在 interface 後面，加非 Windows 平台不再是大手術。
+跨平台支援於 2026-04-30 發布 — Linux x64 / Linux ARM64 / macOS ARM64 binaries 已隨 Windows x64 一同上架。實作概念：音訊由 `Platform/MiniAudioBackend.cs`（Hexa.NET.MiniAudio + SPSC ring + `[UnmanagedCallersOnly]` data callback）處理，手把由 `Platform/Sdl3GamepadBackend.cs`（headless `SDL_INIT_GAMEPAD` 模式的 Hexa.NET.SDL3）處理。Windows 仍維持原本手寫的 backend。**注意**：目前只有 Windows 版有實際使用測試，Linux/macOS preview 缺乏真機回饋，主線開發可能會暫停一段時間。
 
 本專案由 AI 輔助開發，偏向於利用現代電腦效能來實現一些我想嘗試的概念。
 
@@ -432,22 +442,20 @@ AprNes 是一個以追求 cycle-accurate 精度為目標的 NES 硬體模擬研�
     *   `Views/ConfigWindow.axaml.cs` / `AnalogConfigWindow.axaml.cs` / `AudioPlusConfigWindow.axaml.cs` — 多分頁設定視窗。
     *   `CrtGpuRenderThread.cs` — Phase 3A render-thread GPU CRT 路徑（透過 `ISkiaSharpApiLeaseFeature` 取得 GPU 後端的 `SKCanvas`，SkSL shader 直接在 D3D11 上執行，全程不回 CPU）。
     *   `Shaders/crt_core_*.sksl` — 版本化 SkSL shaders（Catmull-Rom / Mitchell 立方採樣）。`ShaderLoader.LoadLatest()` 自動挑時間戳最新的版本；可用 `--crt-shader <檔名>` 切換。
-    *   `Platform/` — 跨平台抽象層：`IAudioBackend`（預設 Win32WaveOutBackend）、`IGamepadBackend`（Win32 DirectInput8 + XInput / Null fallback）、`PlatformFactory`。macOS / Linux 後端是接下來的開發目標。
+    *   `Platform/` — 跨平台抽象層：`IAudioBackend`（Windows: Win32WaveOutBackend；Linux/macOS: MiniAudioBackend）、`IGamepadBackend`（Windows: Win32GamepadBackend = DirectInput8 + XInput；Linux/macOS: Sdl3GamepadBackend）、`PlatformFactory`。
     *   `PublishContent/` — Release-only 資源（ReadMe / configure / tools / benchmark 指令稿） —— `dotnet publish` 自動帶入，平常 build 不會複製。
     *   `TestRunner.cs` — Headless 測試執行器（使用 Avalonia Bitmap，不依賴 System.Drawing）。
     *   **開發版**：`build_avalonia.bat` → `AprNesAvalonia/bin/Debug/net10.0/AprNesAvalonia.exe`
-    *   **Single-file 發行版**：
+    *   **Single-file 發行版**（RID 可換成 `win-x64` / `linux-x64` / `linux-arm64` / `osx-arm64`）：
         ```bash
-        dotnet publish AprNesAvalonia/AprNesAvalonia.csproj -c Release -r win-x64 \
+        dotnet publish AprNesAvalonia/AprNesAvalonia.csproj -c Release -r <RID> \
           --self-contained true \
           -p:PublishSingleFile=true \
-          -p:IncludeNativeLibrariesForSelfExtract=true \
           -p:EnableCompressionInSingleFile=true \
-          -p:PublishReadyToRun=true \
           -p:DebugType=embedded \
-          -o publish/AprNesAvalonia-win-x64
+          -o publish/AprNesAvalonia-<RID>
         ```
-        → 16 個檔案 / 7 個目錄 / 約 60 MB，主程式在 `publish/AprNesAvalonia-win-x64/AprNesAvalonia.exe`
+        → 主執行檔約 50 MB，旁邊放著 native libs（`libSDL3.so/.dylib`、`libminiaudio.so/.dylib`、`libSkiaSharp.so/.dylib`、`libHarfBuzzSharp.so/.dylib`）。Native libs **故意**不打進 single-file 內（csproj 設定 `<IncludeNativeLibrariesForSelfExtract>false</IncludeNativeLibrariesForSelfExtract>`）—— 因為 Hexa.NET 的 `LibraryLoader` 用 raw `NativeLibrary.Load("libname")` 走 `dlopen`，只會找 apphost 的 `$ORIGIN` 目錄，不會看 `~/.net/<app>/<hash>/` 解壓出來的位置。
 
 ### WebAssembly 版本 (AprNesWasm/)
 
