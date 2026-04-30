@@ -75,6 +75,11 @@
     <PackageReference Include="Avalonia" Version="11.3.13" />
     <PackageReference Include="SkiaSharp" Version="3.119.3-preview.1.1" />
     <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="3.119.3-preview.1.1" />
+    <!-- Linux/macOS need explicit 3.119 native-asset overrides; otherwise
+         Avalonia.Skia's transitive 2.88.7 wins and the runtime aborts with
+         "native libSkiaSharp 88.1 is incompatible, expected [119.0, 120.0)". -->
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.3-preview.1.1" />
+    <PackageReference Include="SkiaSharp.NativeAssets.macOS" Version="3.119.3-preview.1.1" />
     <PackageReference Include="Avalonia.Desktop" Version="11.3.13" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.13" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.13" />
