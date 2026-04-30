@@ -12,11 +12,9 @@ public static class PlatformFactory
         if (OperatingSystem.IsWindows())
             return new Win32WaveOutBackend();
 
-        // TODO: Linux → SDL2AudioBackend or PulseAudioBackend
-        // TODO: macOS → SDL2AudioBackend or CoreAudioBackend
-
-        // Return a backend that reports IsAvailable=false
-        return new NullAudioBackend();
+        // Linux / macOS: Hexa.NET.MiniAudio (WASAPI fallback never used here;
+        // ALSA/PulseAudio on Linux, CoreAudio on macOS).
+        return new MiniAudioBackend();
     }
 
     public static IGamepadBackend CreateGamepadBackend()
@@ -28,14 +26,5 @@ public static class PlatformFactory
         // TODO: macOS → SDL2GamepadBackend
 
         return new NullGamepadBackend();
-    }
-
-    /// <summary>Fallback audio backend when platform has no implementation.</summary>
-    private class NullAudioBackend : IAudioBackend
-    {
-        public bool IsAvailable => false;
-        public bool IsOpen => false;
-        public void Open() { }
-        public void Close() { }
     }
 }

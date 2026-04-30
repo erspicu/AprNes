@@ -8,6 +8,11 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <AssemblyName>AprNesAvalonia</AssemblyName>
     <RootNamespace>AprNesAvalonia</RootNamespace>
+    <!-- Cross-platform RuntimeIdentifiers (Phase 0 of cross-platform plan).
+         Plan: MD/Avalonia/cross_platform_audio_gamepad_plan.md
+         Windows keeps existing Win32 backends; Linux/macOS gain
+         Hexa.NET.MiniAudio (audio) + Hexa.NET.SDL3 (gamepad). -->
+    <RuntimeIdentifiers>win-x64;linux-x64;linux-arm64;osx-arm64</RuntimeIdentifiers>
     <!-- .NET 10: full JIT tiered compilation + PGO -->
     <TieredCompilation>true</TieredCompilation>
     <TieredPGO>true</TieredPGO>
@@ -77,6 +82,14 @@
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
+    <!-- Cross-platform native bindings (Phase 0). Linux + macOS only;
+         Windows keeps using its hand-written WaveOut + DirectInput8/XInput
+         backends. Both packages ship prebuilt native binaries
+         (libminiaudio.so/.dylib, libSDL3.so/.dylib) inside the .nupkg
+         under runtimes/{rid}/native/ — published apps need no extra
+         user-side install. -->
+    <PackageReference Include="Hexa.NET.MiniAudio" Version="1.0.1" />
+    <PackageReference Include="Hexa.NET.SDL3"      Version="1.2.17" />
   </ItemGroup>
 
   <!-- Publish-only content (release packaging). Copied to publish dir,
