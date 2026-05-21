@@ -282,7 +282,7 @@ namespace AprNes
             r_PC = 0xFFFF; // TriCNES: nondeterministic, uses 0xFFFF (RESET handler reads vector)
             flagN = 0; flagV = 0; flagD = 0; flagI = 1; flagZ = 0; flagC = 0;
             opcode = 0; operationCycle = 0;
-            cpubus = 0; cpuBusAddr = 0; addressBus = 0; dl = 0; ignoreH = false;
+            cpubus = 0; internalBus = 0; cpuBusAddr = 0; addressBus = 0; dl = 0; ignoreH = false;
             cpuIsRead = true;
 
 

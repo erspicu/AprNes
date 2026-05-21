@@ -1,7 +1,7 @@
 #!/bin/bash
 # run_tests_AccuracyCoin_avalonia.sh
 # Run AccuracyCoin page-by-page and generate HTML report (AprNesAvalonia / .NET 10).
-# All 136 tests are executed (no skips).
+# AccuracyCoin (2026-05-21): 139 tests across 20 pages. All executed (no skips).
 # Page 15 (Power On State) is DRAW-only, screenshots only.
 #
 # Usage:
@@ -15,7 +15,7 @@ set -u
 cd /c/ai_project/AprNes
 
 EXE="AprNesAvalonia/bin/Debug/net10.0/AprNesAvalonia.exe"
-ROM="nes-test-roms-master/AccuracyCoin-main/AccuracyCoin.nes"
+ROM="nes-test-roms-master/AccuracyCoin-main-20260521/AccuracyCoin.nes"
 REPORT_DIR="reports/report-avalonia"
 SS_DIR="$REPORT_DIR/screenshots-ac"
 OUTPUT_HTML="$REPORT_DIR/AccuracyCoin_report.html"

@@ -1,7 +1,7 @@
 #!/bin/bash
 # run_tests_AccuracyCoin_report.sh
 # Run AccuracyCoin page-by-page and generate HTML report.
-# AccuracyCoin commit 03385dd (2026-04-10): 138 tests across 20 pages.
+# AccuracyCoin (2026-05-21): 139 tests across 20 pages.
 # Page 15 (Power On State) is DRAW-only, screenshots only.
 #
 # Usage:
@@ -15,7 +15,7 @@ set -u
 cd /c/ai_project/AprNes
 
 EXE="AprNes/bin/Debug/AprNes.exe"
-ROM="nes-test-roms-master/AccuracyCoin-main-20260410/AccuracyCoin.nes"
+ROM="nes-test-roms-master/AccuracyCoin-main-20260521/AccuracyCoin.nes"
 REPORT_DIR="reports/report"
 SS_DIR="$REPORT_DIR/screenshots-ac"
 OUTPUT_HTML="$REPORT_DIR/AccuracyCoin_report.html"
@@ -653,7 +653,7 @@ tr:hover td {{ background:#1e2a5e; }}
 </head>
 <body>
 <h1>AccuracyCoin Report - AprNes</h1>
-<div class="meta">Generated: {now} | ROM: AccuracyCoin <a href="https://github.com/100thCoin/AccuracyCoin/commit/03385dd" style="color:#5dadec">03385dd</a> (2026-04-10, 138 tests / 20 pages) | Method: page-by-page</div>
+<div class="meta">Generated: {now} | ROM: AccuracyCoin <a href="https://github.com/100thCoin/AccuracyCoin" style="color:#5dadec">2026-05-21</a> (139 tests / 20 pages) | Method: page-by-page</div>
 
 <div class="summary">
   <div class="stat"><div class="num pass-c">{total_pass}</div><div class="lbl">PASS</div></div>

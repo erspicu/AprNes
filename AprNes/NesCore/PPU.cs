@@ -1029,7 +1029,14 @@ namespace AprNes
         }
 
         static byte openbus;
-        static public byte cpubus;  // CPU data bus value (last byte read/written by CPU)
+        static public byte cpubus;  // EXTERNAL data bus — last byte on the 2A03 external bus.
+                                    // Updated by CPU reads/writes (except $4015 reads) AND DMA fetches.
+                                    // This is the value seen by open-bus reads ($4016/$4017 upper bits, unmapped reads, FDS).
+        static public byte internalBus; // INTERNAL data bus (TriCNES: internal to $4015).
+                                    // Updated by CPU reads/writes only — NOT by DMA fetches.
+                                    // Sources bit 5 (open bus) of a $4015 read. A DMC DMA sample fetch
+                                    // updates cpubus but leaves this untouched, so $4015 bit5 is not
+                                    // polluted by the DMA byte (AccuracyCoin "Internal Data Bus" test).
 
         static void ppu_w_2000(byte value)
         {

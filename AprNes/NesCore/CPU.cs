@@ -78,8 +78,8 @@ namespace AprNes
         {
             cpuBusAddr = addr; cpuIsRead = true;
             byte val;
-            if (addr < 0x2000) { val = NES_MEM[addr & 0x7FF]; cpubus = val; }
-            else { val = mem_read_page[addr >> 13](addr); if (addr != 0x4015) cpubus = val; }
+            if (addr < 0x2000) { val = NES_MEM[addr & 0x7FF]; cpubus = val; internalBus = val; }
+            else { val = mem_read_page[addr >> 13](addr); if (addr != 0x4015) { cpubus = val; internalBus = val; } }
             return val;
         }
 
@@ -104,13 +104,14 @@ namespace AprNes
             // This matches TriCNES dataBus vs In distinction ($2000 glitch depends on this)
             mem_write_page[addr >> 13](addr, val);
             cpubus = val;
+            internalBus = val;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static byte CpuReadZP(byte addr)
         {
             cpuBusAddr = addr; cpuIsRead = true;
-            byte val = NES_MEM[addr]; cpubus = val;
+            byte val = NES_MEM[addr]; cpubus = val; internalBus = val;
             return val;
         }
 
@@ -118,7 +119,7 @@ namespace AprNes
         static void CpuWriteZP(byte addr, byte val)
         {
             cpuBusAddr = addr; cpuIsRead = false;
-            NES_MEM[addr] = val; cpubus = val;
+            NES_MEM[addr] = val; cpubus = val; internalBus = val;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

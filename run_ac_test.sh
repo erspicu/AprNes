@@ -17,7 +17,7 @@ set -u
 cd /c/ai_project/AprNes
 
 EXE="AprNes/bin/Debug/AprNes.exe"
-ROM="nes-test-roms-master/AccuracyCoin-main-20260410/AccuracyCoin.nes"
+ROM="nes-test-roms-master/AccuracyCoin-main-20260521/AccuracyCoin.nes"
 
 PAGE=""
 ITEM=""

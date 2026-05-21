@@ -1,8 +1,11 @@
 # AccuracyCoin 修復追蹤
 
-**基線**: 136/136 PASS, 0 FAIL, 0 SKIP ✓ PERFECT
-**最後更新**: 2026-03-23
+**基線**: AccuracyCoin 20260521 = **139/139 PASS**（blargg 184/184 無回歸）
+**最後更新**: 2026-05-22
 **分支**: master
+
+> 測試 ROM 已升級到 `AccuracyCoin-main-20260521`（138→139 題，新增 P20 `Internal Data Bus`）。
+> 舊文件下方「136/136」字樣為 v1 ROM 歷史紀錄，保留參考。版本差異見 [AccuracyCoin_20260521_diff_and_result](AccuracyCoin_20260521_diff_and_result.md)。
 
 ---
 
@@ -21,7 +24,7 @@
 | P17 | PPU VBlank Timing | 全 PASS | |
 | P18 | Sprite Evaluation | 全 PASS | BUGFIX45 修復最後一項 |
 | P19 | PPU Misc | 全 PASS | BUGFIX48 修復 $2004 Stress Test |
-| P20 | CPU Behavior 2 | 全 PASS | Per-cycle CPU rewrite 修復 |
+| P20 | CPU Behavior 2 | 全 PASS | Per-cycle CPU rewrite；20260521 新增 `Internal Data Bus` → dual data-bus fix (2026-05-22) |
 
 ---
 

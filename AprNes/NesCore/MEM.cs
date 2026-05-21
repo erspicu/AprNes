@@ -152,7 +152,7 @@ namespace AprNes
                 byte reg = (byte)(addr & 0x1F);
                 if (reg == 0x15)
                 {
-                    byte status = (byte)(val & 0x20);
+                    byte status = (byte)(internalBus & 0x20); // bit 5 from INTERNAL bus (DMA fetch leaves it untouched)
                     if (statusdmcint)   status |= 0x80;
                     if (statusframeint) status |= 0x40;
                     if (dmcsamplesleft > 0 && dmcDelayedEnable) status |= 0x10;
