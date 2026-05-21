@@ -49,38 +49,33 @@ AprNes 從零到 **139/139 滿分**的過程踩過大量坑。這份指南把那
 
 > 刻意**不按 git 時間順序**（那樣太跳、太亂）。改成依**子系統**分部，每一部把相關測試的硬體行為一次講透。
 > 每一篇章節都照同一個骨架走：**① 測試考什麼（對應 page / error code）→ ② 硬體真實行為 → ③ 我們踩的坑 → ④ 怎麼修（含關鍵 code 片段 + 註解）→ ⑤ 對照 commit / file:line**。
-> 以下是預計收錄的大綱，實際檔案隨撰寫陸續補上。
+> **全部章節已撰寫完成 ✅**（2026-05-22）。
 
 ### 第 0 部：方法論與全紀錄
 - ✅ [`00_fix_history.md`](00_fix_history.md) — **修復編年史（2026-02 → 05）**：由前到後的完整 git 時間線，分 4 個 phase（基礎 cycle-accurate → AC 正面進攻 → 換 per-cycle CPU 模型 → PPU 對齊 TriCNES → dual data-bus），每筆含 commit、問題、修復、PASS 數字。**想看「整段怎麼走過來」先看這篇。**
-- `00_methodology.md` — 怎麼跑 AC、怎麼讀 error code、debug menu、page-by-page headless 測試流程、如何用 TriCNES 當對照基準。（待寫）
-- `00_timing_model.md` — 為什麼需要 per-master-clock / dot 級 timing model；catch-up vs global tick 的取捨（可連到 [`MD/techbook/`](../../techbook/) 既有長文）。（待寫）
+- ✅ [`00_methodology.md`](00_methodology.md) — 怎麼跑 AC、怎麼讀 error code、debug menu、page-by-page headless 測試流程、如何用 TriCNES 當對照基準、修復紀律。
+- ✅ [`00_timing_model.md`](00_timing_model.md) — 為什麼需要 per-master-clock / dot 級 timing model；三代模型演進、master-clock 主迴圈、VBL/NMI 1-cycle delay、catch-up vs global tick。
 
-### 第 1 部：CPU（Page 1, 10–12, 20）
-- 開機狀態、RAM mirroring、PC wraparound、decimal flag、B flag。
-- Dummy read / dummy write cycles、open bus。
-- **內部 vs 外部資料匯流排**（`$4015` bit5 open bus）→ 已有完整案例：[dual data-bus fix](../../bugfix/2026-05-22_AC_InternalDataBus_DualDataBus.md)。
-- 全部 unofficial opcodes（NOP/SH*/ANC/ARR/ANE/LXA…）。
-- Interrupt flag latency、NMI/IRQ overlap、per-cycle CPU 重寫。
+### 第 1 部：✅ [CPU（Page 1, 10–12, 20）](01_cpu.md)
+- open bus（資料匯流排模型）、dummy read/write cycles、decimal flag、B flag。
+- unofficial opcodes（含 SH\* 的 ignoreH）、中斷時序（penultimate 取樣、中斷序列不 poll NMI）。
+- **內部 vs 外部資料匯流排**（`$4015` bit5）→ [dual data-bus fix](../../bugfix/2026-05-22_AC_InternalDataBus_DualDataBus.md)。
 
-### 第 2 部：DMA（Page 13）
-- OAM DMA、DMC DMA 時序、DMA + open bus、DMA 命中各暫存器的 bus conflict。
-- Explicit / Implicit DMA abort。
-- DMC DMA 與 CPU read/write cycle 對齊（get/put cycle）。
+### 第 2 部：✅ [DMA（Page 13）](02_dma.md)
+- OAM / DMC DMA、GET/PUT parity、DMA 命中暫存器的 bus conflict（含 `$4015` external bus）。
+- Explicit / Implicit DMA abort（衝上 v1 136/136 的臨門兩腳）。
 
-### 第 3 部：APU（Page 14）
-- Length counter / length table、frame counter 4-step/5-step、frame IRQ 時序。
-- DMC、APU register activation（含 OAM DMA 讀 APU 暫存器的 bus 行為）。
-- Controller strobing / clocking。
+### 第 3 部：✅ [APU（Page 14）](03_apu.md)
+- Length counter/table、frame counter IRQ（deferred clear / inhibit 是「發生後撤回」）。
+- DMC enable delay、APU register activation、controller strobing/clocking。
 
-### 第 4 部：PPU（Page 16–19）
-- VBlank 開始/結束時序、NMI control/timing/suppression、1-cycle delay model。
-- PPU read buffer、palette RAM quirks、$2007 w/ rendering、rendering flag 行為。
-- Sprite evaluation、sprite 0 hit、OAM corruption、shift register（stale BG/sprite）、$2004/$2007 stress。
+### 第 4 部：✅ [PPU（Page 16–19）](04_ppu.md)
+- VBlank/NMI 1-cycle delay、`$2002` flag stagger（M2 duty）、`$2006`/`$2005` 延遲 t→v copy。
+- read buffer、palette quirks、sprite eval FSM、sprite 0 hit、OAM corruption、shift register 凍結。
 
 ### 附錄
-- `appendix_error_code_index.md` — 各頁 error code 速查（對應 README 的官方說明 + 我們的修法）。
-- `appendix_tricnes_reference.md` — 怎麼把 TriCNES 當 ground truth、它的已知錯誤（哪些測試 TriCNES 自己也不過）。
+- ✅ [`appendix_error_code_index.md`](appendix_error_code_index.md) — 20 頁 / error code 速查索引 + 最容易卡關的招牌題。
+- ✅ [`appendix_tricnes_reference.md`](appendix_tricnes_reference.md) — 把 TriCNES 當 ground truth（對齊語義非數字）+ 它的已知錯誤 + mapper 涵蓋範圍。
 
 ---
 
