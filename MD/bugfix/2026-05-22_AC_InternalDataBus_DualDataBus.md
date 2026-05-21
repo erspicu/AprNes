@@ -66,7 +66,7 @@
   - P13 全 DMA（含 DMA + `$4015` Read、DMC DMA Bus Conflicts、Explicit/Implicit DMA Abort）：全 PASS
   - **P14 `APU Register Activation`：PASS**（回歸修正後；見上方 CPU vs DMA）
   - **P20 `Internal Data Bus`：PASS**（先前 error code 2）
-- 完整 139 題 AC 報告由使用者自行驗證。
+- 完整 139 題 AC：**使用者完整驗證全數通過 (2026-05-22) → 139/139 PASS**。
 
 ## 參考
 

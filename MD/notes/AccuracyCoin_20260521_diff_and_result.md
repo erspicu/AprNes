@@ -125,7 +125,7 @@ BNE FAIL_InternalDataBus   ; bit5 若為 1 → 失敗
   - `$4015` bit5 open bus → 從 **internal** 取
   - Test 3 的反向（從 open bus 讀，期望保留 external 的舊值）也要一起對齊
   - 以 TriCNES 的 internal/external bus 模型為準（符合「以 TriCNES 為唯一準則、禁止自創補償」原則）。
-- **基線更新**：master 的 AC 基線從 **138/138** 改記為 **138/139**（待修 Internal Data Bus Test 2）。
+- **基線更新**：master 的 AC 基線 = **139/139 PASS**（dual-bus 修復後，2026-05-22 使用者完整 139 題驗證全數通過；blargg 184/184 無回歸）。
 - **測試腳本（已更新 2026-05-21）**：`run_tests_AccuracyCoin_report.sh`（NetFx）與 `run_tests_AccuracyCoin_avalonia.sh`（Avalonia）的 `ROM=` 路徑都已改指向 `AccuracyCoin-main-20260521/`（avalonia 之前甚至還指在更舊的無日期 `AccuracyCoin-main/`），報告內的版本/測試數標籤也一併更新為 2026-05-21 / 139 tests。報告的 TOTAL 數字本來就是動態加總，不受影響。
 
 ---
