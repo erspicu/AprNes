@@ -152,7 +152,10 @@ namespace AprNes
                 byte reg = (byte)(addr & 0x1F);
                 if (reg == 0x15)
                 {
-                    byte status = (byte)(internalBus & 0x20); // bit 5 from INTERNAL bus (DMA fetch leaves it untouched)
+                    // DMA read of $4015: bit5 open bus comes from the EXTERNAL bus (the DMA's own
+                    // data bus value), NOT internalBus. A CPU LDA $4015 (apu_r_4015) uses internalBus;
+                    // a DMA fetch of $4015 uses external. (AC P14 "APU Register Activation" code 7.)
+                    byte status = (byte)(val & 0x20);
                     if (statusdmcint)   status |= 0x80;
                     if (statusframeint) status |= 0x40;
                     if (dmcsamplesleft > 0 && dmcDelayedEnable) status |= 0x10;

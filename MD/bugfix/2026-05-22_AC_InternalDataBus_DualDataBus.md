@@ -36,8 +36,24 @@
 |------|------|
 | `NesCore/PPU.cs` | 新增 `static public byte internalBus`（緊鄰 `cpubus`）|
 | `NesCore/CPU.cs` | `CpuRead`/`CpuReadZP`/`CpuWrite`/`CpuWriteZP` 在更新 `cpubus` 時同步 `internalBus`（`$4015` read 兩者都不更新）|
-| `NesCore/APU.cs` | `apu_r_4015()` bit5 改 `internalBus & 0x20` |
-| `NesCore/MEM.cs` | `DmaFetch` 的 `$4015` bus-conflict 路徑 bit5 改 `internalBus & 0x20`；`DmaFetch` 一般路徑維持只更新 `cpubus`、**不**碰 `internalBus` |
+| `NesCore/APU.cs` | `apu_r_4015()`（**CPU** read $4015）bit5 改 `internalBus & 0x20` |
+| `NesCore/MEM.cs` | `DmaFetch` 一般路徑維持只更新 `cpubus`、**不**碰 `internalBus`。`DmaFetch` 的 `$4015` bus-conflict 路徑 bit5 **維持 external `val`（= cpubus）**（見下方「CPU vs DMA」修正）|
+
+### ⚠️ 重要修正：CPU read vs DMA read 的 $4015 bit5 來源不同
+
+初版我把 `MEM.cs` DmaFetch 的 `$4015` 也改成 `internalBus`，結果**回歸** P14 `APU Register Activation` error code 7（"Bus conflicts with the APU registers were not properly emulated"）。
+
+正解是兩條 $4015 讀取路徑來源**不同**：
+
+| 誰讀 $4015 | bit5 open bus 來源 | 程式碼路徑 |
+|-----------|-------------------|-----------|
+| **CPU** (`LDA $4015`) | **internal** bus | `APU.cs apu_r_4015()` |
+| **DMA** (OAM/DMC fetch 命中 $4015) | **external** bus（DMA 自己的 data bus 值）| `MEM.cs DmaFetch` inline |
+
+- P20 `Internal Data Bus` Test 2：CPU `LDA $4015`，DMC DMA 不該汙染 → internal。
+- P14 `APU Register Activation` Test 5：OAM DMA 讀 $4015（APU active），期望 OAM[$15]=`$44`，其中 bit5=0 來自 DMA 的 external bus 值 `$40` → external。
+
+兩條路徑在我們的核心本來就分開（CPU 走 `apu_r_4015`，DMA 走 `DmaFetch` inline），剛好對應這個 internal/external 區別，只是各取各的 bus 即可。
 | `NesCore/Main.cs` | reset 時 `internalBus = 0` |
 
 > 共用 NesCore，AprNes（NetFx）與 AprNesAvalonia 同步受惠。
@@ -48,6 +64,7 @@
 - AccuracyCoin 20260521 受影響頁面（`run_ac_test.sh`）：
   - P1 Open Bus（`$4015` bit5 + databus 規則）：全 PASS
   - P13 全 DMA（含 DMA + `$4015` Read、DMC DMA Bus Conflicts、Explicit/Implicit DMA Abort）：全 PASS
+  - **P14 `APU Register Activation`：PASS**（回歸修正後；見上方 CPU vs DMA）
   - **P20 `Internal Data Bus`：PASS**（先前 error code 2）
 - 完整 139 題 AC 報告由使用者自行驗證。
 
