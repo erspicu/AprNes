@@ -61,7 +61,22 @@
 | `read_write_2007` | `$2007` 讀寫的某些 edge case |
 | `power_up_palette` | 開機 palette 初值 |
 
-另外有一個**三方解讀分歧**的開放問題：**sprite X-counter 在 forced-blank 期間的行為** —— NESdev wiki / AC 測試 / TriCNES 三邊解讀不一致，仍待 AC 作者確認（見專案 notes）。這類「連 ground truth 都不確定」的題目，別硬湊。
+> **⚠️ 別把「TriCNES 跟 wiki 不一致」直接當成 TriCNES 錯。** 有時是 wiki 不夠精確、TriCNES 才對。見下方已解決案例。
+
+---
+
+## 4b. 已解決案例：sprite X-counter 在 forced-blank 的行為（曾是三方分歧）
+
+這題曾經是「NESdev wiki / AC 測試 / TriCNES 三方解讀不一致」的開放問題，一度讓人不知該信誰。**現已由 AC 作者 100thCoin 在 [TriCNES issue #23](https://github.com/100thCoin/TriCNES/issues/23) 親自確認**（"Works as intended"）：
+
+- sprite X-position counter 有兩種模式：**halted / counting**。
+- 進入 counting 的條件：**scanline 的 dot 339 時 rendering 是開的**。
+- **一旦進 counting，之後關 rendering（forced blank）counter 不會停**，照常遞減；只有 L/H shift register 的位移受 rendering-enabled 門控。
+- 非 revision-specific（C/E/G/H 都測過）。
+
+**結論**：TriCNES 的行為（counter 無條件遞減、僅 shifter gated）是對的；NESdev wiki 字面「rendering halted immediately」不夠精確。AprNes 早已 match（`ppu_dispatch.cs:368-389`：`sprXCounter` 遞減在 `if (renderEnabled)` 之外），P19 全 PASS。
+
+> **兩個教訓**：(1) 三方分歧時別硬湊，先擱置、向作者求證（這題就是這樣解決的）；(2) **不要把 `renderEnabled` hoist 到 sprite shift block 外層** —— 會連 counter 一起凍結，P19 立刻 fail。
 
 ---
 
