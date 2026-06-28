@@ -133,9 +133,13 @@ namespace XBRz_speed
             int rot = _MATRIX_ROTATION[nr + i * _MAX_SCALE + j];
             int targetIdx = outi + (rot & 0xFF) + (rot >> 8) * outW;
             uint dst = trg[targetIdx]; uint invN = m - n;
-            uint res_RB = (((col & 0x00FF00FFu) * n + (dst & 0x00FF00FFu) * invN) / m) & 0x00FF00FFu;
-            uint res_G = (((col & 0x0000FF00u) * n + (dst & 0x0000FF00u) * invN) / m) & 0x0000FF00u;
-            trg[targetIdx] = 0xFF000000u | res_RB | res_G;
+            // 逐通道各自除（對應官方 gradientRGB）。原本把 R(bit16-23)+B(bit0-7)
+            // 打包成單一除法，當 m 非 2 次方（角落混合 21/100 等）時 R 的餘數會溢進
+            // B 通道，憑空長出假藍點 → 改成 R/G/B 各自整數除即可消除。
+            uint r = (((col >> 16) & 0xFFu) * n + ((dst >> 16) & 0xFFu) * invN) / m;
+            uint g = (((col >> 8) & 0xFFu) * n + ((dst >> 8) & 0xFFu) * invN) / m;
+            uint b = ((col & 0xFFu) * n + (dst & 0xFFu) * invN) / m;
+            trg[targetIdx] = 0xFF000000u | (r << 16) | (g << 8) | b;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -202,6 +206,12 @@ namespace XBRz_speed
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void ComputeEdgeFeatures(uint* src)
         {
+            // 清跨幀殘留：preProcBuffer_local / _preProcBuffer 是 initTable 配的常駐
+            // 非託管記憶體，跨幀重用。preProcBuffer_local 用來把「上一列」角落狀態帶到
+            // 下一列，第 0 列時應為 0；不清會殘留上一幀最後幾列的垃圾污染頂列並逐幀閃爍。
+            Unsafe.InitBlock(preProcBuffer_local, 0, (uint)width);
+            Unsafe.InitBlock(_preProcBuffer, 0, (uint)(width * height));
+
             // =========================================================
             // 第一階段：平行計算所有邊緣特徵與顏色距離
             // =========================================================
@@ -289,7 +299,10 @@ namespace XBRz_speed
             {
                 byte blendXy1 = 0;
                 int array_loc = y * width;
-                for (int x = 0; x < width - 1; ++x, ++array_loc)
+                // 處理到 x < width（含最右欄），只在寫 x+1 時做邊界守衛。
+                // 原本 x < width-1 會讓最右欄的 _preProcBuffer 從未寫入 → 殘留上一幀資料、
+                // 右緣一格漏混合（clipping）。
+                for (int x = 0; x < width; ++x, ++array_loc)
                 {
                     // ★ 解壓縮：一次讀取 uint，再利用位元遮罩與移位還原 4 個狀態
                     uint state = results_merged[array_loc];
@@ -302,7 +315,8 @@ namespace XBRz_speed
                     _preProcBuffer[array_loc] = (byte)(preProcBuffer_local[x] | (r_f << 4));
                     preProcBuffer_local[x] = blendXy1 = (byte)(blendXy1 | (r_j << 2));
                     blendXy1 = r_k;
-                    preProcBuffer_local[x + 1] = (byte)(preProcBuffer_local[x + 1] | (r_g << 6));
+                    if (x + 1 < width)
+                        preProcBuffer_local[x + 1] = (byte)(preProcBuffer_local[x + 1] | (r_g << 6));
                 }
             }
         }
@@ -484,7 +498,9 @@ namespace XBRz_speed
 
             for (int r = 0; r < 4; r++)
             {
-                *(Vector4*)(trg + trgi + r * pitch) = vCol; // 一次寫入 4 像素
+                // 非對齊 store（movups）：trg+trgi 不保證 16-byte 對齊，直接寫 Vector4
+                // 在某些 JIT 上可能生成需對齊的 SIMD 指令 → AccessViolation。
+                Unsafe.WriteUnaligned(trg + trgi + r * pitch, vCol); // 一次寫入 4 像素
             }
         }
 
@@ -497,8 +513,8 @@ namespace XBRz_speed
             for (int r = 0; r < 5; r++)
             {
                 uint* p = trg + trgi + r * pitch;
-                *(Vector4*)p = vCol;       // 寫入像素 0, 1, 2, 3
-                *(Vector4*)(p + 1) = vCol; // 寫入像素 1, 2, 3, 4 (重疊 1,2,3)
+                Unsafe.WriteUnaligned(p, vCol);       // 寫入像素 0, 1, 2, 3
+                Unsafe.WriteUnaligned(p + 1, vCol);   // 寫入像素 1, 2, 3, 4 (重疊 1,2,3)
             }
         }
 
@@ -511,8 +527,8 @@ namespace XBRz_speed
             for (int r = 0; r < 6; r++)
             {
                 uint* p = trg + trgi + r * pitch;
-                *(Vector4*)p = vCol;       // 寫入像素 0, 1, 2, 3
-                *(Vector4*)(p + 2) = vCol; // 寫入像素 2, 3, 4, 5 (重疊 2,3)
+                Unsafe.WriteUnaligned(p, vCol);       // 寫入像素 0, 1, 2, 3
+                Unsafe.WriteUnaligned(p + 2, vCol);   // 寫入像素 2, 3, 4, 5 (重疊 2,3)
             }
         }
 
